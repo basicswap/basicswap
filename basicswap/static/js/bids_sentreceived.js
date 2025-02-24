@@ -93,6 +93,114 @@ const elements = {
     refreshReceivedBids: document.getElementById('refreshReceivedBids')
 };
 
+const EventManager = {
+    listeners: new Map(),
+
+    add(element, type, handler, options = false) {
+        if (!this.listeners.has(element)) {
+            this.listeners.set(element, new Map());
+        }
+
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners.has(type)) {
+            elementListeners.set(type, new Set());
+        }
+
+        const handlerInfo = { handler, options };
+        elementListeners.get(type).add(handlerInfo);
+        element.addEventListener(type, handler, options);
+
+        return handlerInfo;
+    },
+
+    remove(element, type, handler, options = false) {
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners) return;
+
+        const typeListeners = elementListeners.get(type);
+        if (!typeListeners) return;
+
+        typeListeners.forEach(info => {
+            if (info.handler === handler) {
+                element.removeEventListener(type, handler, options);
+                typeListeners.delete(info);
+            }
+        });
+
+        if (typeListeners.size === 0) {
+            elementListeners.delete(type);
+        }
+        if (elementListeners.size === 0) {
+            this.listeners.delete(element);
+        }
+    },
+
+    removeAll(element) {
+        const elementListeners = this.listeners.get(element);
+        if (!elementListeners) return;
+
+        elementListeners.forEach((typeListeners, type) => {
+            typeListeners.forEach(info => {
+                element.removeEventListener(type, info.handler, info.options);
+            });
+        });
+
+        this.listeners.delete(element);
+    },
+
+    clearAll() {
+        this.listeners.forEach((elementListeners, element) => {
+            this.removeAll(element);
+        });
+        this.listeners.clear();
+    }
+};
+
+function cleanup() {
+    console.log('Starting cleanup process');
+
+    EventManager.clearAll();
+
+    if (window.TooltipManager) {
+        window.TooltipManager.cleanup();
+    }
+
+    if (WebSocketManager.ws) {
+        WebSocketManager.ws.onopen = null;
+        WebSocketManager.ws.onmessage = null;
+        WebSocketManager.ws.onclose = null;
+        WebSocketManager.ws.onerror = null;
+
+        if (WebSocketManager.ws.readyState === WebSocket.OPEN) {
+            WebSocketManager.ws.close();
+        }
+        WebSocketManager.ws = null;
+    }
+
+    if (WebSocketManager.reconnectTimeout) {
+        clearTimeout(WebSocketManager.reconnectTimeout);
+        WebSocketManager.reconnectTimeout = null;
+    }
+
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+        searchTimeout = null;
+    }
+
+    state.data = {
+        sent: [],
+        received: []
+    };
+
+    Object.keys(elements).forEach(key => {
+        elements[key] = null;
+    });
+    
+    console.log('Cleanup completed');
+}
+
+document.addEventListener('beforeunload', cleanup);
+
 // WebSocket Management
 const WebSocketManager = {
     ws: null,
@@ -101,6 +209,7 @@ const WebSocketManager = {
     maxReconnectAttempts: 5,
     reconnectAttempts: 0,
     reconnectDelay: 5000,
+    healthCheckInterval: null,
 
     initialize() {
         this.connect();
@@ -160,11 +269,19 @@ const WebSocketManager = {
     },
 
     startHealthCheck() {
-        setInterval(() => {
+        this.stopHealthCheck();
+        this.healthCheckInterval = setInterval(() => {
             if (!this.isConnected()) {
                 this.handleReconnect();
             }
         }, 30000);
+    },
+    
+    stopHealthCheck() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
     },
 
     handleReconnect() {
@@ -182,6 +299,28 @@ const WebSocketManager = {
                 this.reconnectAttempts = 0;
                 this.connect();
             }, 60000);
+        }
+    },
+    
+    cleanup() {
+        this.stopHealthCheck();
+        
+        if (this.reconnectTimeout) {
+            clearTimeout(this.reconnectTimeout);
+            this.reconnectTimeout = null;
+        }
+        
+        if (this.ws) {
+            this.ws.onopen = null;
+            this.ws.onmessage = null;
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            
+            if (this.ws.readyState === WebSocket.OPEN) {
+                this.ws.close(1000, 'Cleanup');
+            }
+            
+            this.ws = null;
         }
     }
 };
@@ -831,7 +970,7 @@ const fetchBids = async () => {
             body: JSON.stringify({
                 sort_by: state.filters.sort_by || 'created_at',
                 sort_dir: state.filters.sort_dir || 'desc',
-                with_expired: true, // Always fetch all bids
+                with_expired: true,
                 state: state.filters.state ?? -1,
                 with_extra_info: true
             })
@@ -1116,7 +1255,7 @@ function setupFilterEventListeners() {
     const withExpiredSelect = document.getElementById('with_expired');
 
     if (coinToSelect) {
-        coinToSelect.addEventListener('change', () => {
+        EventManager.add(coinToSelect, 'change', () => {
             state.filters.coin_to = coinToSelect.value;
             updateBidsTable();
             updateCoinFilterImages();
@@ -1125,7 +1264,7 @@ function setupFilterEventListeners() {
     }
 
     if (coinFromSelect) {
-        coinFromSelect.addEventListener('change', () => {
+        EventManager.add(coinFromSelect, 'change', () => {
             state.filters.coin_from = coinFromSelect.value;
             updateBidsTable();
             updateCoinFilterImages();
@@ -1134,7 +1273,7 @@ function setupFilterEventListeners() {
     }
 
     if (withExpiredSelect) {
-        withExpiredSelect.addEventListener('change', () => {
+        EventManager.add(withExpiredSelect, 'change', () => {
             state.filters.with_expired = withExpiredSelect.value === 'true';
             updateBidsTable();
             updateClearFiltersButton();
@@ -1143,7 +1282,7 @@ function setupFilterEventListeners() {
 
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
-        searchInput.addEventListener('input', (event) => {
+        EventManager.add(searchInput, 'input', (event) => {
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
             }
@@ -1157,228 +1296,11 @@ function setupFilterEventListeners() {
     }
 }
 
-// Tabs
-const switchTab = (tabId) => {
-    if (state.isLoading) return;
-
-    state.currentTab = tabId === '#sent' ? 'sent' : 'received';
-
-    elements.sentContent.classList.add('hidden');
-    elements.receivedContent.classList.add('hidden');
-
-    const targetPanel = document.querySelector(tabId);
-    if (targetPanel) {
-        targetPanel.classList.remove('hidden');
-    }
-
-    elements.tabButtons.forEach(tab => {
-        const selected = tab.dataset.tabsTarget === tabId;
-        tab.setAttribute('aria-selected', selected);
-        if (selected) {
-            tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
-            tab.classList.remove('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
-        } else {
-            tab.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
-            tab.classList.add('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
-        }
-    });
-
-    updateBidsTable();
-};
-
-const setupEventListeners = () => {
-    const filterControls = document.querySelector('.flex.flex-wrap.justify-center');
-    if (filterControls) {
-        filterControls.addEventListener('submit', (e) => {
-            e.preventDefault();
-        });
-    }
-
-    const applyFiltersBtn = document.getElementById('applyFilters');
-    if (applyFiltersBtn) {
-        applyFiltersBtn.remove();
-    }
-
-    if (elements.tabButtons) {
-        elements.tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                if (state.isLoading) return;
-
-                const targetId = button.getAttribute('data-tabs-target');
-                if (!targetId) return;
-
-                // Update tab button styles
-                elements.tabButtons.forEach(tab => {
-                    const isSelected = tab.getAttribute('data-tabs-target') === targetId;
-                    tab.setAttribute('aria-selected', isSelected);
-
-                    if (isSelected) {
-                        tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
-                        tab.classList.remove('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
-                    } else {
-                        tab.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
-                        tab.classList.add('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
-                    }
-                });
-
-                elements.sentContent.classList.toggle('hidden', targetId !== '#sent');
-                elements.receivedContent.classList.toggle('hidden', targetId !== '#received');
-
-                state.currentTab = targetId === '#sent' ? 'sent' : 'received';
-                state.currentPage[state.currentTab] = 1;
-
-                updateBidsTable();
-            });
-        });
-    }
-
-    ['Sent', 'Received'].forEach(type => {
-        const lowerType = type.toLowerCase();
-
-        if (elements[`prevPage${type}`]) {
-            elements[`prevPage${type}`].addEventListener('click', () => {
-                if (state.isLoading) return;
-                if (state.currentPage[lowerType] > 1) {
-                    state.currentPage[lowerType]--;
-                    updateTableContent(lowerType);
-                    updatePaginationControls(lowerType);
-                }
-            });
-        }
-
-        if (elements[`nextPage${type}`]) {
-            elements[`nextPage${type}`].addEventListener('click', () => {
-                if (state.isLoading) return;
-                const totalPages = Math.ceil(state.data[lowerType].length / PAGE_SIZE);
-                if (state.currentPage[lowerType] < totalPages) {
-                    state.currentPage[lowerType]++;
-                    updateTableContent(lowerType);
-                    updatePaginationControls(lowerType);
-                }
-            });
-        }
-    });
-
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', handleSearch);
-    }
-
-    const coinToSelect = document.getElementById('coin_to');
-    const coinFromSelect = document.getElementById('coin_from');
-
-    if (coinToSelect) {
-        coinToSelect.addEventListener('change', () => {
-            state.filters.coin_to = coinToSelect.value;
-            updateBidsTable();
-            updateCoinFilterImages();
-        });
-    }
-
-    if (coinFromSelect) {
-        coinFromSelect.addEventListener('change', () => {
-            state.filters.coin_from = coinFromSelect.value;
-            updateBidsTable();
-            updateCoinFilterImages();
-        });
-    }
-
-    const filterElements = {
-        stateSelect: document.getElementById('state'),
-        sortBySelect: document.getElementById('sort_by'),
-        sortDirSelect: document.getElementById('sort_dir'),
-        withExpiredSelect: document.getElementById('with_expired'),
-        clearFiltersBtn: document.getElementById('clearFilters')
-    };
-
-    if (filterElements.stateSelect) {
-        filterElements.stateSelect.addEventListener('change', () => {
-            const stateValue = parseInt(filterElements.stateSelect.value);
-
-            state.filters.state = isNaN(stateValue) ? -1 : stateValue;
-
-            console.log('State filter changed:', {
-                selectedValue: filterElements.stateSelect.value,
-                parsedState: state.filters.state
-            });
-
-            updateBidsTable();
-            updateClearFiltersButton();
-        });
-    }
-
-    [
-        filterElements.sortBySelect,
-        filterElements.sortDirSelect,
-        filterElements.withExpiredSelect
-    ].forEach(element => {
-        if (element) {
-            element.addEventListener('change', () => {
-                updateBidsTable();
-                updateClearFiltersButton();
-            });
-        }
-    });
-
-    if (filterElements.clearFiltersBtn) {
-        filterElements.clearFiltersBtn.addEventListener('click', () => {
-            if (filterElements.clearFiltersBtn.disabled) return;
-            clearFilters();
-        });
-    }
-
-    initializeTooltips();
-
-    document.addEventListener('change', (event) => {
-        const target = event.target;
-        const filterForm = document.querySelector('.flex.flex-wrap.justify-center');
-
-        if (filterForm && filterForm.contains(target)) {
-            const formData = {
-                state: filterElements.stateSelect?.value,
-                sort_by: filterElements.sortBySelect?.value,
-                sort_dir: filterElements.sortDirSelect?.value,
-                with_expired: filterElements.withExpiredSelect?.value,
-                coin_from: coinFromSelect?.value,
-                coin_to: coinToSelect?.value,
-                searchQuery: searchInput?.value
-            };
-
-            localStorage.setItem('bidsTableSettings', JSON.stringify(formData));
-        }
-    });
-
-    const savedSettings = localStorage.getItem('bidsTableSettings');
-    if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-
-        Object.entries(settings).forEach(([key, value]) => {
-            const element = document.querySelector(`[name="${key}"]`);
-            if (element) {
-                element.value = value;
-            }
-        });
-
-        state.filters = {
-            state: settings.state ? parseInt(settings.state) : -1,
-            sort_by: settings.sort_by || 'created_at',
-            sort_dir: settings.sort_dir || 'desc',
-            with_expired: settings.with_expired === 'true',
-            searchQuery: settings.searchQuery || '',
-            coin_from: settings.coin_from || 'any',
-            coin_to: settings.coin_to || 'any'
-        };
-    }
-
-    updateCoinFilterImages();
-    updateClearFiltersButton();
-};
-
 const setupRefreshButtons = () => {
     ['Sent', 'Received'].forEach(type => {
         const refreshButton = elements[`refresh${type}Bids`];
         if (refreshButton) {
-            refreshButton.addEventListener('click', async () => {
+            EventManager.add(refreshButton, 'click', async () => {
                 const lowerType = type.toLowerCase();
 
                 if (state.isRefreshing) {
@@ -1421,12 +1343,210 @@ const setupRefreshButtons = () => {
                 } catch (error) {
                     console.error(`Error refreshing ${type} bids:`, error);
                 } finally {
+                    state.isRefreshing = false;
                     state.isLoading = false;
                     updateLoadingState(false);
                 }
             });
         }
     });
+};
+
+// Tabs
+const switchTab = (tabId) => {
+    if (state.isLoading) return;
+
+    if (window.TooltipManager) {
+        window.TooltipManager.cleanup();
+    }
+
+    state.currentTab = tabId === '#sent' ? 'sent' : 'received';
+
+    elements.sentContent.classList.add('hidden');
+    elements.receivedContent.classList.add('hidden');
+
+    const targetPanel = document.querySelector(tabId);
+    if (targetPanel) {
+        targetPanel.classList.remove('hidden');
+    }
+
+    elements.tabButtons.forEach(tab => {
+        const selected = tab.dataset.tabsTarget === tabId;
+        tab.setAttribute('aria-selected', selected);
+        if (selected) {
+            tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
+            tab.classList.remove('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
+        } else {
+            tab.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
+            tab.classList.add('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
+        }
+    });
+
+    updateBidsTable();
+};
+
+const setupEventListeners = () => {
+    const filterControls = document.querySelector('.flex.flex-wrap.justify-center');
+    if (filterControls) {
+        EventManager.add(filterControls, 'submit', (e) => {
+            e.preventDefault();
+        });
+    }
+
+    const applyFiltersBtn = document.getElementById('applyFilters');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.remove();
+    }
+
+    if (elements.tabButtons) {
+        elements.tabButtons.forEach(button => {
+            EventManager.add(button, 'click', () => {
+                if (state.isLoading) return;
+
+                const targetId = button.getAttribute('data-tabs-target');
+                if (!targetId) return;
+
+                elements.tabButtons.forEach(tab => {
+                    const isSelected = tab.getAttribute('data-tabs-target') === targetId;
+                    tab.setAttribute('aria-selected', isSelected);
+
+                    if (isSelected) {
+                        tab.classList.add('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
+                        tab.classList.remove('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
+                    } else {
+                        tab.classList.remove('bg-gray-100', 'dark:bg-gray-600', 'text-gray-900', 'dark:text-white');
+                        tab.classList.add('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
+                    }
+                });
+
+                elements.sentContent.classList.toggle('hidden', targetId !== '#sent');
+                elements.receivedContent.classList.toggle('hidden', targetId !== '#received');
+
+                state.currentTab = targetId === '#sent' ? 'sent' : 'received';
+                state.currentPage[state.currentTab] = 1;
+
+                updateBidsTable();
+            });
+        });
+    }
+
+    ['Sent', 'Received'].forEach(type => {
+        const lowerType = type.toLowerCase();
+
+        if (elements[`prevPage${type}`]) {
+            EventManager.add(elements[`prevPage${type}`], 'click', () => {
+                if (state.isLoading) return;
+                if (state.currentPage[lowerType] > 1) {
+                    state.currentPage[lowerType]--;
+                    updateTableContent(lowerType);
+                    updatePaginationControls(lowerType);
+                }
+            });
+        }
+
+        if (elements[`nextPage${type}`]) {
+            EventManager.add(elements[`nextPage${type}`], 'click', () => {
+                if (state.isLoading) return;
+                const totalPages = Math.ceil(state.data[lowerType].length / PAGE_SIZE);
+                if (state.currentPage[lowerType] < totalPages) {
+                    state.currentPage[lowerType]++;
+                    updateTableContent(lowerType);
+                    updatePaginationControls(lowerType);
+                }
+            });
+        }
+    });
+
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        EventManager.add(searchInput, 'input', handleSearch);
+    }
+
+    const coinToSelect = document.getElementById('coin_to');
+    const coinFromSelect = document.getElementById('coin_from');
+
+    if (coinToSelect) {
+        EventManager.add(coinToSelect, 'change', () => {
+            state.filters.coin_to = coinToSelect.value;
+            updateBidsTable();
+            updateCoinFilterImages();
+        });
+    }
+
+    if (coinFromSelect) {
+        EventManager.add(coinFromSelect, 'change', () => {
+            state.filters.coin_from = coinFromSelect.value;
+            updateBidsTable();
+            updateCoinFilterImages();
+        });
+    }
+
+    const filterElements = {
+        stateSelect: document.getElementById('state'),
+        sortBySelect: document.getElementById('sort_by'),
+        sortDirSelect: document.getElementById('sort_dir'),
+        withExpiredSelect: document.getElementById('with_expired'),
+        clearFiltersBtn: document.getElementById('clearFilters')
+    };
+
+    if (filterElements.stateSelect) {
+        EventManager.add(filterElements.stateSelect, 'change', () => {
+            const stateValue = parseInt(filterElements.stateSelect.value);
+
+            state.filters.state = isNaN(stateValue) ? -1 : stateValue;
+
+            console.log('State filter changed:', {
+                selectedValue: filterElements.stateSelect.value,
+                parsedState: state.filters.state
+            });
+
+            updateBidsTable();
+            updateClearFiltersButton();
+        });
+    }
+
+    [
+        filterElements.sortBySelect,
+        filterElements.sortDirSelect,
+        filterElements.withExpiredSelect
+    ].forEach(element => {
+        if (element) {
+            EventManager.add(element, 'change', () => {
+                updateBidsTable();
+                updateClearFiltersButton();
+            });
+        }
+    });
+
+    if (filterElements.clearFiltersBtn) {
+        EventManager.add(filterElements.clearFiltersBtn, 'click', () => {
+            if (filterElements.clearFiltersBtn.disabled) return;
+            clearFilters();
+        });
+    }
+
+    EventManager.add(document, 'change', (event) => {
+        const target = event.target;
+        const filterForm = document.querySelector('.flex.flex-wrap.justify-center');
+
+        if (filterForm && filterForm.contains(target)) {
+            const formData = {
+                state: filterElements.stateSelect?.value,
+                sort_by: filterElements.sortBySelect?.value,
+                sort_dir: filterElements.sortDirSelect?.value,
+                with_expired: filterElements.withExpiredSelect?.value,
+                coin_from: coinFromSelect?.value,
+                coin_to: coinToSelect?.value,
+                searchQuery: searchInput?.value
+            };
+
+            localStorage.setItem('bidsTableSettings', JSON.stringify(formData));
+        }
+    });
+    
+    initializeTooltips();
+    updateCoinFilterImages();
+    updateClearFiltersButton();
 };
 
 // Init
@@ -1456,4 +1576,6 @@ document.addEventListener('DOMContentLoaded', () => {
     state.currentTab = 'sent';
     state.filters.state = -1;
     updateBidsTable();
+
+    window.cleanupBidsTable = cleanup;
 });
