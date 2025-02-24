@@ -999,14 +999,14 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
         'received'
     ]
     all_bids = []
-    
+
     try:
         received_bids = swap_client.listBids(filters=filters)
         sent_bids = swap_client.listBids(sent=True, filters=filters)
         for bid in received_bids + sent_bids:
             try:
                 bid_state = strBidState(bid[5])
-                tx_state_a = strTxState(bid[7]) 
+                tx_state_a = strTxState(bid[7])
                 tx_state_b = strTxState(bid[8])
                 if bid_state in EXCLUDED_STATES:
                     continue
@@ -1034,9 +1034,9 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     }
                 }
                 all_bids.append(swap_data)
-            except Exception as e:
+            except Exception:
                 continue
-    except Exception as e:
+    except Exception:
         return bytes(json.dumps([]), "UTF-8")
     return bytes(json.dumps(all_bids), "UTF-8")
 
