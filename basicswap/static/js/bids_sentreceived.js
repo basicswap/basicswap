@@ -369,9 +369,8 @@ const getStatusClass = (status) => {
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
         case 'Error':
         case 'Failed':
-        case 'Failed, swiped':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
-        case 'Failed, refunded':
+        case 'Abandoned': 
+        case 'Rejected': 
             return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'InProgress':
         case 'Script coin locked':
