@@ -1,9 +1,9 @@
 {% include 'header.html' %}
 {% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, circular_arrows_svg, input_arrow_down_svg, arrow_right_svg %}
 
-<div class="xl:container mx-auto">
- <section class="py-3 px-4 mt-6">
-  <div class="xl:container mx-auto">
+
+<section class="py-3 px-4 mt-6">
+  <div class="lg:container mx-auto">
    <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
     <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
     <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
@@ -20,6 +20,7 @@
 
  {% include 'inc_messages.html' %}
 
+<div class="xl:container mx-auto">
 <section>
   <div class="pl-6 pr-6 pt-0 mt-5 h-full overflow-hidden">
    <div class="flex flex-wrap items-center justify-between -m-2">
@@ -42,6 +43,7 @@
    </div>
   </div>
 </section>
+</div>
 
  <section>
   <div class="px-6 py-0 h-full overflow-hidden">
@@ -229,6 +231,14 @@
             <span id="refreshSentText">Refresh</span>
            </button>
            {% endif %}
+
+           <button id="exportSentBids" class="ml-4 inline-flex items-center px-4 py-2.5 font-medium text-sm text-white bg-green-600 hover:bg-green-700 hover:border-green-700 rounded-lg transition duration-200 border border-green-600 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <span>Export CSV</span>
+           </button>
+
           </div>
           <div id="pagination-controls-sent" class="flex items-center space-x-2" style="display: none;">
            <button id="prevPageSent" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
@@ -254,7 +264,6 @@
    </div>
   </div>
 
-  <!-- Received Bids Tab -->
   <div class="hidden rounded-lg lg:px-6" id="received" role="tabpanel" aria-labelledby="received-tab">
    <div id="received-content">
     <div class="xl:container mx-auto lg:px-0">
@@ -319,6 +328,14 @@
             <span id="refreshReceivedText">Refresh</span>
            </button>
            {% endif %}
+
+           <button id="exportReceivedBids" class="ml-4 inline-flex items-center px-4 py-2.5 font-medium text-sm text-white bg-green-600 hover:bg-green-700 hover:border-green-700 rounded-lg transition duration-200 border border-green-600 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <span>Export CSV</span>
+           </button>
+
           </div>
           <div id="pagination-controls-received" class="flex items-center space-x-2" style="display: none;">
            <button id="prevPageReceived" class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-green-600 rounded-lg transition duration-200 focus:ring-0 focus:outline-none">
@@ -344,8 +361,8 @@
    </div>
   </div>
  </div>
-</div>
 
 <script src="/static/js/bids_sentreceived.js"></script>
+<script src="/static/js/bids_export.js"></script>
 
 {% include 'footer.html' %}
