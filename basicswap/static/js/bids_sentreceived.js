@@ -226,13 +226,37 @@ const getStatusClass = (status) => {
         case 'Completed':
             return 'bg-green-300 text-black dark:bg-green-600 dark:text-white';
         case 'Expired':
+        case 'Timed-out':
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
         case 'Error':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed':
+        case 'Failed, swiped':
             return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed, refunded':
-            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
+            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
+        case 'InProgress':
+        case 'Script coin locked':
+        case 'Scriptless coin locked':
+        case 'Script coin lock released':
+        case 'SendingInitialTx':
+        case 'SendingPaymentTx':
+            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
+        case 'Received':
+        case 'Exchanged script lock tx sigs msg':
+        case 'Exchanged script lock spend tx msg':
+        case 'Script tx redeemed':
+        case 'Scriptless tx redeemed':
+        case 'Scriptless tx recovered':
+            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
+        case 'Accepted':
+        case 'Request accepted':
+            return 'bg-green-300 text-black dark:bg-green-600 dark:text-white';
+        case 'Delaying':
+        case 'Auto accept delay':
+            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
+        case 'Abandoned':
+        case 'Rejected':
+            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         default:
             return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
     }
@@ -641,8 +665,8 @@ const createTableRow = async (bid) => {
                     <div class="flex items-center min-w-max">
                         <div class="relative" data-tooltip-target="tooltip-identity-${uniqueId}">
                             <a href="/identity/${bid.addr_from}" class="text-xs font-mono">
-                                <span class="mr-2">
-                                    ${state.currentTab === 'sent' ? 'Out' : 'In'}
+                                <span>
+                                    ${state.currentTab === 'sent' ? 'Out:' : 'In:'}
                                 </span>
                                 ${identity?.label || formatAddressSMSG(bid.addr_from)}
                             </a>
@@ -684,27 +708,27 @@ const createTableRow = async (bid) => {
                 </div>
             </td>
 
-            <!-- Status Column -->
-            <td class="p-3">
-                <div class="flex justify-center" data-tooltip-target="tooltip-status-${uniqueId}">
-                    <span class="w-full xl:w-4/5 flex bold justify-center items-center px-2.5 py-1 rounded-full text-xs font-medium
-                                ${getStatusClass(bid.bid_state)}">
-                        ${bid.bid_state}
-                    </span>
-                </div>
+           <!-- Status Column -->
+           <td class="py-3 px-6">
+            <div class="relative flex justify-center" data-tooltip-target="tooltip-status-${uniqueId}">
+                <span class="px-2.5 py-1 inline-flex items-center rounded-full text-xs font-medium ${getStatusClass(bid.bid_state)}">
+                ${bid.bid_state}
+                </span>
+              </div>
             </td>
 
             <!-- Actions Column -->
-            <td class="py-3 pr-6 pl-3">
+            <td class="py-3 pr-4 pl-3">
                 <div class="flex justify-center">
                     <a href="/bid/${bid.bid_id}"
-                        class="inline-block w-24 py-2 px-3 text-center text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-colors">
+                        class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200">
                         View Bid
                     </a>
                 </div>
             </td>
         </tr>
-
+        
+        
         <!-- Tooltips -->
         <div id="tooltip-identity-${uniqueId}" role="tooltip" class="fixed z-50 py-3 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600 max-w-sm pointer-events-none">
             ${createIdentityTooltipContent(identity)}
