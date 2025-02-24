@@ -372,6 +372,10 @@ const getStatusClass = (status) => {
         case 'Abandoned': 
         case 'Rejected': 
             return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
+         case 'Failed, refunded': 
+         case 'Failed, swiped': 
+            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
+
         case 'InProgress':
         case 'Script coin locked':
         case 'Scriptless coin locked':
