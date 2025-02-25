@@ -17,7 +17,7 @@ python tests/basicswap/extended/test_xmr_persistent.py
 
 
 # Copy coin releases to permanent storage for faster subsequent startups
-cp -r ${TEST_PATH}/bin/ ~/tmp/basicswap_bin/
+cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
 
 
 # Continue existing chains with

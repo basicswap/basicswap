@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 25
+CURRENT_DB_VERSION = 26
 CURRENT_DB_DATA_VERSION = 5
 
 
@@ -642,6 +642,17 @@ class CheckedBlock(Table):
     block_height = Column("integer")
     block_hash = Column("blob")
     block_time = Column("integer")
+
+
+class CoinRates(Table):
+    __tablename__ = "coinrates"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    currency_from = Column("integer")
+    currency_to = Column("integer")
+    rate = Column("string")
+    source = Column("string")
+    last_updated = Column("integer")
 
 
 def create_db(db_path: str, log) -> None:
