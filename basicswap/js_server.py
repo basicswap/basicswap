@@ -980,6 +980,67 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
     raise ValueError("Requires URL.")
 
 
+def js_active(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    filters = {
+        "sort_by": "created_at",
+        "sort_dir": "desc"
+    }
+    EXCLUDED_STATES = [
+        'Completed',
+        'Expired',
+        'Timed-out',
+        'Abandoned',
+        'Failed, refunded',
+        'Failed, swiped',
+        'Failed',
+        'Error',
+        'received'
+    ]
+    all_bids = []
+
+    try:
+        received_bids = swap_client.listBids(filters=filters)
+        sent_bids = swap_client.listBids(sent=True, filters=filters)
+        for bid in received_bids + sent_bids:
+            try:
+                bid_state = strBidState(bid[5])
+                tx_state_a = strTxState(bid[7])
+                tx_state_b = strTxState(bid[8])
+                if bid_state in EXCLUDED_STATES:
+                    continue
+                offer = swap_client.getOffer(bid[3])
+                if not offer:
+                    continue
+                swap_data = {
+                    "bid_id": bid[2].hex(),
+                    "offer_id": bid[3].hex(),
+                    "created_at": bid[0],
+                    "bid_state": bid_state,
+                    "tx_state_a": tx_state_a if tx_state_a else 'None',
+                    "tx_state_b": tx_state_b if tx_state_b else 'None',
+                    "coin_from": swap_client.ci(bid[9]).coin_name(),
+                    "coin_to": swap_client.ci(offer.coin_to).coin_name(),
+                    "amount_from": swap_client.ci(bid[9]).format_amount(bid[4]),
+                    "amount_to": swap_client.ci(offer.coin_to).format_amount(
+                        (bid[4] * bid[10]) // swap_client.ci(bid[9]).COIN()
+                    ),
+                    "addr_from": bid[11],
+                    "status": {
+                        "main": bid_state,
+                        "initial_tx": tx_state_a if tx_state_a else 'None',
+                        "payment_tx": tx_state_b if tx_state_b else 'None'
+                    }
+                }
+                all_bids.append(swap_data)
+            except Exception:
+                continue
+    except Exception:
+        return bytes(json.dumps([]), "UTF-8")
+    return bytes(json.dumps(all_bids), "UTF-8")
+
+
 pages = {
     "coins": js_coins,
     "wallets": js_wallets,
@@ -1005,6 +1066,7 @@ pages = {
     "lock": js_lock,
     "help": js_help,
     "readurl": js_readurl,
+    "active": js_active,
 }
 
 

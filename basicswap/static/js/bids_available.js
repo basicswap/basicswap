@@ -374,7 +374,7 @@ const WebSocketManager = {
             state.wsConnected = true;
             this.reconnectAttempts = 0;
             updateConnectionStatus('connected');
-            console.log('🟢  WebSocket connection established');
+            console.log('🟢  WebSocket connection established for Bid Requests');
             updateBidsTable({ resetPage: true, refreshData: true });
         };
 
