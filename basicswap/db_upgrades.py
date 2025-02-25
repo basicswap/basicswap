@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -410,6 +410,19 @@ def upgradeDatabase(self, db_version):
             elif current_version == 24:
                 db_version += 1
                 cursor.execute("ALTER TABLE bidstates ADD COLUMN can_accept INTEGER")
+            elif current_version == 25:
+                db_version += 1
+                cursor.execute(
+                    """
+                    CREATE TABLE coinrates (
+                        record_id INTEGER NOT NULL,
+                        currency_from INTEGER,
+                        currency_to INTEGER,
+                        amount VARCHAR,
+                        source VARCHAR,
+                        last_updated INTEGER,
+                        PRIMARY KEY (record_id))"""
+                )
             if current_version != db_version:
                 self.db_version = db_version
                 self.setIntKV("db_version", db_version, cursor)
