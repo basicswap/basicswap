@@ -94,7 +94,7 @@ const BidExporter = {
         
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
-        const filename = `${type}_bids_${dateStr}.csv`;
+        const filename = `bsx_${type}_bids_${dateStr}.csv`;
         
         this.download(csvContent, filename);
     }

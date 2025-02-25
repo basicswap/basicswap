@@ -153,10 +153,10 @@ const getStatusClass = (status, tx_a, tx_b) => {
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
         case 'Error':
         case 'Failed':
+            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed, swiped':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed, refunded':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
+            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
         case 'InProgress':
         case 'Script coin locked':
         case 'Scriptless coin locked':
@@ -283,7 +283,7 @@ const WebSocketManager = {
             state.wsConnected = true;
             this.reconnectAttempts = 0;
             updateConnectionStatus('connected');
-            console.log('🟢 WebSocket connection established');
+            console.log('🟢  WebSocket connection established for Swaps in Progress');
             updateSwapsTable({ resetPage: true, refreshData: true });
         };
 
