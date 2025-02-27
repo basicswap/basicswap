@@ -53,4 +53,13 @@ XMR_BINDIR = os.path.expanduser(
 XMRD = os.getenv("XMRD", "monerod" + bin_suffix)
 XMR_WALLET_RPC = os.getenv("XMR_WALLET_RPC", "monero-wallet-rpc" + bin_suffix)
 
+
+GHOST_BINDIR = os.path.expanduser(
+    os.getenv("GHOST_BINDIR", os.path.join(DEFAULT_TEST_BINDIR, "ghost"))
+)
+
+GHOSTD = os.getenv("GHOSTD", "ghostd" + bin_suffix)
+GHOST_CLI = os.getenv("GHOST_CLI", "GHOST-cli" + bin_suffix)
+GHOST_TX = os.getenv("GHOST_TX", "ghost-tx" + bin_suffix)
+
 # NOTE: Adding coin definitions here is deprecated.  Please add in coin test file.
