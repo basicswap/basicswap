@@ -35,6 +35,12 @@ class Coins(IntEnum):
     DOGE = 18
 
 
+class Fiat(IntEnum):
+    USD = -1
+    GBP = -2
+    EUR = -3
+
+
 chainparams = {
     Coins.PART: {
         "name": "particl",
