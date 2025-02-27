@@ -847,7 +847,7 @@
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('🟢  WebSocket connection two established');
+      console.log('🟢  WebSocket connection established for Dynamic Counters');
       fetchSummaryData();
       setInterval(fetchSummaryData, 30000); // Refresh every 30 seconds
     };
