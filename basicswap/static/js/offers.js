@@ -284,6 +284,7 @@ const WebSocketManager = {
             clearTimeout(this.connectionState.connectTimeout);
             this.connectionState.lastHealthCheck = Date.now();
             window.ws = this.ws;
+            console.log('🟢  WebSocket connection established for Offers');
             updateConnectionStatus('connected');
         };
 
@@ -2755,7 +2756,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     timerManager.addInterval(() => {
         if (WebSocketManager.isConnected()) {
-            console.log('🟢 WebSocket connection established');
+            console.log('🟢  WebSocket connection established for Offers');
         }
     }, 30000);
 
