@@ -20,10 +20,12 @@ BSX_SELENIUM_DRIVER = os.getenv("BSX_SELENIUM_DRIVER", "firefox")
 def get_driver():
     if BSX_SELENIUM_DRIVER == "firefox":
         from selenium.webdriver import Firefox, FirefoxOptions
+
         options = FirefoxOptions()
         driver = Firefox(options=options)
     elif BSX_SELENIUM_DRIVER == "firefox-ci":
         from selenium.webdriver import Firefox, FirefoxOptions
+
         options = FirefoxOptions()
         options.headless = True
         options.add_argument("start-maximized")
@@ -32,9 +34,11 @@ def get_driver():
         driver = Firefox(options=options)
     elif BSX_SELENIUM_DRIVER == "chrome":
         from selenium.webdriver import Chrome, ChromeOptions
+
         driver = Chrome(options=ChromeOptions())
     elif BSX_SELENIUM_DRIVER == "safari":
         from selenium.webdriver import Safari, SafariOptions
+
         driver = Safari(options=SafariOptions())
     else:
         raise ValueError("Unknown driver " + BSX_SELENIUM_DRIVER)
