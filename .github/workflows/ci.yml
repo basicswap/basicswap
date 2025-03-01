@@ -9,6 +9,9 @@ concurrency:
 env:
   BIN_DIR: /tmp/cached_bin
   TEST_RELOAD_PATH: /tmp/test_basicswap
+  BSX_SELENIUM_DRIVER: firefox-ci
+  XMR_RPC_USER: xmr_user
+  XMR_RPC_PWD: xmr_pwd
 
 jobs:
   ci:
@@ -24,8 +27,18 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        if [ $(dpkg-query -W -f='${Status}' firefox 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+          install -d -m 0755 /etc/apt/keyrings
+          wget -q https://packages.mozilla.org/apt/repo-signing-key.gpg -O- | sudo tee /etc/apt/keyrings/packages.mozilla.org.asc > /dev/null
+          echo "deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main" | sudo tee -a /etc/apt/sources.list.d/mozilla.list > /dev/null
+          echo "Package: *" | sudo tee /etc/apt/preferences.d/mozilla
+          echo "Pin: origin packages.mozilla.org" | sudo tee -a /etc/apt/preferences.d/mozilla
+          echo "Pin-Priority: 1000" | sudo tee -a /etc/apt/preferences.d/mozilla
+          sudo apt-get update
+          sudo apt-get install -y firefox
+        fi
         python -m pip install --upgrade pip
-        pip install flake8 codespell pytest
+        pip install -e .[dev]
         pip install -r requirements.txt --require-hashes
     - name: Install
       run: |
@@ -33,13 +46,16 @@ jobs:
         # Print the core versions to a file for caching
         basicswap-prepare --version --withcoins=bitcoin | tail -n +2 > core_versions.txt
         cat core_versions.txt
-    - name: Running flake8
+    - name: Run flake8
       run: |
         flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
-    - name: Running codespell
+    - name: Run codespell
       run: |
         codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static
-    - name: Running test_other
+    - name: Run black
+      run: |
+        black --check --diff --exclude="contrib" .
+    - name: Run test_other
       run: |
         pytest tests/basicswap/test_other.py
     - name: Cache coin cores
@@ -55,17 +71,33 @@ jobs:
       name: Running basicswap-prepare
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
-    - name: Running test_xmr
+    - name: Run test_xmr
       run: |
         export PYTHONPATH=$(pwd)
         export PARTICL_BINDIR="$BIN_DIR/particl"
         export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
         export XMR_BINDIR="$BIN_DIR/monero"
         pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx"
-    - name: Running test_encrypted_xmr_reload
+    - name: Run test_encrypted_xmr_reload
       run: |
         export PYTHONPATH=$(pwd)
         export TEST_PATH=${TEST_RELOAD_PATH}
         mkdir -p ${TEST_PATH}/bin
         cp -r $BIN_DIR/* ${TEST_PATH}/bin/
         pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+    - name: Run selenium tests
+      run: |
+        export TEST_PATH=/tmp/test_persistent
+        mkdir -p ${TEST_PATH}/bin
+        cp -r $BIN_DIR/* ${TEST_PATH}/bin/
+        export PYTHONPATH=$(pwd)
+        python tests/basicswap/extended/test_xmr_persistent.py > /tmp/log.txt 2>&1 & PID=$!
+        echo "Starting test_xmr_persistent, PID $PID"
+        until curl -s -f -o /dev/null "http://localhost:12701/json/coins"
+        do
+          tail -n 1 /tmp/log.txt
+          sleep 2
+        done
+        echo "Running test_settings.py"
+        python tests/basicswap/selenium/test_settings.py
+        kill -9 $PID

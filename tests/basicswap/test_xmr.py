@@ -660,7 +660,7 @@ class BaseTest(unittest.TestCase):
                     basicswap_dir,
                     settings,
                     "regtest",
-                    log_name="BasicSwap{}".format(i),
+                    log_name=f"BasicSwap{i}",
                 )
                 cls.swap_clients.append(sc)
                 sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
