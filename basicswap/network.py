@@ -6,17 +6,17 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-    Message 2 bytes msg_class, 4 bytes length, [ 2 bytes msg_type, payload ]
+Message 2 bytes msg_class, 4 bytes length, [ 2 bytes msg_type, payload ]
 
-    Handshake procedure:
-        node0 connecting to node1
-        node0 send_handshake
-        node1 process_handshake
-        node1 send_ping  - With a version field
-        node0 recv_ping
-            Both nodes are initialised
+Handshake procedure:
+    node0 connecting to node1
+    node0 send_handshake
+    node1 process_handshake
+    node1 send_ping  - With a version field
+    node0 recv_ping
+        Both nodes are initialised
 
-    XChaCha20_Poly1305 mac is 16bytes
+XChaCha20_Poly1305 mac is 16bytes
 """
 
 import time
