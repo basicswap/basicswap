@@ -7,7 +7,6 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-export RESET_TEST=true
 export TEST_PATH=/tmp/test_persistent
 mkdir -p ${TEST_PATH}/bin
 cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
@@ -19,6 +18,10 @@ python tests/basicswap/extended/test_xmr_persistent.py
 
 # Copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/ ~/tmp/basicswap_bin/
+
+
+# Continue existing chains with
+export RESET_TEST=false
 
 """
 
@@ -62,7 +65,7 @@ from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
 
 test_path = os.path.expanduser(os.getenv("TEST_PATH", "/tmp/test_persistent"))
-RESET_TEST = make_boolean(os.getenv("RESET_TEST", "false"))
+RESET_TEST = make_boolean(os.getenv("RESET_TEST", "true"))
 
 PORT_OFS = int(os.getenv("PORT_OFS", 1))
 UI_PORT = 12700 + PORT_OFS
