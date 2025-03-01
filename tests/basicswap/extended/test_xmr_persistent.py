@@ -228,7 +228,12 @@ def signal_handler(self, sig, frame):
 
 def run_thread(self, client_id):
     client_path = os.path.join(test_path, "client{}".format(client_id))
-    testargs = ["basicswap-run", "-datadir=" + client_path, "-regtest"]
+    testargs = [
+        "basicswap-run",
+        "-datadir=" + client_path,
+        "-regtest",
+        f"-logprefix=BSX{client_id}",
+    ]
     with patch.object(sys, "argv", testargs):
         runSystem.main()
 
@@ -402,7 +407,7 @@ def start_processes(self):
 
     # Wait for height, or sequencelock is thrown off by genesis blocktime
     num_blocks = 3
-    logging.info("Waiting for Particl chain height %d", num_blocks)
+    logging.info(f"Waiting for Particl chain height {num_blocks}")
     for i in range(60):
         if self.delay_event.is_set():
             raise ValueError("Test stopped.")
@@ -451,7 +456,7 @@ class BaseTestWithPrepare(unittest.TestCase):
         if os.path.exists(test_path) and not RESET_TEST:
             logging.info(f"Continuing with existing directory: {test_path}")
         else:
-            logging.info("Preparing %d nodes.", NUM_NODES)
+            logging.info(f"Preparing {NUM_NODES} nodes.")
             prepare_nodes(
                 NUM_NODES,
                 TEST_COINS_LIST,

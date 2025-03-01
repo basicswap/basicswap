@@ -271,7 +271,9 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     return extra_args
 
 
-def runClient(fp, data_dir, chain, start_only_coins):
+def runClient(
+    fp, data_dir: str, chain: str, start_only_coins: bool, log_prefix: str = "BasicSwap"
+):
     global swap_client, logger
     daemons = []
     pids = []
@@ -296,7 +298,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
     with open(settings_path) as fs:
         settings = json.load(fs)
 
-    swap_client = BasicSwap(fp, data_dir, settings, chain)
+    swap_client = BasicSwap(fp, data_dir, settings, chain, log_name=log_prefix)
     logger = swap_client.log
 
     if os.path.exists(pids_path):
@@ -434,7 +436,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
                         )
                     )
                     pid = daemons[-1].handle.pid
-                    swap_client.log.info("Started {} {}".format(filename, pid))
+                    swap_client.log.info(f"Started {filename} {pid}")
 
                 continue  # /decred
 
@@ -529,7 +531,7 @@ def runClient(fp, data_dir, chain, start_only_coins):
 
     closed_pids = []
     for d in daemons:
-        swap_client.log.info("Interrupting {}".format(d.handle.pid))
+        swap_client.log.info(f"Interrupting {d.handle.pid}")
         try:
             d.handle.send_signal(
                 signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
@@ -561,7 +563,9 @@ def runClient(fp, data_dir, chain, start_only_coins):
 
 
 def printVersion():
-    logger.info("Basicswap version: %s", __version__)
+    logger.info(
+        f"Basicswap version: {__version__}",
+    )
 
 
 def printHelp():
@@ -569,9 +573,7 @@ def printHelp():
     print("\n--help, -h               Print help.")
     print("--version, -v            Print version.")
     print(
-        "--datadir=PATH           Path to basicswap data directory, default:{}.".format(
-            cfg.BASICSWAP_DATADIR
-        )
+        f"--datadir=PATH           Path to basicswap data directory, default:{cfg.BASICSWAP_DATADIR}."
     )
     print("--mainnet                Run in mainnet mode.")
     print("--testnet                Run in testnet mode.")
@@ -579,16 +581,18 @@ def printHelp():
     print(
         "--startonlycoin          Only start the provides coin daemon/s, use this if a chain requires extra processing."
     )
+    print("--logprefix              Specify log prefix.")
 
 
 def main():
     data_dir = None
     chain = "mainnet"
     start_only_coins = set()
+    log_prefix: str = "BasicSwap"
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != "-":
-            logger.warning("Unknown argument %s", v)
+            logger.warning(f"Unknown argument {v}")
             continue
 
         s = v.split("=")
@@ -613,6 +617,9 @@ def main():
             if name == "datadir":
                 data_dir = os.path.expanduser(s[1])
                 continue
+            if name == "logprefix":
+                log_prefix = s[1]
+                continue
         if name == "startonlycoin":
             for coin in [s.lower() for s in s[1].split(",")]:
                 if is_known_coin(coin) is False:
@@ -620,7 +627,7 @@ def main():
                 start_only_coins.add(coin)
             continue
 
-        logger.warning("Unknown argument %s", v)
+        logger.warning(f"Unknown argument {v}")
 
     if os.name == "nt":
         logger.warning(
@@ -629,8 +636,8 @@ def main():
 
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
-    logger.info("Using datadir: %s", data_dir)
-    logger.info("Chain: %s", chain)
+    logger.info(f"Using datadir: {data_dir}")
+    logger.info(f"Chain: {chain}")
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
@@ -639,7 +646,7 @@ def main():
         logger.info(
             os.path.basename(sys.argv[0]) + ", version: " + __version__ + "\n\n"
         )
-        runClient(fp, data_dir, chain, start_only_coins)
+        runClient(fp, data_dir, chain, start_only_coins, log_prefix)
 
     print("Done.")
     return swap_client.fail_code if swap_client is not None else 0

@@ -983,20 +983,17 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
 def js_active(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
-    filters = {
-        "sort_by": "created_at",
-        "sort_dir": "desc"
-    }
+    filters = {"sort_by": "created_at", "sort_dir": "desc"}
     EXCLUDED_STATES = [
-        'Completed',
-        'Expired',
-        'Timed-out',
-        'Abandoned',
-        'Failed, refunded',
-        'Failed, swiped',
-        'Failed',
-        'Error',
-        'received'
+        "Completed",
+        "Expired",
+        "Timed-out",
+        "Abandoned",
+        "Failed, refunded",
+        "Failed, swiped",
+        "Failed",
+        "Error",
+        "received",
     ]
     all_bids = []
 
@@ -1018,8 +1015,8 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     "offer_id": bid[3].hex(),
                     "created_at": bid[0],
                     "bid_state": bid_state,
-                    "tx_state_a": tx_state_a if tx_state_a else 'None',
-                    "tx_state_b": tx_state_b if tx_state_b else 'None',
+                    "tx_state_a": tx_state_a if tx_state_a else "None",
+                    "tx_state_b": tx_state_b if tx_state_b else "None",
                     "coin_from": swap_client.ci(bid[9]).coin_name(),
                     "coin_to": swap_client.ci(offer.coin_to).coin_name(),
                     "amount_from": swap_client.ci(bid[9]).format_amount(bid[4]),
@@ -1029,9 +1026,9 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     "addr_from": bid[11],
                     "status": {
                         "main": bid_state,
-                        "initial_tx": tx_state_a if tx_state_a else 'None',
-                        "payment_tx": tx_state_b if tx_state_b else 'None'
-                    }
+                        "initial_tx": tx_state_a if tx_state_a else "None",
+                        "payment_tx": tx_state_b if tx_state_b else "None",
+                    },
                 }
                 all_bids.append(swap_data)
             except Exception:
