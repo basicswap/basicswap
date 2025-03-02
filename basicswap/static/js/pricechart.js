@@ -1225,7 +1225,7 @@ const chartModule = {
     } catch (error) {
       console.error(`Error updating chart for ${coinSymbol}:`, error);
       
-      // Keep existing chart data if possible
+      // Keep existing chart data if possible /todo
       if (!(chartModule.chart?.data?.datasets[0]?.data?.length > 0)) {
         if (!chartModule.chart) {
           chartModule.initChart();
@@ -1334,7 +1334,7 @@ const app = {
   minimumRefreshInterval: 60 * 1000, // 1 min
 
   init: () => {
-    //console.log('Init');
+    console.log('Init');
     window.addEventListener('load', app.onLoad);
     app.loadLastRefreshedTime();
     app.updateAutoRefreshButton();
