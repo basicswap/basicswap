@@ -201,8 +201,6 @@ class XMRInterface(CoinInterface):
 
         try:
             self.rpc_wallet("open_wallet", params)
-            # TODO Remove `refresh` after upstream fix to refresh on open_wallet
-            self.rpc_wallet("refresh")
         except Exception as e:
             if "no connection to daemon" in str(e):
                 self._log.debug(f"{self.coin_name()} {e}")
@@ -217,8 +215,6 @@ class XMRInterface(CoinInterface):
                 pass
 
             self.rpc_wallet("open_wallet", params)
-            # TODO Remove `refresh` after upstream fix to refresh on open_wallet
-            self.rpc_wallet("refresh")
             self._log.debug(f"Reattempt to open {self.coin_name()} wallet")
 
     def initialiseWallet(
@@ -305,6 +301,8 @@ class XMRInterface(CoinInterface):
                 raise e
 
             rv = {}
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
             balance_info = self.rpc_wallet("get_balance")
 
             rv["wallet_blocks"] = self.rpc_wallet("get_height")["height"]
@@ -406,6 +404,8 @@ class XMRInterface(CoinInterface):
     ) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             Kbv = self.getPubkey(kbv)
             shared_addr = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
@@ -446,6 +446,9 @@ class XMRInterface(CoinInterface):
             except Exception as e:  # noqa: F841
                 self.createWallet(params)
                 self.openWallet(address_b58)
+
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             """
             # Debug
@@ -498,6 +501,8 @@ class XMRInterface(CoinInterface):
     def findTxnByHash(self, txid):
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             try:
                 current_height = self.rpc2("get_height", timeout=self._rpctimeout)[
@@ -566,6 +571,8 @@ class XMRInterface(CoinInterface):
                 self.createWallet(params)
                 self.openWallet(wallet_filename)
 
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
             rv = self.rpc_wallet("get_balance")
             if rv["balance"] < cb_swap_value:
                 self._log.warning("Balance is too low, checking for existing spend.")
@@ -620,6 +627,8 @@ class XMRInterface(CoinInterface):
     ) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             if sweepall:
                 balance = self.rpc_wallet("get_balance")
@@ -699,6 +708,9 @@ class XMRInterface(CoinInterface):
                         self.createWallet(params)
                         self.openWallet(address_b58)
 
+                self.rpc_wallet("refresh")
+                self._log.debug(f"Refreshing {self.coin_name()} wallet")
+
                 rv = self.rpc_wallet(
                     "get_transfers",
                     {"in": True, "out": True, "pending": True, "failed": True},
@@ -711,6 +723,8 @@ class XMRInterface(CoinInterface):
     def getSpendableBalance(self) -> int:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
+            self.rpc_wallet("refresh")
+            self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             balance_info = self.rpc_wallet("get_balance")
             return balance_info["unlocked_balance"]
