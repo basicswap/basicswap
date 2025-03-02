@@ -917,7 +917,6 @@ const forceTooltipDOMCleanup = () => {
     foundCount += allTooltipElements.length;
 
     allTooltipElements.forEach(element => {
-
         const isDetached = !document.body.contains(element) || 
                            element.classList.contains('hidden') ||
                            element.style.display === 'none';
@@ -947,7 +946,6 @@ const forceTooltipDOMCleanup = () => {
 
     const tippyRoots = document.querySelectorAll('[data-tippy-root]');
     foundCount += tippyRoots.length;
-    
     tippyRoots.forEach(element => {
         const isOrphan = !element.children.length || 
                          element.children[0].classList.contains('hidden') ||
@@ -975,13 +973,10 @@ const forceTooltipDOMCleanup = () => {
             }
         }
     });
-    
-    // Handle legacy tooltip elements
     document.querySelectorAll('.tooltip').forEach(element => {
         const isTrulyDetached = !element.parentElement || 
                                !document.body.contains(element.parentElement) ||
                                element.classList.contains('hidden');
-
         if (isTrulyDetached) {
             try {
                 element.remove();
@@ -992,14 +987,11 @@ const forceTooltipDOMCleanup = () => {
         }
     });
 
-    if (window.TooltipManager && window.TooltipManager.activeTooltips) {
-        window.TooltipManager.activeTooltips.forEach((instance, id) => {
-            const tooltipElement = document.getElementById(id.split('tooltip-trigger-')[1]);
-            const triggerElement = document.querySelector(`[data-tooltip-trigger-id="${id}"]`);
-
-            if (!tooltipElement || !triggerElement || 
-                !document.body.contains(tooltipElement) || 
-                !document.body.contains(triggerElement)) {
+    if (window.TooltipManager && typeof window.TooltipManager.getActiveTooltipInstances === 'function') {
+        const activeTooltips = window.TooltipManager.getActiveTooltipInstances();
+        activeTooltips.forEach(([element, instance]) => {
+            const tooltipId = element.getAttribute('data-tooltip-trigger-id');
+            if (!document.body.contains(element)) {
                 if (instance?.[0]) {
                     try {
                         instance[0].destroy();
@@ -1007,14 +999,13 @@ const forceTooltipDOMCleanup = () => {
                         console.warn('Error destroying tooltip instance:', e);
                     }
                 }
-                window.TooltipManager.activeTooltips.delete(id);
             }
         });
     }
     if (removedCount > 0) {
        // console.log(`Tooltip cleanup: found ${foundCount}, removed ${removedCount} detached tooltips`);
     }
-};
+}
 
 const createTableRow = async (bid) => {
     const identity = await IdentityManager.getIdentityData(bid.addr_from);
