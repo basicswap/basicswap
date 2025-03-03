@@ -241,40 +241,47 @@ const WebSocketManager = {
     },
 
     connect() {
-        if (this.connectionState.isConnecting || this.isIntentionallyClosed) {
-            return false;
+    if (this.connectionState.isConnecting || this.isIntentionallyClosed) {
+        return false;
+    }
+
+    this.cleanup();
+    this.connectionState.isConnecting = true;
+    this.connectionState.lastConnectAttempt = Date.now();
+
+    try {
+        let wsPort;
+        
+        if (typeof getWebSocketConfig === 'function') {
+            const wsConfig = getWebSocketConfig();
+            wsPort = wsConfig.port || wsConfig.fallbackPort;
+            console.log("Using WebSocket port:", wsPort);
+        } else {
+            wsPort = config?.port || window.ws_port || '11700';
         }
 
-        this.cleanup();
-        this.connectionState.isConnecting = true;
-        this.connectionState.lastConnectAttempt = Date.now();
-
-        try {
-            const wsPort = config.port || window.ws_port || '11700';
-
-            if (!wsPort) {
-                this.connectionState.isConnecting = false;
-                return false;
-            }
-
-            this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
-            this.setupEventHandlers();
-
-            this.connectionState.connectTimeout = setTimeout(() => {
-                if (this.connectionState.isConnecting) {
-                    this.cleanup();
-                    this.handleReconnect();
-                }
-            }, 5000);
-
-            return true;
-        } catch (error) {
+        if (!wsPort) {
             this.connectionState.isConnecting = false;
-            this.handleReconnect();
             return false;
         }
-    },
 
+        this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
+        this.setupEventHandlers();
+
+        this.connectionState.connectTimeout = setTimeout(() => {
+            if (this.connectionState.isConnecting) {
+                this.cleanup();
+                this.handleReconnect();
+            }
+        }, 5000);
+
+        return true;
+    } catch (error) {
+        this.connectionState.isConnecting = false;
+        this.handleReconnect();
+        return false;
+    }
+},
     setupEventHandlers() {
         if (!this.ws) return;
 

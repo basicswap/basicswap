@@ -1,3 +1,128 @@
+// CLEANUP
+const cleanupManager = {
+  eventListeners: [],
+  timeouts: [],
+  intervals: [],
+  animationFrames: [],
+
+  addListener: function(element, type, handler, options) {
+    if (!element) return null;
+    element.addEventListener(type, handler, options);
+    this.eventListeners.push({ element, type, handler, options });
+    return handler;
+  },
+
+  setTimeout: function(callback, delay) {
+    const id = setTimeout(callback, delay);
+    this.timeouts.push(id);
+    return id;
+  },
+
+  setInterval: function(callback, delay) {
+    const id = setInterval(callback, delay);
+    this.intervals.push(id);
+    return id;
+  },
+
+  requestAnimationFrame: function(callback) {
+    const id = requestAnimationFrame(callback);
+    this.animationFrames.push(id);
+    return id;
+  },
+
+  clearAll: function() {
+    this.eventListeners.forEach(({ element, type, handler, options }) => {
+      if (element) {
+        try {
+          element.removeEventListener(type, handler, options);
+        } catch (e) {
+          console.warn('Error removing event listener:', e);
+        }
+      }
+    });
+    this.eventListeners = [];
+
+    this.timeouts.forEach(id => clearTimeout(id));
+    this.timeouts = [];
+
+    this.intervals.forEach(id => clearInterval(id));
+    this.intervals = [];
+
+    this.animationFrames.forEach(id => cancelAnimationFrame(id));
+    this.animationFrames = [];
+
+    console.log('All resources cleaned up');
+  },
+  
+  clearTimeouts: function() {
+    this.timeouts.forEach(id => clearTimeout(id));
+    this.timeouts = [];
+  },
+  
+  clearIntervals: function() {
+    this.intervals.forEach(id => clearInterval(id));
+    this.intervals = [];
+  },
+
+  removeListenersByElement: function(element) {
+    if (!element) return;
+
+    const listenersToRemove = this.eventListeners.filter(
+      listener => listener.element === element
+    );
+
+    listenersToRemove.forEach(({ element, type, handler, options }) => {
+      try {
+        element.removeEventListener(type, handler, options);
+      } catch (e) {
+        console.warn('Error removing event listener:', e);
+      }
+    });
+
+    this.eventListeners = this.eventListeners.filter(
+      listener => listener.element !== element
+    );
+  }
+};
+
+// MEMORY
+const memoryMonitor = {
+  isEnabled: true,
+  lastLogTime: 0,
+  logInterval: 5 * 60 * 1000,
+  monitorInterval: null,
+
+  startMonitoring: function() {
+    console.log('Starting memory monitoring');
+    if (!this.isEnabled) return;
+
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+    }
+
+    this.monitorInterval = setInterval(() => {
+      this.logMemoryUsage();
+    }, this.logInterval);
+
+    this.logMemoryUsage();
+  },
+  
+  logMemoryUsage: function() {
+    console.log('Logging memory usage');
+    if (window.performance && window.performance.memory) {
+      const memory = window.performance.memory;
+      console.log(`Memory Usage: ${Math.round(memory.usedJSHeapSize / (1024 * 1024))}MB / ${Math.round(memory.jsHeapSizeLimit / (1024 * 1024))}MB`);
+    }
+  },
+
+  stopMonitoring: function() {
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+      this.monitorInterval = null;
+    }
+  }
+};
+
 // CONFIG
 const config = {
   apiKeys: getAPIKeys(),
@@ -393,49 +518,138 @@ const rateLimiter = {
 
 // CACHE
 const cache = {
-  set: (key, value, customTtl = null) => {
+  maxSizeBytes: 10 * 1024 * 1024,
+  maxItems: 200,
+  cacheTTL: 5 * 60 * 1000,
+
+  set: function(key, value, customTtl = null) {
+    this.cleanup();
+
     const item = {
       value: value,
       timestamp: Date.now(),
-      expiresAt: Date.now() + (customTtl || app.cacheTTL)
+      expiresAt: Date.now() + (customTtl || this.cacheTTL)
     };
-    localStorage.setItem(key, JSON.stringify(item));
-    //console.log(`Cache set for ${key}, expires in ${(customTtl || app.cacheTTL) / 1000} seconds`);
+
+    try {
+      const serialized = JSON.stringify(item);
+      localStorage.setItem(key, serialized);
+    } catch (e) {
+      console.warn('Cache set error:', e);
+      this.clear();
+      try {
+        const serialized = JSON.stringify(item);
+        localStorage.setItem(key, serialized);
+      } catch (e2) {
+        console.error('Failed to store in cache even after cleanup:', e2);
+      }
+    }
   },
-  get: (key) => {
+
+  get: function(key) {
     const itemStr = localStorage.getItem(key);
     if (!itemStr) {
       return null;
     }
+
     try {
       const item = JSON.parse(itemStr);
       const now = Date.now();
+      
       if (now < item.expiresAt) {
-        //console.log(`Cache hit for ${key}, ${(item.expiresAt - now) / 1000} seconds remaining`);
         return {
           value: item.value,
           remainingTime: item.expiresAt - now
         };
       } else {
-        //console.log(`Cache expired for ${key}`);
         localStorage.removeItem(key);
       }
     } catch (error) {
-      //console.error('Error parsing cache item:', error.message);
+      console.error('Error parsing cache item:', error.message);
       localStorage.removeItem(key);
     }
+
     return null;
   },
-  isValid: (key) => {
-    return cache.get(key) !== null;
+
+  isValid: function(key) {
+    return this.get(key) !== null;
   },
-  clear: () => {
-    Object.keys(localStorage).forEach(key => {
+
+  clear: function() {
+    const keysToRemove = [];
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
       if (key.startsWith('coinData_') || key.startsWith('chartData_') || key === 'coinGeckoOneLiner') {
-        localStorage.removeItem(key);
+        keysToRemove.push(key);
       }
+    }
+
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
     });
-    //console.log('Cache cleared');
+
+    console.log(`Cache cleared: removed ${keysToRemove.length} items`);
+  },
+
+  cleanup: function() {
+    let totalSize = 0;
+    const items = [];
+    const keysToRemove = [];
+    const now = Date.now();
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith('coinData_') || key.startsWith('chartData_') || key === 'coinGeckoOneLiner') {
+        try {
+          const value = localStorage.getItem(key);
+          const size = new Blob([value]).size;
+
+          const item = JSON.parse(value);
+
+          if (item.expiresAt && item.expiresAt < now) {
+            keysToRemove.push(key);
+            continue;
+          }
+
+          totalSize += size;
+          items.push({
+            key,
+            size,
+            timestamp: item.timestamp || 0,
+            expiresAt: item.expiresAt || 0
+          });
+        } catch (e) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+
+    if (totalSize > this.maxSizeBytes || items.length > this.maxItems) {
+      items.sort((a, b) => a.timestamp - b.timestamp);
+
+      const itemsToRemove = Math.max(
+        Math.ceil(items.length * 0.2),
+        items.length - this.maxItems
+      );
+
+      items.slice(0, itemsToRemove).forEach(item => {
+        localStorage.removeItem(item.key);
+      });
+ 
+      console.log(`Cache cleanup: removed ${itemsToRemove} items, freed ${Math.round((totalSize - this.maxSizeBytes) / 1024)}KB`);
+    }
+
+    return {
+      totalSize,
+      itemCount: items.length,
+      removedCount: keysToRemove.length
+    };
   }
 };
 
@@ -631,6 +845,8 @@ const chartModule = {
   chart: null,
   currentCoin: 'BTC',
   loadStartTime: 0,
+  chartRefs: new WeakMap(),
+  
   verticalLinePlugin: {
     id: 'verticalLine',
     beforeDraw: (chart, args, options) => {
@@ -652,15 +868,44 @@ const chartModule = {
     }
   },
 
-  initChart: () => {
-    const ctx = document.getElementById('coin-chart')?.getContext('2d');
+  getChartByElement: function(element) {
+    return this.chartRefs.get(element);
+  },
+
+  setChartReference: function(element, chart) {
+    this.chartRefs.set(element, chart);
+  },
+
+  destroyChart: function() {
+    if (chartModule.chart) {
+      try {
+        chartModule.chart.destroy();
+      } catch (e) {
+        console.error('Error destroying chart:', e);
+      }
+      chartModule.chart = null;
+    }
+  },
+
+  initChart: function() {
+    this.destroyChart();
+    
+    const canvas = document.getElementById('coin-chart');
+    if (!canvas) {
+      logger.error('Chart canvas element not found');
+      return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     if (!ctx) {
       logger.error('Failed to get chart context. Make sure the canvas element exists.');
       return;
     }
+    
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(77, 132, 240, 0.2)');
     gradient.addColorStop(1, 'rgba(77, 132, 240, 0)');
+    
     chartModule.chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -811,11 +1056,15 @@ const chartModule = {
       },
       plugins: [chartModule.verticalLinePlugin]
     });
+
+    this.setChartReference(canvas, chartModule.chart);
   },
-  prepareChartData: (coinSymbol, data) => {
+
+  prepareChartData: function(coinSymbol, data) {
     if (!data) {
       return [];
     }
+
     try {
       let preparedData;
 
@@ -825,9 +1074,11 @@ const chartModule = {
         const endUnix = endTime.getTime();
         const startUnix = endUnix - (24 * 3600000);
         const hourlyPoints = [];
+
         for (let hourUnix = startUnix; hourUnix <= endUnix; hourUnix += 3600000) {
           const targetHour = new Date(hourUnix);
           targetHour.setUTCMinutes(0, 0, 0);
+
           const closestPoint = data.reduce((prev, curr) => {
             const prevTime = new Date(prev[0]);
             const currTime = new Date(curr[0]);
@@ -868,6 +1119,7 @@ const chartModule = {
           y: price
         }));
       } else {
+        console.warn('Unknown data format for chartData:', data);
         return [];
       }
       return preparedData.map(point => ({
@@ -880,7 +1132,7 @@ const chartModule = {
     }
   },
 
-  ensureHourlyData: (data) => {
+  ensureHourlyData: function(data) {
     const now = new Date();
     now.setUTCMinutes(0, 0, 0);
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -888,136 +1140,176 @@ const chartModule = {
 
     for (let i = 0; i < 24; i++) {
       const targetTime = new Date(twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000);
-      const closestDataPoint = data.reduce((prev, curr) =>
-        Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) <
-        Math.abs(new Date(prev.x).getTime() - targetTime.getTime()) ? curr : prev
-      );
-      hourlyData.push({
-        x: targetTime.getTime(),
-        y: closestDataPoint.y
-      });
+
+      if (data.length > 0) {
+       const closestDataPoint = data.reduce((prev, curr) =>
+  Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) < 
+  Math.abs(new Date(prev.x).getTime() - targetTime.getTime()) ? curr : prev
+);
+        hourlyData.push({
+          x: targetTime.getTime(),
+          y: closestDataPoint.y
+        });
+      }
     }
+
     return hourlyData;
   },
 
-    updateChart: async (coinSymbol, forceRefresh = false) => {
+  updateChart: async function(coinSymbol, forceRefresh = false) {
+    try {
+      if (!chartModule.chart) {
+        chartModule.initChart();
+      }
+      const currentChartData = chartModule.chart?.data?.datasets[0]?.data || [];
+      if (currentChartData.length === 0) {
+        chartModule.showChartLoader();
+      }
+      chartModule.loadStartTime = Date.now();
+      const cacheKey = `chartData_${coinSymbol}_${config.currentResolution}`;
+      let cachedData = !forceRefresh ? cache.get(cacheKey) : null;
+      let data;
+      if (cachedData && Object.keys(cachedData.value).length > 0) {
+        data = cachedData.value;
+      } else {
         try {
-            const currentChartData = chartModule.chart?.data.datasets[0].data || [];
-            if (currentChartData.length === 0) {
-                chartModule.showChartLoader();
-            }
-            chartModule.loadStartTime = Date.now();
-            const cacheKey = `chartData_${coinSymbol}_${config.currentResolution}`;
-            let cachedData = !forceRefresh ? cache.get(cacheKey) : null;
-            let data;
-            if (cachedData && Object.keys(cachedData.value).length > 0) {
-                data = cachedData.value;
-                //console.log(`Using cached data for ${coinSymbol}`);
-            } else {
-                try {
-                    const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
-                    data = allData[coinSymbol];
-                    if (!data || Object.keys(data).length === 0) {
-                        throw new Error(`No data returned for ${coinSymbol}`);
-                    }
-                    cache.set(cacheKey, data, config.cacheTTL);
-                } catch (error) {
-                    if (error.message.includes('429') && currentChartData.length > 0) {
-                        //console.warn(`Rate limit hit for ${coinSymbol}, maintaining current chart`);
-                        return;
-                    }
-                    const expiredCache = localStorage.getItem(cacheKey);
-                    if (expiredCache) {
-                        try {
-                            const parsedCache = JSON.parse(expiredCache);
-                            data = parsedCache.value;
-                            //console.log(`Using expired cache data for ${coinSymbol}`);
-                        } catch (cacheError) {
-                            throw error;
-                        }
-                    } else {
-                        throw error;
-                    }
-                }
-            }
-            const chartData = chartModule.prepareChartData(coinSymbol, data);
-            if (chartData.length > 0 && chartModule.chart) {
-                chartModule.chart.data.datasets[0].data = chartData;
-                chartModule.chart.data.datasets[0].label = `${coinSymbol} Price (USD)`;
-                if (coinSymbol === 'WOW') {
-                    chartModule.chart.options.scales.x.time.unit = 'hour';
-                } else {
-                    const resolution = config.resolutions[config.currentResolution];
-                    chartModule.chart.options.scales.x.time.unit = 
-                        resolution.interval === 'hourly' ? 'hour' : 
-                        config.currentResolution === 'year' ? 'month' : 'day';
-                }
-                chartModule.chart.update('active');
-                chartModule.currentCoin = coinSymbol;
-                const loadTime = Date.now() - chartModule.loadStartTime;
-                ui.updateLoadTimeAndCache(loadTime, cachedData);
-            }
-        } catch (error) {
-            console.error(`Error updating chart for ${coinSymbol}:`, error);
-            if (!(chartModule.chart?.data.datasets[0].data.length > 0)) {
-                chartModule.chart.data.datasets[0].data = [];
-                chartModule.chart.update('active');
-            }
-        } finally {
-            chartModule.hideChartLoader();
-        }
-    },
+          const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
+          data = allData[coinSymbol];
+          
+          if (!data || Object.keys(data).length === 0) {
+            throw new Error(`No data returned for ${coinSymbol}`);
+          }
 
-  showChartLoader: () => {
+          cache.set(cacheKey, data, config.cacheTTL);
+        } catch (error) {
+          if (error.message.includes('429') && currentChartData.length > 0) {
+            console.warn(`Rate limit hit for ${coinSymbol}, maintaining current chart`);
+            chartModule.hideChartLoader();
+            return;
+          }
+          const expiredCache = localStorage.getItem(cacheKey);
+          if (expiredCache) {
+            try {
+              const parsedCache = JSON.parse(expiredCache);
+              data = parsedCache.value;
+            } catch (cacheError) {
+              throw error;
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+      if (chartModule.currentCoin !== coinSymbol) {
+        chartModule.destroyChart();
+        chartModule.initChart();
+      }
+
+      const chartData = chartModule.prepareChartData(coinSymbol, data);
+      if (chartData.length > 0 && chartModule.chart) {
+        chartModule.chart.data.datasets[0].data = chartData;
+        chartModule.chart.data.datasets[0].label = `${coinSymbol} Price (USD)`;
+        if (coinSymbol === 'WOW') {
+          chartModule.chart.options.scales.x.time.unit = 'hour';
+        } else {
+          const resolution = config.resolutions[config.currentResolution];
+          chartModule.chart.options.scales.x.time.unit = 
+            resolution.interval === 'hourly' ? 'hour' : 
+            config.currentResolution === 'year' ? 'month' : 'day';
+        }
+        chartModule.chart.update('active');
+        chartModule.currentCoin = coinSymbol;
+        const loadTime = Date.now() - chartModule.loadStartTime;
+        ui.updateLoadTimeAndCache(loadTime, cachedData);
+      }
+    } catch (error) {
+      console.error(`Error updating chart for ${coinSymbol}:`, error);
+      
+      // Keep existing chart data if possible /todo
+      if (!(chartModule.chart?.data?.datasets[0]?.data?.length > 0)) {
+        if (!chartModule.chart) {
+          chartModule.initChart();
+        }
+        if (chartModule.chart) {
+          chartModule.chart.data.datasets[0].data = [];
+          chartModule.chart.update('active');
+        }
+      }
+    } finally {
+      chartModule.hideChartLoader();
+    }
+  },
+
+  showChartLoader: function() {
     const loader = document.getElementById('chart-loader');
     const chart = document.getElementById('coin-chart');
     if (!loader || !chart) {
-      //console.warn('Chart loader or chart container elements not found');
       return;
     }
     loader.classList.remove('hidden');
     chart.classList.add('hidden');
   },
 
-  hideChartLoader: () => {
+  hideChartLoader: function() {
     const loader = document.getElementById('chart-loader');
     const chart = document.getElementById('coin-chart');
     if (!loader || !chart) {
-      //console.warn('Chart loader or chart container elements not found');
       return;
     }
     loader.classList.add('hidden');
     chart.classList.remove('hidden');
   },
+  cleanup: function() {
+    this.destroyChart();
+    this.currentCoin = null;
+    this.loadStartTime = 0;
+    console.log('Chart module cleaned up');
+  }
 };
 
 Chart.register(chartModule.verticalLinePlugin);
 
-  const volumeToggle = {
-    isVisible: localStorage.getItem('volumeToggleState') === 'true',
-    init: () => {
-      const toggleButton = document.getElementById('toggle-volume');
-      if (toggleButton) {
+const volumeToggle = {
+  isVisible: localStorage.getItem('volumeToggleState') === 'true',
+  init: function() {
+    const toggleButton = document.getElementById('toggle-volume');
+    if (toggleButton) {
+      if (typeof cleanupManager !== 'undefined') {
+        cleanupManager.addListener(toggleButton, 'click', volumeToggle.toggle);
+      } else {
         toggleButton.addEventListener('click', volumeToggle.toggle);
-        volumeToggle.updateVolumeDisplay();
       }
-    },
-    toggle: () => {
-      volumeToggle.isVisible = !volumeToggle.isVisible;
-      localStorage.setItem('volumeToggleState', volumeToggle.isVisible.toString());
       volumeToggle.updateVolumeDisplay();
-    },
-    updateVolumeDisplay: () => {
-      const volumeDivs = document.querySelectorAll('[id$="-volume-div"]');
-      volumeDivs.forEach(div => {
-        div.style.display = volumeToggle.isVisible ? 'flex' : 'none';
-      });
-      const toggleButton = document.getElementById('toggle-volume');
-      if (toggleButton) {
-        updateButtonStyles(toggleButton, volumeToggle.isVisible, 'green');
-      }
     }
-  };
+  },
+
+  toggle: function() {
+    volumeToggle.isVisible = !volumeToggle.isVisible;
+    localStorage.setItem('volumeToggleState', volumeToggle.isVisible.toString());
+    volumeToggle.updateVolumeDisplay();
+  },
+
+  updateVolumeDisplay: function() {
+    const volumeDivs = document.querySelectorAll('[id$="-volume-div"]');
+    volumeDivs.forEach(div => {
+      if (div) {
+        div.style.display = volumeToggle.isVisible ? 'flex' : 'none';
+      }
+    });
+
+    const toggleButton = document.getElementById('toggle-volume');
+    if (toggleButton) {
+      updateButtonStyles(toggleButton, volumeToggle.isVisible, 'green');
+    }
+  },
+
+  cleanup: function() {
+    const toggleButton = document.getElementById('toggle-volume');
+    if (toggleButton) {
+      toggleButton.removeEventListener('click', volumeToggle.toggle);
+    }
+  }
+};
 
   function updateButtonStyles(button, isActive, color) {
     button.classList.toggle('text-' + color + '-500', isActive);
@@ -1042,7 +1334,7 @@ const app = {
   minimumRefreshInterval: 60 * 1000, // 1 min
 
   init: () => {
-    //console.log('Init');
+    console.log('Init');
     window.addEventListener('load', app.onLoad);
     app.loadLastRefreshedTime();
     app.updateAutoRefreshButton();
@@ -1688,6 +1980,49 @@ resolutionButtons.forEach(button => {
     }
   });
 });
+
+// LOAD
+const appCleanup = {
+  init: function() {
+    memoryMonitor.startMonitoring();
+    window.addEventListener('beforeunload', this.globalCleanup);
+  },
+
+  globalCleanup: function() {
+    try {
+      if (app.autoRefreshInterval) {
+        clearTimeout(app.autoRefreshInterval);
+      }
+      if (chartModule) {
+        chartModule.cleanup();
+      }
+      if (volumeToggle) {
+        volumeToggle.cleanup();
+      }
+      cleanupManager.clearAll();
+      memoryMonitor.stopMonitoring();
+      cache.clear();
+
+      console.log('Global application cleanup completed');
+    } catch (error) {
+      console.error('Error during global cleanup:', error);
+    }
+  },
+  manualCleanup: function() {
+    this.globalCleanup();
+    window.location.reload();
+  }
+};
+
+app.init = () => {
+  //console.log('Init');
+  window.addEventListener('load', app.onLoad);
+  appCleanup.init();
+  app.loadLastRefreshedTime();
+  app.updateAutoRefreshButton();
+  memoryMonitor.startMonitoring();
+  //console.log('App initialized');
+};
 
 // LOAD
 app.init();
