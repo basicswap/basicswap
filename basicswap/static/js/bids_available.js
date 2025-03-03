@@ -370,7 +370,7 @@ const WebSocketManager = {
             wsPort = window.config.port;
         }
         if (!wsPort) {
-            wsPort = window.ws_port || '11701';
+            wsPort = window.ws_port || '11700';
         }
         console.log("Using WebSocket port:", wsPort);
         this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
