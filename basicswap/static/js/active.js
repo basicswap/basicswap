@@ -266,18 +266,33 @@ const WebSocketManager = {
     },
 
     connect() {
-        if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.ws?.readyState === WebSocket.OPEN) return;
 
-        try {
-            const wsPort = window.ws_port || '11700';
-            this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
-            this.setupEventHandlers();
-        } catch (error) {
-            console.error('WebSocket connection error:', error);
-            this.handleReconnect();
+    try {
+
+        let wsPort;
+        
+        if (typeof getWebSocketConfig === 'function') {
+            const wsConfig = getWebSocketConfig();
+            wsPort = wsConfig?.port || wsConfig?.fallbackPort;
         }
-    },
 
+        if (!wsPort && window.config?.port) {
+            wsPort = window.config.port;
+        }
+
+        if (!wsPort) {
+            wsPort = window.ws_port || '11701';
+        }
+
+        console.log("Using WebSocket port:", wsPort);
+        this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
+        this.setupEventHandlers();
+    } catch (error) {
+        console.error('WebSocket connection error:', error);
+        this.handleReconnect();
+    }
+},
     setupEventHandlers() {
         this.ws.onopen = () => {
             state.wsConnected = true;
