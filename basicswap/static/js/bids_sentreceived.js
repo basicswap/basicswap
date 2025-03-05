@@ -249,21 +249,37 @@ const WebSocketManager = {
     },
 
     connect() {
-        if (this.isConnected() || this.isPaused) return;
+    if (this.isConnected() || this.isPaused) return;
 
-        if (this.ws) {
-            this.cleanupConnection();
+    if (this.ws) {
+        this.cleanupConnection();
+    }
+
+    try {
+
+        let wsPort;
+        
+        if (typeof getWebSocketConfig === 'function') {
+            const wsConfig = getWebSocketConfig();
+            wsPort = wsConfig?.port || wsConfig?.fallbackPort;
         }
 
-        try {
-            const wsPort = window.ws_port || '11700';
-            this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
-            this.setupEventHandlers();
-        } catch (error) {
-            console.error('WebSocket connection error:', error);
-            this.handleReconnect();
+        if (!wsPort && window.config?.port) {
+            wsPort = window.config.port;
         }
-    },
+
+        if (!wsPort) {
+            wsPort = window.ws_port || '11700';
+        }
+
+        console.log("Using WebSocket port:", wsPort);
+        this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
+        this.setupEventHandlers();
+    } catch (error) {
+        console.error('WebSocket connection error:', error);
+        this.handleReconnect();
+    }
+},
 
     setupEventHandlers() {
         if (!this.ws) return;
@@ -917,7 +933,6 @@ const forceTooltipDOMCleanup = () => {
     foundCount += allTooltipElements.length;
 
     allTooltipElements.forEach(element => {
-
         const isDetached = !document.body.contains(element) || 
                            element.classList.contains('hidden') ||
                            element.style.display === 'none';
@@ -947,7 +962,6 @@ const forceTooltipDOMCleanup = () => {
 
     const tippyRoots = document.querySelectorAll('[data-tippy-root]');
     foundCount += tippyRoots.length;
-    
     tippyRoots.forEach(element => {
         const isOrphan = !element.children.length || 
                          element.children[0].classList.contains('hidden') ||
@@ -975,13 +989,10 @@ const forceTooltipDOMCleanup = () => {
             }
         }
     });
-    
-    // Handle legacy tooltip elements
     document.querySelectorAll('.tooltip').forEach(element => {
         const isTrulyDetached = !element.parentElement || 
                                !document.body.contains(element.parentElement) ||
                                element.classList.contains('hidden');
-
         if (isTrulyDetached) {
             try {
                 element.remove();
@@ -992,14 +1003,11 @@ const forceTooltipDOMCleanup = () => {
         }
     });
 
-    if (window.TooltipManager && window.TooltipManager.activeTooltips) {
-        window.TooltipManager.activeTooltips.forEach((instance, id) => {
-            const tooltipElement = document.getElementById(id.split('tooltip-trigger-')[1]);
-            const triggerElement = document.querySelector(`[data-tooltip-trigger-id="${id}"]`);
-
-            if (!tooltipElement || !triggerElement || 
-                !document.body.contains(tooltipElement) || 
-                !document.body.contains(triggerElement)) {
+    if (window.TooltipManager && typeof window.TooltipManager.getActiveTooltipInstances === 'function') {
+        const activeTooltips = window.TooltipManager.getActiveTooltipInstances();
+        activeTooltips.forEach(([element, instance]) => {
+            const tooltipId = element.getAttribute('data-tooltip-trigger-id');
+            if (!document.body.contains(element)) {
                 if (instance?.[0]) {
                     try {
                         instance[0].destroy();
@@ -1007,14 +1015,13 @@ const forceTooltipDOMCleanup = () => {
                         console.warn('Error destroying tooltip instance:', e);
                     }
                 }
-                window.TooltipManager.activeTooltips.delete(id);
             }
         });
     }
     if (removedCount > 0) {
        // console.log(`Tooltip cleanup: found ${foundCount}, removed ${removedCount} detached tooltips`);
     }
-};
+}
 
 const createTableRow = async (bid) => {
     const identity = await IdentityManager.getIdentityData(bid.addr_from);

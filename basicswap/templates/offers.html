@@ -8,22 +8,6 @@
   };
 </script>
 
-<script>
-function getAPIKeys() {
-  return {
-    cryptoCompare: "{{ chart_api_key|safe }}",
-    coinGecko: "{{ coingecko_api_key|safe }}"
-  };
-}
-
-function getWebSocketConfig() {
-    return {
-        port: "{{ ws_port|safe }}",
-        fallbackPort: "11700"
-    };
-}
-</script>
-
  <section class="py-3 px-4 mt-6">
   <div class="lg:container mx-auto">
     <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">

@@ -120,6 +120,23 @@
       updateShutdownButtons();
     });
   </script>
+
+  <script>
+function getAPIKeys() {
+  return {
+    cryptoCompare: "{{ chart_api_key|safe }}",
+    coinGecko: "{{ coingecko_api_key|safe }}"
+  };
+}
+
+function getWebSocketConfig() {
+    return {
+        port: "{{ ws_port|safe }}",
+        fallbackPort: "11700"
+    };
+}
+</script>
+
 </head>
 
 <body class="dark:bg-gray-700">
