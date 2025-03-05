@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2023 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,7 +21,17 @@ def get_driver():
     if BSX_SELENIUM_DRIVER == "firefox":
         from selenium.webdriver import Firefox, FirefoxOptions
 
-        driver = Firefox(options=FirefoxOptions())
+        options = FirefoxOptions()
+        driver = Firefox(options=options)
+    elif BSX_SELENIUM_DRIVER == "firefox-ci":
+        from selenium.webdriver import Firefox, FirefoxOptions
+
+        options = FirefoxOptions()
+        options.headless = True
+        options.add_argument("start-maximized")
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        driver = Firefox(options=options)
     elif BSX_SELENIUM_DRIVER == "chrome":
         from selenium.webdriver import Chrome, ChromeOptions
 
@@ -32,7 +42,6 @@ def get_driver():
         driver = Safari(options=SafariOptions())
     else:
         raise ValueError("Unknown driver " + BSX_SELENIUM_DRIVER)
-
     return driver
 
 

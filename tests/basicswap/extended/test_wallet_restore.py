@@ -114,7 +114,12 @@ class Test(TestBase):
 
     def run_thread(self, client_id):
         client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
-        testargs = ["basicswap-run", "-datadir=" + client_path, "-regtest"]
+        testargs = [
+            "basicswap-run",
+            "-datadir=" + client_path,
+            "-regtest",
+            f"-logprefix=BSX{client_id}",
+        ]
         with patch.object(sys, "argv", testargs):
             runSystem.main()
 

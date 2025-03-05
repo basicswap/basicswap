@@ -145,7 +145,7 @@ def get_data_with_pagination(data, filters):
 
     offset = filters.get("offset", 0)
     limit = filters.get("limit", PAGE_LIMIT)
-    return data[offset:offset + limit]
+    return data[offset : offset + limit]
 
 
 def getTxIdHex(bid, tx_type, suffix):
