@@ -1055,6 +1055,7 @@ def js_coinprices(self, url_split, post_string, is_json) -> bytes:
     match_input_key: bool = toBool(
         get_data_entry_or(post_data, "match_input_key", "true")
     )
+    ttl: int = int(get_data_entry_or(post_data, "ttl", 300))
 
     coins = get_data_entry(post_data, "coins")
     coins_list = coins.split(",")
@@ -1078,7 +1079,7 @@ def js_coinprices(self, url_split, post_string, is_json) -> bytes:
         input_id_map[coin_id] = coin
 
     coinprices = swap_client.lookupFiatRates(
-        coin_ids, currency_to=currency_to, rate_source=rate_source
+        coin_ids, currency_to=currency_to, rate_source=rate_source, saved_ttl=ttl
     )
 
     rv = {}

@@ -11082,6 +11082,7 @@ class BasicSwap(BaseApp):
     ):
         self.log.debug(f"lookupFiatRates {coins_list}.")
         ensure(len(coins_list) > 0, "Must specify coin/s")
+        ensure(saved_ttl >= 0, "Invalid saved time")
 
         now: int = int(time.time())
         oldest_time_valid: int = now - saved_ttl
@@ -11132,7 +11133,7 @@ class BasicSwap(BaseApp):
                 for coin_id in coins_list:
                     if len(coin_ids) > 0:
                         coin_ids += ","
-                    exchange_name = self.getExchangeName(coin_id, rate_source)
+                    exchange_name: str = self.getExchangeName(coin_id, rate_source)
                     coin_ids += exchange_name
                     exchange_name_map[exchange_name] = coin_id
 
@@ -11156,25 +11157,37 @@ class BasicSwap(BaseApp):
                     new_values[exchange_name_map[k]] = v[ticker_to]
             elif rate_source == "cryptocompare.com":
                 ticker_to: str = fiatTicker(currency_to).upper()
-                for coin_id in need_coins:
+                api_key: str = get_api_key_setting(
+                    self.settings,
+                    "chart_api_key",
+                    default_chart_api_key,
+                    escape=True,
+                )
+                if len(need_coins) == 1:
                     coin_ticker: str = chainparams[coin_id]["ticker"]
-
-                    api_key: str = get_api_key_setting(
-                        self.settings,
-                        "chart_api_key",
-                        default_chart_api_key,
-                        escape=True,
-                    )
                     url: str = (
                         f"https://min-api.cryptocompare.com/data/price?fsym={coin_ticker}&tsyms={ticker_to}"
                     )
-                    if api_key != "":
-                        url += f"&api_key={api_key}"
-
                     self.log.debug(f"lookupFiatRates: {url}")
                     js = json.loads(self.readURL(url, timeout=10, headers=headers))
                     return_rates[int(coin_id)] = js[ticker_to]
                     new_values[coin_id] = js[ticker_to]
+                else:
+                    coin_ids: str = ""
+                    for coin_id in coins_list:
+                        if len(coin_ids) > 0:
+                            coin_ids += ","
+                        coin_ticker: str = chainparams[coin_id]["ticker"]
+                        coin_ids += coin_ticker
+                        exchange_name_map[coin_ticker] = coin_id
+                    url: str = (
+                        f"https://min-api.cryptocompare.com/data/pricemulti?fsyms={coin_ids}&tsyms={ticker_to}"
+                    )
+                    self.log.debug(f"lookupFiatRates: {url}")
+                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
+                    for k, v in js.items():
+                        return_rates[int(exchange_name_map[k])] = v[ticker_to]
+                        new_values[exchange_name_map[k]] = v[ticker_to]
             else:
                 raise ValueError(f"Unknown rate source {rate_source}")
 
