@@ -877,29 +877,30 @@ const coinNameToSymbol = {
 };
 
 const getUsdValue = (cryptoValue, coinSymbol) => {
+  let source = "cryptocompare.com";
+  let coin_id = coinSymbol;
   if (coinSymbol === 'WOW') {
-    return fetch(`https://api.coingecko.com/api/v3/simple/price?ids=wownero&vs_currencies=usd`)
-      .then(response => response.json())
-      .then(data => {
-        const exchangeRate = data.wownero.usd;
-        if (!isNaN(exchangeRate)) {
-          return cryptoValue * exchangeRate;
-        } else {
-          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
-        }
-      });
-  } else {
-    return fetch(`https://min-api.cryptocompare.com/data/price?fsym=${coinSymbol}&tsyms=USD`)
-      .then(response => response.json())
-      .then(data => {
-        const exchangeRate = data.USD;
-        if (!isNaN(exchangeRate)) {
-          return cryptoValue * exchangeRate;
-        } else {
-          throw new Error(`Invalid exchange rate for ${coinSymbol}`);
-        }
-      });
+    source = "coingecko.com"
+    coin_id = "wownero"
   }
+
+  return fetch("/json/coinprices", {
+      method: "POST",
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        coins: coin_id,
+        source: source
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+      const exchangeRate = data.rates[coin_id];
+      if (!isNaN(exchangeRate)) {
+        return cryptoValue * exchangeRate;
+      } else {
+        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+      }
+    });
 };
 
   const updateUsdValue = async (cryptoCell, coinFullName, usdValueSpan) => {

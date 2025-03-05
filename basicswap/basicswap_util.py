@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,12 +9,14 @@
 import struct
 import hashlib
 from enum import IntEnum, auto
+from html import escape as html_escape
 from .util.address import (
     encodeAddress,
     decodeAddress,
 )
 from .chainparams import (
     chainparams,
+    Fiat,
 )
 
 
@@ -520,7 +522,7 @@ def getLastBidState(packed_states):
         return BidStates.BID_STATE_UNKNOWN
 
 
-def strSwapType(swap_type):
+def strSwapType(swap_type) -> str:
     if swap_type == SwapTypes.SELLER_FIRST:
         return "seller_first"
     if swap_type == SwapTypes.XMR_SWAP:
@@ -528,12 +530,37 @@ def strSwapType(swap_type):
     return None
 
 
-def strSwapDesc(swap_type):
+def strSwapDesc(swap_type) -> str:
     if swap_type == SwapTypes.SELLER_FIRST:
         return "Secret Hash"
     if swap_type == SwapTypes.XMR_SWAP:
         return "Adaptor Sig"
     return None
+
+
+def fiatTicker(fiat_ind: int) -> str:
+    try:
+        return Fiat(fiat_ind).name
+    except Exception as e:  # noqa: F841
+        raise ValueError(f"Unknown fiat ind {fiat_ind}")
+
+
+def fiatFromTicker(ticker: str) -> int:
+    ticker_uc = ticker.upper()
+    for entry in Fiat:
+        if entry.name == ticker_uc:
+            return entry
+    raise ValueError(f"Unknown fiat {ticker}")
+
+
+def get_api_key_setting(
+    settings, setting_name: str, default_value: str = "", escape: bool = False
+):
+    setting_name_enc: str = setting_name + "_enc"
+    if setting_name_enc in settings:
+        rv = bytes.fromhex(settings[setting_name_enc]).decode("utf-8")
+        return html_escape(rv) if escape else rv
+    return settings.get(setting_name, default_value)
 
 
 inactive_states = [

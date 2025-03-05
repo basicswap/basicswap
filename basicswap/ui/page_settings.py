@@ -16,6 +16,9 @@ from basicswap.util import (
     toBool,
     InactiveCoin,
 )
+from basicswap.basicswap_util import (
+    get_api_key_setting,
+)
 from basicswap.chainparams import (
     Coins,
 )
@@ -168,23 +171,13 @@ def page_settings(self, url_split, post_string):
         "debug_ui": swap_client.debug_ui,
         "expire_db_records": swap_client._expire_db_records,
     }
-    if "chart_api_key_enc" in swap_client.settings:
-        chart_api_key = html.escape(
-            bytes.fromhex(swap_client.settings.get("chart_api_key_enc", "")).decode(
-                "utf-8"
-            )
-        )
-    else:
-        chart_api_key = swap_client.settings.get("chart_api_key", "")
 
-    if "coingecko_api_key_enc" in swap_client.settings:
-        coingecko_api_key = html.escape(
-            bytes.fromhex(swap_client.settings.get("coingecko_api_key_enc", "")).decode(
-                "utf-8"
-            )
-        )
-    else:
-        coingecko_api_key = swap_client.settings.get("coingecko_api_key", "")
+    chart_api_key = get_api_key_setting(
+        swap_client.settings, "chart_api_key", escape=True
+    )
+    coingecko_api_key = get_api_key_setting(
+        swap_client.settings, "coingecko_api_key", escape=True
+    )
 
     chart_settings = {
         "show_chart": swap_client.settings.get("show_chart", True),

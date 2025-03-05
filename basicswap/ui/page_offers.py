@@ -15,7 +15,6 @@ from .util import (
     get_data_entry_or,
     have_data_entry,
     inputAmount,
-    known_chart_coins,
     listAvailableCoins,
     PAGE_LIMIT,
     setCoinFilter,
@@ -32,6 +31,7 @@ from basicswap.basicswap_util import (
     SwapTypes,
     DebugTypes,
     getLockName,
+    get_api_key_setting,
     strBidState,
     strSwapDesc,
     strSwapType,
@@ -40,12 +40,12 @@ from basicswap.basicswap_util import (
 )
 from basicswap.chainparams import (
     Coins,
+    ticker_map,
 )
-
-default_chart_api_key = (
-    "95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553"
+from basicswap.explorers import (
+    default_chart_api_key,
+    default_coingecko_api_key,
 )
-default_coingecko_api_key = "CG-8hm3r9iLfpEXv4ied8oLbeUj"
 
 
 def value_or_none(v):
@@ -973,30 +973,20 @@ def page_offers(self, url_split, post_string, sent=False):
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
-    chart_api_key = swap_client.settings.get("chart_api_key", "")
-    if chart_api_key == "":
-        chart_api_key_enc = swap_client.settings.get("chart_api_key_enc", "")
-        chart_api_key = (
-            default_chart_api_key
-            if chart_api_key_enc == ""
-            else bytes.fromhex(chart_api_key_enc).decode("utf-8")
-        )
-
-    coingecko_api_key = swap_client.settings.get("coingecko_api_key", "")
-    if coingecko_api_key == "":
-        coingecko_api_key_enc = swap_client.settings.get("coingecko_api_key_enc", "")
-        coingecko_api_key = (
-            default_coingecko_api_key
-            if coingecko_api_key_enc == ""
-            else bytes.fromhex(coingecko_api_key_enc).decode("utf-8")
-        )
+    chart_api_key = get_api_key_setting(
+        swap_client.settings, "chart_api_key", default_chart_api_key
+    )
+    coingecko_api_key = get_api_key_setting(
+        swap_client.settings, "coingecko_api_key", default_coingecko_api_key
+    )
 
     offers_count = len(formatted_offers)
 
     enabled_chart_coins = []
     enabled_chart_coins_setting = swap_client.settings.get("enabled_chart_coins", "")
     if enabled_chart_coins_setting.lower() == "all":
-        enabled_chart_coins = known_chart_coins
+        for coin_ticker in ticker_map:
+            enabled_chart_coins.append(coin_ticker.upper())
     elif enabled_chart_coins_setting.strip() == "":
         for coin_id in swap_client.coin_clients:
             if not swap_client.isCoinActive(coin_id):
@@ -1007,7 +997,7 @@ def page_offers(self, url_split, post_string, sent=False):
                 continue
             if (
                 enabled_ticker not in enabled_chart_coins
-                and enabled_ticker in known_chart_coins
+                and enabled_ticker.lower() in ticker_map
             ):
                 enabled_chart_coins.append(enabled_ticker)
     else:
@@ -1016,7 +1006,7 @@ def page_offers(self, url_split, post_string, sent=False):
 
             if (
                 upcased_ticker not in enabled_chart_coins
-                and upcased_ticker in known_chart_coins
+                and upcased_ticker.lower() in ticker_map
             ):
                 enabled_chart_coins.append(upcased_ticker)
 

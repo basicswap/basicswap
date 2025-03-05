@@ -32,7 +32,7 @@ from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from . import __version__
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
-from .ui.util import getCoinName, known_chart_coins
+from .ui.util import getCoinName
 from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
@@ -65,6 +65,12 @@ from basicswap.util.network import is_private_ip_address
 from .chainparams import (
     Coins,
     chainparams,
+    Fiat,
+    ticker_map,
+)
+from .explorers import (
+    default_chart_api_key,
+    default_coingecko_api_key,
 )
 from .script import (
     OpCodes,
@@ -126,6 +132,8 @@ from .basicswap_util import (
     BidStates,
     DebugTypes,
     EventLogTypes,
+    fiatTicker,
+    get_api_key_setting,
     KeyTypes,
     MessageTypes,
     NotificationTypes as NT,
@@ -9894,7 +9902,7 @@ class BasicSwap(BaseApp):
                     seen_tickers = []
                     for ticker in tickers:
                         upcased_ticker = ticker.strip().upper()
-                        if upcased_ticker not in known_chart_coins:
+                        if upcased_ticker.lower() not in ticker_map:
                             raise ValueError(f"Unknown coin: {ticker}")
                         if upcased_ticker in seen_tickers:
                             raise ValueError(f"Duplicate coin: {ticker}")
@@ -11058,6 +11066,160 @@ class BasicSwap(BaseApp):
             ).isWalletEncryptedLocked()
         return self._is_encrypted, self._is_locked
 
+    def getExchangeName(self, coin_id: int, exchange_name: str) -> str:
+        if coin_id == Coins.BCH:
+            return "bitcoin-cash"
+        if coin_id == Coins.FIRO:
+            return "zcoin"
+        return chainparams[coin_id]["name"]
+
+    def lookupFiatRates(
+        self,
+        coins_list,
+        currency_to: int = Fiat.USD,
+        rate_source: str = "coingecko.com",
+        saved_ttl: int = 300,
+    ):
+        self.log.debug(f"lookupFiatRates {coins_list}.")
+        ensure(len(coins_list) > 0, "Must specify coin/s")
+
+        now: int = int(time.time())
+        oldest_time_valid: int = now - saved_ttl
+        return_rates = {}
+
+        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+
+        cursor = self.openDB()
+        try:
+            parameters = {
+                "rate_source": rate_source,
+                "oldest_time_valid": oldest_time_valid,
+                "currency_to": currency_to,
+            }
+            coins_list_query = ""
+            for i, coin_id in enumerate(coins_list):
+                try:
+                    _ = Coins(coin_id)
+                except Exception:
+                    raise ValueError(f"Unknown coin type {coin_id}")
+
+                param_name = f"coin_{i}"
+                if i > 0:
+                    coins_list_query += ","
+                coins_list_query += f":{param_name}"
+                parameters[param_name] = coin_id
+
+            query = f"SELECT currency_from, rate FROM coinrates WHERE currency_from IN ({coins_list_query}) AND currency_to = :currency_to AND source = :rate_source AND last_updated >= :oldest_time_valid"
+            rows = cursor.execute(query, parameters)
+
+            for row in rows:
+                return_rates[int(row[0])] = float(row[1])
+
+            need_coins = []
+            new_values = {}
+            exchange_name_map = {}
+            for coin_id in coins_list:
+                if coin_id not in return_rates:
+                    need_coins.append(coin_id)
+
+            if len(need_coins) < 1:
+                return return_rates
+
+            if rate_source == "coingecko.com":
+                ticker_to: str = fiatTicker(currency_to).lower()
+                # Update all requested coins
+                coin_ids: str = ""
+                for coin_id in coins_list:
+                    if len(coin_ids) > 0:
+                        coin_ids += ","
+                    exchange_name = self.getExchangeName(coin_id, rate_source)
+                    coin_ids += exchange_name
+                    exchange_name_map[exchange_name] = coin_id
+
+                api_key: str = get_api_key_setting(
+                    self.settings,
+                    "coingecko_api_key",
+                    default_coingecko_api_key,
+                    escape=True,
+                )
+                url: str = (
+                    f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies={ticker_to}"
+                )
+                if api_key != "":
+                    url += f"&api_key={api_key}"
+
+                self.log.debug(f"lookupFiatRates: {url}")
+                js = json.loads(self.readURL(url, timeout=10, headers=headers))
+
+                for k, v in js.items():
+                    return_rates[int(exchange_name_map[k])] = v[ticker_to]
+                    new_values[exchange_name_map[k]] = v[ticker_to]
+            elif rate_source == "cryptocompare.com":
+                ticker_to: str = fiatTicker(currency_to).upper()
+                for coin_id in need_coins:
+                    coin_ticker: str = chainparams[coin_id]["ticker"]
+
+                    api_key: str = get_api_key_setting(
+                        self.settings,
+                        "chart_api_key",
+                        default_chart_api_key,
+                        escape=True,
+                    )
+                    url: str = (
+                        f"https://min-api.cryptocompare.com/data/price?fsym={coin_ticker}&tsyms={ticker_to}"
+                    )
+                    if api_key != "":
+                        url += f"&api_key={api_key}"
+
+                    self.log.debug(f"lookupFiatRates: {url}")
+                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
+                    return_rates[int(coin_id)] = js[ticker_to]
+                    new_values[coin_id] = js[ticker_to]
+            else:
+                raise ValueError(f"Unknown rate source {rate_source}")
+
+            if len(new_values) < 1:
+                return return_rates
+
+            # ON CONFLICT clause does not match any PRIMARY KEY or UNIQUE constraint
+            update_query = """
+                UPDATE coinrates SET
+                    rate=:rate,
+                    last_updated=:last_updated
+                WHERE currency_from = :currency_from AND currency_to = :currency_to AND source = :rate_source
+                """
+
+            insert_query = """INSERT INTO coinrates(currency_from, currency_to, rate, source, last_updated)
+                    VALUES(:currency_from, :currency_to, :rate, :rate_source, :last_updated)"""
+
+            for k, v in new_values.items():
+                cursor.execute(
+                    update_query,
+                    {
+                        "currency_from": k,
+                        "currency_to": currency_to,
+                        "rate": v,
+                        "rate_source": rate_source,
+                        "last_updated": now,
+                    },
+                )
+                if cursor.rowcount < 1:
+                    cursor.execute(
+                        insert_query,
+                        {
+                            "currency_from": k,
+                            "currency_to": currency_to,
+                            "rate": v,
+                            "rate_source": rate_source,
+                            "last_updated": now,
+                        },
+                    )
+
+            self.commitDB()
+            return return_rates
+        finally:
+            self.closeDB(cursor, commit=False)
+
     def lookupRates(self, coin_from, coin_to, output_array=False):
         self.log.debug(
             "lookupRates {}, {}.".format(
@@ -11070,25 +11232,14 @@ class BasicSwap(BaseApp):
         ci_to = self.ci(int(coin_to))
         name_from = ci_from.chainparams()["name"]
         name_to = ci_to.chainparams()["name"]
-        exchange_name_from = ci_from.getExchangeName("coingecko.com")
-        exchange_name_to = ci_to.getExchangeName("coingecko.com")
         ticker_from = ci_from.chainparams()["ticker"]
         ticker_to = ci_to.chainparams()["ticker"]
-        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
         rv = {}
 
         if rate_sources.get("coingecko.com", True):
             try:
-                url = "https://api.coingecko.com/api/v3/simple/price?ids={},{}&vs_currencies=usd,btc".format(
-                    exchange_name_from, exchange_name_to
-                )
-                self.log.debug(f"lookupRates: {url}")
-                start = time.time()
-                js = json.loads(self.readURL(url, timeout=10, headers=headers))
-                js["time_taken"] = time.time() - start
-                rate = float(js[exchange_name_from]["usd"]) / float(
-                    js[exchange_name_to]["usd"]
-                )
+                js = self.lookupFiatRates([int(coin_from), int(coin_to)])
+                rate = float(js[int(coin_from)]) / float(js[int(coin_to)])
                 js["rate_inferred"] = ci_to.format_amount(rate, conv_int=True, r=1)
                 rv["coingecko"] = js
             except Exception as e:
@@ -11096,12 +11247,10 @@ class BasicSwap(BaseApp):
                 if self.debug:
                     self.log.error(traceback.format_exc())
 
-            if exchange_name_from != name_from:
-                js[name_from] = js[exchange_name_from]
-                js.pop(exchange_name_from)
-            if exchange_name_to != name_to:
-                js[name_to] = js[exchange_name_to]
-                js.pop(exchange_name_to)
+            js[name_from] = {"usd": js[int(coin_from)]}
+            js.pop(int(coin_from))
+            js[name_to] = {"usd": js[int(coin_to)]}
+            js.pop(int(coin_to))
 
         if output_array:
 
@@ -11120,8 +11269,6 @@ class BasicSwap(BaseApp):
                         ticker_to,
                         format_float(float(js[name_from]["usd"])),
                         format_float(float(js[name_to]["usd"])),
-                        format_float(float(js[name_from]["btc"])),
-                        format_float(float(js[name_to]["btc"])),
                         format_float(float(js["rate_inferred"])),
                     )
                 )

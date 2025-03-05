@@ -14,6 +14,7 @@ from .util import (
     toBool,
 )
 from .basicswap_util import (
+    fiatFromTicker,
     strBidState,
     strTxState,
     SwapTypes,
@@ -22,6 +23,9 @@ from .basicswap_util import (
 from .chainparams import (
     Coins,
     chainparams,
+    Fiat,
+    getCoinIdFromTicker,
+    getCoinIdFromName,
 )
 from .ui.util import (
     PAGE_LIMIT,
@@ -33,7 +37,6 @@ from .ui.util import (
     get_data_entry,
     get_data_entry_or,
     have_data_entry,
-    tickerToCoinId,
     listOldBidStates,
     checkAddressesOwned,
 )
@@ -124,7 +127,7 @@ def js_wallets(self, url_split, post_string, is_json):
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
         ticker_str = url_split[3]
-        coin_type = tickerToCoinId(ticker_str)
+        coin_type = getCoinIdFromTicker(ticker_str)
 
         if len(url_split) > 4:
             cmd = url_split[4]
@@ -820,7 +823,7 @@ def js_validateamount(self, url_split, post_string: str, is_json: bool) -> bytes
             f"Unknown rounding method, must be one of {valid_round_methods}"
         )
 
-    coin_type = tickerToCoinId(ticker_str)
+    coin_type = getCoinIdFromTicker(ticker_str)
     ci = swap_client.ci(coin_type)
 
     r = 0
@@ -951,7 +954,7 @@ def js_404(self, url_split, post_string, is_json) -> bytes:
 def js_help(self, url_split, post_string, is_json) -> bytes:
     # TODO: Add details and examples
     commands = []
-    for k in pages:
+    for k in endpoints:
         commands.append(k)
     return bytes(json.dumps({"commands": commands}), "UTF-8")
 
@@ -959,22 +962,22 @@ def js_help(self, url_split, post_string, is_json) -> bytes:
 def js_readurl(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = {} if post_string == "" else getFormData(post_string, is_json)
-    if have_data_entry(post_data, "url"):
-        url = get_data_entry(post_data, "url")
-        default_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-        }
-        response = swap_client.readURL(url, headers=default_headers)
-        try:
-            error = json.loads(response.decode())
-            if "Error" in error:
-                return json.dumps({"Error": error["Error"]}).encode()
-        except json.JSONDecodeError:
-            pass
-        return response
-    raise ValueError("Requires URL.")
+    if not have_data_entry(post_data, "url"):
+        raise ValueError("Requires URL.")
+    url = get_data_entry(post_data, "url")
+    default_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    response = swap_client.readURL(url, headers=default_headers)
+    try:
+        error = json.loads(response.decode())
+        if "Error" in error:
+            return json.dumps({"Error": error["Error"]}).encode()
+    except json.JSONDecodeError:
+        pass
+    return response
 
 
 def js_active(self, url_split, post_string, is_json) -> bytes:
@@ -1035,7 +1038,62 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps(all_bids), "UTF-8")
 
 
-pages = {
+def js_coinprices(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+    if not have_data_entry(post_data, "coins"):
+        raise ValueError("Requires coins list.")
+
+    currency_to = Fiat.USD
+    if have_data_entry(post_data, "currency_to"):
+        currency_to = fiatFromTicker(get_data_entry(post_data, "currency_to"))
+
+    rate_source: str = "coingecko.com"
+    if have_data_entry(post_data, "source"):
+        rate_source = get_data_entry(post_data, "source")
+
+    match_input_key: bool = toBool(
+        get_data_entry_or(post_data, "match_input_key", "true")
+    )
+
+    coins = get_data_entry(post_data, "coins")
+    coins_list = coins.split(",")
+    coin_ids = []
+    input_id_map = {}
+    for coin in coins_list:
+        if coin.isdigit():
+            try:
+                coin_id = Coins(int(coin))
+            except Exception:
+                raise ValueError(f"Unknown coin type {coin}")
+        else:
+            try:
+                coin_id = getCoinIdFromTicker(coin)
+            except Exception:
+                try:
+                    coin_id = getCoinIdFromName(coin)
+                except Exception:
+                    raise ValueError(f"Unknown coin type {coin}")
+        coin_ids.append(coin_id)
+        input_id_map[coin_id] = coin
+
+    coinprices = swap_client.lookupFiatRates(
+        coin_ids, currency_to=currency_to, rate_source=rate_source
+    )
+
+    rv = {}
+    for k, v in coinprices.items():
+        if match_input_key:
+            rv[input_id_map[k]] = v
+        else:
+            rv[int(k)] = v
+    return bytes(
+        json.dumps({"currency": currency_to.name, "source": rate_source, "rates": rv}),
+        "UTF-8",
+    )
+
+
+endpoints = {
     "coins": js_coins,
     "wallets": js_wallets,
     "offers": js_offers,
@@ -1061,10 +1119,11 @@ pages = {
     "help": js_help,
     "readurl": js_readurl,
     "active": js_active,
+    "coinprices": js_coinprices,
 }
 
 
 def js_url_to_function(url_split):
     if len(url_split) > 2:
-        return pages.get(url_split[2], js_404)
+        return endpoints.get(url_split[2], js_404)
     return js_index
