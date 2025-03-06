@@ -55,7 +55,7 @@ const Wallets = (function() {
     'PIVX': 'PIVX',
     'Decred': 'DCR',
     'Bitcoin Cash': 'BCH',
-     'Dogecoin': 'DOGE'
+    'Dogecoin': 'DOGE'
   };
 
   class Cache {
@@ -108,22 +108,25 @@ const Wallets = (function() {
         }
       }
 
-      const mainCoins = Object.values(COIN_SYMBOLS)
-        .filter(symbol => symbol !== 'WOW')
-        .map(symbol => COINGECKO_IDS[symbol] || symbol.toLowerCase())
-        .join(',');
-
       let lastError = null;
       for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
         try {
           const processedData = {};
+          const currentSource = CONFIG.PRICE_SOURCE.PRIMARY;
+          
+          const shouldIncludeWow = currentSource === 'coingecko.com';
+          
+          const coinsToFetch = Object.values(COIN_SYMBOLS)
+            .filter(symbol => shouldIncludeWow || symbol !== 'WOW')
+            .map(symbol => COINGECKO_IDS[symbol] || symbol.toLowerCase())
+            .join(',');
 
           const mainResponse = await fetch("/json/coinprices", {
             method: "POST",
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-              coins: mainCoins,
-              source: CONFIG.PRICE_SOURCE.PRIMARY,
+              coins: coinsToFetch,
+              source: currentSource,
               ttl: CONFIG.DEFAULT_TTL
             })
           });
@@ -149,28 +152,30 @@ const Wallets = (function() {
             });
           }
 
-          try {
-            const wowResponse = await fetch("/json/coinprices", {
-              method: "POST",
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                coins: "wownero",
-                source: "coingecko.com",
-                ttl: CONFIG.DEFAULT_TTL
-              })
-            });
+          if (!shouldIncludeWow && !processedData['wownero']) {
+            try {
+              const wowResponse = await fetch("/json/coinprices", {
+                method: "POST",
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                  coins: "wownero",
+                  source: "coingecko.com",
+                  ttl: CONFIG.DEFAULT_TTL
+                })
+              });
 
-            if (wowResponse.ok) {
-              const wowData = await wowResponse.json();
-              if (wowData && wowData.rates && wowData.rates.wownero) {
-                processedData['wownero'] = {
-                  usd: wowData.rates.wownero,
-                  btc: processedData.bitcoin ? wowData.rates.wownero / processedData.bitcoin.usd : 0
-                };
+              if (wowResponse.ok) {
+                const wowData = await wowResponse.json();
+                if (wowData && wowData.rates && wowData.rates.wownero) {
+                  processedData['wownero'] = {
+                    usd: wowData.rates.wownero,
+                    btc: processedData.bitcoin ? wowData.rates.wownero / processedData.bitcoin.usd : 0
+                  };
+                }
               }
+            } catch (wowError) {
+              console.error('Error fetching WOW price:', wowError);
             }
-          } catch (wowError) {
-            console.error('Error fetching WOW price:', wowError);
           }
 
           this.cache.set(processedData);
@@ -232,7 +237,7 @@ const Wallets = (function() {
       this.priceUpdateInterval = null;
       this.lastUpdateTime = parseInt(localStorage.getItem(STATE_KEYS.LAST_UPDATE) || '0');
       this.isWalletsPage = document.querySelector('.wallet-list') !== null || 
-                            window.location.pathname.includes('/wallets');
+      window.location.pathname.includes('/wallets');
     }
 
     getShortName(fullName) {
