@@ -575,14 +575,13 @@ const createSwapTableRow = async (swap) => {
              </div>
             </div>
            </td>
-            <!-- You Send Column -->
+
+            <!-- You Receive Column -->
             <td class="py-0">
                 <div class="py-3 px-4 text-left">
                     <div class="items-center monospace">
-                        <div class="pr-2">
-                            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
-                        </div>
+                        <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
                     </div>
                 </div>
             </td>
@@ -593,8 +592,8 @@ const createSwapTableRow = async (swap) => {
                     <div class="flex items-center justify-center">
                         <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12" 
-                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png" 
-                                 alt="${swap.coin_from}"
+                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png" 
+                                 alt="${swap.coin_to}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -602,20 +601,22 @@ const createSwapTableRow = async (swap) => {
                         </svg>
                         <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12" 
-                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png" 
-                                 alt="${swap.coin_to}"
+                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png" 
+                                 alt="${swap.coin_from}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
                     </div>
                 </div>
             </td>
 
-            <!-- You Receive Column -->
+            <!-- You Send Column -->
             <td class="py-0">
                 <div class="py-3 px-4 text-right">
                     <div class="items-center monospace">
-                        <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
+                        <div>
+                            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
+                        </div>
                     </div>
                 </div>
             </td>
