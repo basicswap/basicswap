@@ -1,8 +1,8 @@
 {% from 'style.html' import circular_info_messages_svg, green_cross_close_svg, red_cross_close_svg, circular_error_messages_svg %}
 
 {% for m in messages %}
-<section class="py-4" id="messages_{{ m[0] }}" role="alert">
-  <div class="container px-4 mx-auto">
+<section class="py-4 px-6" id="messages_{{ m[0] }}" role="alert">
+   <div class="lg:container mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-green-50 border border-green-500 dark:bg-gray-500 dark:text-green-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">
@@ -27,8 +27,8 @@
 </section>
 {% endfor %}
 {% if err_messages %}
-<section class="py-4" id="err_messages_{{ err_messages[0][0] }}" role="alert">
-  <div class="container px-4 mx-auto">
+<section class="py-4 px-6" id="err_messages_{{ err_messages[0][0] }}" role="alert">
+   <div class="lg:container mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
       <div class="flex flex-wrap justify-between items-center -m-2">
         <div class="flex-1 p-2">

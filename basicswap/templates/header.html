@@ -120,8 +120,25 @@
       updateShutdownButtons();
     });
   </script>
-
+  
   <script>
+  document.addEventListener('DOMContentLoaded', function() {
+  const closeButtons = document.querySelectorAll('[data-dismiss-target]');
+  
+  closeButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const targetId = this.getAttribute('data-dismiss-target');
+      const targetElement = document.querySelector(targetId);
+
+      if (targetElement) {
+        targetElement.style.display = 'none';
+      }
+    });
+  });
+});
+</script>
+
+<script>
 function getAPIKeys() {
   return {
     cryptoCompare: "{{ chart_api_key|safe }}",
@@ -140,7 +157,6 @@ function getWebSocketConfig() {
 </head>
 
 <body class="dark:bg-gray-700">
-  <!-- Shutdown Modal -->
   <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
     <div class="fixed inset-0 bg-black bg-opacity-60 transition-opacity"></div>
     <div class="flex items-center justify-center min-h-screen p-4 relative z-10">

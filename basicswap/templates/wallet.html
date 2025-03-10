@@ -1,35 +1,27 @@
 {% include 'header.html' %}
 {% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg %}
 <script src="/static/js/libs//qrcode.js"></script>
-  <section class="p-5 mt-5">
-   <div class="container mx-auto">
-    <div class="flex flex-wrap items-center -m-2">
-      <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li><a class="flex font-medium text-md lg:text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">Home</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-md lg:text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallets">Wallets</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-md lg:text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/wallet/{{ w.ticker }}">{{ w.ticker }}</a></li>
-        </ul>
-      </div>
-    </div>
-   </div>
-  </section>
-  <section class="py-4 px-6">
-    <div class="lg:container mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden"> <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red"> <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
+
+ <section class="py-3 px-4 mt-6">
+  <div class="lg:container mx-auto">
+    <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+        <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
+        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
         <div class="relative z-20 flex flex-wrap items-center -m-3">
           <div class="w-full md:w-1/2">
-            <h2 class="text-3xl font-bold text-white"> <span class="inline-block align-middle"><img class="mr-2 h-16" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"></span>({{ w.ticker }}) {{ w.name }} Wallet </h2>
+            <h2 class="text-3xl font-bold text-white"> 
+              <span class="inline-block align-middle">
+              <img class="mr-2 h-16" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"></span>({{ w.ticker }}) {{ w.name }} Wallet </h2>
           </div>
           <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> <a class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallet/{{ w.ticker }}"> {{ circular_arrows_svg | safe }}<span>Refresh</span> </a> </div>
         </div>
       </div>
     </div>
-  </section>
-  {% include 'inc_messages.html' %}
-  {% if w.updating %}
+</section>
+
+{% include 'inc_messages.html' %}
+
+{% if w.updating %}
 <section class="py-4 px-6" id="messages_updating" role="alert">
   <div class="lg:container mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-blue-50 border border-blue-500 dark:bg-gray-500 dark:text-blue-400 rounded-md">
@@ -54,9 +46,10 @@
     </div>
   </div>
 </section>
-  {% endif %}
-  {% if w.havedata %}
-  {% if w.error %}
+{% endif %}
+
+{% if w.havedata %}
+{% if w.error %}
 <section class="py-4 px-6" id="messages_error" role="alert">
   <div class="lg:container mx-auto">
     <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
@@ -82,18 +75,17 @@
     </div>
   </div>
 </section>
-  {% else %}
+{% else %}
+
 {% if w.cid == '18' %} {# DOGE #}
 <section class="py-4 px-6" id="messages_notice">
   <div class="lg:container mx-auto">
     <div class="p-6 rounded-lg bg-coolGray-100 dark:bg-gray-500 shadow-sm">
       <div class="flex items-start">
-        <svg class="w-6 h-6 text-blue-500 mt-1 mr-3 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"></path></svg>
         <div class="flex flex-wrap -m-1">
           <ul class="ml-4">
-            <li class="font-semibold text-lg dark:text-white mb-2">NOTICE:</li>
             <li class="font-medium text-gray-600 dark:text-white leading-relaxed">
-              This version of DOGE Core is experimental and has been custom-built for compatibility with BasicSwap. As a result, it may not always be fully aligned with upstream changes, features unrelated to BasicSwap might not work as expected, and its code may differ from the official release.
+              NOTICE: This version of DOGE Core is experimental and has been custom-built for compatibility with BasicSwap. As a result, it may not always be fully aligned with upstream changes, features unrelated to BasicSwap might not work as expected, and its code may differ from the official release.
             </li>
           </ul>
         </div>
@@ -102,9 +94,10 @@
   </div>
 </section>
 {% endif %}
-  <section>
+
+<section>
     <form method="post" autocomplete="off">
-      <div class="px-6 py-0 mt-5 h-full overflow-hidden">
+      <div class="px-6 py-0 h-full overflow-hidden">
         <div class="pb-6 border-coolGray-100">
           <div class="flex flex-wrap items-center justify-between -m-2">
             <div class="w-full pt-2">
@@ -125,39 +118,46 @@
                         </thead>
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Balance: </td>
-                          <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} (<span class="usd-value"></span>)
-                          {% if w.pending %}
-                            <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.pending }} {{ w.ticker }} </span>
-                          {% endif %}
-                        </td>
+                          <td class="py-3 px-6 bold">
+                            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }}</span>
+                            (<span class="usd-value"></span>)
+                            {% if w.pending %}
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.pending }} {{ w.ticker }} </span>
+                            {% endif %}
+                          </td>
                         </tr>
                         {% if w.cid == '1' %} {# PART #}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Blind"> </span>Blind Balance: </td>
-                          <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
-                          {% if w.blind_unconfirmed %}
-                          <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.blind_unconfirmed }} {{ w.ticker }}</span>
-                          {% endif %}
-                        </td>
+                          <td class="py-3 px-6 bold">
+                            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }}</span>
+                            (<span class="usd-value"></span>)
+                            {% if w.blind_unconfirmed %}
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.blind_unconfirmed }} {{ w.ticker }}</span>
+                            {% endif %}
+                          </td>
                         </tr>
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Anon"> </span>Anon Balance: </td>
-                          <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
+                          <td class="py-3 px-6 bold">
+                            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }}</span>
+                            (<span class="usd-value"></span>)
                             {% if w.anon_pending %}
-                            <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.ticker }}</span>
-                          {% endif %}
-                        </td>
-                          <td class="usd-value"></td>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.ticker }}</span>
+                            {% endif %}
+                          </td>
                         </tr>
                         {# / PART #}
                         {% elif w.cid == '3' %} {# LTC #}
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} MWEB"> </span>MWEB Balance: </td>
-                          <td class="py-3 px-6 bold coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} (<span class="usd-value"></span>)
-                        {% if w.mweb_pending %}
-                            <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.ticker }} </span>
-                        {% endif %}
-                        </td>
+                          <td class="py-3 px-6 bold">
+                            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }}</span>
+                            (<span class="usd-value"></span>)
+                            {% if w.mweb_pending %}
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.ticker }} </span>
+                            {% endif %}
+                          </td>
                         </tr>
                         {% endif %}
                         {# / LTC #}
@@ -222,8 +222,9 @@
           </div>
         </div>
       </div>
-    </section>
-  {% if block_unknown_seeds and w.expected_seed != true %} {# Only show addresses if wallet seed is correct #}
+</section>
+
+{% if block_unknown_seeds and w.expected_seed != true %} {# Only show addresses if wallet seed is correct #}
     <section class="px-6 py-0 h-full overflow-hidden">
       <div class="pb-6 border-coolGray-100">
         <div class="flex flex-wrap items-center justify-between -m-2">
@@ -246,6 +247,7 @@
   <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 {% else %}
+
 <section class="p-6">
  <div class="lg:container mx-auto">
   <div class="flex items-center">
@@ -253,6 +255,7 @@
   </div>
  </div>
 </section>
+
 <form method="post" autocomplete="off">
   <section>
     <div class="px-6 py-0 overflow-hidden">
@@ -276,9 +279,8 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Main Address: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-monero-main" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_main_address">{{ w.main_address }}</div>
+                                <div class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_main_address">{{ w.main_address }}</div>
                               </div>
-                              <div id="tooltip-copy-monero-main" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                {% else %}
                                   <div id="qrcode-deposit" class="qrcode"> </div>
                                 </div>
@@ -292,11 +294,7 @@
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address </button>
                                 </div>
                               </div>
-                              <div id="tooltip-copy-default" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                                {% endif %}
-                                <p>Copy to clipboard</p>
-                                <div class="tooltip-arrow" data-popper-arrow></div>
-                              </div>
                             </div>
                           </div>
                         </div>
@@ -316,14 +314,13 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Subaddress: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-monero-sub" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
+                                <div class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_sub_address">{{ w.deposit_address }}</div>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
                                 <div class="py-3 px-6 bold mt-5">
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Subaddress"> {{ circular_arrows_svg }} New {{ w.name }} Deposit Address</button>
                                 </div>
                               </div>
-                              <div id="tooltip-copy-monero-sub" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               {% elif w.cid == '1' %}
                               {# PART #}
                                   <div id="qrcode-stealth" class="qrcode"> </div>
@@ -331,18 +328,17 @@
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Stealth Address: </div>
                               <div class="relative flex justify-center items-center">
-                                <div data-tooltip-target="tooltip-copy-particl-stealth" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }}
+                                <div  class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-10 focus:ring-0" id="stealth_address"> {{ w.stealth_address }}
                                 </div>
-                              <div id="tooltip-copy-particl-stealth" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               {# / PART #}
                               {% elif w.cid == '3' %}
-                              {# LTC #}
+                             {# LTC #}
                                   <div id="qrcode-mweb" class="qrcode"> </div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">MWEB Address: </div>
                               <div class="text-center relative">
-                                <div data-tooltip-target="tooltip-copy-litecoin-mweb" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div>
+                                <div class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="stealth_address">{{ w.mweb_address }}</div>
                                 <span class="absolute inset-y-0 right-0 flex items-center pr-3 cursor-pointer" id="copyIcon"></span>
                               </div>
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
@@ -350,11 +346,8 @@
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newmwebaddr_{{ w.cid }}" value="New MWEB Address"> {{ circular_arrows_svg }} New MWEB Address </button>
                                 </div>
                               </div>
-                              <div id="tooltip-copy-litecoin-mweb" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-lg lg:text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
                               {# / LTC #}
                               {% endif %}
-                                <p>Copy to clipboard</p>
-                                <div class="tooltip-arrow" data-popper-arrow></div>
                                </div>
                              </div>
                            </div>
@@ -368,7 +361,8 @@
             </div>
           </div>
   </section>
-  {% if w.cid == '1' %}
+
+{% if w.cid == '1' %}
   {# PART #}
   <script>
     // Particl Stealth
@@ -383,6 +377,7 @@
       correctLevel: QRCode.CorrectLevel.L
     });
   </script>
+
   {% elif w.cid == '3' %}
   {# LTC #}
   <script>
@@ -399,6 +394,7 @@
     });
   </script>
   {% endif %}
+
   {% if w.cid in '6, 9' %}
   {# XMR | WOW #}
   <script>
@@ -414,6 +410,7 @@
       correctLevel: QRCode.CorrectLevel.L
     });
   </script>
+
   <script>
     // Monero Main
     var moneroMainAddress = "{{ w.main_address }}";
@@ -427,6 +424,7 @@
       correctLevel: QRCode.CorrectLevel.L
     });
   </script>
+
   {% else %}
   <script>
     // Default
@@ -440,328 +438,511 @@
       colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.L
     });
-</script>
+  </script>
 {% endif %}
+
 <script>
-let clickTimeout = null;
+document.addEventListener('DOMContentLoaded', function() {
+  setupAddressCopy();
+});
+
+function setupAddressCopy() {
+  const copyableElements = [
+    'main_deposit_address',
+    'monero_main_address',
+    'monero_sub_address',
+    'stealth_address'
+  ];
+  
+  copyableElements.forEach(id => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    
+    element.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-600', 'transition-colors');
+    
+    if (!element.querySelector('.copy-icon')) {
+      const copyIcon = document.createElement('span');
+      copyIcon.className = 'copy-icon absolute right-2 inset-y-0 flex items-center text-gray-500 dark:text-gray-300';
+      copyIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>`;
+      
+      element.style.position = 'relative';
+      element.style.paddingRight = '2.5rem';
+      element.appendChild(copyIcon);
+    }
+    
+    element.addEventListener('click', function(e) {
+      const textToCopy = this.innerText.trim();
+      
+      copyToClipboard(textToCopy);
+      
+      this.classList.add('bg-blue-50', 'dark:bg-blue-900');
+      
+      showCopyFeedback(this);
+      
+      setTimeout(() => {
+        this.classList.remove('bg-blue-50', 'dark:bg-blue-900');
+      }, 1000);
+    });
+  });
+}
+
+let activeTooltip = null;
+
+function showCopyFeedback(element) {
+  if (activeTooltip && activeTooltip.parentNode) {
+    activeTooltip.parentNode.removeChild(activeTooltip);
+  }
+  
+  const popup = document.createElement('div');
+  popup.className = 'copy-feedback-popup fixed z-50 bg-blue-600 text-white text-sm py-2 px-3 rounded-md shadow-lg';
+  popup.innerText = 'Copied!';
+  document.body.appendChild(popup);
+  
+  activeTooltip = popup;
+  
+  updateTooltipPosition(popup, element);
+  
+  const scrollHandler = () => {
+    if (popup.parentNode) {
+      updateTooltipPosition(popup, element);
+    }
+  };
+  
+  window.addEventListener('scroll', scrollHandler, { passive: true });
+  
+  popup.style.opacity = '0';
+  popup.style.transition = 'opacity 0.2s ease-in-out';
+  
+  setTimeout(() => {
+    popup.style.opacity = '1';
+  }, 10);
+  
+  setTimeout(() => {
+    window.removeEventListener('scroll', scrollHandler);
+    popup.style.opacity = '0';
+    
+    setTimeout(() => {
+      if (popup.parentNode) {
+        popup.parentNode.removeChild(popup);
+      }
+      if (activeTooltip === popup) {
+        activeTooltip = null;
+      }
+    }, 200);
+  }, 1500);
+}
+
+function updateTooltipPosition(tooltip, element) {
+  const rect = element.getBoundingClientRect();
+  
+  let top = rect.top - tooltip.offsetHeight - 8;
+  const left = rect.left + rect.width / 2;
+  
+  if (top < 10) {
+    top = rect.bottom + 8;
+  }
+  
+  tooltip.style.top = `${top}px`;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.transform = 'translateX(-50%)';
+}
 
 function copyToClipboard(text) {
-   const el = document.createElement('textarea');
-   el.value = text;
-   document.body.appendChild(el);
-   el.select();
-   document.execCommand('copy');
-   document.body.removeChild(el);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(err => {
+      console.error('Failed to copy: ', err);
+      copyToClipboardFallback(text);
+    });
+  } else {
+    copyToClipboardFallback(text);
+  }
 }
 
-function copyAndShowMessage(elementId) {
-   const addressElement = document.getElementById(elementId);
-   if (!addressElement) return;
-   const addressText = addressElement.innerText.trim();
-
-   if (addressText === 'Copied to clipboard') return;
-
-   copyToClipboard(addressText);
-   addressElement.innerText = 'Copied to clipboard';
-   const originalWidth = addressElement.offsetWidth;
-   addressElement.classList.add('copying');
-   addressElement.parentElement.style.width = `${originalWidth}px`;
-   setTimeout(function () {
-       addressElement.innerText = addressText;
-       addressElement.classList.remove('copying');
-       addressElement.parentElement.style.width = '';
-   }, 1000);
+function copyToClipboardFallback(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-999999px';
+  textArea.style.top = '-999999px';
+  
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Failed to copy text: ', err);
+  }
+  
+  document.body.removeChild(textArea);
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-   const stealthAddressElement = document.getElementById('stealth_address');
-   if (stealthAddressElement) {
-       stealthAddressElement.addEventListener('click', function() {
-           copyAndShowMessage('stealth_address');
-       });
-   }
-   const mainDepositAddressElement = document.getElementById('main_deposit_address');
-   if (mainDepositAddressElement) {
-       mainDepositAddressElement.addEventListener('click', function() {
-           copyAndShowMessage('main_deposit_address');
-       });
-   }
-   const moneroMainAddressElement = document.getElementById('monero_main_address');
-   if (moneroMainAddressElement) {
-       moneroMainAddressElement.addEventListener('click', function() {
-           copyAndShowMessage('monero_main_address');
-       });
-   }
-   const moneroSubAddressElement = document.getElementById('monero_sub_address');
-   if (moneroSubAddressElement) {
-       moneroSubAddressElement.addEventListener('click', function() {
-           copyAndShowMessage('monero_sub_address');
-       });
-   }
-});
 </script>
-  <section class="p-6">
+
+<section class="p-6">
    <div class="lg:container mx-auto">
     <div class="flex items-center">
       <h4 class="font-semibold text-2xl text-black dark:text-white">Withdraw</h4>
     </div>
   </div>
- </section>
-  <section>
-    <div class="px-6 py-0 h-full overflow-hidden">
-      <div class="border-coolGray-100">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
-            <div class="lg:container mt-5 mx-auto">
-              <div class="py-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                <div class="px-6">
-                  <div class="w-full pb-6 overflow-x-auto">
-                    <table class="w-full text-lg lg:text-sm">
-                      <thead class="uppercase">
-                        <tr class="text-left">
-                          <th class="p-0">
-                            <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span> </div>
-                          </th>
-                          <th class="p-0">
-                            <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Input</span> </div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Balance: </td>
-                        <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }} </td>
-                      </tr>
-                        {% if w.cid == '3' %}
-                        {# LTC #}
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold w-1/4"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>MWEB Balance: </td>
-                        <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }} </td>
-                      </tr>
-                        {% elif w.cid == '1' %}
-                        {# PART #}
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Blind Balance: </td>
-                        <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }} </td>
-                      </tr>
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Anon Balance: </td>
-                        <td class="py-3 px-6" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }} </td>
-                      </tr>
-                       {% endif %}
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> {{ w.name }} Address: </td>
-                        <td class="py-3 px-6"> <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
-                      </tr>
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-4 pl-6 bold"> {{ w.name }} Amount:
-                        <td class="py-3 px-6">
-                          <div class="flex"> <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
-                            <div class="ml-2 flex">
+</section>
+
+<section>
+ <div class="px-6 py-0 h-full overflow-hidden">
+  <div class="border-coolGray-100">
+   <div class="flex flex-wrap items-center justify-between -m-2">
+    <div class="w-full pt-2">
+     <div class="lg:container mt-5 mx-auto">
+      <div class="py-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+       <div class="px-6">
+        <div class="w-full pb-6 overflow-x-auto">
+         <table class="w-full text-lg lg:text-sm">
+          <thead class="uppercase">
+           <tr class="text-left">
+            <th class="p-0">
+             <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span> </div>
+            </th>
+            <th class="p-0">
+             <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"> <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Input</span> </div>
+            </th>
+           </tr>
+          </thead>
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Balance: </td>
+           <td class="py-3 px-6">
+            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.balance }} {{ w.ticker }}</span>
+            (<span class="usd-value"></span>)
+           </td>
+          </tr>
+          {% if w.cid == '3' %}
+          {# LTC #}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-4 pl-6 bold w-1/4"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>MWEB Balance: </td>
+           <td class="py-3 px-6">
+            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.mweb_balance }} {{ w.ticker }}</span>
+            (<span class="usd-value"></span>)
+           </td>
+          </tr>
+          {% elif w.cid == '1' %}
+          {# PART #}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Blind Balance: </td>
+           <td class="py-3 px-6">
+            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.blind_balance }} {{ w.ticker }}</span>
+            (<span class="usd-value"></span>)
+           </td>
+          </tr>
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Anon Balance: </td>
+           <td class="py-3 px-6">
+            <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.anon_balance }} {{ w.ticker }}</span>
+            (<span class="usd-value"></span>)
+           </td>
+          </tr>
+          {% endif %}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-4 pl-6 bold"> {{ w.name }} Address: </td>
+           <td class="py-3 px-6"> <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
+          </tr>
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-4 pl-6 bold"> {{ w.name }} Amount:
+           <td class="py-3 px-6">
+            <div class="flex"> <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
+             <div class="ml-2 flex">
+
 {% if w.cid == '1' %}
 {# PART #}
 <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">25%</button>
 <button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">50%</button>
 <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">100%</button>
+
 <script>
-  function setAmount(percent, balance, cid, blindBalance, anonBalance) {
-    var amountInput = document.getElementById('amount');
-    var typeSelect = document.getElementById('withdraw_type');
-    var selectedType = typeSelect.value;
-    var floatBalance;
-    var calculatedAmount;
+function setAmount(percent, balance, cid, blindBalance, anonBalance) {
+ var amountInput = document.getElementById('amount');
+ var typeSelect = document.getElementById('withdraw_type');
+ var selectedType = typeSelect.value;
+ var floatBalance;
+ var calculatedAmount;
 
-    switch(selectedType) {
-      case 'plain':
-        floatBalance = parseFloat(balance);
-        break;
-      case 'blind':
-        floatBalance = parseFloat(blindBalance);
-        break;
-      case 'anon':
-        floatBalance = parseFloat(anonBalance);
-        break;
-      default:
-        floatBalance = parseFloat(balance);
-        break;
-    }
-    calculatedAmount = floatBalance * percent;
-    amountInput.value = calculatedAmount.toFixed(8);
+ console.log('SetAmount Called with:', {
+  percent: percent,
+  balance: balance,
+  cid: cid,
+  blindBalance: blindBalance,
+  anonBalance: anonBalance,
+  selectedType: selectedType,
+  blindBalanceType: typeof blindBalance,
+  blindBalanceNumeric: Number(blindBalance)
+ });
 
-    var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
-    if (subfeeCheckbox) {
-      subfeeCheckbox.checked = (percent === 1);
-    }
+ const safeParseFloat = (value) => {
+  const numValue = Number(value);
+
+  if (!isNaN(numValue) && numValue > 0) {
+   return numValue;
   }
+
+  console.warn('Invalid balance value:', value);
+  return 0;
+ };
+
+ switch(selectedType) {
+  case 'plain':
+   floatBalance = safeParseFloat(balance);
+   break;
+  case 'blind':
+   floatBalance = safeParseFloat(blindBalance);
+   break;
+  case 'anon':
+   floatBalance = safeParseFloat(anonBalance);
+   break;
+  default:
+   floatBalance = safeParseFloat(balance);
+   break;
+ }
+
+ calculatedAmount = Math.max(0, Math.floor(floatBalance * percent * 100000000) / 100000000);
+ 
+ console.log('Calculated Amount:', {
+  floatBalance: floatBalance,
+  calculatedAmount: calculatedAmount,
+  percent: percent
+ });
+
+ if (percent === 1) {
+  calculatedAmount = floatBalance;
+ }
+
+ if (calculatedAmount < 0.00000001) {
+  console.warn('Calculated amount too small, setting to zero');
+  calculatedAmount = 0;
+ }
+
+ amountInput.value = calculatedAmount.toFixed(8);
+
+ var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
+ if (subfeeCheckbox) {
+  subfeeCheckbox.checked = (percent === 1);
+ }
+
+ console.log('Final Amount Set:', amountInput.value);
+}function setAmount(percent, balance, cid, blindBalance, anonBalance) {
+ var amountInput = document.getElementById('amount');
+ var typeSelect = document.getElementById('withdraw_type');
+ var selectedType = typeSelect.value;
+ var floatBalance;
+ var calculatedAmount;
+
+ switch(selectedType) {
+  case 'plain':
+   floatBalance = parseFloat(balance);
+   break;
+  case 'blind':
+   floatBalance = parseFloat(blindBalance);
+   break;
+  case 'anon':
+   floatBalance = parseFloat(anonBalance);
+   break;
+  default:
+   floatBalance = parseFloat(balance);
+   break;
+ }
+
+ calculatedAmount = Math.floor(floatBalance * percent * 100000000) / 100000000;
+
+ if (percent === 1) {
+  calculatedAmount = floatBalance;
+ }
+
+ amountInput.value = calculatedAmount.toFixed(8);
+
+ var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
+ if (subfeeCheckbox) {
+  subfeeCheckbox.checked = (percent === 1);
+ }
+
+}
 </script>
+
 {# / PART #}
+
 {% elif w.cid == '3' %}
 {# LTC #}
 <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">25%</button>
 <button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">50%</button>
 <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">100%</button>
+
 <script>
-  function setAmount(percent, balance, cid, mwebBalance) {
-    var amountInput = document.getElementById('amount');
-    var typeSelect = document.getElementById('withdraw_type');
-    var selectedType = typeSelect.value;
-    var floatBalance;
-    var calculatedAmount;
+ function setAmount(percent, balance, cid, mwebBalance) {
+  var amountInput = document.getElementById('amount');
+  var typeSelect = document.getElementById('withdraw_type');
+  var selectedType = typeSelect.value;
+  var floatBalance;
+  var calculatedAmount;
 
-    switch(selectedType) {
-      case 'plain':
-        floatBalance = parseFloat(balance);
-        break;
-      case 'mweb':
-        floatBalance = parseFloat(mwebBalance);
-        break;
-      default:
-        floatBalance = parseFloat(balance);
-        break;
-    }
-    calculatedAmount = floatBalance * percent;
-    amountInput.value = calculatedAmount.toFixed(8);
-
-    var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
-    if (subfeeCheckbox) {
-      subfeeCheckbox.checked = (percent === 1);
-    }
+  switch(selectedType) {
+   case 'plain':
+    floatBalance = parseFloat(balance);
+    break;
+   case 'mweb':
+    floatBalance = parseFloat(mwebBalance);
+    break;
+   default:
+    floatBalance = parseFloat(balance);
+    break;
   }
+  calculatedAmount = floatBalance * percent;
+  amountInput.value = calculatedAmount.toFixed(8);
+
+  var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
+  if (subfeeCheckbox) {
+   subfeeCheckbox.checked = (percent === 1);
+  }
+ }
 </script>
+
 {# / LTC #}
 {% else %}
 <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }})">25%</button>
 <button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }})">50%</button>
 <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }})">100%</button>
+
 <script>
-  function setAmount(percent, balance, cid) {
-    var amountInput = document.getElementById('amount');
-    var floatBalance = parseFloat(balance);
-    var calculatedAmount = floatBalance * percent;
+ function setAmount(percent, balance, cid) {
+  var amountInput = document.getElementById('amount');
+  var floatBalance = parseFloat(balance);
+  var calculatedAmount = floatBalance * percent;
 
-    const specialCids = [6, 9];
+  const specialCids = [6, 9];
 
-    console.log("CID:", cid);
-    console.log("Percent:", percent);
-    console.log("Balance:", balance);
-    console.log("Calculated Amount:", calculatedAmount);
+  console.log("CID:", cid);
+  console.log("Percent:", percent);
+  console.log("Balance:", balance);
+  console.log("Calculated Amount:", calculatedAmount);
 
-    if (specialCids.includes(parseInt(cid)) && percent === 1) {
-        amountInput.setAttribute('data-hidden', 'true');
-        amountInput.placeholder = 'Sweep All';
-        amountInput.value = '';
-        amountInput.disabled = true;
-        console.log("Sweep All activated for special CID:", cid);
-    } else {
-        amountInput.value = calculatedAmount.toFixed(8);
-        amountInput.setAttribute('data-hidden', 'false');
-        amountInput.placeholder = '';
-        amountInput.disabled = false;
-    }
-
-    let sweepAllCheckbox = document.getElementById('sweepall');
-    if (sweepAllCheckbox) {
-        if (specialCids.includes(parseInt(cid)) && percent === 1) {
-            sweepAllCheckbox.checked = true;
-            console.log("Sweep All checkbox checked");
-        } else {
-            sweepAllCheckbox.checked = false;
-            console.log("Sweep All checkbox unchecked");
-        }
-    }
-
-    let subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
-    if (subfeeCheckbox) {
-        subfeeCheckbox.checked = (percent === 1);
-        console.log("Subfee checkbox status for CID", cid, ":", subfeeCheckbox.checked);
-    }
+  if (specialCids.includes(parseInt(cid)) && percent === 1) {
+   amountInput.setAttribute('data-hidden', 'true');
+   amountInput.placeholder = 'Sweep All';
+   amountInput.value = '';
+   amountInput.disabled = true;
+   console.log("Sweep All activated for special CID:", cid);
+  } else {
+   amountInput.value = calculatedAmount.toFixed(8);
+   amountInput.setAttribute('data-hidden', 'false');
+   amountInput.placeholder = '';
+   amountInput.disabled = false;
   }
-</script>
 
-{% endif %}
+  let sweepAllCheckbox = document.getElementById('sweepall');
+  if (sweepAllCheckbox) {
+   if (specialCids.includes(parseInt(cid)) && percent === 1) {
+    sweepAllCheckbox.checked = true;
+    console.log("Sweep All checkbox checked");
+   } else {
+    sweepAllCheckbox.checked = false;
+    console.log("Sweep All checkbox unchecked");
+   }
+  }
+
+  let subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
+  if (subfeeCheckbox) {
+   subfeeCheckbox.checked = (percent === 1);
+   console.log("Subfee checkbox status for CID", cid, ":", subfeeCheckbox.checked);
+  }
+ }
+</script>
+           {% endif %}
+            </div>
+            </div>
+            </td>
+           </td>
+          </tr>
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           {% if w.cid in '6, 9' %} {# XMR | WOW #}
+           <td class="hidden py-3 px-6 bold">Sweep All:</td>
+           <td class="hidden py-3 px-6">
+              <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked="checked"{% endif %}>
+           </td>
+          {% else %}
+           <td class="py-3 px-6 bold">Subtract Fee:</td>
+             <td class="py-3 px-6">
+              <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="checked"{% endif %}>
+             </td>
+           {% endif %}
+             <td>
+           </td>
+          </tr>
+          {% if w.cid == '1' %}
+          {# PART #}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-3 px-6 bold">Type From:</td>
+           <td class="py-3 px-6">
+            <div class="w-full md:flex-1">
+             <div class="relative"> {{ select_box_arrow_svg | safe }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
+               <option value="any" {% if w.wd_type_from==-1 %} selected{% endif %}>Select Type</option>
+               <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
+               <option value="blind" {% if w.wd_type_from=='blind' %} selected{% endif %}>Blind</option>
+               <option value="anon" {% if w.wd_type_from=='anon' %} selected{% endif %}>Anon</option>
+              </select> </div>
+            </div>
+           </td>
+          </tr>
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-3 px-6 bold">Type To:</td>
+           <td class="py-3 px-6">
+            <div class="w-full md:flex-1">
+             <div class="relative"> {{ select_box_arrow_svg }} <select class="{{ select_box_class }}" name="withdraw_type_to_{{ w.cid }}">
+               <option value="any" {% if w.wd_type_to==-1 %} selected{% endif %}>Select Type</option>
+               <option value="plain" {% if w.wd_type_to=='plain' %} selected{% endif %}>Plain</option>
+               <option value="blind" {% if w.wd_type_to=='blind' %} selected{% endif %}>Blind</option>
+               <option value="anon" {% if w.wd_type_to=='anon' %} selected{% endif %}>Anon</option>
+              </select> </div>
+            </div>
+           </td>
+          </tr>
+          {# / PART #}
+          {% elif w.cid == '3' %} {# LTC #}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-3 px-6 bold">Type From:</td>
+           <td class="py-3 px-6">
+            <div class="w-full md:flex-1">
+             <div class="relative"> {{ select_box_arrow_svg }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
+               <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
+               <option value="mweb" {% if w.wd_type_from=='mweb' %} selected{% endif %}>MWEB</option>
+              </select> </div>
+            </div>
+           </td>
+          </tr>
+          {% endif %}
+          {# / LTC #}
+          {% if w.cid not in '6,9' %} {# Not XMR WOW #}
+          <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-3 px-6 bold">Fee Rate:</td>
+           <td class="py-3 px-6">{{ w.fee_rate }}</td>
+          </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
+           <td class="py-3 px-6 bold">Fee Estimate:</td>
+           <td class="py-3 px-6">
+           <span class="coinname-value" data-coinname="{{ w.name }}">{{ w.est_fee }}</span>
+          (<span class="usd-value fee-estimate-usd" data-decimals="8"></span>)
+          </td>
+          </tr>
+          {% endif %}
+         </table>
+        </div>
+       </div>
+      </div>
+     </div>
     </div>
    </div>
-  </td>
- </td>
-</tr>
-<tr class="opacity-100 text-gray-500 dark:text-gray-100">
-  {% if w.cid in '6, 9' %} {# XMR | WOW #}
-  <td class="hidden py-3 px-6 bold">Sweep All:</td>
-  <td class="hidden py-3 px-6">
-    <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="sweepall" name="sweepall_{{ w.cid }}" {% if w.wd_sweepall==true %} checked="checked"{% endif %}>
-  </td>
-  {% else %}
-  <td class="py-3 px-6 bold">Subtract Fee:</td>
-  <td class="py-3 px-6">
-    <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" name="subfee_{{ w.cid }}" {% if w.wd_subfee==true %} checked="checked"{% endif %}>
-  </td>
-  {% endif %}
-  <td>
-  </td>
-</tr>
-                      {% if w.cid == '1' %}
-                      {# PART #}
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6 bold">Type From:</td>
-                        <td class="py-3 px-6">
-                          <div class="w-full md:flex-1">
-                            <div class="relative"> {{ select_box_arrow_svg | safe }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
-                                <option value="any" {% if w.wd_type_from==-1 %} selected{% endif %}>Select Type</option>
-                                <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
-                                <option value="blind" {% if w.wd_type_from=='blind' %} selected{% endif %}>Blind</option>
-                                <option value="anon" {% if w.wd_type_from=='anon' %} selected{% endif %}>Anon</option>
-                              </select> </div>
-                          </div>
-                        </td>
-                      </tr>
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6 bold">Type To:</td>
-                        <td class="py-3 px-6">
-                          <div class="w-full md:flex-1">
-                            <div class="relative"> {{ select_box_arrow_svg }} <select class="{{ select_box_class }}" name="withdraw_type_to_{{ w.cid }}">
-                                <option value="any" {% if w.wd_type_to==-1 %} selected{% endif %}>Select Type</option>
-                                <option value="plain" {% if w.wd_type_to=='plain' %} selected{% endif %}>Plain</option>
-                                <option value="blind" {% if w.wd_type_to=='blind' %} selected{% endif %}>Blind</option>
-                                <option value="anon" {% if w.wd_type_to=='anon' %} selected{% endif %}>Anon</option>
-                              </select> </div>
-                          </div>
-                        </td>
-                      </tr>
-                      {# / PART #}
-                      {% elif w.cid == '3' %} {# LTC #}
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6 bold">Type From:</td>
-                        <td class="py-3 px-6">
-                          <div class="w-full md:flex-1">
-                            <div class="relative"> {{ select_box_arrow_svg }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
-                                <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
-                                <option value="mweb" {% if w.wd_type_from=='mweb' %} selected{% endif %}>MWEB</option>
-                              </select> </div>
-                          </div>
-                        </td>
-                      </tr>
-                      {% endif %}
-                      {# / LTC #}
-                      {% if w.cid not in '6,9' %} {# Not XMR WOW #}
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6 bold">Fee Rate:</td>
-                        <td class="py-3 px-6">{{ w.fee_rate }}</td>
-                      </tr>
-                      <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6 bold">Fee Estimate:</td>
-                        <td class="py-3 px-6"> {{ w.est_fee }} </td>
-                      </tr>
-                      {% endif %}
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-  <section>
+  </div>
+ </div>
+</section>
+
+<section>
     <div class="px-6 py-0 h-full overflow-hidden">
       <div class="pb-6 ">
         <div class="flex flex-wrap items-center justify-between -m-2">
@@ -787,8 +968,9 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
     </div>
-  </section>
-  {% if w.show_utxo_groups %}
+</section>
+
+{% if w.show_utxo_groups %}
   <section class="p-6">
    <div class="lg:container mx-auto">
     <div class="flex items-center">
@@ -796,6 +978,7 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
    </div>
   </section>
+
   <section>
     <div class="px-6 py-0 h-full overflow-hidden">
       <div class="border-coolGray-100">
@@ -834,6 +1017,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
   </section>
+
   <section>
     <div class="px-6 py-0 h-full overflow-hidden ">
       <div class="pb-6 ">
@@ -851,166 +1035,155 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
   </section>
-  {% else %}
   {% endif %}
+
   {% endif %}
   {% endif %}
   {% endif %}
   <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
+
+<div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="confirmTitle">Confirm Action</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+        <div class="flex justify-center gap-4">
+          <button type="button" id="confirmYes" 
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Confirm
+          </button>
+          <button type="button" id="confirmNo"
+                  class="px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-const coinNameToSymbol = {
-  'Bitcoin': 'BTC',
-  'Particl': 'PART',
-  'Particl Blind': 'PART',
-  'Particl Anon': 'PART',
-  'Monero': 'XMR',
-  'Wownero': 'WOW',
-  'Litecoin': 'LTC',
-  'Dogecoin': 'DOGE',
-  'Firo': 'FIRO',
-  'Dash': 'DASH',
-  'PIVX': 'PIVX',
-  'Decred': 'DCR',
-  'Zano': 'ZANO',
-  'Bitcoin Cash': 'BCH',
-};
+let confirmCallback = null;
+let triggerElement = null;
+let currentCoinId = '';
 
-const getUsdValue = (cryptoValue, coinSymbol) => {
-  let source = "cryptocompare.com";
-  let coin_id = coinSymbol;
-  if (coinSymbol === 'WOW') {
-    source = "coingecko.com"
-    coin_id = "wownero"
+function showConfirmDialog(title, message, callback) {
+  confirmCallback = callback;
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  const modal = document.getElementById('confirmModal');
+  if (modal) {
+    modal.classList.remove('hidden');
   }
+  return false;
+}
 
-  return fetch("/json/coinprices", {
-      method: "POST",
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        coins: coin_id,
-        source: source
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-      const exchangeRate = data.rates[coin_id];
-      if (!isNaN(exchangeRate)) {
-        return cryptoValue * exchangeRate;
-      } else {
-        throw new Error(`Invalid exchange rate for ${coinSymbol}`);
+function hideConfirmDialog() {
+  const modal = document.getElementById('confirmModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+  confirmCallback = null;
+  return false;
+}
+
+function confirmReseed() {
+  triggerElement = document.activeElement;
+  return showConfirmDialog(
+    "Confirm Reseed Wallet",
+    "Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.",
+    function() {
+      if (triggerElement) {
+        const form = triggerElement.form;
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = triggerElement.name;
+        hiddenInput.value = triggerElement.value;
+        form.appendChild(hiddenInput);
+        form.submit();
       }
+    }
+  );
+}
+
+function confirmWithdrawal() {
+  triggerElement = document.activeElement;
+  return showConfirmDialog(
+    "Confirm Withdrawal",
+    "Are you sure you want to proceed with this withdrawal?",
+    function() {
+      if (triggerElement) {
+        const form = triggerElement.form;
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = triggerElement.name;
+        hiddenInput.value = triggerElement.value;
+        form.appendChild(hiddenInput);
+        form.submit();
+      }
+    }
+  );
+}
+
+function confirmUTXOResize() {
+  triggerElement = document.activeElement;
+  return showConfirmDialog(
+    "Confirm UTXO Resize",
+    "Are you sure you want to resize UTXOs?",
+    function() {
+      if (triggerElement) {
+        const form = triggerElement.form;
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = triggerElement.name;
+        hiddenInput.value = triggerElement.value;
+        form.appendChild(hiddenInput);
+        form.submit();
+      }
+    }
+  );
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('confirmYes').addEventListener('click', function() {
+    if (typeof confirmCallback === 'function') {
+      confirmCallback();
+    }
+    hideConfirmDialog();
+  });
+  
+  document.getElementById('confirmNo').addEventListener('click', hideConfirmDialog);
+  
+  document.querySelectorAll('input[type="submit"][name^="reseed_"]').forEach(function(button) {
+    button.addEventListener('click', function(e) {
+      e.preventDefault();
+      currentCoinId = button.name.split('_')[1];
+      return confirmReseed();
     });
-};
-
-  const updateUsdValue = async (cryptoCell, coinFullName, usdValueSpan) => {
-    const coinSymbol = coinNameToSymbol[coinFullName] || '';
-    if (!coinSymbol) {
-      console.error(`Coin symbol not found for full name: ${coinFullName}`);
-      return;
-    }
-
-    const cryptoValue = parseFloat(cryptoCell.textContent);
-
-    if (!isNaN(cryptoValue) && cryptoValue !== 0) {
-      try {
-        const usdValue = await getUsdValue(cryptoValue, coinSymbol);
-        if (usdValueSpan) {
-          usdValueSpan.textContent = `$${usdValue.toFixed(2)}`;
-        }
-      } catch (error) {
-        console.error('Error in updateUsdValue:', error);
-        if (usdValueSpan) {
-          usdValueSpan.textContent = 'Error retrieving exchange rate';
-        }
-      }
-    } else {
-      if (usdValueSpan) {
-        usdValueSpan.textContent = `$0.00`;
-      }
-    }
-  };
-
-  const calculateTotalUsdValue = async () => {
-    const coinNameValues = document.querySelectorAll('.coinname-value');
-    let totalUsdValue = 0;
-
-    for (const coinNameValue of coinNameValues) {
-      const coinFullName = coinNameValue.getAttribute('data-coinname');
-      const cryptoValue = parseFloat(coinNameValue.textContent);
-      const coinSymbol = coinNameToSymbol[coinFullName];
-
-      if (coinSymbol) {
-        const usdValueSpan = coinNameValue.querySelector('.usd-value');
-
-        if (!isNaN(cryptoValue) && cryptoValue !== 0) {
-          try {
-            const usdValue = await getUsdValue(cryptoValue, coinSymbol);
-            totalUsdValue += usdValue;
-            if (usdValueSpan) {
-              usdValueSpan.textContent = `$${usdValue.toFixed(2)}`;
-            }
-          } catch (error) {
-            console.error(`Error retrieving exchange rate for ${coinFullName}`);
-          }
-        } else {
-          if (usdValueSpan) {
-            usdValueSpan.textContent = `$0.00`;
-          }
-        }
-      } else {
-        console.error(`Coin symbol not found for full name: ${coinFullName}`);
-      }
-    }
-
-    const totalUsdValueElement = document.getElementById('total-usd-value');
-    if (totalUsdValueElement) {
-      totalUsdValueElement.textContent = `$${totalUsdValue.toFixed(2)}`;
-    }
-  };
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const coinNameValues = document.querySelectorAll('.coinname-value');
-
-    for (const coinNameValue of coinNameValues) {
-      const coinFullName = coinNameValue.getAttribute('data-coinname');
-      const usdValueSpan = coinNameValue.querySelector('.usd-value');
-      updateUsdValue(coinNameValue, coinFullName, usdValueSpan);
-    }
-
-    calculateTotalUsdValue();
-
-  function set_sweep_all(element) {
-  let input = document.getElementById('amount');
-  if (element.checked) {
-    input.disabled = true;
-  } else {
-    input.disabled = false;
-  }
-  }
-
-  let cb_sweepall = document.getElementById('sweepall');
-  if (cb_sweepall) {
-  set_sweep_all(cb_sweepall);
-  cb_sweepall.addEventListener('change', (event) => {
-    set_sweep_all(event.currentTarget);
   });
-  }
-
+  
+  document.querySelectorAll('button[name^="withdraw_"]').forEach(function(button) {
+    button.addEventListener('click', function(e) {
+      e.preventDefault();
+      currentCoinId = button.name.split('_')[1];
+      return confirmWithdrawal();
+    });
   });
-
-  function confirmReseed() {
-   return confirm("Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.");
+  
+  const utxoButton = document.getElementById('create_utxo');
+  if (utxoButton) {
+    utxoButton.addEventListener('click', function(e) {
+      e.preventDefault();
+      return confirmUTXOResize();
+    });
   }
-
-  function confirmWithdrawal() {
-   return confirm("Are you sure?");
-  }
-
-  function confirmUTXOResize() {
-   return confirm("Are you sure?");
-  }
+});
 </script>
+
+<script src="/static/js/wallets.js"></script>
 {% include 'footer.html' %}
 </body>
 </html>
