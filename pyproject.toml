@@ -35,7 +35,7 @@ dev = [
     "pip-tools",
     "pytest",
     "ruff",
-    "black==24.10.0",
+    "black==25.1.0",
     "selenium",
 ]
 
