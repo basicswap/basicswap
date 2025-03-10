@@ -996,12 +996,16 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
         "received",
     ]
     all_bids = []
+    processed_bid_ids = set()
 
     try:
         received_bids = swap_client.listBids(filters=filters)
         sent_bids = swap_client.listBids(sent=True, filters=filters)
         for bid in received_bids + sent_bids:
             try:
+                bid_id_hex = bid[2].hex()
+                if bid_id_hex in processed_bid_ids:
+                    continue
                 bid_state = strBidState(bid[5])
                 tx_state_a = strTxState(bid[7])
                 tx_state_b = strTxState(bid[8])
@@ -1011,7 +1015,7 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                 if not offer:
                     continue
                 swap_data = {
-                    "bid_id": bid[2].hex(),
+                    "bid_id": bid_id_hex,
                     "offer_id": bid[3].hex(),
                     "created_at": bid[0],
                     "bid_state": bid_state,
@@ -1031,6 +1035,7 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     },
                 }
                 all_bids.append(swap_data)
+                processed_bid_ids.add(bid_id_hex)
             except Exception:
                 continue
     except Exception:
