@@ -272,8 +272,8 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
 
 
 def runClient(
-    fp, data_dir: str, chain: str, start_only_coins: bool, log_prefix: str = "BasicSwap"
-):
+    data_dir: str, chain: str, start_only_coins: bool, log_prefix: str = "BasicSwap"
+) -> int:
     global swap_client, logger
     daemons = []
     pids = []
@@ -298,7 +298,7 @@ def runClient(
     with open(settings_path) as fs:
         settings = json.load(fs)
 
-    swap_client = BasicSwap(fp, data_dir, settings, chain, log_name=log_prefix)
+    swap_client = BasicSwap(data_dir, settings, chain, log_name=log_prefix)
     logger = swap_client.log
 
     if os.path.exists(pids_path):
@@ -482,7 +482,6 @@ def runClient(
                     else cfg.DEFAULT_ALLOW_CORS
                 )
                 thread_http = HttpThread(
-                    fp,
                     settings["htmlhost"],
                     settings["htmlport"],
                     allow_cors,
@@ -548,6 +547,9 @@ def runClient(
         except Exception as e:
             swap_client.log.error(f"Error: {e}")
 
+    fail_code: int = swap_client.fail_code
+    del swap_client
+
     if os.path.exists(pids_path):
         with open(pids_path) as fd:
             lines = fd.read().split("\n")
@@ -560,6 +562,8 @@ def runClient(
                 pass
         with open(pids_path, "w") as fd:
             fd.write(still_running)
+
+    return fail_code
 
 
 def printVersion():
@@ -642,14 +646,11 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
-    with open(os.path.join(data_dir, "basicswap.log"), "a") as fp:
-        logger.info(
-            os.path.basename(sys.argv[0]) + ", version: " + __version__ + "\n\n"
-        )
-        runClient(fp, data_dir, chain, start_only_coins, log_prefix)
+    logger.info(os.path.basename(sys.argv[0]) + ", version: " + __version__ + "\n\n")
+    fail_code = runClient(data_dir, chain, start_only_coins, log_prefix)
 
     print("Done.")
-    return swap_client.fail_code if swap_client is not None else 0
+    return fail_code
 
 
 if __name__ == "__main__":

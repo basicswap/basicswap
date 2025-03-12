@@ -414,9 +414,8 @@ class Test(unittest.TestCase):
             settings_path = os.path.join(basicswap_dir, cfg.CONFIG_FILENAME)
             with open(settings_path) as fs:
                 settings = json.load(fs)
-            fp = open(os.path.join(basicswap_dir, "basicswap.log"), "w")
             sc = BasicSwap(
-                fp, basicswap_dir, settings, "regtest", log_name="BasicSwap{}".format(i)
+                basicswap_dir, settings, "regtest", log_name="BasicSwap{}".format(i)
             )
             cls.swap_clients.append(sc)
             sc.setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
@@ -424,7 +423,7 @@ class Test(unittest.TestCase):
             sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
             sc.start()
 
-            t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
+            t = HttpThread(TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
             cls.http_threads.append(t)
             t.start()
 
@@ -482,7 +481,6 @@ class Test(unittest.TestCase):
             t.join()
         for c in cls.swap_clients:
             c.finalise()
-            c.fp.close()
 
         stopDaemons(cls.daemons)
         cls.http_threads.clear()

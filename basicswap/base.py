@@ -5,17 +5,18 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-import time
-import shlex
-import socks
-import random
-import socket
-import urllib
 import logging
-import threading
-import traceback
+import os
+import random
+import shlex
+import socket
+import socks
 import subprocess
+import sys
+import threading
+import time
+import traceback
+import urllib
 
 from sockshandler import SocksiPyHandler
 
@@ -42,9 +43,9 @@ def getaddrinfo_tor(*args):
 
 
 class BaseApp(DBMethods):
-    def __init__(self, fp, data_dir, settings, chain, log_name="BasicSwap"):
+    def __init__(self, data_dir, settings, chain, log_name="BasicSwap"):
+        self.fp = None
         self.log_name = log_name
-        self.fp = fp
         self.fail_code = 0
         self.mock_time_offset = 0
 
@@ -71,16 +72,25 @@ class BaseApp(DBMethods):
         self.default_socket_timeout = socket.getdefaulttimeout()
         self.default_socket_getaddrinfo = socket.getaddrinfo
 
+    def __del__(self):
+        if self.fp:
+            self.fp.close()
+
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
         with self.mxDB:
             self.chainstate_delay_event.set()
             self.delay_event.set()
 
+    def openLogFile(self):
+        self.fp = open(os.path.join(self.data_dir, "basicswap.log"), "a")
+
     def prepareLogging(self):
         logging.setLoggerClass(BSXLogger)
         self.log = logging.getLogger(self.log_name)
         self.log.propagate = False
+
+        self.openLogFile()
 
         # Remove any existing handlers
         self.log.handlers = []
@@ -88,7 +98,7 @@ class BaseApp(DBMethods):
         formatter = logging.Formatter(
             "%(asctime)s %(levelname)s : %(message)s", "%Y-%m-%d %H:%M:%S"
         )
-        stream_stdout = logging.StreamHandler()
+        stream_stdout = logging.StreamHandler(sys.stdout)
         if self.log_name != "BasicSwap":
             stream_stdout.setFormatter(
                 logging.Formatter(
@@ -98,6 +108,7 @@ class BaseApp(DBMethods):
             )
         else:
             stream_stdout.setFormatter(formatter)
+        self.log_formatter = formatter
         stream_fp = logging.StreamHandler(self.fp)
         stream_fp.setFormatter(formatter)
 

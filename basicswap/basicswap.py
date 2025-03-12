@@ -11,6 +11,7 @@ import concurrent.futures
 import copy
 import datetime as dt
 import json
+import logging
 import os
 import random
 import secrets
@@ -281,14 +282,13 @@ class BasicSwap(BaseApp):
 
     def __init__(
         self,
-        fp,
         data_dir,
         settings,
         chain,
         log_name="BasicSwap",
         transient_instance=False,
     ):
-        super().__init__(fp, data_dir, settings, chain, log_name)
+        super().__init__(data_dir, settings, chain, log_name)
 
         v = __version__.split(".")
         self._version = struct.pack(">HHH", int(v[0]), int(v[1]), int(v[2]))
@@ -352,6 +352,13 @@ class BasicSwap(BaseApp):
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
+        self._max_logfile_bytes = self.settings.get(
+            "max_logfile_size", 100
+        )  # In MB 0 to disable truncation
+        if self._max_logfile_bytes > 0:
+            self._max_logfile_bytes *= 1024 * 1024
+        self._max_logfiles = self.get_int_setting("max_logfiles", 10, 1, 100)
+
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
@@ -9723,6 +9730,51 @@ class BasicSwap(BaseApp):
                 self.expireDBRecords()
                 self.checkAcceptedBids()
                 self._last_checked_expired = now
+
+                if self._max_logfile_bytes > 0:
+                    logfile_size: int = self.fp.tell()
+                    self.log.debug(f"Log file bytes: {logfile_size}.")
+                    if logfile_size > self._max_logfile_bytes:
+                        for i, log_handler in enumerate(self.log.handlers):
+                            stream_name = getattr(log_handler.stream, "name", "")
+                            if stream_name.endswith(".log"):
+                                del self.log.handlers[i]
+                                break
+
+                        self.fp.close()
+                        log_path = os.path.join(self.data_dir, "basicswap.log")
+                        if self._max_logfiles == 1:
+                            os.remove(log_path)
+                        else:
+                            last_log = os.path.join(
+                                self.data_dir,
+                                f"basicswap_{self._max_logfiles - 1:0>2}.log",
+                            )
+                            if os.path.exists(last_log):
+                                os.remove(last_log)
+
+                            for i in range(self._max_logfiles - 2, 0, -1):
+                                path_from = os.path.join(
+                                    self.data_dir, f"basicswap_{i:0>2}.log"
+                                )
+                                path_to = os.path.join(
+                                    self.data_dir, f"basicswap_{i + 1:0>2}.log"
+                                )
+                                if os.path.exists(path_from):
+                                    os.rename(path_from, path_to)
+
+                            log_path = os.path.join(self.data_dir, "basicswap.log")
+                            os.rename(
+                                log_path,
+                                os.path.join(self.data_dir, "basicswap_01.log"),
+                            )
+
+                        self.openLogFile()
+
+                        stream_fp = logging.StreamHandler(self.fp)
+                        stream_fp.setFormatter(self.log_formatter)
+                        self.log.addHandler(stream_fp)
+                        self.log.info("Log file rotated.")
 
             if now - self._last_checked_actions >= self.check_actions_seconds:
                 self.checkQueuedActions()

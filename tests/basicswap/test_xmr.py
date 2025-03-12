@@ -654,9 +654,7 @@ class BaseTest(unittest.TestCase):
                     if cls.restore_instance and i == 1:
                         cls.network_key = settings["network_key"]
                         cls.network_pubkey = settings["network_pubkey"]
-                fp = open(os.path.join(basicswap_dir, "basicswap.log"), "w")
                 sc = BasicSwap(
-                    fp,
                     basicswap_dir,
                     settings,
                     "regtest",
@@ -684,7 +682,7 @@ class BaseTest(unittest.TestCase):
                     # Import a random seed to keep the existing test behaviour. BTC core rescans even with timestamp: now.
                     sc.ci(Coins.BTC).initialiseWallet(random.randbytes(32))
 
-                t = HttpThread(sc.fp, TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
+                t = HttpThread(TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
                 cls.http_threads.append(t)
                 t.start()
             # Set future block rewards to nowhere (a random address), so wallet amounts stay constant
@@ -952,7 +950,6 @@ class BaseTest(unittest.TestCase):
         logging.info("Stopping swap clients")
         for c in cls.swap_clients:
             c.finalise()
-            c.fp.close()
 
         logging.info("Stopping coin nodes")
         stopDaemons(cls.xmr_daemons)
