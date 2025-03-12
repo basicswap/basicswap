@@ -11,6 +11,7 @@ import concurrent.futures
 import copy
 import datetime as dt
 import json
+import logging
 import os
 import random
 import secrets
@@ -61,6 +62,7 @@ from .util.address import (
 from .util.crypto import (
     sha256,
 )
+from basicswap.util.logging import trimLogFile
 from basicswap.util.network import is_private_ip_address
 from .chainparams import (
     Coins,
@@ -281,14 +283,13 @@ class BasicSwap(BaseApp):
 
     def __init__(
         self,
-        fp,
         data_dir,
         settings,
         chain,
         log_name="BasicSwap",
         transient_instance=False,
     ):
-        super().__init__(fp, data_dir, settings, chain, log_name)
+        super().__init__(data_dir, settings, chain, log_name)
 
         v = __version__.split(".")
         self._version = struct.pack(">HHH", int(v[0]), int(v[1]), int(v[2]))
@@ -352,6 +353,12 @@ class BasicSwap(BaseApp):
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
+        self._max_logfile_bytes = self.settings.get(
+            "max_logfile_size", 100
+        )  # In MB 0 to disable truncation
+        if self._max_logfile_bytes > 0:
+            self._max_logfile_bytes *= 1024 * 1024
+
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
@@ -9723,6 +9730,30 @@ class BasicSwap(BaseApp):
                 self.expireDBRecords()
                 self.checkAcceptedBids()
                 self._last_checked_expired = now
+
+                if self._max_logfile_bytes > 0:
+                    logfile_size: int = self.fp.tell()
+                    self.log.debug(f"Log file bytes: {logfile_size}.")
+                    if logfile_size > self._max_logfile_bytes:
+                        for i, log_handler in enumerate(self.log.handlers):
+                            stream_name = getattr(log_handler.stream, "name", "")
+                            if stream_name.endswith(".log"):
+                                del self.log.handlers[i]
+                                break
+
+                        self.fp.close()
+
+                        trimLogFile(
+                            os.path.join(self.data_dir, "basicswap.log"),
+                            self._max_logfile_bytes,
+                        )
+
+                        self.openLogFile()
+
+                        stream_fp = logging.StreamHandler(self.fp)
+                        stream_fp.setFormatter(self.log_formatter)
+                        self.log.addHandler(stream_fp)
+                        self.log.info("Log file truncated.")
 
             if now - self._last_checked_actions >= self.check_actions_seconds:
                 self.checkQueuedActions()
