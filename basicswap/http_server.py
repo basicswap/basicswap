@@ -637,11 +637,10 @@ class HttpHandler(BaseHTTPRequestHandler):
 
 
 class HttpThread(threading.Thread, HTTPServer):
-    def __init__(self, fp, host_name, port_no, allow_cors, swap_client):
+    def __init__(self, host_name, port_no, allow_cors, swap_client):
         threading.Thread.__init__(self)
 
         self.stop_event = threading.Event()
-        self.fp = fp
         self.host_name = host_name
         self.port_no = port_no
         self.allow_cors = allow_cors

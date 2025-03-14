@@ -1733,48 +1733,45 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
     swap_client = None
     daemons = []
     daemon_args = ["-noconnect", "-nodnsseed", "-nofindpeers", "-nostaking"]
-    with open(os.path.join(data_dir, "basicswap.log"), "a") as fp:
-        try:
-            swap_client = BasicSwap(
-                fp, data_dir, settings, chain, transient_instance=True
-            )
-            if not swap_client.use_tor_proxy:
-                # Cannot set -bind or -whitebind together with -listen=0
-                daemon_args.append("-nolisten")
-            c = Coins.PART
-            coin_name = "particl"
-            coin_settings = settings["chainclients"][coin_name]
-            daemon_args += getCoreBinArgs(c, coin_settings, prepare=True)
-            extra_config = {"stdout_to_file": True}
-            if coin_settings["manage_daemon"]:
-                filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
-                daemons.append(
-                    startDaemon(
-                        coin_settings["datadir"],
-                        coin_settings["bindir"],
-                        filename,
-                        daemon_args,
-                        extra_config=extra_config,
-                    )
+    try:
+        swap_client = BasicSwap(data_dir, settings, chain, transient_instance=True)
+        if not swap_client.use_tor_proxy:
+            # Cannot set -bind or -whitebind together with -listen=0
+            daemon_args.append("-nolisten")
+        c = Coins.PART
+        coin_name = "particl"
+        coin_settings = settings["chainclients"][coin_name]
+        daemon_args += getCoreBinArgs(c, coin_settings, prepare=True)
+        extra_config = {"stdout_to_file": True}
+        if coin_settings["manage_daemon"]:
+            filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
+            daemons.append(
+                startDaemon(
+                    coin_settings["datadir"],
+                    coin_settings["bindir"],
+                    filename,
+                    daemon_args,
+                    extra_config=extra_config,
                 )
-                swap_client.setDaemonPID(c, daemons[-1].handle.pid)
-            swap_client.setCoinRunParams(c)
-            swap_client.createCoinInterface(c)
-            swap_client.waitForDaemonRPC(c, with_wallet=True)
+            )
+            swap_client.setDaemonPID(c, daemons[-1].handle.pid)
+        swap_client.setCoinRunParams(c)
+        swap_client.createCoinInterface(c)
+        swap_client.waitForDaemonRPC(c, with_wallet=True)
 
-            if swap_client.ci(c).isWalletEncrypted():
-                logger.info("Particl Wallet is encrypted")
-                if WALLET_ENCRYPTION_PWD == "":
-                    raise ValueError(
-                        "Must set WALLET_ENCRYPTION_PWD to add coin when Particl wallet is encrypted"
-                    )
-                swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
-        finally:
-            if swap_client:
-                swap_client.finalise()
-                del swap_client
-            for d in daemons:
-                finalise_daemon(d)
+        if swap_client.ci(c).isWalletEncrypted():
+            logger.info("Particl Wallet is encrypted")
+            if WALLET_ENCRYPTION_PWD == "":
+                raise ValueError(
+                    "Must set WALLET_ENCRYPTION_PWD to add coin when Particl wallet is encrypted"
+                )
+            swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
+    finally:
+        if swap_client:
+            swap_client.finalise()
+            del swap_client
+        for d in daemons:
+            finalise_daemon(d)
 
 
 def encrypt_wallet(swap_client, coin_type) -> None:
@@ -1793,217 +1790,206 @@ def initialise_wallets(
 
     coins_failed_to_initialise = []
 
-    with open(os.path.join(data_dir, "basicswap.log"), "a") as fp:
-        try:
-            swap_client = BasicSwap(
-                fp, data_dir, settings, chain, transient_instance=True
-            )
-            if not swap_client.use_tor_proxy:
-                # Cannot set -bind or -whitebind together with -listen=0
-                daemon_args.append("-nolisten")
-            coins_to_create_wallets_for = (
-                Coins.PART,
-                Coins.BTC,
-                Coins.LTC,
-                Coins.DOGE,
-                Coins.DCR,
-                Coins.DASH,
-            )
-            # Always start Particl, it must be running to initialise a wallet in addcoin mode
-            # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
-            start_daemons = [
-                "particl",
-            ] + [c for c in with_coins if c != "particl"]
-            for coin_name in start_daemons:
-                coin_settings = settings["chainclients"][coin_name]
-                wallet_name = coin_settings.get("wallet_name", "wallet.dat")
-                c = swap_client.getCoinIdFromName(coin_name)
+    try:
+        swap_client = BasicSwap(data_dir, settings, chain, transient_instance=True)
+        if not swap_client.use_tor_proxy:
+            # Cannot set -bind or -whitebind together with -listen=0
+            daemon_args.append("-nolisten")
+        coins_to_create_wallets_for = (
+            Coins.PART,
+            Coins.BTC,
+            Coins.LTC,
+            Coins.DOGE,
+            Coins.DCR,
+            Coins.DASH,
+        )
+        # Always start Particl, it must be running to initialise a wallet in addcoin mode
+        # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
+        start_daemons = [
+            "particl",
+        ] + [c for c in with_coins if c != "particl"]
+        for coin_name in start_daemons:
+            coin_settings = settings["chainclients"][coin_name]
+            wallet_name = coin_settings.get("wallet_name", "wallet.dat")
+            c = swap_client.getCoinIdFromName(coin_name)
 
-                if c == Coins.XMR:
-                    if coin_settings["manage_wallet_daemon"]:
-                        filename = (
-                            coin_name
-                            + "-wallet-rpc"
-                            + (".exe" if os.name == "nt" else "")
+            if c == Coins.XMR:
+                if coin_settings["manage_wallet_daemon"]:
+                    filename = (
+                        coin_name + "-wallet-rpc" + (".exe" if os.name == "nt" else "")
+                    )
+                    filename: str = getWalletBinName(
+                        c, coin_settings, coin_name + "-wallet-rpc"
+                    )
+                    daemons.append(
+                        startXmrWalletDaemon(
+                            coin_settings["datadir"],
+                            coin_settings["bindir"],
+                            filename,
                         )
-                        filename: str = getWalletBinName(
-                            c, coin_settings, coin_name + "-wallet-rpc"
+                    )
+            elif c == Coins.WOW:
+                if coin_settings["manage_wallet_daemon"]:
+                    filename: str = getWalletBinName(
+                        c, coin_settings, coin_name + "-wallet-rpc"
+                    )
+                    daemons.append(
+                        startXmrWalletDaemon(
+                            coin_settings["datadir"],
+                            coin_settings["bindir"],
+                            filename,
                         )
-                        daemons.append(
-                            startXmrWalletDaemon(
-                                coin_settings["datadir"],
-                                coin_settings["bindir"],
-                                filename,
+                    )
+            elif c == Coins.DCR:
+                pass
+            else:
+                if coin_settings["manage_daemon"]:
+                    filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
+                    coin_args = (
+                        ["-nofindpeers", "-nostaking"] if c == Coins.PART else []
+                    )
+                    coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
+
+                    if c == Coins.FIRO:
+                        coin_args += [
+                            "-hdseed={}".format(
+                                swap_client.getWalletKey(Coins.FIRO, 1).hex()
                             )
-                        )
-                elif c == Coins.WOW:
-                    if coin_settings["manage_wallet_daemon"]:
-                        filename: str = getWalletBinName(
-                            c, coin_settings, coin_name + "-wallet-rpc"
-                        )
-                        daemons.append(
-                            startXmrWalletDaemon(
-                                coin_settings["datadir"],
-                                coin_settings["bindir"],
-                                filename,
-                            )
-                        )
-                elif c == Coins.DCR:
-                    pass
-                else:
-                    if coin_settings["manage_daemon"]:
-                        filename: str = getCoreBinName(
-                            c, coin_settings, coin_name + "d"
-                        )
-                        coin_args = (
-                            ["-nofindpeers", "-nostaking"] if c == Coins.PART else []
-                        )
-                        coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
-
-                        if c == Coins.FIRO:
-                            coin_args += [
-                                "-hdseed={}".format(
-                                    swap_client.getWalletKey(Coins.FIRO, 1).hex()
-                                )
-                            ]
-
-                        extra_config = {"stdout_to_file": True}
-                        daemons.append(
-                            startDaemon(
-                                coin_settings["datadir"],
-                                coin_settings["bindir"],
-                                filename,
-                                daemon_args + coin_args,
-                                extra_config=extra_config,
-                            )
-                        )
-                        swap_client.setDaemonPID(c, daemons[-1].handle.pid)
-                swap_client.setCoinRunParams(c)
-                swap_client.createCoinInterface(c)
-
-                if c in coins_to_create_wallets_for:
-                    if c == Coins.DCR:
-                        if coin_settings["manage_wallet_daemon"] is False:
-                            continue
-                        from basicswap.interface.dcr.util import createDCRWallet
-
-                        dcr_password = (
-                            coin_settings["wallet_pwd"]
-                            if WALLET_ENCRYPTION_PWD == ""
-                            else WALLET_ENCRYPTION_PWD
-                        )
-                        extra_opts = [
-                            '--appdata="{}"'.format(coin_settings["datadir"]),
-                            "--pass={}".format(dcr_password),
                         ]
 
-                        filename: str = getWalletBinName(c, coin_settings, "dcrwallet")
-                        args = [
-                            os.path.join(coin_settings["bindir"], filename),
-                            "--create",
-                        ] + extra_opts
-                        hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
-                        createDCRWallet(args, hex_seed, logger, threading.Event())
-                        continue
-                    swap_client.waitForDaemonRPC(c, with_wallet=False)
-                    # Create wallet if it doesn't exist yet
-                    wallets = swap_client.callcoinrpc(c, "listwallets")
-                    if wallet_name not in wallets:
-                        logger.info(
-                            f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
+                    extra_config = {"stdout_to_file": True}
+                    daemons.append(
+                        startDaemon(
+                            coin_settings["datadir"],
+                            coin_settings["bindir"],
+                            filename,
+                            daemon_args + coin_args,
+                            extra_config=extra_config,
                         )
+                    )
+                    swap_client.setDaemonPID(c, daemons[-1].handle.pid)
+            swap_client.setCoinRunParams(c)
+            swap_client.createCoinInterface(c)
 
-                        if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
-                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+            if c in coins_to_create_wallets_for:
+                if c == Coins.DCR:
+                    if coin_settings["manage_wallet_daemon"] is False:
+                        continue
+                    from basicswap.interface.dcr.util import createDCRWallet
 
-                            use_descriptors = coin_settings.get(
-                                "use_descriptors", False
-                            )
+                    dcr_password = (
+                        coin_settings["wallet_pwd"]
+                        if WALLET_ENCRYPTION_PWD == ""
+                        else WALLET_ENCRYPTION_PWD
+                    )
+                    extra_opts = [
+                        '--appdata="{}"'.format(coin_settings["datadir"]),
+                        "--pass={}".format(dcr_password),
+                    ]
+
+                    filename: str = getWalletBinName(c, coin_settings, "dcrwallet")
+                    args = [
+                        os.path.join(coin_settings["bindir"], filename),
+                        "--create",
+                    ] + extra_opts
+                    hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
+                    createDCRWallet(args, hex_seed, logger, threading.Event())
+                    continue
+                swap_client.waitForDaemonRPC(c, with_wallet=False)
+                # Create wallet if it doesn't exist yet
+                wallets = swap_client.callcoinrpc(c, "listwallets")
+                if wallet_name not in wallets:
+                    logger.info(
+                        f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
+                    )
+
+                    if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
+                        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+
+                        use_descriptors = coin_settings.get("use_descriptors", False)
+                        swap_client.callcoinrpc(
+                            c,
+                            "createwallet",
+                            [
+                                wallet_name,
+                                False,
+                                True,
+                                WALLET_ENCRYPTION_PWD,
+                                False,
+                                use_descriptors,
+                            ],
+                        )
+                        if use_descriptors:
                             swap_client.callcoinrpc(
                                 c,
                                 "createwallet",
                                 [
-                                    wallet_name,
-                                    False,
+                                    coin_settings["watch_wallet_name"],
                                     True,
-                                    WALLET_ENCRYPTION_PWD,
+                                    True,
+                                    "",
                                     False,
                                     use_descriptors,
                                 ],
                             )
-                            if use_descriptors:
-                                swap_client.callcoinrpc(
-                                    c,
-                                    "createwallet",
-                                    [
-                                        coin_settings["watch_wallet_name"],
-                                        True,
-                                        True,
-                                        "",
-                                        False,
-                                        use_descriptors,
-                                    ],
-                                )
-                            swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
-                        else:
-                            swap_client.callcoinrpc(
-                                c,
-                                "createwallet",
-                                [
-                                    wallet_name,
-                                ],
-                            )
-                            if WALLET_ENCRYPTION_PWD != "":
-                                encrypt_wallet(swap_client, c)
-
-                        if c == Coins.LTC:
-                            password = (
-                                WALLET_ENCRYPTION_PWD
-                                if WALLET_ENCRYPTION_PWD != ""
-                                else None
-                            )
-                            swap_client.ci(Coins.LTC_MWEB).init_wallet(password)
-
-                if c == Coins.PART:
-                    if "particl" in with_coins:
-                        logger.info("Loading Particl mnemonic")
-                        if particl_wallet_mnemonic is None:
-                            particl_wallet_mnemonic = swap_client.callcoinrpc(
-                                Coins.PART, "mnemonic", ["new"]
-                            )["mnemonic"]
-                            generated_mnemonic = True
-                        swap_client.callcoinrpc(
-                            Coins.PART, "extkeyimportmaster", [particl_wallet_mnemonic]
-                        )
-                    # Particl wallet must be unlocked to call getWalletKey
-                    if WALLET_ENCRYPTION_PWD != "":
                         swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
-
-            for coin_name in with_coins:
-                c = swap_client.getCoinIdFromName(coin_name)
-                if c in (Coins.PART,):
-                    continue
-                if c not in (Coins.DCR,):
-                    # initialiseWallet only sets main_wallet_seedid_
-                    swap_client.waitForDaemonRPC(c)
-                try:
-                    swap_client.initialiseWallet(c, raise_errors=True)
-                except Exception as e:
-                    coins_failed_to_initialise.append((c, e))
-                if WALLET_ENCRYPTION_PWD != "" and c not in coins_to_create_wallets_for:
-                    try:
-                        swap_client.ci(c).changeWalletPassword(
-                            "", WALLET_ENCRYPTION_PWD
+                    else:
+                        swap_client.callcoinrpc(
+                            c,
+                            "createwallet",
+                            [
+                                wallet_name,
+                            ],
                         )
-                    except Exception as e:  # noqa: F841
-                        logger.warning(f"changeWalletPassword failed for {coin_name}.")
+                        if WALLET_ENCRYPTION_PWD != "":
+                            encrypt_wallet(swap_client, c)
 
-        finally:
-            if swap_client:
-                swap_client.finalise()
-                del swap_client
-            for d in daemons:
-                finalise_daemon(d)
+                    if c == Coins.LTC:
+                        password = (
+                            WALLET_ENCRYPTION_PWD
+                            if WALLET_ENCRYPTION_PWD != ""
+                            else None
+                        )
+                        swap_client.ci(Coins.LTC_MWEB).init_wallet(password)
+
+            if c == Coins.PART:
+                if "particl" in with_coins:
+                    logger.info("Loading Particl mnemonic")
+                    if particl_wallet_mnemonic is None:
+                        particl_wallet_mnemonic = swap_client.callcoinrpc(
+                            Coins.PART, "mnemonic", ["new"]
+                        )["mnemonic"]
+                        generated_mnemonic = True
+                    swap_client.callcoinrpc(
+                        Coins.PART, "extkeyimportmaster", [particl_wallet_mnemonic]
+                    )
+                # Particl wallet must be unlocked to call getWalletKey
+                if WALLET_ENCRYPTION_PWD != "":
+                    swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
+
+        for coin_name in with_coins:
+            c = swap_client.getCoinIdFromName(coin_name)
+            if c in (Coins.PART,):
+                continue
+            if c not in (Coins.DCR,):
+                # initialiseWallet only sets main_wallet_seedid_
+                swap_client.waitForDaemonRPC(c)
+            try:
+                swap_client.initialiseWallet(c, raise_errors=True)
+            except Exception as e:
+                coins_failed_to_initialise.append((c, e))
+            if WALLET_ENCRYPTION_PWD != "" and c not in coins_to_create_wallets_for:
+                try:
+                    swap_client.ci(c).changeWalletPassword("", WALLET_ENCRYPTION_PWD)
+                except Exception as e:  # noqa: F841
+                    logger.warning(f"changeWalletPassword failed for {coin_name}.")
+
+    finally:
+        if swap_client:
+            swap_client.finalise()
+            del swap_client
+        for d in daemons:
+            finalise_daemon(d)
 
     print("")
     for pair in coins_failed_to_initialise:
