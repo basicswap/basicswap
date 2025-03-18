@@ -14,7 +14,7 @@ from typing import Optional
 
 
 CURRENT_DB_VERSION = 26
-CURRENT_DB_DATA_VERSION = 5
+CURRENT_DB_DATA_VERSION = 6
 
 
 class Concepts(IntEnum):

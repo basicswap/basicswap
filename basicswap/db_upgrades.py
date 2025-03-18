@@ -104,17 +104,19 @@ def upgradeDatabaseData(self, data_version):
                     ),
                     cursor,
                 )
-        if data_version > 0 and data_version < 3:
+        if data_version > 0 and data_version < 6:
             for state in BidStates:
                 in_error = isErrorBidState(state)
                 swap_failed = isFailingBidState(state)
                 swap_ended = isFinalBidState(state)
+                can_accept = canAcceptBidState(state)
                 cursor.execute(
-                    "UPDATE bidstates SET in_error = :in_error, swap_failed = :swap_failed, swap_ended = :swap_ended WHERE state_id = :state_id",
+                    "UPDATE bidstates SET can_accept = :can_accept, in_error = :in_error, swap_failed = :swap_failed, swap_ended = :swap_ended WHERE state_id = :state_id",
                     {
                         "in_error": in_error,
                         "swap_failed": swap_failed,
                         "swap_ended": swap_ended,
+                        "can_accept": can_accept,
                         "state_id": int(state),
                     },
                 )

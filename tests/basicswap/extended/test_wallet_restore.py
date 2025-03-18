@@ -10,7 +10,7 @@
 export TEST_PATH=/tmp/test_basicswap_wallet_restore
 mkdir -p ${TEST_PATH}/bin
 cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
-export PGP_KEYS_DIR_PATH=$(pwd)/pgp/keys
+export PGP_KEYS_DIR_PATH=$(pwd)/basicswap/pgp/keys
 export PYTHONPATH=$(pwd)
 python tests/basicswap/extended/test_wallet_restore.py
 
