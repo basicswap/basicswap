@@ -71,6 +71,12 @@ jobs:
       name: Running basicswap-prepare
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
+    - name: Run test_prepare
+      run: |
+        export PYTHONPATH=$(pwd)
+        export TEST_BIN_PATH="$BIN_DIR"
+        export TEST_PATH=/tmp/test_prepare
+        pytest tests/basicswap/extended/test_prepare.py
     - name: Run test_xmr
       run: |
         export PYTHONPATH=$(pwd)
