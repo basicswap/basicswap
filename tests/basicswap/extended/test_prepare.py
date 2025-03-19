@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -109,42 +109,42 @@ class Test(unittest.TestCase):
             testargs = [
                 "basicswap-prepare",
                 "-datadir=" + test_path_plain,
-                "-addcoin=namecoin",
+                "-addcoin=bitcoin",
             ]
             with patch.object(sys, "argv", testargs):
                 prepareSystem.main()
             with open(config_path) as fs:
                 settings = json.load(fs)
                 self.assertTrue(
-                    settings["chainclients"]["namecoin"]["connection_type"] == "rpc"
+                    settings["chainclients"]["bitcoin"]["connection_type"] == "rpc"
                 )
 
             logger.info("Test disablecoin")
             testargs = [
                 "basicswap-prepare",
                 "-datadir=" + test_path_plain,
-                "-disablecoin=namecoin",
+                "-disablecoin=bitcoin",
             ]
             with patch.object(sys, "argv", testargs):
                 prepareSystem.main()
             with open(config_path) as fs:
                 settings = json.load(fs)
                 self.assertTrue(
-                    settings["chainclients"]["namecoin"]["connection_type"] == "none"
+                    settings["chainclients"]["bitcoin"]["connection_type"] == "none"
                 )
 
             logger.info("Test addcoin existing")
             testargs = [
                 "basicswap-prepare",
                 "-datadir=" + test_path_plain,
-                "-addcoin=namecoin",
+                "-addcoin=bitcoin",
             ]
             with patch.object(sys, "argv", testargs):
                 prepareSystem.main()
             with open(config_path) as fs:
                 settings = json.load(fs)
                 self.assertTrue(
-                    settings["chainclients"]["namecoin"]["connection_type"] == "rpc"
+                    settings["chainclients"]["bitcoin"]["connection_type"] == "rpc"
                 )
 
             logging.info("notorproxy")
