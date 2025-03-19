@@ -1872,6 +1872,10 @@ def initialise_wallets(
             swap_client.createCoinInterface(c)
 
             if c in coins_to_create_wallets_for:
+                if c == Coins.PART and "particl" not in with_coins:
+                    # Running addcoin with an existing particl wallet
+                    swap_client.waitForDaemonRPC(c, with_wallet=True)
+                    continue
                 if c == Coins.DCR:
                     if coin_settings["manage_wallet_daemon"] is False:
                         continue
