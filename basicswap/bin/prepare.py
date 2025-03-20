@@ -82,6 +82,9 @@ FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 NAV_VERSION = os.getenv("NAV_VERSION", "7.0.3")
 NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
 
+NMC_VERSION = os.getenv("NAV_VERSION", "28.0")
+NMC_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
+
 DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 
@@ -103,7 +106,7 @@ known_coins = {
     "bitcoin": (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ("laanwj",)),
     "litecoin": (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ("davidburkett38",)),
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
-    "namecoin": ("0.18.0", "", ("JeremyRand",)),
+    "namecoin": (NMC_VERSION, NMC_VERSION_TAG, ("RoseTuring",)),
     "monero": (MONERO_VERSION, MONERO_VERSION_TAG, ("binaryfate",)),
     "wownero": (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ("wowario",)),
     "pivx": (PIVX_VERSION, PIVX_VERSION_TAG, ("fuzzbawls",)),
@@ -115,8 +118,7 @@ known_coins = {
 }
 
 disabled_coins = [
-    "navcoin",
-    "namecoin",  # Needs update
+    "navcoin"
 ]
 
 expected_key_ids = {
@@ -124,6 +126,7 @@ expected_key_ids = {
     "thrasher": ("FE3348877809386C",),
     "laanwj": ("1E4AED62986CD25D",),
     "JeremyRand": ("2DBE339E29F6294C",),
+    "RoseTuring": ("9FE3BFDDA6C53495",),
     "binaryfate": ("F0AF4D462A0BDF92",),
     "wowario": ("793504B449C69220",),
     "davidburkett38": ("3620E9D387E55666",),
@@ -228,6 +231,9 @@ DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).
 
 NMC_RPC_HOST = os.getenv("NMC_RPC_HOST", "127.0.0.1")
 NMC_RPC_PORT = int(os.getenv("NMC_RPC_PORT", 19698))
+NMC_ONION_PORT = int(os.getenv("NMC_ONION_PORT", 9698))
+NMC_RPC_USER = os.getenv("NMC_RPC_USER", "")
+NMC_RPC_PWD = os.getenv("NMC_RPC_PWD", "")
 
 PIVX_RPC_HOST = os.getenv("PIVX_RPC_HOST", "127.0.0.1")
 PIVX_RPC_PORT = int(os.getenv("PIVX_RPC_PORT", 51473))
@@ -931,16 +937,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 % (version, assert_filename)
             )
         elif coin == "namecoin":
-            release_url = "https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}".format(
-                version, release_filename
-            )
-            assert_filename = "{}-{}-{}-build.assert".format(
-                coin, os_name, version.rsplit(".", 1)[0]
-            )
-            assert_url = (
-                "https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s"
-                % (version, os_dir_name, signing_key_name, assert_filename)
-            )
+            release_url = f"https://beta.namecoin.org/files/namecoin-core/namecoin-core-{version}/{release_filename}"
+            signing_key = "Rose%20Turing"
+            assert_filename = "noncodesigned.SHA256SUMS"
+            assert_url = f"https://raw.githubusercontent.com/namecoin/guix.sigs/main/{version}/{signing_key}/{assert_filename}"
         elif coin == "pivx":
             release_filename = "{}-{}-{}.{}".format(coin, version, BIN_ARCH, FILE_EXT)
             release_url = (
@@ -1804,6 +1804,7 @@ def initialise_wallets(
             Coins.DOGE,
             Coins.DCR,
             Coins.DASH,
+            Coins.NMC,
         )
         # Always start Particl, it must be running to initialise a wallet in addcoin mode
         # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
@@ -2453,14 +2454,15 @@ def main():
             "manage_daemon": shouldManageDaemon("NMC"),
             "rpchost": NMC_RPC_HOST,
             "rpcport": NMC_RPC_PORT + port_offset,
+            "onionport": NMC_ONION_PORT + port_offset,
             "datadir": os.getenv("NMC_DATA_DIR", os.path.join(data_dir, "namecoin")),
             "bindir": os.path.join(bin_dir, "namecoin"),
-            "use_segwit": False,
-            "use_csv": False,
+            "use_segwit": True,
+            "use_csv": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
             "core_version_no": getKnownVersion("namecoin"),
-            "core_version_group": 18,
+            "core_version_group": 28,
             "chain_lookups": "local",
         },
         "monero": {
