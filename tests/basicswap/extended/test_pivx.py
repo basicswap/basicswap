@@ -701,9 +701,9 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(
             Coins.PIVX,
             Coins.BTC,
-            0.001 * COIN,
+            0.01 * COIN,
             1.0 * COIN,
-            0.001 * COIN,
+            0.01 * COIN,
             SwapTypes.SELLER_FIRST,
             TxLockTypes.ABS_LOCK_TIME,
         )
@@ -718,7 +718,7 @@ class Test(unittest.TestCase):
             swap_clients[0].getChainClientSettings(Coins.BTC)["override_feerate"] = 10.0
             swap_clients[0].getChainClientSettings(Coins.PIVX)[
                 "override_feerate"
-            ] = 10.0
+            ] = 100.0
             wait_for_bid(
                 delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60
             )

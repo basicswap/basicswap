@@ -4668,7 +4668,7 @@ class BasicSwap(BaseApp):
                 + (len(txn_script)).to_bytes(1, "big")
                 + txn_script
             )
-            refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, script)
+            refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, script).hex()
 
         if coin_type in (Coins.NAV, Coins.DCR):
             # Only checks signature

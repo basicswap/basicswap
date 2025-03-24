@@ -34,9 +34,6 @@ class PIVXInterface(BTCInterface):
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
 
-    def checkWallets(self) -> int:
-        return 1
-
     def signTxWithWallet(self, tx):
         rv = self.rpc("signrawtransaction", [tx.hex()])
         return bytes.fromhex(rv["hex"])
