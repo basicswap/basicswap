@@ -11132,7 +11132,9 @@ class BasicSwap(BaseApp):
         rate_source: str = "coingecko.com",
         saved_ttl: int = 300,
     ):
-        self.log.debug(f"lookupFiatRates {coins_list}.")
+        if self.debug:
+            coins_list_display = ", ".join([Coins(c).name for c in coins_list])
+            self.log.debug(f"lookupFiatRates {coins_list_display}.")
         ensure(len(coins_list) > 0, "Must specify coin/s")
         ensure(saved_ttl >= 0, "Invalid saved time")
 
