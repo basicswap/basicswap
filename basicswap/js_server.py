@@ -328,9 +328,10 @@ def formatBids(swap_client, bids, filters) -> bytes:
         offer = swap_client.getOffer(b[3])
         ci_to = swap_client.ci(offer.coin_to) if offer else None
 
+        bid_rate: int = 0 if b[10] is None else b[10]
         amount_to = None
         if ci_to:
-            amount_to = ci_to.format_amount((b[4] * b[10]) // ci_from.COIN())
+            amount_to = ci_to.format_amount((b[4] * bid_rate) // ci_from.COIN())
 
         bid_data = {
             "bid_id": b[2].hex(),
@@ -341,7 +342,7 @@ def formatBids(swap_client, bids, filters) -> bytes:
             "coin_to": ci_to.coin_name() if ci_to else "Unknown",
             "amount_from": ci_from.format_amount(b[4]),
             "amount_to": amount_to,
-            "bid_rate": swap_client.ci(b[14]).format_amount(b[10]),
+            "bid_rate": swap_client.ci(b[14]).format_amount(bid_rate),
             "bid_state": strBidState(b[5]),
             "addr_from": b[11],
             "addr_to": offer.addr_to if offer else None,

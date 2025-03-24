@@ -11,9 +11,11 @@ import shlex
 import traceback
 import threading
 import http.client
-from urllib import parse
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from jinja2 import Environment, PackageLoader
+from socket import error as SocketError
+from urllib import parse
 
 from . import __version__
 from .util import (
@@ -30,7 +32,6 @@ from .basicswap_util import (
     strTxState,
     strBidState,
 )
-
 from .js_server import (
     js_error,
     js_url_to_function,
@@ -616,14 +617,20 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         response = self.handle_http(200, self.path)
-        self.wfile.write(response)
+        try:
+            self.wfile.write(response)
+        except SocketError as e:
+            self.server.swap_client.log.debug(f"do_GET SocketError {e}")
 
     def do_POST(self):
         post_string = self.rfile.read(int(self.headers.get("Content-Length")))
 
         is_json = True if "json" in self.headers.get("Content-Type", "") else False
         response = self.handle_http(200, self.path, post_string, is_json)
-        self.wfile.write(response)
+        try:
+            self.wfile.write(response)
+        except SocketError as e:
+            self.server.swap_client.log.debug(f"do_POST SocketError {e}")
 
     def do_HEAD(self):
         self.putHeaders(200, "text/html")
