@@ -27,11 +27,11 @@ If the dependencies have changed the container must be built with `--no-cache`:
 
 After updating the code and rebuilding the container run:
 
+
     basicswap/docker]$ docker-compose run --rm swapclient \
-        basicswap-prepare --datadir=/coindata --preparebinonly --withcoins=monero,bitcoin
+        basicswap-prepare --datadir=/coindata --upgradecores
 
 
-Specify all required coins after `--withcoins=`, separated by commas.
 If updating from versions below 0.21, you may need to add `wallet=wallet.dat` to the core config files.
 
 
@@ -46,4 +46,4 @@ If updating from versions below 0.21, you may need to add `wallet=wallet.dat` to
 
 #### Update core versions
 
-    basicswap-prepare --datadir=$SWAP_DATADIR -preparebinonly --withcoins=monero,bitcoin
+    basicswap-prepare --datadir=$SWAP_DATADIR --upgradecores

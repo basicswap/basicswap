@@ -82,6 +82,16 @@ To instead use Monero public nodes and not run a local Monero daemon<br>(it can 
 **Mnemonics should be stored encrypted and/or air-gapped.**
 And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restore your wallet.
 
+
+##### Restore
+
+To restore an existing install use --particl_mnemonic to input the existing mnemonic:
+
+    docker-compose run --rm swapclient basicswap-prepare --datadir=/coindata --htmlhost="0.0.0.0" --wshost="0.0.0.0" \
+                       --withcoins=monero --xmrrestoreheight=$ORIGINAL_XMR_HEIGHT \
+                       --particl_mnemonic="existing mnemonic here"
+
+
 #### Set the timezone (optional)
 
 Edit the `.env` file in the docker directory, set TZ to your local timezone.
@@ -209,7 +219,7 @@ Add a coin (Stop basicswap first):
 
 
 Start after installed:
-    
+
     export SWAP_DATADIR=$HOME/coinswaps
     . $SWAP_DATADIR/venv/bin/activate && python -V
     basicswap-run --datadir=$SWAP_DATADIR

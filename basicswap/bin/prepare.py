@@ -1027,7 +1027,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             if not os.path.exists(assert_sig_path):
                 downloadFile(assert_sig_url, assert_sig_path)
 
-    release_hash = getFileHash(release_path)
+    release_hash: str = getFileHash(release_path)
     logger.info(f"{release_filename} hash: {release_hash}")
     with (
         open(assert_path, "rb", 0) as fp,
@@ -1125,7 +1125,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         logger.warning("Double checking Navcoin release hash.")
         with open(assert_sig_path, "rb") as fp:
             decrypted = gpg.decrypt_file(fp)
-            assert release_hash.hex() in str(decrypted)
+            assert release_hash in str(decrypted)
     else:
         with open(assert_sig_path, "rb") as fp:
             verified = gpg.verify_file(fp, assert_path)
