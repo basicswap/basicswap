@@ -5,7 +5,7 @@ const BidExporter = {
         }
 
         const isSent = type === 'sent';
-        
+
         const headers = [
             'Date/Time',
             'Bid ID',
@@ -19,9 +19,9 @@ const BidExporter = {
             'Created At',
             'Expires At'
         ];
-        
+
         let csvContent = headers.join(',') + '\n';
-        
+
         bids.forEach(bid => {
             const row = [
                 `"${formatTime(bid.created_at)}"`,
@@ -36,17 +36,17 @@ const BidExporter = {
                 bid.created_at,
                 bid.expire_at
             ];
-            
+
             csvContent += row.join(',') + '\n';
         });
-        
+
         return csvContent;
     },
-    
+
     download(content, filename) {
         try {
             const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-            
+
             if (window.navigator && window.navigator.msSaveOrOpenBlob) {
                 window.navigator.msSaveOrOpenBlob(blob, filename);
                 return;
@@ -54,48 +54,48 @@ const BidExporter = {
 
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            
+
             link.href = url;
             link.download = filename;
             link.style.display = 'none';
-            
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
+
             setTimeout(() => {
                 URL.revokeObjectURL(url);
             }, 100);
         } catch (error) {
             console.error('Error downloading CSV:', error);
-            
+
             const csvData = 'data:text/csv;charset=utf-8,' + encodeURIComponent(content);
             const link = document.createElement('a');
             link.setAttribute('href', csvData);
             link.setAttribute('download', filename);
             link.style.display = 'none';
-            
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
     },
-    
+
     exportCurrentView() {
         const type = state.currentTab;
         const data = state.data[type];
-        
+
         if (!data || !data.length) {
             alert('No data to export');
             return;
         }
-        
+
         const csvContent = this.toCSV(data, type);
-        
+
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
         const filename = `bsx_${type}_bids_${dateStr}.csv`;
-        
+
         this.download(csvContent, filename);
     }
 };
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     BidExporter.exportCurrentView();
                 });
             }
-            
+
             const exportReceivedButton = document.getElementById('exportReceivedBids');
             if (exportReceivedButton) {
                 EventManager.add(exportReceivedButton, 'click', (e) => {
@@ -127,14 +127,14 @@ document.addEventListener('DOMContentLoaded', function() {
 const originalCleanup = window.cleanup || function(){};
 window.cleanup = function() {
     originalCleanup();
-    
+
     const exportSentButton = document.getElementById('exportSentBids');
     const exportReceivedButton = document.getElementById('exportReceivedBids');
-    
+
     if (exportSentButton && typeof EventManager !== 'undefined') {
         EventManager.remove(exportSentButton, 'click');
     }
-    
+
     if (exportReceivedButton && typeof EventManager !== 'undefined') {
         EventManager.remove(exportReceivedButton, 'click');
     }

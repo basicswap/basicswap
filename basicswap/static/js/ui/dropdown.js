@@ -62,7 +62,7 @@
             this._handleOutsideClick = this._handleOutsideClick.bind(this);
 
             dropdownInstances.push(this);
-            
+
             this.init();
         }
 
@@ -73,7 +73,7 @@
                 this._targetEl.style.position = 'fixed';
                 this._targetEl.style.zIndex = '40';
                 this._targetEl.classList.add('dropdown-menu');
-                
+
                 this._setupEventListeners();
                 this._initialized = true;
             }
@@ -120,8 +120,8 @@
         }
 
         _handleOutsideClick(e) {
-            if (this._visible && 
-                !this._targetEl.contains(e.target) && 
+            if (this._visible &&
+                !this._targetEl.contains(e.target) &&
                 !this._triggerEl.contains(e.target)) {
                 this.hide();
             }

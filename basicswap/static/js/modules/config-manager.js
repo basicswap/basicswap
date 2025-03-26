@@ -4,9 +4,9 @@ const ConfigManager = (function() {
     };
 
     function determineWebSocketPort() {
-        const wsPort = 
-            window.ws_port || 
-            (typeof getWebSocketConfig === 'function' ? getWebSocketConfig().port : null) || 
+        const wsPort =
+            window.ws_port ||
+            (typeof getWebSocketConfig === 'function' ? getWebSocketConfig().port : null) ||
             '11700';
         return wsPort;
     }
@@ -17,10 +17,10 @@ const ConfigManager = (function() {
         cacheDuration: 10 * 60 * 1000,
         requestTimeout: 60000,
         wsPort: selectedWsPort,
-        
+
         cacheConfig: {
             defaultTTL: 10 * 60 * 1000,
-            
+
             ttlSettings: {
                 prices: 5 * 60 * 1000,
                 chart: 5 * 60 * 1000,
@@ -34,7 +34,7 @@ const ConfigManager = (function() {
                 maxSizeBytes: 10 * 1024 * 1024,
                 maxItems: 200
             },
-            
+
             fallbackTTL: 24 * 60 * 60 * 1000
         },
 
@@ -92,7 +92,7 @@ const ConfigManager = (function() {
                 'Bitcoin Cash': 'BCH',
                 'Dogecoin': 'DOGE'
             },
-            
+
             nameToDisplayName: {
                 'Bitcoin': 'Bitcoin',
                 'Litecoin': 'Litecoin',
@@ -164,13 +164,13 @@ const ConfigManager = (function() {
             if (options) {
                 Object.assign(this, options);
             }
-            
+
             if (window.CleanupManager) {
                 window.CleanupManager.registerResource('configManager', this, (mgr) => mgr.dispose());
             }
 
             this.utils = utils;
-            
+
             state.isInitialized = true;
             console.log('ConfigManager initialized');
             return this;
@@ -205,7 +205,7 @@ const ConfigManager = (function() {
             const lowerCoinName = typeof coinName === 'string' ? coinName.toLowerCase() : '';
             return nameMap[lowerCoinName] || lowerCoinName;
         },
-        
+
         coinMatches: function(offerCoin, filterCoin) {
             if (!offerCoin || !filterCoin) return false;
 
@@ -254,7 +254,7 @@ const ConfigManager = (function() {
         get: function(path, defaultValue = null) {
             const parts = path.split('.');
             let current = this;
-            
+
             for (let i = 0; i < parts.length; i++) {
                 if (current === undefined || current === null) {
                     return defaultValue;
@@ -376,12 +376,12 @@ const ConfigManager = (function() {
                 'firo': { usd: null, btc: null }
             };
         },
-        
+
         getCoinSymbol: function(fullName) {
             return publicAPI.coinMappings?.nameToSymbol[fullName] || fullName;
         }
     };
-    
+
     return publicAPI;
 })();
 

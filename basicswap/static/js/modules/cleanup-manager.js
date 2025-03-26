@@ -111,8 +111,8 @@ const CleanupManager = (function() {
             }
 
             state.eventListeners = state.eventListeners.filter(
-                listener => !(listener.element === element && 
-                            listener.type === type && 
+                listener => !(listener.element === element &&
+                            listener.type === type &&
                             listener.handler === handler)
             );
         },
@@ -224,10 +224,10 @@ const CleanupManager = (function() {
                 intervals: state.intervals.length,
                 animationFrames: state.animationFrames.length,
                 resources: state.resources.size,
-                total: state.eventListeners.length + 
-                      state.timeouts.length + 
-                      state.intervals.length + 
-                      state.animationFrames.length + 
+                total: state.eventListeners.length +
+                      state.timeouts.length +
+                      state.intervals.length +
+                      state.animationFrames.length +
                       state.resources.size
             };
         },

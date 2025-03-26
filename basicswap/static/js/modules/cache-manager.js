@@ -19,7 +19,7 @@ const CacheManager = (function() {
   ];
 
   const isCacheKey = (key) => {
-    return CACHE_KEY_PATTERNS.some(pattern => key.startsWith(pattern)) || 
+    return CACHE_KEY_PATTERNS.some(pattern => key.startsWith(pattern)) ||
            key === 'coinGeckoOneLiner' ||
            key === PRICES_CACHE_KEY;
   };
@@ -48,7 +48,7 @@ const CacheManager = (function() {
       const ttlConfig = window.config?.cacheConfig?.ttlSettings || {};
       return ttlConfig[resourceType] || window.config?.cacheConfig?.defaultTTL || defaults.defaultTTL;
     },
-    
+
     set: function(key, value, resourceTypeOrCustomTtl = null) {
       try {
         this.cleanup();
@@ -119,10 +119,10 @@ const CacheManager = (function() {
               .filter(k => isCacheKey(k))
               .sort((a, b) => memoryCache.get(a).timestamp - memoryCache.get(b).timestamp)
               .slice(0, Math.floor(memoryCache.size * 0.2)); // Remove oldest 20%
-            
+
             keysToDelete.forEach(k => memoryCache.delete(k));
           }
-          
+
           return true;
         }
       } catch (error) {
@@ -194,7 +194,7 @@ const CacheManager = (function() {
             memoryCache.delete(key);
           }
         }
-        
+
         return null;
       } catch (error) {
         console.error("Cache retrieval error:", error);
@@ -286,7 +286,7 @@ const CacheManager = (function() {
           .filter(key => isCacheKey(key))
           .sort((a, b) => memoryCache.get(a).timestamp - memoryCache.get(b).timestamp)
           .slice(0, Math.floor(memoryCache.size * 0.3)); // Remove oldest 30% during aggressive cleanup
-        
+
         keysToDelete.forEach(key => memoryCache.delete(key));
       }
 
@@ -327,7 +327,7 @@ const CacheManager = (function() {
       Array.from(memoryCache.keys())
         .filter(key => isCacheKey(key))
         .forEach(key => memoryCache.delete(key));
-      
+
       console.log("Cache cleared successfully");
       return true;
     },
@@ -368,7 +368,7 @@ const CacheManager = (function() {
       let memoryCacheSize = 0;
       let memoryCacheItems = 0;
       let memoryCacheExpired = 0;
-      
+
       memoryCache.forEach((item, key) => {
         if (isCacheKey(key)) {
           memoryCacheItems++;
@@ -381,7 +381,7 @@ const CacheManager = (function() {
           }
         }
       });
-      
+
       return {
         totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
         itemCount,
@@ -415,10 +415,10 @@ const CacheManager = (function() {
             }
           }
         });
-        
+
         console.log(`Migrated ${migratedCount} items from memory cache to localStorage.`);
       }
-      
+
       return {
         available: storageAvailable,
         type: storageAvailable ? 'localStorage' : 'memory'
@@ -430,7 +430,7 @@ const CacheManager = (function() {
     ...cacheAPI,
 
     setPrices: function(priceData, customTtl = null) {
-      return this.set(PRICES_CACHE_KEY, priceData, 
+      return this.set(PRICES_CACHE_KEY, priceData,
         customTtl || (typeof customTtl === 'undefined' ? 'prices' : null));
     },
 
@@ -447,7 +447,7 @@ const CacheManager = (function() {
       const normalizedSymbol = symbol.toLowerCase();
       return prices.value[normalizedSymbol] || null;
     },
-    
+
     getCompatiblePrices: function(format) {
       const prices = this.getPrices();
       if (!prices || !prices.value) {
@@ -464,7 +464,7 @@ const CacheManager = (function() {
               .join(' ')
               .toLowerCase()
               .replace(' ', '-');
-            
+
             ratesFormat[coinKey] = {
               usd: data.price || data.usd,
               btc: data.price_btc || data.btc
@@ -493,7 +493,7 @@ const CacheManager = (function() {
             value: geckoFormat,
             remainingTime: prices.remainingTime
           };
-          
+
         default:
           return prices;
       }

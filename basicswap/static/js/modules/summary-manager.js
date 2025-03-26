@@ -15,9 +15,9 @@ const SummaryManager = (function() {
   function updateElement(elementId, value) {
     const element = document.getElementById(elementId);
     if (!element) return false;
-    
-    const safeValue = (value !== undefined && value !== null) 
-      ? value 
+
+    const safeValue = (value !== undefined && value !== null)
+      ? value
       : (element.dataset.lastValue || 0);
 
     element.dataset.lastValue = safeValue;
@@ -32,8 +32,8 @@ const SummaryManager = (function() {
       element.textContent = safeValue;
     }
 
-    if (['offers-counter', 'bid-requests-counter', 'sent-bids-counter', 
-         'recv-bids-counter', 'swaps-counter', 'network-offers-counter', 
+    if (['offers-counter', 'bid-requests-counter', 'sent-bids-counter',
+         'recv-bids-counter', 'swaps-counter', 'network-offers-counter',
          'watched-outputs-counter'].includes(elementId)) {
       element.classList.remove('bg-blue-500', 'bg-gray-400');
       element.classList.add(safeValue > 0 ? 'bg-blue-500' : 'bg-gray-400');
@@ -57,7 +57,7 @@ const SummaryManager = (function() {
 
   function updateUIFromData(data) {
     if (!data) return;
-    
+
     updateElement('network-offers-counter', data.num_network_offers);
     updateElement('offers-counter', data.num_sent_active_offers);
     updateElement('sent-bids-counter', data.num_sent_active_bids);
@@ -65,7 +65,7 @@ const SummaryManager = (function() {
     updateElement('bid-requests-counter', data.num_available_bids);
     updateElement('swaps-counter', data.num_swapping);
     updateElement('watched-outputs-counter', data.num_watched_outputs);
-    
+
     const shutdownButtons = document.querySelectorAll('.shutdown-button');
     shutdownButtons.forEach(button => {
       button.setAttribute('data-active-swaps', data.num_swapping);
@@ -83,7 +83,7 @@ const SummaryManager = (function() {
 
   function cacheSummaryData(data) {
     if (!data) return;
-    
+
     localStorage.setItem('summary_data_cache', JSON.stringify({
       timestamp: Date.now(),
       data: data
@@ -92,24 +92,24 @@ const SummaryManager = (function() {
 
   function getCachedSummaryData() {
     let cachedData = null;
-    
+
     cachedData = localStorage.getItem('summary_data_cache');
     if (!cachedData) return null;
-    
+
     const parsedCache = JSON.parse(cachedData);
     const maxAge = 24 * 60 * 60 * 1000;
-    
+
     if (Date.now() - parsedCache.timestamp < maxAge) {
       return parsedCache.data;
     }
-    
+
     return null;
   }
 
   function fetchSummaryDataWithTimeout() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), config.requestTimeout);
-    
+
     return fetch(config.summaryEndpoint, {
       signal: controller.signal,
       headers: {
@@ -120,11 +120,11 @@ const SummaryManager = (function() {
     })
     .then(response => {
       clearTimeout(timeoutId);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
-      
+
       return response.json();
     })
     .catch(error => {
@@ -138,21 +138,21 @@ const SummaryManager = (function() {
       webSocket.close();
     }
 
-    const wsPort = window.config?.wsPort || 
+    const wsPort = window.config?.wsPort ||
                    (typeof determineWebSocketPort === 'function' ? determineWebSocketPort() : '11700');
-                   
+
     const wsUrl = "ws://" + window.location.hostname + ":" + wsPort;
     webSocket = new WebSocket(wsUrl);
-    
+
     webSocket.onopen = () => {
       publicAPI.fetchSummaryData()
         .then(() => {})
         .catch(() => {});
     };
-    
+
     webSocket.onmessage = (event) => {
       let data;
-      
+
       try {
         data = JSON.parse(event.data);
       } catch (error) {
@@ -161,18 +161,18 @@ const SummaryManager = (function() {
         }
         return;
       }
-      
+
       if (data.event) {
         publicAPI.fetchSummaryData()
           .then(() => {})
           .catch(() => {});
-        
+
         if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
           window.NotificationManager.handleWebSocketEvent(data);
         }
       }
     };
-    
+
     webSocket.onclose = () => {
       setTimeout(setupWebSocket, 5000);
     };
@@ -185,8 +185,8 @@ const SummaryManager = (function() {
       template.innerHTML = document.querySelector('[id^="swapContainer"]')?.innerHTML || '';
       document.body.appendChild(template);
     }
-    
-    if (!document.getElementById('swap-in-progress-green-template') && 
+
+    if (!document.getElementById('swap-in-progress-green-template') &&
         document.querySelector('[id^="swapContainer"]')?.innerHTML) {
       const greenTemplate = document.createElement('template');
       greenTemplate.id = 'swap-in-progress-green-template';
@@ -229,7 +229,7 @@ const SummaryManager = (function() {
 
       if (window.WebSocketManager && typeof window.WebSocketManager.initialize === 'function') {
         const wsManager = window.WebSocketManager;
-        
+
         if (!wsManager.isConnected()) {
           wsManager.connect();
         }
@@ -239,7 +239,7 @@ const SummaryManager = (function() {
             this.fetchSummaryData()
               .then(() => {})
               .catch(() => {});
-            
+
             if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
               window.NotificationManager.handleWebSocketEvent(data);
             }
@@ -302,7 +302,7 @@ const SummaryManager = (function() {
           }
         });
     },
-    
+
     startRefreshTimer: function() {
       startRefreshTimer();
     },

@@ -30,13 +30,13 @@ const NetworkManager = (function() {
     const publicAPI = {
         initialize: function(options = {}) {
             Object.assign(config, options);
-            
+
             window.addEventListener('online', this.handleOnlineStatus.bind(this));
             window.addEventListener('offline', this.handleOfflineStatus.bind(this));
-            
+
             state.isOnline = navigator.onLine;
             log(`Network status initialized: ${state.isOnline ? 'online' : 'offline'}`);
-            
+
             if (window.CleanupManager) {
                 window.CleanupManager.registerResource('networkManager', this, (mgr) => mgr.dispose());
             }
@@ -61,7 +61,7 @@ const NetworkManager = (function() {
             log('Browser reports online status');
             state.isOnline = true;
             this.notifyHandlers('online');
-            
+
             if (state.reconnectTimer) {
                 this.scheduleReconnectRefresh();
             }
@@ -103,7 +103,7 @@ const NetworkManager = (function() {
                 state.reconnectTimer = null;
             }
 
-            const delay = config.reconnectDelay * Math.pow(config.reconnectBackoff, 
+            const delay = config.reconnectDelay * Math.pow(config.reconnectBackoff,
                                                  Math.min(state.reconnectAttempts, 5));
 
             log(`Scheduling reconnection attempt in ${delay/1000} seconds`);
@@ -145,7 +145,7 @@ const NetworkManager = (function() {
                         this.notifyHandlers('reconnected');
                     } else {
                         log('Backend still unavailable');
-                        
+
                         if (state.reconnectAttempts < config.maxReconnectAttempts) {
                             this.scheduleReconnectRefresh();
                         } else {
@@ -157,7 +157,7 @@ const NetworkManager = (function() {
                 .catch(error => {
                     state.connectionTestInProgress = false;
                     log('Error during connection test:', error);
-                    
+
                     if (state.reconnectAttempts < config.maxReconnectAttempts) {
                         this.scheduleReconnectRefresh();
                     } else {
@@ -210,7 +210,7 @@ const NetworkManager = (function() {
 
             const handlerId = generateHandlerId();
             state.eventHandlers[event][handlerId] = handler;
-            
+
             return handlerId;
         },
 
@@ -256,9 +256,9 @@ const NetworkManager = (function() {
 
             window.removeEventListener('online', this.handleOnlineStatus);
             window.removeEventListener('offline', this.handleOfflineStatus);
-            
+
             state.eventHandlers = {};
-            
+
             log('NetworkManager disposed');
         }
     };

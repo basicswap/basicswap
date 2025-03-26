@@ -60,7 +60,7 @@ const IdentityManager = (function() {
                 const oldestEntries = [...state.cache.entries()]
                     .sort((a, b) => a[1].timestamp - b[1].timestamp)
                     .slice(0, Math.floor(state.config.maxCacheSize * 0.2));
-                    
+
                 oldestEntries.forEach(([key]) => {
                     state.cache.delete(key);
                     log(`Pruned cache entry for ${key}`);
@@ -88,10 +88,10 @@ const IdentityManager = (function() {
             const entriesToRemove = [...state.cache.entries()]
                 .sort((a, b) => a[1].timestamp - b[1].timestamp)
                 .slice(0, state.cache.size - maxSize);
-            
+
             entriesToRemove.forEach(([key]) => state.cache.delete(key));
             log(`Limited cache size, removed ${entriesToRemove.length} entries`);
-            
+
             return entriesToRemove.length;
         },
 
@@ -138,11 +138,11 @@ const IdentityManager = (function() {
             if (options) {
                 this.configure(options);
             }
-            
+
             if (window.CleanupManager) {
                 window.CleanupManager.registerResource('identityManager', this, (mgr) => mgr.dispose());
             }
-            
+
             log('IdentityManager initialized');
             return this;
         },

@@ -26,14 +26,14 @@ const TooltipManager = (function() {
 
         create(element, content, options = {}) {
             if (!element) return null;
-            
+
             this.destroy(element);
 
             if (this.tooltipElementsMap.size > this.maxTooltips * this.cleanupThreshold) {
                 const oldestEntries = Array.from(this.tooltipElementsMap.entries())
                     .sort((a, b) => a[1].timestamp - b[1].timestamp)
                     .slice(0, 20);
-                
+
                 oldestEntries.forEach(([el]) => {
                     this.destroy(el);
                 });
@@ -199,7 +199,7 @@ const TooltipManager = (function() {
                     instance[0].destroy();
                 } catch (e) {
                     console.warn('Error destroying tooltip:', e);
-                    
+
                     const tippyRoot = document.querySelector(`[data-for-tooltip-id="${id}"]`);
                     if (tippyRoot && tippyRoot.parentNode) {
                         tippyRoot.parentNode.removeChild(tippyRoot);
@@ -209,7 +209,7 @@ const TooltipManager = (function() {
 
             this.activeTooltips.delete(element);
             this.tooltipElementsMap.delete(element);
-            
+
             element.removeAttribute('data-tooltip-trigger-id');
         }
 
@@ -355,7 +355,7 @@ const TooltipManager = (function() {
             this.handleVisibilityChange = () => {
                 if (document.hidden) {
                     this.cleanup();
-                    
+
                     if (window.MemoryManager) {
                         window.MemoryManager.forceCleanup();
                     }
@@ -365,7 +365,7 @@ const TooltipManager = (function() {
             window.addEventListener('beforeunload', this.boundCleanup);
             window.addEventListener('unload', this.boundCleanup);
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
-            
+
             if (window.CleanupManager) {
                 window.CleanupManager.registerResource('tooltipManager', this, (tm) => tm.dispose());
             }
@@ -471,7 +471,7 @@ const TooltipManager = (function() {
                 }
             });
 
-            this.mutationObserver.observe(document.body, { 
+            this.mutationObserver.observe(document.body, {
                 childList: true,
                 subtree: true
             });
@@ -497,7 +497,7 @@ const TooltipManager = (function() {
                 cancelAnimationFrame(id);
             });
             this.pendingAnimationFrames.clear();
-            
+
             if (this.mutationObserver) {
                 this.mutationObserver.disconnect();
                 this.mutationObserver = null;
