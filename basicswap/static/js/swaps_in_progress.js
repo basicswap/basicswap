@@ -1,4 +1,3 @@
-// Constants and State
 const PAGE_SIZE = 50;
 const COIN_NAME_TO_SYMBOL = {
     'Bitcoin': 'BTC',
@@ -16,7 +15,6 @@ const COIN_NAME_TO_SYMBOL = {
     'Dogecoin': 'DOGE'
 };
 
-// Global state
 const state = {
     identities: new Map(),
     currentPage: 1,
@@ -27,7 +25,6 @@ const state = {
     refreshPromise: null
 };
 
-// DOM
 const elements = {
     swapsBody: document.getElementById('active-swaps-body'),
     prevPageButton: document.getElementById('prevPage'),
@@ -38,105 +35,6 @@ const elements = {
     refreshSwapsButton: document.getElementById('refreshSwaps'),
     statusDot: document.getElementById('status-dot'),
     statusText: document.getElementById('status-text')
-};
-
-// Identity Manager
-const IdentityManager = {
-    cache: new Map(),
-    pendingRequests: new Map(),
-    retryDelay: 2000,
-    maxRetries: 3,
-    cacheTimeout: 5 * 60 * 1000, // 5 minutes
-
-    async getIdentityData(address) {
-        if (!address) {
-            return { address: '' };
-        }
-
-        const cachedData = this.getCachedIdentity(address);
-        if (cachedData) {
-            return { ...cachedData, address };
-        }
-
-        if (this.pendingRequests.has(address)) {
-            const pendingData = await this.pendingRequests.get(address);
-            return { ...pendingData, address };
-        }
-
-        const request = this.fetchWithRetry(address);
-        this.pendingRequests.set(address, request);
-
-        try {
-            const data = await request;
-            this.cache.set(address, {
-                data,
-                timestamp: Date.now()
-            });
-            return { ...data, address };
-        } catch (error) {
-            console.warn(`Error fetching identity for ${address}:`, error);
-            return { address };
-        } finally {
-            this.pendingRequests.delete(address);
-        }
-    },
-
-    getCachedIdentity(address) {
-        const cached = this.cache.get(address);
-        if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
-            return cached.data;
-        }
-        if (cached) {
-            this.cache.delete(address);
-        }
-        return null;
-    },
-
-    async fetchWithRetry(address, attempt = 1) {
-        try {
-            const response = await fetch(`/json/identities/${address}`, {
-                signal: AbortSignal.timeout(5000)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return {
-                ...data,
-                address,
-                num_sent_bids_successful: safeParseInt(data.num_sent_bids_successful),
-                num_recv_bids_successful: safeParseInt(data.num_recv_bids_successful),
-                num_sent_bids_failed: safeParseInt(data.num_sent_bids_failed),
-                num_recv_bids_failed: safeParseInt(data.num_recv_bids_failed),
-                num_sent_bids_rejected: safeParseInt(data.num_sent_bids_rejected),
-                num_recv_bids_rejected: safeParseInt(data.num_recv_bids_rejected),
-                label: data.label || '',
-                note: data.note || '',
-                automation_override: safeParseInt(data.automation_override)
-            };
-        } catch (error) {
-            if (attempt >= this.maxRetries) {
-                console.warn(`Failed to fetch identity for ${address} after ${attempt} attempts`);
-                return {
-                    address,
-                    num_sent_bids_successful: 0,
-                    num_recv_bids_successful: 0,
-                    num_sent_bids_failed: 0,
-                    num_recv_bids_failed: 0,
-                    num_sent_bids_rejected: 0,
-                    num_recv_bids_rejected: 0,
-                    label: '',
-                    note: '',
-                    automation_override: 0
-                };
-            }
-
-            await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
-            return this.fetchWithRetry(address, attempt + 1);
-        }
-    }
 };
 
 const safeParseInt = (value) => {
@@ -200,7 +98,6 @@ const getTxStatusClass = (status) => {
     return 'text-blue-500';
 };
 
-// Util
 const formatTimeAgo = (timestamp) => {
     const now = Math.floor(Date.now() / 1000);
     const diff = now - timestamp;
@@ -210,7 +107,6 @@ const formatTimeAgo = (timestamp) => {
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
     return `${Math.floor(diff / 86400)} days ago`;
 };
-
 
 const formatTime = (timestamp) => {
     if (!timestamp) return '';
@@ -251,111 +147,6 @@ const getTimeStrokeColor = (expireTime) => {
     return '#10B981'; // More than 30 minutes
 };
 
-// WebSocket Manager
-const WebSocketManager = {
-    ws: null,
-    processingQueue: false,
-    reconnectTimeout: null,
-    maxReconnectAttempts: 5,
-    reconnectAttempts: 0,
-    reconnectDelay: 5000,
-
-    initialize() {
-        this.connect();
-        this.startHealthCheck();
-    },
-
-    connect() {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
-
-    try {
-
-        let wsPort;
-        
-        if (typeof getWebSocketConfig === 'function') {
-            const wsConfig = getWebSocketConfig();
-            wsPort = wsConfig?.port || wsConfig?.fallbackPort;
-        }
-
-        if (!wsPort && window.config?.port) {
-            wsPort = window.config.port;
-        }
-
-        if (!wsPort) {
-            wsPort = window.ws_port || '11700';
-        }
-
-        console.log("Using WebSocket port:", wsPort);
-        this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
-        this.setupEventHandlers();
-    } catch (error) {
-        console.error('WebSocket connection error:', error);
-        this.handleReconnect();
-    }
-},
-    setupEventHandlers() {
-        this.ws.onopen = () => {
-            state.wsConnected = true;
-            this.reconnectAttempts = 0;
-            updateConnectionStatus('connected');
-            console.log('🟢  WebSocket connection established for Swaps in Progress');
-            updateSwapsTable({ resetPage: true, refreshData: true });
-        };
-
-        this.ws.onmessage = () => {
-            if (!this.processingQueue) {
-                this.processingQueue = true;
-                setTimeout(async () => {
-                    try {
-                        if (!state.isRefreshing) {
-                            await updateSwapsTable({ resetPage: false, refreshData: true });
-                        }
-                    } finally {
-                        this.processingQueue = false;
-                    }
-                }, 200);
-            }
-        };
-
-        this.ws.onclose = () => {
-            state.wsConnected = false;
-            updateConnectionStatus('disconnected');
-            this.handleReconnect();
-        };
-
-        this.ws.onerror = () => {
-            updateConnectionStatus('error');
-        };
-    },
-
-    startHealthCheck() {
-        setInterval(() => {
-            if (this.ws?.readyState !== WebSocket.OPEN) {
-                this.handleReconnect();
-            }
-        }, 30000);
-    },
-
-    handleReconnect() {
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-        }
-
-        this.reconnectAttempts++;
-        if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-            const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
-            this.reconnectTimeout = setTimeout(() => this.connect(), delay);
-        } else {
-            updateConnectionStatus('error');
-            setTimeout(() => {
-                this.reconnectAttempts = 0;
-                this.connect();
-            }, 60000);
-        }
-    }
-};
-
-// UI
 const updateConnectionStatus = (status) => {
     const { statusDot, statusText } = elements;
     if (!statusDot || !statusText) return;
@@ -528,7 +319,7 @@ const createSwapTableRow = async (swap) => {
             <td class="relative w-0 p-0 m-0">
                 <div class="absolute top-0 bottom-0 left-0 w-1"></div>
             </td>
-            
+
             <!-- Time Column -->
             <td class="py-3 pl-1 pr-2 text-xs whitespace-nowrap">
                 <div class="flex items-center">
@@ -575,13 +366,14 @@ const createSwapTableRow = async (swap) => {
              </div>
             </div>
            </td>
-
-            <!-- You Receive Column -->
+            <!-- You Send Column -->
             <td class="py-0">
                 <div class="py-3 px-4 text-left">
                     <div class="items-center monospace">
-                        <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
+                        <div class="pr-2">
+                            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
+                        </div>
                     </div>
                 </div>
             </td>
@@ -592,8 +384,8 @@ const createSwapTableRow = async (swap) => {
                     <div class="flex items-center justify-center">
                         <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12" 
-                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png" 
-                                 alt="${swap.coin_to}"
+                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png" 
+                                 alt="${swap.coin_from}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -601,30 +393,27 @@ const createSwapTableRow = async (swap) => {
                         </svg>
                         <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12" 
-                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png" 
-                                 alt="${swap.coin_from}"
+                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png" 
+                                 alt="${swap.coin_to}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
                     </div>
                 </div>
             </td>
 
-            <!-- You Send Column -->
+            <!-- You Receive Column -->
             <td class="py-0">
                 <div class="py-3 px-4 text-right">
                     <div class="items-center monospace">
-                        <div>
-                            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
-                        </div>
+                        <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
                     </div>
                 </div>
             </td>
-
             <!-- Status Column -->
             <td class="py-3 px-4 text-center">
                 <div data-tooltip-target="tooltip-status-${uniqueId}" class="flex justify-center">
-                    <span class="px-2.5 py-1 text-xs font-medium rounded-full ${getStatusClass(swap.bid_state, swap.tx_state_a, swap.tx_state_b)}">
+                    <span class="w-full lg:w-7/8 xl:w-2/3 px-2.5 py-1 inline-flex items-center justify-center text-center rounded-full text-xs font-medium bold ${getStatusClass(swap.bid_state, swap.tx_state_a, swap.tx_state_b)}">
                         ${swap.bid_state}
                     </span>
                 </div>
@@ -727,6 +516,8 @@ const createSwapTableRow = async (swap) => {
 async function updateSwapsTable(options = {}) {
     const { resetPage = false, refreshData = true } = options;
 
+    //console.log('Updating swaps table:', { resetPage, refreshData });
+
     if (state.refreshPromise) {
         await state.refreshPromise;
         return;
@@ -752,9 +543,19 @@ async function updateSwapsTable(options = {}) {
                     }
 
                     const data = await response.json();
-                    state.swapsData = Array.isArray(data) ? data : [];
+                    //console.log('Received swap data:', data);
+
+                    state.swapsData = Array.isArray(data) 
+                        ? data.filter(swap => {
+                            const isActive = isActiveSwap(swap);
+                            //console.log(`Swap ${swap.bid_id}: ${isActive ? 'Active' : 'Inactive'}`, swap.bid_state);
+                            return isActive;
+                        }) 
+                        : [];
+
+                    //console.log('Filtered active swaps:', state.swapsData);
                 } catch (error) {
-                    console.error('Error fetching swap data:', error);
+                    //console.error('Error fetching swap data:', error);
                     state.swapsData = [];
                 } finally {
                     state.refreshPromise = null;
@@ -780,13 +581,14 @@ async function updateSwapsTable(options = {}) {
         const endIndex = startIndex + PAGE_SIZE;
         const currentPageSwaps = state.swapsData.slice(startIndex, endIndex);
 
+        //console.log('Current page swaps:', currentPageSwaps);
+
         if (elements.swapsBody) {
             if (currentPageSwaps.length > 0) {
                 const rowPromises = currentPageSwaps.map(swap => createSwapTableRow(swap));
                 const rows = await Promise.all(rowPromises);
                 elements.swapsBody.innerHTML = rows.join('');
 
-                // Initialize tooltips
                 if (window.TooltipManager) {
                     window.TooltipManager.cleanup();
                     const tooltipTriggers = document.querySelectorAll('[data-tooltip-target]');
@@ -801,6 +603,7 @@ async function updateSwapsTable(options = {}) {
                     });
                 }
             } else {
+                //console.log('No active swaps found, displaying empty state');
                 elements.swapsBody.innerHTML = `
                     <tr>
                         <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
@@ -808,22 +611,6 @@ async function updateSwapsTable(options = {}) {
                         </td>
                     </tr>`;
             }
-        }
-
-        if (elements.paginationControls) {
-            elements.paginationControls.style.display = totalPages > 1 ? 'flex' : 'none';
-        }
-
-        if (elements.currentPageSpan) {
-            elements.currentPageSpan.textContent = state.currentPage;
-        }
-
-        if (elements.prevPageButton) {
-            elements.prevPageButton.style.display = state.currentPage > 1 ? 'inline-flex' : 'none';
-        }
-
-        if (elements.nextPageButton) {
-            elements.nextPageButton.style.display = state.currentPage < totalPages ? 'inline-flex' : 'none';
         }
 
     } catch (error) {
@@ -841,7 +628,34 @@ async function updateSwapsTable(options = {}) {
     }
 }
 
-// Event
+function isActiveSwap(swap) {
+    const activeStates = [
+
+        'InProgress', 
+        'Accepted', 
+        'Delaying', 
+        'Auto accept delay',
+        'Request accepted',
+        //'Received',
+
+        'Script coin locked', 
+        'Scriptless coin locked',
+        'Script coin lock released',
+ 
+        'SendingInitialTx', 
+        'SendingPaymentTx',
+
+        'Exchanged script lock tx sigs msg',
+        'Exchanged script lock spend tx msg',
+
+        'Script tx redeemed',
+        'Scriptless tx redeemed',
+        'Scriptless tx recovered'
+    ];
+
+    return activeStates.includes(swap.bid_state);
+}
+
 const setupEventListeners = () => {
     if (elements.refreshSwapsButton) {
         elements.refreshSwapsButton.addEventListener('click', async (e) => {
@@ -881,8 +695,11 @@ const setupEventListeners = () => {
     }
 };
 
-// Init
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     WebSocketManager.initialize();
     setupEventListeners();
+    await updateSwapsTable({ resetPage: true, refreshData: true });
+    const autoRefreshInterval = setInterval(async () => {
+        await updateSwapsTable({ resetPage: false, refreshData: true });
+    }, 10000);  // 30 seconds
 });

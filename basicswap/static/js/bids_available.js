@@ -1,4 +1,3 @@
-// Constants and State
 const PAGE_SIZE = 50;
 const COIN_NAME_TO_SYMBOL = {
     'Bitcoin': 'BTC',
@@ -16,7 +15,6 @@ const COIN_NAME_TO_SYMBOL = {
     'Dogecoin': 'DOGE'
 };
 
-// Global state
 const state = {
     dentities: new Map(),
     currentPage: 1,
@@ -27,7 +25,6 @@ const state = {
     refreshPromise: null
 };
 
-// DOM
 const elements = {
     bidsBody: document.getElementById('bids-body'),
     prevPageButton: document.getElementById('prevPage'),
@@ -40,125 +37,6 @@ const elements = {
     statusText: document.getElementById('status-text')
 };
 
-// Identity Manager
-const IdentityManager = {
-    cache: new Map(),
-    pendingRequests: new Map(),
-    retryDelay: 2000,
-    maxRetries: 3,
-    cacheTimeout: 5 * 60 * 1000, // 5 minutes
-
-    async getIdentityData(address) {
-        if (!address) {
-            return { address: '' };
-        }
-
-        const cachedData = this.getCachedIdentity(address);
-        if (cachedData) {
-            return { ...cachedData, address };
-        }
-
-        if (this.pendingRequests.has(address)) {
-            const pendingData = await this.pendingRequests.get(address);
-            return { ...pendingData, address };
-        }
-
-        const request = this.fetchWithRetry(address);
-        this.pendingRequests.set(address, request);
-
-        try {
-            const data = await request;
-            this.cache.set(address, {
-                data,
-                timestamp: Date.now()
-            });
-            return { ...data, address };
-        } catch (error) {
-            console.warn(`Error fetching identity for ${address}:`, error);
-            return { address };
-        } finally {
-            this.pendingRequests.delete(address);
-        }
-    },
-
-    getCachedIdentity(address) {
-        const cached = this.cache.get(address);
-        if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
-            return cached.data;
-        }
-        if (cached) {
-            this.cache.delete(address);
-        }
-        return null;
-    },
-
-    async fetchWithRetry(address, attempt = 1) {
-        try {
-            const response = await fetch(`/json/identities/${address}`, {
-                signal: AbortSignal.timeout(5000)
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            return {
-                ...data,
-                address,
-                num_sent_bids_successful: safeParseInt(data.num_sent_bids_successful),
-                num_recv_bids_successful: safeParseInt(data.num_recv_bids_successful),
-                num_sent_bids_failed: safeParseInt(data.num_sent_bids_failed),
-                num_recv_bids_failed: safeParseInt(data.num_recv_bids_failed),
-                num_sent_bids_rejected: safeParseInt(data.num_sent_bids_rejected),
-                num_recv_bids_rejected: safeParseInt(data.num_recv_bids_rejected),
-                label: data.label || '',
-                note: data.note || '',
-                automation_override: safeParseInt(data.automation_override)
-            };
-        } catch (error) {
-            if (attempt >= this.maxRetries) {
-                console.warn(`Failed to fetch identity for ${address} after ${attempt} attempts`);
-                return {
-                    address,
-                    num_sent_bids_successful: 0,
-                    num_recv_bids_successful: 0,
-                    num_sent_bids_failed: 0,
-                    num_recv_bids_failed: 0,
-                    num_sent_bids_rejected: 0,
-                    num_recv_bids_rejected: 0,
-                    label: '',
-                    note: '',
-                    automation_override: 0
-                };
-            }
-
-            await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
-            return this.fetchWithRetry(address, attempt + 1);
-        }
-    },
-
-    clearCache() {
-        this.cache.clear();
-        this.pendingRequests.clear();
-    },
-
-    removeFromCache(address) {
-        this.cache.delete(address);
-        this.pendingRequests.delete(address);
-    },
-
-    cleanup() {
-        const now = Date.now();
-        for (const [address, cached] of this.cache.entries()) {
-            if (now - cached.timestamp >= this.cacheTimeout) {
-                this.cache.delete(address);
-            }
-        }
-    }
-};
-
-// Util
 const formatTimeAgo = (timestamp) => {
     const now = Math.floor(Date.now() / 1000);
     const diff = now - timestamp;
@@ -342,108 +220,6 @@ const createIdentityTooltip = (identity) => {
     `;
 };
 
-// WebSocket Manager
-const WebSocketManager = {
-    ws: null,
-    processingQueue: false,
-    reconnectTimeout: null,
-    maxReconnectAttempts: 5,
-    reconnectAttempts: 0,
-    reconnectDelay: 5000,
-
-    initialize() {
-        this.connect();
-        this.startHealthCheck();
-    },
-
-    connect() {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
-
-    try {
-        let wsPort;
-
-        if (typeof getWebSocketConfig === 'function') {
-            const wsConfig = getWebSocketConfig();
-            wsPort = wsConfig?.port || wsConfig?.fallbackPort;
-        }
-        if (!wsPort && window.config?.port) {
-            wsPort = window.config.port;
-        }
-        if (!wsPort) {
-            wsPort = window.ws_port || '11700';
-        }
-        console.log("Using WebSocket port:", wsPort);
-        this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
-        this.setupEventHandlers();
-    } catch (error) {
-        console.error('WebSocket connection error:', error);
-        this.handleReconnect();
-    }
-},
-
-    setupEventHandlers() {
-        this.ws.onopen = () => {
-            state.wsConnected = true;
-            this.reconnectAttempts = 0;
-            updateConnectionStatus('connected');
-            console.log('🟢  WebSocket connection established for Bid Requests');
-            updateBidsTable({ resetPage: true, refreshData: true });
-        };
-
-        this.ws.onmessage = () => {
-            if (!this.processingQueue) {
-                this.processingQueue = true;
-                setTimeout(async () => {
-                    try {
-                        if (!state.isRefreshing) {
-                            await updateBidsTable({ resetPage: false, refreshData: true });
-                        }
-                    } finally {
-                        this.processingQueue = false;
-                    }
-                }, 200);
-            }
-        };
-
-        this.ws.onclose = () => {
-            state.wsConnected = false;
-            updateConnectionStatus('disconnected');
-            this.handleReconnect();
-        };
-
-        this.ws.onerror = () => {
-            updateConnectionStatus('error');
-        };
-    },
-
-    startHealthCheck() {
-        setInterval(() => {
-            if (this.ws?.readyState !== WebSocket.OPEN) {
-                this.handleReconnect();
-            }
-        }, 30000);
-    },
-
-    handleReconnect() {
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-        }
-
-        this.reconnectAttempts++;
-        if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-            const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
-            this.reconnectTimeout = setTimeout(() => this.connect(), delay);
-        } else {
-            updateConnectionStatus('error');
-            setTimeout(() => {
-                this.reconnectAttempts = 0;
-                this.connect();
-            }, 60000);
-        }
-    }
-};
-
-// UI
 const updateConnectionStatus = (status) => {
     const { statusDot, statusText } = elements;
     if (!statusDot || !statusText) return;
@@ -864,7 +640,6 @@ async function updateBidsTable(options = {}) {
     }
 }
 
-// Event
 const setupEventListeners = () => {
 if (elements.refreshBidsButton) {
     elements.refreshBidsButton.addEventListener('click', async () => {
@@ -904,8 +679,8 @@ if (elements.refreshBidsButton) {
     }
 };
 
-// Init
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     WebSocketManager.initialize();
     setupEventListeners();
+    await updateBidsTable({ resetPage: true, refreshData: true });
 });

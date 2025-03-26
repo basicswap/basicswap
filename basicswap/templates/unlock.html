@@ -9,19 +9,49 @@
     <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
     <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
     <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
-    <script src="/static/js/main.js"></script>
+
+  <!-- Third-party Libraries -->
+  <script src="/static/js/libs/chart.js"></script>
+  <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="/static/js/libs/popper.js"></script>
+  <script src="/static/js/libs/tippy.js"></script>
+  
+  <!-- UI Components -->
+  <script src="/static/js/ui/tabs.js"></script>
+  <script src="/static/js/ui/dropdown.js"></script>
+  
+  <!-- Core Application Modules -->
+  <script src="/static/js/modules/config-manager.js"></script>
+  <script src="/static/js/modules/cache-manager.js"></script>
+  <script src="/static/js/modules/cleanup-manager.js"></script>
+  
+  <!-- Connection & Communication Modules -->
+  <script src="/static/js/modules/websocket-manager.js"></script>
+  <script src="/static/js/modules/network-manager.js"></script>
+  <script src="/static/js/modules/api-manager.js"></script>
+  
+  <!-- UI & Interaction Modules -->
+  <script src="/static/js/modules/tooltips-manager.js"></script>
+  <script src="/static/js/modules/notification-manager.js"></script>
+  <script src="/static/js/modules/identity-manager.js"></script>
+  <script src="/static/js/modules/summary-manager.js"></script>
+  {% if current_page == 'wallets' or current_page == 'wallet' %}
+  <script src="/static/js/modules/wallet-manager.js"></script>
+  {% endif %}
+  <script src="/static/js/modules/memory-manager.js"></script>
+  
     <script>
-      const isDarkMode =
-        localStorage.getItem('color-theme') === 'dark' ||
-        (!localStorage.getItem('color-theme') &&
-          window.matchMedia('(prefers-color-scheme: dark)').matches);
-
+    (function() {
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
+        (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      
       if (!localStorage.getItem('color-theme')) {
-        localStorage.setItem('color-theme', isDarkMode ? 'dark' : 'light');
+        localStorage.setItem('color-theme', 'dark');
       }
-
       document.documentElement.classList.toggle('dark', isDarkMode);
+    })();
     </script>
+
     <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
     <title>(BSX) BasicSwap - v{{ version }}</title>
   </head>
@@ -107,7 +137,6 @@
     
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Password toggle functionality
       const passwordToggle = document.querySelector('.js-password-toggle');
       if (passwordToggle) {
         passwordToggle.addEventListener('change', function() {
@@ -126,7 +155,6 @@
         });
       }
 
-      // Image toggling function
       function toggleImages() {
         const html = document.querySelector('html');
         const darkImages = document.querySelectorAll('.dark-image');
@@ -147,42 +175,6 @@
         });
       }
 
-      // Theme toggle functionality
-      function setTheme(theme) {
-        if (theme === 'light') {
-          document.documentElement.classList.remove('dark');
-          localStorage.setItem('color-theme', 'light');
-        } else {
-          document.documentElement.classList.add('dark');
-          localStorage.setItem('color-theme', 'dark');
-        }
-      }
-
-      // Initialize theme
-      const themeToggle = document.getElementById('theme-toggle');
-      const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
-      const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
-
-      if (themeToggle && themeToggleDarkIcon && themeToggleLightIcon) {
-        if (localStorage.getItem('color-theme') === 'dark' || (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-          themeToggleLightIcon.classList.remove('hidden');
-        } else {
-          themeToggleDarkIcon.classList.remove('hidden');
-        }
-
-        themeToggle.addEventListener('click', () => {
-          if (localStorage.getItem('color-theme') === 'dark') {
-            setTheme('light');
-          } else {
-            setTheme('dark');
-          }
-          themeToggleDarkIcon.classList.toggle('hidden');
-          themeToggleLightIcon.classList.toggle('hidden');
-          toggleImages();
-        });
-      }
-
-      // Call toggleImages on load
       toggleImages();
     });
     </script>

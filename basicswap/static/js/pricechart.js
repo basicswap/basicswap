@@ -1,184 +1,22 @@
-// CLEANUP
-const cleanupManager = {
-  eventListeners: [],
-  timeouts: [],
-  intervals: [],
-  animationFrames: [],
+const chartConfig = window.config.chartConfig;
+const coins = window.config.coins;
+const apiKeys = window.config.getAPIKeys();
 
-  addListener: function(element, type, handler, options) {
-    if (!element) return null;
-    element.addEventListener(type, handler, options);
-    this.eventListeners.push({ element, type, handler, options });
-    return handler;
-  },
-
-  setTimeout: function(callback, delay) {
-    const id = setTimeout(callback, delay);
-    this.timeouts.push(id);
-    return id;
-  },
-
-  setInterval: function(callback, delay) {
-    const id = setInterval(callback, delay);
-    this.intervals.push(id);
-    return id;
-  },
-
-  requestAnimationFrame: function(callback) {
-    const id = requestAnimationFrame(callback);
-    this.animationFrames.push(id);
-    return id;
-  },
-
-  clearAll: function() {
-    this.eventListeners.forEach(({ element, type, handler, options }) => {
-      if (element) {
-        try {
-          element.removeEventListener(type, handler, options);
-        } catch (e) {
-          console.warn('Error removing event listener:', e);
-        }
-      }
-    });
-    this.eventListeners = [];
-
-    this.timeouts.forEach(id => clearTimeout(id));
-    this.timeouts = [];
-
-    this.intervals.forEach(id => clearInterval(id));
-    this.intervals = [];
-
-    this.animationFrames.forEach(id => cancelAnimationFrame(id));
-    this.animationFrames = [];
-
-    console.log('All resources cleaned up');
-  },
-  
-  clearTimeouts: function() {
-    this.timeouts.forEach(id => clearTimeout(id));
-    this.timeouts = [];
-  },
-  
-  clearIntervals: function() {
-    this.intervals.forEach(id => clearInterval(id));
-    this.intervals = [];
-  },
-
-  removeListenersByElement: function(element) {
-    if (!element) return;
-
-    const listenersToRemove = this.eventListeners.filter(
-      listener => listener.element === element
-    );
-
-    listenersToRemove.forEach(({ element, type, handler, options }) => {
-      try {
-        element.removeEventListener(type, handler, options);
-      } catch (e) {
-        console.warn('Error removing event listener:', e);
-      }
-    });
-
-    this.eventListeners = this.eventListeners.filter(
-      listener => listener.element !== element
-    );
-  }
-};
-
-// MEMORY
-const memoryMonitor = {
-  isEnabled: true,
-  lastLogTime: 0,
-  logInterval: 5 * 60 * 1000,
-  monitorInterval: null,
-
-  startMonitoring: function() {
-    console.log('Starting memory monitoring');
-    if (!this.isEnabled) return;
-
-    if (this.monitorInterval) {
-      clearInterval(this.monitorInterval);
-    }
-
-    this.monitorInterval = setInterval(() => {
-      this.logMemoryUsage();
-    }, this.logInterval);
-
-    this.logMemoryUsage();
-  },
-  
-  logMemoryUsage: function() {
-    console.log('Logging memory usage');
-    if (window.performance && window.performance.memory) {
-      const memory = window.performance.memory;
-      console.log(`Memory Usage: ${Math.round(memory.usedJSHeapSize / (1024 * 1024))}MB / ${Math.round(memory.jsHeapSizeLimit / (1024 * 1024))}MB`);
-    }
-  },
-
-  stopMonitoring: function() {
-    if (this.monitorInterval) {
-      clearInterval(this.monitorInterval);
-      this.monitorInterval = null;
-    }
-  }
-};
-
-// CONFIG
-const config = {
-  apiKeys: getAPIKeys(),
-  coins: [
-    { symbol: 'BTC', name: 'bitcoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'XMR', name: 'monero', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'PART', name: 'particl', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'BCH', name: 'bitcoin-cash', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'PIVX', name: 'pivx', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'FIRO', name: 'zcoin', displayName: 'Firo', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'DASH', name: 'dash', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'LTC', name: 'litecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'DOGE', name: 'dogecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'ETH', name: 'ethereum', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'DCR', name: 'decred', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'ZANO', name: 'zano', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-    { symbol: 'WOW', name: 'wownero', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 }
-  ],
-  apiEndpoints: {
-    cryptoCompare: 'https://min-api.cryptocompare.com/data/pricemultifull',
-    coinGecko: 'https://api.coingecko.com/api/v3',
-    cryptoCompareHistorical: 'https://min-api.cryptocompare.com/data/v2/histoday'
-  },
-  chartColors: {
-    default: {
-      lineColor: 'rgba(77, 132, 240, 1)',
-      backgroundColor: 'rgba(77, 132, 240, 0.1)'
-    }
-  },
-  showVolume: false,
-  cacheTTL: 10 * 60 * 1000,
-  specialCoins: [''],
-  resolutions: {
-    year: { days: 365, interval: 'month' },
-    sixMonths: { days: 180, interval: 'daily' },
-    day: { days: 1, interval: 'hourly' }
-  },
-  currentResolution: 'year',
-  requestTimeout: 60000,  // 60 sec
-  retryDelays: [5000, 15000, 30000],
-  rateLimits: {
-    coingecko: {
-      requestsPerMinute: 50,
-      minInterval: 1200  // 1.2 sec
-    },
-    cryptocompare: {
-      requestsPerMinute: 30,
-      minInterval: 2000  // 2 sec
-    }
-  }
-};
-
-// UTILS
 const utils = {
-  formatNumber: (number, decimals = 2) =>
-    number.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+  formatNumber: (number, decimals = 2) => {
+    if (typeof number !== 'number' || isNaN(number)) {
+      return '0';
+    }
+
+    try {
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      }).format(number);
+    } catch (e) {
+      return '0';
+    }
+  },
   formatDate: (timestamp, resolution) => {
     const date = new Date(timestamp);
     const options = {
@@ -188,7 +26,6 @@ const utils = {
     };
     return date.toLocaleString('en-US', { ...options[resolution], timeZone: 'UTC' });
   },
-
   debounce: (func, delay) => {
     let timeoutId;
     return (...args) => {
@@ -198,7 +35,6 @@ const utils = {
   }
 };
 
-// ERROR
 class AppError extends Error {
   constructor(message, type = 'AppError') {
     super(message);
@@ -206,7 +42,6 @@ class AppError extends Error {
   }
 }
 
-// LOG
 const logger = {
   log: (message) => console.log(`[AppLog] ${new Date().toISOString()}: ${message}`),
   warn: (message) => console.warn(`[AppWarn] ${new Date().toISOString()}: ${message}`),
@@ -214,153 +49,192 @@ const logger = {
 };
 
 const api = {
-    makePostRequest: (url, headers = {}) => {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/json/readurl');
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.timeout = config.requestTimeout;
-            
-            xhr.ontimeout = () => {
-                logger.warn(`Request timed out for ${url}`);
-                reject(new AppError('Request timed out'));
-            };
-            
-            xhr.onload = () => {
-                logger.log(`Response for ${url}:`, xhr.responseText);
-                if (xhr.status === 200) {
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response.Error) {
-                            logger.error(`API Error for ${url}:`, response.Error);
-                            reject(new AppError(response.Error, 'APIError'));
-                        } else {
-                            resolve(response);
-                        }
-                    } catch (error) {
-                        logger.error(`Invalid JSON response for ${url}:`, xhr.responseText);
-                        reject(new AppError(`Invalid JSON response: ${error.message}`, 'ParseError'));
+    fetchVolumeDataXHR: async () => {
+        const cacheKey = 'volumeData';
+        const cachedData = CacheManager.get(cacheKey);
+
+        if (cachedData) {
+            console.log("Using cached volume data");
+            return cachedData.value;
+        }
+
+        try {
+            if (!NetworkManager.isOnline()) {
+                throw new Error('Network is offline');
+            }
+
+            const volumeData = await Api.fetchVolumeData({
+                cryptoCompare: apiKeys.cryptoCompare,
+                coinGecko: apiKeys.coinGecko
+            });
+
+            if (Object.keys(volumeData).length > 0) {
+                CacheManager.set(cacheKey, volumeData, 'volume');
+                return volumeData;
+            }
+
+            throw new Error("No volume data found in the response");
+        } catch (error) {
+            console.error("Error fetching volume data:", error);
+
+            NetworkManager.handleNetworkError(error);
+
+            try {
+                const existingCache = localStorage.getItem(cacheKey);
+                if (existingCache) {
+                    const fallbackData = JSON.parse(existingCache).value;
+                    if (fallbackData && Object.keys(fallbackData).length > 0) {
+                        return fallbackData;
                     }
-                } else {
-                    logger.error(`HTTP Error for ${url}: ${xhr.status} ${xhr.statusText}`);
-                    reject(new AppError(`HTTP Error: ${xhr.status} ${xhr.statusText}`, 'HTTPError'));
                 }
-            };
-            
-            xhr.onerror = () => {
-                logger.error(`Network error occurred for ${url}`);
-                reject(new AppError('Network error occurred', 'NetworkError'));
-            };
-            
-            xhr.send(JSON.stringify({
-                url: url,
-                headers: headers
-            }));
-        });
+            } catch (e) {
+                console.warn("Error accessing cached volume data:", e);
+            }
+            return {};
+        }
     },
 
     fetchCryptoCompareDataXHR: (coin) => {
-        return rateLimiter.queueRequest('cryptocompare', async () => {
-            const url = `${config.apiEndpoints.cryptoCompare}?fsyms=${coin}&tsyms=USD,BTC&api_key=${config.apiKeys.cryptoCompare}`;
-            const headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-            };
-            try {
-                return await api.makePostRequest(url, headers);
-            } catch (error) {
-                logger.error(`CryptoCompare request failed for ${coin}:`, error);
-                const cachedData = cache.get(`coinData_${coin}`);
-                if (cachedData) {
-                    logger.info(`Using cached data for ${coin}`);
-                    return cachedData.value;
-                }
-                return { error: error.message };
+        try {
+            if (!NetworkManager.isOnline()) {
+                throw new Error('Network is offline');
             }
-        });
+
+            return Api.fetchCryptoCompareData(coin, {
+                cryptoCompare: apiKeys.cryptoCompare
+            });
+        } catch (error) {
+            logger.error(`CryptoCompare request failed for ${coin}:`, error);
+
+            NetworkManager.handleNetworkError(error);
+
+            const cachedData = CacheManager.get(`coinData_${coin}`);
+            if (cachedData) {
+                logger.info(`Using cached data for ${coin}`);
+                return cachedData.value;
+            }
+            return { error: error.message };
+        }
     },
 
     fetchCoinGeckoDataXHR: async () => {
         const cacheKey = 'coinGeckoOneLiner';
-        const cachedData = cache.get(cacheKey);
+        const cachedData = CacheManager.get(cacheKey);
 
         if (cachedData) {
-            //console.log('Using cached CoinGecko data');
             return cachedData.value;
         }
 
-        return rateLimiter.queueRequest('coingecko', async () => {
+        try {
+            if (!NetworkManager.isOnline()) {
+                throw new Error('Network is offline');
+            }
+
+            const existingCache = localStorage.getItem(cacheKey);
+            let fallbackData = null;
+
+            if (existingCache) {
+                try {
+                    const parsed = JSON.parse(existingCache);
+                    fallbackData = parsed.value;
+                } catch (e) {
+                    console.warn('Failed to parse existing cache:', e);
+                }
+            }
+
+            const apiResponse = await Api.fetchCoinGeckoData({
+                coinGecko: window.config.getAPIKeys().coinGecko
+            });
+            
+            if (!apiResponse || !apiResponse.rates) {
+                if (fallbackData) {
+                    return fallbackData;
+                }
+                throw new Error('Invalid data structure received from API');
+            }
+
+            const transformedData = {};
+            window.config.coins.forEach(coin => {
+                const coinName = coin.name;
+                const coinRate = apiResponse.rates[coinName];
+                if (coinRate) {
+                    const symbol = coin.symbol.toLowerCase();
+                    transformedData[symbol] = {
+                        current_price: coinRate,
+                        price_btc: coinName === 'bitcoin' ? 1 : coinRate / (apiResponse.rates.bitcoin || 1),
+                        total_volume: fallbackData && fallbackData[symbol] ? fallbackData[symbol].total_volume : null,
+                        price_change_percentage_24h: fallbackData && fallbackData[symbol] ? fallbackData[symbol].price_change_percentage_24h : null,
+                        displayName: coin.displayName || coin.symbol || coinName
+                    };
+                }
+            });
+
+            try {
+                if (!transformedData['wow'] && config.coins.some(c => c.symbol === 'WOW')) {
+                    const wowResponse = await Api.fetchCoinPrices("wownero", {
+                        coinGecko: window.config.getAPIKeys().coinGecko
+                    });
+                    
+                    if (wowResponse && wowResponse.rates && wowResponse.rates.wownero) {
+                        transformedData['wow'] = {
+                            current_price: wowResponse.rates.wownero,
+                            price_btc: transformedData.btc ? wowResponse.rates.wownero / transformedData.btc.current_price : 0,
+                            total_volume: fallbackData && fallbackData['wow'] ? fallbackData['wow'].total_volume : null,
+                            price_change_percentage_24h: fallbackData && fallbackData['wow'] ? fallbackData['wow'].price_change_percentage_24h : null,
+                            displayName: 'Wownero'
+                        };
+                    }
+                }
+            } catch (wowError) {
+                console.error('Error fetching WOW price:', wowError);
+            }
+
+            const missingCoins = window.config.coins.filter(coin => 
+                !transformedData[coin.symbol.toLowerCase()] && 
+                fallbackData && 
+                fallbackData[coin.symbol.toLowerCase()]
+            );
+
+            missingCoins.forEach(coin => {
+                const symbol = coin.symbol.toLowerCase();
+                if (fallbackData && fallbackData[symbol]) {
+                    transformedData[symbol] = fallbackData[symbol];
+                }
+            });
+
+            CacheManager.set(cacheKey, transformedData, 'prices');
+            
+            if (NetworkManager.getReconnectAttempts() > 0) {
+                NetworkManager.resetReconnectAttempts();
+            }
+            
+            return transformedData;
+        } catch (error) {
+            console.error('Error fetching coin data:', error);
+
+            NetworkManager.handleNetworkError(error);
+
+            const cachedData = CacheManager.get(cacheKey);
+            if (cachedData) {
+                console.log('Using cached data due to error');
+                return cachedData.value;
+            }
+
             try {
                 const existingCache = localStorage.getItem(cacheKey);
-                let fallbackData = null;
-
                 if (existingCache) {
-                    try {
-                        const parsed = JSON.parse(existingCache);
-                        fallbackData = parsed.value;
-                    } catch (e) {
-                        console.warn('Failed to parse existing cache:', e);
+                    const parsed = JSON.parse(existingCache);
+                    if (parsed.value) {
+                        console.log('Using expired cache as last resort');
+                        return parsed.value;
                     }
                 }
-
-                const coinIds = config.coins
-                    .filter(coin => coin.usesCoinGecko)
-                    .map(coin => coin.name)
-                    .join(',');
-
-                const url = `${config.apiEndpoints.coinGecko}/simple/price?ids=${coinIds}&vs_currencies=usd,btc&include_24hr_vol=true&include_24hr_change=true&api_key=${config.apiKeys.coinGecko}`;
-
-                const response = await api.makePostRequest(url, {
-                    'User-Agent': 'Mozilla/5.0',
-                    'Accept': 'application/json',
-                    'Accept-Language': 'en-US,en;q=0.5'
-                });
-
-                if (typeof response !== 'object' || response === null) {
-                    if (fallbackData) {
-                        //console.log('Using fallback data due to invalid response');
-                        return fallbackData;
-                    }
-                    throw new AppError('Invalid data structure received from CoinGecko');
-                }
-
-                if (response.error || response.Error) {
-                    if (fallbackData) {
-                        //console.log('Using fallback data due to API error');
-                        return fallbackData;
-                    }
-                    throw new AppError(response.error || response.Error);
-                }
-
-                const transformedData = {};
-                Object.entries(response).forEach(([id, values]) => {
-                    const coinConfig = config.coins.find(coin => coin.name === id);
-                    const symbol = coinConfig?.symbol.toLowerCase() || id;
-                    transformedData[symbol] = {
-                        current_price: values.usd,
-                        price_btc: values.btc,
-                        total_volume: values.usd_24h_vol,
-                        price_change_percentage_24h: values.usd_24h_change,
-                        displayName: coinConfig?.displayName || coinConfig?.symbol || id
-                    };
-                });
-
-                cache.set(cacheKey, transformedData);
-                return transformedData;
-
-            } catch (error) {
-                console.error('Error fetching CoinGecko data:', error);
-
-                const cachedData = cache.get(cacheKey);
-                if (cachedData) {
-                    //console.log('Using expired cache data due to error');
-                    return cachedData.value;
-                }
-
-                throw error;
+            } catch (e) {
+                console.warn('Failed to parse expired cache:', e);
             }
-        });
+
+            throw error;
+        }
     },
 
     fetchHistoricalDataXHR: async (coinSymbols) => {
@@ -369,78 +243,57 @@ const api = {
         }
 
         const results = {};
-        const fetchPromises = coinSymbols.map(async coin => {
-            const coinConfig = config.coins.find(c => c.symbol === coin);
-            if (!coinConfig) return;
 
-            const cacheKey = `historical_${coin}_${config.currentResolution}`;
-            const cachedData = cache.get(cacheKey);
-            if (cachedData) {
-                results[coin] = cachedData.value;
-                return;
+        try {
+            if (!NetworkManager.isOnline()) {
+                throw new Error('Network is offline');
             }
 
-            if (coin === 'WOW') {
-                return rateLimiter.queueRequest('coingecko', async () => {
-                    const url = `${config.apiEndpoints.coinGecko}/coins/wownero/market_chart?vs_currency=usd&days=1&api_key=${config.apiKeys.coinGecko}`;
-                    try {
-                        const response = await api.makePostRequest(url);
-                        if (response && response.prices) {
-                            results[coin] = response.prices;
-                            cache.set(cacheKey, response.prices);
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching CoinGecko data for WOW:`, error);
-                        if (cachedData) {
-                            results[coin] = cachedData.value;
-                        }
-                    }
-                });
-            } else {
-                return rateLimiter.queueRequest('cryptocompare', async () => {
-                    const resolution = config.resolutions[config.currentResolution];
-                    let url;
-                    if (resolution.interval === 'hourly') {
-                        url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=${resolution.days * 24}&api_key=${config.apiKeys.cryptoCompare}`;
-                    } else {
-                        url = `${config.apiEndpoints.cryptoCompareHistorical}?fsym=${coin}&tsym=USD&limit=${resolution.days}&api_key=${config.apiKeys.cryptoCompare}`;
-                    }
+            const historicalData = await Api.fetchHistoricalData(
+                coinSymbols, 
+                window.config.currentResolution, 
+                {
+                    cryptoCompare: window.config.getAPIKeys().cryptoCompare
+                }
+            );
 
-                    try {
-                        const response = await api.makePostRequest(url);
-                        if (response.Response === "Error") {
-                            console.error(`API Error for ${coin}:`, response.Message);
-                            if (cachedData) {
-                                results[coin] = cachedData.value;
-                            }
-                        } else if (response.Data && response.Data.Data) {
-                            results[coin] = response.Data;
-                            cache.set(cacheKey, response.Data);
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
-                        if (cachedData) {
-                            results[coin] = cachedData.value;
-                        }
-                    }
-                });
+            Object.keys(historicalData).forEach(coin => {
+                if (historicalData[coin]) {
+                    results[coin] = historicalData[coin];
+                    
+                    const cacheKey = `historical_${coin}_${window.config.currentResolution}`;
+                    CacheManager.set(cacheKey, historicalData[coin], 'historical');
+                }
+            });
+
+            return results;
+        } catch (error) {
+            console.error('Error fetching historical data:', error);
+
+            NetworkManager.handleNetworkError(error);
+
+            for (const coin of coinSymbols) {
+                const cacheKey = `historical_${coin}_${window.config.currentResolution}`;
+                const cachedData = CacheManager.get(cacheKey);
+                if (cachedData) {
+                    results[coin] = cachedData.value;
+                }
             }
-        });
-
-        await Promise.all(fetchPromises);
-        return results;
-    }
+            
+            return results;
+        }
+    },
 };
 
 const rateLimiter = {
     lastRequestTime: {},
     minRequestInterval: {
-        coingecko: config.rateLimits.coingecko.minInterval,
-        cryptocompare: config.rateLimits.cryptocompare.minInterval
+        coingecko: window.config.rateLimits.coingecko.minInterval,
+        cryptocompare: window.config.rateLimits.cryptocompare.minInterval
     },
     requestQueue: {},
-    retryDelays: config.retryDelays,
-    
+    retryDelays: window.config.retryDelays,
+
     canMakeRequest: function(apiName) {
         const now = Date.now();
         const lastRequest = this.lastRequestTime[apiName] || 0;
@@ -485,11 +338,7 @@ const rateLimiter = {
                     if ((error.message.includes('timeout') || error.name === 'NetworkError') && 
                         retryCount < this.retryDelays.length) {
                         const delay = this.retryDelays[retryCount];
-                        logger.warn(`Request failed, retrying in ${delay/1000} seconds...`, {
-                            apiName,
-                            retryCount,
-                            error: error.message
-                        });
+                        logger.warn(`Request failed, retrying in ${delay/1000} seconds...`);
                         await new Promise(resolve => setTimeout(resolve, delay));
                         return this.queueRequest(apiName, requestFn, retryCount + 1);
                     }
@@ -500,14 +349,15 @@ const rateLimiter = {
 
             this.requestQueue[apiName] = executeRequest();
             return await this.requestQueue[apiName];
-            
         } catch (error) {
             if (error.message.includes('429') || 
                 error.message.includes('timeout') || 
                 error.name === 'NetworkError') {
-                const cachedData = cache.get(`coinData_${apiName}`);
+                
+                NetworkManager.handleNetworkError(error);
+                
+                const cachedData = CacheManager.get(`coinData_${apiName}`);
                 if (cachedData) {
-                    //console.log('Using cached data due to request failure');
                     return cachedData.value;
                 }
             }
@@ -516,190 +366,65 @@ const rateLimiter = {
     }
 };
 
-// CACHE
-const cache = {
-  maxSizeBytes: 10 * 1024 * 1024,
-  maxItems: 200,
-  cacheTTL: 5 * 60 * 1000,
-
-  set: function(key, value, customTtl = null) {
-    this.cleanup();
-
-    const item = {
-      value: value,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + (customTtl || this.cacheTTL)
-    };
-
-    try {
-      const serialized = JSON.stringify(item);
-      localStorage.setItem(key, serialized);
-    } catch (e) {
-      console.warn('Cache set error:', e);
-      this.clear();
-      try {
-        const serialized = JSON.stringify(item);
-        localStorage.setItem(key, serialized);
-      } catch (e2) {
-        console.error('Failed to store in cache even after cleanup:', e2);
-      }
-    }
-  },
-
-  get: function(key) {
-    const itemStr = localStorage.getItem(key);
-    if (!itemStr) {
-      return null;
-    }
-
-    try {
-      const item = JSON.parse(itemStr);
-      const now = Date.now();
-      
-      if (now < item.expiresAt) {
-        return {
-          value: item.value,
-          remainingTime: item.expiresAt - now
-        };
-      } else {
-        localStorage.removeItem(key);
-      }
-    } catch (error) {
-      console.error('Error parsing cache item:', error.message);
-      localStorage.removeItem(key);
-    }
-
-    return null;
-  },
-
-  isValid: function(key) {
-    return this.get(key) !== null;
-  },
-
-  clear: function() {
-    const keysToRemove = [];
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith('coinData_') || key.startsWith('chartData_') || key === 'coinGeckoOneLiner') {
-        keysToRemove.push(key);
-      }
-    }
-
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key);
-    });
-
-    console.log(`Cache cleared: removed ${keysToRemove.length} items`);
-  },
-
-  cleanup: function() {
-    let totalSize = 0;
-    const items = [];
-    const keysToRemove = [];
-    const now = Date.now();
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith('coinData_') || key.startsWith('chartData_') || key === 'coinGeckoOneLiner') {
-        try {
-          const value = localStorage.getItem(key);
-          const size = new Blob([value]).size;
-
-          const item = JSON.parse(value);
-
-          if (item.expiresAt && item.expiresAt < now) {
-            keysToRemove.push(key);
-            continue;
-          }
-
-          totalSize += size;
-          items.push({
-            key,
-            size,
-            timestamp: item.timestamp || 0,
-            expiresAt: item.expiresAt || 0
-          });
-        } catch (e) {
-          keysToRemove.push(key);
-        }
-      }
-    }
-
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key);
-    });
-
-    if (totalSize > this.maxSizeBytes || items.length > this.maxItems) {
-      items.sort((a, b) => a.timestamp - b.timestamp);
-
-      const itemsToRemove = Math.max(
-        Math.ceil(items.length * 0.2),
-        items.length - this.maxItems
-      );
-
-      items.slice(0, itemsToRemove).forEach(item => {
-        localStorage.removeItem(item.key);
-      });
- 
-      console.log(`Cache cleanup: removed ${itemsToRemove} items, freed ${Math.round((totalSize - this.maxSizeBytes) / 1024)}KB`);
-    }
-
-    return {
-      totalSize,
-      itemCount: items.length,
-      removedCount: keysToRemove.length
-    };
-  }
-};
-
-// UI
 const ui = {
-displayCoinData: (coin, data) => {
+  displayCoinData: (coin, data) => {
     let priceUSD, priceBTC, priceChange1d, volume24h;
     const updateUI = (isError = false) => {
-        const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
-        const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
-        const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
-        const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
-        const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
-        if (priceUsdElement) {
-            priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
+      const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
+      const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
+      const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
+      const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
+      const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
+      
+      if (priceUsdElement) {
+        priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
+      }
+
+      if (volumeDiv && volumeElement) {
+        if (isError || volume24h === null || volume24h === undefined) {
+          volumeElement.textContent = 'N/A';
+        } else {
+          volumeElement.textContent = `${utils.formatNumber(volume24h, 0)} USD`;
         }
-        if (volumeDiv && volumeElement) {
-            volumeElement.textContent = isError ? 'N/A' : `${utils.formatNumber(volume24h, 0)} USD`;
-            volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
+        volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
+      }
+
+      if (btcPriceDiv && priceBtcElement) {
+        if (coin === 'BTC') {
+          btcPriceDiv.style.display = 'none';
+        } else {
+          priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)}`;
+          btcPriceDiv.style.display = 'flex';
         }
-        if (btcPriceDiv && priceBtcElement) {
-            if (coin === 'BTC') {
-                btcPriceDiv.style.display = 'none';
-            } else {
-                priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)}`;
-                btcPriceDiv.style.display = 'flex';
-            }
-        }
-        ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
+      }
+
+      ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
     };
+
     try {
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        if (!data || !data.current_price) {
-            throw new Error(`Invalid CoinGecko data structure for ${coin}`);
-        }
-        priceUSD = data.current_price;
-        priceBTC = coin === 'BTC' ? 1 : data.price_btc || (data.current_price / app.btcPriceUSD);
-        priceChange1d = data.price_change_percentage_24h;
-        volume24h = data.total_volume;
-        if (isNaN(priceUSD) || isNaN(priceBTC) || isNaN(volume24h)) {
-            throw new Error(`Invalid numeric values in data for ${coin}`);
-        }
-        updateUI(false);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      if (!data || !data.current_price) {
+        throw new Error(`Invalid data structure for ${coin}`);
+      }
+
+      priceUSD = data.current_price;
+      priceBTC = coin === 'BTC' ? 1 : data.price_btc || (data.current_price / app.btcPriceUSD);
+      priceChange1d = data.price_change_percentage_24h || 0;
+      volume24h = data.total_volume || 0;
+
+      if (isNaN(priceUSD) || isNaN(priceBTC)) {
+        throw new Error(`Invalid numeric values in data for ${coin}`);
+      }
+
+      updateUI(false);
     } catch (error) {
-    logger.error(`Failed to display data for ${coin}:`, error.message);
-    updateUI(true); // Show error state in UI
-}
-},
+      logger.error(`Failed to display data for ${coin}:`, error.message);
+      updateUI(true);
+    }
+  },
 
   showLoader: () => {
     const loader = document.getElementById('loader');
@@ -762,9 +487,13 @@ displayCoinData: (coin, data) => {
   updatePriceChangeContainer: (coin, priceChange) => {
     const container = document.querySelector(`#${coin.toLowerCase()}-price-change-container`);
     if (container) {
-      container.innerHTML = priceChange !== null ?
-        (priceChange >= 0 ? ui.positivePriceChangeHTML(priceChange) : ui.negativePriceChangeHTML(priceChange)) :
-        'N/A';
+      if (priceChange === null || priceChange === undefined) {
+        container.innerHTML = 'N/A';
+      } else {
+        container.innerHTML = priceChange >= 0 ? 
+          ui.positivePriceChangeHTML(priceChange) : 
+          ui.negativePriceChangeHTML(priceChange);
+      }
     }
   },
 
@@ -773,6 +502,16 @@ displayCoinData: (coin, data) => {
     if (lastRefreshedElement && app.lastRefreshedTime) {
       const formattedTime = app.lastRefreshedTime.toLocaleTimeString();
       lastRefreshedElement.textContent = `Last Refreshed: ${formattedTime}`;
+    }
+  },
+  
+  updateConnectionStatus: () => {
+    const statusElement = document.getElementById('connection-status');
+    if (statusElement) {
+      const online = NetworkManager.isOnline();
+      statusElement.textContent = online ? 'Connected' : 'Disconnected';
+      statusElement.classList.toggle('text-green-500', online);
+      statusElement.classList.toggle('text-red-500', !online);
     }
   },
 
@@ -819,7 +558,7 @@ displayCoinData: (coin, data) => {
     });
   },
 
-  displayErrorMessage: (message) => {
+  displayErrorMessage: (message, duration = 0) => {
     const errorOverlay = document.getElementById('error-overlay');
     const errorMessage = document.getElementById('error-message');
     const chartContainer = document.querySelector('.container-to-blur');
@@ -827,6 +566,12 @@ displayCoinData: (coin, data) => {
       errorOverlay.classList.remove('hidden');
       errorMessage.textContent = message;
       chartContainer.classList.add('blurred');
+
+      if (duration > 0) {
+        setTimeout(() => {
+          ui.hideErrorMessage();
+        }, duration);
+      }
     }
   },
 
@@ -837,16 +582,42 @@ displayCoinData: (coin, data) => {
       errorOverlay.classList.add('hidden');
       containersToBlur.forEach(container => container.classList.remove('blurred'));
     }
+  },
+
+  showNetworkErrorMessage: () => {
+    ui.displayErrorMessage(
+      "Network connection lost. Data shown may be outdated. We'll automatically refresh once connection is restored.",
+      0
+    );
+
+    const errorOverlay = document.getElementById('error-overlay');
+    if (errorOverlay) {
+      const reconnectBtn = document.createElement('button');
+      reconnectBtn.className = "mt-4 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded";
+      reconnectBtn.textContent = "Try to Reconnect";
+      reconnectBtn.onclick = () => {
+        NetworkManager.manualReconnect();
+      };
+
+      const buttonContainer = errorOverlay.querySelector('.button-container') || 
+                              document.createElement('div');
+      buttonContainer.className = "button-container mt-4";
+      buttonContainer.innerHTML = '';
+      buttonContainer.appendChild(reconnectBtn);
+      
+      if (!errorOverlay.querySelector('.button-container')) {
+        errorOverlay.querySelector('div').appendChild(buttonContainer);
+      }
+    }
   }
 };
 
-// CHART
 const chartModule = {
   chart: null,
   currentCoin: 'BTC',
   loadStartTime: 0,
   chartRefs: new WeakMap(),
-  
+
   verticalLinePlugin: {
     id: 'verticalLine',
     beforeDraw: (chart, args, options) => {
@@ -879,29 +650,54 @@ const chartModule = {
   destroyChart: function() {
     if (chartModule.chart) {
       try {
+        const canvas = document.getElementById('coin-chart');
+        if (canvas) {
+          const events = ['click', 'mousemove', 'mouseout', 'mouseover', 'mousedown', 'mouseup'];
+          events.forEach(eventType => {
+            canvas.removeEventListener(eventType, null);
+          });
+        }
+
         chartModule.chart.destroy();
+        chartModule.chart = null;
+
+        if (canvas) {
+          chartModule.chartRefs.delete(canvas);
+        }
       } catch (e) {
-        console.error('Error destroying chart:', e);
+        try {
+          if (chartModule.chart) {
+            if (chartModule.chart.destroy && typeof chartModule.chart.destroy === 'function') {
+              chartModule.chart.destroy();
+            }
+            chartModule.chart = null;
+          }
+        } catch (finalError) {}
       }
-      chartModule.chart = null;
     }
   },
 
   initChart: function() {
     this.destroyChart();
-    
+
     const canvas = document.getElementById('coin-chart');
     if (!canvas) {
-      logger.error('Chart canvas element not found');
+      console.error('Chart canvas element not found');
       return;
     }
-    
+
+    canvas.style.display = 'block';
+    if (canvas.style.width === '1px' || canvas.style.height === '1px') {
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+    }
+
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      logger.error('Failed to get chart context. Make sure the canvas element exists.');
+      console.error('Failed to get chart context. Make sure the canvas element exists.');
       return;
     }
-    
+
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(77, 132, 240, 0.2)');
     gradient.addColorStop(1, 'rgba(77, 132, 240, 0)');
@@ -923,6 +719,9 @@ const chartModule = {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+          duration: 750
+        },
         interaction: {
           intersect: false,
           mode: 'index'
@@ -945,7 +744,7 @@ const chartModule = {
               }
             },
             ticks: {
-              source: 'data',
+              source: 'auto',
               maxTicksLimit: 12,
               font: {
                 size: 12,
@@ -956,14 +755,14 @@ const chartModule = {
               minRotation: 0,
               callback: function(value) {
                 const date = new Date(value);
-                if (config.currentResolution === 'day') {
+                if (window.config.currentResolution === 'day') {
                   return date.toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
                     hour12: true,
                     timeZone: 'UTC'
                   });
-                } else if (config.currentResolution === 'year') {
+                } else if (window.config.currentResolution === 'year') {
                   return date.toLocaleDateString('en-US', {
                     month: 'short',
                     year: 'numeric',
@@ -1015,7 +814,7 @@ const chartModule = {
             callbacks: {
               title: (tooltipItems) => {
                 const date = new Date(tooltipItems[0].parsed.x);
-                if (config.currentResolution === 'day') {
+                if (window.config.currentResolution === 'day') {
                   return date.toLocaleString('en-US', {
                     month: 'short',
                     day: 'numeric',
@@ -1024,7 +823,7 @@ const chartModule = {
                     hour12: true,
                     timeZone: 'UTC'
                   });
-                } else if (config.currentResolution === 'year') {
+                } else if (window.config.currentResolution === 'year') {
                   return date.toLocaleString('en-US', {
                     year: 'numeric',
                     month: 'short',
@@ -1058,6 +857,12 @@ const chartModule = {
     });
 
     this.setChartReference(canvas, chartModule.chart);
+
+    if (window.CleanupManager) {
+      window.CleanupManager.registerResource('chart', chartModule.chart, () => {
+        chartModule.destroyChart();
+      });
+    }
   },
 
   prepareChartData: function(coinSymbol, data) {
@@ -1066,68 +871,85 @@ const chartModule = {
     }
 
     try {
-      let preparedData;
+      let rawDataPoints = [];
 
-      if (coinSymbol === 'WOW' && Array.isArray(data)) {
-        const endTime = new Date(data[data.length - 1][0]);
-        endTime.setUTCMinutes(0, 0, 0);
-        const endUnix = endTime.getTime();
-        const startUnix = endUnix - (24 * 3600000);
-        const hourlyPoints = [];
-
-        for (let hourUnix = startUnix; hourUnix <= endUnix; hourUnix += 3600000) {
-          const targetHour = new Date(hourUnix);
-          targetHour.setUTCMinutes(0, 0, 0);
-
-          const closestPoint = data.reduce((prev, curr) => {
-            const prevTime = new Date(prev[0]);
-            const currTime = new Date(curr[0]);
-            const prevDiff = Math.abs(prevTime - targetHour);
-            const currDiff = Math.abs(currTime - targetHour);
-            return currDiff < prevDiff ? curr : prev;
-          });
-
-          hourlyPoints.push({
-            x: targetHour,
-            y: closestPoint[1]
-          });
-        }
-
-        const lastTime = new Date(data[data.length - 1][0]);
-        if (lastTime.getUTCMinutes() !== 0) {
-          hourlyPoints.push({
-            x: lastTime,
-            y: data[data.length - 1][1]
-          });
-        }
-
-        preparedData = hourlyPoints;
-
+      if (Array.isArray(data)) {
+        rawDataPoints = data.map(([timestamp, price]) => ({
+          time: new Date(timestamp).getTime(),
+          close: price
+        }));
       } else if (data.Data && Array.isArray(data.Data)) {
-        preparedData = data.Data.map(d => ({
-          x: new Date(d.time * 1000),
-          y: d.close
+        rawDataPoints = data.Data.map(d => ({
+          time: d.time * 1000,
+          close: d.close
         }));
       } else if (data.Data && data.Data.Data && Array.isArray(data.Data.Data)) {
-        preparedData = data.Data.Data.map(d => ({
-          x: new Date(d.time * 1000),
-          y: d.close
-        }));
-      } else if (Array.isArray(data)) {
-        preparedData = data.map(([timestamp, price]) => ({
-          x: new Date(timestamp),
-          y: price
+        rawDataPoints = data.Data.Data.map(d => ({
+          time: d.time * 1000,
+          close: d.close
         }));
       } else {
-        console.warn('Unknown data format for chartData:', data);
         return [];
       }
-      return preparedData.map(point => ({
-        x: new Date(point.x).getTime(),
-        y: point.y
-      }));
+
+      if (rawDataPoints.length === 0) {
+        return [];
+      }
+
+      rawDataPoints.sort((a, b) => a.time - b.time);
+      
+      let preparedData = [];
+
+      if (window.config.currentResolution === 'day') {
+        const endTime = new Date(rawDataPoints[rawDataPoints.length - 1].time);
+        endTime.setUTCMinutes(0, 0, 0);
+
+        const endUnix = endTime.getTime();
+        const startUnix = endUnix - (24 * 3600000);
+
+        for (let hourUnix = startUnix; hourUnix <= endUnix; hourUnix += 3600000) {
+          let closestPoint = null;
+          let closestDiff = Infinity;
+
+          for (const point of rawDataPoints) {
+            const diff = Math.abs(point.time - hourUnix);
+            if (diff < closestDiff) {
+              closestDiff = diff;
+              closestPoint = point;
+            }
+          }
+          
+          if (closestPoint) {
+            preparedData.push({
+              x: hourUnix,
+              y: closestPoint.close
+            });
+          }
+        }
+
+        const lastTime = rawDataPoints[rawDataPoints.length - 1].time;
+        if (lastTime > endUnix) {
+          preparedData.push({
+            x: lastTime,
+            y: rawDataPoints[rawDataPoints.length - 1].close
+          });
+        }
+      } else {
+        preparedData = rawDataPoints.map(point => ({
+          x: point.time,
+          y: point.close
+        }));
+      }
+      
+      if (preparedData.length === 0 && rawDataPoints.length > 0) {
+        preparedData = rawDataPoints.map(point => ({
+          x: point.time,
+          y: point.close
+        }));
+      }
+
+      return preparedData;
     } catch (error) {
-      console.error(`Error preparing chart data for ${coinSymbol}:`, error);
       return [];
     }
   },
@@ -1142,10 +964,10 @@ const chartModule = {
       const targetTime = new Date(twentyFourHoursAgo.getTime() + i * 60 * 60 * 1000);
 
       if (data.length > 0) {
-       const closestDataPoint = data.reduce((prev, curr) =>
-  Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) < 
-  Math.abs(new Date(prev.x).getTime() - targetTime.getTime()) ? curr : prev
-);
+        const closestDataPoint = data.reduce((prev, curr) =>
+          Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) < 
+          Math.abs(new Date(prev.x).getTime() - targetTime.getTime()) ? curr : prev
+        , data[0]);
         hourlyData.push({
           x: targetTime.getTime(),
           y: closestDataPoint.y
@@ -1166,13 +988,17 @@ const chartModule = {
         chartModule.showChartLoader();
       }
       chartModule.loadStartTime = Date.now();
-      const cacheKey = `chartData_${coinSymbol}_${config.currentResolution}`;
-      let cachedData = !forceRefresh ? cache.get(cacheKey) : null;
+      const cacheKey = `chartData_${coinSymbol}_${window.config.currentResolution}`;
+      let cachedData = !forceRefresh ? CacheManager.get(cacheKey) : null;
       let data;
       if (cachedData && Object.keys(cachedData.value).length > 0) {
         data = cachedData.value;
       } else {
         try {
+          if (!NetworkManager.isOnline()) {
+            throw new Error('Network is offline');
+          }
+
           const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
           data = allData[coinSymbol];
           
@@ -1180,8 +1006,10 @@ const chartModule = {
             throw new Error(`No data returned for ${coinSymbol}`);
           }
 
-          cache.set(cacheKey, data, config.cacheTTL);
+          CacheManager.set(cacheKey, data, 'chart');
         } catch (error) {
+          NetworkManager.handleNetworkError(error);
+          
           if (error.message.includes('429') && currentChartData.length > 0) {
             console.warn(`Rate limit hit for ${coinSymbol}, maintaining current chart`);
             chartModule.hideChartLoader();
@@ -1212,10 +1040,10 @@ const chartModule = {
         if (coinSymbol === 'WOW') {
           chartModule.chart.options.scales.x.time.unit = 'hour';
         } else {
-          const resolution = config.resolutions[config.currentResolution];
+          const resolution = window.config.chartConfig.resolutions[window.config.currentResolution];
           chartModule.chart.options.scales.x.time.unit = 
-            resolution.interval === 'hourly' ? 'hour' : 
-            config.currentResolution === 'year' ? 'month' : 'day';
+            resolution && resolution.interval === 'hourly' ? 'hour' :
+            window.config.currentResolution === 'year' ? 'month' : 'day';
         }
         chartModule.chart.update('active');
         chartModule.currentCoin = coinSymbol;
@@ -1224,8 +1052,7 @@ const chartModule = {
       }
     } catch (error) {
       console.error(`Error updating chart for ${coinSymbol}:`, error);
-      
-      // Keep existing chart data if possible /todo
+
       if (!(chartModule.chart?.data?.datasets[0]?.data?.length > 0)) {
         if (!chartModule.chart) {
           chartModule.initChart();
@@ -1259,11 +1086,12 @@ const chartModule = {
     loader.classList.add('hidden');
     chart.classList.remove('hidden');
   },
+  
   cleanup: function() {
     this.destroyChart();
     this.currentCoin = null;
     this.loadStartTime = 0;
-    console.log('Chart module cleaned up');
+    this.chartRefs = new WeakMap();
   }
 };
 
@@ -1274,8 +1102,8 @@ const volumeToggle = {
   init: function() {
     const toggleButton = document.getElementById('toggle-volume');
     if (toggleButton) {
-      if (typeof cleanupManager !== 'undefined') {
-        cleanupManager.addListener(toggleButton, 'click', volumeToggle.toggle);
+      if (typeof CleanupManager !== 'undefined') {
+        CleanupManager.addListener(toggleButton, 'click', volumeToggle.toggle);
       } else {
         toggleButton.addEventListener('click', volumeToggle.toggle);
       }
@@ -1311,12 +1139,12 @@ const volumeToggle = {
   }
 };
 
-  function updateButtonStyles(button, isActive, color) {
-    button.classList.toggle('text-' + color + '-500', isActive);
-    button.classList.toggle('text-gray-600', !isActive);
-    button.classList.toggle('dark:text-' + color + '-400', isActive);
-    button.classList.toggle('dark:text-gray-400', !isActive);
-  }
+function updateButtonStyles(button, isActive, color) {
+  button.classList.toggle('text-' + color + '-500', isActive);
+  button.classList.toggle('text-gray-600', !isActive);
+  button.classList.toggle('dark:text-' + color + '-400', isActive);
+  button.classList.toggle('dark:text-gray-400', !isActive);
+}
 
 const app = {
   btcPriceUSD: 0,
@@ -1330,92 +1158,122 @@ const app = {
     disabled: 'Auto-refresh: disabled',
     justRefreshed: 'Just refreshed',
   },
-  cacheTTL: 5 * 60 * 1000, // 5 min
-  minimumRefreshInterval: 60 * 1000, // 1 min
+  cacheTTL: window.config.cacheConfig.ttlSettings.prices,
+  minimumRefreshInterval: 60 * 1000,
 
-  init: () => {
-    console.log('Init');
+  init: function() {
     window.addEventListener('load', app.onLoad);
     app.loadLastRefreshedTime();
     app.updateAutoRefreshButton();
-    //console.log('App initialized');
+
+    NetworkManager.addHandler('offline', () => {
+      ui.showNetworkErrorMessage();
+    });
+
+    NetworkManager.addHandler('reconnected', () => {
+      ui.hideErrorMessage();
+      app.refreshAllData();
+    });
+
+    NetworkManager.addHandler('maxAttemptsReached', () => {
+      ui.displayErrorMessage(
+        "Server connection lost. Please check your internet connection and try refreshing the page.",
+        0
+      );
+    });
+    
+    return app;
   },
 
-  onLoad: async () => {
-    //console.log('App onLoad event triggered');
+  onLoad: async function() {
     ui.showLoader();
     try {
-        volumeToggle.init();
-        await app.updateBTCPrice();
-        const chartContainer = document.getElementById('coin-chart');
-        if (chartContainer) {
-            chartModule.initChart();
-            chartModule.showChartLoader();
+      volumeToggle.init();
+      await app.updateBTCPrice();
+      const chartContainer = document.getElementById('coin-chart');
+      if (chartContainer) {
+        chartModule.initChart();
+        chartModule.showChartLoader();
+      }
+
+      await app.loadAllCoinData();
+
+      if (chartModule.chart) {
+        window.config.currentResolution = 'day';
+        await chartModule.updateChart('BTC');
+        app.updateResolutionButtons('BTC');
+
+        const chartTitle = document.getElementById('chart-title');
+        if (chartTitle) {
+          chartTitle.textContent = 'Price Chart (BTC)';
         }
+      }
+      ui.setActiveContainer('btc-container');
 
-        //console.log('Loading all coin data...');
-        await app.loadAllCoinData();
-
-        if (chartModule.chart) {
-            config.currentResolution = 'day';
-            await chartModule.updateChart('BTC');
-            app.updateResolutionButtons('BTC');
-
-            const chartTitle = document.getElementById('chart-title');
-            if (chartTitle) {
-                chartTitle.textContent = 'Price Chart (BTC)';
-            }
-        }
-        ui.setActiveContainer('btc-container');
-
-        app.setupEventListeners();
-        app.initializeSelectImages();
-        app.initAutoRefresh();
+      app.setupEventListeners();
+      app.initAutoRefresh();
 
     } catch (error) {
-        ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
+      ui.displayErrorMessage('Failed to initialize the dashboard. Please try refreshing the page.');
+      NetworkManager.handleNetworkError(error);
     } finally {
-        ui.hideLoader();
-        if (chartModule.chart) {
-            chartModule.hideChartLoader();
-        }
-        //console.log('App onLoad completed');
+      ui.hideLoader();
+      if (chartModule.chart) {
+        chartModule.hideChartLoader();
+      }
     }
-},
-    loadAllCoinData: async () => {
-        //console.log('Loading data for all coins...');
-        try {
-            const allCoinData = await api.fetchCoinGeckoDataXHR();
-            if (allCoinData.error) {
-                throw new Error(allCoinData.error);
-            }
+  },
+  
+  loadAllCoinData: async function() {
+    try {
+      if (!NetworkManager.isOnline()) {
+        throw new Error('Network is offline');
+      }
+      
+      const allCoinData = await api.fetchCoinGeckoDataXHR();
+      if (allCoinData.error) {
+        throw new Error(allCoinData.error);
+      }
 
-            for (const coin of config.coins) {
-                const coinData = allCoinData[coin.symbol.toLowerCase()];
-                if (coinData) {
-                    coinData.displayName = coin.displayName || coin.symbol;
-                    ui.displayCoinData(coin.symbol, coinData);
-                    const cacheKey = `coinData_${coin.symbol}`;
-                    cache.set(cacheKey, coinData);
-                } else {
-                    //console.warn(`No data found for ${coin.symbol}`);
-                }
+      let volumeData = {};
+      try {
+        volumeData = await api.fetchVolumeDataXHR();
+      } catch (volumeError) {}
+
+      for (const coin of window.config.coins) {
+        const coinData = allCoinData[coin.symbol.toLowerCase()];
+        
+        if (coinData) {
+          coinData.displayName = coin.displayName || coin.symbol;
+
+          const backendId = getCoinBackendId ? getCoinBackendId(coin.name) : coin.name;
+          if (volumeData[backendId]) {
+            coinData.total_volume = volumeData[backendId].total_volume;
+            if (!coinData.price_change_percentage_24h && volumeData[backendId].price_change_percentage_24h) {
+              coinData.price_change_percentage_24h = volumeData[backendId].price_change_percentage_24h;
             }
-        } catch (error) {
-            //console.error('Error loading all coin data:', error);
-            ui.displayErrorMessage('Failed to load coin data. Please try refreshing the page.');
-        } finally {
-            //console.log('All coin data loaded');
+          }
+
+          ui.displayCoinData(coin.symbol, coinData);
+
+          const cacheKey = `coinData_${coin.symbol}`;
+          CacheManager.set(cacheKey, coinData);
+        } else {
+          console.warn(`No data found for ${coin.symbol}`);
         }
-    },
+      }
+    } catch (error) {
+      console.error('Error loading all coin data:', error);
+      NetworkManager.handleNetworkError(error);
+      ui.displayErrorMessage('Failed to load coin data. Please try refreshing the page.');
+    }
+  },
 
-  loadCoinData: async (coin) => {
-    //console.log(`Loading data for ${coin.symbol}...`);
+  loadCoinData: async function(coin) {
     const cacheKey = `coinData_${coin.symbol}`;
-    let cachedData = cache.get(cacheKey);
+    let cachedData = CacheManager.get(cacheKey);
     let data;
     if (cachedData) {
-      //console.log(`Using cached data for ${coin.symbol}`);
       data = cachedData.value;
     } else {
       try {
@@ -1428,11 +1286,10 @@ const app = {
         if (data.error) {
           throw new Error(data.error);
         }
-        //console.log(`Caching new data for ${coin.symbol}`);
-        cache.set(cacheKey, data);
+        CacheManager.set(cacheKey, data, 'prices');
         cachedData = null;
       } catch (error) {
-        //console.error(`Error fetching ${coin.symbol} data:`, error.message);
+        NetworkManager.handleNetworkError(error);
         data = {
           error: error.message
         };
@@ -1442,49 +1299,51 @@ const app = {
     }
     ui.displayCoinData(coin.symbol, data);
     ui.updateLoadTimeAndCache(0, cachedData);
-    //console.log(`Data loaded for ${coin.symbol}`);
   },
 
-setupEventListeners: () => {
-    config.coins.forEach(coin => {
-        const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
-        if (container) {
-            container.addEventListener('click', () => {
-                const chartTitle = document.getElementById('chart-title');
-                if (chartTitle) {
-                    chartTitle.textContent = `Price Chart (${coin.symbol})`;
-                }
-                ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
-                if (chartModule.chart) {
-                    if (coin.symbol === 'WOW') {
-                        config.currentResolution = 'day';
-                    }
-                    chartModule.updateChart(coin.symbol);
-                    app.updateResolutionButtons(coin.symbol);
-                }
-            });
-        }
+  setupEventListeners: function() {
+    window.config.coins.forEach(coin => {
+      const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
+      if (container) {
+        CleanupManager.addListener(container, 'click', () => {
+          const chartTitle = document.getElementById('chart-title');
+          if (chartTitle) {
+            chartTitle.textContent = `Price Chart (${coin.symbol})`;
+          }
+          ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
+          if (chartModule.chart) {
+            if (coin.symbol === 'WOW') {
+              window.config.currentResolution = 'day';
+            }
+            chartModule.updateChart(coin.symbol);
+            app.updateResolutionButtons(coin.symbol);
+          }
+        });
+      }
     });
 
     const refreshAllButton = document.getElementById('refresh-all');
     if (refreshAllButton) {
-      refreshAllButton.addEventListener('click', app.refreshAllData);
+      CleanupManager.addListener(refreshAllButton, 'click', app.refreshAllData);
     }
 
     const headers = document.querySelectorAll('th');
     headers.forEach((header, index) => {
-      header.addEventListener('click', () => app.sortTable(index, header.classList.contains('disabled')));
+      CleanupManager.addListener(header, 'click', () => app.sortTable(index, header.classList.contains('disabled')));
     });
 
     const closeErrorButton = document.getElementById('close-error');
     if (closeErrorButton) {
-      closeErrorButton.addEventListener('click', ui.hideErrorMessage);
+      CleanupManager.addListener(closeErrorButton, 'click', ui.hideErrorMessage);
     }
-    //console.log('Event listeners set up');
+
+    const reconnectButton = document.getElementById('network-reconnect');
+    if (reconnectButton) {
+      CleanupManager.addListener(reconnectButton, 'click', NetworkManager.manualReconnect);
+    }
   },
 
-  initAutoRefresh: () => {
-   //console.log('Initializing auto-refresh...');
+  initAutoRefresh: function() {
     const toggleAutoRefreshButton = document.getElementById('toggle-auto-refresh');
     if (toggleAutoRefreshButton) {
       toggleAutoRefreshButton.addEventListener('click', app.toggleAutoRefresh);
@@ -1492,15 +1351,11 @@ setupEventListeners: () => {
     }
 
     if (app.isAutoRefreshEnabled) {
-      console.log('Auto-refresh is enabled, scheduling next refresh');
       app.scheduleNextRefresh();
-    } else {
-      console.log('Auto-refresh is disabled');
     }
   },
 
-  scheduleNextRefresh: () => {
-    //console.log('Scheduling next refresh...');
+  scheduleNextRefresh: function() {
     if (app.autoRefreshInterval) {
       clearTimeout(app.autoRefreshInterval);
     }
@@ -1516,7 +1371,6 @@ setupEventListeners: () => {
             earliestExpiration = Math.min(earliestExpiration, cachedItem.expiresAt);
           }
         } catch (error) {
-          //console.error(`Error parsing cached item ${key}:`, error);
           localStorage.removeItem(key);
         }
       }
@@ -1526,22 +1380,30 @@ setupEventListeners: () => {
     if (earliestExpiration !== Infinity) {
       nextRefreshTime = Math.max(earliestExpiration, now + app.minimumRefreshInterval);
     } else {
-      nextRefreshTime = now + config.cacheTTL;
+      nextRefreshTime = now + window.config.cacheTTL;
     }
     const timeUntilRefresh = nextRefreshTime - now;
-    console.log(`Next refresh scheduled in ${timeUntilRefresh / 1000} seconds`);
     app.nextRefreshTime = nextRefreshTime;
     app.autoRefreshInterval = setTimeout(() => {
-      console.log('Auto-refresh triggered');
-      app.refreshAllData();
+      if (NetworkManager.isOnline()) {
+        app.refreshAllData();
+      } else {
+        app.scheduleNextRefresh();
+      }
     }, timeUntilRefresh);
     localStorage.setItem('nextRefreshTime', app.nextRefreshTime.toString());
     app.updateNextRefreshTime();
   },
-      refreshAllData: async () => {
+
+  refreshAllData: async function() {
     if (app.isRefreshing) {
-        console.log('Refresh already in progress, skipping...');
-        return;
+      console.log('Refresh already in progress, skipping...');
+      return;
+    }
+
+    if (!NetworkManager.isOnline()) {
+      ui.displayErrorMessage("Network connection unavailable. Please check your connection.");
+      return;
     }
 
     const lastGeckoRequest = rateLimiter.lastRequestTime['coingecko'] || 0;
@@ -1549,131 +1411,159 @@ setupEventListeners: () => {
     const waitTime = Math.max(0, rateLimiter.minRequestInterval.coingecko - timeSinceLastRequest);
     
     if (waitTime > 0) {
-        const seconds = Math.ceil(waitTime / 1000);
-        ui.displayErrorMessage(`Rate limit: Please wait ${seconds} seconds before refreshing`);
+      const seconds = Math.ceil(waitTime / 1000);
+      ui.displayErrorMessage(`Rate limit: Please wait ${seconds} seconds before refreshing`);
 
-        let remainingTime = seconds;
-        const countdownInterval = setInterval(() => {
-            remainingTime--;
-            if (remainingTime > 0) {
-                ui.displayErrorMessage(`Rate limit: Please wait ${remainingTime} seconds before refreshing`);
-            } else {
-                clearInterval(countdownInterval);
-                ui.hideErrorMessage();
-            }
-        }, 1000);
+      let remainingTime = seconds;
+      const countdownInterval = setInterval(() => {
+        remainingTime--;
+        if (remainingTime > 0) {
+          ui.displayErrorMessage(`Rate limit: Please wait ${remainingTime} seconds before refreshing`);
+        } else {
+          clearInterval(countdownInterval);
+          ui.hideErrorMessage();
+        }
+      }, 1000);
 
-        return;
+      return;
     }
 
-    //console.log('Starting refresh of all data...');
+    console.log('Starting refresh of all data...');
     app.isRefreshing = true;
     ui.showLoader();
     chartModule.showChartLoader();
 
     try {
-        ui.hideErrorMessage();
-        cache.clear();
+      ui.hideErrorMessage();
+      CacheManager.clear();
 
-        const btcUpdateSuccess = await app.updateBTCPrice();
-        if (!btcUpdateSuccess) {
-            console.warn('BTC price update failed, continuing with cached or default value');
-        }
+      const btcUpdateSuccess = await app.updateBTCPrice();
+      if (!btcUpdateSuccess) {
+        console.warn('BTC price update failed, continuing with cached or default value');
+      }
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const allCoinData = await api.fetchCoinGeckoDataXHR();
-        if (allCoinData.error) {
-            throw new Error(`CoinGecko API Error: ${allCoinData.error}`);
-        }
+      const allCoinData = await api.fetchCoinGeckoDataXHR();
+      if (allCoinData.error) {
+        throw new Error(`CoinGecko API Error: ${allCoinData.error}`);
+      }
 
-        const failedCoins = [];
+      let volumeData = {};
+      try {
+        volumeData = await api.fetchVolumeDataXHR();
+      } catch (volumeError) {}
 
-        for (const coin of config.coins) {
-            const symbol = coin.symbol.toLowerCase();
-            const coinData = allCoinData[symbol];
+      const failedCoins = [];
 
-            try {
-                if (!coinData) {
-                    throw new Error(`No data received`);
-                }
+      for (const coin of window.config.coins) {
+        const symbol = coin.symbol.toLowerCase();
+        const coinData = allCoinData[symbol];
 
-                coinData.displayName = coin.displayName || coin.symbol;
-                ui.displayCoinData(coin.symbol, coinData);
+        try {
+          if (!coinData) {
+            throw new Error(`No data received`);
+          }
 
-                const cacheKey = `coinData_${coin.symbol}`;
-                cache.set(cacheKey, coinData);
+          coinData.displayName = coin.displayName || coin.symbol;
 
-            } catch (coinError) {
-                console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
-                failedCoins.push(coin.symbol);
+          const backendId = getCoinBackendId ? getCoinBackendId(coin.name) : coin.name;
+          if (volumeData[backendId]) {
+            coinData.total_volume = volumeData[backendId].total_volume;
+            if (!coinData.price_change_percentage_24h && volumeData[backendId].price_change_percentage_24h) {
+              coinData.price_change_percentage_24h = volumeData[backendId].price_change_percentage_24h;
             }
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        if (chartModule.currentCoin) {
+          } else {
             try {
-                await chartModule.updateChart(chartModule.currentCoin, true);
-            } catch (chartError) {
-                console.error('Chart update failed:', chartError);
+              const cacheKey = `coinData_${coin.symbol}`;
+              const cachedData = CacheManager.get(cacheKey);
+              if (cachedData && cachedData.value && cachedData.value.total_volume) {
+                coinData.total_volume = cachedData.value.total_volume;
+              }
+              if (cachedData && cachedData.value && cachedData.value.price_change_percentage_24h && 
+                  !coinData.price_change_percentage_24h) {
+                coinData.price_change_percentage_24h = cachedData.value.price_change_percentage_24h;
+              }
+            } catch (e) {
+              console.warn(`Failed to retrieve cached volume data for ${coin.symbol}:`, e);
             }
+          }
+
+          ui.displayCoinData(coin.symbol, coinData);
+
+          const cacheKey = `coinData_${coin.symbol}`;
+          CacheManager.set(cacheKey, coinData, 'prices');
+
+        } catch (coinError) {
+          console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
+          failedCoins.push(coin.symbol);
         }
+      }
 
-        app.lastRefreshedTime = new Date();
-        localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
-        ui.updateLastRefreshedTime();
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-        if (failedCoins.length > 0) {
-            const failureMessage = failedCoins.length === config.coins.length
-                ? 'Failed to update any coin data'
-                : `Failed to update some coins: ${failedCoins.join(', ')}`;
+      if (chartModule.currentCoin) {
+        try {
+          await chartModule.updateChart(chartModule.currentCoin, true);
+        } catch (chartError) {
+          console.error('Chart update failed:', chartError);
+        }
+      }
 
-            let countdown = 5;
+      app.lastRefreshedTime = new Date();
+      localStorage.setItem('lastRefreshedTime', app.lastRefreshedTime.getTime().toString());
+      ui.updateLastRefreshedTime();
+
+      if (failedCoins.length > 0) {
+        const failureMessage = failedCoins.length === window.config.coins.length
+            ? 'Failed to update any coin data'
+            : `Failed to update some coins: ${failedCoins.join(', ')}`;
+
+        let countdown = 5;
+        ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+
+        const countdownInterval = setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
             ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
+          } else {
+            clearInterval(countdownInterval);
+            ui.hideErrorMessage();
+          }
+        }, 1000);
+      }
 
-            const countdownInterval = setInterval(() => {
-                countdown--;
-                if (countdown > 0) {
-                    ui.displayErrorMessage(`${failureMessage} (${countdown}s)`);
-                } else {
-                    clearInterval(countdownInterval);
-                    ui.hideErrorMessage();
-                }
-            }, 1000);
-        }
-
-        console.log(`Refresh completed. Failed coins: ${failedCoins.length}`);
+      console.log(`Refresh completed. Failed coins: ${failedCoins.length}`);
 
     } catch (error) {
-        console.error('Critical error during refresh:', error);
+      console.error('Critical error during refresh:', error);
+      NetworkManager.handleNetworkError(error);
 
-        let countdown = 10;
-        ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
-        
-        const countdownInterval = setInterval(() => {
-            countdown--;
-            if (countdown > 0) {
-                ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
-            } else {
-                clearInterval(countdownInterval);
-                ui.hideErrorMessage();
-            }
-        }, 1000);
+      let countdown = 10;
+      ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
+      
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
+        } else {
+          clearInterval(countdownInterval);
+          ui.hideErrorMessage();
+        }
+      }, 1000);
 
     } finally {
-        ui.hideLoader();
-        chartModule.hideChartLoader();
-        app.isRefreshing = false;
+      ui.hideLoader();
+      chartModule.hideChartLoader();
+      app.isRefreshing = false;
 
-        if (app.isAutoRefreshEnabled) {
-            app.scheduleNextRefresh();
-        }
+      if (app.isAutoRefreshEnabled) {
+        app.scheduleNextRefresh();
+      }
     }
-},
+  },
 
-  updateNextRefreshTime: () => {
-    //console.log('Updating next refresh time display');
+  updateNextRefreshTime: function() {
     const nextRefreshSpan = document.getElementById('next-refresh-time');
     const labelElement = document.getElementById('next-refresh-label');
     const valueElement = document.getElementById('next-refresh-value');
@@ -1708,8 +1598,7 @@ setupEventListeners: () => {
     }
   },
 
-  updateAutoRefreshButton: () => {
-    //console.log('Updating auto-refresh button state');
+  updateAutoRefreshButton: function() {
     const button = document.getElementById('toggle-auto-refresh');
     if (button) {
       if (app.isAutoRefreshEnabled) {
@@ -1725,8 +1614,7 @@ setupEventListeners: () => {
     }
   },
 
-  startSpinAnimation: () => {
-    //console.log('Starting spin animation on auto-refresh button');
+  startSpinAnimation: function() {
     const svg = document.querySelector('#toggle-auto-refresh svg');
     if (svg) {
       svg.classList.add('animate-spin');
@@ -1736,16 +1624,14 @@ setupEventListeners: () => {
     }
   },
 
-  stopSpinAnimation: () => {
-    //console.log('Stopping spin animation on auto-refresh button');
+  stopSpinAnimation: function() {
     const svg = document.querySelector('#toggle-auto-refresh svg');
     if (svg) {
       svg.classList.remove('animate-spin');
     }
   },
 
-  updateLastRefreshedTime: () => {
-    //console.log('Updating last refreshed time');
+  updateLastRefreshedTime: function() {
     const lastRefreshedElement = document.getElementById('last-refreshed-time');
     if (lastRefreshedElement && app.lastRefreshedTime) {
       const formattedTime = app.lastRefreshedTime.toLocaleTimeString();
@@ -1753,8 +1639,7 @@ setupEventListeners: () => {
     }
   },
 
-  loadLastRefreshedTime: () => {
-    //console.log('Loading last refreshed time from storage');
+  loadLastRefreshedTime: function() {
     const storedTime = localStorage.getItem('lastRefreshedTime');
     if (storedTime) {
       app.lastRefreshedTime = new Date(parseInt(storedTime));
@@ -1762,199 +1647,57 @@ setupEventListeners: () => {
     }
   },
 
-updateBTCPrice: async () => {
-    //console.log('Updating BTC price...');
+  updateBTCPrice: async function() {
     try {
-        const priceData = await api.fetchCoinGeckoDataXHR();
+      if (!NetworkManager.isOnline()) {
+        throw new Error('Network is offline');
+      }
+      
+      const response = await Api.fetchCoinPrices("bitcoin");
 
-        if (priceData.error) {
-            console.warn('API error when fetching BTC price:', priceData.error);
-            return false;
-        }
+      if (response && response.rates && response.rates.bitcoin) {
+        app.btcPriceUSD = response.rates.bitcoin;
+        return true;
+      }
 
-        if (priceData.btc && typeof priceData.btc.current_price === 'number') {
-            app.btcPriceUSD = priceData.btc.current_price;
-            return true;
-        } else if (priceData.bitcoin && typeof priceData.bitcoin.usd === 'number') {
-            app.btcPriceUSD = priceData.bitcoin.usd;
-            return true;
-        }
-
-        console.warn('Unexpected BTC price data structure:', priceData);
-        return false;
+      console.warn('Unexpected BTC price data structure:', response);
+      return false;
 
     } catch (error) {
-        console.error('Error fetching BTC price:', error);
-        return false;
+      console.error('Error fetching BTC price:', error);
+      NetworkManager.handleNetworkError(error);
+      return false;
     }
-},
+  },
 
-sortTable: (columnIndex) => {
-  //console.log(`Sorting column: ${columnIndex}`);
-  const sortableColumns = [0, 5, 6, 7]; // 0: Time, 5: Rate, 6: Market +/-, 7: Trade
-  if (!sortableColumns.includes(columnIndex)) {
-    //console.log(`Column ${columnIndex} is not sortable`);
-    return;
-  }
-  const table = document.querySelector('table');
-  if (!table) {
-    //console.error("Table not found for sorting.");
-    return;
-  }
-  const rows = Array.from(table.querySelectorAll('tbody tr'));
-  console.log(`Found ${rows.length} rows to sort`);
-  const sortIcon = document.getElementById(`sort-icon-${columnIndex}`);
-  if (!sortIcon) {
-    //console.error("Sort icon not found.");
-    return;
-  }
-  const sortOrder = sortIcon.textContent === '↓' ? 1 : -1;
-  sortIcon.textContent = sortOrder === 1 ? '↑' : '↓';
-
-  const getSafeTextContent = (element) => element ? element.textContent.trim() : '';
-
-  rows.sort((a, b) => {
-    let aValue, bValue;
-    switch (columnIndex) {
-      case 1: // Time column
-        aValue = getSafeTextContent(a.querySelector('td:first-child .text-xs:first-child'));
-        bValue = getSafeTextContent(b.querySelector('td:first-child .text-xs:first-child'));
-        //console.log(`Comparing times: "${aValue}" vs "${bValue}"`);
-
-        const parseTime = (timeStr) => {
-          const [value, unit] = timeStr.split(' ');
-          const numValue = parseFloat(value);
-          switch(unit) {
-            case 'seconds': return numValue;
-            case 'minutes': return numValue * 60;
-            case 'hours': return numValue * 3600;
-            case 'days': return numValue * 86400;
-            default: return 0;
-          }
-        };
-        return (parseTime(bValue) - parseTime(aValue)) * sortOrder;
-
-      case 5: // Rate
-      case 6: // Market +/-
-        aValue = getSafeTextContent(a.cells[columnIndex]);
-        bValue = getSafeTextContent(b.cells[columnIndex]);
-        //console.log(`Comparing values: "${aValue}" vs "${bValue}"`);
-
-        aValue = parseFloat(aValue.replace(/[^\d.-]/g, '') || '0');
-        bValue = parseFloat(bValue.replace(/[^\d.-]/g, '') || '0');
-        return (aValue - bValue) * sortOrder;
-
-      case 7: // Trade
-        const aCell = a.cells[columnIndex];
-        const bCell = b.cells[columnIndex];
-        //console.log('aCell:', aCell ? aCell.outerHTML : 'null');
-        //console.log('bCell:', bCell ? bCell.outerHTML : 'null');
-
-        aValue = getSafeTextContent(aCell.querySelector('a')) || 
-                 getSafeTextContent(aCell.querySelector('button')) || 
-                 getSafeTextContent(aCell);
-        bValue = getSafeTextContent(bCell.querySelector('a')) || 
-                 getSafeTextContent(bCell.querySelector('button')) || 
-                 getSafeTextContent(bCell);
-        
-        aValue = aValue.toLowerCase();
-        bValue = bValue.toLowerCase();
-
-        //console.log(`Comparing trade actions: "${aValue}" vs "${bValue}"`);
-
-        if (aValue === bValue) return 0;
-        if (aValue === "swap") return -1 * sortOrder;
-        if (bValue === "swap") return 1 * sortOrder;
-        return aValue.localeCompare(bValue) * sortOrder;
-
-      default:
-        aValue = getSafeTextContent(a.cells[columnIndex]);
-        bValue = getSafeTextContent(b.cells[columnIndex]);
-        //console.log(`Comparing default values: "${aValue}" vs "${bValue}"`);
-        return aValue.localeCompare(bValue, undefined, {
-          numeric: true,
-          sensitivity: 'base'
-        }) * sortOrder;
-    }
-  });
-
-  const tbody = table.querySelector('tbody');
-  if (tbody) {
-    rows.forEach(row => tbody.appendChild(row));
-  } else {
-    //console.error("Table body not found.");
-  }
-  //console.log('Sorting completed');
-},
-  
-  initializeSelectImages: () => {
-    const updateSelectedImage = (selectId) => {
-      const select = document.getElementById(selectId);
-      const button = document.getElementById(`${selectId}_button`);
-      if (!select || !button) {
-        //console.error(`Elements not found for ${selectId}`);
-        return;
-      }
-      const selectedOption = select.options[select.selectedIndex];
-      const imageURL = selectedOption?.getAttribute('data-image');
-      requestAnimationFrame(() => {
-        if (imageURL) {
-          button.style.backgroundImage = `url('${imageURL}')`;
-          button.style.backgroundSize = '25px 25px';
-          button.style.backgroundPosition = 'center';
-          button.style.backgroundRepeat = 'no-repeat';
+  updateResolutionButtons: function(coinSymbol) {
+    const resolutionButtons = document.querySelectorAll('.resolution-button');
+    resolutionButtons.forEach(button => {
+      const resolution = button.id.split('-')[1];
+      if (coinSymbol === 'WOW') {
+        if (resolution === 'day') {
+          button.classList.remove('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
+          button.classList.add('active');
+          button.disabled = false;
         } else {
-          button.style.backgroundImage = 'none';
+          button.classList.add('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
+          button.classList.remove('active');
+          button.disabled = true;
         }
-        button.style.minWidth = '25px';
-        button.style.minHeight = '25px';
-      });
-    };
-    const handleSelectChange = (event) => {
-      updateSelectedImage(event.target.id);
-    };
-    ['coin_to', 'coin_from'].forEach(selectId => {
-      const select = document.getElementById(selectId);
-      if (select) {
-        select.addEventListener('change', handleSelectChange);
-        updateSelectedImage(selectId);
       } else {
-        //console.error(`Select element not found for ${selectId}`);
+        button.classList.remove('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
+        button.classList.toggle('active', resolution === window.config.currentResolution);
+        button.disabled = false;
       }
     });
   },
 
-updateResolutionButtons: (coinSymbol) => {
-  const resolutionButtons = document.querySelectorAll('.resolution-button');
-  resolutionButtons.forEach(button => {
-    const resolution = button.id.split('-')[1];
-    if (coinSymbol === 'WOW') {
-      if (resolution === 'day') {
-        button.classList.remove('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
-        button.classList.add('active');
-        button.disabled = false;
-      } else {
-        button.classList.add('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
-        button.classList.remove('active');
-        button.disabled = true;
-      }
-    } else {
-      button.classList.remove('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
-      button.classList.toggle('active', resolution === config.currentResolution);
-      button.disabled = false;
-    }
-  });
-},
-  
- toggleAutoRefresh: () => {
-    console.log('Toggling auto-refresh');
+  toggleAutoRefresh: function() {
     app.isAutoRefreshEnabled = !app.isAutoRefreshEnabled;
     localStorage.setItem('autoRefreshEnabled', app.isAutoRefreshEnabled.toString());
     if (app.isAutoRefreshEnabled) {
-      console.log('Auto-refresh enabled, scheduling next refresh');
       app.scheduleNextRefresh();
     } else {
-      console.log('Auto-refresh disabled, clearing interval');
       if (app.autoRefreshInterval) {
         clearTimeout(app.autoRefreshInterval);
         app.autoRefreshInterval = null;
@@ -1974,55 +1717,158 @@ resolutionButtons.forEach(button => {
     const currentCoin = chartModule.currentCoin;
     
     if (currentCoin !== 'WOW' || resolution === 'day') {
-      config.currentResolution = resolution;
+      window.config.currentResolution = resolution;
       chartModule.updateChart(currentCoin, true);
       app.updateResolutionButtons(currentCoin);
     }
   });
 });
 
-// LOAD
+function cleanup() {
+  console.log('Starting cleanup process');
+  
+  try {
+    if (window.MemoryManager) {
+      MemoryManager.forceCleanup();
+    }
+    
+    if (chartModule) {
+      CleanupManager.registerResource('chartModule', chartModule, (cm) => {
+        cm.cleanup();
+      });
+    }
+
+    if (volumeToggle) {
+      CleanupManager.registerResource('volumeToggle', volumeToggle, (vt) => {
+        vt.cleanup();
+      });
+    }
+
+    ['chartModule', 'volumeToggle', 'app'].forEach(ref => {
+      if (window[ref]) {
+        window[ref] = null;
+      }
+    });
+
+    const cleanupCounts = CleanupManager.clearAll();
+    console.log('All resources cleaned up:', cleanupCounts);
+    
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+    CleanupManager.clearAll();
+  }
+}
+
+window.cleanup = cleanup;
+
 const appCleanup = {
   init: function() {
-    memoryMonitor.startMonitoring();
     window.addEventListener('beforeunload', this.globalCleanup);
   },
 
   globalCleanup: function() {
     try {
+      if (window.MemoryManager) {
+        MemoryManager.forceCleanup();
+      }
+
       if (app.autoRefreshInterval) {
-        clearTimeout(app.autoRefreshInterval);
+        CleanupManager.clearTimeout(app.autoRefreshInterval);
       }
       if (chartModule) {
-        chartModule.cleanup();
+        CleanupManager.registerResource('chartModule', chartModule, (cm) => {
+          cm.cleanup();
+        });
       }
       if (volumeToggle) {
-        volumeToggle.cleanup();
+        CleanupManager.registerResource('volumeToggle', volumeToggle, (vt) => {
+          vt.cleanup();
+        });
       }
-      cleanupManager.clearAll();
-      memoryMonitor.stopMonitoring();
-      cache.clear();
-
-      console.log('Global application cleanup completed');
-    } catch (error) {
-      console.error('Error during global cleanup:', error);
-    }
+      CleanupManager.clearAll();
+      CacheManager.clear();
+    } catch (error) {}
   },
+
   manualCleanup: function() {
     this.globalCleanup();
     window.location.reload();
   }
 };
 
-app.init = () => {
-  //console.log('Init');
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.NetworkManager && !window.networkManagerInitialized) {
+        NetworkManager.initialize({
+            connectionTestEndpoint: '/json',
+            connectionTestTimeout: 3000,
+            reconnectDelay: 5000, 
+            maxReconnectAttempts: 5
+        });
+        window.networkManagerInitialized = true;
+    }
+
+    app.init();
+
+    if (window.MemoryManager) {
+        MemoryManager.enableAutoCleanup();
+    }
+
+    CleanupManager.setInterval(() => {
+        CacheManager.cleanup();
+    }, 300000);  // Every 5 minutes
+
+    CleanupManager.setInterval(() => {
+        if (chartModule && chartModule.currentCoin && NetworkManager.isOnline()) {
+            chartModule.updateChart(chartModule.currentCoin);
+        }
+    }, 900000);  // Every 15 minutes
+
+    CleanupManager.addListener(document, 'visibilitychange', () => {
+        if (!document.hidden) {
+            console.log('Page is now visible');
+
+            if (NetworkManager.isOnline()) {
+                if (chartModule && chartModule.currentCoin) {
+                    chartModule.updateChart(chartModule.currentCoin);
+                }
+            } else {
+
+                NetworkManager.attemptReconnect();
+            }
+        }
+    });
+
+    CleanupManager.addListener(window, 'beforeunload', () => {
+        cleanup();
+    });
+
+    appCleanup.init();
+});
+
+app.init = function() {
   window.addEventListener('load', app.onLoad);
-  appCleanup.init();
   app.loadLastRefreshedTime();
   app.updateAutoRefreshButton();
-  memoryMonitor.startMonitoring();
-  //console.log('App initialized');
+
+  if (window.NetworkManager) {
+    NetworkManager.addHandler('offline', () => {
+      ui.showNetworkErrorMessage();
+    });
+
+    NetworkManager.addHandler('reconnected', () => {
+      ui.hideErrorMessage();
+      app.refreshAllData();
+    });
+
+    NetworkManager.addHandler('maxAttemptsReached', () => {
+      ui.displayErrorMessage(
+        "Server connection lost. Please check your internet connection and try refreshing the page.",
+        0
+      );
+    });
+  }
+
+  return app;
 };
 
-// LOAD
 app.init();

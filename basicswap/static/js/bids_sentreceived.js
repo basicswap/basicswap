@@ -1,4 +1,3 @@
-// Constants and State
 const PAGE_SIZE = 50;
 const state = {
     currentPage: {
@@ -167,262 +166,225 @@ const EventManager = {
 };
 
 function cleanup() {
-    console.log('Starting cleanup process');
-    EventManager.clearAll();
-
-    const exportSentButton = document.getElementById('exportSentBids');
-    const exportReceivedButton = document.getElementById('exportReceivedBids');
-
-    if (exportSentButton) {
-        exportSentButton.remove();
-    }
-
-    if (exportReceivedButton) {
-        exportReceivedButton.remove();
-    }
-
-    if (window.TooltipManager) {
-    const originalCleanup = window.TooltipManager.cleanup;
-    window.TooltipManager.cleanup = function() {
-        originalCleanup.call(window.TooltipManager);
-
-        setTimeout(() => {
-            forceTooltipDOMCleanup();
-
-            const detachedTooltips = document.querySelectorAll('[id^="tooltip-"]');
-            detachedTooltips.forEach(tooltip => {
-                const tooltipId = tooltip.id;
-                const trigger = document.querySelector(`[data-tooltip-target="${tooltipId}"]`);
-                if (!trigger || !document.body.contains(trigger)) {
-                    tooltip.remove();
-                }
-            });
-        }, 10);
-    };
-}
-
-    WebSocketManager.cleanup();
-    if (searchTimeout) {
-        clearTimeout(searchTimeout);
-        searchTimeout = null;
-    }
-    state.data = {
-        sent: [],
-        received: []
-    };
-    IdentityManager.clearCache();
-    Object.keys(elements).forEach(key => {
-        elements[key] = null;
-    });
+    //console.log('Starting comprehensive cleanup process for bids table');
     
-    console.log('Cleanup completed');
+    try {
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+            searchTimeout = null;
+        }
+
+        if (state.refreshPromise) {
+            state.isRefreshing = false;
+        }
+
+        if (window.WebSocketManager) {
+            WebSocketManager.disconnect();
+        }
+
+        cleanupTooltips();
+        forceTooltipDOMCleanup();
+        
+        if (window.TooltipManager) {
+            window.TooltipManager.cleanup();
+        }
+
+        tooltipIdsToCleanup.clear();
+
+        const cleanupTableBody = (tableId) => {
+            const tbody = document.getElementById(tableId);
+            if (!tbody) return;
+
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                if (window.CleanupManager) {
+                    CleanupManager.removeListenersByElement(row);
+                } else {
+                    EventManager.removeAll(row);
+                }
+                Array.from(row.attributes).forEach(attr => {
+                    if (attr.name.startsWith('data-')) {
+                        row.removeAttribute(attr.name);
+                    }
+                });
+            });
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+        };
+
+        cleanupTableBody('sent-tbody');
+        cleanupTableBody('received-tbody');
+
+        if (window.CleanupManager) {
+            CleanupManager.clearAll();
+        } else {
+            EventManager.clearAll();
+        }
+
+        const clearAllAnimationFrames = () => {
+            const rafList = window.requestAnimationFrameList;
+            if (Array.isArray(rafList)) {
+                rafList.forEach(id => {
+                    cancelAnimationFrame(id);
+                });
+                window.requestAnimationFrameList = [];
+            }
+        };
+        clearAllAnimationFrames();
+
+        state.data = {
+            sent: [],
+            received: []
+        };
+        
+        state.currentPage = {
+            sent: 1,
+            received: 1
+        };
+        
+        state.isLoading = false;
+        state.isRefreshing = false;
+        state.wsConnected = false;
+        state.refreshPromise = null;
+
+        state.filters = {
+            state: -1,
+            sort_by: 'created_at',
+            sort_dir: 'desc',
+            with_expired: true,
+            searchQuery: '',
+            coin_from: 'any',
+            coin_to: 'any'
+        };
+
+        if (window.IdentityManager) {
+            IdentityManager.clearCache();
+        }
+
+        if (window.CacheManager) {
+            CacheManager.cleanup(true);
+        }
+
+        if (window.MemoryManager) {
+            MemoryManager.forceCleanup();
+        }
+
+        Object.keys(elements).forEach(key => {
+            elements[key] = null;
+        });
+
+        console.log('Comprehensive cleanup completed');
+    } catch (error) {
+        console.error('Error during cleanup process:', error);
+
+        try {
+            if (window.EventManager) EventManager.clearAll();
+            if (window.CleanupManager) CleanupManager.clearAll();
+            if (window.WebSocketManager) WebSocketManager.disconnect();
+
+            state.data = { sent: [], received: [] };
+            state.isLoading = false;
+
+            Object.keys(elements).forEach(key => {
+                elements[key] = null;
+            });
+        } catch (e) {
+            console.error('Failsafe cleanup also failed:', e);
+        }
+    }
 }
 
-document.addEventListener('beforeunload', cleanup);
-document.addEventListener('visibilitychange', () => {
+window.cleanupBidsTable = cleanup;
+
+CleanupManager.addListener(document, 'visibilitychange', () => {
     if (document.hidden) {
-        WebSocketManager.pause();
+        //console.log('Page hidden - pausing WebSocket and optimizing memory');
+
+        if (WebSocketManager && typeof WebSocketManager.pause === 'function') {
+            WebSocketManager.pause();
+        } else if (WebSocketManager && typeof WebSocketManager.disconnect === 'function') {
+            WebSocketManager.disconnect();
+        }
+
+        if (window.TooltipManager && typeof window.TooltipManager.cleanup === 'function') {
+            window.TooltipManager.cleanup();
+        }
+        
+        // Run memory optimization
+        if (window.MemoryManager) {
+            MemoryManager.forceCleanup();
+        }
     } else {
-        WebSocketManager.resume();
+
+        if (WebSocketManager && typeof WebSocketManager.resume === 'function') {
+            WebSocketManager.resume();
+        } else if (WebSocketManager && typeof WebSocketManager.connect === 'function') {
+            WebSocketManager.connect();
+        }
+
+        const lastUpdateTime = state.lastRefresh || 0;
+        const now = Date.now();
+        const refreshInterval = 5 * 60 * 1000; // 5 minutes
+        
+        if (now - lastUpdateTime > refreshInterval) {
+            setTimeout(() => {
+                updateBidsTable();
+            }, 500);
+        }
     }
 });
 
-// WebSocket Management
-const WebSocketManager = {
-    ws: null,
-    processingQueue: false,
-    reconnectTimeout: null,
-    maxReconnectAttempts: 5,
-    reconnectAttempts: 0,
-    reconnectDelay: 5000,
-    healthCheckInterval: null,
-    isPaused: false,
-    lastMessageTime: Date.now(),
+CleanupManager.addListener(window, 'beforeunload', () => {
+    cleanup();
+});
+
+function cleanupRow(row) {
+    if (!row) return;
+
+    const tooltipTriggers = row.querySelectorAll('[data-tooltip-target]');
+    tooltipTriggers.forEach(trigger => {
+        if (window.TooltipManager) {
+            window.TooltipManager.destroy(trigger);
+        }
+    });
+
+    if (window.CleanupManager) {
+        CleanupManager.removeListenersByElement(row);
+    } else {
+        EventManager.removeAll(row);
+    }
+
+    row.removeAttribute('data-offer-id');
+    row.removeAttribute('data-bid-id');
+
+    while (row.firstChild) {
+        const child = row.firstChild;
+        row.removeChild(child);
+    }
+}
+
+function optimizeMemoryUsage() {
+    const MAX_BIDS_IN_MEMORY = 500;
     
-    initialize() {
-        this.connect();
-        this.startHealthCheck();
-    },
+    ['sent', 'received'].forEach(type => {
+        if (state.data[type] && state.data[type].length > MAX_BIDS_IN_MEMORY) {
+            console.log(`Trimming ${type} bids data from ${state.data[type].length} to ${MAX_BIDS_IN_MEMORY}`);
+            state.data[type] = state.data[type].slice(0, MAX_BIDS_IN_MEMORY);
+        }
+    });
 
-    isConnected() {
-        return this.ws?.readyState === WebSocket.OPEN;
-    },
+    cleanupOffscreenTooltips();
 
-    connect() {
-    if (this.isConnected() || this.isPaused) return;
-
-    if (this.ws) {
-        this.cleanupConnection();
+    if (window.IdentityManager && typeof IdentityManager.limitCacheSize === 'function') {
+        IdentityManager.limitCacheSize(100);
     }
 
-    try {
-
-        let wsPort;
-        
-        if (typeof getWebSocketConfig === 'function') {
-            const wsConfig = getWebSocketConfig();
-            wsPort = wsConfig?.port || wsConfig?.fallbackPort;
-        }
-
-        if (!wsPort && window.config?.port) {
-            wsPort = window.config.port;
-        }
-
-        if (!wsPort) {
-            wsPort = window.ws_port || '11700';
-        }
-
-        console.log("Using WebSocket port:", wsPort);
-        this.ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
-        this.setupEventHandlers();
-    } catch (error) {
-        console.error('WebSocket connection error:', error);
-        this.handleReconnect();
+    if (window.MemoryManager) {
+        MemoryManager.forceCleanup();
     }
-},
+}
 
-    setupEventHandlers() {
-        if (!this.ws) return;
-        
-        this.ws.onopen = () => {
-            state.wsConnected = true;
-            this.reconnectAttempts = 0;
-            this.lastMessageTime = Date.now();
-            updateConnectionStatus('connected');
-            console.log('🟢  WebSocket connection established for Sent Bids / Received Bids');
-            updateBidsTable();
-        };
-
-        this.ws.onmessage = () => {
-            this.lastMessageTime = Date.now();
-            if (this.isPaused) return;
-            
-            if (!this.processingQueue) {
-                this.processingQueue = true;
-                setTimeout(async () => {
-                    try {
-                        if (!state.isRefreshing) {
-                            await updateBidsTable();
-                        }
-                    } finally {
-                        this.processingQueue = false;
-                    }
-                }, 200);
-            }
-        };
-
-        this.ws.onclose = () => {
-            state.wsConnected = false;
-            updateConnectionStatus('disconnected');
-            if (!this.isPaused) {
-                this.handleReconnect();
-            }
-        };
-
-        this.ws.onerror = () => {
-            updateConnectionStatus('error');
-        };
-    },
-
-    startHealthCheck() {
-        this.stopHealthCheck();
-        
-        this.healthCheckInterval = setInterval(() => {
-            if (this.isPaused) return;
-
-            const timeSinceLastMessage = Date.now() - this.lastMessageTime;
-            if (timeSinceLastMessage > 120000) {
-                console.log('WebSocket connection appears stale. Reconnecting...');
-                this.cleanupConnection();
-                this.connect();
-                return;
-            }
-            
-            if (!this.isConnected()) {
-                this.handleReconnect();
-            }
-        }, 30000);
-    },
-
-    stopHealthCheck() {
-        if (this.healthCheckInterval) {
-            clearInterval(this.healthCheckInterval);
-            this.healthCheckInterval = null;
-        }
-    },
-
-    handleReconnect() {
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
-
-        if (this.isPaused) return;
-
-        this.reconnectAttempts++;
-        if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-            const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
-            //console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-            this.reconnectTimeout = setTimeout(() => this.connect(), delay);
-        } else {
-            updateConnectionStatus('error');
-            //console.log('Maximum reconnection attempts reached. Will try again in 60 seconds.');
-            setTimeout(() => {
-                this.reconnectAttempts = 0;
-                this.connect();
-            }, 60000);
-        }
-    },
-
-    cleanupConnection() {
-        if (this.ws) {
-            this.ws.onopen = null;
-            this.ws.onmessage = null;
-            this.ws.onclose = null;
-            this.ws.onerror = null;
-            if (this.ws.readyState === WebSocket.OPEN) {
-                try {
-                    this.ws.close(1000, 'Cleanup');
-                } catch (e) {
-                    console.warn('Error closing WebSocket:', e);
-                }
-            }
-            this.ws = null;
-        }
-    },
-
-    pause() {
-        this.isPaused = true;
-        //console.log('WebSocket operations paused');
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
-    },
-
-    resume() {
-        if (!this.isPaused) return;
-        this.isPaused = false;
-        //console.log('WebSocket operations resumed');
-        this.lastMessageTime = Date.now();
-        if (!this.isConnected()) {
-            this.reconnectAttempts = 0;
-            this.connect();
-        }
-    },
-
-    cleanup() {
-        this.isPaused = true;
-        this.stopHealthCheck();
-        if (this.reconnectTimeout) {
-            clearTimeout(this.reconnectTimeout);
-            this.reconnectTimeout = null;
-        }
-        this.cleanupConnection();
-    }
-};
-
-// Core
 const safeParseInt = (value) => {
     const parsed = parseInt(value);
     return isNaN(parsed) ? 0 : parsed;
@@ -528,7 +490,6 @@ function coinMatches(offerCoin, filterCoin) {
     return false;
 }
 
-// State
 function hasActiveFilters() {
     const coinFromSelect = document.getElementById('coin_from');
     const coinToSelect = document.getElementById('coin_to');
@@ -596,11 +557,58 @@ function filterAndSortData(bids) {
             const searchStr = state.filters.searchQuery.toLowerCase();
             const matchesBidId = bid.bid_id.toLowerCase().includes(searchStr);
             const matchesIdentity = bid.addr_from?.toLowerCase().includes(searchStr);
-            const identity = IdentityManager.cache.get(bid.addr_from);
-            const label = identity?.data?.label || '';
+
+            let label = '';
+            try {
+                if (window.IdentityManager) {
+
+                    let identity = null;
+
+                    if (IdentityManager.cache && typeof IdentityManager.cache.get === 'function') {
+                        identity = IdentityManager.cache.get(bid.addr_from);
+                    }
+
+                    if (identity && identity.label) {
+                        label = identity.label;
+                    } else if (identity && identity.data && identity.data.label) {
+                        label = identity.data.label;
+                    }
+
+                    if (!label && bid.identity) {
+                        label = bid.identity.label || '';
+                    }
+                }
+            } catch (e) {
+                console.warn('Error accessing identity for search:', e);
+            }
+            
             const matchesLabel = label.toLowerCase().includes(searchStr);
 
-            if (!(matchesBidId || matchesIdentity || matchesLabel)) {
+            let matchesDisplayedLabel = false;
+            if (!matchesLabel && document) {
+                try {
+                    const tableId = state.currentTab === 'sent' ? 'sent' : 'received';
+                    const cells = document.querySelectorAll(`#${tableId} a[href^="/identity/"]`);
+                    
+                    for (const cell of cells) {
+
+                        const href = cell.getAttribute('href');
+                        const cellAddress = href ? href.split('/').pop() : '';
+
+                        if (cellAddress === bid.addr_from) {
+                            const cellText = cell.textContent.trim().toLowerCase();
+                            if (cellText.includes(searchStr)) {
+                                matchesDisplayedLabel = true;
+                                break;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error checking displayed labels:', e);
+                }
+            }
+            
+            if (!(matchesBidId || matchesIdentity || matchesLabel || matchesDisplayedLabel)) {
                 return false;
             }
         }
@@ -613,6 +621,37 @@ function filterAndSortData(bids) {
         }
         return 0;
     });
+}
+
+async function preloadIdentitiesForSearch(bids) {
+    if (!window.IdentityManager || typeof IdentityManager.getIdentityData !== 'function') {
+        return;
+    }
+    
+    try {
+        const addresses = new Set();
+        bids.forEach(bid => {
+            if (bid.addr_from) {
+                addresses.add(bid.addr_from);
+            }
+        });
+
+        const BATCH_SIZE = 20;
+        const addressArray = Array.from(addresses);
+        
+        for (let i = 0; i < addressArray.length; i += BATCH_SIZE) {
+            const batch = addressArray.slice(i, i + BATCH_SIZE);
+            await Promise.all(batch.map(addr => IdentityManager.getIdentityData(addr)));
+
+            if (i + BATCH_SIZE < addressArray.length) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+        }
+        
+        console.log(`Preloaded ${addressArray.length} identities for search`);
+    } catch (error) {
+        console.error('Error preloading identities:', error);
+    }
 }
 
 function updateCoinFilterImages() {
@@ -709,108 +748,6 @@ const updateConnectionStatus = (status) => {
     });
 };
 
-// Identity
-const IdentityManager = {
-    cache: new Map(),
-    pendingRequests: new Map(),
-    retryDelay: 2000,
-    maxRetries: 3,
-    cacheTimeout: 5 * 60 * 1000,
-    maxCacheSize: 500,
-
-    async getIdentityData(address) {
-        if (!address) return { address: '' };
-
-        const cachedData = this.getCachedIdentity(address);
-        if (cachedData) return { ...cachedData, address };
-
-        if (this.pendingRequests.has(address)) {
-            try {
-                const pendingData = await this.pendingRequests.get(address);
-                return { ...pendingData, address };
-            } catch (error) {
-                this.pendingRequests.delete(address);
-            }
-        }
-
-        const request = this.fetchWithRetry(address);
-        this.pendingRequests.set(address, request);
-
-        try {
-            const data = await request;
-
-            this.trimCacheIfNeeded();
-
-            this.cache.set(address, {
-                data,
-                timestamp: Date.now()
-            });
-
-            return { ...data, address };
-        } catch (error) {
-            console.warn(`Error fetching identity for ${address}:`, error);
-            return { address };
-        } finally {
-            this.pendingRequests.delete(address);
-        }
-    },
-
-    getCachedIdentity(address) {
-        const cached = this.cache.get(address);
-        if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
-            cached.timestamp = Date.now();
-            return cached.data;
-        }
-        if (cached) {
-            this.cache.delete(address);
-        }
-        return null;
-    },
-
-    trimCacheIfNeeded() {
-        if (this.cache.size > this.maxCacheSize) {
-
-            const entries = Array.from(this.cache.entries());
-            const sortedByAge = entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-
-            const toRemove = Math.ceil(this.maxCacheSize * 0.2);
-            for (let i = 0; i < toRemove && i < sortedByAge.length; i++) {
-                this.cache.delete(sortedByAge[i][0]);
-            }
-            console.log(`Trimmed identity cache: removed ${toRemove} oldest entries`);
-        }
-    },
-
-    clearCache() {
-        this.cache.clear();
-        this.pendingRequests.clear();
-    },
-
-    async fetchWithRetry(address, attempt = 1) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            
-            const response = await fetch(`/json/identities/${address}`, { 
-                signal: controller.signal 
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            return await response.json();
-        } catch (error) {
-            if (attempt >= this.maxRetries) {
-                console.warn(`Failed to fetch identity for ${address} after ${attempt} attempts`);
-                return { address };
-            }
-            await new Promise(resolve => setTimeout(resolve, this.retryDelay * attempt));
-            return this.fetchWithRetry(address, attempt + 1);
-        }
-    }
-};
-
-// Stats
 const processIdentityStats = (identity) => {
     if (!identity) return null;
 
@@ -910,7 +847,6 @@ const createIdentityTooltipContent = (identity) => {
     `;
 };
 
-// Table
 let tooltipIdsToCleanup = new Set();
 
 const cleanupTooltips = () => {
@@ -1097,14 +1033,14 @@ const createTableRow = async (bid) => {
            <!-- Status Column -->
            <td class="py-3 px-6">
             <div class="relative flex justify-center" data-tooltip-target="tooltip-status-${uniqueId}">
-                <span class="w-full lg:w-7/8 xl:w-2/3 px-2.5 py-1 inline-flex items-center justify-center rounded-full text-xs font-medium bold ${getStatusClass(bid.bid_state)}">
+                <span class="w-full lg:w-7/8 xl:w-2/3 px-2.5 py-1 inline-flex items-center justify-center text-center rounded-full text-xs font-medium bold ${getStatusClass(bid.bid_state)}">
                 ${bid.bid_state}
                 </span>
               </div>
             </td>
 
             <!-- Actions Column -->
-            <td class="py-3 pr-4 pl-3">
+            <td class="py-3 pr-4">
                 <div class="flex justify-center">
                     <a href="/bid/${bid.bid_id}"
                         class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200">
@@ -1357,7 +1293,6 @@ function implementVirtualizedRows() {
     });
 }
 
-// Fetching
 let activeFetchController = null;
 
 const fetchBids = async () => {
@@ -1432,21 +1367,20 @@ const fetchBids = async () => {
 
 const updateBidsTable = async () => {
     if (state.isLoading) {
-        //console.log('Already loading, skipping update');
         return;
     }
 
     try {
-        //console.log('Starting updateBidsTable for tab:', state.currentTab);
-        //console.log('Current filters:', state.filters);
-
         state.isLoading = true;
         updateLoadingState(true);
 
         const bids = await fetchBids();
-
-       //console.log('Fetched bids:', bids.length);
-
+        
+        // Add identity preloading if we're searching
+        if (state.filters.searchQuery && state.filters.searchQuery.length > 0) {
+            await preloadIdentitiesForSearch(bids);
+        }
+        
         state.data[state.currentTab] = bids;
         state.currentPage[state.currentTab] = 1;
 
@@ -1503,7 +1437,6 @@ const updatePaginationControls = (type) => {
     }
 };
 
-// Filter
 let searchTimeout;
 function handleSearch(event) {
     if (searchTimeout) {
@@ -1708,7 +1641,6 @@ const setupRefreshButtons = () => {
     });
 };
 
-// Tabs
 const switchTab = (tabId) => {
     if (state.isLoading) return;
 
@@ -1925,15 +1857,22 @@ function setupMemoryMonitoring() {
     const intervalId = setInterval(() => {
         if (document.hidden) {
             console.log('Tab hidden - running memory optimization');
-            IdentityManager.trimCacheIfNeeded();
-            if (window.TooltipManager) {
+
+            if (window.IdentityManager) {
+                if (typeof IdentityManager.limitCacheSize === 'function') {
+                    IdentityManager.limitCacheSize(100);
+                }
+            }
+
+            if (window.TooltipManager && typeof window.TooltipManager.cleanup === 'function') {
                 window.TooltipManager.cleanup();
             }
+
             if (state.data.sent.length > 1000) {
                 console.log('Trimming sent bids data');
                 state.data.sent = state.data.sent.slice(0, 1000);
             }
-            
+
             if (state.data.received.length > 1000) {
                 console.log('Trimming received bids data');
                 state.data.received = state.data.received.slice(0, 1000);
@@ -1942,6 +1881,7 @@ function setupMemoryMonitoring() {
             cleanupTooltips();
         }
     }, MEMORY_CHECK_INTERVAL);
+
     document.addEventListener('beforeunload', () => {
         clearInterval(intervalId);
     }, { once: true });
@@ -1984,6 +1924,12 @@ function initialize() {
         state.filters.state = -1;
         updateBidsTable();
     }, 100);
+
+    setInterval(() => {
+        if ((state.data.sent.length + state.data.received.length) > 1000) {
+            optimizeMemoryUsage();
+        }
+    }, 5 * 60 * 1000); // Check every 5 minutes
 
     window.cleanupBidsTable = cleanup;
 }
