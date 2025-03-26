@@ -985,7 +985,7 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
     swap_client.checkSystemStatus()
 
     filters = {
-        "sort_by": "created_at", 
+        "sort_by": "created_at",
         "sort_dir": "desc",
         "with_available_or_active": True,
         "with_extra_info": True
