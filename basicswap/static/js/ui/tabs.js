@@ -36,7 +36,7 @@
 
         show(tabId, force = false) {
             const tab = this.getTab(tabId);
-            
+
             if ((tab !== this._activeTab) || force) {
                 this._items.forEach(t => {
                     if (t !== tab) {

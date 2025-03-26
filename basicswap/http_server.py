@@ -178,6 +178,16 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.server.msg_id_counter += 1
             args_dict["err_messages"] = err_messages_with_ids
 
+        if self.path:
+            parsed = parse.urlparse(self.path)
+            url_split = parsed.path.split("/")
+            if len(url_split) > 1 and url_split[1]:
+                args_dict["current_page"] = url_split[1]
+            else:
+                args_dict["current_page"] = "index"
+        else:
+            args_dict["current_page"] = "index"
+
         shutdown_token = os.urandom(8).hex()
         self.server.session_tokens["shutdown"] = shutdown_token
         args_dict["shutdown_token"] = shutdown_token
@@ -410,7 +420,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         return self.render_template(
             template,
             {
-                "refresh": 30,
                 "active_swaps": [
                     (
                         s[0].hex(),

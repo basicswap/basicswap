@@ -223,8 +223,6 @@ def page_bids(
         return self.render_template(
             template,
             {
-                "page_type_available": "Bids Available",
-                "page_type_available_description": "Bids available for you to accept.",
                 "messages": messages,
                 "filters": filters,
                 "data": page_data,

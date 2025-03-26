@@ -1,15 +1,17 @@
 (function(window) {
     'use strict';
 
+    const dropdownInstances = [];
+
     function positionElement(targetEl, triggerEl, placement = 'bottom', offsetDistance = 8) {
         targetEl.style.visibility = 'hidden';
         targetEl.style.display = 'block';
-        
+
         const triggerRect = triggerEl.getBoundingClientRect();
         const targetRect = targetEl.getBoundingClientRect();
         const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        
+
         let top, left;
 
         top = triggerRect.bottom + offsetDistance;
@@ -58,6 +60,9 @@
             this._handleScroll = this._handleScroll.bind(this);
             this._handleResize = this._handleResize.bind(this);
             this._handleOutsideClick = this._handleOutsideClick.bind(this);
+
+            dropdownInstances.push(this);
+            
             this.init();
         }
 
@@ -66,7 +71,8 @@
                 this._targetEl.style.margin = '0';
                 this._targetEl.style.display = 'none';
                 this._targetEl.style.position = 'fixed';
-                this._targetEl.style.zIndex = '50';
+                this._targetEl.style.zIndex = '40';
+                this._targetEl.classList.add('dropdown-menu');
                 
                 this._setupEventListeners();
                 this._initialized = true;
@@ -123,6 +129,12 @@
 
         show() {
             if (!this._visible) {
+                dropdownInstances.forEach(instance => {
+                    if (instance !== this && instance._visible) {
+                        instance.hide();
+                    }
+                });
+
                 this._targetEl.style.display = 'block';
                 this._targetEl.style.visibility = 'hidden';
 
@@ -133,7 +145,7 @@
                         this._options.placement,
                         this._options.offset
                     );
-                    
+
                     this._visible = true;
                     this._options.onShow();
                 });
@@ -160,6 +172,12 @@
             document.removeEventListener('click', this._handleOutsideClick);
             window.removeEventListener('scroll', this._handleScroll, true);
             window.removeEventListener('resize', this._handleResize);
+
+            const index = dropdownInstances.indexOf(this);
+            if (index > -1) {
+                dropdownInstances.splice(index, 1);
+            }
+
             this._initialized = false;
         }
     }
@@ -168,7 +186,7 @@
         document.querySelectorAll('[data-dropdown-toggle]').forEach(triggerEl => {
             const targetId = triggerEl.getAttribute('data-dropdown-toggle');
             const targetEl = document.getElementById(targetId);
-            
+
             if (targetEl) {
                 const placement = triggerEl.getAttribute('data-dropdown-placement');
                 new Dropdown(targetEl, triggerEl, {
@@ -183,6 +201,8 @@
     } else {
         initDropdowns();
     }
+
+    Dropdown.instances = dropdownInstances;
 
     window.Dropdown = Dropdown;
     window.initDropdowns = initDropdowns;

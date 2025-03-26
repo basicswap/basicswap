@@ -983,37 +983,49 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
 def js_active(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
-    filters = {"sort_by": "created_at", "sort_dir": "desc"}
+
+    filters = {
+        "sort_by": "created_at", 
+        "sort_dir": "desc",
+        "with_available_or_active": True,
+        "with_extra_info": True
+    }
+
     EXCLUDED_STATES = [
-        "Completed",
-        "Expired",
-        "Timed-out",
-        "Abandoned",
         "Failed, refunded",
         "Failed, swiped",
         "Failed",
         "Error",
-        "received",
+        "Expired",
+        "Timed-out",
+        "Abandoned",
+        "Completed"
     ]
+
     all_bids = []
     processed_bid_ids = set()
-
     try:
         received_bids = swap_client.listBids(filters=filters)
         sent_bids = swap_client.listBids(sent=True, filters=filters)
+
         for bid in received_bids + sent_bids:
             try:
                 bid_id_hex = bid[2].hex()
                 if bid_id_hex in processed_bid_ids:
                     continue
-                bid_state = strBidState(bid[5])
-                tx_state_a = strTxState(bid[7])
-                tx_state_b = strTxState(bid[8])
-                if bid_state in EXCLUDED_STATES:
-                    continue
+
                 offer = swap_client.getOffer(bid[3])
                 if not offer:
                     continue
+
+                bid_state = strBidState(bid[5])
+
+                if bid_state in EXCLUDED_STATES:
+                    continue
+
+                tx_state_a = strTxState(bid[7])
+                tx_state_b = strTxState(bid[8])
+
                 swap_data = {
                     "bid_id": bid_id_hex,
                     "offer_id": bid[3].hex(),
@@ -1040,6 +1052,7 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                 continue
     except Exception:
         return bytes(json.dumps([]), "UTF-8")
+
     return bytes(json.dumps(all_bids), "UTF-8")
 
 

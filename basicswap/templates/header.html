@@ -9,153 +9,95 @@
   swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, 
   bids_sent_svg, header_arrow_down_svg, love_svg %}
 
+<!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Meta Tags -->
   <meta charset="UTF-8">
   {% if refresh %}
   <meta http-equiv="refresh" content="{{ refresh }}">
   {% endif %}
-
-  <!-- Scripts -->
-  <script src="/static/js/libs/chart.js"></script>
-  <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="/static/js/main.js"></script>
-  <script src="/static/js/tabs.js"></script>
-  <script src="/static/js/dropdown.js"></script>
-  <script src="/static/js/libs/popper.js"></script>
-  <script src="/static/js/libs/tippy.js"></script>
-  <script src="/static/js/tooltips.js"></script>
-
-  <!-- Styles -->
-  <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
+  <title>(BSX) BasicSwap - v{{ version }}</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
+  
+  <!-- Stylesheets -->
+  <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
-
-  <link rel="icon" sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-
-  <title>(BSX) BasicSwap - v{{ version }}</title>
-
-  <!-- Initialize tooltips -->
+  
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const tooltipManager = TooltipManager.initialize();
-      tooltipManager.initializeTooltips();
-    });
-  </script>
-
-  <!-- Dark mode initialization -->
-  <script>
-    const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
-      (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    
-    if (!localStorage.getItem('color-theme')) {
-      localStorage.setItem('color-theme', 'dark');
+    // API Keys Configuration
+    function getAPIKeys() {
+      return {
+        cryptoCompare: "{{ chart_api_key|safe }}",
+        coinGecko: "{{ coingecko_api_key|safe }}"
+      };
     }
-    document.documentElement.classList.toggle('dark', isDarkMode);
-  </script>
-
-  <!-- Shutdown modal functionality -->
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const shutdownButtons = document.querySelectorAll('.shutdown-button');
-      const shutdownModal = document.getElementById('shutdownModal');
-      const closeModalButton = document.getElementById('closeShutdownModal');
-      const confirmShutdownButton = document.getElementById('confirmShutdown');
-      const shutdownWarning = document.getElementById('shutdownWarning');
-
-      function updateShutdownButtons() {
-        const activeSwaps = parseInt(shutdownButtons[0].getAttribute('data-active-swaps') || '0');
-        shutdownButtons.forEach(button => {
-          if (activeSwaps > 0) {
-            button.classList.add('shutdown-disabled');
-            button.setAttribute('data-disabled', 'true');
-            button.setAttribute('title', 'Caution: Swaps in progress');
-          } else {
-            button.classList.remove('shutdown-disabled');
-            button.removeAttribute('data-disabled');
-            button.removeAttribute('title');
-          }
-        });
-      }
-
-      function showShutdownModal() {
-        const activeSwaps = parseInt(shutdownButtons[0].getAttribute('data-active-swaps') || '0');
-        if (activeSwaps > 0) {
-          shutdownWarning.classList.remove('hidden');
-          confirmShutdownButton.textContent = 'Yes, Shut Down Anyway';
-        } else {
-          shutdownWarning.classList.add('hidden');
-          confirmShutdownButton.textContent = 'Yes, Shut Down';
-        }
-        shutdownModal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-      }
-
-      function hideShutdownModal() {
-        shutdownModal.classList.add('hidden');
-        document.body.style.overflow = '';
-      }
-
-      shutdownButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.preventDefault();
-          showShutdownModal();
-        });
+    
+    // WebSocket Configuration
+    (function() {
+      Object.defineProperty(window, 'ws_port', {
+        value: "{{ ws_port|safe }}",
+        writable: false,
+        configurable: false,
+        enumerable: true
       });
-
-      closeModalButton.addEventListener('click', hideShutdownModal);
-
-      confirmShutdownButton.addEventListener('click', function() {
-        const shutdownToken = document.querySelector('.shutdown-button')
-          .getAttribute('href').split('/').pop();
-        window.location.href = '/shutdown/' + shutdownToken;
-      });
-
-      shutdownModal.addEventListener('click', function(e) {
-        if (e.target === this) {
-          hideShutdownModal();
-        }
-      });
-
-      updateShutdownButtons();
-    });
+      
+      window.getWebSocketConfig = window.getWebSocketConfig || function() {
+        return {
+          port: window.ws_port || '11701',
+          fallbackPort: '11700'
+        };
+      };
+    })();
+    
+    // Dark Mode Initialization
+    (function() {
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
+        (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      
+      if (!localStorage.getItem('color-theme')) {
+        localStorage.setItem('color-theme', 'dark');
+      }
+      document.documentElement.classList.toggle('dark', isDarkMode);
+    })();
   </script>
   
-  <script>
-  document.addEventListener('DOMContentLoaded', function() {
-  const closeButtons = document.querySelectorAll('[data-dismiss-target]');
+  <!-- Third-party Libraries -->
+  <script src="/static/js/libs/chart.js"></script>
+  <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="/static/js/libs/popper.js"></script>
+  <script src="/static/js/libs/tippy.js"></script>
   
-  closeButtons.forEach(button => {
-    button.addEventListener('click', function() {
-      const targetId = this.getAttribute('data-dismiss-target');
-      const targetElement = document.querySelector(targetId);
-
-      if (targetElement) {
-        targetElement.style.display = 'none';
-      }
-    });
-  });
-});
-</script>
-
-<script>
-function getAPIKeys() {
-  return {
-    cryptoCompare: "{{ chart_api_key|safe }}",
-    coinGecko: "{{ coingecko_api_key|safe }}"
-  };
-}
-
-function getWebSocketConfig() {
-    return {
-        port: "{{ ws_port|safe }}",
-        fallbackPort: "11700"
-    };
-}
-</script>
-
+  <!-- UI Components -->
+  <script src="/static/js/ui/tabs.js"></script>
+  <script src="/static/js/ui/dropdown.js"></script>
+  
+  <!-- Core Application Modules -->
+  <script src="/static/js/modules/config-manager.js"></script>
+  <script src="/static/js/modules/cache-manager.js"></script>
+  <script src="/static/js/modules/cleanup-manager.js"></script>
+  
+  <!-- Connection & Communication Modules -->
+  <script src="/static/js/modules/websocket-manager.js"></script>
+  <script src="/static/js/modules/network-manager.js"></script>
+  <script src="/static/js/modules/api-manager.js"></script>
+  
+  <!-- UI & Interaction Modules -->
+  <script src="/static/js/modules/tooltips-manager.js"></script>
+  <script src="/static/js/modules/notification-manager.js"></script>
+  <script src="/static/js/modules/identity-manager.js"></script>
+  <script src="/static/js/modules/summary-manager.js"></script>
+  {% if current_page == 'wallets' or current_page == 'wallet' %}
+  <script src="/static/js/modules/wallet-manager.js"></script>
+  {% endif %}
+  <script src="/static/js/modules/memory-manager.js"></script>
+  
+  <!-- Global Script -->
+  <script src="/static/js/global.js"></script>
 </head>
-
 <body class="dark:bg-gray-700">
   <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
     <div class="fixed inset-0 bg-black bg-opacity-60 transition-opacity"></div>
@@ -757,194 +699,3 @@ function getWebSocketConfig() {
 </div>
     </div>
   </section>
-
-  <!-- WebSocket  -->
-  {% if ws_port %}
-  <script>
-(function() {
-  window.notificationConfig = {
-    showNewOffers: false,
-    showNewBids: true,
-    showBidAccepted: true
-  };
-
-  function ensureToastContainer() {
-    let container = document.getElementById('ul_updates');
-    if (!container) {
-      const floating_div = document.createElement('div');
-      floating_div.classList.add('floatright');
-      container = document.createElement('ul');
-      container.setAttribute('id', 'ul_updates');
-      floating_div.appendChild(container);
-      document.body.appendChild(floating_div);
-    }
-    return container;
-  }
-
-  function createToast(title, type = 'success') {
-    const messages = ensureToastContainer();
-    const message = document.createElement('li');
-    message.innerHTML = `
-      <div id="hide">
-        <div id="toast-${type}" class="flex items-center p-4 mb-4 w-full max-w-xs text-gray-500 
-          bg-white rounded-lg shadow" role="alert">
-          <div class="inline-flex flex-shrink-0 justify-center items-center w-10 h-10 
-            bg-blue-500 rounded-lg">
-            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" height="18" width="18" 
-              viewBox="0 0 24 24">
-              <g fill="#ffffff">
-                <path d="M8.5,20a1.5,1.5,0,0,1-1.061-.439L.379,12.5,2.5,10.379l6,6,13-13L23.621,
-                  5.5,9.561,19.561A1.5,1.5,0,0,1,8.5,20Z"></path>
-              </g>
-            </svg>
-          </div>
-          <div class="uppercase w-40 ml-3 text-sm font-semibold text-gray-900">${title}</div>
-          <button type="button" onclick="closeAlert(event)" class="ml-auto -mx-1.5 -my-1.5 
-            bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-0 focus:outline-none 
-            focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8">
-            <span class="sr-only">Close</span>
-            <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" 
-              xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 
-                1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 
-                4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" 
-                clip-rule="evenodd"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-    `;
-    messages.appendChild(message);
-  }
-
-  function updateElement(elementId, value, options = {}) {
-    const element = document.getElementById(elementId);
-    if (!element) return false;
-    
-    const safeValue = (value !== undefined && value !== null) 
-      ? value 
-      : (element.dataset.lastValue || 0);
-
-    element.dataset.lastValue = safeValue;
-
-    if (elementId === 'sent-bids-counter' || elementId === 'recv-bids-counter') {
-      const svg = element.querySelector('svg');
-      element.textContent = safeValue;
-      if (svg) {
-        element.insertBefore(svg, element.firstChild);
-      }
-    } else {
-      element.textContent = safeValue;
-    }
-
-    if (['offers-counter', 'bid-requests-counter', 'sent-bids-counter', 
-         'recv-bids-counter', 'swaps-counter', 'network-offers-counter', 
-         'watched-outputs-counter'].includes(elementId)) {
-      element.classList.remove('bg-blue-500', 'bg-gray-400');
-      element.classList.add(safeValue > 0 ? 'bg-blue-500' : 'bg-gray-400');
-    }
-
-    if (elementId === 'swaps-counter') {
-      const swapContainer = document.getElementById('swapContainer');
-      if (swapContainer) {
-        const isSwapping = safeValue > 0;
-        if (isSwapping) {
-          swapContainer.innerHTML = `{{ swap_in_progress_green_svg | safe }}`;
-          swapContainer.style.animation = 'spin 2s linear infinite';
-        } else {
-          swapContainer.innerHTML = `{{ swap_in_progress_svg | safe }}`;
-          swapContainer.style.animation = 'none';
-        }
-      }
-    }
-    return true;
-  }
-
-  function fetchSummaryData() {
-    fetch('/json')
-      .then(response => response.json())
-      .then(data => {
-        updateElement('network-offers-counter', data.num_network_offers);
-        updateElement('offers-counter', data.num_sent_active_offers);
-        updateElement('sent-bids-counter', data.num_sent_active_bids);
-        updateElement('recv-bids-counter', data.num_recv_active_bids);
-        updateElement('bid-requests-counter', data.num_available_bids);
-        updateElement('swaps-counter', data.num_swapping);
-        updateElement('watched-outputs-counter', data.num_watched_outputs);
-      })
-      .catch(error => console.error('Summary data fetch error:', error));
-  }
-
-  function initWebSocket() {
-    const wsUrl = "ws://" + window.location.hostname + ":{{ ws_port }}";
-    const ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      console.log('🟢  WebSocket connection established for Dynamic Counters');
-      fetchSummaryData();
-      setInterval(fetchSummaryData, 30000); // Refresh every 30 seconds
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.event) {
-          let toastTitle;
-          let shouldShowToast = false;
-
-          switch (data.event) {
-            case 'new_offer':
-              toastTitle = `New network <a class="underline" href=/offer/${data.offer_id}>offer</a>`;
-              shouldShowToast = window.notificationConfig.showNewOffers;
-              break;
-            case 'new_bid':
-              toastTitle = `<a class="underline" href=/bid/${data.bid_id}>New bid</a> on 
-                <a class="underline" href=/offer/${data.offer_id}>offer</a>`;
-              shouldShowToast = window.notificationConfig.showNewBids;
-              break;
-            case 'bid_accepted':
-              toastTitle = `<a class="underline" href=/bid/${data.bid_id}>Bid</a> accepted`;
-              shouldShowToast = window.notificationConfig.showBidAccepted;
-              break;
-          }
-
-          if (toastTitle && shouldShowToast) {
-            createToast(toastTitle);
-          }
-        }
-        fetchSummaryData();
-      } catch (error) {
-        console.error('WebSocket message processing error:', error);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket Error:', error);
-    };
-
-    ws.onclose = (event) => {
-      console.log('WebSocket connection closed', event);
-      setTimeout(initWebSocket, 5000);
-    };
-  }
-
-  window.closeAlert = function(event) {
-    let element = event.target;
-    while (element.nodeName !== "BUTTON") {
-      element = element.parentNode;
-    }
-    element.parentNode.parentNode.removeChild(element.parentNode);
-  };
-
-  function init() {
-    initWebSocket();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-})();
-  </script>
-  {% endif %}
