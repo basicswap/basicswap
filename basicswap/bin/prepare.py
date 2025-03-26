@@ -493,6 +493,8 @@ def importPubkey(gpg, pubkey_filename, pubkeyurls):
             return
         except Exception as e:
             logging.warning(f"Import from file failed: {e}")
+    else:
+        logger.warning(f"Public key file {pubkey_filename} not found locally.")
 
     for url in pubkeyurls:
         try:
