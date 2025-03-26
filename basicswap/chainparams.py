@@ -33,6 +33,8 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    GHOST = 19
+    GHOST_ANON = 20
 
 
 class Fiat(IntEnum):
@@ -528,6 +530,47 @@ chainparams = {
             "script_address": 196,
             "key_prefix": 239,
             "hrp": "bchreg",
+            "bip44": 1,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+    },
+
+    Coins.GHOST: {
+        "name": "ghost",
+        "ticker": "GHOST",
+        "message_magic": "Bitcoin Signed Message:\n",
+        "blocks_target": 60 * 2,
+        "decimal_places": 8,
+        "mainnet": {
+            "rpcport": 51728,
+            "pubkey_address": 0x26,
+            "script_address": 0x61,
+            "key_prefix": 0xA6,
+            "stealth_key_prefix": 0x14,
+            "hrp": "gw",
+            "bip44": 44,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+        "testnet": {
+            "rpcport": 51928,
+            "pubkey_address": 0x4B,
+            "script_address": 0x89,
+            "key_prefix": 0x2E,
+            "stealth_key_prefix": 0x14,
+            "hrp": "tpw",
+            "bip44": 1,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+        "regtest": {
+            "rpcport": 51936,
+            "pubkey_address": 0x76,
+            "script_address": 0x7A,
+            "key_prefix": 0x2E,
+            "stealth_key_prefix": 0x15,
+            "hrp": "rtpw",
             "bip44": 1,
             "min_amount": 100000,
             "max_amount": 10000000 * COIN,

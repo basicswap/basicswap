@@ -913,6 +913,16 @@ class BasicSwap(BaseApp):
             from .interface.nav import NAVInterface
 
             return NAVInterface(self.coin_clients[coin], self.chain, self)
+
+        elif coin == Coins.GHOST:
+            interface = PARTInterface(self.coin_clients[coin], self.chain, self)
+            self.coin_clients[coin]["interface_anon"] = PARTInterfaceAnon(
+                self.coin_clients[coin], self.chain, self
+            )
+            self.coin_clients[coin]["interface_blind"] = PARTInterfaceBlind(
+                self.coin_clients[coin], self.chain, self
+            )
+            return interface
         else:
             raise ValueError("Unknown coin type")
 
@@ -940,6 +950,7 @@ class BasicSwap(BaseApp):
                 "dash",
                 "firo",
                 "bitcoincash",
+                "ghost"
             ):
                 pidfilename += "d"
 

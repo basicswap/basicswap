@@ -91,6 +91,10 @@ BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
+GHOST_VERSION = os.getenv("GHOST_VERSION", "0.23.0.0")
+GHOST_VERSION_TAG = os.getenv("GHOST_VERSION_TAG", "")
+GHOST_LINUX_EXTRA = os.getenv("GHOST_LINUX_EXTRA", "")
+
 GUIX_SSL_CERT_DIR = None
 OVERRIDE_DISABLED_COINS = toBool(os.getenv("OVERRIDE_DISABLED_COINS", "false"))
 
@@ -112,6 +116,7 @@ known_coins = {
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
     "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
+    "ghost": (GHOST_VERSION, GHOST_VERSION_TAG, ("tizymandias",)),
 }
 
 disabled_coins = [
@@ -136,6 +141,7 @@ expected_key_ids = {
     "nicolasdorier": ("6618763EF09186FE", "223FDA69DEBEA82D", "62FE85647DEDDA2E"),
     "decred_release": ("6D897EDF518A031D",),
     "Calin_Culianu": ("21810A542031C02C",),
+    "tizymandias": ("")
 }
 
 USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
@@ -265,6 +271,14 @@ DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
 DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
 DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
 DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
+
+
+GHOST_ZMQ_PORT = int(os.getenv("GHOST_ZMQ_PORT", 20792))
+GHOST_RPC_HOST = os.getenv("GHOST_RPC_HOST", "127.0.0.1")
+GHOST_RPC_PORT = int(os.getenv("GHOST_RPC_PORT", 51728))
+GHOST_ONION_PORT = int(os.getenv("GHOST_ONION_PORT", 51734))
+GHOST_RPC_USER = os.getenv("GHOST_RPC_USER", "")
+GHOST_RPC_PWD = os.getenv("GHOST_RPC_PWD", "")
 
 TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
@@ -689,6 +703,8 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
             return "{}-{}_nousb/bin/{}".format(dir_name, version + version_tag, b)
         elif coin == "decred":
             return "{}-{}-v{}/{}".format(dir_name, extra_opts["arch_name"], version, b)
+        elif coin == "ghost":
+            return "{}-{}/{}".format(dir_name, version + version_tag, b)
         else:
             return "{}-{}/bin/{}".format(dir_name, version + version_tag, b)
 
@@ -711,7 +727,9 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
     else:
         with tarfile.open(release_path) as ft:
             for b in bins:
+                print("FOR VALUE {}", bin_dir)
                 out_path = os.path.join(bin_dir, b)
+                print("OUT PATH ", out_path)
                 if not os.path.exists(out_path) or extract_core_overwrite:
                     with (
                         open(out_path, "wb") as fout,
@@ -1002,6 +1020,19 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = "https://github.com/navcoin/navcoin-core/releases/download/{}/{}".format(
                 version + version_tag, assert_filename
             )
+        elif coin == "ghost":
+            arch_name = BIN_ARCH
+            if BIN_ARCH == "x86_64-linux-gnu":
+                arch_name = "x86_64-pc-linux-gnu"
+            elif BIN_ARCH == "osx64":
+                arch_name = "MacOS64.tar.gz"
+            
+            release_filename = "{}-{}-{}.{}".format(coin, version, arch_name, FILE_EXT)
+            release_url = "https://github.com/ghost-coin/ghost-core/releases/download/v{}/{}".format(
+                version + version_tag, release_filename
+            )
+            assert_url = "https://github.com/ghost-coin/ghost-core/releases/download/v{}/hashes.txt".format(version + version_tag)
+
         else:
             raise ValueError("Unknown coin")
 
@@ -1019,6 +1050,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if coin not in (
             "firo",
             "bitcoincash",
+            "ghost"
         ):
             assert_sig_url = assert_url + (".asc" if use_guix else ".sig")
             if coin not in ("nav",):
@@ -1040,6 +1072,13 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 f"Error: Release hash {release_hash} not found in assert file."
             )
         logger.info("Found release hash in assert file.")
+
+    if coin == "ghost":
+        logger.warning(
+            "Skipping binary signature check as ghost doesn't support it yet."
+        )
+        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
+        return
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
@@ -2570,6 +2609,21 @@ def main():
             "walletrpctimeoutlong": 300,
             "core_version_no": getKnownVersion("wownero"),
             "core_type_group": "xmr",
+        },
+
+        "ghost": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("GHOST"),
+            "rpchost": GHOST_RPC_HOST,
+            "rpcport": GHOST_RPC_PORT + port_offset,
+            "onionport": PART_ONION_PORT + port_offset,
+            "datadir": os.getenv("GHOST_DATA_DIR", os.path.join(data_dir, "ghost")),
+            "bindir": os.path.join(bin_dir, "ghost"),
+            "blocks_confirmed": 2,
+            "override_feerate": 0.002,
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("ghost"),
+            "core_version_group": 0,
         },
     }
 

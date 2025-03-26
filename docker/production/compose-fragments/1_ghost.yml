@@ -1,0 +1,16 @@
+    ghost_core:
+        image: i_ghost
+        build:
+            context: ghost
+            dockerfile: Dockerfile
+        container_name: ghost_core
+        volumes:
+            - ${DATA_PATH}/ghost-core:/data
+        expose:
+            - ${WOW_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped
