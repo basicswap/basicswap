@@ -136,6 +136,7 @@ class OfferMessage(NonProtobufClass):
         17: ("amount_negotiable", 0, 2),
         18: ("rate_negotiable", 0, 2),
         19: ("proof_utxos", 2, 0),
+        20: ("auto_accept_type", 0, 0),
     }
 
 

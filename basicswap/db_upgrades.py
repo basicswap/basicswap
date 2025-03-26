@@ -425,6 +425,9 @@ def upgradeDatabase(self, db_version):
                         last_updated INTEGER,
                         PRIMARY KEY (record_id))"""
                 )
+            elif current_version == 26:
+                db_version += 1
+                cursor.execute("ALTER TABLE offers ADD COLUMN auto_accept_type INTEGER")
             if current_version != db_version:
                 self.db_version = db_version
                 self.setIntKV("db_version", db_version, cursor)
