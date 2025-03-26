@@ -44,6 +44,7 @@ from basicswap.rpc import (
 from basicswap.contrib.key import (
     ECKey,
 )
+from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.http_server import (
     HttpThread,
 )
@@ -64,6 +65,7 @@ from tests.basicswap.common import (
     BASE_ZMQ_PORT,
     PREFIX_SECRET_KEY_REGTEST,
     waitForRPC,
+    make_rpc_func,
 )
 from basicswap.bin.run import startDaemon
 
@@ -72,6 +74,17 @@ logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
+
+
+NAMECOIN_BINDIR = os.path.expanduser(
+    os.getenv("NAMECOIN_BINDIR", os.path.join(cfg.DEFAULT_TEST_BINDIR, "namecoin"))
+)
+NAMECOIND = os.getenv("NAMECOIND", "namecoind" + cfg.bin_suffix)
+NAMECOIN_CLI = os.getenv("NAMECOIN_CLI", "namecoin-cli" + cfg.bin_suffix)
+NAMECOIN_TX = os.getenv("NAMECOIN_TX", "namecoin-tx" + cfg.bin_suffix)
+
+NMC_BASE_PORT = 8136
+NMC_BASE_RPC_PORT= 8146
 
 NUM_NODES = 3
 NMC_NODE = 3
@@ -90,8 +103,21 @@ def prepareOtherDir(datadir, nodeId, conf_file="namecoin.conf"):
     with open(filePath, "w+") as fp:
         fp.write("regtest=1\n")
         fp.write("[regtest]\n")
-        fp.write("port=" + str(BASE_PORT + nodeId) + "\n")
-        fp.write("rpcport=" + str(BASE_RPC_PORT + nodeId) + "\n")
+
+        if conf_file == "bitcoin.conf":
+            fp.write("port=" + str(BASE_PORT + nodeId) + "\n")
+            fp.write("rpcport=" + str(BASE_RPC_PORT + nodeId) + "\n")
+        else:
+            fp.write("port=" + str(NMC_BASE_PORT + nodeId) + "\n")
+            fp.write("rpcport=" + str(NMC_BASE_RPC_PORT + nodeId) + "\n")
+            salt = generate_salt(16)
+            fp.write(
+                "rpcauth={}:{}${}\n".format(
+                    "test" + str(nodeId),
+                    salt,
+                    password_to_hmac(salt, "test_pass" + str(nodeId)),
+                )
+            )
 
         fp.write("daemon=0\n")
         fp.write("printtoconsole=0\n")
@@ -105,9 +131,8 @@ def prepareOtherDir(datadir, nodeId, conf_file="namecoin.conf"):
 
         fp.write("fallbackfee=0.01\n")
         fp.write("acceptnonstdtxn=0\n")
-
-        if conf_file == "bitcoin.conf":
-            fp.write("wallet=wallet.dat\n")
+        fp.write("deprecatedrpc=create_bdb\n")
+        fp.write("wallet=wallet.dat\n")
 
 
 def prepareDir(datadir, nodeId, network_key, network_pubkey):
@@ -175,11 +200,11 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
             "namecoin": {
                 "connection_type": "rpc",
                 "manage_daemon": False,
-                "rpcport": BASE_RPC_PORT + NMC_NODE,
+                "rpcport": NMC_BASE_RPC_PORT + NMC_NODE,
                 "datadir": nmcdatadir,
-                "bindir": cfg.NAMECOIN_BINDIR,
-                "use_csv": False,
-                # 'use_segwit': True,
+                "bindir": NAMECOIN_BINDIR,
+                "use_csv": True,
+                "use_segwit": True,
             },
             "bitcoin": {
                 "connection_type": "rpc",
@@ -221,11 +246,11 @@ def btcRpc(cmd):
 
 def nmcRpc(cmd):
     return callrpc_cli(
-        cfg.NAMECOIN_BINDIR,
+        NAMECOIN_BINDIR,
         os.path.join(cfg.TEST_DATADIRS, str(NMC_NODE)),
         "regtest",
         cmd,
-        cfg.NAMECOIN_CLI,
+        NAMECOIN_CLI,
     )
 
 
@@ -305,11 +330,15 @@ class Test(unittest.TestCase):
         cls.daemons.append(
             startDaemon(
                 os.path.join(cfg.TEST_DATADIRS, str(NMC_NODE)),
-                cfg.NAMECOIN_BINDIR,
-                cfg.NAMECOIND,
+                NAMECOIN_BINDIR,
+                NAMECOIND,
             )
         )
-        logging.info("Started %s %d", cfg.NAMECOIND, cls.daemons[-1].handle.pid)
+        logging.info("Started %s %d", NAMECOIND, cls.daemons[-1].handle.pid)
+        nmcRpc2 = make_rpc_func(NMC_NODE, base_rpc_port=NMC_BASE_RPC_PORT)
+        waitForRPC(nmcRpc2, delay_event, rpc_command="getblockchaininfo")
+        if len(nmcRpc2("listwallets")) < 1:
+            nmcRpc2("createwallet", ["wallet.dat", False, False, "", False, False])
 
         for i in range(NUM_NODES):
             data_dir = os.path.join(cfg.TEST_DATADIRS, str(i))
@@ -378,10 +407,9 @@ class Test(unittest.TestCase):
             cls.http_threads.append(t)
             t.start()
 
-        waitForRPC(nmcRpc, delay_event)
         num_blocks = 500
         logging.info("Mining %d namecoin blocks", num_blocks)
-        cls.nmc_addr = nmcRpc("getnewaddress mining_addr legacy")
+        cls.nmc_addr = nmcRpc("getnewaddress mining_addr bech32")
         nmcRpc("generatetoaddress {} {}".format(num_blocks, cls.nmc_addr))
 
         ro = nmcRpc("getblockchaininfo")
@@ -453,8 +481,7 @@ class Test(unittest.TestCase):
             100 * COIN,
             0.1 * COIN,
             100 * COIN,
-            SwapTypes.SELLER_FIRST,
-            TxLockTypes.ABS_LOCK_TIME,
+            SwapTypes.SELLER_FIRST
         )
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
@@ -494,8 +521,7 @@ class Test(unittest.TestCase):
             10 * COIN,
             9.0 * COIN,
             10 * COIN,
-            SwapTypes.SELLER_FIRST,
-            TxLockTypes.ABS_LOCK_TIME,
+            SwapTypes.SELLER_FIRST
         )
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
@@ -534,8 +560,7 @@ class Test(unittest.TestCase):
             10 * COIN,
             0.1 * COIN,
             10 * COIN,
-            SwapTypes.SELLER_FIRST,
-            TxLockTypes.ABS_LOCK_TIME,
+            SwapTypes.SELLER_FIRST
         )
 
         wait_for_offer(delay_event, swap_clients[1], offer_id)
@@ -577,7 +602,7 @@ class Test(unittest.TestCase):
             0.1 * COIN,
             10 * COIN,
             SwapTypes.SELLER_FIRST,
-            TxLockTypes.ABS_LOCK_BLOCKS,
+            TxLockTypes.SEQUENCE_LOCK_BLOCKS,
             10,
         )
 
@@ -618,8 +643,7 @@ class Test(unittest.TestCase):
             10 * COIN,
             10 * COIN,
             10 * COIN,
-            SwapTypes.SELLER_FIRST,
-            TxLockTypes.ABS_LOCK_TIME,
+            SwapTypes.SELLER_FIRST
         )
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
@@ -655,11 +679,10 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(
             Coins.NMC,
             Coins.BTC,
-            0.001 * COIN,
+            0.01 * COIN,
             1.0 * COIN,
-            0.001 * COIN,
-            SwapTypes.SELLER_FIRST,
-            TxLockTypes.ABS_LOCK_TIME,
+            0.01 * COIN,
+            SwapTypes.SELLER_FIRST
         )
 
         wait_for_offer(delay_event, swap_clients[0], offer_id)
@@ -669,8 +692,8 @@ class Test(unittest.TestCase):
         wait_for_bid(delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
         try:
-            swap_clients[0].getChainClientSettings(Coins.BTC)["override_feerate"] = 10.0
-            swap_clients[0].getChainClientSettings(Coins.NMC)["override_feerate"] = 10.0
+            swap_clients[0].getChainClientSettings(Coins.BTC)["override_feerate"] = 100.0
+            swap_clients[0].getChainClientSettings(Coins.NMC)["override_feerate"] = 100.0
             wait_for_bid(
                 delay_event, swap_clients[0], bid_id, BidStates.BID_ERROR, wait_for=60
             )

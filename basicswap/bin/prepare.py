@@ -1400,6 +1400,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     )
                 )
         elif coin == "namecoin":
+            fp.write("deprecatedrpc=create_bdb\n")
             fp.write("prune=2000\n")
         elif coin == "pivx":
             params_dir = os.path.join(data_dir, "pivx-params")
@@ -1910,7 +1911,7 @@ def initialise_wallets(
                         f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
                     )
 
-                    if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
+                    if c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE, Coins.DASH):
                         # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
 
                         use_descriptors = coin_settings.get("use_descriptors", False)

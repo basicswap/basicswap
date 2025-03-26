@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2019-2024 The Basicswap developers
+# Copyright (c) 2019-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -39,13 +39,6 @@ LITECOIN_TX = os.getenv("LITECOIN_TX", "litecoin-tx" + bin_suffix)
 DOGECOIND = os.getenv("DOGECOIND", "dogecoind" + bin_suffix)
 DOGECOIN_CLI = os.getenv("DOGECOIN_CLI", "dogecoin-cli" + bin_suffix)
 DOGECOIN_TX = os.getenv("DOGECOIN_TX", "dogecoin-tx" + bin_suffix)
-
-NAMECOIN_BINDIR = os.path.expanduser(
-    os.getenv("NAMECOIN_BINDIR", os.path.join(DEFAULT_TEST_BINDIR, "namecoin"))
-)
-NAMECOIND = os.getenv("NAMECOIND", "namecoind" + bin_suffix)
-NAMECOIN_CLI = os.getenv("NAMECOIN_CLI", "namecoin-cli" + bin_suffix)
-NAMECOIN_TX = os.getenv("NAMECOIN_TX", "namecoin-tx" + bin_suffix)
 
 XMR_BINDIR = os.path.expanduser(
     os.getenv("XMR_BINDIR", os.path.join(DEFAULT_TEST_BINDIR, "monero"))
