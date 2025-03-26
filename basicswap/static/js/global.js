@@ -84,7 +84,7 @@ function setupShutdownModal() {
 
     function showShutdownModal() {
         closeAllDropdowns();
-        
+
         const activeSwaps = parseInt(shutdownButtons[0].getAttribute('data-active-swaps') || '0');
         if (activeSwaps > 0) {
             shutdownWarning.classList.remove('hidden');
@@ -142,7 +142,7 @@ function setupDarkMode() {
     const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
 
     if (themeToggleDarkIcon && themeToggleLightIcon) {
-        if (localStorage.getItem('color-theme') === 'dark' || 
+        if (localStorage.getItem('color-theme') === 'dark' ||
             (!('color-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             themeToggleLightIcon.classList.remove('hidden');
         } else {
@@ -167,12 +167,12 @@ function setupDarkMode() {
             } else {
                 setTheme('dark');
             }
-            
+
             if (themeToggleDarkIcon && themeToggleLightIcon) {
                 themeToggleDarkIcon.classList.toggle('hidden');
                 themeToggleLightIcon.classList.toggle('hidden');
             }
-            
+
             toggleImages();
         });
     }

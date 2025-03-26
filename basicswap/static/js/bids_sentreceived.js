@@ -97,7 +97,7 @@ const EventManager = {
 
     add(element, type, handler, options = false) {
         if (!element) return null;
-        
+
         if (!this.listeners.has(element)) {
             this.listeners.set(element, new Map());
         }
@@ -116,7 +116,7 @@ const EventManager = {
 
     remove(element, type, handler, options = false) {
         if (!element) return;
-        
+
         const elementListeners = this.listeners.get(element);
         if (!elementListeners) return;
 
@@ -140,7 +140,7 @@ const EventManager = {
 
     removeAll(element) {
         if (!element) return;
-        
+
         const elementListeners = this.listeners.get(element);
         if (!elementListeners) return;
 
@@ -167,7 +167,7 @@ const EventManager = {
 
 function cleanup() {
     //console.log('Starting comprehensive cleanup process for bids table');
-    
+
     try {
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -184,7 +184,7 @@ function cleanup() {
 
         cleanupTooltips();
         forceTooltipDOMCleanup();
-        
+
         if (window.TooltipManager) {
             window.TooltipManager.cleanup();
         }
@@ -237,12 +237,12 @@ function cleanup() {
             sent: [],
             received: []
         };
-        
+
         state.currentPage = {
             sent: 1,
             received: 1
         };
-        
+
         state.isLoading = false;
         state.isRefreshing = false;
         state.wsConnected = false;
@@ -310,7 +310,7 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
         if (window.TooltipManager && typeof window.TooltipManager.cleanup === 'function') {
             window.TooltipManager.cleanup();
         }
-        
+
         // Run memory optimization
         if (window.MemoryManager) {
             MemoryManager.forceCleanup();
@@ -326,7 +326,7 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
         const lastUpdateTime = state.lastRefresh || 0;
         const now = Date.now();
         const refreshInterval = 5 * 60 * 1000; // 5 minutes
-        
+
         if (now - lastUpdateTime > refreshInterval) {
             setTimeout(() => {
                 updateBidsTable();
@@ -366,7 +366,7 @@ function cleanupRow(row) {
 
 function optimizeMemoryUsage() {
     const MAX_BIDS_IN_MEMORY = 500;
-    
+
     ['sent', 'received'].forEach(type => {
         if (state.data[type] && state.data[type].length > MAX_BIDS_IN_MEMORY) {
             console.log(`Trimming ${type} bids data from ${state.data[type].length} to ${MAX_BIDS_IN_MEMORY}`);
@@ -581,7 +581,7 @@ function filterAndSortData(bids) {
             } catch (e) {
                 console.warn('Error accessing identity for search:', e);
             }
-            
+
             const matchesLabel = label.toLowerCase().includes(searchStr);
 
             let matchesDisplayedLabel = false;
@@ -589,7 +589,7 @@ function filterAndSortData(bids) {
                 try {
                     const tableId = state.currentTab === 'sent' ? 'sent' : 'received';
                     const cells = document.querySelectorAll(`#${tableId} a[href^="/identity/"]`);
-                    
+
                     for (const cell of cells) {
 
                         const href = cell.getAttribute('href');
@@ -607,7 +607,7 @@ function filterAndSortData(bids) {
                     console.warn('Error checking displayed labels:', e);
                 }
             }
-            
+
             if (!(matchesBidId || matchesIdentity || matchesLabel || matchesDisplayedLabel)) {
                 return false;
             }
@@ -627,7 +627,7 @@ async function preloadIdentitiesForSearch(bids) {
     if (!window.IdentityManager || typeof IdentityManager.getIdentityData !== 'function') {
         return;
     }
-    
+
     try {
         const addresses = new Set();
         bids.forEach(bid => {
@@ -638,7 +638,7 @@ async function preloadIdentitiesForSearch(bids) {
 
         const BATCH_SIZE = 20;
         const addressArray = Array.from(addresses);
-        
+
         for (let i = 0; i < addressArray.length; i += BATCH_SIZE) {
             const batch = addressArray.slice(i, i + BATCH_SIZE);
             await Promise.all(batch.map(addr => IdentityManager.getIdentityData(addr)));
@@ -647,7 +647,7 @@ async function preloadIdentitiesForSearch(bids) {
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
         }
-        
+
         console.log(`Preloaded ${addressArray.length} identities for search`);
     } catch (error) {
         console.error('Error preloading identities:', error);
@@ -847,7 +847,7 @@ const createIdentityTooltipContent = (identity) => {
     `;
 };
 
-let tooltipIdsToCleanup = new Set();
+const tooltipIdsToCleanup = new Set();
 
 const cleanupTooltips = () => {
     if (window.TooltipManager) {
@@ -869,7 +869,7 @@ const forceTooltipDOMCleanup = () => {
     foundCount += allTooltipElements.length;
 
     allTooltipElements.forEach(element => {
-        const isDetached = !document.body.contains(element) || 
+        const isDetached = !document.body.contains(element) ||
                            element.classList.contains('hidden') ||
                            element.style.display === 'none';
 
@@ -877,7 +877,7 @@ const forceTooltipDOMCleanup = () => {
             const triggerId = element.id;
             const triggerElement = document.querySelector(`[data-tooltip-target="${triggerId}"]`);
 
-            if (!triggerElement || 
+            if (!triggerElement ||
                 !document.body.contains(triggerElement) ||
                 triggerElement.classList.contains('hidden')) {
                 element.remove();
@@ -899,7 +899,7 @@ const forceTooltipDOMCleanup = () => {
     const tippyRoots = document.querySelectorAll('[data-tippy-root]');
     foundCount += tippyRoots.length;
     tippyRoots.forEach(element => {
-        const isOrphan = !element.children.length || 
+        const isOrphan = !element.children.length ||
                          element.children[0].classList.contains('hidden') ||
                          !document.body.contains(element);
 
@@ -926,7 +926,7 @@ const forceTooltipDOMCleanup = () => {
         }
     });
     document.querySelectorAll('.tooltip').forEach(element => {
-        const isTrulyDetached = !element.parentElement || 
+        const isTrulyDetached = !element.parentElement ||
                                !document.body.contains(element.parentElement) ||
                                element.classList.contains('hidden');
         if (isTrulyDetached) {
@@ -1108,7 +1108,7 @@ const updateTableContent = async (type) => {
         if (currentPageData.length > 0) {
             const BATCH_SIZE = 10;
             let allRows = [];
-            
+
             for (let i = 0; i < currentPageData.length; i += BATCH_SIZE) {
                 const batch = currentPageData.slice(i, i + BATCH_SIZE);
                 const rowPromises = batch.map(bid => createTableRow(bid));
@@ -1166,7 +1166,7 @@ const initializeTooltips = () => {
 
     window.TooltipManager.cleanup();
 
-    let selector = '#' + state.currentTab + ' [data-tooltip-target]';
+    const selector = '#' + state.currentTab + ' [data-tooltip-target]';
     const tooltipTriggers = document.querySelectorAll(selector);
     const tooltipCount = tooltipTriggers.length;
     if (tooltipCount > 50) {
@@ -1187,7 +1187,7 @@ const initializeTooltips = () => {
         });
 
         const offscreenTooltips = Array.from(tooltipTriggers).filter(t => !viewportTooltips.includes(t));
-        
+
         offscreenTooltips.forEach(trigger => {
             const createTooltipOnHover = () => {
                 createTooltipForTrigger(trigger);
@@ -1206,7 +1206,7 @@ const initializeTooltips = () => {
 
 const createTooltipForTrigger = (trigger) => {
     if (!trigger || !window.TooltipManager) return;
-    
+
     const targetId = trigger.getAttribute('data-tooltip-target');
     const tooltipContent = document.getElementById(targetId);
 
@@ -1250,7 +1250,7 @@ function cleanupOffscreenTooltips() {
 
     const farOffscreenTriggers = Array.from(tooltipTriggers).filter(trigger => {
         const rect = trigger.getBoundingClientRect();
-        return (rect.bottom < -window.innerHeight * 2 || 
+        return (rect.bottom < -window.innerHeight * 2 ||
                 rect.top > window.innerHeight * 3);
     });
 
@@ -1312,7 +1312,7 @@ const fetchBids = async () => {
                 activeFetchController.abort();
             }
         }, 30000);
-        
+
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -1328,14 +1328,14 @@ const fetchBids = async () => {
             }),
             signal: activeFetchController.signal
         });
-        
+
         clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        let data = await response.json();
+        const data = await response.json();
         //console.log('Received raw data:', data.length, 'bids');
 
         state.filters.with_expired = includeExpired;
@@ -1351,7 +1351,7 @@ const fetchBids = async () => {
         } else {
             processedData = filterAndSortData(data);
         }
-        
+
         return processedData;
     } catch (error) {
         if (error.name === 'AbortError') {
@@ -1375,12 +1375,12 @@ const updateBidsTable = async () => {
         updateLoadingState(true);
 
         const bids = await fetchBids();
-        
+
         // Add identity preloading if we're searching
         if (state.filters.searchQuery && state.filters.searchQuery.length > 0) {
             await preloadIdentitiesForSearch(bids);
         }
-        
+
         state.data[state.currentTab] = bids;
         state.currentPage[state.currentTab] = 1;
 
@@ -1911,13 +1911,13 @@ function initialize() {
         WebSocketManager.initialize();
         setupEventListeners();
     }, 10);
-    
+
     setTimeout(() => {
         setupRefreshButtons();
         setupFilterEventListeners();
         updateCoinFilterImages();
     }, 50);
-    
+
     setTimeout(() => {
         updateClearFiltersButton();
         state.currentTab = 'sent';

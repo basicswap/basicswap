@@ -37,7 +37,7 @@ const WalletManager = (function() {
       'Decred': 'DCR',
       'Bitcoin Cash': 'BCH'
     },
-    
+
     coingeckoIds: {
       'BTC': 'btc',
       'PART': 'part',
@@ -51,7 +51,7 @@ const WalletManager = (function() {
       'DCR': 'dcr',
       'BCH': 'bch'
     },
-    
+
     shortNames: {
       'Bitcoin': 'BTC',
       'Particl': 'PART',
@@ -99,9 +99,9 @@ const WalletManager = (function() {
       try {
         const processedData = {};
         const currentSource = config.priceSource.primary;
-        
+
         const shouldIncludeWow = currentSource === 'coingecko.com';
-        
+
         const coinsToFetch = Object.values(coinData.symbols)
           .filter(symbol => shouldIncludeWow || symbol !== 'WOW')
           .map(symbol => coinData.coingeckoIds[symbol] || symbol.toLowerCase())
@@ -171,8 +171,8 @@ const WalletManager = (function() {
         lastError = error;
         console.error(`Price fetch attempt ${attempt + 1} failed:`, error);
 
-        if (attempt === config.maxRetries - 1 && 
-            config.priceSource.fallback && 
+        if (attempt === config.maxRetries - 1 &&
+            config.priceSource.fallback &&
             config.priceSource.fallback !== config.priceSource.primary) {
           const temp = config.priceSource.primary;
           config.priceSource.primary = config.priceSource.fallback;
@@ -269,14 +269,14 @@ const WalletManager = (function() {
         }
 
         const coinId = coinName.toLowerCase().replace(' ', '-');
-        
+
         if (!prices[coinId]) {
           return;
         }
 
         const price = prices[coinId]?.usd || parseFloat(localStorage.getItem(`${coinId}-price`) || '0');
         if (!price) return;
-        
+
         const usdValue = (amount * price).toFixed(2);
 
         if (coinName === 'Particl') {
@@ -300,7 +300,7 @@ const WalletManager = (function() {
         }
 
         let usdEl = null;
-        
+
         const flexContainer = el.closest('.flex');
         if (flexContainer) {
           const nextFlex = flexContainer.nextElementSibling;
@@ -384,7 +384,7 @@ const WalletManager = (function() {
       return false;
     }
   }
-  
+
   function updateTotalValues(totalUsd, btcPrice) {
     const totalUsdEl = document.getElementById('total-usd-value');
     if (totalUsdEl) {
@@ -439,7 +439,7 @@ const WalletManager = (function() {
 
     const eyeIcon = document.querySelector("#hide-usd-amount-toggle svg");
     if (eyeIcon) {
-      eyeIcon.innerHTML = isVisible ? 
+      eyeIcon.innerHTML = isVisible ?
         '<path d="M23.444,10.239C21.905,8.062,17.708,3,12,3S2.1,8.062,.555,10.24a3.058,3.058,0,0,0,0,3.52h0C2.1,15.938,6.292,21,12,21s9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239ZM12,17a5,5,0,1,1,5-5A5,5,0,0,1,12,17Z"></path>' :
         '<path d="M23.444,10.239a22.936,22.936,0,0,0-2.492-2.948l-4.021,4.021A5.026,5.026,0,0,1,17,12a5,5,0,0,1-5,5,5.026,5.026,0,0,1-.688-.069L8.055,20.188A10.286,10.286,0,0,0,12,21c5.708,0,9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239Z"></path><path d="M12,3C6.292,3,2.1,8.062,.555,10.24a3.058,3.058,0,0,0,0,3.52h0a21.272,21.272,0,0,0,4.784,4.9l3.124-3.124a5,5,0,0,1,7.071-7.072L8.464,15.536l10.2-10.2A11.484,11.484,0,0,0,12,3Z"></path><path data-color="color-2" d="M1,24a1,1,0,0,1-.707-1.707l22-22a1,1,0,0,1,1.414,1.414l-22,22A1,1,0,0,1,1,24Z"></path>';
     }
@@ -500,7 +500,7 @@ const WalletManager = (function() {
     document.querySelectorAll('.coinname-value').forEach(el => {
       el.textContent = '****';
     });
-    
+
     document.querySelectorAll('.usd-value').forEach(el => {
       el.textContent = '****';
     });
@@ -542,7 +542,7 @@ const WalletManager = (function() {
       }
 
       state.lastUpdateTime = parseInt(localStorage.getItem(stateKeys.lastUpdate) || '0');
-      state.isWalletsPage = document.querySelector('.wallet-list') !== null || 
+      state.isWalletsPage = document.querySelector('.wallet-list') !== null ||
         window.location.pathname.includes('/wallets');
 
       document.querySelectorAll('.usd-value').forEach(el => {
@@ -553,7 +553,7 @@ const WalletManager = (function() {
       });
 
       storeOriginalValues();
-      
+
       if (localStorage.getItem('balancesVisible') === null) {
         localStorage.setItem('balancesVisible', 'true');
       }
@@ -581,7 +581,7 @@ const WalletManager = (function() {
 
       state.initialized = true;
       console.log('WalletManager initialized');
-      
+
       return this;
     },
 
@@ -606,7 +606,7 @@ const WalletManager = (function() {
       if (fallbackSource) {
         config.priceSource.fallback = fallbackSource;
       }
-      
+
       return this;
     },
 

@@ -65,7 +65,7 @@ const MemoryManager = (function() {
 
             const nodeCount = document.querySelectorAll('*').length;
             console.log('DOM node count:', nodeCount);
-            
+
             if (window.CleanupManager) {
                 const counts = CleanupManager.getResourceCounts();
                 console.log('Managed resources:', counts);
@@ -102,11 +102,11 @@ const MemoryManager = (function() {
             state.cleanupInterval = setInterval(() => {
                 this.forceCleanup();
             }, interval);
-            
+
             log('Auto-cleanup enabled every', interval/1000, 'seconds');
             return true;
         },
-        
+
         disableAutoCleanup: function() {
             if (state.cleanupInterval) {
                 clearInterval(state.cleanupInterval);
@@ -155,7 +155,7 @@ const MemoryManager = (function() {
 
             return true;
         },
-        
+
         setDebugMode: function(enabled) {
             config.debug = Boolean(enabled);
             return `Debug mode ${config.debug ? 'enabled' : 'disabled'}`;

@@ -85,7 +85,7 @@ const getStatusClass = (status, tx_a, tx_b) => {
 
 const getTxStatusClass = (status) => {
     if (!status || status === 'None') return 'text-gray-400';
-    
+
     if (status.includes('Complete') || status.includes('Confirmed')) {
         return 'text-green-500';
     }
@@ -545,12 +545,12 @@ async function updateSwapsTable(options = {}) {
                     const data = await response.json();
                     //console.log('Received swap data:', data);
 
-                    state.swapsData = Array.isArray(data) 
+                    state.swapsData = Array.isArray(data)
                         ? data.filter(swap => {
                             const isActive = isActiveSwap(swap);
                             //console.log(`Swap ${swap.bid_id}: ${isActive ? 'Active' : 'Inactive'}`, swap.bid_state);
                             return isActive;
-                        }) 
+                        })
                         : [];
 
                     //console.log('Filtered active swaps:', state.swapsData);
@@ -570,7 +570,7 @@ async function updateSwapsTable(options = {}) {
         }
 
         const totalPages = Math.ceil(state.swapsData.length / PAGE_SIZE);
-        
+
         if (resetPage && state.swapsData.length > 0) {
             state.currentPage = 1;
         }
@@ -631,18 +631,18 @@ async function updateSwapsTable(options = {}) {
 function isActiveSwap(swap) {
     const activeStates = [
 
-        'InProgress', 
-        'Accepted', 
-        'Delaying', 
+        'InProgress',
+        'Accepted',
+        'Delaying',
         'Auto accept delay',
         'Request accepted',
         //'Received',
 
-        'Script coin locked', 
+        'Script coin locked',
         'Scriptless coin locked',
         'Script coin lock released',
- 
-        'SendingInitialTx', 
+
+        'SendingInitialTx',
         'SendingPaymentTx',
 
         'Exchanged script lock tx sigs msg',

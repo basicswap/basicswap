@@ -145,7 +145,7 @@ const api = {
             const apiResponse = await Api.fetchCoinGeckoData({
                 coinGecko: window.config.getAPIKeys().coinGecko
             });
-            
+
             if (!apiResponse || !apiResponse.rates) {
                 if (fallbackData) {
                     return fallbackData;
@@ -174,7 +174,7 @@ const api = {
                     const wowResponse = await Api.fetchCoinPrices("wownero", {
                         coinGecko: window.config.getAPIKeys().coinGecko
                     });
-                    
+
                     if (wowResponse && wowResponse.rates && wowResponse.rates.wownero) {
                         transformedData['wow'] = {
                             current_price: wowResponse.rates.wownero,
@@ -189,9 +189,9 @@ const api = {
                 console.error('Error fetching WOW price:', wowError);
             }
 
-            const missingCoins = window.config.coins.filter(coin => 
-                !transformedData[coin.symbol.toLowerCase()] && 
-                fallbackData && 
+            const missingCoins = window.config.coins.filter(coin =>
+                !transformedData[coin.symbol.toLowerCase()] &&
+                fallbackData &&
                 fallbackData[coin.symbol.toLowerCase()]
             );
 
@@ -203,11 +203,11 @@ const api = {
             });
 
             CacheManager.set(cacheKey, transformedData, 'prices');
-            
+
             if (NetworkManager.getReconnectAttempts() > 0) {
                 NetworkManager.resetReconnectAttempts();
             }
-            
+
             return transformedData;
         } catch (error) {
             console.error('Error fetching coin data:', error);
@@ -250,8 +250,8 @@ const api = {
             }
 
             const historicalData = await Api.fetchHistoricalData(
-                coinSymbols, 
-                window.config.currentResolution, 
+                coinSymbols,
+                window.config.currentResolution,
                 {
                     cryptoCompare: window.config.getAPIKeys().cryptoCompare
                 }
@@ -260,7 +260,7 @@ const api = {
             Object.keys(historicalData).forEach(coin => {
                 if (historicalData[coin]) {
                     results[coin] = historicalData[coin];
-                    
+
                     const cacheKey = `historical_${coin}_${window.config.currentResolution}`;
                     CacheManager.set(cacheKey, historicalData[coin], 'historical');
                 }
@@ -279,7 +279,7 @@ const api = {
                     results[coin] = cachedData.value;
                 }
             }
-            
+
             return results;
         }
     },
@@ -317,7 +317,7 @@ const rateLimiter = {
 
         try {
             await this.requestQueue[apiName];
-            
+
             const executeRequest = async () => {
                 const waitTime = this.getWaitTime(apiName);
                 if (waitTime > 0) {
@@ -335,7 +335,7 @@ const rateLimiter = {
                         return this.queueRequest(apiName, requestFn, retryCount + 1);
                     }
 
-                    if ((error.message.includes('timeout') || error.name === 'NetworkError') && 
+                    if ((error.message.includes('timeout') || error.name === 'NetworkError') &&
                         retryCount < this.retryDelays.length) {
                         const delay = this.retryDelays[retryCount];
                         logger.warn(`Request failed, retrying in ${delay/1000} seconds...`);
@@ -350,12 +350,12 @@ const rateLimiter = {
             this.requestQueue[apiName] = executeRequest();
             return await this.requestQueue[apiName];
         } catch (error) {
-            if (error.message.includes('429') || 
-                error.message.includes('timeout') || 
+            if (error.message.includes('429') ||
+                error.message.includes('timeout') ||
                 error.name === 'NetworkError') {
-                
+
                 NetworkManager.handleNetworkError(error);
-                
+
                 const cachedData = CacheManager.get(`coinData_${apiName}`);
                 if (cachedData) {
                     return cachedData.value;
@@ -375,7 +375,7 @@ const ui = {
       const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
       const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
       const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
-      
+
       if (priceUsdElement) {
         priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
       }
@@ -490,8 +490,8 @@ const ui = {
       if (priceChange === null || priceChange === undefined) {
         container.innerHTML = 'N/A';
       } else {
-        container.innerHTML = priceChange >= 0 ? 
-          ui.positivePriceChangeHTML(priceChange) : 
+        container.innerHTML = priceChange >= 0 ?
+          ui.positivePriceChangeHTML(priceChange) :
           ui.negativePriceChangeHTML(priceChange);
       }
     }
@@ -504,7 +504,7 @@ const ui = {
       lastRefreshedElement.textContent = `Last Refreshed: ${formattedTime}`;
     }
   },
-  
+
   updateConnectionStatus: () => {
     const statusElement = document.getElementById('connection-status');
     if (statusElement) {
@@ -599,12 +599,12 @@ const ui = {
         NetworkManager.manualReconnect();
       };
 
-      const buttonContainer = errorOverlay.querySelector('.button-container') || 
+      const buttonContainer = errorOverlay.querySelector('.button-container') ||
                               document.createElement('div');
       buttonContainer.className = "button-container mt-4";
       buttonContainer.innerHTML = '';
       buttonContainer.appendChild(reconnectBtn);
-      
+
       if (!errorOverlay.querySelector('.button-container')) {
         errorOverlay.querySelector('div').appendChild(buttonContainer);
       }
@@ -701,7 +701,7 @@ const chartModule = {
     const gradient = ctx.createLinearGradient(0, 0, 0, 400);
     gradient.addColorStop(0, 'rgba(77, 132, 240, 0.2)');
     gradient.addColorStop(1, 'rgba(77, 132, 240, 0)');
-    
+
     chartModule.chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -897,7 +897,7 @@ const chartModule = {
       }
 
       rawDataPoints.sort((a, b) => a.time - b.time);
-      
+
       let preparedData = [];
 
       if (window.config.currentResolution === 'day') {
@@ -918,7 +918,7 @@ const chartModule = {
               closestPoint = point;
             }
           }
-          
+
           if (closestPoint) {
             preparedData.push({
               x: hourUnix,
@@ -940,7 +940,7 @@ const chartModule = {
           y: point.close
         }));
       }
-      
+
       if (preparedData.length === 0 && rawDataPoints.length > 0) {
         preparedData = rawDataPoints.map(point => ({
           x: point.time,
@@ -965,7 +965,7 @@ const chartModule = {
 
       if (data.length > 0) {
         const closestDataPoint = data.reduce((prev, curr) =>
-          Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) < 
+          Math.abs(new Date(curr.x).getTime() - targetTime.getTime()) <
           Math.abs(new Date(prev.x).getTime() - targetTime.getTime()) ? curr : prev
         , data[0]);
         hourlyData.push({
@@ -989,7 +989,7 @@ const chartModule = {
       }
       chartModule.loadStartTime = Date.now();
       const cacheKey = `chartData_${coinSymbol}_${window.config.currentResolution}`;
-      let cachedData = !forceRefresh ? CacheManager.get(cacheKey) : null;
+      const cachedData = !forceRefresh ? CacheManager.get(cacheKey) : null;
       let data;
       if (cachedData && Object.keys(cachedData.value).length > 0) {
         data = cachedData.value;
@@ -1001,7 +1001,7 @@ const chartModule = {
 
           const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
           data = allData[coinSymbol];
-          
+
           if (!data || Object.keys(data).length === 0) {
             throw new Error(`No data returned for ${coinSymbol}`);
           }
@@ -1009,7 +1009,7 @@ const chartModule = {
           CacheManager.set(cacheKey, data, 'chart');
         } catch (error) {
           NetworkManager.handleNetworkError(error);
-          
+
           if (error.message.includes('429') && currentChartData.length > 0) {
             console.warn(`Rate limit hit for ${coinSymbol}, maintaining current chart`);
             chartModule.hideChartLoader();
@@ -1041,7 +1041,7 @@ const chartModule = {
           chartModule.chart.options.scales.x.time.unit = 'hour';
         } else {
           const resolution = window.config.chartConfig.resolutions[window.config.currentResolution];
-          chartModule.chart.options.scales.x.time.unit = 
+          chartModule.chart.options.scales.x.time.unit =
             resolution && resolution.interval === 'hourly' ? 'hour' :
             window.config.currentResolution === 'year' ? 'month' : 'day';
         }
@@ -1086,7 +1086,7 @@ const chartModule = {
     loader.classList.add('hidden');
     chart.classList.remove('hidden');
   },
-  
+
   cleanup: function() {
     this.destroyChart();
     this.currentCoin = null;
@@ -1181,7 +1181,7 @@ const app = {
         0
       );
     });
-    
+
     return app;
   },
 
@@ -1223,13 +1223,13 @@ const app = {
       }
     }
   },
-  
+
   loadAllCoinData: async function() {
     try {
       if (!NetworkManager.isOnline()) {
         throw new Error('Network is offline');
       }
-      
+
       const allCoinData = await api.fetchCoinGeckoDataXHR();
       if (allCoinData.error) {
         throw new Error(allCoinData.error);
@@ -1242,7 +1242,7 @@ const app = {
 
       for (const coin of window.config.coins) {
         const coinData = allCoinData[coin.symbol.toLowerCase()];
-        
+
         if (coinData) {
           coinData.displayName = coin.displayName || coin.symbol;
 
@@ -1409,7 +1409,7 @@ const app = {
     const lastGeckoRequest = rateLimiter.lastRequestTime['coingecko'] || 0;
     const timeSinceLastRequest = Date.now() - lastGeckoRequest;
     const waitTime = Math.max(0, rateLimiter.minRequestInterval.coingecko - timeSinceLastRequest);
-    
+
     if (waitTime > 0) {
       const seconds = Math.ceil(waitTime / 1000);
       ui.displayErrorMessage(`Rate limit: Please wait ${seconds} seconds before refreshing`);
@@ -1480,7 +1480,7 @@ const app = {
               if (cachedData && cachedData.value && cachedData.value.total_volume) {
                 coinData.total_volume = cachedData.value.total_volume;
               }
-              if (cachedData && cachedData.value && cachedData.value.price_change_percentage_24h && 
+              if (cachedData && cachedData.value && cachedData.value.price_change_percentage_24h &&
                   !coinData.price_change_percentage_24h) {
                 coinData.price_change_percentage_24h = cachedData.value.price_change_percentage_24h;
               }
@@ -1541,7 +1541,7 @@ const app = {
 
       let countdown = 10;
       ui.displayErrorMessage(`Refresh failed: ${error.message}. Please try again later. (${countdown}s)`);
-      
+
       const countdownInterval = setInterval(() => {
         countdown--;
         if (countdown > 0) {
@@ -1652,7 +1652,7 @@ const app = {
       if (!NetworkManager.isOnline()) {
         throw new Error('Network is offline');
       }
-      
+
       const response = await Api.fetchCoinPrices("bitcoin");
 
       if (response && response.rates && response.rates.bitcoin) {
@@ -1715,7 +1715,7 @@ resolutionButtons.forEach(button => {
   button.addEventListener('click', () => {
     const resolution = button.id.split('-')[1];
     const currentCoin = chartModule.currentCoin;
-    
+
     if (currentCoin !== 'WOW' || resolution === 'day') {
       window.config.currentResolution = resolution;
       chartModule.updateChart(currentCoin, true);
@@ -1726,12 +1726,12 @@ resolutionButtons.forEach(button => {
 
 function cleanup() {
   console.log('Starting cleanup process');
-  
+
   try {
     if (window.MemoryManager) {
       MemoryManager.forceCleanup();
     }
-    
+
     if (chartModule) {
       CleanupManager.registerResource('chartModule', chartModule, (cm) => {
         cm.cleanup();
@@ -1752,7 +1752,7 @@ function cleanup() {
 
     const cleanupCounts = CleanupManager.clearAll();
     console.log('All resources cleaned up:', cleanupCounts);
-    
+
   } catch (error) {
     console.error('Error during cleanup:', error);
     CleanupManager.clearAll();
@@ -1801,7 +1801,7 @@ document.addEventListener('DOMContentLoaded', () => {
         NetworkManager.initialize({
             connectionTestEndpoint: '/json',
             connectionTestTimeout: 3000,
-            reconnectDelay: 5000, 
+            reconnectDelay: 5000,
             maxReconnectAttempts: 5
         });
         window.networkManagerInitialized = true;

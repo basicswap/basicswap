@@ -51,7 +51,7 @@ const ApiManager = (function() {
 
             try {
                 await this.requestQueue[apiName];
-                
+
                 const executeRequest = async () => {
                     const waitTime = this.getWaitTime(apiName);
                     if (waitTime > 0) {
@@ -69,7 +69,7 @@ const ApiManager = (function() {
                             return publicAPI.rateLimiter.queueRequest(apiName, requestFn, retryCount + 1);
                         }
 
-                        if ((error.message.includes('timeout') || error.name === 'NetworkError') && 
+                        if ((error.message.includes('timeout') || error.name === 'NetworkError') &&
                             retryCount < this.retryDelays.length) {
                             const delay = this.retryDelays[retryCount];
                             console.warn(`Request failed, retrying in ${delay/1000} seconds...`, {
@@ -87,10 +87,10 @@ const ApiManager = (function() {
 
                 this.requestQueue[apiName] = executeRequest();
                 return await this.requestQueue[apiName];
-                
+
             } catch (error) {
-                if (error.message.includes('429') || 
-                    error.message.includes('timeout') || 
+                if (error.message.includes('429') ||
+                    error.message.includes('timeout') ||
                     error.name === 'NetworkError') {
                     const cacheKey = `coinData_${apiName}`;
                     try {
@@ -110,7 +110,7 @@ const ApiManager = (function() {
     const publicAPI = {
         config,
         rateLimiter,
-        
+
         initialize: function(options = {}) {
             if (state.isInitialized) {
                 console.warn('[ApiManager] Already initialized');
@@ -158,7 +158,7 @@ const ApiManager = (function() {
                 }
 
                 const response = await fetch(url, options);
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -215,18 +215,18 @@ const ApiManager = (function() {
         fetchCoinGeckoData: async function() {
             return this.rateLimiter.queueRequest('coingecko', async () => {
                 try {
-                    const coins = (window.config && window.config.coins) ? 
+                    const coins = (window.config && window.config.coins) ?
                         window.config.coins
                             .filter(coin => coin.usesCoinGecko)
                             .map(coin => coin.name)
-                            .join(',') : 
+                            .join(',') :
                         'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred';
 
                     //console.log('Fetching coin prices for:', coins);
                     const response = await this.fetchCoinPrices(coins);
-                    
+
                     //console.log('Full API response:', response);
-                    
+
                     if (!response || typeof response !== 'object') {
                         throw new Error('Invalid response type');
                     }
@@ -249,11 +249,11 @@ const ApiManager = (function() {
         fetchVolumeData: async function() {
             return this.rateLimiter.queueRequest('coingecko', async () => {
                 try {
-                    const coins = (window.config && window.config.coins) ? 
+                    const coins = (window.config && window.config.coins) ?
                         window.config.coins
                             .filter(coin => coin.usesCoinGecko)
                             .map(coin => getCoinBackendId ? getCoinBackendId(coin.name) : coin.name)
-                            .join(',') : 
+                            .join(',') :
                         'bitcoin,monero,particl,bitcoin-cash,pivx,firo,dash,litecoin,dogecoin,decred';
 
                     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coins}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`;
@@ -280,7 +280,7 @@ const ApiManager = (function() {
                 }
             });
         },
-        
+
         fetchCryptoCompareData: function(coin) {
             return this.rateLimiter.queueRequest('cryptocompare', async () => {
                 try {
@@ -290,7 +290,7 @@ const ApiManager = (function() {
                         'User-Agent': 'Mozilla/5.0',
                         'Accept': 'application/json'
                     };
-                    
+
                     return await this.makePostRequest(url, headers);
                 } catch (error) {
                     console.error(`CryptoCompare request failed for ${coin}:`, error);
@@ -324,7 +324,7 @@ const ApiManager = (function() {
                         try {
                             const apiKey = window.config?.apiKeys?.cryptoCompare || '';
                             let url;
-                            
+
                             if (resolution === 'day') {
                                 url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=24&api_key=${apiKey}`;
                             } else if (resolution === 'year') {
@@ -351,7 +351,7 @@ const ApiManager = (function() {
             await Promise.all(fetchPromises);
             return results;
         },
-        
+
         dispose: function() {
             // Clear any pending requests or resources
             rateLimiter.requestQueue = {};

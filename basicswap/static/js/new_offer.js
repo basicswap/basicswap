@@ -61,7 +61,7 @@ const Ajax = {
             if (xhr.status === 200) {
                 if (onSuccess) {
                     try {
-                        const response = xhr.responseText.startsWith('{') ? 
+                        const response = xhr.responseText.startsWith('{') ?
                             JSON.parse(xhr.responseText) : xhr.responseText;
                         onSuccess(response);
                     } catch (e) {
@@ -153,10 +153,10 @@ const RateManager = {
 
         const params = 'coin_from=' + selectedCoin + '&coin_to=' + coinTo;
 
-        Ajax.post('/json/rates', params, 
+        Ajax.post('/json/rates', params,
             (response) => {
                 if (ratesDisplay) {
-                    ratesDisplay.innerHTML = typeof response === 'string' ? 
+                    ratesDisplay.innerHTML = typeof response === 'string' ?
                         response : '<pre><code>' + JSON.stringify(response, null, '  ') + '</code></pre>';
                 }
             },
@@ -167,7 +167,7 @@ const RateManager = {
             }
         );
     },
-    
+
     getRateInferred: (event) => {
         if (event) event.preventDefault();
 
@@ -180,12 +180,12 @@ const RateManager = {
             return;
         }
 
-        const params = 'coin_from=' + encodeURIComponent(coinFrom) + 
+        const params = 'coin_from=' + encodeURIComponent(coinFrom) +
                       '&coin_to=' + encodeURIComponent(coinTo);
 
         DOM.setValue('rate', 'Loading...');
 
-        Ajax.post('/json/rates', params, 
+        Ajax.post('/json/rates', params,
             (response) => {
                 if (response.coingecko && response.coingecko.rate_inferred) {
                     DOM.setValue('rate', response.coingecko.rate_inferred);
@@ -213,7 +213,7 @@ const RateManager = {
             swapType: DOM.get('swap_type')
         };
 
-        if (!elements.coinFrom || !elements.coinTo || 
+        if (!elements.coinFrom || !elements.coinTo ||
             !elements.amtFrom || !elements.amtTo || !elements.rate) {
             console.log('Required elements for setRate not found');
             return;
@@ -225,7 +225,7 @@ const RateManager = {
             amtFrom: elements.amtFrom.value,
             amtTo: elements.amtTo.value,
             rate: elements.rate.value,
-            lockRate: elements.rate.value == '' ? false : 
+            lockRate: elements.rate.value == '' ? false :
                      (elements.rateLock ? elements.rateLock.checked : false)
         };
 
@@ -236,8 +236,8 @@ const RateManager = {
 
         if (elements.swapType) {
             SwapTypeManager.setSwapTypeEnabled(
-                values.coinFrom, 
-                values.coinTo, 
+                values.coinFrom,
+                values.coinTo,
                 elements.swapType
             );
         }
@@ -248,8 +248,8 @@ const RateManager = {
 
         let params = 'coin_from=' + values.coinFrom + '&coin_to=' + values.coinTo;
 
-        if (valueChanged == 'rate' || 
-            (values.lockRate && valueChanged == 'amt_from') || 
+        if (valueChanged == 'rate' ||
+            (values.lockRate && valueChanged == 'amt_from') ||
             (values.amtTo == '' && valueChanged == 'amt_from')) {
 
             if (values.rate == '' || (values.amtFrom == '' && values.amtTo == '')) {
@@ -274,7 +274,7 @@ const RateManager = {
             params += '&amt_from=' + values.amtFrom + '&amt_to=' + values.amtTo;
         }
 
-        Ajax.post('/json/rate', params, 
+        Ajax.post('/json/rate', params,
             (response) => {
                 if (response.hasOwnProperty('rate')) {
                     DOM.setValue('rate', response.rate);
@@ -314,13 +314,13 @@ const SwapTypeManager = {
         coinFrom = String(coinFrom);
         coinTo = String(coinTo);
 
-        if (SwapTypeManager.adaptor_sig_only_coins.includes(coinFrom) || 
+        if (SwapTypeManager.adaptor_sig_only_coins.includes(coinFrom) ||
             SwapTypeManager.adaptor_sig_only_coins.includes(coinTo)) {
             swapTypeElement.disabled = true;
             swapTypeElement.value = 'xmr_swap';
             makeHidden = true;
             swapTypeElement.classList.add('select-disabled');
-        } else if (SwapTypeManager.secret_hash_only_coins.includes(coinFrom) || 
+        } else if (SwapTypeManager.secret_hash_only_coins.includes(coinFrom) ||
                   SwapTypeManager.secret_hash_only_coins.includes(coinTo)) {
             swapTypeElement.disabled = true;
             swapTypeElement.value = 'seller_first';
@@ -426,7 +426,7 @@ const UIEnhancer = {
             const name = selectedOption.textContent.trim();
             selectCache[select.id] = { image, name };
         }
-        
+
         function setSelectData(select) {
             if (!select || !select.options || select.selectedIndex === undefined) return;
 
@@ -457,9 +457,9 @@ const UIEnhancer = {
             const options = select.querySelectorAll('option');
             const selectIcon = select.parentElement?.querySelector('.select-icon');
             const selectImage = select.parentElement?.querySelector('.select-image');
-            
+
             if (!options || !selectIcon || !selectImage) return;
-            
+
             options.forEach(option => {
                 const image = option.getAttribute('data-image');
                 if (image) {
@@ -476,7 +476,7 @@ const UIEnhancer = {
                 setSelectData(select);
                 Storage.setRaw(select.name, select.value);
             });
-            
+
             setSelectData(select);
             selectIcon.style.display = 'none';
             selectImage.style.display = 'none';

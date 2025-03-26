@@ -43,12 +43,12 @@ const WebSocketManager = (function() {
             wsPort = window.ws_port.toString();
             return wsPort;
         }
-        
+
         if (typeof getWebSocketConfig === 'function') {
             const wsConfig = getWebSocketConfig();
             wsPort = (wsConfig.port || wsConfig.fallbackPort || '11700').toString();
             return wsPort;
-        } 
+        }
 
         wsPort = '11700';
         return wsPort;
@@ -62,14 +62,14 @@ const WebSocketManager = (function() {
             startHealthCheck();
 
             log('WebSocketManager initialized with options:', options);
-            
+
             if (window.CleanupManager) {
                 window.CleanupManager.registerResource('webSocketManager', this, (mgr) => mgr.dispose());
             }
 
             return this;
         },
-        
+
         connect: function() {
             if (state.isConnecting || state.isIntentionallyClosed) {
                 log('Connection attempt blocked - already connecting or intentionally closed');
@@ -87,7 +87,7 @@ const WebSocketManager = (function() {
 
             try {
                 const wsPort = determineWebSocketPort();
-                
+
                 if (!wsPort) {
                     state.isConnecting = false;
                     return false;
@@ -129,7 +129,7 @@ const WebSocketManager = (function() {
                 log('Cannot send message - not connected');
                 return false;
             }
-            
+
             try {
                 ws.send(JSON.stringify(message));
                 return true;
@@ -143,13 +143,13 @@ const WebSocketManager = (function() {
             if (!state.messageHandlers[type]) {
                 state.messageHandlers[type] = {};
             }
-            
+
             const handlerId = generateHandlerId();
             state.messageHandlers[type][handlerId] = handler;
-            
+
             return handlerId;
         },
-        
+
         removeMessageHandler: function(type, handlerId) {
             if (state.messageHandlers[type] && state.messageHandlers[type][handlerId]) {
                 delete state.messageHandlers[type][handlerId];
@@ -158,7 +158,7 @@ const WebSocketManager = (function() {
 
         cleanup: function() {
             log('Cleaning up WebSocket resources');
-            
+
             clearTimeout(state.connectTimeout);
             stopHealthCheck();
 
@@ -211,11 +211,11 @@ const WebSocketManager = (function() {
         resume: function() {
             log('WebSocketManager resumed');
             state.isIntentionallyClosed = false;
-            
+
             if (!this.isConnected()) {
                 this.connect();
             }
-            
+
             startHealthCheck();
         }
     };
@@ -264,16 +264,16 @@ const WebSocketManager = (function() {
             log('WebSocket closed:', event);
             state.isConnecting = false;
             window.ws = null;
-            
+
             if (typeof updateConnectionStatus === 'function') {
                 updateConnectionStatus('disconnected');
             }
 
-            notifyHandlers('disconnect', { 
-                code: event.code, 
-                reason: event.reason 
+            notifyHandlers('disconnect', {
+                code: event.code,
+                reason: event.reason
             });
-            
+
             if (!state.isIntentionallyClosed) {
                 handleReconnect();
             }
@@ -292,12 +292,12 @@ const WebSocketManager = (function() {
         document.addEventListener('visibilitychange', visibilityChangeHandler);
         state.listeners.visibilityChange = visibilityChangeHandler;
     }
-    
+
     function handlePageHidden() {
         log('Page hidden');
         state.isPageHidden = true;
         stopHealthCheck();
-        
+
         if (ws && ws.readyState === WebSocket.OPEN) {
             state.isIntentionallyClosed = true;
             ws.close(1000, 'Page hidden');
@@ -308,7 +308,7 @@ const WebSocketManager = (function() {
         log('Page visible');
         state.isPageHidden = false;
         state.isIntentionallyClosed = false;
-        
+
         setTimeout(() => {
             if (!publicAPI.isConnected()) {
                 publicAPI.connect();
@@ -323,7 +323,7 @@ const WebSocketManager = (function() {
             performHealthCheck();
         }, 30000);
     }
-    
+
     function stopHealthCheck() {
         if (state.healthCheckInterval) {
             clearInterval(state.healthCheckInterval);
@@ -340,7 +340,7 @@ const WebSocketManager = (function() {
 
         const now = Date.now();
         const lastCheck = state.lastHealthCheck;
-        
+
         if (lastCheck && (now - lastCheck) > 60000) {
             log('Health check failed - too long since last check');
             handleReconnect();
@@ -401,10 +401,10 @@ const WebSocketManager = (function() {
 
     function cleanup() {
         log('Cleaning up WebSocket resources');
-        
+
         clearTimeout(state.connectTimeout);
         stopHealthCheck();
-        
+
         if (state.reconnectTimeout) {
             clearTimeout(state.reconnectTimeout);
             state.reconnectTimeout = null;
