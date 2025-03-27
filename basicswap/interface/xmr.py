@@ -143,7 +143,6 @@ class XMRInterface(CoinInterface):
 
         self._rpctimeout = coin_settings.get("rpctimeout", 60)
         self._walletrpctimeout = coin_settings.get("walletrpctimeout", 120)
-        # walletrpctimeoutlong likely unneeded
         self._walletrpctimeoutlong = coin_settings.get("walletrpctimeoutlong", 600)
 
         self.rpc = make_xmr_rpc_func(
@@ -179,7 +178,9 @@ class XMRInterface(CoinInterface):
     def createWallet(self, params):
         if self._wallet_password is not None:
             params["password"] = self._wallet_password
-        rv = self.rpc_wallet("generate_from_keys", params)
+        rv = self.rpc_wallet(
+            "generate_from_keys", params, timeout=self._walletrpctimeoutlong
+        )
         if "address" in rv:
             new_address: str = rv["address"]
             is_watch_only: bool = "Watch-only" in rv.get("info", "")
