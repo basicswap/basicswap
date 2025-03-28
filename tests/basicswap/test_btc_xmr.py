@@ -59,7 +59,6 @@ from basicswap.contrib.test_framework.script import (
 from .test_xmr import BaseTest, test_delay_event, callnoderpc
 
 logger = logging.getLogger()
-
 test_seed = "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
 
 
@@ -666,7 +665,7 @@ class TestFunctions(BaseTest):
         balance_from_before: float = self.getBalance(jsw, coin_from)
         self.prepare_balance(
             coin_to,
-            balance_from_before + 1,
+            balance_from_before * 3,
             1800 + id_bidder,
             1801 if coin_to in (Coins.XMR,) else 1800,
         )
@@ -718,6 +717,7 @@ class TestFunctions(BaseTest):
             assert False, "Should fail"
 
         amt_swap -= ci_from.make_int(1)
+        rate_swap = ci_to.make_int(1.0, r=1)
         offer_id = swap_clients[id_offerer].postOffer(
             coin_from,
             coin_to,
@@ -769,6 +769,8 @@ class TestFunctions(BaseTest):
 
 
 class BasicSwapTest(TestFunctions):
+
+    test_fee_rate: int = 1000  # sats/kvB
 
     @classmethod
     def setUpClass(cls):
@@ -1236,12 +1238,7 @@ class BasicSwapTest(TestFunctions):
         swap_client = self.swap_clients[0]
         ci = swap_client.ci(self.test_coin_from)
 
-        addr_1 = ci.rpc_wallet(
-            "getnewaddress",
-            [
-                "gettxout test 1",
-            ],
-        )
+        addr_1 = ci.getNewAddress(True, "gettxout test 1")
         txid = ci.rpc_wallet("sendtoaddress", [addr_1, 1.0])
         assert len(txid) == 64
 
@@ -1266,12 +1263,7 @@ class BasicSwapTest(TestFunctions):
         else:
             assert addr_1 in txout["scriptPubKey"]["addresses"]
         # Spend
-        addr_2 = ci.rpc_wallet(
-            "getnewaddress",
-            [
-                "gettxout test 2",
-            ],
-        )
+        addr_2 = ci.getNewAddress(True, "gettxout test 2")
         tx_funded = ci.rpc(
             "createrawtransaction",
             [[{"txid": utxo["txid"], "vout": utxo["vout"]}], {addr_2: 0.99}],
@@ -1297,12 +1289,7 @@ class BasicSwapTest(TestFunctions):
         logging.info("---------- Test {} scantxoutset".format(self.test_coin_from.name))
         ci = self.swap_clients[0].ci(self.test_coin_from)
 
-        addr_1 = ci.rpc_wallet(
-            "getnewaddress",
-            [
-                "scantxoutset test",
-            ],
-        )
+        addr_1 = ci.getNewAddress(True, "scantxoutset test")
         txid = ci.rpc_wallet("sendtoaddress", [addr_1, 1.0])
         assert len(txid) == 64
 
@@ -1324,9 +1311,6 @@ class BasicSwapTest(TestFunctions):
         # Record unspents before createSCLockTx as the used ones will be locked
         unspents = ci.rpc_wallet("listunspent")
 
-        # fee_rate is in sats/kvB
-        fee_rate: int = 1000
-
         a = ci.getNewRandomKey()
         b = ci.getNewRandomKey()
 
@@ -1335,7 +1319,7 @@ class BasicSwapTest(TestFunctions):
         lock_tx_script = pi.genScriptLockTxScript(ci, A, B)
 
         lock_tx = ci.createSCLockTx(amount, lock_tx_script)
-        lock_tx = ci.fundSCLockTx(lock_tx, fee_rate)
+        lock_tx = ci.fundSCLockTx(lock_tx, self.test_fee_rate)
         lock_tx = ci.signTxWithWallet(lock_tx)
 
         unspents_after = ci.rpc_wallet("listunspent")
@@ -1345,7 +1329,7 @@ class BasicSwapTest(TestFunctions):
         txid = tx_decoded["txid"]
 
         vsize = tx_decoded["vsize"]
-        expect_fee_int = round(fee_rate * vsize / 1000)
+        expect_fee_int = round(self.test_fee_rate * vsize / 1000)
 
         out_value: int = 0
         for txo in tx_decoded["vout"]:
@@ -1372,7 +1356,7 @@ class BasicSwapTest(TestFunctions):
         pkh_out = ci.decodeAddress(addr_out)
         fee_info = {}
         lock_spend_tx = ci.createSCLockSpendTx(
-            lock_tx, lock_tx_script, pkh_out, fee_rate, fee_info=fee_info
+            lock_tx, lock_tx_script, pkh_out, self.test_fee_rate, fee_info=fee_info
         )
         vsize_estimated: int = fee_info["vsize"]
 
@@ -1400,11 +1384,11 @@ class BasicSwapTest(TestFunctions):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, self.test_fee_rate)
 
         addr_out = ci.getNewAddress(True)
         lock_tx_b_spend_txid = ci.spendBLockTx(
-            lock_tx_b_txid, addr_out, v, s, amount, fee_rate, 0
+            lock_tx_b_txid, addr_out, v, s, amount, self.test_fee_rate, 0
         )
         lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)
         if lock_tx_b_spend is None:
@@ -1635,7 +1619,9 @@ class BasicSwapTest(TestFunctions):
             wallet=new_wallet_name,
         )
 
-        addr = self.callnoderpc("getnewaddress", wallet=new_wallet_name)
+        addr = self.callnoderpc(
+            "getnewaddress", ["test descriptors"], wallet=new_wallet_name
+        )
         addr_info = self.callnoderpc(
             "getaddressinfo",
             [
@@ -1645,7 +1631,8 @@ class BasicSwapTest(TestFunctions):
         )
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0h/0h/0h"
-        assert addr == "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr"
+        if self.test_coin_from == Coins.BTC:
+            assert addr == "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr"
 
         addr_change = self.callnoderpc("getrawchangeaddress", wallet=new_wallet_name)
         addr_info = self.callnoderpc(
@@ -1657,7 +1644,8 @@ class BasicSwapTest(TestFunctions):
         )
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0h/1h/0h"
-        assert addr_change == "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a"
+        if self.test_coin_from == Coins.BTC:
+            assert addr_change == "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a"
 
         desc_watch = descsum_create(f"addr({addr})")
         self.callnoderpc(
@@ -1683,7 +1671,13 @@ class BasicSwapTest(TestFunctions):
 
         # Test that addresses can be generated beyond range in listdescriptors
         for i in range(2000):
-            self.callnoderpc("getnewaddress", wallet=new_wallet_name)
+            self.callnoderpc(
+                "getnewaddress",
+                [
+                    f"t{i}",
+                ],
+                wallet=new_wallet_name,
+            )
 
         self.callnoderpc("unloadwallet", [new_wallet_name])
         self.callnoderpc("unloadwallet", [new_watch_wallet_name])

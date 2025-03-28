@@ -52,11 +52,17 @@ PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 
+BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "28.0")
+BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
+
 LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.4")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
-BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "28.0")
-BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
+DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
+DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
+
+NMC_VERSION = os.getenv("NMC_VERSION", "28.0")
+NMC_VERSION_TAG = os.getenv("NMC_VERSION_TAG", "")
 
 MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.3.4")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
@@ -81,12 +87,6 @@ FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 
 NAV_VERSION = os.getenv("NAV_VERSION", "7.0.3")
 NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
-
-NMC_VERSION = os.getenv("NAV_VERSION", "28.0")
-NMC_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
-
-DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
-DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 
 BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "28.0.1")
 BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
@@ -117,9 +117,7 @@ known_coins = {
     "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
 }
 
-disabled_coins = [
-    "navcoin"
-]
+disabled_coins = ["navcoin"]
 
 expected_key_ids = {
     "tecnovert": ("13F13651C9CF0D6B",),
@@ -184,6 +182,35 @@ PART_ONION_PORT = int(os.getenv("PART_ONION_PORT", 51734))
 PART_RPC_USER = os.getenv("PART_RPC_USER", "")
 PART_RPC_PWD = os.getenv("PART_RPC_PWD", "")
 
+BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
+BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
+BTC_PORT = int(os.getenv("BTC_PORT", 8333))
+BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
+BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
+BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
+
+LTC_RPC_HOST = os.getenv("LTC_RPC_HOST", "127.0.0.1")
+LTC_RPC_PORT = int(os.getenv("LTC_RPC_PORT", 19895))
+LTC_ONION_PORT = int(os.getenv("LTC_ONION_PORT", 9333))
+LTC_RPC_USER = os.getenv("LTC_RPC_USER", "")
+LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
+
+DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
+DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
+DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
+DCR_WALLET_RPC_PORT = int(os.getenv("DCR_WALLET_RPC_PORT", 9209))
+DCR_WALLET_PWD = os.getenv(
+    "DCR_WALLET_PWD", random.randbytes(random.randint(14, 18)).hex()
+)
+DCR_RPC_USER = os.getenv("DCR_RPC_USER", "user")
+DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).hex())
+
+NMC_RPC_HOST = os.getenv("NMC_RPC_HOST", "127.0.0.1")
+NMC_RPC_PORT = int(os.getenv("NMC_RPC_PORT", 19698))
+NMC_ONION_PORT = int(os.getenv("NMC_ONION_PORT", 9698))
+NMC_RPC_USER = os.getenv("NMC_RPC_USER", "")
+NMC_RPC_PWD = os.getenv("NMC_RPC_PWD", "")
+
 XMR_RPC_HOST = os.getenv("XMR_RPC_HOST", "127.0.0.1")
 XMR_RPC_PORT = int(os.getenv("XMR_RPC_PORT", 29798))
 XMR_ZMQ_PORT = int(os.getenv("XMR_ZMQ_PORT", 30898))
@@ -205,35 +232,6 @@ WOW_WALLET_RPC_PWD = os.getenv("WOW_WALLET_RPC_PWD", "wow_wallet_pwd")
 WOW_RPC_USER = os.getenv("WOW_RPC_USER", "")
 WOW_RPC_PWD = os.getenv("WOW_RPC_PWD", "")
 DEFAULT_WOW_RESTORE_HEIGHT = int(os.getenv("DEFAULT_WOW_RESTORE_HEIGHT", 450000))
-
-LTC_RPC_HOST = os.getenv("LTC_RPC_HOST", "127.0.0.1")
-LTC_RPC_PORT = int(os.getenv("LTC_RPC_PORT", 19895))
-LTC_ONION_PORT = int(os.getenv("LTC_ONION_PORT", 9333))
-LTC_RPC_USER = os.getenv("LTC_RPC_USER", "")
-LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
-
-BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
-BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
-BTC_PORT = int(os.getenv("BTC_PORT", 8333))
-BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
-BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
-BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
-
-DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
-DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
-DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
-DCR_WALLET_RPC_PORT = int(os.getenv("DCR_WALLET_RPC_PORT", 9209))
-DCR_WALLET_PWD = os.getenv(
-    "DCR_WALLET_PWD", random.randbytes(random.randint(14, 18)).hex()
-)
-DCR_RPC_USER = os.getenv("DCR_RPC_USER", "user")
-DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).hex())
-
-NMC_RPC_HOST = os.getenv("NMC_RPC_HOST", "127.0.0.1")
-NMC_RPC_PORT = int(os.getenv("NMC_RPC_PORT", 19698))
-NMC_ONION_PORT = int(os.getenv("NMC_ONION_PORT", 9698))
-NMC_RPC_USER = os.getenv("NMC_RPC_USER", "")
-NMC_RPC_PWD = os.getenv("NMC_RPC_PWD", "")
 
 PIVX_RPC_HOST = os.getenv("PIVX_RPC_HOST", "127.0.0.1")
 PIVX_RPC_PORT = int(os.getenv("PIVX_RPC_PORT", 51473))
@@ -1400,8 +1398,10 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     )
                 )
         elif coin == "namecoin":
-            fp.write("deprecatedrpc=create_bdb\n")
             fp.write("prune=2000\n")
+            fp.write("deprecatedrpc=create_bdb\n")
+            fp.write("addresstype=bech32\n")
+            fp.write("changetype=bech32\n")
         elif coin == "pivx":
             params_dir = os.path.join(data_dir, "pivx-params")
             downloadPIVXParams(params_dir)

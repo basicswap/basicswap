@@ -138,7 +138,6 @@ def run_test_success_path(self, coin_from: Coins, coin_to: Coins):
 
     # Verify lock tx spends are found in the expected wallets
     bid, offer = swap_clients[node_from].getBidAndOffer(bid_id)
-    max_fee: int = 10000
     itx_spend = bid.initiate_tx.spend_txid.hex()
     node_to_ci_from = swap_clients[node_to].ci(coin_from)
     wtx = node_to_ci_from.rpc_wallet(
@@ -147,7 +146,9 @@ def run_test_success_path(self, coin_from: Coins, coin_to: Coins):
             itx_spend,
         ],
     )
-    assert amt_swap - node_to_ci_from.make_int(wtx["details"][0]["amount"]) < max_fee
+    assert (
+        amt_swap - node_to_ci_from.make_int(wtx["details"][0]["amount"]) < self.max_fee
+    )
 
     node_from_ci_to = swap_clients[node_from].ci(coin_to)
     ptx_spend = bid.participate_tx.spend_txid.hex()
@@ -158,7 +159,8 @@ def run_test_success_path(self, coin_from: Coins, coin_to: Coins):
         ],
     )
     assert (
-        bid.amount_to - node_from_ci_to.make_int(wtx["details"][0]["amount"]) < max_fee
+        bid.amount_to - node_from_ci_to.make_int(wtx["details"][0]["amount"])
+        < self.max_fee
     )
 
     js_0 = read_json_api(1800 + node_from)
@@ -235,7 +237,6 @@ def run_test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
 
     # Verify lock tx spends are found in the expected wallets
     bid, offer = swap_clients[node_from].getBidAndOffer(bid_id)
-    max_fee: int = 10000
     itx_spend = bid.initiate_tx.spend_txid.hex()
     node_from_ci_from = swap_clients[node_from].ci(coin_from)
     wtx = node_from_ci_from.rpc_wallet(
@@ -244,7 +245,10 @@ def run_test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
             itx_spend,
         ],
     )
-    assert amt_swap - node_from_ci_from.make_int(wtx["details"][0]["amount"]) < max_fee
+    assert (
+        amt_swap - node_from_ci_from.make_int(wtx["details"][0]["amount"])
+        < self.max_fee
+    )
 
     node_to_ci_to = swap_clients[node_to].ci(coin_to)
     bid, offer = swap_clients[node_to].getBidAndOffer(bid_id)
@@ -255,7 +259,10 @@ def run_test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
             ptx_spend,
         ],
     )
-    assert bid.amount_to - node_to_ci_to.make_int(wtx["details"][0]["amount"]) < max_fee
+    assert (
+        bid.amount_to - node_to_ci_to.make_int(wtx["details"][0]["amount"])
+        < self.max_fee
+    )
 
     bid_id_hex = bid_id.hex()
     path = f"bids/{bid_id_hex}/states"
@@ -338,7 +345,6 @@ def run_test_itx_refund(self, coin_from: Coins, coin_to: Coins):
 
     # Verify lock tx spends are found in the expected wallets
     bid, offer = swap_clients[node_from].getBidAndOffer(bid_id)
-    max_fee: int = 10000
     itx_spend = bid.initiate_tx.spend_txid.hex()
     node_from_ci_from = swap_clients[node_from].ci(coin_from)
     wtx = node_from_ci_from.rpc_wallet(
@@ -348,7 +354,8 @@ def run_test_itx_refund(self, coin_from: Coins, coin_to: Coins):
         ],
     )
     assert (
-        swap_value - node_from_ci_from.make_int(wtx["details"][0]["amount"]) < max_fee
+        swap_value - node_from_ci_from.make_int(wtx["details"][0]["amount"])
+        < self.max_fee
     )
 
     node_from_ci_to = swap_clients[node_from].ci(coin_to)
@@ -360,7 +367,8 @@ def run_test_itx_refund(self, coin_from: Coins, coin_to: Coins):
         ],
     )
     assert (
-        bid.amount_to - node_from_ci_to.make_int(wtx["details"][0]["amount"]) < max_fee
+        bid.amount_to - node_from_ci_to.make_int(wtx["details"][0]["amount"])
+        < self.max_fee
     )
 
 
@@ -425,7 +433,6 @@ def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
     bid, xmr_swap = swap_clients[id_offerer].getXmrBid(bid_id)
 
     node_from_ci_to = swap_clients[0].ci(coin_to)
-    max_fee: int = 10000
     if node_from_ci_to.coin_type() in (Coins.XMR, Coins.WOW):
         pass
     else:
@@ -437,7 +444,7 @@ def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
         )
         assert (
             bid.amount_to - node_from_ci_to.make_int(wtx["details"][0]["amount"])
-            < max_fee
+            < self.max_fee
         )
 
     node_to_ci_from = swap_clients[1].ci(coin_from)
@@ -451,7 +458,8 @@ def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
             ],
         )
         assert (
-            bid.amount - node_to_ci_from.make_int(wtx["details"][0]["amount"]) < max_fee
+            bid.amount - node_to_ci_from.make_int(wtx["details"][0]["amount"])
+            < self.max_fee
         )
 
     bid_id_hex = bid_id.hex()
@@ -550,7 +558,6 @@ def run_test_ads_both_refund(
     bid, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
 
     node_from_ci_from = swap_clients[0].ci(coin_from)
-    max_fee: int = 10000
     if node_from_ci_from.coin_type() in (Coins.XMR, Coins.WOW):
         pass
     else:
@@ -562,7 +569,7 @@ def run_test_ads_both_refund(
         )
         assert (
             bid.amount - node_from_ci_from.make_int(wtx["details"][0]["amount"])
-            < max_fee
+            < self.max_fee
         )
 
     node_to_ci_to = swap_clients[1].ci(coin_to)
@@ -577,7 +584,7 @@ def run_test_ads_both_refund(
         )
         assert (
             bid.amount_to - node_to_ci_to.make_int(wtx["details"][0]["amount"])
-            < max_fee
+            < self.max_fee
         )
 
     bid_id_hex = bid_id.hex()
@@ -720,6 +727,7 @@ class Test(BaseTest):
     start_xmr_nodes = True
     dcr_mining_addr = "SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH"
     extra_wait_time = 0
+    max_fee: int = 10000
 
     hex_seeds = [
         "e8574b2a94404ee62d8acc0258cab4c0defcfab8a5dfc2f4954c1f9d7e09d72a",
