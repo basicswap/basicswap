@@ -309,7 +309,6 @@ def make_xmr_rpc2_func(
         transport.set_proxy(proxy_host, proxy_port)
 
     def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
-        nonlocal port, auth, host, transport, tag
         return callrpc_xmr2(
             port,
             method,
@@ -345,7 +344,6 @@ def make_xmr_rpc_func(
         transport.set_proxy(proxy_host, proxy_port)
 
     def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
-        nonlocal port, auth, host, transport, tag
         return callrpc_xmr(
             port,
             method,

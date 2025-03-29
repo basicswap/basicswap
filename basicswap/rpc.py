@@ -159,7 +159,6 @@ def make_rpc_func(port, auth, wallet=None, host="127.0.0.1"):
     host = host
 
     def rpc_func(method, params=None, wallet_override=None):
-        nonlocal port, auth, wallet, host
         return callrpc(
             port,
             auth,

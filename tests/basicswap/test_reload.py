@@ -111,7 +111,6 @@ class Test(unittest.TestCase):
         )
 
     def test_reload(self):
-        global stop_test
         processes = []
 
         for i in range(3):

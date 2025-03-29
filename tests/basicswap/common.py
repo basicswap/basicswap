@@ -357,7 +357,6 @@ def make_rpc_func(node_id, base_rpc_port=BASE_RPC_PORT):
     auth = "test{0}:test_pass{0}".format(node_id)
 
     def rpc_func(method, params=None, wallet=None):
-        nonlocal node_id, auth
         return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
 
     return rpc_func

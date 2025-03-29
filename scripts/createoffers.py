@@ -101,7 +101,6 @@ def make_json_api_func(host: str, port: int):
     port = port
 
     def api_func(path=None, json_data=None, timeout=300):
-        nonlocal host, port
         url = f"http://{host}:{port}/json"
         if path is not None:
             url += "/" + path
@@ -765,7 +764,7 @@ def prune_script_state(now, args, config, script_state):
 
 
 def main():
-    global read_json_api, read_json_api_wallet, coins_map
+    global read_json_api, read_json_api_wallet
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "-v",

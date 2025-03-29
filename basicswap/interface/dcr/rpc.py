@@ -42,7 +42,6 @@ def make_rpc_func(port, auth, host="127.0.0.1"):
     host = host
 
     def rpc_func(method, params=None):
-        nonlocal port, auth, host
         return callrpc(port, auth, method, params, host)
 
     return rpc_func

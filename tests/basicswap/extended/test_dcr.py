@@ -70,7 +70,6 @@ def make_rpc_func(node_id, base_rpc_port):
     auth = "test{0}:test_pass{0}".format(node_id)
 
     def rpc_func(method, params=None):
-        nonlocal node_id, auth
         return callrpc(base_rpc_port + node_id, auth, method, params)
 
     return rpc_func

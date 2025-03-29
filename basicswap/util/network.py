@@ -38,8 +38,7 @@ def make_reporthook(read_start: int, logger):
         logger.info(f"Attempting to resume from byte {read_start}")
 
     def reporthook(blocknum, blocksize, totalsize):
-        nonlocal read, last_percent_str, time_last, read_last, display_last, read_start
-        nonlocal average_buffer, abo, logger
+        nonlocal read, last_percent_str, time_last, read_last, display_last, abo
         read += blocksize
 
         # totalsize excludes read_start

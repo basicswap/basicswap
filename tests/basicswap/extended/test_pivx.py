@@ -282,7 +282,6 @@ def make_part_cli_rpc_func(node_id):
     node_id = node_id
 
     def rpc_func(method, params=None, wallet=None):
-        nonlocal node_id
         cmd = method
         if params:
             for p in params:

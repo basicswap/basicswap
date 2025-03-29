@@ -113,7 +113,6 @@ class Test(BaseTest):
         pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
 
         def wait_for_unspents(delay_event, iterations=20, delay_time=0.5):
-            nonlocal ci
             i = 0
             while not delay_event.is_set():
                 unspents = ci.rpc_wallet("listunspentblind")
