@@ -379,6 +379,12 @@ def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> 
     return wallet_name
 
 
+def getDescriptorWalletOption(coin_params):
+    ticker: str = coin_params["ticker"]
+    default_option: bool = True if ticker in ("NMC",) else False
+    return toBool(os.getenv(ticker + "_USE_DESCRIPTORS", default_option))
+
+
 def getKnownVersion(coin_name: str) -> str:
     version, version_tag, _ = known_coins[coin_name]
     return version + version_tag
@@ -1928,11 +1934,15 @@ def initialise_wallets(
                             ],
                         )
                         if use_descriptors:
+                            watch_wallet_name = coin_settings["watch_wallet_name"]
+                            logger.info(
+                                f'Creating wallet "{watch_wallet_name}" for {getCoinName(c)}.'
+                            )
                             swap_client.callcoinrpc(
                                 c,
                                 "createwallet",
                                 [
-                                    coin_settings["watch_wallet_name"],
+                                    watch_wallet_name,
                                     True,
                                     True,
                                     "",
@@ -2596,9 +2606,8 @@ def main():
             coin_settings["wallet_name"] = set_name
 
         ticker: str = coin_params["ticker"]
-        if toBool(os.getenv(ticker + "_USE_DESCRIPTORS", False)):
-
-            if coin_id not in (Coins.BTC,):
+        if getDescriptorWalletOption(coin_params):
+            if coin_id not in (Coins.BTC, Coins.NMC):
                 raise ValueError(f"Descriptor wallet unavailable for {coin_name}")
 
             coin_settings["use_descriptors"] = True

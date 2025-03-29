@@ -58,6 +58,8 @@ chainparams = {
             "bip44": 44,
             "min_amount": 100000,
             "max_amount": 10000000 * COIN,
+            "ext_public_key_prefix": 0x696E82D1,
+            "ext_secret_key_prefix": 0x8F1DAEB8,
         },
         "testnet": {
             "rpcport": 51935,
@@ -69,6 +71,8 @@ chainparams = {
             "bip44": 1,
             "min_amount": 100000,
             "max_amount": 10000000 * COIN,
+            "ext_public_key_prefix": 0xE1427800,
+            "ext_secret_key_prefix": 0x04889478,
         },
         "regtest": {
             "rpcport": 51936,
@@ -80,6 +84,8 @@ chainparams = {
             "bip44": 1,
             "min_amount": 100000,
             "max_amount": 10000000 * COIN,
+            "ext_public_key_prefix": 0xE1427800,
+            "ext_secret_key_prefix": 0x04889478,
         },
     },
     Coins.BTC: {

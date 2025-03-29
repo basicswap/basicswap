@@ -54,7 +54,7 @@ NAMECOIND = os.getenv("NAMECOIND", "namecoind" + cfg.bin_suffix)
 NAMECOIN_CLI = os.getenv("NAMECOIN_CLI", "namecoin-cli" + cfg.bin_suffix)
 NAMECOIN_TX = os.getenv("NAMECOIN_TX", "namecoin-tx" + cfg.bin_suffix)
 
-USE_DESCRIPTOR_WALLETS = toBool(os.getenv("USE_DESCRIPTOR_WALLETS", False))
+NMC_USE_DESCRIPTORS = toBool(os.getenv("NMC_USE_DESCRIPTORS", True))
 
 NMC_BASE_PORT = 8136
 NMC_BASE_RPC_PORT = 8146
@@ -112,7 +112,7 @@ class TestNMC(BasicSwapTest):
     base_rpc_port = NMC_BASE_RPC_PORT
     nmc_addr = None
     max_fee: int = 200000
-    test_fee_rate: int = 10000  # sats/kvB
+    test_fee_rate: int = 100000  # sats/kvB
 
     def mineBlock(self, num_blocks: int = 1) -> None:
         self.callnoderpc("generatetoaddress", [num_blocks, self.nmc_addr])
@@ -160,8 +160,13 @@ class TestNMC(BasicSwapTest):
         if len(nmc_rpc("listwallets")) < 1:
             nmc_rpc(
                 "createwallet",
-                ["wallet.dat", False, False, "", False, USE_DESCRIPTOR_WALLETS],
+                ["wallet.dat", False, True, "", False, NMC_USE_DESCRIPTORS],
             )
+            if NMC_USE_DESCRIPTORS:
+                nmc_rpc(
+                    "createwallet",
+                    ["bsx_watch", True, True, "", False, True],
+                )
 
     @classmethod
     def addPIDInfo(cls, sc, i):
@@ -180,12 +185,18 @@ class TestNMC(BasicSwapTest):
             "use_csv": True,
             "use_segwit": True,
             "blocks_confirmed": 1,
+            "use_descriptors": NMC_USE_DESCRIPTORS,
         }
+        if NMC_USE_DESCRIPTORS:
+            settings["chainclients"]["namecoin"]["watch_wallet_name"] = "bsx_watch"
 
     @classmethod
     def prepareExtraCoins(cls):
         ci0 = cls.swap_clients[0].ci(cls.test_coin)
         if not cls.restore_instance:
+            for sc in cls.swap_clients:
+                ci = sc.ci(cls.test_coin)
+                ci.initialiseWallet(ci.getNewRandomKey())
             cls.nmc_addr = ci0.rpc_wallet("getnewaddress", ["mining_addr", "bech32"])
         else:
             addrs = ci0.rpc_wallet(
@@ -214,7 +225,7 @@ class TestNMC(BasicSwapTest):
         new_wallet_name = random.randbytes(10).hex()
         self.callnoderpc(
             "createwallet",
-            [new_wallet_name, False, False, "", False, USE_DESCRIPTOR_WALLETS],
+            [new_wallet_name, False, False, "", False, NMC_USE_DESCRIPTORS],
         )
         self.callnoderpc("sethdseed", [True, test_wif], wallet=new_wallet_name)
         addr = self.callnoderpc(

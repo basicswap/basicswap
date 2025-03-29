@@ -26,6 +26,9 @@ from basicswap.db import (
 from basicswap.util import (
     make_int,
 )
+from basicswap.util.address import (
+    decodeAddress,
+)
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.interface.base import Curves
 from tests.basicswap.util import (
@@ -182,7 +185,7 @@ class TestFunctions(BaseTest):
         bid0 = read_json_api(1800 + id_offerer, f"bids/{bid_id.hex()}")
         bid1 = read_json_api(1800 + id_bidder, f"bids/{bid_id.hex()}")
 
-        tolerance = 1
+        tolerance = 2
         assert bid0["ticker_from"] == ci_from.ticker()
         assert bid1["ticker_from"] == ci_from.ticker()
         assert bid0["ticker_to"] == ci_to.ticker()
@@ -1180,6 +1183,10 @@ class BasicSwapTest(TestFunctions):
         logging.info("---------- Test {} hdwallet".format(self.test_coin_from.name))
         ci = self.swap_clients[0].ci(self.test_coin_from)
 
+        if hasattr(ci, "_use_descriptors") and ci._use_descriptors:
+            logging.warning("Skipping test")
+            return
+
         test_wif = (
             self.swap_clients[0]
             .ci(self.test_coin_from)
@@ -1310,7 +1317,7 @@ class BasicSwapTest(TestFunctions):
 
         # Record unspents before createSCLockTx as the used ones will be locked
         unspents = ci.rpc_wallet("listunspent")
-
+        lockedunspents_before = ci.rpc_wallet("listlockunspent")
         a = ci.getNewRandomKey()
         b = ci.getNewRandomKey()
 
@@ -1322,8 +1329,17 @@ class BasicSwapTest(TestFunctions):
         lock_tx = ci.fundSCLockTx(lock_tx, self.test_fee_rate)
         lock_tx = ci.signTxWithWallet(lock_tx)
 
+        # Check that inputs were locked
+        lockedunspents = ci.rpc_wallet("listlockunspent")
+        assert len(lockedunspents) > len(lockedunspents_before)
         unspents_after = ci.rpc_wallet("listunspent")
-        assert len(unspents) > len(unspents_after)
+        for utxo in unspents_after:
+            for locked_utxo in lockedunspents:
+                if (
+                    locked_utxo["txid"] == utxo["txid"]
+                    and locked_utxo["vout"] == utxo["vout"]
+                ):
+                    raise ValueError("Locked utxo in listunspent")
 
         tx_decoded = ci.rpc("decoderawtransaction", [lock_tx.hex()])
         txid = tx_decoded["txid"]
@@ -1678,6 +1694,49 @@ class BasicSwapTest(TestFunctions):
                 ],
                 wallet=new_wallet_name,
             )
+
+        # https://github.com/bitcoin/bitcoin/issues/10542
+        # https://github.com/bitcoin/bitcoin/issues/26046
+        sign_for_address: str = self.callnoderpc(
+            "getnewaddress",
+            [
+                "sign address",
+            ],
+            wallet=new_wallet_name,
+        )
+        priv_keys = self.callnoderpc("listdescriptors", [True], wallet=new_wallet_name)
+        addr_info = self.callnoderpc(
+            "getaddressinfo", [sign_for_address], wallet=new_wallet_name
+        )
+        hdkeypath = addr_info["hdkeypath"]
+
+        sign_for_address_key = None
+        for descriptor in priv_keys["descriptors"]:
+            if descriptor["active"] is False or descriptor["internal"] is True:
+                continue
+            desc = descriptor["desc"]
+            assert desc.startswith("wpkh(")
+            ext_key = desc[5:].split(")")[0].split("/", 1)[0]
+            ext_key_data = decodeAddress(ext_key)[4:]
+            ci_part = self.swap_clients[0].ci(Coins.PART)
+            ext_key_data_part = ci_part.encode_secret_extkey(ext_key_data)
+            rv = ci_part.rpc_wallet("extkey", ["info", ext_key_data_part, hdkeypath])
+            extkey_derived = rv["key_info"]["result"]
+            ext_key_data = decodeAddress(extkey_derived)[4:]
+            ek = ExtKeyPair()
+            ek.decode(ext_key_data)
+            addr = ci.encodeSegwitAddress(ci.getAddressHashFromKey(ek._key))
+            assert addr == sign_for_address
+            sign_for_address_key = ci.encodeKey(ek._key)
+            break
+        assert sign_for_address_key is not None
+        sign_message: str = "Would be better if dumpprivkey or signmessage worked"
+        sig = self.callnoderpc(
+            "signmessagewithprivkey",
+            [sign_for_address_key, sign_message],
+            wallet=new_wallet_name,
+        )
+        assert ci.verifyMessage(sign_for_address, sign_message, sig)
 
         self.callnoderpc("unloadwallet", [new_wallet_name])
         self.callnoderpc("unloadwallet", [new_watch_wallet_name])

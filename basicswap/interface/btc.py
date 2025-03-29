@@ -1862,20 +1862,70 @@ class BTCInterface(Secp256k1Interface):
             "Could not find address with enough funds for proof",
         )
 
-        self._log.debug("sign_for_addr %s", sign_for_addr)
+        self._log.debug(f"sign_for_addr {sign_for_addr}")
 
+        funds_addr: str = sign_for_addr
         if (
             self.using_segwit()
         ):  # TODO: Use isSegwitAddress when scantxoutset can use combo
             # 'Address does not refer to key' for non p2pkh
             pkh = self.decodeAddress(sign_for_addr)
             sign_for_addr = self.pkh_to_address(pkh)
-            self._log.debug("sign_for_addr converted %s", sign_for_addr)
+            self._log.debug(f"sign_for_addr converted {sign_for_addr}")
 
-        signature = self.rpc_wallet(
-            "signmessage",
-            [sign_for_addr, sign_for_addr + "_swap_proof_" + extra_commit_bytes.hex()],
-        )
+        if self._use_descriptors:
+            # https://github.com/bitcoin/bitcoin/issues/10542
+            # https://github.com/bitcoin/bitcoin/issues/26046
+            priv_keys = self.rpc_wallet(
+                "listdescriptors",
+                [
+                    True,
+                ],
+            )
+            addr_info = self.rpc_wallet(
+                "getaddressinfo",
+                [
+                    funds_addr,
+                ],
+            )
+            hdkeypath = addr_info["hdkeypath"]
+
+            sign_for_address_key = None
+            for descriptor in priv_keys["descriptors"]:
+                if descriptor["active"] is False or descriptor["internal"] is True:
+                    continue
+                desc = descriptor["desc"]
+                assert desc.startswith("wpkh(")
+                ext_key = desc[5:].split(")")[0].split("/", 1)[0]
+                ext_key_data = decodeAddress(ext_key)[4:]
+                ci_part = self._sc.ci(Coins.PART)
+                ext_key_data_part = ci_part.encode_secret_extkey(ext_key_data)
+                rv = ci_part.rpc_wallet(
+                    "extkey", ["info", ext_key_data_part, hdkeypath]
+                )
+                extkey_derived = rv["key_info"]["result"]
+                ext_key_data = decodeAddress(extkey_derived)[4:]
+                ek = ExtKeyPair()
+                ek.decode(ext_key_data)
+                sign_for_address_key = self.encodeKey(ek._key)
+                break
+            assert sign_for_address_key is not None
+            signature = self.rpc(
+                "signmessagewithprivkey",
+                [
+                    sign_for_address_key,
+                    sign_for_addr + "_swap_proof_" + extra_commit_bytes.hex(),
+                ],
+            )
+            del priv_keys
+        else:
+            signature = self.rpc_wallet(
+                "signmessage",
+                [
+                    sign_for_addr,
+                    sign_for_addr + "_swap_proof_" + extra_commit_bytes.hex(),
+                ],
+            )
 
         prove_utxos = []  # TODO: Send specific utxos
         return (sign_for_addr, signature, prove_utxos)
