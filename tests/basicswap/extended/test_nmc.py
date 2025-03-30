@@ -58,6 +58,7 @@ NMC_USE_DESCRIPTORS = toBool(os.getenv("NMC_USE_DESCRIPTORS", True))
 
 NMC_BASE_PORT = 8136
 NMC_BASE_RPC_PORT = 8146
+NMC_BASE_TOR_PORT = 8156
 
 
 def prepareNMCDataDir(datadir, nodeId, conf_file="namecoin.conf"):

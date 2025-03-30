@@ -220,7 +220,7 @@ const ApiManager = (function() {
                             .filter(coin => coin.usesCoinGecko)
                             .map(coin => coin.name)
                             .join(',') :
-                        'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred';
+                        'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin';
 
                     //console.log('Fetching coin prices for:', coins);
                     const response = await this.fetchCoinPrices(coins);
@@ -254,7 +254,7 @@ const ApiManager = (function() {
                             .filter(coin => coin.usesCoinGecko)
                             .map(coin => getCoinBackendId ? getCoinBackendId(coin.name) : coin.name)
                             .join(',') :
-                        'bitcoin,monero,particl,bitcoin-cash,pivx,firo,dash,litecoin,dogecoin,decred';
+                        'bitcoin,monero,particl,bitcoin-cash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin';
 
                     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coins}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`;
 

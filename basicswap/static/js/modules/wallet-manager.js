@@ -35,6 +35,7 @@ const WalletManager = (function() {
       'Dash': 'DASH',
       'PIVX': 'PIVX',
       'Decred': 'DCR',
+      'Namecoin': 'NMC',
       'Bitcoin Cash': 'BCH'
     },
 
@@ -49,6 +50,7 @@ const WalletManager = (function() {
       'DASH': 'dash',
       'PIVX': 'pivx',
       'DCR': 'dcr',
+      'NMC': 'nmc',
       'BCH': 'bch'
     },
 
@@ -63,6 +65,7 @@ const WalletManager = (function() {
       'Dash': 'DASH',
       'PIVX': 'PIVX',
       'Decred': 'DCR',
+      'Namecoin': 'NMC',
       'Bitcoin Cash': 'BCH',
       'Dogecoin': 'DOGE'
     }

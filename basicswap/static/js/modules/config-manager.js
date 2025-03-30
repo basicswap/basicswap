@@ -72,6 +72,7 @@ const ConfigManager = (function() {
             { symbol: 'LTC', name: 'litecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
             { symbol: 'DOGE', name: 'dogecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
             { symbol: 'DCR', name: 'decred', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
+            { symbol: 'NMC', name: 'namecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
             { symbol: 'WOW', name: 'wownero', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 }
         ],
 
@@ -88,6 +89,7 @@ const ConfigManager = (function() {
                 'Zcoin': 'FIRO',
                 'Dash': 'DASH',
                 'Decred': 'DCR',
+                'Namecoin': 'NMC',
                 'Wownero': 'WOW',
                 'Bitcoin Cash': 'BCH',
                 'Dogecoin': 'DOGE'
@@ -105,13 +107,14 @@ const ConfigManager = (function() {
                 'Zcoin': 'Firo',
                 'Dash': 'Dash',
                 'Decred': 'Decred',
+                'Namecoin': 'Namecoin',
                 'Wownero': 'Wownero',
                 'Bitcoin Cash': 'Bitcoin Cash',
                 'Dogecoin': 'Dogecoin'
             },
 
             idToName: {
-                1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred',
+                1: 'particl', 2: 'bitcoin', 3: 'litecoin', 4: 'decred', 5: 'namecoin',
                 6: 'monero', 7: 'particl blind', 8: 'particl anon',
                 9: 'wownero', 11: 'pivx', 13: 'firo', 17: 'bitcoincash',
                 18: 'dogecoin'
@@ -130,6 +133,7 @@ const ConfigManager = (function() {
                 'litecoin': 'litecoin',
                 'dogecoin': 'dogecoin',
                 'decred': 'decred',
+                'namecoin': 'namecoin',
                 'wownero': 'wownero'
             }
         },
@@ -367,6 +371,7 @@ const ConfigManager = (function() {
                 'dash': { usd: null, btc: null },
                 'dogecoin': { usd: null, btc: null },
                 'decred': { usd: null, btc: null },
+                'namecoin': { usd: null, btc: null },
                 'litecoin': { usd: null, btc: null },
                 'particl': { usd: null, btc: null },
                 'pivx': { usd: null, btc: null },

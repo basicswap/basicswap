@@ -10,6 +10,7 @@ const COIN_NAME_TO_SYMBOL = {
     'Firo': 'FIRO',
     'Dash': 'DASH',
     'Decred': 'DCR',
+    'Namecoin': 'NMC',
     'Wownero': 'WOW',
     'Bitcoin Cash': 'BCH',
     'Dogecoin': 'DOGE'
@@ -335,13 +336,13 @@ const createBidTableRow = async (bid) => {
                         </a>
                     </div>
                     <div class="monospace text-xs text-gray-500 dark:text-gray-300">
-                        <span class="font-semibold">Offer ID:</span> 
+                        <span class="font-semibold">Offer ID:</span>
                         <a href="/offer/${bid.offer_id}" data-tooltip-target="tooltip-offer-${uniqueId}" class="hover:underline">
                             ${formatAddress(bid.offer_id)}
                         </a>
                     </div>
                     <div class="monospace text-xs text-gray-500 dark:text-gray-300">
-                        <span class="font-semibold">Bid ID:</span> 
+                        <span class="font-semibold">Bid ID:</span>
                         <a href="/bid/${bid.bid_id}" data-tooltip-target="tooltip-bid-${uniqueId}" class="hover:underline">
                             ${formatAddress(bid.bid_id)}
                         </a>
@@ -366,8 +367,8 @@ const createBidTableRow = async (bid) => {
                 <div class="py-3 px-4 text-center">
                     <div class="flex items-center justify-center">
                         <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-                            <img class="h-12" 
-                                 src="/static/images/coins/${bid.coin_from.replace(' ', '-')}.png" 
+                            <img class="h-12"
+                                 src="/static/images/coins/${bid.coin_from.replace(' ', '-')}.png"
                                  alt="${bid.coin_from}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
@@ -375,15 +376,14 @@ const createBidTableRow = async (bid) => {
                             <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z"></path>
                         </svg>
                         <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                            <img class="h-12" 
-                                 src="/static/images/coins/${bid.coin_to.replace(' ', '-')}.png" 
+                            <img class="h-12"
+                                 src="/static/images/coins/${bid.coin_to.replace(' ', '-')}.png"
                                  alt="${bid.coin_to}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
                     </div>
                 </div>
             </td>
-            
             <!-- You Get Column -->
             <td class="py-0">
                 <div class="py-3 px-4 text-right">
@@ -410,7 +410,7 @@ const createBidTableRow = async (bid) => {
 
             <!-- Actions Column -->
             <td class="py-3 px-4 text-center">
-                <a href="/bid/${bid.bid_id}/accept" 
+                <a href="/bid/${bid.bid_id}/accept"
                    class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200">
                     Accept
                 </a>
@@ -506,13 +506,13 @@ const createDetailsColumn = (bid, identity, uniqueId) => `
                 </a>
             </div>
             <div class="monospace text-xs text-gray-500 dark:text-gray-300">
-                <span class="font-semibold">Offer ID:</span> 
+                <span class="font-semibold">Offer ID:</span>
                 <a href="/offer/${bid.offer_id}" data-tooltip-target="tooltip-offer-${uniqueId}" class="hover:underline">
                     ${formatAddress(bid.offer_id)}
                 </a>
             </div>
             <div class="monospace text-xs text-gray-500 dark:text-gray-300">
-                <span class="font-semibold">Bid ID:</span> 
+                <span class="font-semibold">Bid ID:</span>
                 <a href="/bid/${bid.bid_id}" data-tooltip-target="tooltip-bid-${uniqueId}" class="hover:underline">
                     ${formatAddress(bid.bid_id)}
                 </a>

@@ -117,7 +117,9 @@ known_coins = {
     "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
 }
 
-disabled_coins = ["navcoin"]
+disabled_coins = [
+    "navcoin",
+]
 
 expected_key_ids = {
     "tecnovert": ("13F13651C9CF0D6B",),
@@ -207,6 +209,7 @@ DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).
 
 NMC_RPC_HOST = os.getenv("NMC_RPC_HOST", "127.0.0.1")
 NMC_RPC_PORT = int(os.getenv("NMC_RPC_PORT", 19698))
+NMC_PORT = int(os.getenv("NMC_PORT", 8134))
 NMC_ONION_PORT = int(os.getenv("NMC_ONION_PORT", 9698))
 NMC_RPC_USER = os.getenv("NMC_RPC_USER", "")
 NMC_RPC_PWD = os.getenv("NMC_RPC_PWD", "")
@@ -1349,6 +1352,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         fp.write("printtoconsole=0\n")
         fp.write("daemon=0\n")
         fp.write(f"wallet={wallet_name}\n")
+        if "watch_wallet_name" in core_settings:
+            fp.write("wallet={}\n".format(core_settings["watch_wallet_name"]))
 
         if tor_control_password is not None:
             writeTorSettings(fp, coin, core_settings, tor_control_password)
@@ -1408,6 +1413,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write("deprecatedrpc=create_bdb\n")
             fp.write("addresstype=bech32\n")
             fp.write("changetype=bech32\n")
+            fp.write("fallbackfee=0.001\n")  # minrelaytxfee
         elif coin == "pivx":
             params_dir = os.path.join(data_dir, "pivx-params")
             downloadPIVXParams(params_dir)
@@ -2391,22 +2397,6 @@ def main():
             "core_version_no": getKnownVersion("bitcoin"),
             "core_version_group": 28,
         },
-        "bitcoincash": {
-            "connection_type": "rpc",
-            "manage_daemon": shouldManageDaemon("BCH"),
-            "rpchost": BCH_RPC_HOST,
-            "rpcport": BCH_RPC_PORT + port_offset,
-            "onionport": BCH_ONION_PORT + port_offset,
-            "datadir": os.getenv("BCH_DATA_DIR", os.path.join(data_dir, "bitcoincash")),
-            "bindir": os.path.join(bin_dir, "bitcoincash"),
-            "port": BCH_PORT + port_offset,
-            "config_filename": "bitcoin.conf",
-            "use_segwit": False,
-            "blocks_confirmed": 1,
-            "conf_target": 2,
-            "core_version_no": getKnownVersion("bitcoincash"),
-            "core_version_group": 22,
-        },
         "litecoin": {
             "connection_type": "rpc",
             "manage_daemon": shouldManageDaemon("LTC"),
@@ -2421,22 +2411,6 @@ def main():
             "core_version_no": getKnownVersion("litecoin"),
             "core_version_group": 20,
             "min_relay_fee": 0.00001,
-        },
-        "dogecoin": {
-            "connection_type": "rpc",
-            "manage_daemon": shouldManageDaemon("DOGE"),
-            "rpchost": DOGE_RPC_HOST,
-            "rpcport": DOGE_RPC_PORT + port_offset,
-            "onionport": DOGE_ONION_PORT + port_offset,
-            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
-            "bindir": os.path.join(bin_dir, "dogecoin"),
-            "use_segwit": False,
-            "use_csv": False,
-            "blocks_confirmed": 2,
-            "conf_target": 2,
-            "core_version_no": getKnownVersion("dogecoin"),
-            "core_version_group": 23,
-            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
         "decred": {
             "connection_type": "rpc",
@@ -2468,6 +2442,7 @@ def main():
             "onionport": NMC_ONION_PORT + port_offset,
             "datadir": os.getenv("NMC_DATA_DIR", os.path.join(data_dir, "namecoin")),
             "bindir": os.path.join(bin_dir, "namecoin"),
+            "port": NMC_PORT + port_offset,
             "use_segwit": True,
             "use_csv": True,
             "blocks_confirmed": 1,
@@ -2497,6 +2472,28 @@ def main():
             "walletrpctimeoutlong": 600,
             "wallet_config_filename": "monero_wallet.conf",
             "core_version_no": getKnownVersion("monero"),
+            "core_type_group": "xmr",
+        },
+        "wownero": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("WOW"),
+            "manage_wallet_daemon": shouldManageDaemon("WOW_WALLET"),
+            "rpcport": WOW_RPC_PORT + port_offset,
+            "zmqport": WOW_ZMQ_PORT + port_offset,
+            "walletrpcport": WOW_WALLET_RPC_PORT + port_offset,
+            "rpchost": WOW_RPC_HOST,
+            "trusted_daemon": extra_opts.get("trust_remote_node", "auto"),
+            "walletrpchost": WOW_WALLET_RPC_HOST,
+            "walletrpcuser": WOW_WALLET_RPC_USER,
+            "walletrpcpassword": WOW_WALLET_RPC_PWD,
+            "datadir": os.getenv("WOW_DATA_DIR", os.path.join(data_dir, "wownero")),
+            "bindir": os.path.join(bin_dir, "wownero"),
+            "restore_height": wow_restore_height,
+            "blocks_confirmed": 2,
+            "rpctimeout": 60,
+            "walletrpctimeout": 120,
+            "walletrpctimeoutlong": 300,
+            "core_version_no": getKnownVersion("wownero"),
             "core_type_group": "xmr",
         },
         "pivx": {
@@ -2562,27 +2559,37 @@ def main():
             "chain_lookups": "local",
             "startup_tries": 40,
         },
-        "wownero": {
+        "bitcoincash": {
             "connection_type": "rpc",
-            "manage_daemon": shouldManageDaemon("WOW"),
-            "manage_wallet_daemon": shouldManageDaemon("WOW_WALLET"),
-            "rpcport": WOW_RPC_PORT + port_offset,
-            "zmqport": WOW_ZMQ_PORT + port_offset,
-            "walletrpcport": WOW_WALLET_RPC_PORT + port_offset,
-            "rpchost": WOW_RPC_HOST,
-            "trusted_daemon": extra_opts.get("trust_remote_node", "auto"),
-            "walletrpchost": WOW_WALLET_RPC_HOST,
-            "walletrpcuser": WOW_WALLET_RPC_USER,
-            "walletrpcpassword": WOW_WALLET_RPC_PWD,
-            "datadir": os.getenv("WOW_DATA_DIR", os.path.join(data_dir, "wownero")),
-            "bindir": os.path.join(bin_dir, "wownero"),
-            "restore_height": wow_restore_height,
+            "manage_daemon": shouldManageDaemon("BCH"),
+            "rpchost": BCH_RPC_HOST,
+            "rpcport": BCH_RPC_PORT + port_offset,
+            "onionport": BCH_ONION_PORT + port_offset,
+            "datadir": os.getenv("BCH_DATA_DIR", os.path.join(data_dir, "bitcoincash")),
+            "bindir": os.path.join(bin_dir, "bitcoincash"),
+            "port": BCH_PORT + port_offset,
+            "config_filename": "bitcoin.conf",
+            "use_segwit": False,
+            "blocks_confirmed": 1,
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("bitcoincash"),
+            "core_version_group": 22,
+        },
+        "dogecoin": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("DOGE"),
+            "rpchost": DOGE_RPC_HOST,
+            "rpcport": DOGE_RPC_PORT + port_offset,
+            "onionport": DOGE_ONION_PORT + port_offset,
+            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
+            "bindir": os.path.join(bin_dir, "dogecoin"),
+            "use_segwit": False,
+            "use_csv": False,
             "blocks_confirmed": 2,
-            "rpctimeout": 60,
-            "walletrpctimeout": 120,
-            "walletrpctimeoutlong": 300,
-            "core_version_no": getKnownVersion("wownero"),
-            "core_type_group": "xmr",
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("dogecoin"),
+            "core_version_group": 23,
+            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
     }
 

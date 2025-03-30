@@ -60,6 +60,7 @@ from tests.basicswap.common_xmr import (
     prepare_nodes,
     XMR_BASE_RPC_PORT,
     DOGE_BASE_RPC_PORT,
+    NMC_BASE_RPC_PORT,
 )
 from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
@@ -73,12 +74,13 @@ UI_PORT = 12700 + PORT_OFS
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv("BITCOIN_RPC_PORT_BASE", BTC_BASE_RPC_PORT))
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
-DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT))
+DECRED_WALLET_RPC_PORT_BASE = int(os.getenv("DECRED_WALLET_RPC_PORT_BASE", 9210))
+NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
+XMR_BASE_RPC_PORT = int(os.getenv("XMR_BASE_RPC_PORT", XMR_BASE_RPC_PORT))
 BITCOINCASH_RPC_PORT_BASE = int(
     os.getenv("BITCOINCASH_RPC_PORT_BASE", BCH_BASE_RPC_PORT)
 )
-DECRED_WALLET_RPC_PORT_BASE = int(os.getenv("DECRED_WALLET_RPC_PORT_BASE", 9210))
-XMR_BASE_RPC_PORT = int(os.getenv("XMR_BASE_RPC_PORT", XMR_BASE_RPC_PORT))
+DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT))
 TEST_COINS_LIST = os.getenv("TEST_COINS_LIST", "bitcoin,monero")
 
 NUM_NODES = int(os.getenv("NUM_NODES", 3))
@@ -130,6 +132,17 @@ def calldcrrpc(
     return callrpc_dcr(base_rpc_port + node_id, auth, method, params)
 
 
+def callnmcrpc(
+    node_id,
+    method,
+    params=[],
+    wallet="wallet.dat",
+    base_rpc_port=NAMECOIN_RPC_PORT_BASE + PORT_OFS,
+):
+    auth = "test_nmc_{0}:test_nmc_pwd_{0}".format(node_id)
+    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
+
+
 def callbchrpc(
     node_id,
     method,
@@ -163,6 +176,8 @@ def updateThread(cls):
                 callbchrpc(0, "generatetoaddress", [1, cls.bch_addr])
             if cls.doge_addr is not None:
                 calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
+            if cls.nmc_addr is not None:
+                callnmcrpc(0, "generatetoaddress", [1, cls.nmc_addr])
         except Exception as e:
             print("updateThread error", str(e))
         cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
@@ -388,6 +403,18 @@ def start_processes(self):
                 0, "generatetoaddress", [num_blocks - have_blocks, self.doge_addr]
             )
 
+    if "namecoin" in TEST_COINS_LIST:
+        self.nmc_addr = callnmcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
+        num_blocks: int = 500
+        have_blocks: int = callnmcrpc(0, "getblockcount")
+        if have_blocks < num_blocks:
+            logging.info(
+                f"Mining {num_blocks - have_blocks} Namecoin blocks to {self.nmc_addr}"
+            )
+            callnmcrpc(
+                0, "generatetoaddress", [num_blocks - have_blocks, self.nmc_addr]
+            )
+
     if RESET_TEST:
         # Lower output split threshold for more stakeable outputs
         for i in range(NUM_NODES):
@@ -444,6 +471,7 @@ class BaseTestWithPrepare(unittest.TestCase):
     dcr_addr = "SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH"
     dcr_acc = None
     doge_addr = None
+    nmc_addr = None
 
     initialised = False
 
