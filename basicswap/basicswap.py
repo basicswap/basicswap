@@ -2665,7 +2665,8 @@ class BasicSwap(BaseApp):
             self.log.warning(msg)
             return False
 
-        expect_seedid = self.getStringKV("main_wallet_seedid_" + ci.coin_name().lower())
+        seed_key: str = "main_wallet_seedid_" + ci.coin_name().lower()
+        expect_seedid: str = self.getStringKV(seed_key)
         if expect_seedid is None:
             self.log.warning(
                 f"Can't find expected wallet seed id for coin {ci.coin_name()}."
@@ -2677,6 +2678,7 @@ class BasicSwap(BaseApp):
                 )
                 root_key = self.getWalletKey(c, 1)
                 self.storeSeedIDForCoin(root_key, c)
+                expect_seedid: str = self.getStringKV(seed_key)
             else:
                 self.log.warning("Node is locked.")
                 return False

@@ -488,6 +488,10 @@ class TestBCH(BasicSwapTest):
         new_wallet_name = random.randbytes(10).hex()
         self.callnoderpc("createwallet", [new_wallet_name])
         self.callnoderpc("sethdseed", [True, test_wif], wallet=new_wallet_name)
+
+        wi = self.callnoderpc("getwalletinfo", wallet=new_wallet_name)
+        assert wi["hdseedid"] == "3da5c0af91879e8ce97d9a843874601c08688078"
+
         addr = self.callnoderpc("getnewaddress", wallet=new_wallet_name)
         self.callnoderpc("unloadwallet", [new_wallet_name])
         assert addr == "bchreg:qqxr67wf5ltty5jvm44zryywmpt7ntdaa50carjt59"
