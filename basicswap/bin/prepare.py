@@ -944,7 +944,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 % (version, assert_filename)
             )
         elif coin == "namecoin":
-            release_url = f"https://beta.namecoin.org/files/namecoin-core/namecoin-core-{version}/{release_filename}"
+            release_url = f"https://www.namecoin.org/files/namecoin-core/namecoin-core-{version}/{release_filename}"
             signing_key = "Rose%20Turing"
             assert_filename = "noncodesigned.SHA256SUMS"
             assert_url = f"https://raw.githubusercontent.com/namecoin/guix.sigs/main/{version}/{signing_key}/{assert_filename}"
