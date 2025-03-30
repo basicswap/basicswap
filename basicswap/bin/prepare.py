@@ -122,23 +122,29 @@ disabled_coins = [
 ]
 
 expected_key_ids = {
-    "tecnovert": ("13F13651C9CF0D6B",),
-    "thrasher": ("FE3348877809386C",),
-    "laanwj": ("1E4AED62986CD25D",),
-    "JeremyRand": ("2DBE339E29F6294C",),
-    "RoseTuring": ("9FE3BFDDA6C53495",),
-    "binaryfate": ("F0AF4D462A0BDF92",),
-    "wowario": ("793504B449C69220",),
-    "davidburkett38": ("3620E9D387E55666",),
-    "xanimo": ("6E8F17C1B1BCDCBE",),
-    "patricklodder": ("2D3A345B98D0DC1F",),
-    "fuzzbawls": ("C1ABA64407731FD9",),
-    "pasta": ("52527BEDABE87984", "E2F3D7916E722D38"),
-    "reuben": ("1290A1D0FA7EE109",),
-    "nav_builder": ("2782262BF6E7FADB",),
-    "nicolasdorier": ("6618763EF09186FE", "223FDA69DEBEA82D", "62FE85647DEDDA2E"),
-    "decred_release": ("6D897EDF518A031D",),
-    "Calin_Culianu": ("21810A542031C02C",),
+    "tecnovert": ("8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B",),
+    "thrasher": ("59CAF0E96F23F53747945FD4FE3348877809386C",),
+    "laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",),
+    "RoseTuring": ("FD8366A807A99FA27FD9CCEA9FE3BFDDA6C53495",),
+    "binaryfate": ("81AC591FE9C4B65C5806AFC3F0AF4D462A0BDF92",),
+    "wowario": ("AB3A2F725818FCFF2794841C793504B449C69220",),
+    "davidburkett38": ("D35621D53A1CC6A3456758D03620E9D387E55666",),
+    "xanimo": ("2EAA8B1021C71AD5186CA07F6E8F17C1B1BCDCBE",),
+    "patricklodder": ("DC6EF4A8BF9F1B1E4DE1EE522D3A345B98D0DC1F",),
+    "fuzzbawls": ("0CFBDA9F60D661BA31EB5D50C1ABA64407731FD9",),
+    "pasta": (
+        "29590362EC878A81FD3C202B52527BEDABE87984",
+        "02B8E7D002167C8B451AF05FE2F3D7916E722D38",
+    ),
+    "reuben": ("0186454D63E83D85EF91DE4E1290A1D0FA7EE109",),
+    "nav_builder": ("1BF9B51BAED51BA0B3A174EE2782262BF6E7FADB",),
+    "nicolasdorier": (
+        "AB4CFA9895ACA0DBE27F6B346618763EF09186FE",
+        "015B4C837B245509E4AC8995223FDA69DEBEA82D",
+        "7121BDE3555D9BE06BDDC68162FE85647DEDDA2E",
+    ),
+    "decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",),
+    "Calin_Culianu": ("D465135F97D0047E18E99DC321810A542031C02C",),
 }
 
 USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
@@ -541,7 +547,7 @@ def testOnionLink():
 
 def havePubkey(gpg, key_id):
     for key in gpg.list_keys():
-        if key["keyid"] == key_id:
+        if key["fingerprint"] == key_id:
             return True
     return False
 
@@ -604,8 +610,10 @@ def ensureValidSignatureBy(result, signing_key_name):
     if not isValidSignature(result):
         raise ValueError("Signature verification failed.")
 
-    if result.key_id not in expected_key_ids[signing_key_name]:
-        raise ValueError("Signature made by unexpected keyid: " + result.key_id)
+    if result.fingerprint not in expected_key_ids[signing_key_name]:
+        raise ValueError(
+            "Signature made by unexpected key fingerprint: " + result.fingerprint
+        )
 
     logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
 
@@ -2091,7 +2099,10 @@ def check_btc_fastsync_data(base_dir, sync_filename):
         importPubkey(gpg, pubkey_filename, pubkeyurls)
     with open(asc_file_path, "rb") as fp:
         verified = gpg.verify_file(fp)
-    if isValidSignature(verified) and verified.key_id in expected_key_ids["tecnovert"]:
+    if (
+        isValidSignature(verified)
+        and verified.fingerprint in expected_key_ids["tecnovert"]
+    ):
         ensureValidSignatureBy(verified, "tecnovert")
     else:
         pubkey_filename = "nicolasdorier.asc"
