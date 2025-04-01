@@ -707,7 +707,7 @@ class BasicSwap(BaseApp):
     def getXMRTrustedDaemon(self, coin, node_host: str) -> bool:
         coin = Coins(coin)  # Errors for invalid coin value
         chain_client_settings = self.getChainClientSettings(coin)
-        trusted_daemon_setting = chain_client_settings.get("trusted_daemon", "auto")
+        trusted_daemon_setting = chain_client_settings.get("trusted_daemon", True)
         self.log.debug(
             f"'trusted_daemon' setting for {getCoinName(coin)}: {trusted_daemon_setting}."
         )
