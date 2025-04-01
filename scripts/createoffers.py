@@ -18,6 +18,7 @@ Create offers
     "prune_state_delay": Seconds between pruning old state data, set to 0 to disable pruning.
     "main_loop_delay": Seconds between main loop iterations.
     "prune_state_after_seconds": Seconds to keep old state data for.
+    "auth": Basicswap API auth string, e.g., "admin:password". Ignored if client auth is not enabled.
     "offers": [
         {
             "name": Offer template name, eg "Offer 0", will be automatically renamed if not unique.
@@ -74,6 +75,8 @@ import threading
 import time
 import traceback
 import urllib
+import urllib.error
+import base64
 from urllib.request import urlopen
 
 delay_event = threading.Event()
@@ -85,29 +88,113 @@ DEFAULT_CONFIG_FILE: str = "createoffers.json"
 DEFAULT_STATE_FILE: str = "createoffers_state.json"
 
 
-def post_req(url: str, json_data=None):
+def post_req(url: str, json_data=None, auth_header_val=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    if auth_header_val:
+        req.add_header("Authorization", auth_header_val)
     if json_data:
         req.add_header("Content-Type", "application/json; charset=utf-8")
         post_bytes = json.dumps(json_data).encode("utf-8")
         req.add_header("Content-Length", len(post_bytes))
     else:
         post_bytes = None
-    return urlopen(req, data=post_bytes, timeout=300).read()
+    return urlopen(req, data=post_bytes, timeout=300)
 
 
-def make_json_api_func(host: str, port: int):
+def make_json_api_func(host: str, port: int, auth_string: str = None):
     host = host
     port = port
+    _auth_header_val = None
+    _auth_required_confirmed = False
+    if auth_string:
+        try:
+            if auth_string and ":" in auth_string:
+                try:
+                    auth_bytes = auth_string.encode("utf-8")
+                    _auth_header_val = "Basic " + base64.b64encode(auth_bytes).decode(
+                        "ascii"
+                    )
+                except Exception as e:
+                    print(
+                        f"Warning: Could not process auth string '{auth_string}': {e}"
+                    )
+                    _auth_header_val = None
+            elif auth_string:
+                print(
+                    "Warning: Auth string is not in 'username:password' format. Ignoring."
+                )
+        except Exception as e:
+            print(f"Error processing authentication: {e}")
 
     def api_func(path=None, json_data=None, timeout=300):
+        nonlocal _auth_required_confirmed
         url = f"http://{host}:{port}/json"
         if path is not None:
             url += "/" + path
-        if json_data is not None:
-            return json.loads(post_req(url, json_data))
-        response = urlopen(url, timeout=300).read()
-        return json.loads(response)
+
+        current_auth_header = _auth_header_val if _auth_required_confirmed else None
+
+        try:
+            if json_data is not None:
+                response_obj = post_req(
+                    url, json_data, auth_header_val=current_auth_header
+                )
+            else:
+                headers = {"User-Agent": "Mozilla/5.0"}
+                if current_auth_header:
+                    headers["Authorization"] = current_auth_header
+                req = urllib.request.Request(url, headers=headers)
+                response_obj = urlopen(req, timeout=timeout)
+
+            response_bytes = response_obj.read()
+            return json.loads(response_bytes)
+
+        except urllib.error.HTTPError as e:
+            if e.code == 401 and not _auth_required_confirmed:
+                if _auth_header_val:
+                    print(
+                        "Server requires authentication, retrying with credentials..."
+                    )
+                    _auth_required_confirmed = True
+                    try:
+                        if json_data is not None:
+                            response_obj = post_req(
+                                url, json_data, auth_header_val=_auth_header_val
+                            )
+                        else:
+                            headers = {
+                                "User-Agent": "Mozilla/5.0",
+                                "Authorization": _auth_header_val,
+                            }
+                            req = urllib.request.Request(url, headers=headers)
+                            response_obj = urlopen(req, timeout=timeout)
+                        response_bytes = response_obj.read()
+                        return json.loads(response_bytes)
+                    except urllib.error.HTTPError as retry_e:
+                        if retry_e.code == 401:
+                            raise ValueError(
+                                "Authentication failed: Invalid credentials provided in 'auth' key."
+                            )
+                        else:
+                            print(f"Error during authenticated API request: {retry_e}")
+                            raise retry_e
+                    except Exception as retry_e:
+                        print(f"Error during authenticated API request: {retry_e}")
+                        raise retry_e
+                else:
+                    raise ValueError(
+                        "Server requires authentication (401), but no 'auth' key found or properly formatted in config file."
+                    )
+            else:
+                if e.code == 401 and _auth_required_confirmed:
+                    raise ValueError(
+                        "Authentication failed: Invalid credentials provided in 'auth' key."
+                    )
+                else:
+                    raise e
+        except Exception as e:
+            print(f"Error during API connection: {e}")
+            raise e
 
     return api_func
 
@@ -820,14 +907,50 @@ def main():
     )
     args = parser.parse_args()
 
-    read_json_api = make_json_api_func(args.host, args.port)
-
     if not os.path.exists(args.configfile):
         raise ValueError(f'Config file "{args.configfile}" not found.')
+    try:
+        with open(args.configfile) as fs:
+            initial_config = json.load(fs)
+    except Exception as e:
+        print(f"Error reading config file {args.configfile}: {e}")
+        sys.exit(1)
 
-    known_coins = read_json_api("coins")
-    for known_coin in known_coins:
-        coins_map[known_coin["name"]] = known_coin
+    auth_info = initial_config.get("auth")
+
+    read_json_api = make_json_api_func(args.host, args.port, auth_info)
+    wallet_api_port_override = initial_config.get("wallet_port_override")
+    if wallet_api_port_override:
+        read_json_api_wallet_auth = make_json_api_func(
+            args.host, int(wallet_api_port_override), auth_info
+        )
+    else:
+        read_json_api_wallet_auth = read_json_api_wallet
+
+    try:
+        print("Checking API connection...")
+        known_coins = read_json_api("coins")
+        for known_coin in known_coins:
+            coins_map[known_coin["name"]] = known_coin
+        print("API connection successful.")
+    except ValueError as e:
+        print(f"\nError: {e}")
+        print(
+            'Please ensure the \'auth\' key in your config file is correct (e.g., "auth": "username:password")'
+        )
+        sys.exit(1)
+    except urllib.error.URLError as e:
+        print(
+            f"\nError: Could not connect to Basicswap API at http://{args.host}:{args.port}"
+        )
+        print(f"Reason: {e.reason}")
+        print("Please ensure Basicswap is running and accessible.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\nError during initial API connection: {e}")
+        if args.debug:
+            traceback.print_exc()
+        sys.exit(1)
 
     script_state = {}
     if os.path.exists(args.statefile):
@@ -843,7 +966,7 @@ def main():
         if "wallet_port_override" in config:
             wallet_api_port = int(config["wallet_port_override"])
             print(f"Overriding wallet api port: {wallet_api_port}")
-            read_json_api_wallet = make_json_api_func(args.host, wallet_api_port)
+            read_json_api_wallet = read_json_api_wallet_auth
         else:
             read_json_api_wallet = read_json_api
 

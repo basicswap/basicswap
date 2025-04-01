@@ -66,6 +66,10 @@ Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bi
 Append `--usebtcfastsync` to the below command to optionally initialise the Bitcoin datadir with a chain snapshot from btcpayserver FastSync.<br>
 [FastSync README.md](https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md)
 
+##### FastSync
+
+Append `--client-auth-password=<YOUR_PASSWORD>` to the below command to optionally enable client authentication to protect your web UI from unauthorized access.<br>
+
 
 Setup with a local Monero daemon (recommended):
 
@@ -200,7 +204,7 @@ Prepare the datadir:
     OR using a remote/public XMR daemon (not recommended):
     XMR_RPC_HOST="node.xmr.to" XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
-
+Append `--client-auth-password=<YOUR_PASSWORD>` to the above command to optionally enable client authentication to protect your web UI from unauthorized access.<br>
 Record the mnemonic from the output of the above command.
 
 Start Basicswap:

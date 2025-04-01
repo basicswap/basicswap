@@ -1,0 +1,72 @@
+{% from 'style.html' import circular_error_messages_svg %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
+    <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
+    <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
+    <script>
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
+    <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
+    <title>(BSX) BasicSwap - Login - v{{ version }}</title>
+</head>
+<body class="dark:bg-gray-700">
+    <section class="py-24 md:py-32">
+        <div class="container px-4 mx-auto">
+            <div class="max-w-sm mx-auto">
+                <div class="mb-6 text-center">
+                     <a class="inline-block mb-6" href="#">
+                       <img src="/static/images/logos/basicswap-logo.svg" class="h-20 imageshow dark-image" style="display: none;">
+                       <img src="/static/images/logos/basicswap-logo-dark.svg" class="h-20 imageshow light-image" style="display: block;">
+                     </a>
+                    <h3 class="mb-4 text-2xl md:text-3xl font-bold dark:text-white">Login Required</h3>
+                    <p class="text-lg text-coolGray-500 font-medium dark:text-gray-300">Please enter the password to access BasicSwap.</p>
+                </div>
+
+                {% for m in err_messages %}
+                <section class="py-4" id="err_messages_{{ m[0] }}" role="alert">
+                  <div class="container px-4 mx-auto">
+                    <div class="p-4 text-red-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-600 dark:text-red-300 rounded-md">
+                      <div class="flex flex-wrap items-center -m-1">
+                        <div class="w-auto p-1"> {{ circular_error_messages_svg | safe }} </div>
+                        <p class="ml-2 font-medium text-sm">{{ m[1] }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                {% endfor %}
+
+                <form method="post" action="/login" autocomplete="off">
+                    <div class="mb-6">
+                        <label class="block mb-2 text-coolGray-800 font-medium dark:text-white" for="password">Password</label>
+                        <input class="appearance-none block w-full p-3 leading-5 text-coolGray-900 border border-coolGray-200 rounded-lg shadow-md placeholder-coolGray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                               type="password" name="password" id="password" required autocomplete="current-password">
+                    </div>
+                    <button class="inline-block py-3 px-7 mb-6 w-full text-base text-blue-50 font-medium text-center leading-6 bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
+                            type="submit">Login</button>
+                     <p class="text-center">
+                       <span class="text-xs font-medium text-coolGray-500 dark:text-gray-500">{{ title }}</span>
+                     </p>
+                </form>
+            </div>
+        </div>
+    </section>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        function toggleImages() {
+          const isDark = document.documentElement.classList.contains('dark');
+          const darkImages = document.querySelectorAll('.dark-image');
+          const lightImages = document.querySelectorAll('.light-image');
+          darkImages.forEach(img => img.style.display = isDark ? 'block' : 'none');
+          lightImages.forEach(img => img.style.display = isDark ? 'none' : 'block');
+        }
+        toggleImages();
+      });
+    </script>
+</body>
+</html>
