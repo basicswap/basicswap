@@ -1062,6 +1062,7 @@ async function updateOffersTable() {
         requestAnimationFrame(() => {
             updateRowTimes();
             updatePaginationControls(Math.ceil(validOffers.length / itemsPerPage));
+            updateProfitLossDisplays();
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
@@ -2283,6 +2284,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             requestAnimationFrame(() => {
                 updateOffersTable();
                 updatePaginationInfo();
+                updateProfitLossDisplays();
             });
         } catch (error) {
             console.error('[Debug] Error processing WebSocket message:', error);
