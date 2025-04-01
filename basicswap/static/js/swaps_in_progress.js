@@ -10,6 +10,7 @@ const COIN_NAME_TO_SYMBOL = {
     'Firo': 'FIRO',
     'Dash': 'DASH',
     'Decred': 'DCR',
+    'Namecoin': 'NMC',
     'Wownero': 'WOW',
     'Bitcoin Cash': 'BCH',
     'Dogecoin': 'DOGE'
@@ -383,8 +384,8 @@ const createSwapTableRow = async (swap) => {
                 <div class="py-3 px-4 text-center">
                     <div class="flex items-center justify-center">
                         <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
-                            <img class="h-12" 
-                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png" 
+                            <img class="h-12"
+                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png"
                                  alt="${swap.coin_from}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
@@ -392,8 +393,8 @@ const createSwapTableRow = async (swap) => {
                             <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z"></path>
                         </svg>
                         <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                            <img class="h-12" 
-                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png" 
+                            <img class="h-12"
+                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png"
                                  alt="${swap.coin_to}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
@@ -421,7 +422,7 @@ const createSwapTableRow = async (swap) => {
 
             <!-- Actions Column -->
             <td class="py-3 px-4 text-center">
-                <a href="/bid/${swap.bid_id}" 
+                <a href="/bid/${swap.bid_id}"
                    class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200">
                     Details
                 </a>

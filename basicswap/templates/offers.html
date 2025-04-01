@@ -13,7 +13,7 @@
     <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
       <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
       <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-      <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" 
+      <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover"
            src="/static/images/elements/wave.svg" alt="">
       <div class="relative z-20 flex flex-wrap items-center -m-3">
         <div class="w-full md:w-1/2 p-3">
@@ -21,7 +21,7 @@
           <p class="font-normal text-coolGray-200 dark:text-white">{{ page_type_description }}</p>
         </div>
         <div class="w-full md:w-1/2 p-3 flex justify-end items-center hidden">
-          <a id="refresh" href="/newoffer" 
+          <a id="refresh" href="/newoffer"
              class="rounded-full flex items-center justify-center px-4 py-2 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md focus:ring-0 focus:outline-none">
             {{ place_new_offer_svg | safe }}
             <span>Place new Offer</span>
@@ -136,12 +136,13 @@
     'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': false},
     'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Dogecoin.png', 'show': true},
     'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
+    'NMC': {'name': 'Namecoin', 'symbol': 'NMC', 'image': 'Namecoin.png', 'show': true},
     'ZANO': {'name': 'Zano', 'symbol': 'ZANO', 'image': 'Zano.png', 'show': false},
     'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
     }
   %}
-  {% set custom_order = ['BTC', 'ETH', 'XMR', 'PART', 'LTC', 'BCH', 'FIRO', 'PIVX', 'DASH', 'DOGE', 'DCR', 'ZANO', 'WOW'] %}
-  
+  {% set custom_order = ['BTC', 'ETH', 'XMR', 'PART', 'LTC', 'BCH', 'FIRO', 'PIVX', 'DASH', 'DOGE', 'DCR', 'NMC', 'ZANO', 'WOW'] %}
+
   {% if enabled_chart_coins is string %}
     {% if enabled_chart_coins == "" %}
       {% set display_coins = coin_data.keys()|list %}

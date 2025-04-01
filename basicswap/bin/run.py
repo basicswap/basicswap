@@ -265,7 +265,11 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     # As BCH may use port 8334, disable it here.
     # When tor is enabled a bind option for the onionport will be added to bitcoin.conf.
     # https://github.com/bitcoin/bitcoin/blob/master/doc/release-notes/release-notes-28.0.md?plain=1#L84
-    if prepare is False and use_tor_proxy is False and coin_id == Coins.BTC:
+    if (
+        prepare is False
+        and use_tor_proxy is False
+        and coin_id in (Coins.BTC, Coins.NMC)
+    ):
         port: int = coin_settings.get("port", 8333)
         extra_args.append(f"--bind=0.0.0.0:{port}")
     return extra_args

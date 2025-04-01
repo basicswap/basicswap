@@ -52,11 +52,17 @@ PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 
+BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "28.0")
+BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
+
 LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.4")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
-BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "28.0")
-BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
+DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
+DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
+
+NMC_VERSION = os.getenv("NMC_VERSION", "28.0")
+NMC_VERSION_TAG = os.getenv("NMC_VERSION_TAG", "")
 
 MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.3.4")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
@@ -82,9 +88,6 @@ FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 NAV_VERSION = os.getenv("NAV_VERSION", "7.0.3")
 NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
 
-DCR_VERSION = os.getenv("DCR_VERSION", "1.8.1")
-DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
-
 BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "28.0.1")
 BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 
@@ -103,7 +106,7 @@ known_coins = {
     "bitcoin": (BITCOIN_VERSION, BITCOIN_VERSION_TAG, ("laanwj",)),
     "litecoin": (LITECOIN_VERSION, LITECOIN_VERSION_TAG, ("davidburkett38",)),
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
-    "namecoin": ("0.18.0", "", ("JeremyRand",)),
+    "namecoin": (NMC_VERSION, NMC_VERSION_TAG, ("RoseTuring",)),
     "monero": (MONERO_VERSION, MONERO_VERSION_TAG, ("binaryfate",)),
     "wownero": (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ("wowario",)),
     "pivx": (PIVX_VERSION, PIVX_VERSION_TAG, ("fuzzbawls",)),
@@ -116,26 +119,32 @@ known_coins = {
 
 disabled_coins = [
     "navcoin",
-    "namecoin",  # Needs update
 ]
 
 expected_key_ids = {
-    "tecnovert": ("13F13651C9CF0D6B",),
-    "thrasher": ("FE3348877809386C",),
-    "laanwj": ("1E4AED62986CD25D",),
-    "JeremyRand": ("2DBE339E29F6294C",),
-    "binaryfate": ("F0AF4D462A0BDF92",),
-    "wowario": ("793504B449C69220",),
-    "davidburkett38": ("3620E9D387E55666",),
-    "xanimo": ("6E8F17C1B1BCDCBE",),
-    "patricklodder": ("2D3A345B98D0DC1F",),
-    "fuzzbawls": ("C1ABA64407731FD9",),
-    "pasta": ("52527BEDABE87984", "E2F3D7916E722D38"),
-    "reuben": ("1290A1D0FA7EE109",),
-    "nav_builder": ("2782262BF6E7FADB",),
-    "nicolasdorier": ("6618763EF09186FE", "223FDA69DEBEA82D", "62FE85647DEDDA2E"),
-    "decred_release": ("6D897EDF518A031D",),
-    "Calin_Culianu": ("21810A542031C02C",),
+    "tecnovert": ("8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B",),
+    "thrasher": ("59CAF0E96F23F53747945FD4FE3348877809386C",),
+    "laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",),
+    "RoseTuring": ("FD8366A807A99FA27FD9CCEA9FE3BFDDA6C53495",),
+    "binaryfate": ("81AC591FE9C4B65C5806AFC3F0AF4D462A0BDF92",),
+    "wowario": ("AB3A2F725818FCFF2794841C793504B449C69220",),
+    "davidburkett38": ("D35621D53A1CC6A3456758D03620E9D387E55666",),
+    "xanimo": ("2EAA8B1021C71AD5186CA07F6E8F17C1B1BCDCBE",),
+    "patricklodder": ("DC6EF4A8BF9F1B1E4DE1EE522D3A345B98D0DC1F",),
+    "fuzzbawls": ("0CFBDA9F60D661BA31EB5D50C1ABA64407731FD9",),
+    "pasta": (
+        "29590362EC878A81FD3C202B52527BEDABE87984",
+        "02B8E7D002167C8B451AF05FE2F3D7916E722D38",
+    ),
+    "reuben": ("0186454D63E83D85EF91DE4E1290A1D0FA7EE109",),
+    "nav_builder": ("1BF9B51BAED51BA0B3A174EE2782262BF6E7FADB",),
+    "nicolasdorier": (
+        "AB4CFA9895ACA0DBE27F6B346618763EF09186FE",
+        "015B4C837B245509E4AC8995223FDA69DEBEA82D",
+        "7121BDE3555D9BE06BDDC68162FE85647DEDDA2E",
+    ),
+    "decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",),
+    "Calin_Culianu": ("D465135F97D0047E18E99DC321810A542031C02C",),
 }
 
 USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
@@ -181,6 +190,36 @@ PART_ONION_PORT = int(os.getenv("PART_ONION_PORT", 51734))
 PART_RPC_USER = os.getenv("PART_RPC_USER", "")
 PART_RPC_PWD = os.getenv("PART_RPC_PWD", "")
 
+BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
+BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
+BTC_PORT = int(os.getenv("BTC_PORT", 8333))
+BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
+BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
+BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
+
+LTC_RPC_HOST = os.getenv("LTC_RPC_HOST", "127.0.0.1")
+LTC_RPC_PORT = int(os.getenv("LTC_RPC_PORT", 19895))
+LTC_ONION_PORT = int(os.getenv("LTC_ONION_PORT", 9333))
+LTC_RPC_USER = os.getenv("LTC_RPC_USER", "")
+LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
+
+DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
+DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
+DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
+DCR_WALLET_RPC_PORT = int(os.getenv("DCR_WALLET_RPC_PORT", 9209))
+DCR_WALLET_PWD = os.getenv(
+    "DCR_WALLET_PWD", random.randbytes(random.randint(14, 18)).hex()
+)
+DCR_RPC_USER = os.getenv("DCR_RPC_USER", "user")
+DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).hex())
+
+NMC_RPC_HOST = os.getenv("NMC_RPC_HOST", "127.0.0.1")
+NMC_RPC_PORT = int(os.getenv("NMC_RPC_PORT", 19698))
+NMC_PORT = int(os.getenv("NMC_PORT", 8134))
+NMC_ONION_PORT = int(os.getenv("NMC_ONION_PORT", 9698))
+NMC_RPC_USER = os.getenv("NMC_RPC_USER", "")
+NMC_RPC_PWD = os.getenv("NMC_RPC_PWD", "")
+
 XMR_RPC_HOST = os.getenv("XMR_RPC_HOST", "127.0.0.1")
 XMR_RPC_PORT = int(os.getenv("XMR_RPC_PORT", 29798))
 XMR_ZMQ_PORT = int(os.getenv("XMR_ZMQ_PORT", 30898))
@@ -202,32 +241,6 @@ WOW_WALLET_RPC_PWD = os.getenv("WOW_WALLET_RPC_PWD", "wow_wallet_pwd")
 WOW_RPC_USER = os.getenv("WOW_RPC_USER", "")
 WOW_RPC_PWD = os.getenv("WOW_RPC_PWD", "")
 DEFAULT_WOW_RESTORE_HEIGHT = int(os.getenv("DEFAULT_WOW_RESTORE_HEIGHT", 450000))
-
-LTC_RPC_HOST = os.getenv("LTC_RPC_HOST", "127.0.0.1")
-LTC_RPC_PORT = int(os.getenv("LTC_RPC_PORT", 19895))
-LTC_ONION_PORT = int(os.getenv("LTC_ONION_PORT", 9333))
-LTC_RPC_USER = os.getenv("LTC_RPC_USER", "")
-LTC_RPC_PWD = os.getenv("LTC_RPC_PWD", "")
-
-BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
-BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
-BTC_PORT = int(os.getenv("BTC_PORT", 8333))
-BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
-BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
-BTC_RPC_PWD = os.getenv("BTC_RPC_PWD", "")
-
-DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
-DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
-DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
-DCR_WALLET_RPC_PORT = int(os.getenv("DCR_WALLET_RPC_PORT", 9209))
-DCR_WALLET_PWD = os.getenv(
-    "DCR_WALLET_PWD", random.randbytes(random.randint(14, 18)).hex()
-)
-DCR_RPC_USER = os.getenv("DCR_RPC_USER", "user")
-DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).hex())
-
-NMC_RPC_HOST = os.getenv("NMC_RPC_HOST", "127.0.0.1")
-NMC_RPC_PORT = int(os.getenv("NMC_RPC_PORT", 19698))
 
 PIVX_RPC_HOST = os.getenv("PIVX_RPC_HOST", "127.0.0.1")
 PIVX_RPC_PORT = int(os.getenv("PIVX_RPC_PORT", 51473))
@@ -373,6 +386,12 @@ def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> 
     wallet_name: str = os.getenv(env_var_name, default_name)
     assert len(wallet_name) > 0
     return wallet_name
+
+
+def getDescriptorWalletOption(coin_params):
+    ticker: str = coin_params["ticker"]
+    default_option: bool = True if ticker in ("NMC",) else False
+    return toBool(os.getenv(ticker + "_USE_DESCRIPTORS", default_option))
 
 
 def getKnownVersion(coin_name: str) -> str:
@@ -528,7 +547,7 @@ def testOnionLink():
 
 def havePubkey(gpg, key_id):
     for key in gpg.list_keys():
-        if key["keyid"] == key_id:
+        if key["fingerprint"] == key_id:
             return True
     return False
 
@@ -591,8 +610,10 @@ def ensureValidSignatureBy(result, signing_key_name):
     if not isValidSignature(result):
         raise ValueError("Signature verification failed.")
 
-    if result.key_id not in expected_key_ids[signing_key_name]:
-        raise ValueError("Signature made by unexpected keyid: " + result.key_id)
+    if result.fingerprint not in expected_key_ids[signing_key_name]:
+        raise ValueError(
+            "Signature made by unexpected key fingerprint: " + result.fingerprint
+        )
 
     logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
 
@@ -931,16 +952,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 % (version, assert_filename)
             )
         elif coin == "namecoin":
-            release_url = "https://beta.namecoin.org/files/namecoin-core/namecoin-core-{}/{}".format(
-                version, release_filename
-            )
-            assert_filename = "{}-{}-{}-build.assert".format(
-                coin, os_name, version.rsplit(".", 1)[0]
-            )
-            assert_url = (
-                "https://raw.githubusercontent.com/namecoin/gitian.sigs/master/%s-%s/%s/%s"
-                % (version, os_dir_name, signing_key_name, assert_filename)
-            )
+            release_url = f"https://www.namecoin.org/files/namecoin-core/namecoin-core-{version}/{release_filename}"
+            signing_key = "Rose%20Turing"
+            assert_filename = "noncodesigned.SHA256SUMS"
+            assert_url = f"https://raw.githubusercontent.com/namecoin/guix.sigs/main/{version}/{signing_key}/{assert_filename}"
         elif coin == "pivx":
             release_filename = "{}-{}-{}.{}".format(coin, version, BIN_ARCH, FILE_EXT)
             release_url = (
@@ -1345,6 +1360,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         fp.write("printtoconsole=0\n")
         fp.write("daemon=0\n")
         fp.write(f"wallet={wallet_name}\n")
+        if "watch_wallet_name" in core_settings:
+            fp.write("wallet={}\n".format(core_settings["watch_wallet_name"]))
 
         if tor_control_password is not None:
             writeTorSettings(fp, coin, core_settings, tor_control_password)
@@ -1401,6 +1418,10 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 )
         elif coin == "namecoin":
             fp.write("prune=2000\n")
+            fp.write("deprecatedrpc=create_bdb\n")
+            fp.write("addresstype=bech32\n")
+            fp.write("changetype=bech32\n")
+            fp.write("fallbackfee=0.001\n")  # minrelaytxfee
         elif coin == "pivx":
             params_dir = os.path.join(data_dir, "pivx-params")
             downloadPIVXParams(params_dir)
@@ -1804,6 +1825,7 @@ def initialise_wallets(
             Coins.DOGE,
             Coins.DCR,
             Coins.DASH,
+            Coins.NMC,
         )
         # Always start Particl, it must be running to initialise a wallet in addcoin mode
         # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
@@ -1909,7 +1931,7 @@ def initialise_wallets(
                         f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
                     )
 
-                    if c in (Coins.BTC, Coins.LTC, Coins.DOGE, Coins.DASH):
+                    if c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE, Coins.DASH):
                         # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
 
                         use_descriptors = coin_settings.get("use_descriptors", False)
@@ -1926,11 +1948,15 @@ def initialise_wallets(
                             ],
                         )
                         if use_descriptors:
+                            watch_wallet_name = coin_settings["watch_wallet_name"]
+                            logger.info(
+                                f'Creating wallet "{watch_wallet_name}" for {getCoinName(c)}.'
+                            )
                             swap_client.callcoinrpc(
                                 c,
                                 "createwallet",
                                 [
-                                    coin_settings["watch_wallet_name"],
+                                    watch_wallet_name,
                                     True,
                                     True,
                                     "",
@@ -2073,7 +2099,10 @@ def check_btc_fastsync_data(base_dir, sync_filename):
         importPubkey(gpg, pubkey_filename, pubkeyurls)
     with open(asc_file_path, "rb") as fp:
         verified = gpg.verify_file(fp)
-    if isValidSignature(verified) and verified.key_id in expected_key_ids["tecnovert"]:
+    if (
+        isValidSignature(verified)
+        and verified.fingerprint in expected_key_ids["tecnovert"]
+    ):
         ensureValidSignatureBy(verified, "tecnovert")
     else:
         pubkey_filename = "nicolasdorier.asc"
@@ -2379,22 +2408,6 @@ def main():
             "core_version_no": getKnownVersion("bitcoin"),
             "core_version_group": 28,
         },
-        "bitcoincash": {
-            "connection_type": "rpc",
-            "manage_daemon": shouldManageDaemon("BCH"),
-            "rpchost": BCH_RPC_HOST,
-            "rpcport": BCH_RPC_PORT + port_offset,
-            "onionport": BCH_ONION_PORT + port_offset,
-            "datadir": os.getenv("BCH_DATA_DIR", os.path.join(data_dir, "bitcoincash")),
-            "bindir": os.path.join(bin_dir, "bitcoincash"),
-            "port": BCH_PORT + port_offset,
-            "config_filename": "bitcoin.conf",
-            "use_segwit": False,
-            "blocks_confirmed": 1,
-            "conf_target": 2,
-            "core_version_no": getKnownVersion("bitcoincash"),
-            "core_version_group": 22,
-        },
         "litecoin": {
             "connection_type": "rpc",
             "manage_daemon": shouldManageDaemon("LTC"),
@@ -2409,22 +2422,6 @@ def main():
             "core_version_no": getKnownVersion("litecoin"),
             "core_version_group": 20,
             "min_relay_fee": 0.00001,
-        },
-        "dogecoin": {
-            "connection_type": "rpc",
-            "manage_daemon": shouldManageDaemon("DOGE"),
-            "rpchost": DOGE_RPC_HOST,
-            "rpcport": DOGE_RPC_PORT + port_offset,
-            "onionport": DOGE_ONION_PORT + port_offset,
-            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
-            "bindir": os.path.join(bin_dir, "dogecoin"),
-            "use_segwit": False,
-            "use_csv": False,
-            "blocks_confirmed": 2,
-            "conf_target": 2,
-            "core_version_no": getKnownVersion("dogecoin"),
-            "core_version_group": 23,
-            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
         "decred": {
             "connection_type": "rpc",
@@ -2453,14 +2450,16 @@ def main():
             "manage_daemon": shouldManageDaemon("NMC"),
             "rpchost": NMC_RPC_HOST,
             "rpcport": NMC_RPC_PORT + port_offset,
+            "onionport": NMC_ONION_PORT + port_offset,
             "datadir": os.getenv("NMC_DATA_DIR", os.path.join(data_dir, "namecoin")),
             "bindir": os.path.join(bin_dir, "namecoin"),
-            "use_segwit": False,
-            "use_csv": False,
+            "port": NMC_PORT + port_offset,
+            "use_segwit": True,
+            "use_csv": True,
             "blocks_confirmed": 1,
             "conf_target": 2,
             "core_version_no": getKnownVersion("namecoin"),
-            "core_version_group": 18,
+            "core_version_group": 28,
             "chain_lookups": "local",
         },
         "monero": {
@@ -2484,6 +2483,28 @@ def main():
             "walletrpctimeoutlong": 600,
             "wallet_config_filename": "monero_wallet.conf",
             "core_version_no": getKnownVersion("monero"),
+            "core_type_group": "xmr",
+        },
+        "wownero": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("WOW"),
+            "manage_wallet_daemon": shouldManageDaemon("WOW_WALLET"),
+            "rpcport": WOW_RPC_PORT + port_offset,
+            "zmqport": WOW_ZMQ_PORT + port_offset,
+            "walletrpcport": WOW_WALLET_RPC_PORT + port_offset,
+            "rpchost": WOW_RPC_HOST,
+            "trusted_daemon": extra_opts.get("trust_remote_node", "auto"),
+            "walletrpchost": WOW_WALLET_RPC_HOST,
+            "walletrpcuser": WOW_WALLET_RPC_USER,
+            "walletrpcpassword": WOW_WALLET_RPC_PWD,
+            "datadir": os.getenv("WOW_DATA_DIR", os.path.join(data_dir, "wownero")),
+            "bindir": os.path.join(bin_dir, "wownero"),
+            "restore_height": wow_restore_height,
+            "blocks_confirmed": 2,
+            "rpctimeout": 60,
+            "walletrpctimeout": 120,
+            "walletrpctimeoutlong": 300,
+            "core_version_no": getKnownVersion("wownero"),
             "core_type_group": "xmr",
         },
         "pivx": {
@@ -2549,27 +2570,37 @@ def main():
             "chain_lookups": "local",
             "startup_tries": 40,
         },
-        "wownero": {
+        "bitcoincash": {
             "connection_type": "rpc",
-            "manage_daemon": shouldManageDaemon("WOW"),
-            "manage_wallet_daemon": shouldManageDaemon("WOW_WALLET"),
-            "rpcport": WOW_RPC_PORT + port_offset,
-            "zmqport": WOW_ZMQ_PORT + port_offset,
-            "walletrpcport": WOW_WALLET_RPC_PORT + port_offset,
-            "rpchost": WOW_RPC_HOST,
-            "trusted_daemon": extra_opts.get("trust_remote_node", "auto"),
-            "walletrpchost": WOW_WALLET_RPC_HOST,
-            "walletrpcuser": WOW_WALLET_RPC_USER,
-            "walletrpcpassword": WOW_WALLET_RPC_PWD,
-            "datadir": os.getenv("WOW_DATA_DIR", os.path.join(data_dir, "wownero")),
-            "bindir": os.path.join(bin_dir, "wownero"),
-            "restore_height": wow_restore_height,
+            "manage_daemon": shouldManageDaemon("BCH"),
+            "rpchost": BCH_RPC_HOST,
+            "rpcport": BCH_RPC_PORT + port_offset,
+            "onionport": BCH_ONION_PORT + port_offset,
+            "datadir": os.getenv("BCH_DATA_DIR", os.path.join(data_dir, "bitcoincash")),
+            "bindir": os.path.join(bin_dir, "bitcoincash"),
+            "port": BCH_PORT + port_offset,
+            "config_filename": "bitcoin.conf",
+            "use_segwit": False,
+            "blocks_confirmed": 1,
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("bitcoincash"),
+            "core_version_group": 22,
+        },
+        "dogecoin": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("DOGE"),
+            "rpchost": DOGE_RPC_HOST,
+            "rpcport": DOGE_RPC_PORT + port_offset,
+            "onionport": DOGE_ONION_PORT + port_offset,
+            "datadir": os.getenv("DOGE_DATA_DIR", os.path.join(data_dir, "dogecoin")),
+            "bindir": os.path.join(bin_dir, "dogecoin"),
+            "use_segwit": False,
+            "use_csv": False,
             "blocks_confirmed": 2,
-            "rpctimeout": 60,
-            "walletrpctimeout": 120,
-            "walletrpctimeoutlong": 300,
-            "core_version_no": getKnownVersion("wownero"),
-            "core_type_group": "xmr",
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("dogecoin"),
+            "core_version_group": 23,
+            "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
     }
 
@@ -2593,9 +2624,8 @@ def main():
             coin_settings["wallet_name"] = set_name
 
         ticker: str = coin_params["ticker"]
-        if toBool(os.getenv(ticker + "_USE_DESCRIPTORS", False)):
-
-            if coin_id not in (Coins.BTC,):
+        if getDescriptorWalletOption(coin_params):
+            if coin_id not in (Coins.BTC, Coins.NMC):
                 raise ValueError(f"Descriptor wallet unavailable for {coin_name}")
 
             coin_settings["use_descriptors"] = True

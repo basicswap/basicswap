@@ -34,6 +34,11 @@ from tests.basicswap.common import (
     PIVX_BASE_PORT,
     BTC_USE_DESCRIPTORS,
 )
+from tests.basicswap.extended.test_nmc import (
+    NMC_BASE_PORT,
+    NMC_BASE_RPC_PORT,
+    NMC_BASE_TOR_PORT,
+)
 from tests.basicswap.extended.test_dcr import (
     DCR_BASE_PORT,
     DCR_BASE_RPC_PORT,
@@ -50,13 +55,6 @@ from tests.basicswap.extended.test_doge import (
 import basicswap.config as cfg
 import basicswap.bin.run as runSystem
 
-XMR_BASE_P2P_PORT = 17792
-XMR_BASE_RPC_PORT = 29798
-XMR_BASE_WALLET_RPC_PORT = 29998
-
-FIRO_BASE_PORT = 34832
-FIRO_BASE_RPC_PORT = 35832
-FIRO_RPC_PORT_BASE = int(os.getenv("FIRO_RPC_PORT_BASE", FIRO_BASE_RPC_PORT))
 
 TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "~/test_basicswap1"))
 
@@ -68,7 +66,21 @@ BITCOIN_RPC_PORT_BASE = int(os.getenv("BITCOIN_RPC_PORT_BASE", BTC_BASE_RPC_PORT
 BITCOIN_TOR_PORT_BASE = int(os.getenv("BITCOIN_TOR_PORT_BASE", BTC_BASE_TOR_PORT))
 
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
+
 DECRED_RPC_PORT_BASE = int(os.getenv("DECRED_RPC_PORT_BASE", DCR_BASE_RPC_PORT))
+
+NAMECOIN_PORT_BASE = int(os.getenv("NAMECOIN_PORT_BASE", NMC_BASE_PORT))
+NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
+NAMECOIN_TOR_PORT_BASE = int(os.getenv("NAMECOIN_TOR_PORT_BASE", NMC_BASE_TOR_PORT))
+
+XMR_BASE_P2P_PORT = 17792
+XMR_BASE_RPC_PORT = 29798
+XMR_BASE_WALLET_RPC_PORT = 29998
+
+FIRO_BASE_PORT = 34832
+FIRO_BASE_RPC_PORT = 35832
+FIRO_RPC_PORT_BASE = int(os.getenv("FIRO_RPC_PORT_BASE", FIRO_BASE_RPC_PORT))
+
 BITCOINCASH_RPC_PORT_BASE = int(
     os.getenv("BITCOINCASH_RPC_PORT_BASE", BCH_BASE_RPC_PORT)
 )
@@ -130,18 +142,20 @@ def run_prepare(
     os.environ["BTC_RPC_PORT"] = str(BITCOIN_RPC_PORT_BASE)
     os.environ["BTC_PORT"] = str(BITCOIN_PORT_BASE)
     os.environ["BTC_USE_DESCRIPTORS"] = str(BTC_USE_DESCRIPTORS)
+    os.environ["BTC_ONION_PORT"] = str(BITCOIN_TOR_PORT_BASE)
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
+    os.environ["DCR_RPC_PWD"] = "dcr_pwd"
+    os.environ["NMC_RPC_PORT"] = str(NAMECOIN_RPC_PORT_BASE)
+    os.environ["NMC_PORT"] = str(NMC_BASE_PORT)
+    os.environ["NMC_ONION_PORT"] = str(NAMECOIN_TOR_PORT_BASE)
+    os.environ["XMR_RPC_USER"] = "xmr_user"
+    os.environ["XMR_RPC_PWD"] = "xmr_pwd"
     os.environ["FIRO_RPC_PORT"] = str(FIRO_RPC_PORT_BASE)
     os.environ["BCH_PORT"] = str(BCH_BASE_PORT)
     os.environ["BCH_RPC_PORT"] = str(BITCOINCASH_RPC_PORT_BASE)
     os.environ["DOGE_PORT"] = str(DOGE_BASE_PORT)
     os.environ["DOGE_RPC_PORT"] = str(DOGECOIN_RPC_PORT_BASE)
-
-    os.environ["XMR_RPC_USER"] = "xmr_user"
-    os.environ["XMR_RPC_PWD"] = "xmr_pwd"
-
-    os.environ["DCR_RPC_PWD"] = "dcr_pwd"
 
     import basicswap.bin.prepare as prepareSystem
 
@@ -320,6 +334,62 @@ def run_prepare(
         with open(config_filename, "a") as fp:
             fp.write("enablevoting=1\n")
 
+    if "namecoin" in coins_array:
+        # Pruned nodes don't provide blocks
+        config_filename = os.path.join(datadir_path, "namecoin", "namecoin.conf")
+        with open(config_filename, "r") as fp:
+            lines = fp.readlines()
+        with open(config_filename, "w") as fp:
+            for line in lines:
+                if not line.startswith("prune"):
+                    fp.write(line)
+            # fp.write("bind=127.0.0.1\n")  # Causes BTC v28 to try and bind to bind=127.0.0.1:8444, even with a bind...=onion present
+            # listenonion=0 does not stop the node from trying to bind to the tor port
+            # https://github.com/bitcoin/bitcoin/issues/22726
+            fp.write(
+                "bind=127.0.0.1:{}=onion\n".format(
+                    NAMECOIN_TOR_PORT_BASE + node_id + port_ofs
+                )
+            )
+            fp.write("dnsseed=0\n")
+            fp.write("discover=0\n")
+            fp.write("listenonion=0\n")
+            fp.write("upnp=0\n")
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = "test_nmc_" + str(node_id)
+                rpc_pass = "test_nmc_pwd_" + str(node_id)
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        rpc_user, salt, password_to_hmac(salt, rpc_pass)
+                    )
+                )
+                settings["chainclients"]["namecoin"]["rpcuser"] = rpc_user
+                settings["chainclients"]["namecoin"]["rpcpassword"] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write(
+                        "connect=127.0.0.1:{}\n".format(
+                            NAMECOIN_PORT_BASE + ip + port_ofs
+                        )
+                    )
+            for opt in EXTRA_CONFIG_JSON.get("ncm{}".format(node_id), []):
+                fp.write(opt + "\n")
+
+    if "monero" in coins_array:
+        with open(os.path.join(datadir_path, "monero", "monerod.conf"), "a") as fp:
+            fp.write("p2p-bind-ip=127.0.0.1\n")
+            fp.write(
+                "p2p-bind-port={}\n".format(XMR_BASE_P2P_PORT + node_id + port_ofs)
+            )
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write(
+                        "add-exclusive-node=127.0.0.1:{}\n".format(
+                            XMR_BASE_P2P_PORT + ip + port_ofs
+                        )
+                    )
+
     if "pivx" in coins_array:
         # Pruned nodes don't provide blocks
         config_filename = os.path.join(datadir_path, "pivx", "pivx.conf")
@@ -387,20 +457,6 @@ def run_prepare(
                     )
             for opt in EXTRA_CONFIG_JSON.get("firo{}".format(node_id), []):
                 fp.write(opt + "\n")
-
-    if "monero" in coins_array:
-        with open(os.path.join(datadir_path, "monero", "monerod.conf"), "a") as fp:
-            fp.write("p2p-bind-ip=127.0.0.1\n")
-            fp.write(
-                "p2p-bind-port={}\n".format(XMR_BASE_P2P_PORT + node_id + port_ofs)
-            )
-            for ip in range(num_nodes):
-                if ip != node_id:
-                    fp.write(
-                        "add-exclusive-node=127.0.0.1:{}\n".format(
-                            XMR_BASE_P2P_PORT + ip + port_ofs
-                        )
-                    )
 
     if "bitcoincash" in coins_array:
         config_filename = os.path.join(datadir_path, "bitcoincash", "bitcoin.conf")

@@ -391,7 +391,7 @@ class BasicSwap(BaseApp):
             Coins.PART_BLIND,
             Coins.BCH,
         )
-        self.coins_without_segwit = (Coins.PIVX, Coins.DASH, Coins.NMC)
+        self.coins_without_segwit = (Coins.PIVX, Coins.DASH)
 
         # TODO: Adjust ranges
         self.min_delay_event = self.get_int_setting("min_delay_event", 10, 0, 20 * 60)

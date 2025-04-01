@@ -34,6 +34,7 @@ window.tableRateModule = {
         'Dash': 'DASH',
         'PIVX': 'PIVX',
         'Decred': 'DCR',
+        'Namecoin': 'NMC',
         'Zano': 'ZANO',
         'Bitcoin Cash': 'BCH',
         'Dogecoin': 'DOGE'
@@ -56,9 +57,9 @@ window.tableRateModule = {
     },
 
     setCachedValue(key, value, resourceType = null) {
-        const ttl = resourceType ? 
-            window.config.cacheConfig.ttlSettings[resourceType] || 
-            window.config.cacheConfig.defaultTTL : 
+        const ttl = resourceType ?
+            window.config.cacheConfig.ttlSettings[resourceType] ||
+            window.config.cacheConfig.defaultTTL :
             900000;
 
         const item = {
@@ -306,13 +307,14 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
                 'ltc': 'litecoin',
                 'doge': 'dogecoin',
                 'dcr': 'decred',
+                'nmc': 'namecoin',
                 'wow': 'wownero'
             };
 
             if (lowerCoin === 'zcoin') return 'firo';
             if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
             if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
-            
+
             return symbolToName[lowerCoin] || lowerCoin;
         };
 
@@ -406,7 +408,7 @@ async function fetchLatestPrices() {
         const coinIds = [
             'bitcoin', 'particl', 'monero', 'litecoin',
             'dogecoin', 'firo', 'dash', 'pivx',
-            'decred', 'bitcoincash'
+            'decred', 'namecoin', 'bitcoincash'
         ];
 
         let processedData = {};
@@ -419,7 +421,7 @@ async function fetchLatestPrices() {
                 if (mainResponse && mainResponse.rates) {
                     Object.entries(mainResponse.rates).forEach(([coinId, price]) => {
                         const normalizedCoinId = coinId === 'bitcoincash' ? 'bitcoin-cash' : coinId.toLowerCase();
-                        
+
                         processedData[normalizedCoinId] = {
                             usd: price,
                             btc: normalizedCoinId === 'bitcoin' ? 1 : price / (mainResponse.rates.bitcoin || 1)
@@ -453,7 +455,7 @@ async function fetchLatestPrices() {
             } catch (error) {
                 console.error(`Price fetch attempt ${attempt + 1} failed:`, error);
                 NetworkManager.handleNetworkError(error);
-                
+
                 if (attempt < MAX_RETRIES - 1) {
                     const delay = Math.min(500 * Math.pow(2, attempt), 5000);
                     await new Promise(resolve => setTimeout(resolve, delay));
@@ -520,7 +522,7 @@ async function fetchOffers() {
         originalJsonData = [...jsonData];
 
         latestPrices = pricesData || getEmptyPriceData();
-        
+
         CacheManager.set('offers_cached', jsonData, 'offers');
 
         await updateOffersTable();
@@ -1353,7 +1355,7 @@ function createRateColumn(offer, coinFrom, coinTo) {
 
     const getPriceKey = (coin) => {
         const lowerCoin = coin.toLowerCase();
-        
+
         const symbolToName = {
             'btc': 'bitcoin',
             'xmr': 'monero',
@@ -1365,13 +1367,14 @@ function createRateColumn(offer, coinFrom, coinTo) {
             'ltc': 'litecoin',
             'doge': 'dogecoin',
             'dcr': 'decred',
+            'nmc': 'namecoin',
             'wow': 'wownero'
         };
-        
+
         if (lowerCoin === 'zcoin') return 'firo';
         if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
         if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
-        
+
         return symbolToName[lowerCoin] || lowerCoin;
     };
 
@@ -1655,23 +1658,24 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
             'ltc': 'litecoin',
             'doge': 'dogecoin',
             'dcr': 'decred',
+            'nmc': 'namecoin',
             'wow': 'wownero'
         };
 
         if (lowerCoin === 'zcoin') return 'firo';
         if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
         if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
-        
+
         return symbolToName[lowerCoin] || lowerCoin;
     };
-    
+
     if (latestPrices && latestPrices['firo'] && !latestPrices['zcoin']) {
         latestPrices['zcoin'] = JSON.parse(JSON.stringify(latestPrices['firo']));
     }
 
     const fromSymbol = getPriceKey(coinFrom);
     const toSymbol = getPriceKey(coinTo);
-    
+
     let fromPriceUSD = latestPrices && latestPrices[fromSymbol] ? latestPrices[fromSymbol].usd : null;
     let toPriceUSD = latestPrices && latestPrices[toSymbol] ? latestPrices[toSymbol].usd : null;
 
@@ -1685,7 +1689,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
         isNaN(fromPriceUSD) || isNaN(toPriceUSD)) {
         return `<p class="font-bold mb-1">Price Information Unavailable</p>
                 <p>Current market prices are temporarily unavailable.</p>
-                <p class="mt-2">You are ${isSentOffers ? 'selling' : 'buying'} ${fromAmount.toFixed(8)} ${coinFrom} 
+                <p class="mt-2">You are ${isSentOffers ? 'selling' : 'buying'} ${fromAmount.toFixed(8)} ${coinFrom}
                 for ${toAmount.toFixed(8)} ${coinTo}.</p>
                 <p class="font-bold mt-2">Note:</p>
                 <p>Profit/loss calculations will be available when price data is restored.</p>`;
@@ -1757,13 +1761,14 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
             'ltc': 'litecoin',
             'doge': 'dogecoin',
             'dcr': 'decred',
+            'nmc': 'namecoin',
             'wow': 'wownero'
         };
 
         if (lowerCoin === 'zcoin') return 'firo';
         if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
         if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
-        
+
         return symbolToName[lowerCoin] || lowerCoin;
     };
 
@@ -1876,7 +1881,7 @@ function clearFilters() {
 
     jsonData = [...originalJsonData];
     currentPage = 1;
-    
+
     const storageKey = isSentOffers ? 'sentOffersTableSettings' : 'networkOffersTableSettings';
     localStorage.removeItem(storageKey);
 
@@ -2194,7 +2199,7 @@ async function initializeTableAndData() {
 function loadSavedSettings() {
     const storageKey = isSentOffers ? 'sentOffersTableSettings' : 'networkOffersTableSettings';
     const saved = localStorage.getItem(storageKey);
-    
+
     if (saved) {
         const settings = JSON.parse(saved);
 
@@ -2229,7 +2234,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         NetworkManager.initialize({
             connectionTestEndpoint: '/json',
             connectionTestTimeout: 3000,
-            reconnectDelay: 5000, 
+            reconnectDelay: 5000,
             maxReconnectAttempts: 5
         });
         window.networkManagerInitialized = true;
@@ -2252,7 +2257,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     const tableLoadPromise = initializeTableAndData();
-    
+
     WebSocketManager.initialize({
         debug: false
     });
@@ -2262,7 +2267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!NetworkManager.isOnline()) {
                 return;
             }
-            
+
             const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
             const response = await fetch(endpoint);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -2349,7 +2354,7 @@ async function cleanup() {
         lastRefreshTime = null;
 
         const domRefs = [
-            'offersBody', 'filterForm', 'prevPageButton', 'nextPageButton', 
+            'offersBody', 'filterForm', 'prevPageButton', 'nextPageButton',
             'currentPageSpan', 'totalPagesSpan', 'lastRefreshTimeSpan', 'newEntriesCountSpan'
         ];
 

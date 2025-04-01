@@ -504,13 +504,14 @@ const CacheManager = (function() {
         'bitcoin': 'BTC',
         'litecoin': 'LTC',
         'monero': 'XMR',
+        'wownero': 'WOW',
         'particl': 'PART',
         'pivx': 'PIVX',
         'firo': 'FIRO',
         'zcoin': 'FIRO',
         'dash': 'DASH',
         'decred': 'DCR',
-        'wownero': 'WOW',
+        'namecoin': 'NMR',
         'bitcoin-cash': 'BCH',
         'dogecoin': 'DOGE'
       };
