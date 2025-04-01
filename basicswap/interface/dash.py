@@ -111,17 +111,11 @@ class DASHInterface(BTCInterface):
 
         return None
 
-    def unlockWallet(self, password: str):
-        super().unlockWallet(password)
+    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
+        super().unlockWallet(password, check_seed)
         if self._wallet_v20_compatible:
             # Store password for initialiseWallet
             self._wallet_passphrase = password
-        if not self._have_checked_seed:
-            try:
-                self._sc.checkWalletSeed(self.coin_type())
-            except Exception as ex:
-                # dumphdinfo can fail if the wallet is not initialised
-                self._log.debug(f"DASH checkWalletSeed failed: {ex}.")
 
     def lockWallet(self):
         super().lockWallet()

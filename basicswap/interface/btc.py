@@ -1986,7 +1986,7 @@ class BTCInterface(Secp256k1Interface):
             return self.rpc_wallet("encryptwallet", [new_password])
         self.rpc_wallet("walletpassphrasechange", [old_password, new_password])
 
-    def unlockWallet(self, password: str):
+    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         if password == "":
             return
         self._log.info(f"unlockWallet - {self.ticker()}")
@@ -2007,7 +2007,8 @@ class BTCInterface(Secp256k1Interface):
 
         # Max timeout value, ~3 years
         self.rpc_wallet("walletpassphrase", [password, 100000000])
-        self._sc.checkWalletSeed(self.coin_type())
+        if check_seed:
+            self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self):
         self._log.info(f"lockWallet - {self.ticker()}")

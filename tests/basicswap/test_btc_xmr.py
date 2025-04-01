@@ -1187,12 +1187,12 @@ class BasicSwapTest(TestFunctions):
             logging.warning("Skipping test")
             return
 
-        test_wif = (
+        test_wif: str = (
             self.swap_clients[0]
             .ci(self.test_coin_from)
             .encodeKey(bytes.fromhex(test_seed))
         )
-        new_wallet_name = random.randbytes(10).hex()
+        new_wallet_name: str = random.randbytes(10).hex()
         # wallet_name, wallet_name, blank, passphrase, avoid_reuse, descriptors
         self.callnoderpc(
             "createwallet", [new_wallet_name, False, True, "", False, False]

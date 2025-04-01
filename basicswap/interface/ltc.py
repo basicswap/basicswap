@@ -146,7 +146,7 @@ class LTCInterfaceMWEB(LTCInterface):
                 self.rpc_wallet("walletpassphrase", [password, 100000000])
             self.rpc_wallet("keypoolrefill")
 
-    def unlockWallet(self, password: str):
+    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         if password == "":
             return
         self._log.info("unlockWallet - {}".format(self.ticker()))
@@ -156,5 +156,5 @@ class LTCInterfaceMWEB(LTCInterface):
         else:
             # Max timeout value, ~3 years
             self.rpc_wallet("walletpassphrase", [password, 100000000])
-
-        self._sc.checkWalletSeed(self.coin_type())
+        if check_seed:
+            self._sc.checkWalletSeed(self.coin_type())

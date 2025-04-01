@@ -744,11 +744,11 @@ class XMRInterface(CoinInterface):
             self._wallet_password = orig_password
             raise e
 
-    def unlockWallet(self, password: str) -> None:
+    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         self._log.info("unlockWallet - {}".format(self.ticker()))
         self._wallet_password = password
 
-        if not self._have_checked_seed:
+        if check_seed and not self._have_checked_seed:
             self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self) -> None:

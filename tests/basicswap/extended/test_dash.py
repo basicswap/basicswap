@@ -758,20 +758,39 @@ class Test(unittest.TestCase):
     def test_09_initialise_wallet(self):
         logging.info("---------- Test DASH initialiseWallet")
 
-        self.swap_clients[0].initialiseWallet(Coins.DASH, raise_errors=True)
-        assert self.swap_clients[0].checkWalletSeed(Coins.DASH) is True
+        test_seed = "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
+        ci = self.swap_clients[0].ci(Coins.DASH)
+        test_wif: str = ci.encodeKey(bytes.fromhex(test_seed))
+        new_wallet_name: str = random.randbytes(10).hex()
+        # wallet_name, wallet_name, blank, passphrase, avoid_reuse, descriptors
+        ci.rpc("createwallet", [new_wallet_name, False, True, "", False, False])
+        ci.rpc("sethdseed", [True, test_wif], wallet_override=new_wallet_name)
 
-        addr = dashRpc('getnewaddress "hd wallet test"')
-        assert addr == "ybzWYJbZEhZai8kiKkTtPFKTuDNwhpiwac"
+        test_pwd: str = "test_pwd"
+        ci.rpc(
+            "encryptwallet",
+            [
+                test_pwd,
+            ],
+            wallet_override=new_wallet_name,
+        )
 
-        logging.info("Test that getcoinseed returns a mnemonic for Dash")
-        mnemonic = read_json_api(1800, "getcoinseed", {"coin": "DASH"})["mnemonic"]
-        new_wallet_name = random.randbytes(10).hex()
-        dashRpc(f'createwallet "{new_wallet_name}"')
-        dashRpc(f'upgradetohd "{mnemonic}"', wallet=new_wallet_name)
-        addr_test = dashRpc("getnewaddress", wallet=new_wallet_name)
-        dashRpc("unloadwallet", wallet=new_wallet_name)
-        assert addr_test == addr
+        addr = ci.rpc("getnewaddress", wallet_override=new_wallet_name)
+        # sethdseed keys are not == upgradetohd, was "ybzWYJbZEhZai8kiKkTtPFKTuDNwhpiwac"
+        assert addr == "yb8DSec26MLqtuj48iELnhnDCSBBbpWJ9p"
+
+        new_wallet_name += "_encrypted"
+        ci.rpc("createwallet", [new_wallet_name, False, True, test_pwd, False, False])
+        ci.rpc("walletpassphrase", [test_pwd, 1000], wallet_override=new_wallet_name)
+        # sethdseed fails on encrypted wallets!
+        try:
+            ci.rpc("sethdseed", [True, test_wif], wallet_override=new_wallet_name)
+        except Exception as e:
+            assert "AddHDChainSingle failed" in str(e)
+        else:
+            raise ValueError(
+                "sethdseed on encrypted wallets is fixed! Remove workaround in prepare.py."
+            )
 
     def test_10_prefunded_itx(self):
         logging.info("---------- Test prefunded itx offer")

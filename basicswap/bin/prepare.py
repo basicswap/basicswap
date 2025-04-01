@@ -1899,6 +1899,9 @@ def initialise_wallets(
                 if c == Coins.PART and "particl" not in with_coins:
                     # Running addcoin with an existing particl wallet
                     swap_client.waitForDaemonRPC(c, with_wallet=True)
+                    # Particl wallet must be unlocked to call getWalletKey
+                    if WALLET_ENCRYPTION_PWD != "":
+                        swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
                     continue
                 if c == Coins.DCR:
                     if coin_settings["manage_wallet_daemon"] is False:
@@ -1930,11 +1933,28 @@ def initialise_wallets(
                     logger.info(
                         f'Creating wallet "{wallet_name}" for {getCoinName(c)}.'
                     )
-
-                    if c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE, Coins.DASH):
+                    use_descriptors = coin_settings.get("use_descriptors", False)
+                    if c in (Coins.DASH,):
+                        # TODO: Remove when fixed
+                        if WALLET_ENCRYPTION_PWD != "":
+                            logger.warning(
+                                "Workaround for Dash sethdseed error if wallet is encrypted."
+                            )  # Errors with "AddHDChainSingle failed"
+                        assert use_descriptors is False
+                        swap_client.callcoinrpc(
+                            c,
+                            "createwallet",
+                            [
+                                wallet_name,
+                                False,
+                                True,
+                                "",
+                                False,
+                                use_descriptors,
+                            ],
+                        )
+                    elif c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE):
                         # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-
-                        use_descriptors = coin_settings.get("use_descriptors", False)
                         swap_client.callcoinrpc(
                             c,
                             "createwallet",
@@ -1964,7 +1984,9 @@ def initialise_wallets(
                                     use_descriptors,
                                 ],
                             )
-                        swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
+                        swap_client.ci(c).unlockWallet(
+                            WALLET_ENCRYPTION_PWD, check_seed=False
+                        )
                     else:
                         swap_client.callcoinrpc(
                             c,
@@ -1995,9 +2017,6 @@ def initialise_wallets(
                     swap_client.callcoinrpc(
                         Coins.PART, "extkeyimportmaster", [particl_wallet_mnemonic]
                     )
-                # Particl wallet must be unlocked to call getWalletKey
-                if WALLET_ENCRYPTION_PWD != "":
-                    swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
 
         for coin_name in with_coins:
             c = swap_client.getCoinIdFromName(coin_name)
@@ -2010,7 +2029,9 @@ def initialise_wallets(
                 swap_client.initialiseWallet(c, raise_errors=True)
             except Exception as e:
                 coins_failed_to_initialise.append((c, e))
-            if WALLET_ENCRYPTION_PWD != "" and c not in coins_to_create_wallets_for:
+            if WALLET_ENCRYPTION_PWD != "" and (
+                c not in coins_to_create_wallets_for or c in (Coins.DASH,)
+            ):  # TODO: Remove DASH workaround
                 try:
                     swap_client.ci(c).changeWalletPassword("", WALLET_ENCRYPTION_PWD)
                 except Exception as e:  # noqa: F841
@@ -2026,12 +2047,12 @@ def initialise_wallets(
     print("")
     for pair in coins_failed_to_initialise:
         c, e = pair
-        if c in (Coins.PIVX,):
+        if c in (Coins.PIVX, Coins.BCH):
             print(
                 f"NOTE - Unable to initialise wallet for {getCoinName(c)}.  To complete setup click 'Reseed Wallet' from the ui page once chain is synced."
             )
         else:
-            print(f"WARNING - Failed to initialise wallet for {getCoinName(c)}: {e}")
+            raise ValueError(f"Failed to initialise wallet for {getCoinName(c)}: {e}")
 
     if "decred" in with_coins and WALLET_ENCRYPTION_PWD != "":
         print(

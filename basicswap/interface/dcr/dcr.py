@@ -368,14 +368,15 @@ class DCRInterface(Secp256k1Interface):
         # Clear initial password
         self._sc.editSettings(self.coin_name().lower(), {"wallet_pwd": ""})
 
-    def unlockWallet(self, password: str):
+    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         if password == "":
             return
         self._log.info("unlockWallet - {}".format(self.ticker()))
 
         # Max timeout value, ~3 years
         self.rpc_wallet("walletpassphrase", [password, 100000000])
-        self._sc.checkWalletSeed(self.coin_type())
+        if check_seed:
+            self._sc.checkWalletSeed(self.coin_type())
 
     def lockWallet(self):
         self._log.info("lockWallet - {}".format(self.ticker()))
