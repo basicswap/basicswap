@@ -6,29 +6,33 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
-import sys
+import importlib
 import json
-import shutil
 import logging
-import unittest
-import threading
 import multiprocessing
+import os
+import shutil
+import sys
+import threading
+import unittest
 
 from io import StringIO
 from unittest.mock import patch
 
 import basicswap.config as cfg
 from tests.basicswap.util import (
+    make_boolean,
     read_json_api,
     waitForServer,
 )
 
+TEST_DELETE_DIRS = make_boolean(os.getenv("TEST_DELETE_DIRS", True))
 bin_path = os.path.expanduser(os.getenv("TEST_BIN_PATH", ""))
 test_base_path = os.path.expanduser(os.getenv("TEST_PREPARE_PATH", "~/test_basicswap"))
 test_path_plain = os.path.join(test_base_path, "plain")
 test_path_encrypted = os.path.join(test_base_path, "encrypted")
 test_path_encrypt = os.path.join(test_base_path, "encrypt")
+
 
 delay_event = threading.Event()
 logger = logging.getLogger()
@@ -60,13 +64,27 @@ def start_run(args, env_pairs=[]):
 
 class Test(unittest.TestCase):
     @classmethod
+    def setUpClass(cls):
+        super(Test, cls).setUpClass()
+        # Reset env vars
+        reset_vars = ["BSX_ALLOW_ENV_OVERRIDE", "BSX_DOCKER_MODE", "BSX_LOCAL_TOR"]
+        for var_name in reset_vars:
+            if var_name in os.environ:
+                del os.environ[var_name]
+
+    @classmethod
     def tearDownClass(self):
         try:
-            for test_dir in (test_path_plain, test_path_encrypted, test_path_encrypt):
-                if os.path.exists(test_dir):
-                    shutil.rmtree(test_dir)
+            if TEST_DELETE_DIRS:
+                for test_dir in (
+                    test_path_plain,
+                    test_path_encrypted,
+                    test_path_encrypt,
+                ):
+                    if os.path.exists(test_dir):
+                        shutil.rmtree(test_dir)
         except Exception as ex:
-            logger.warning("tearDownClass %s", str(ex))
+            logger.warning(f"tearDownClass {ex}")
         super(Test, self).tearDownClass()
 
     def test_plain(self):
@@ -146,6 +164,7 @@ class Test(unittest.TestCase):
                 self.assertTrue(
                     settings["chainclients"]["bitcoin"]["connection_type"] == "rpc"
                 )
+                assert settings.get("use_tor", False) is False
 
             logging.info("notorproxy")
             testargs = [
@@ -165,8 +184,89 @@ class Test(unittest.TestCase):
                 "--usetorproxy and --notorproxy together" in fake_stderr.getvalue()
             )
 
+            logger.info("Test persistent setup config.")
+
+            with open(config_path) as fs:
+                settings = json.load(fs)
+            assert settings.get("use_tor", False) is False
+            assert settings["setup_docker_mode"] is False
+            assert settings["setup_local_tor"] is False
+            assert "setup_tor_control_listen_interface" not in settings
+            assert "setup_torrc_dns_host" not in settings
+
+            os.environ["BSX_LOCAL_TOR"] = "true"
+            # Reimport to reset globals and set env
+            importlib.reload(prepareSystem)
+
+            testargs = [
+                "basicswap-prepare",
+                "-datadir=" + test_path_plain,
+                "--enabletor",
+            ]
+            with patch("sys.stderr", new=StringIO()) as fake_stderr:
+                with patch.object(sys, "argv", testargs):
+                    with self.assertRaises(SystemExit) as cm:
+                        prepareSystem.main()
+
+            self.assertEqual(cm.exception.code, 1)
+            self.assertTrue(
+                "Env var BSX_LOCAL_TOR differs from saved config"
+                in fake_stderr.getvalue()
+            )
+
+            os.environ["BSX_ALLOW_ENV_OVERRIDE"] = "true"
+            os.environ["TOR_CONTROL_LISTEN_INTERFACE"] = "127.1.1.1"
+            importlib.reload(prepareSystem)
+
+            with patch.object(sys, "argv", testargs):
+                prepareSystem.main()
+
+            with open(config_path) as fs:
+                settings = json.load(fs)
+            assert settings.get("use_tor", False) is True
+            assert settings["setup_docker_mode"] is False
+            assert settings["setup_local_tor"] is True
+            assert settings["setup_tor_control_listen_interface"] == "127.1.1.1"
+            assert "setup_torrc_dns_host" not in settings
+
+            particl_config_path = os.path.join(
+                test_path_plain, "particl", "particl.conf"
+            )
+            with open(particl_config_path) as fs:
+                particl_conf = fs.read()
+                assert "bind=127.1.1.1:" in particl_conf
+
+            testargs = [
+                "basicswap-prepare",
+                "-datadir=" + test_path_plain,
+                "-disablecoin=bitcoin",
+            ]
+            with patch.object(sys, "argv", testargs):
+                prepareSystem.main()
+
+            os.environ["TOR_PROXY_HOST"] = "127.2.2.2"
+            del os.environ["BSX_ALLOW_ENV_OVERRIDE"]
+            importlib.reload(prepareSystem)
+
+            testargs = [
+                "basicswap-prepare",
+                "-datadir=" + test_path_plain,
+                "-addcoin=bitcoin",
+                "-notorproxy",  # Disable TOR connection check
+            ]
+            with patch("sys.stderr", new=StringIO()) as fake_stderr:
+                with patch.object(sys, "argv", testargs):
+                    with self.assertRaises(SystemExit) as cm:
+                        prepareSystem.main()
+
+            self.assertEqual(cm.exception.code, 1)
+            self.assertTrue(
+                "Env var TOR_PROXY_HOST differs from saved config"
+                in fake_stderr.getvalue()
+            )
+
         finally:
-            del prepareSystem
+            del prepareSystem  # Does not cause next import to refresh globals and env (tested v3.13)
 
     def test_encrypted(self):
         if os.path.exists(test_path_encrypted):
