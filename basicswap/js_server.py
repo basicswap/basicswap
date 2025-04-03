@@ -993,10 +993,6 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
     }
 
     EXCLUDED_STATES = [
-        "Failed, refunded",
-        "Failed, swiped",
-        "Failed",
-        "Error",
         "Expired",
         "Timed-out",
         "Abandoned",
