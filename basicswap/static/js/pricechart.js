@@ -119,16 +119,14 @@ const api = {
 
     fetchCoinGeckoDataXHR: async () => {
         try {
-            // Use the shared PriceManager
             const priceData = await window.PriceManager.getPrices();
-            
-            // Transform the data to match the expected format for the price chart
+
             const transformedData = {};
-            
+
             window.config.coins.forEach(coin => {
                 const symbol = coin.symbol.toLowerCase();
                 const coinData = priceData[symbol] || priceData[coin.name.toLowerCase()];
-                
+
                 if (coinData && coinData.usd) {
                     transformedData[symbol] = {
                         current_price: coinData.usd,
@@ -137,7 +135,7 @@ const api = {
                     };
                 }
             });
-            
+
             return transformedData;
         } catch (error) {
             console.error('Error in fetchCoinGeckoDataXHR:', error);

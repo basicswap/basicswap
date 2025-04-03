@@ -1424,7 +1424,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
                     } else if (latestPrices && latestPrices['bch']) {
                         return 'bch';
                     }
-                    return 'bitcoin-cash'; // Default
+                    return 'bitcoin-cash';
                 }
 
                 if (symbol.toUpperCase() === 'PART') {
@@ -1544,7 +1544,7 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
                     } else if (latestPrices && latestPrices['bch']) {
                         return 'bch';
                     }
-                    return 'bitcoin-cash'; // Default
+                    return 'bitcoin-cash';
                 }
                 if (symbol.toUpperCase() === 'PART') {
                     return 'part';
@@ -1947,7 +1947,6 @@ function initializeTableEvents() {
                     await updateOffersTable({ fromPaginationClick: true });
                     updatePaginationInfo();
                 } finally {
-                    // Use setTimeout to prevent immediate re-triggers
                     setTimeout(() => {
                         isPaginationInProgress = false;
                     }, 100);

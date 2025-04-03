@@ -73,7 +73,6 @@ const WalletManager = (function() {
 
         const shouldIncludeWow = currentSource === 'coingecko.com';
 
-        // Get all coins and filter as needed
         const coinsToFetch = [];
         const processedCoins = new Set();
 
@@ -82,7 +81,6 @@ const WalletManager = (function() {
           
           if (!coinName || processedCoins.has(coinName)) return;
 
-          // Special handling for special cases
           const adjustedName = coinName === 'Zcoin' ? 'Firo' : 
                                coinName.includes('Particl') ? 'Particl' : 
                                coinName;
@@ -118,7 +116,6 @@ const WalletManager = (function() {
             const coinName = el.getAttribute('data-coinname');
             if (!coinName) return;
 
-            // Special case handling
             const adjustedName = coinName === 'Zcoin' ? 'Firo' : 
                                  coinName.includes('Particl') ? 'Particl' : 
                                  coinName;
