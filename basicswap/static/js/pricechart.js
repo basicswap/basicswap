@@ -118,122 +118,30 @@ const api = {
     },
 
     fetchCoinGeckoDataXHR: async () => {
-        const cacheKey = 'coinGeckoOneLiner';
-        const cachedData = CacheManager.get(cacheKey);
-
-        if (cachedData) {
-            return cachedData.value;
-        }
-
         try {
-            if (!NetworkManager.isOnline()) {
-                throw new Error('Network is offline');
-            }
-
-            const existingCache = localStorage.getItem(cacheKey);
-            let fallbackData = null;
-
-            if (existingCache) {
-                try {
-                    const parsed = JSON.parse(existingCache);
-                    fallbackData = parsed.value;
-                } catch (e) {
-                    console.warn('Failed to parse existing cache:', e);
-                }
-            }
-
-            const apiResponse = await Api.fetchCoinGeckoData({
-                coinGecko: window.config.getAPIKeys().coinGecko
-            });
-
-            if (!apiResponse || !apiResponse.rates) {
-                if (fallbackData) {
-                    return fallbackData;
-                }
-                throw new Error('Invalid data structure received from API');
-            }
-
+            // Use the shared PriceManager
+            const priceData = await window.PriceManager.getPrices();
+            
+            // Transform the data to match the expected format for the price chart
             const transformedData = {};
+            
             window.config.coins.forEach(coin => {
-                const coinName = coin.name;
-                const coinRate = apiResponse.rates[coinName];
-                if (coinRate) {
-                    const symbol = coin.symbol.toLowerCase();
+                const symbol = coin.symbol.toLowerCase();
+                const coinData = priceData[symbol] || priceData[coin.name.toLowerCase()];
+                
+                if (coinData && coinData.usd) {
                     transformedData[symbol] = {
-                        current_price: coinRate,
-                        price_btc: coinName === 'bitcoin' ? 1 : coinRate / (apiResponse.rates.bitcoin || 1),
-                        total_volume: fallbackData && fallbackData[symbol] ? fallbackData[symbol].total_volume : null,
-                        price_change_percentage_24h: fallbackData && fallbackData[symbol] ? fallbackData[symbol].price_change_percentage_24h : null,
-                        displayName: coin.displayName || coin.symbol || coinName
+                        current_price: coinData.usd,
+                        price_btc: coinData.btc || (priceData.bitcoin ? coinData.usd / priceData.bitcoin.usd : 0),
+                        displayName: coin.displayName || coin.symbol
                     };
                 }
             });
-
-            try {
-                if (!transformedData['wow'] && config.coins.some(c => c.symbol === 'WOW')) {
-                    const wowResponse = await Api.fetchCoinPrices("wownero", {
-                        coinGecko: window.config.getAPIKeys().coinGecko
-                    });
-
-                    if (wowResponse && wowResponse.rates && wowResponse.rates.wownero) {
-                        transformedData['wow'] = {
-                            current_price: wowResponse.rates.wownero,
-                            price_btc: transformedData.btc ? wowResponse.rates.wownero / transformedData.btc.current_price : 0,
-                            total_volume: fallbackData && fallbackData['wow'] ? fallbackData['wow'].total_volume : null,
-                            price_change_percentage_24h: fallbackData && fallbackData['wow'] ? fallbackData['wow'].price_change_percentage_24h : null,
-                            displayName: 'Wownero'
-                        };
-                    }
-                }
-            } catch (wowError) {
-                console.error('Error fetching WOW price:', wowError);
-            }
-
-            const missingCoins = window.config.coins.filter(coin =>
-                !transformedData[coin.symbol.toLowerCase()] &&
-                fallbackData &&
-                fallbackData[coin.symbol.toLowerCase()]
-            );
-
-            missingCoins.forEach(coin => {
-                const symbol = coin.symbol.toLowerCase();
-                if (fallbackData && fallbackData[symbol]) {
-                    transformedData[symbol] = fallbackData[symbol];
-                }
-            });
-
-            CacheManager.set(cacheKey, transformedData, 'prices');
-
-            if (NetworkManager.getReconnectAttempts() > 0) {
-                NetworkManager.resetReconnectAttempts();
-            }
-
+            
             return transformedData;
         } catch (error) {
-            console.error('Error fetching coin data:', error);
-
-            NetworkManager.handleNetworkError(error);
-
-            const cachedData = CacheManager.get(cacheKey);
-            if (cachedData) {
-                console.log('Using cached data due to error');
-                return cachedData.value;
-            }
-
-            try {
-                const existingCache = localStorage.getItem(cacheKey);
-                if (existingCache) {
-                    const parsed = JSON.parse(existingCache);
-                    if (parsed.value) {
-                        console.log('Using expired cache as last resort');
-                        return parsed.value;
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to parse expired cache:', e);
-            }
-
-            throw error;
+            console.error('Error in fetchCoinGeckoDataXHR:', error);
+            return {};
         }
     },
 
@@ -1329,7 +1237,6 @@ const app = {
 
     const headers = document.querySelectorAll('th');
     headers.forEach((header, index) => {
-      CleanupManager.addListener(header, 'click', () => app.sortTable(index, header.classList.contains('disabled')));
     });
 
     const closeErrorButton = document.getElementById('close-error');
@@ -1649,23 +1556,33 @@ const app = {
 
   updateBTCPrice: async function() {
     try {
-      if (!NetworkManager.isOnline()) {
-        throw new Error('Network is offline');
+      const priceData = await window.PriceManager.getPrices();
+
+      if (priceData) {
+        if (priceData.bitcoin && priceData.bitcoin.usd) {
+          app.btcPriceUSD = priceData.bitcoin.usd;
+          return true;
+        } else if (priceData.btc && priceData.btc.usd) {
+          app.btcPriceUSD = priceData.btc.usd;
+          return true;
+        }
       }
 
-      const response = await Api.fetchCoinPrices("bitcoin");
-
-      if (response && response.rates && response.rates.bitcoin) {
-        app.btcPriceUSD = response.rates.bitcoin;
+      if (app.btcPriceUSD > 0) {
+        console.log('Using previously cached BTC price:', app.btcPriceUSD);
         return true;
       }
 
-      console.warn('Unexpected BTC price data structure:', response);
+      console.warn('Could not find BTC price in current data');
       return false;
-
     } catch (error) {
       console.error('Error fetching BTC price:', error);
-      NetworkManager.handleNetworkError(error);
+
+      if (app.btcPriceUSD > 0) {
+        console.log('Using previously cached BTC price after error:', app.btcPriceUSD);
+        return true;
+      }
+      
       return false;
     }
   },
@@ -1815,13 +1732,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     CleanupManager.setInterval(() => {
         CacheManager.cleanup();
-    }, 300000);  // Every 5 minutes
+    }, 300000);
 
     CleanupManager.setInterval(() => {
         if (chartModule && chartModule.currentCoin && NetworkManager.isOnline()) {
             chartModule.updateChart(chartModule.currentCoin);
         }
-    }, 900000);  // Every 15 minutes
+    }, 900000);
 
     CleanupManager.addListener(document, 'visibilitychange', () => {
         if (!document.hidden) {

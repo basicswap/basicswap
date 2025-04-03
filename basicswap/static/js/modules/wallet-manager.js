@@ -23,54 +23,6 @@ const WalletManager = (function() {
     balancesVisible: 'balancesVisible'
   };
 
-  const coinData = {
-    symbols: {
-      'Bitcoin': 'BTC',
-      'Particl': 'PART',
-      'Monero': 'XMR',
-      'Wownero': 'WOW',
-      'Litecoin': 'LTC',
-      'Dogecoin': 'DOGE',
-      'Firo': 'FIRO',
-      'Dash': 'DASH',
-      'PIVX': 'PIVX',
-      'Decred': 'DCR',
-      'Namecoin': 'NMC',
-      'Bitcoin Cash': 'BCH'
-    },
-
-    coingeckoIds: {
-      'BTC': 'btc',
-      'PART': 'part',
-      'XMR': 'xmr',
-      'WOW': 'wownero',
-      'LTC': 'ltc',
-      'DOGE': 'doge',
-      'FIRO': 'firo',
-      'DASH': 'dash',
-      'PIVX': 'pivx',
-      'DCR': 'dcr',
-      'NMC': 'nmc',
-      'BCH': 'bch'
-    },
-
-    shortNames: {
-      'Bitcoin': 'BTC',
-      'Particl': 'PART',
-      'Monero': 'XMR',
-      'Wownero': 'WOW',
-      'Litecoin': 'LTC',
-      'Litecoin MWEB': 'LTC MWEB',
-      'Firo': 'FIRO',
-      'Dash': 'DASH',
-      'PIVX': 'PIVX',
-      'Decred': 'DCR',
-      'Namecoin': 'NMC',
-      'Bitcoin Cash': 'BCH',
-      'Dogecoin': 'DOGE'
-    }
-  };
-
   const state = {
     lastFetchTime: 0,
     toggleInProgress: false,
@@ -83,7 +35,23 @@ const WalletManager = (function() {
   };
 
   function getShortName(fullName) {
-    return coinData.shortNames[fullName] || fullName;
+    return window.CoinManager.getSymbol(fullName) || fullName;
+  }
+
+  function getCoingeckoId(coinName) {
+    if (!window.CoinManager) {
+      console.warn('[WalletManager] CoinManager not available');
+      return coinName;
+    }
+
+    const coin = window.CoinManager.getCoinByAnyIdentifier(coinName);
+    
+    if (!coin) {
+      console.warn(`[WalletManager] No coin found for: ${coinName}`);
+      return coinName;
+    }
+
+    return coin.symbol;
   }
 
   async function fetchPrices(forceUpdate = false) {
@@ -105,16 +73,35 @@ const WalletManager = (function() {
 
         const shouldIncludeWow = currentSource === 'coingecko.com';
 
-        const coinsToFetch = Object.values(coinData.symbols)
-          .filter(symbol => shouldIncludeWow || symbol !== 'WOW')
-          .map(symbol => coinData.coingeckoIds[symbol] || symbol.toLowerCase())
-          .join(',');
+        // Get all coins and filter as needed
+        const coinsToFetch = [];
+        const processedCoins = new Set();
+
+        document.querySelectorAll('.coinname-value').forEach(el => {
+          const coinName = el.getAttribute('data-coinname');
+          
+          if (!coinName || processedCoins.has(coinName)) return;
+
+          // Special handling for special cases
+          const adjustedName = coinName === 'Zcoin' ? 'Firo' : 
+                               coinName.includes('Particl') ? 'Particl' : 
+                               coinName;
+
+          const coinId = getCoingeckoId(adjustedName);
+          
+          if (coinId && (shouldIncludeWow || coinId !== 'WOW')) {
+            coinsToFetch.push(coinId);
+            processedCoins.add(coinName);
+          }
+        });
+
+        const fetchCoinsString = coinsToFetch.join(',');
 
         const mainResponse = await fetch("/json/coinprices", {
           method: "POST",
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
-            coins: coinsToFetch,
+            coins: fetchCoinsString,
             source: currentSource,
             ttl: config.defaultTTL
           })
@@ -127,44 +114,26 @@ const WalletManager = (function() {
         const mainData = await mainResponse.json();
 
         if (mainData && mainData.rates) {
-          Object.entries(mainData.rates).forEach(([coinId, price]) => {
-            const symbol = Object.entries(coinData.coingeckoIds).find(([sym, id]) => id.toLowerCase() === coinId.toLowerCase())?.[0];
-            if (symbol) {
-              const coinKey = Object.keys(coinData.symbols).find(key => coinData.symbols[key] === symbol);
-              if (coinKey) {
-                processedData[coinKey.toLowerCase().replace(' ', '-')] = {
-                  usd: price,
-                  btc: symbol === 'BTC' ? 1 : price / (mainData.rates.btc || 1)
-                };
-              }
+          document.querySelectorAll('.coinname-value').forEach(el => {
+            const coinName = el.getAttribute('data-coinname');
+            if (!coinName) return;
+
+            // Special case handling
+            const adjustedName = coinName === 'Zcoin' ? 'Firo' : 
+                                 coinName.includes('Particl') ? 'Particl' : 
+                                 coinName;
+
+            const coinId = getCoingeckoId(adjustedName);
+            const price = mainData.rates[coinId];
+
+            if (price) {
+              const coinKey = coinName.toLowerCase().replace(' ', '-');
+              processedData[coinKey] = {
+                usd: price,
+                btc: coinId === 'BTC' ? 1 : price / (mainData.rates.BTC || 1)
+              };
             }
           });
-        }
-
-        if (!shouldIncludeWow && !processedData['wownero']) {
-          try {
-            const wowResponse = await fetch("/json/coinprices", {
-              method: "POST",
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({
-                coins: "wownero",
-                source: "coingecko.com",
-                ttl: config.defaultTTL
-              })
-            });
-
-            if (wowResponse.ok) {
-              const wowData = await wowResponse.json();
-              if (wowData && wowData.rates && wowData.rates.wownero) {
-                processedData['wownero'] = {
-                  usd: wowData.rates.wownero,
-                  btc: processedData.bitcoin ? wowData.rates.wownero / processedData.bitcoin.usd : 0
-                };
-              }
-            }
-          } catch (wowError) {
-            console.error('Error fetching WOW price:', wowError);
-          }
         }
 
         CacheManager.set(state.cacheKey, processedData, config.cacheExpiration);
@@ -202,7 +171,6 @@ const WalletManager = (function() {
     throw lastError || new Error('Failed to fetch prices');
   }
 
-  // UI Management functions
   function storeOriginalValues() {
     document.querySelectorAll('.coinname-value').forEach(el => {
       const coinName = el.getAttribute('data-coinname');
@@ -210,10 +178,10 @@ const WalletManager = (function() {
 
       if (coinName) {
         const amount = value ? parseFloat(value.replace(/[^0-9.-]+/g, '')) : 0;
-        const coinId = coinData.symbols[coinName];
+        const coinSymbol = window.CoinManager.getSymbol(coinName);
         const shortName = getShortName(coinName);
 
-        if (coinId) {
+        if (coinSymbol) {
           if (coinName === 'Particl') {
             const isBlind = el.closest('.flex')?.querySelector('h4')?.textContent?.includes('Blind');
             const isAnon = el.closest('.flex')?.querySelector('h4')?.textContent?.includes('Anon');
@@ -224,7 +192,7 @@ const WalletManager = (function() {
             const balanceType = isMWEB ? 'mweb' : 'public';
             localStorage.setItem(`litecoin-${balanceType}-amount`, amount.toString());
           } else {
-            localStorage.setItem(`${coinId.toLowerCase()}-amount`, amount.toString());
+            localStorage.setItem(`${coinSymbol.toLowerCase()}-amount`, amount.toString());
           }
 
           el.setAttribute('data-original-value', `${amount} ${shortName}`);

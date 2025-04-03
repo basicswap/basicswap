@@ -6,6 +6,7 @@ let originalJsonData = [];
 let currentSortColumn = 0;
 let currentSortDirection = 'desc';
 let filterTimeout = null;
+let isPaginationInProgress = false;
 
 const isSentOffers = window.offersTableConfig.isSentOffers;
 const CACHE_DURATION = window.config.cacheConfig.defaultTTL;
@@ -22,23 +23,6 @@ const lastRefreshTimeSpan = document.getElementById('lastRefreshTime');
 const newEntriesCountSpan = document.getElementById('newEntriesCount');
 
 window.tableRateModule = {
-    coinNameToSymbol: {
-        'Bitcoin': 'BTC',
-        'Particl': 'PART',
-        'Particl Blind': 'PART',
-        'Particl Anon': 'PART',
-        'Monero': 'XMR',
-        'Wownero': 'WOW',
-        'Litecoin': 'LTC',
-        'Firo': 'FIRO',
-        'Dash': 'DASH',
-        'PIVX': 'PIVX',
-        'Decred': 'DCR',
-        'Namecoin': 'NMC',
-        'Zano': 'ZANO',
-        'Bitcoin Cash': 'BCH',
-        'Dogecoin': 'DOGE'
-    },
 
     cache: {},
     processedOffers: new Set(),
@@ -102,8 +86,10 @@ window.tableRateModule = {
     },
 
     getFallbackValue(coinSymbol) {
-        const value = localStorage.getItem(`fallback_${coinSymbol}_usd`);
-        return value ? parseFloat(value) : null;
+        if (!coinSymbol) return null;
+        const normalizedSymbol = coinSymbol.toLowerCase() === 'part' ? 'particl' : coinSymbol.toLowerCase();
+        const cachedValue = this.getCachedValue(`fallback_${normalizedSymbol}_usd`);
+        return cachedValue;
     },
 
     initializeTable() {
@@ -191,143 +177,182 @@ function saveFilterSettings() {
     }));
 }
 
+function coinMatches(offerCoin, filterCoin) {
+    if (!offerCoin || !filterCoin || filterCoin === 'any') return true;
+
+    offerCoin = offerCoin.toLowerCase();
+    filterCoin = filterCoin.toLowerCase();
+
+    if (offerCoin === filterCoin) return true;
+
+    if ((offerCoin === 'firo' || offerCoin === 'zcoin') &&
+        (filterCoin === 'firo' || filterCoin === 'zcoin')) {
+        return true;
+    }
+
+    if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
+        (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
+        return true;
+    }
+
+    const particlVariants = ['particl', 'particl anon', 'particl blind'];
+    if (filterCoin === 'particl' && particlVariants.includes(offerCoin)) {
+        return true;
+    }
+
+    if (particlVariants.includes(filterCoin)) {
+        return offerCoin === filterCoin;
+    }
+
+    return false;
+}
+
 function filterAndSortData() {
-   const formData = new FormData(filterForm);
-   const filters = Object.fromEntries(formData);
+    const formData = new FormData(filterForm);
+    const filters = Object.fromEntries(formData);
 
-   saveFilterSettings();
+    saveFilterSettings();
 
-   if (filters.coin_to !== 'any') {
-       filters.coin_to = window.config.coinMappings.idToName[filters.coin_to] || filters.coin_to;
-   }
-   if (filters.coin_from !== 'any') {
-       filters.coin_from = window.config.coinMappings.idToName[filters.coin_from] || filters.coin_from;
-   }
+    let filteredData = [...originalJsonData];
 
-   let filteredData = [...originalJsonData];
+    const sentFromFilter = filters.sent_from || 'any';
+    filteredData = filteredData.filter(offer => {
+        const isMatch = sentFromFilter === 'public' ? offer.is_public : 
+                        sentFromFilter === 'private' ? !offer.is_public : 
+                        true;
+        return isMatch;
+    });
 
-   const sentFromFilter = filters.sent_from || 'any';
-   filteredData = filteredData.filter(offer => {
-       if (sentFromFilter === 'public') return offer.is_public;
-       if (sentFromFilter === 'private') return !offer.is_public;
-       return true;
-   });
+    filteredData = filteredData.filter(offer => {
+        if (!isSentOffers && isOfferExpired(offer)) {
+            return false;
+        }
 
-   filteredData = filteredData.filter(offer => {
-       if (!isSentOffers && isOfferExpired(offer)) return false;
+        if (filters.coin_to && filters.coin_to !== 'any') {
+            const coinToSelect = document.getElementById('coin_to');
+            const selectedOption = coinToSelect?.querySelector(`option[value="${filters.coin_to}"]`);
+            const coinName = selectedOption?.textContent.trim();
+            
+            if (coinName && !coinMatches(offer.coin_to, coinName)) {
+                return false;
+            }
+        }
 
-       const coinFrom = (offer.coin_from || '').toLowerCase();
-       const coinTo = (offer.coin_to || '').toLowerCase();
+        if (filters.coin_from && filters.coin_from !== 'any') {
+            const coinFromSelect = document.getElementById('coin_from');
+            const selectedOption = coinFromSelect?.querySelector(`option[value="${filters.coin_from}"]`);
+            const coinName = selectedOption?.textContent.trim();
+            
+            if (coinName && !coinMatches(offer.coin_from, coinName)) {
+                return false;
+            }
+        }
 
-       if (filters.coin_to !== 'any' && !coinMatches(coinTo, filters.coin_to)) return false;
-       if (filters.coin_from !== 'any' && !coinMatches(coinFrom, filters.coin_from)) return false;
+        if (isSentOffers && filters.status && filters.status !== 'any') {
+            const isExpired = offer.expire_at <= Math.floor(Date.now() / 1000);
+            const isRevoked = Boolean(offer.is_revoked);
 
-       if (isSentOffers && filters.status && filters.status !== 'any') {
-           const isExpired = offer.expire_at <= Math.floor(Date.now() / 1000);
-           const isRevoked = Boolean(offer.is_revoked);
+            let statusMatch = false;
+            switch (filters.status) {
+                case 'active': 
+                    statusMatch = !isExpired && !isRevoked;
+                    break;
+                case 'expired': 
+                    statusMatch = isExpired && !isRevoked;
+                    break;
+                case 'revoked': 
+                    statusMatch = isRevoked;
+                    break;
+            }
 
-           switch (filters.status) {
-               case 'active': return !isExpired && !isRevoked;
-               case 'expired': return isExpired && !isRevoked;
-               case 'revoked': return isRevoked;
-           }
-       }
-       return true;
-   });
+            if (!statusMatch) {
+                return false;
+            }
+        }
 
-   if (currentSortColumn !== null) {
-       const priceCache = new Map();
-       const getPrice = coin => {
-           if (priceCache.has(coin)) return priceCache.get(coin);
-           const symbol = coin === 'Firo' || coin === 'Zcoin' ? 'zcoin' :
-                         coin === 'Bitcoin Cash' ? 'bitcoin-cash' :
-                         coin.includes('Particl') ? 'particl' :
-                         coin.toLowerCase();
-           const price = latestPrices[symbol]?.usd || 0;
-           priceCache.set(coin, price);
-           return price;
-       };
+        return true;
+    });
 
-       const calculateValue = offer => {
-           const fromUSD = parseFloat(offer.amount_from) * getPrice(offer.coin_from);
-           const toUSD = parseFloat(offer.amount_to) * getPrice(offer.coin_to);
-           return (isSentOffers || offer.is_own_offer) ?
-               ((toUSD / fromUSD) - 1) * 100 :
-               ((fromUSD / toUSD) - 1) * 100;
-       };
+    if (currentSortColumn !== null && currentSortDirection !== null) {
+        filteredData.sort((a, b) => {
+            let aValue, bValue;
 
-       const sortValues = new Map();
-       if (currentSortColumn === 5 || currentSortColumn === 6) {
-           filteredData.forEach(offer => {
-               sortValues.set(offer.offer_id, calculateValue(offer));
-           });
-       }
+            switch(currentSortColumn) {
+                case 0: // Time column
+                    aValue = a.created_at;
+                    bValue = b.created_at;
+                    break;
+                case 1: // Details column (usually address)
+                    aValue = a.addr_from || '';
+                    bValue = b.addr_from || '';
+                    break;
+                case 2: // Taker Amount column
+                    aValue = parseFloat(a.amount_to) || 0;
+                    bValue = parseFloat(b.amount_to) || 0;
+                    break;
+                case 3: // Swap column (could sort by coin names)
+                    aValue = a.coin_from + a.coin_to;
+                    bValue = b.coin_from + b.coin_to;
+                    break;
+                case 4: // Orderbook column
+                    aValue = parseFloat(a.amount_from) || 0;
+                    bValue = parseFloat(b.amount_from) || 0;
+                    break;
+                case 5: // Rate column
+                    aValue = parseFloat(a.rate) || 0;
+                    bValue = parseFloat(b.rate) || 0;
+                    break;
+                default:
+                    aValue = a.created_at;
+                    bValue = b.created_at;
+            }
 
-       filteredData.sort((a, b) => {
-           let comparison;
-           switch(currentSortColumn) {
-               case 0:
-                   comparison = a.created_at - b.created_at;
-                   break;
-               case 5:
-               case 6:
-                   comparison = sortValues.get(a.offer_id) - sortValues.get(b.offer_id);
-                   break;
-               case 7:
-                   comparison = a.offer_id.localeCompare(b.offer_id);
-                   break;
-               default:
-                   comparison = 0;
-           }
-           return currentSortDirection === 'desc' ? -comparison : comparison;
-       });
-   }
+            if (typeof aValue === 'number' && typeof bValue === 'number') {
+                return currentSortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+            }
 
-   return filteredData;
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+                return currentSortDirection === 'asc' 
+                    ? aValue.localeCompare(bValue) 
+                    : bValue.localeCompare(aValue);
+            }
+
+            return currentSortDirection === 'asc' ? (aValue > bValue ? 1 : -1) : (bValue > aValue ? 1 : -1);
+        });
+    }
+
+    return filteredData;
 }
 
 async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
     return new Promise((resolve) => {
-        if (!latestPrices) {
-            console.error('Latest prices not available. Unable to calculate profit/loss.');
+        if (!fromCoin || !toCoin) {
             resolve(null);
             return;
         }
 
-        const getPriceKey = (coin) => {
-            const lowerCoin = coin.toLowerCase();
-            const symbolToName = {
-                'btc': 'bitcoin',
-                'xmr': 'monero',
-                'part': 'particl',
-                'bch': 'bitcoin-cash',
-                'pivx': 'pivx',
-                'firo': 'firo',
-                'dash': 'dash',
-                'ltc': 'litecoin',
-                'doge': 'dogecoin',
-                'dcr': 'decred',
-                'nmc': 'namecoin',
-                'wow': 'wownero'
-            };
+        const getPriceForCoin = (coin) => {
+            if (!coin) return null;
 
-            if (lowerCoin === 'zcoin') return 'firo';
-            if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
-            if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
+            let normalizedCoin = coin.toLowerCase();
 
-            return symbolToName[lowerCoin] || lowerCoin;
+            if (window.CoinManager) {
+                normalizedCoin = window.CoinManager.getPriceKey(coin) || normalizedCoin;
+            } else {
+                if (normalizedCoin === 'zcoin') normalizedCoin = 'firo';
+                if (normalizedCoin === 'bitcoincash' || normalizedCoin === 'bitcoin cash') 
+                    normalizedCoin = 'bitcoin-cash';
+                if (normalizedCoin.includes('particl')) normalizedCoin = 'particl';
+            }
+            let price = null;
+            if (latestPrices && latestPrices[normalizedCoin]) {
+                price = latestPrices[normalizedCoin].usd;
+            }
+            return price;
         };
 
-        const fromSymbol = getPriceKey(fromCoin);
-        const toSymbol = getPriceKey(toCoin);
-
-        let fromPriceUSD = latestPrices && latestPrices[fromSymbol] ? latestPrices[fromSymbol].usd : null;
-        let toPriceUSD = latestPrices && latestPrices[toSymbol] ? latestPrices[toSymbol].usd : null;
-
-        if (!fromPriceUSD || !toPriceUSD) {
-            fromPriceUSD = tableRateModule.getFallbackValue(fromSymbol);
-            toPriceUSD = tableRateModule.getFallbackValue(toSymbol);
-        }
+        const fromPriceUSD = getPriceForCoin(fromCoin);
+        const toPriceUSD = getPriceForCoin(toCoin);
 
         if (!fromPriceUSD || !toPriceUSD || isNaN(fromPriceUSD) || isNaN(toPriceUSD)) {
             resolve(null);
@@ -363,129 +388,14 @@ function getEmptyPriceData() {
 }
 
 async function fetchLatestPrices() {
-    if (!NetworkManager.isOnline()) {
-        const cachedData = CacheManager.get('prices_coingecko');
-        return cachedData?.value || getEmptyPriceData();
-    }
-
-    if (WebSocketManager.isPageHidden || WebSocketManager.priceUpdatePaused) {
-        const cachedData = CacheManager.get('prices_coingecko');
-        return cachedData?.value || getEmptyPriceData();
-    }
-
-    const PRICES_CACHE_KEY = 'prices_coingecko';
-    const minRequestInterval = 60000;
-    const currentTime = Date.now();
-
-    if (!window.isManualRefresh) {
-        const lastRequestTime = window.lastPriceRequest || 0;
-        if (currentTime - lastRequestTime < minRequestInterval) {
-            const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-            if (cachedData) {
-                return cachedData.value;
-            }
-        }
-    }
-    window.lastPriceRequest = currentTime;
-
-    if (!window.isManualRefresh) {
-        const cachedData = CacheManager.get(PRICES_CACHE_KEY);
-        if (cachedData && cachedData.remainingTime > 60000) {
-            latestPrices = cachedData.value;
-            Object.entries(cachedData.value).forEach(([coin, prices]) => {
-                if (prices.usd) {
-                    tableRateModule.setFallbackValue(coin, prices.usd);
-                }
-            });
-            return cachedData.value;
-        }
-    }
-
     try {
-        const existingCache = CacheManager.get(PRICES_CACHE_KEY);
-        const fallbackData = existingCache ? existingCache.value : null;
 
-        const coinIds = [
-            'bitcoin', 'particl', 'monero', 'litecoin',
-            'dogecoin', 'firo', 'dash', 'pivx',
-            'decred', 'namecoin', 'bitcoincash'
-        ];
-
-        let processedData = {};
-        const MAX_RETRIES = 3;
-
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-            try {
-                const mainResponse = await Api.fetchCoinPrices(coinIds);
-
-                if (mainResponse && mainResponse.rates) {
-                    Object.entries(mainResponse.rates).forEach(([coinId, price]) => {
-                        const normalizedCoinId = coinId === 'bitcoincash' ? 'bitcoin-cash' : coinId.toLowerCase();
-
-                        processedData[normalizedCoinId] = {
-                            usd: price,
-                            btc: normalizedCoinId === 'bitcoin' ? 1 : price / (mainResponse.rates.bitcoin || 1)
-                        };
-                    });
-                }
-
-                try {
-                    const wowResponse = await Api.fetchCoinPrices("wownero");
-
-                    if (wowResponse && wowResponse.rates && wowResponse.rates.wownero) {
-                        processedData['wownero'] = {
-                            usd: wowResponse.rates.wownero,
-                            btc: processedData.bitcoin ? wowResponse.rates.wownero / processedData.bitcoin.usd : 0
-                        };
-                    }
-                } catch (wowError) {
-                    console.error('Error fetching WOW price:', wowError);
-                }
-
-                latestPrices = processedData;
-                CacheManager.set(PRICES_CACHE_KEY, processedData, 'prices');
-
-                Object.entries(processedData).forEach(([coin, prices]) => {
-                    if (prices.usd) {
-                        tableRateModule.setFallbackValue(coin, prices.usd);
-                    }
-                });
-
-                return processedData;
-            } catch (error) {
-                console.error(`Price fetch attempt ${attempt + 1} failed:`, error);
-                NetworkManager.handleNetworkError(error);
-
-                if (attempt < MAX_RETRIES - 1) {
-                    const delay = Math.min(500 * Math.pow(2, attempt), 5000);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-        }
-
-        if (fallbackData) {
-            return fallbackData;
-        }
-
-        const fallbackPrices = {};
-        Object.keys(getEmptyPriceData()).forEach(coin => {
-            const fallbackValue = tableRateModule.getFallbackValue(coin);
-            if (fallbackValue !== null) {
-                fallbackPrices[coin] = { usd: fallbackValue, btc: null };
-            }
-        });
-
-        if (Object.keys(fallbackPrices).length > 0) {
-            return fallbackPrices;
-        }
-
-        return getEmptyPriceData();
-    } catch (error) {
-        console.error('Unexpected error in fetchLatestPrices:', error);
-        NetworkManager.handleNetworkError(error);
-        return getEmptyPriceData();
-    } finally {
+        const prices = await window.PriceManager.getPrices(window.isManualRefresh);
         window.isManualRefresh = false;
+        return prices;
+    } catch (error) {
+        console.error('Error fetching prices:', error);
+        return getEmptyPriceData();
     }
 }
 
@@ -652,20 +562,26 @@ function updatePaginationInfo() {
     const validOffers = getValidOffers();
     const totalItems = validOffers.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+    const previousPage = currentPage;
 
-    currentPage = Math.max(1, Math.min(currentPage, totalPages));
+    if (previousPage !== currentPage) {
+        debugPaginationChange('updatePaginationInfo', previousPage, currentPage);
+    }
 
-    currentPageSpan.textContent = currentPage;
-    totalPagesSpan.textContent = totalPages;
+    if (currentPageSpan) currentPageSpan.textContent = totalPages > 0 ? currentPage : 0;
+    if (totalPagesSpan) totalPagesSpan.textContent = totalPages;
 
     const showPrev = currentPage > 1;
-    const showNext = currentPage < totalPages && totalItems > 0;
+    const showNext = currentPage < totalPages;
 
-    prevPageButton.style.display = showPrev ? 'inline-flex' : 'none';
-    nextPageButton.style.display = showNext ? 'inline-flex' : 'none';
+    if (prevPageButton) {
+        prevPageButton.style.display = showPrev ? 'inline-flex' : 'none';
+        prevPageButton.disabled = !showPrev;
+    }
 
-    if (lastRefreshTime) {
-        lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
+    if (nextPageButton) {
+        nextPageButton.style.display = showNext ? 'inline-flex' : 'none';
+        nextPageButton.disabled = !showNext;
     }
 
     if (newEntriesCountSpan) {
@@ -721,181 +637,6 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
             }
         })
         .catch(error => {
-            console.error('Error in updateProfitLoss:', error);
-            profitLossElement.textContent = 'N/A';
-            profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
-        });
-}
-
-function updateClearFiltersButton() {
-    const clearButton = document.getElementById('clearFilters');
-    if (clearButton) {
-        const hasFilters = hasActiveFilters();
-        clearButton.classList.toggle('opacity-50', !hasFilters);
-        clearButton.disabled = !hasFilters;
-
-        if (hasFilters) {
-            clearButton.classList.add('hover:bg-green-600', 'hover:text-white');
-            clearButton.classList.remove('cursor-not-allowed');
-        } else {
-            clearButton.classList.remove('hover:bg-green-600', 'hover:text-white');
-            clearButton.classList.add('cursor-not-allowed');
-        }
-    }
-}
-
-function updateConnectionStatus(status) {
-    const dot = document.getElementById('status-dot');
-    const text = document.getElementById('status-text');
-
-    if (!dot || !text) {
-        return;
-    }
-
-    switch(status) {
-        case 'connected':
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-green-500 mr-2';
-            text.textContent = 'Connected';
-            text.className = 'text-sm text-green-500';
-            break;
-        case 'disconnected':
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-red-500 mr-2';
-            text.textContent = 'Disconnected - Reconnecting...';
-            text.className = 'text-sm text-red-500';
-            break;
-        case 'error':
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2';
-            text.textContent = 'Connection Error';
-            text.className = 'text-sm text-yellow-500';
-            break;
-        default:
-            dot.className = 'w-2.5 h-2.5 rounded-full bg-gray-500 mr-2';
-            text.textContent = 'Connecting...';
-            text.className = 'text-sm text-gray-500';
-    }
-}
-
-function updateRowTimes() {
-    requestAnimationFrame(() => {
-        const rows = document.querySelectorAll('[data-offer-id]');
-        rows.forEach(row => {
-            const offerId = row.getAttribute('data-offer-id');
-            const offer = jsonData.find(o => o.offer_id === offerId);
-            if (!offer) return;
-
-            const newPostedTime = formatTime(offer.created_at, true);
-            const newExpiresIn = formatTimeLeft(offer.expire_at);
-
-            const postedElement = row.querySelector('.text-xs:first-child');
-            const expiresElement = row.querySelector('.text-xs:last-child');
-
-            if (postedElement && postedElement.textContent !== `Posted: ${newPostedTime}`) {
-                postedElement.textContent = `Posted: ${newPostedTime}`;
-            }
-            if (expiresElement && expiresElement.textContent !== `Expires in: ${newExpiresIn}`) {
-                expiresElement.textContent = `Expires in: ${newExpiresIn}`;
-            }
-        });
-    });
-}
-
-function updateLastRefreshTime() {
-    if (lastRefreshTimeSpan) {
-        lastRefreshTimeSpan.textContent = lastRefreshTime ? new Date(lastRefreshTime).toLocaleTimeString() : 'Never';
-    }
-}
-
-function stopRefreshAnimation() {
-    const refreshButton = document.getElementById('refreshOffers');
-    const refreshIcon = document.getElementById('refreshIcon');
-    const refreshText = document.getElementById('refreshText');
-
-    if (refreshButton) {
-        refreshButton.disabled = false;
-        refreshButton.classList.remove('opacity-75', 'cursor-wait');
-    }
-    if (refreshIcon) {
-        refreshIcon.classList.remove('animate-spin');
-    }
-    if (refreshText) {
-        refreshText.textContent = 'Refresh';
-    }
-}
-
-function updatePaginationInfo() {
-    const validOffers = getValidOffers();
-    const totalItems = validOffers.length;
-    const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
-
-    currentPage = Math.max(1, Math.min(currentPage, totalPages));
-
-    currentPageSpan.textContent = currentPage;
-    totalPagesSpan.textContent = totalPages;
-
-    const showPrev = currentPage > 1;
-    const showNext = currentPage < totalPages && totalItems > 0;
-
-    prevPageButton.style.display = showPrev ? 'inline-flex' : 'none';
-    nextPageButton.style.display = showNext ? 'inline-flex' : 'none';
-
-    if (lastRefreshTime) {
-        lastRefreshTimeSpan.textContent = new Date(lastRefreshTime).toLocaleTimeString();
-    }
-
-    if (newEntriesCountSpan) {
-        newEntriesCountSpan.textContent = totalItems;
-    }
-}
-
-function updatePaginationControls(totalPages) {
-    prevPageButton.style.display = currentPage > 1 ? 'inline-flex' : 'none';
-    nextPageButton.style.display = currentPage < totalPages ? 'inline-flex' : 'none';
-    currentPageSpan.textContent = currentPage;
-    totalPagesSpan.textContent = totalPages;
-}
-
-function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffer) {
-    const profitLossElement = row.querySelector('.profit-loss');
-    if (!profitLossElement) {
-        return;
-    }
-
-    if (!fromCoin || !toCoin) {
-        profitLossElement.textContent = 'N/A';
-        profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
-        return;
-    }
-
-    calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwnOffer)
-        .then(percentDiff => {
-            if (percentDiff === null || isNaN(percentDiff)) {
-                profitLossElement.textContent = 'N/A';
-                profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
-                return;
-            }
-
-            const formattedPercentDiff = percentDiff.toFixed(2);
-            const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
-                                     (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
-
-            const colorClass = getProfitColorClass(percentDiff);
-            profitLossElement.textContent = `${percentDiffDisplay}%`;
-            profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
-
-            const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
-            const tooltipElement = document.getElementById(tooltipId);
-            if (tooltipElement) {
-                const tooltipContent = createTooltipContent(isSentOffers || isOwnOffer, fromCoin, toCoin, fromAmount, toAmount);
-                tooltipElement.innerHTML = `
-                    <div class="tooltip-content">
-                        ${tooltipContent}
-                    </div>
-                    <div class="tooltip-arrow" data-popper-arrow></div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Error in updateProfitLoss:', error);
             profitLossElement.textContent = 'N/A';
             profitLossElement.className = 'profit-loss text-lg font-bold text-gray-300';
         });
@@ -1012,8 +753,14 @@ function handleNoOffersScenario() {
     }
 }
 
-async function updateOffersTable() {
+async function updateOffersTable(options = {}) {
     try {
+
+        if (isPaginationInProgress && !options.fromPaginationClick) {
+            console.log('Skipping table update during pagination operation');
+            return;
+        }
+
         if (window.TooltipManager) {
             window.TooltipManager.cleanup();
         }
@@ -1022,6 +769,16 @@ async function updateOffersTable() {
         if (validOffers.length === 0) {
             handleNoOffersScenario();
             return;
+        }
+
+        const totalPages = Math.ceil(validOffers.length / itemsPerPage);
+
+        if (!options.fromPaginationClick) {
+            const oldPage = currentPage;
+            currentPage = Math.max(1, Math.min(currentPage, totalPages));
+            if (oldPage !== currentPage) {
+                debugPaginationChange('updateOffersTable auto-adjust', oldPage, currentPage);
+            }
         }
 
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1061,7 +818,7 @@ async function updateOffersTable() {
 
         requestAnimationFrame(() => {
             updateRowTimes();
-            updatePaginationControls(Math.ceil(validOffers.length / itemsPerPage));
+            updatePaginationInfo();
             updateProfitLossDisplays();
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
@@ -1164,13 +921,30 @@ function createTableRow(offer, identity = null) {
        is_public: isPublic
    } = offer;
 
-   const coinFromSymbol = window.config.coinMappings.nameToSymbol[coinFrom] || coinFrom.toLowerCase();
-   const coinToSymbol = window.config.coinMappings.nameToSymbol[coinTo] || coinTo.toLowerCase();
-   const coinFromDisplay = getDisplayName(coinFrom);
-   const coinToDisplay = getDisplayName(coinTo);
+   let coinFromSymbol, coinToSymbol;
+   
+   if (window.CoinManager) {
+       coinFromSymbol = window.CoinManager.getSymbol(coinFrom) || coinFrom.toLowerCase();
+       coinToSymbol = window.CoinManager.getSymbol(coinTo) || coinTo.toLowerCase();
+   } else {
+       coinFromSymbol = coinFrom.toLowerCase();
+       coinToSymbol = coinTo.toLowerCase();
+   }
+
+   let coinFromDisplay, coinToDisplay;
+   
+   if (window.CoinManager) {
+       coinFromDisplay = window.CoinManager.getDisplayName(coinFrom) || coinFrom;
+       coinToDisplay = window.CoinManager.getDisplayName(coinTo) || coinTo;
+   } else {
+       coinFromDisplay = coinFrom;
+       coinToDisplay = coinTo;
+       if (coinFromDisplay.toLowerCase() === 'zcoin') coinFromDisplay = 'Firo';
+       if (coinToDisplay.toLowerCase() === 'zcoin') coinToDisplay = 'Firo';
+   }
+   
    const postedTime = formatTime(createdAt, true);
    const expiresIn = formatTime(expireAt);
-
    const currentTime = Math.floor(Date.now() / 1000);
    const isActuallyExpired = currentTime > expireAt;
    const fromAmount = parseFloat(amountFrom) || 0;
@@ -1353,31 +1127,6 @@ function createOrderbookColumn(offer, coinFrom) {
 function createRateColumn(offer, coinFrom, coinTo) {
     const rate = parseFloat(offer.rate) || 0;
     const inverseRate = rate ? (1 / rate) : 0;
-
-    const getPriceKey = (coin) => {
-        const lowerCoin = coin.toLowerCase();
-
-        const symbolToName = {
-            'btc': 'bitcoin',
-            'xmr': 'monero',
-            'part': 'particl',
-            'bch': 'bitcoin-cash',
-            'pivx': 'pivx',
-            'firo': 'firo',
-            'dash': 'dash',
-            'ltc': 'litecoin',
-            'doge': 'dogecoin',
-            'dcr': 'decred',
-            'nmc': 'namecoin',
-            'wow': 'wownero'
-        };
-
-        if (lowerCoin === 'zcoin') return 'firo';
-        if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
-        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
-
-        return symbolToName[lowerCoin] || lowerCoin;
-    };
 
     const toSymbolKey = getPriceKey(coinTo);
     let toPriceUSD = latestPrices && latestPrices[toSymbolKey] ? latestPrices[toSymbolKey].usd : null;
@@ -1646,42 +1395,58 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     toAmount = parseFloat(toAmount) || 0;
 
     const getPriceKey = (coin) => {
+        if (!coin) return null;
+        
         const lowerCoin = coin.toLowerCase();
 
-        const symbolToName = {
-            'btc': 'bitcoin',
-            'xmr': 'monero',
-            'part': 'particl',
-            'bch': 'bitcoin-cash',
-            'pivx': 'pivx',
-            'firo': 'firo',
-            'dash': 'dash',
-            'ltc': 'litecoin',
-            'doge': 'dogecoin',
-            'dcr': 'decred',
-            'nmc': 'namecoin',
-            'wow': 'wownero'
-        };
-
         if (lowerCoin === 'zcoin') return 'firo';
-        if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
-        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
 
-        return symbolToName[lowerCoin] || lowerCoin;
+        if (lowerCoin === 'bitcoin cash' || lowerCoin === 'bitcoincash' || lowerCoin === 'bch') {
+
+            if (latestPrices && latestPrices['bitcoin-cash']) {
+                return 'bitcoin-cash';
+            } else if (latestPrices && latestPrices['bch']) {
+                return 'bch';
+            }
+            return 'bitcoin-cash';
+        }
+
+        if (lowerCoin === 'part' || lowerCoin === 'particl' || lowerCoin.includes('particl')) {
+            return 'part';
+        }
+
+        if (window.config && window.config.coinMappings && window.config.coinMappings.nameToSymbol) {
+            const symbol = window.config.coinMappings.nameToSymbol[coin];
+            if (symbol) {
+                if (symbol.toUpperCase() === 'BCH') {
+                    if (latestPrices && latestPrices['bitcoin-cash']) {
+                        return 'bitcoin-cash';
+                    } else if (latestPrices && latestPrices['bch']) {
+                        return 'bch';
+                    }
+                    return 'bitcoin-cash'; // Default
+                }
+
+                if (symbol.toUpperCase() === 'PART') {
+                    return 'part';
+                }
+
+                return symbol.toLowerCase();
+            }
+        }
+        return lowerCoin;
     };
-
-    if (latestPrices && latestPrices['firo'] && !latestPrices['zcoin']) {
-        latestPrices['zcoin'] = JSON.parse(JSON.stringify(latestPrices['firo']));
-    }
 
     const fromSymbol = getPriceKey(coinFrom);
     const toSymbol = getPriceKey(coinTo);
 
-    let fromPriceUSD = latestPrices && latestPrices[fromSymbol] ? latestPrices[fromSymbol].usd : null;
-    let toPriceUSD = latestPrices && latestPrices[toSymbol] ? latestPrices[toSymbol].usd : null;
+    let fromPriceUSD = latestPrices && fromSymbol ? latestPrices[fromSymbol]?.usd : null;
+    let toPriceUSD = latestPrices && toSymbol ? latestPrices[toSymbol]?.usd : null;
 
-    if (!fromPriceUSD || !toPriceUSD) {
+    if (!fromPriceUSD && window.tableRateModule) {
         fromPriceUSD = tableRateModule.getFallbackValue(fromSymbol);
+    }
+    if (!toPriceUSD && window.tableRateModule) {
         toPriceUSD = tableRateModule.getFallbackValue(toSymbol);
     }
 
@@ -1749,42 +1514,57 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
     const inverseRate = rate ? (1 / rate) : 0;
 
     const getPriceKey = (coin) => {
+        if (!coin) return null;
+        
         const lowerCoin = coin.toLowerCase();
 
-        const symbolToName = {
-            'btc': 'bitcoin',
-            'xmr': 'monero',
-            'part': 'particl',
-            'bch': 'bitcoin-cash',
-            'pivx': 'pivx',
-            'firo': 'firo',
-            'dash': 'dash',
-            'ltc': 'litecoin',
-            'doge': 'dogecoin',
-            'dcr': 'decred',
-            'nmc': 'namecoin',
-            'wow': 'wownero'
-        };
-
         if (lowerCoin === 'zcoin') return 'firo';
-        if (lowerCoin === 'bitcoin cash') return 'bitcoin-cash';
-        if (lowerCoin === 'particl anon' || lowerCoin === 'particl blind') return 'particl';
 
-        return symbolToName[lowerCoin] || lowerCoin;
+        if (lowerCoin === 'bitcoin cash' || lowerCoin === 'bitcoincash' || lowerCoin === 'bch') {
+            if (latestPrices && latestPrices['bitcoin-cash']) {
+                return 'bitcoin-cash';
+            } else if (latestPrices && latestPrices['bch']) {
+                return 'bch';
+            }
+
+            return 'bitcoin-cash';
+        }
+
+        if (lowerCoin === 'part' || lowerCoin === 'particl' || lowerCoin.includes('particl')) {
+            return 'part';
+        }
+
+        if (window.config && window.config.coinMappings && window.config.coinMappings.nameToSymbol) {
+            const symbol = window.config.coinMappings.nameToSymbol[coin];
+            if (symbol) {
+                if (symbol.toUpperCase() === 'BCH') {
+
+                    if (latestPrices && latestPrices['bitcoin-cash']) {
+                        return 'bitcoin-cash';
+                    } else if (latestPrices && latestPrices['bch']) {
+                        return 'bch';
+                    }
+                    return 'bitcoin-cash'; // Default
+                }
+                if (symbol.toUpperCase() === 'PART') {
+                    return 'part';
+                }
+                return symbol.toLowerCase();
+            }
+        }
+        return lowerCoin;
     };
-
-    if (latestPrices && latestPrices['firo'] && !latestPrices['zcoin']) {
-        latestPrices['zcoin'] = JSON.parse(JSON.stringify(latestPrices['firo']));
-    }
 
     const fromSymbol = getPriceKey(coinFrom);
     const toSymbol = getPriceKey(coinTo);
 
-    let fromPriceUSD = latestPrices && latestPrices[fromSymbol] ? latestPrices[fromSymbol].usd : null;
-    let toPriceUSD = latestPrices && latestPrices[toSymbol] ? latestPrices[toSymbol].usd : null;
+    let fromPriceUSD = latestPrices && fromSymbol ? latestPrices[fromSymbol]?.usd : null;
+    let toPriceUSD = latestPrices && toSymbol ? latestPrices[toSymbol]?.usd : null;
 
-    if (!fromPriceUSD || !toPriceUSD) {
+    if (!fromPriceUSD && window.tableRateModule) {
         fromPriceUSD = tableRateModule.getFallbackValue(fromSymbol);
+    }
+    if (!toPriceUSD && window.tableRateModule) {
         toPriceUSD = tableRateModule.getFallbackValue(toSymbol);
     }
 
@@ -1807,7 +1587,7 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
     const percentDiff = marketRate ? ((rate - marketRate) / marketRate) * 100 : 0;
     const formattedPercentDiff = percentDiff.toFixed(2);
     const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
-                            (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+    (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
     const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
     const action = treatAsSentOffer ? "selling" : "buying";
 
@@ -1853,9 +1633,9 @@ function applyFilters() {
 
     try {
         filterTimeout = setTimeout(() => {
+            currentPage = 1;
             jsonData = filterAndSortData();
             updateOffersTable();
-            updatePaginationInfo();
             updateClearFiltersButton();
             filterTimeout = null;
         }, 250);
@@ -1909,6 +1689,9 @@ function formatTimeLeft(timestamp) {
 }
 
 function getDisplayName(coinName) {
+    if (window.CoinManager) {
+        return window.CoinManager.getDisplayName(coinName) || coinName;
+    }
     if (coinName.toLowerCase() === 'zcoin') {
         return 'Firo';
     }
@@ -1929,6 +1712,9 @@ function getCoinSymbolLowercase(coin) {
 }
 
 function coinMatches(offerCoin, filterCoin) {
+    if (window.CoinManager) {
+        return window.CoinManager.coinMatches(offerCoin, filterCoin);
+    }
     return window.config.coinMatches(offerCoin, filterCoin);
 }
 
@@ -1957,7 +1743,38 @@ function escapeHtml(unsafe) {
     return window.config.utils.escapeHtml(unsafe);
 }
 
+function getPriceKey(coin) {
+
+    if (window.CoinManager) {
+        return window.CoinManager.getPriceKey(coin);
+    }
+
+    if (!coin) return null;
+    
+    const lowerCoin = coin.toLowerCase();
+
+    if (lowerCoin === 'zcoin') {
+        return 'firo';
+    }
+
+    if (lowerCoin === 'bitcoin cash' || lowerCoin === 'bitcoincash' || lowerCoin === 'bch') {
+        return 'bitcoin-cash';
+    }
+
+    if (lowerCoin === 'part' || lowerCoin === 'particl' || 
+        lowerCoin.includes('particl')) {
+        return 'particl';
+    }
+
+    return lowerCoin;
+}
+
 function getCoinSymbol(fullName) {
+
+    if (window.CoinManager) {
+        return window.CoinManager.getSymbol(fullName) || fullName;
+    }
+
     return window.config.coinMappings.nameToSymbol[fullName] || fullName;
 }
 
@@ -1977,6 +1794,8 @@ function initializeTableEvents() {
 
     const coinToSelect = document.getElementById('coin_to');
     const coinFromSelect = document.getElementById('coin_from');
+    const statusSelect = document.getElementById('status');
+    const sentFromSelect = document.getElementById('sent_from');
 
     if (coinToSelect) {
         CleanupManager.addListener(coinToSelect, 'change', () => {
@@ -1989,6 +1808,18 @@ function initializeTableEvents() {
         CleanupManager.addListener(coinFromSelect, 'change', () => {
             applyFilters();
             updateCoinFilterImages();
+        });
+    }
+
+    if (statusSelect) {
+        CleanupManager.addListener(statusSelect, 'change', () => {
+            applyFilters();
+        });
+    }
+
+    if (sentFromSelect) {
+        CleanupManager.addListener(sentFromSelect, 'change', () => {
+            applyFilters();
         });
     }
 
@@ -2103,45 +1934,70 @@ function initializeTableEvents() {
         });
     }
 
-    document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
-        CleanupManager.addListener(header, 'click', async () => {
-            const columnIndex = parseInt(header.getAttribute('data-column-index'));
-            handleTableSort(columnIndex, header);
-        });
-    });
-
     const prevPageButton = document.getElementById('prevPage');
     const nextPageButton = document.getElementById('nextPage');
 
     if (prevPageButton) {
-        CleanupManager.addListener(prevPageButton, 'click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                updateOffersTable();
+        CleanupManager.addListener(prevPageButton, 'click', async () => {
+            if (currentPage > 1 && !isPaginationInProgress) {
+                try {
+                    isPaginationInProgress = true;
+                    const oldPage = currentPage;
+                    currentPage--;
+                    await updateOffersTable({ fromPaginationClick: true });
+                    updatePaginationInfo();
+                } finally {
+                    // Use setTimeout to prevent immediate re-triggers
+                    setTimeout(() => {
+                        isPaginationInProgress = false;
+                    }, 100);
+                }
             }
         });
     }
 
     if (nextPageButton) {
-        CleanupManager.addListener(nextPageButton, 'click', () => {
-            const totalPages = Math.ceil(jsonData.length / itemsPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                updateOffersTable();
+        CleanupManager.addListener(nextPageButton, 'click', async () => {
+            const validOffers = getValidOffers();
+            const totalPages = Math.ceil(validOffers.length / itemsPerPage);
+            if (currentPage < totalPages && !isPaginationInProgress) {
+                try {
+                    isPaginationInProgress = true;
+                    const oldPage = currentPage;
+                    currentPage++;
+                    await updateOffersTable({ fromPaginationClick: true });
+                    updatePaginationInfo();
+                } finally {
+                    setTimeout(() => {
+                        isPaginationInProgress = false;
+                    }, 100);
+                }
             }
         });
     }
+
+    document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+        CleanupManager.addListener(header, 'click', () => {
+            const columnIndex = parseInt(header.getAttribute('data-column-index'));
+            handleTableSort(columnIndex, header);
+        });
+    });
 }
 
 function handleTableSort(columnIndex, header) {
     if (currentSortColumn === columnIndex) {
-        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+        if (currentSortDirection === null) {
+            currentSortDirection = 'desc';
+        } else if (currentSortDirection === 'desc') {
+            currentSortDirection = 'asc';
+        } else if (currentSortDirection === 'asc') {
+            currentSortColumn = null;
+            currentSortDirection = null;
+        }
     } else {
         currentSortColumn = columnIndex;
         currentSortDirection = 'desc';
     }
-
-    saveFilterSettings();
 
     document.querySelectorAll('th[data-sortable="true"]').forEach(th => {
         const columnSpan = th.querySelector('span:not(.sort-icon)');
@@ -2156,7 +2012,18 @@ function handleTableSort(columnIndex, header) {
             if (icon) {
                 icon.classList.remove('text-gray-600', 'dark:text-gray-400');
                 icon.classList.add('text-blue-500', 'dark:text-blue-500');
-                icon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
+
+                if (currentSortDirection === 'desc') {
+                    icon.textContent = '↓';
+                } else if (currentSortDirection === 'asc') {
+                    icon.textContent = '↑';
+                } else {
+                    icon.textContent = '↓';
+                    columnSpan.classList.remove('text-blue-500', 'dark:text-blue-500');
+                    columnSpan.classList.add('text-gray-600', 'dark:text-gray-300');
+                    icon.classList.remove('text-blue-500', 'dark:text-blue-500');
+                    icon.classList.add('text-gray-600', 'dark:text-gray-400');
+                }
             }
         } else {
             if (columnSpan) {
@@ -2170,6 +2037,8 @@ function handleTableSort(columnIndex, header) {
             }
         }
     });
+
+    saveFilterSettings();
 
     if (window.sortTimeout) {
         clearTimeout(window.sortTimeout);
@@ -2230,163 +2099,233 @@ function updateSortIndicators() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    if (window.NetworkManager && !window.networkManagerInitialized) {
-        NetworkManager.initialize({
-            connectionTestEndpoint: '/json',
-            connectionTestTimeout: 3000,
-            reconnectDelay: 5000,
-            maxReconnectAttempts: 5
-        });
-        window.networkManagerInitialized = true;
-    }
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        if (typeof window.PriceManager === 'undefined') {
+            console.error('PriceManager module not loaded');
+            ui.displayErrorMessage('Price data unavailable. Some features may not work correctly.');
+        }
 
-    NetworkManager.addHandler('offline', () => {
-        ui.displayErrorMessage("Network connection lost. Will automatically retry when connection is restored.");
-        updateConnectionStatus('disconnected');
-    });
+        if (initializeTableRateModule()) {
+            tableRateModule.init();
+        }
 
-    NetworkManager.addHandler('reconnected', () => {
-        ui.hideErrorMessage();
-        updateConnectionStatus('connected');
-        fetchOffers();
-    });
+        await initializeTableAndData();
 
-    NetworkManager.addHandler('maxAttemptsReached', () => {
-        ui.displayErrorMessage("Server connection lost. Please check your internet connection and try refreshing the page.");
-        updateConnectionStatus('error');
-    });
-
-    const tableLoadPromise = initializeTableAndData();
-
-    WebSocketManager.initialize({
-        debug: false
-    });
-
-    WebSocketManager.addMessageHandler('message', async (message) => {
-        try {
-            if (!NetworkManager.isOnline()) {
-                return;
-            }
-
-            const endpoint = isSentOffers ? '/json/sentoffers' : '/json/offers';
-            const response = await fetch(endpoint);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-            const newData = await response.json();
-            const fetchedOffers = Array.isArray(newData) ? newData : Object.values(newData);
-
-            jsonData = formatInitialData(fetchedOffers);
-            originalJsonData = [...jsonData];
-
-            CacheManager.set('offers_cached', jsonData, 'offers');
-
-            requestAnimationFrame(() => {
-                updateOffersTable();
-                updatePaginationInfo();
+        if (window.PriceManager) {
+            window.PriceManager.addEventListener('priceUpdate', function(prices) {
+                latestPrices = prices;
                 updateProfitLossDisplays();
             });
-        } catch (error) {
-            console.error('[Debug] Error processing WebSocket message:', error);
-            NetworkManager.handleNetworkError(error);
-        }
-    });
-
-    await tableLoadPromise;
-
-    CleanupManager.setInterval(() => {
-        CacheManager.cleanup();
-    }, 300000);
-
-    CleanupManager.setInterval(updateRowTimes, 900000);
-
-    if (window.MemoryManager) {
-        MemoryManager.enableAutoCleanup();
-    }
-
-    CleanupManager.addListener(document, 'visibilitychange', () => {
-        if (!document.hidden) {
-            if (!WebSocketManager.isConnected()) {
-                WebSocketManager.connect();
-            }
-
-            if (NetworkManager.isOnline()) {
-                fetchLatestPrices().then(priceData => {
-                    if (priceData) {
-                        latestPrices = priceData;
-                        updateProfitLossDisplays();
-                    }
-                });
-            }
-        }
-    });
-
-    CleanupManager.addListener(window, 'beforeunload', () => {
-        cleanup();
-    });
-});
-
-async function cleanup() {
-    console.log('Starting cleanup process');
-
-    try {
-
-        if (filterTimeout) {
-            clearTimeout(filterTimeout);
-            filterTimeout = null;
         }
 
         if (window.WebSocketManager) {
-            WebSocketManager.disconnect();
-            WebSocketManager.dispose();
+            WebSocketManager.addMessageHandler('message', async (data) => {
+                if (data.event === 'new_offer' || data.event === 'offer_revoked') {
+                    console.log('WebSocket event received:', data.event);
+                    try {
+
+                        const previousPrices = latestPrices;
+
+                        const offersResponse = await fetch(isSentOffers ? '/json/sentoffers' : '/json/offers');
+                        if (!offersResponse.ok) {
+                            throw new Error(`HTTP error! status: ${offersResponse.status}`);
+                        }
+                        
+                        const newData = await offersResponse.json();
+                        const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
+                        jsonData = formatInitialData(processedNewData);
+                        originalJsonData = [...jsonData];
+
+                        let priceData;
+                        if (window.PriceManager) {
+                            priceData = await window.PriceManager.getPrices(true);
+                        } else {
+                            priceData = await fetchLatestPrices();
+                        }
+                        
+                        if (priceData) {
+                            latestPrices = priceData;
+                            CacheManager.set('prices_coingecko', priceData, 'prices');
+                        } else if (previousPrices) {
+                            console.log('Using previous price data after failed refresh');
+                            latestPrices = previousPrices;
+                        }
+
+                        await updateOffersTable();
+ 
+                        updateProfitLossDisplays();
+
+                        document.querySelectorAll('.usd-value').forEach(usdValue => {
+                            const coinName = usdValue.getAttribute('data-coin');
+                            if (coinName) {
+                                const priceKey = getPriceKey(coinName);
+                                const price = latestPrices[priceKey]?.usd;
+                                if (price !== undefined && price !== null) {
+                                    const amount = parseFloat(usdValue.getAttribute('data-amount') || '0');
+                                    if (!isNaN(amount) && amount > 0) {
+                                        const usdValue = amount * price;
+                                        usdValue.textContent = tableRateModule.formatUSD(usdValue);
+                                    }
+                                }
+                            }
+                        });
+
+                        updatePaginationInfo();
+
+                        console.log('WebSocket-triggered refresh completed successfully');
+                    } catch (error) {
+                        console.error('Error during WebSocket-triggered refresh:', error);
+                        NetworkManager.handleNetworkError(error);
+                    }
+                }
+            });
+
+            if (!WebSocketManager.isConnected()) {
+                WebSocketManager.connect();
+            }
+        }
+
+        document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+            CleanupManager.addListener(header, 'click', () => {
+                const columnIndex = parseInt(header.getAttribute('data-column-index'), 10);
+                if (columnIndex !== null && !isNaN(columnIndex)) {
+                    handleTableSort(columnIndex, header);
+                }
+            });
+        });
+
+        if (window.NetworkManager) {
+            NetworkManager.addHandler('online', () => {
+                updateConnectionStatus('connected');
+                if (document.getElementById('error-overlay').classList.contains('hidden')) {
+                    fetchOffers();
+                }
+            });
+
+            NetworkManager.addHandler('offline', () => {
+                updateConnectionStatus('disconnected');
+            });
+        }
+
+        if (window.config.autoRefreshEnabled) {
+            startAutoRefresh();
+        }
+
+        const filterForm = document.getElementById('filterForm');
+        if (filterForm) {
+            filterForm.querySelectorAll('select').forEach(select => {
+                CleanupManager.addListener(select, 'change', () => {
+                    applyFilters();
+                    updateCoinFilterImages();
+                    updateClearFiltersButton();
+                });
+            });
+        }
+
+        const clearFiltersBtn = document.getElementById('clearFilters');
+        if (clearFiltersBtn) {
+            CleanupManager.addListener(clearFiltersBtn, 'click', clearFilters);
+        }
+
+        const rowTimeInterval = setInterval(updateRowTimes, 30000);
+        if (CleanupManager.registerResource) {
+            CleanupManager.registerResource('rowTimeInterval', rowTimeInterval, () => {
+                clearInterval(rowTimeInterval);
+            });
+        } else if (CleanupManager.addResource) {
+            CleanupManager.addResource('rowTimeInterval', rowTimeInterval, () => {
+                clearInterval(rowTimeInterval);
+            });
+        } else {
+
+            window._cleanupIntervals = window._cleanupIntervals || [];
+            window._cleanupIntervals.push(rowTimeInterval);
+        }
+
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        ui.displayErrorMessage('Error initializing application. Please refresh the page.');
+    }
+});
+
+async function cleanup() {
+    console.log('Starting offers.js cleanup process');
+
+    try {
+        if (window.filterTimeout) {
+            clearTimeout(window.filterTimeout);
+            window.filterTimeout = null;
+        }
+
+        if (window.sortTimeout) {
+            clearTimeout(window.sortTimeout);
+            window.sortTimeout = null;
+        }
+
+        if (window.refreshInterval) {
+            clearInterval(window.refreshInterval);
+            window.refreshInterval = null;
+        }
+
+        if (window.countdownInterval) {
+            clearInterval(window.countdownInterval);
+            window.countdownInterval = null;
+        }
+
+        if (window._cleanupIntervals && Array.isArray(window._cleanupIntervals)) {
+            window._cleanupIntervals.forEach(interval => {
+                clearInterval(interval);
+            });
+            window._cleanupIntervals = [];
+        }
+
+        if (window.PriceManager) {
+            if (typeof window.PriceManager.removeEventListener === 'function') {
+                window.PriceManager.removeEventListener('priceUpdate');
+            }
         }
 
         if (window.TooltipManager) {
-            window.TooltipManager.cleanup();
-            window.TooltipManager.dispose();
+            if (typeof window.TooltipManager.cleanup === 'function') {
+                window.TooltipManager.cleanup();
+            }
         }
 
-        cleanupTable();
+        const filterForm = document.getElementById('filterForm');
+        if (filterForm) {
+            CleanupManager.removeListenersByElement(filterForm);
+            
+            filterForm.querySelectorAll('select').forEach(select => {
+                CleanupManager.removeListenersByElement(select);
+            });
+        }
 
-        CleanupManager.clearAll();
-
-        latestPrices = null;
-        jsonData = [];
-        originalJsonData = [];
-        lastRefreshTime = null;
-
-        const domRefs = [
-            'offersBody', 'filterForm', 'prevPageButton', 'nextPageButton',
-            'currentPageSpan', 'totalPagesSpan', 'lastRefreshTimeSpan', 'newEntriesCountSpan'
-        ];
-
-        domRefs.forEach(ref => {
-            if (window[ref]) window[ref] = null;
+        const paginationButtons = document.querySelectorAll('#prevPage, #nextPage');
+        paginationButtons.forEach(button => {
+            CleanupManager.removeListenersByElement(button);
         });
 
-        if (window.tableRateModule) {
-            window.tableRateModule.cache = {};
-            window.tableRateModule.processedOffers.clear();
+        document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+            CleanupManager.removeListenersByElement(header);
+        });
+
+        const offersBody = document.getElementById('offers-body');
+        if (offersBody) {
+            const rows = offersBody.querySelectorAll('tr');
+            rows.forEach(row => {
+                cleanupRow(row);
+            });
+            offersBody.innerHTML = '';
         }
 
-        currentPage = 1;
-        currentSortColumn = 0;
-        currentSortDirection = 'desc';
+        jsonData = null;
+        originalJsonData = null;
+        latestPrices = null;
 
-        if (window.MemoryManager) {
-            MemoryManager.forceCleanup();
-        }
-
-        console.log('Offers table cleanup completed');
+        console.log('Offers.js cleanup completed');
     } catch (error) {
-        console.error('Error during offers cleanup:', error);
-
-        try {
-            CleanupManager.clearAll();
-            cleanupTable();
-        } catch (e) {
-            console.error('Failsafe cleanup failed:', e);
-        }
+        console.error('Error during cleanup:', error);
     }
 }
 

@@ -201,12 +201,23 @@ const ApiManager = (function() {
         },
 
         fetchCoinPrices: async function(coins, source = "coingecko.com", ttl = 300) {
-            if (!Array.isArray(coins)) {
-                coins = [coins];
+            if (!coins) {
+                throw new Error('No coins specified for price lookup');
+            }
+            let coinsParam;
+            if (Array.isArray(coins)) {
+                coinsParam = coins.filter(c => c && c.trim() !== '').join(',');
+            } else if (typeof coins === 'object' && coins.coins) {
+                coinsParam = coins.coins;
+            } else {
+                coinsParam = coins;
+            }
+            if (!coinsParam || coinsParam.trim() === '') {
+                throw new Error('No valid coins to fetch prices for');
             }
 
             return this.makeRequest('/json/coinprices', 'POST', {}, {
-                coins: Array.isArray(coins) ? coins.join(',') : coins,
+                coins: coinsParam,
                 source: source,
                 ttl: ttl
             });

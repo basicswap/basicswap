@@ -12,31 +12,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Meta Tags -->
   <meta charset="UTF-8">
   {% if refresh %}
   <meta http-equiv="refresh" content="{{ refresh }}">
   {% endif %}
   <title>(BSX) BasicSwap - v{{ version }}</title>
-  
-  <!-- Favicon -->
   <link rel="icon" sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-  
-  <!-- Stylesheets -->
   <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
-  
+
   <script>
-    // API Keys Configuration
     function getAPIKeys() {
       return {
         cryptoCompare: "{{ chart_api_key|safe }}",
         coinGecko: "{{ coingecko_api_key|safe }}"
       };
     }
-    
-    // WebSocket Configuration
     (function() {
       Object.defineProperty(window, 'ws_port', {
         value: "{{ ws_port|safe }}",
@@ -52,8 +44,6 @@
         };
       };
     })();
-    
-    // Dark Mode Initialization
     (function() {
       const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
         (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -64,28 +54,25 @@
       document.documentElement.classList.toggle('dark', isDarkMode);
     })();
   </script>
-  
-  <!-- Third-party Libraries -->
+
   <script src="/static/js/libs/chart.js"></script>
   <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="/static/js/libs/popper.js"></script>
   <script src="/static/js/libs/tippy.js"></script>
-  
-  <!-- UI Components -->
+
   <script src="/static/js/ui/tabs.js"></script>
   <script src="/static/js/ui/dropdown.js"></script>
-  
-  <!-- Core Application Modules -->
+
+  <script src="/static/js/modules/coin-manager.js"></script>
   <script src="/static/js/modules/config-manager.js"></script>
   <script src="/static/js/modules/cache-manager.js"></script>
   <script src="/static/js/modules/cleanup-manager.js"></script>
-  
-  <!-- Connection & Communication Modules -->
+
   <script src="/static/js/modules/websocket-manager.js"></script>
   <script src="/static/js/modules/network-manager.js"></script>
   <script src="/static/js/modules/api-manager.js"></script>
-  
-  <!-- UI & Interaction Modules -->
+  <script src="/static/js/modules/price-manager.js"></script>
+
   <script src="/static/js/modules/tooltips-manager.js"></script>
   <script src="/static/js/modules/notification-manager.js"></script>
   <script src="/static/js/modules/identity-manager.js"></script>
@@ -94,9 +81,9 @@
   <script src="/static/js/modules/wallet-manager.js"></script>
   {% endif %}
   <script src="/static/js/modules/memory-manager.js"></script>
-  
-  <!-- Global Script -->
+
   <script src="/static/js/global.js"></script>
+
 </head>
 <body class="dark:bg-gray-700">
   <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
