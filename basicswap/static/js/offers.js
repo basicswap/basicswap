@@ -242,7 +242,7 @@ function filterAndSortData() {
             const coinFromSelect = document.getElementById('coin_from');
             const selectedOption = coinFromSelect?.querySelector(`option[value="${filters.coin_from}"]`);
             const coinName = selectedOption?.textContent.trim();
-            
+
             if (coinName && !coinMatches(offer.coin_from, coinName)) {
                 return false;
             }
@@ -273,34 +273,89 @@ function filterAndSortData() {
         return true;
     });
 
-    if (currentSortColumn !== null && currentSortDirection !== null) {
+    if (currentSortColumn === 7) {
+        const offersWithPercentages = [];
+        
+        for (const offer of filteredData) {
+            const fromAmount = parseFloat(offer.amount_from) || 0;
+            const toAmount = parseFloat(offer.amount_to) || 0;
+            const coinFrom = offer.coin_from;
+            const coinTo = offer.coin_to;
+
+            const fromSymbol = getPriceKey(coinFrom);
+            const toSymbol = getPriceKey(coinTo);
+
+            const fromPriceUSD = latestPrices && fromSymbol ? latestPrices[fromSymbol]?.usd : null;
+            const toPriceUSD = latestPrices && toSymbol ? latestPrices[toSymbol]?.usd : null;
+
+            let percentDiff = null;
+
+            if (fromPriceUSD && toPriceUSD && !isNaN(fromPriceUSD) && !isNaN(toPriceUSD)) {
+                const fromValueUSD = fromAmount * fromPriceUSD;
+                const toValueUSD = toAmount * toPriceUSD;
+                
+                if (fromValueUSD && toValueUSD) {
+                    if (offer.is_own_offer || isSentOffers) {
+                        percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
+                    } else {
+                        percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
+                    }
+                }
+            }
+            
+            offersWithPercentages.push({
+                offer: offer,
+                percentDiff: percentDiff
+            });
+        }
+
+        const validOffers = offersWithPercentages.filter(item => item.percentDiff !== null);
+        const nullOffers = offersWithPercentages.filter(item => item.percentDiff === null);
+
+        validOffers.sort((a, b) => {
+            return currentSortDirection === 'asc' ? a.percentDiff - b.percentDiff : b.percentDiff - a.percentDiff;
+        });
+
+        filteredData = [...validOffers.map(item => item.offer), ...nullOffers.map(item => item.offer)];
+    } else if (currentSortColumn !== null && currentSortDirection !== null) {
         filteredData.sort((a, b) => {
             let aValue, bValue;
 
             switch(currentSortColumn) {
-                case 0: // Time column
+                case 0:
                     aValue = a.created_at;
                     bValue = b.created_at;
                     break;
-                case 1: // Details column (usually address)
+                case 1:
                     aValue = a.addr_from || '';
                     bValue = b.addr_from || '';
                     break;
-                case 2: // Taker Amount column
+                case 2:
                     aValue = parseFloat(a.amount_to) || 0;
                     bValue = parseFloat(b.amount_to) || 0;
                     break;
-                case 3: // Swap column (could sort by coin names)
+                case 3:
                     aValue = a.coin_from + a.coin_to;
                     bValue = b.coin_from + b.coin_to;
                     break;
-                case 4: // Orderbook column
+                case 4:
                     aValue = parseFloat(a.amount_from) || 0;
                     bValue = parseFloat(b.amount_from) || 0;
                     break;
-                case 5: // Rate column
+                case 5:
                     aValue = parseFloat(a.rate) || 0;
                     bValue = parseFloat(b.rate) || 0;
+                    break;
+                case 6:
+                    const aSymbol = getPriceKey(a.coin_to);
+                    const bSymbol = getPriceKey(b.coin_to);
+                    const aRate = parseFloat(a.rate) || 0;
+                    const bRate = parseFloat(b.rate) || 0;
+                    const aPriceUSD = latestPrices && aSymbol ? latestPrices[aSymbol]?.usd : null;
+                    const bPriceUSD = latestPrices && bSymbol ? latestPrices[bSymbol]?.usd : null;
+                    
+                    aValue = aPriceUSD && !isNaN(aPriceUSD) ? aRate * aPriceUSD : 0;
+                    bValue = bPriceUSD && !isNaN(bPriceUSD) ? bRate * bPriceUSD : 0;
                     break;
                 default:
                     aValue = a.created_at;
