@@ -984,9 +984,7 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
 def js_active(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
-
     all_bids = []
-
     try:
         for bid_id, (bid, offer) in list(swap_client.swaps_in_progress.items()):
             try:
@@ -1000,19 +998,31 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     "tx_state_b": None,
                     "coin_from": swap_client.ci(offer.coin_from).coin_name(),
                     "coin_to": swap_client.ci(offer.coin_to).coin_name(),
-                    "amount_from": swap_client.ci(offer.coin_from).format_amount(bid.amount),
-                    "amount_to": swap_client.ci(offer.coin_to).format_amount(bid.amount_to),
+                    "amount_from": swap_client.ci(offer.coin_from).format_amount(
+                        bid.amount
+                    ),
+                    "amount_to": swap_client.ci(offer.coin_to).format_amount(
+                        bid.amount_to
+                    ),
                     "addr_from": bid.bid_addr if bid.was_received else offer.addr_from,
                 }
 
                 if offer.swap_type == SwapTypes.XMR_SWAP:
-                    swap_data["tx_state_a"] = strTxState(bid.xmr_a_lock_tx.state) if bid.xmr_a_lock_tx else None
-                    swap_data["tx_state_b"] = strTxState(bid.xmr_b_lock_tx.state) if bid.xmr_b_lock_tx else None
+                    swap_data["tx_state_a"] = (
+                        strTxState(bid.xmr_a_lock_tx.state)
+                        if bid.xmr_a_lock_tx
+                        else None
+                    )
+                    swap_data["tx_state_b"] = (
+                        strTxState(bid.xmr_b_lock_tx.state)
+                        if bid.xmr_b_lock_tx
+                        else None
+                    )
                 else:
                     swap_data["tx_state_a"] = bid.getITxState()
                     swap_data["tx_state_b"] = bid.getPTxState()
 
-                if hasattr(bid, 'rate'):
+                if hasattr(bid, "rate"):
                     swap_data["rate"] = bid.rate
 
                 all_bids.append(swap_data)
@@ -1021,7 +1031,6 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                 pass
     except Exception:
         return bytes(json.dumps([]), "UTF-8")
-
     return bytes(json.dumps(all_bids), "UTF-8")
 
 
