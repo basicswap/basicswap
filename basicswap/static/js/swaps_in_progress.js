@@ -614,31 +614,7 @@ async function updateSwapsTable(options = {}) {
 }
 
 function isActiveSwap(swap) {
-    const activeStates = [
-
-        'InProgress',
-        'Accepted',
-        'Delaying',
-        'Auto accept delay',
-        'Request accepted',
-        //'Received',
-
-        'Script coin locked',
-        'Scriptless coin locked',
-        'Script coin lock released',
-
-        'SendingInitialTx',
-        'SendingPaymentTx',
-
-        'Exchanged script lock tx sigs msg',
-        'Exchanged script lock spend tx msg',
-
-        'Script tx redeemed',
-        'Scriptless tx redeemed',
-        'Scriptless tx recovered'
-    ];
-
-    return activeStates.includes(swap.bid_state);
+    return true;
 }
 
 const setupEventListeners = () => {

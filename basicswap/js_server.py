@@ -985,71 +985,40 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
 
-    filters = {
-        "sort_by": "created_at",
-        "sort_dir": "desc",
-        "with_available_or_active": True,
-        "with_extra_info": True,
-    }
-
-    EXCLUDED_STATES = [
-        "Failed, refunded",
-        "Failed, swiped",
-        "Failed",
-        "Expired",
-        "Timed-out",
-        "Abandoned",
-        "Completed",
-    ]
-
     all_bids = []
-    processed_bid_ids = set()
+
     try:
-        received_bids = swap_client.listBids(filters=filters)
-        sent_bids = swap_client.listBids(sent=True, filters=filters)
-
-        for bid in received_bids + sent_bids:
+        for bid_id, (bid, offer) in list(swap_client.swaps_in_progress.items()):
             try:
-                bid_id_hex = bid[2].hex()
-                if bid_id_hex in processed_bid_ids:
-                    continue
-
-                offer = swap_client.getOffer(bid[3])
-                if not offer:
-                    continue
-
-                bid_state = strBidState(bid[5])
-
-                if bid_state in EXCLUDED_STATES:
-                    continue
-
-                tx_state_a = strTxState(bid[7])
-                tx_state_b = strTxState(bid[8])
-
                 swap_data = {
-                    "bid_id": bid_id_hex,
-                    "offer_id": bid[3].hex(),
-                    "created_at": bid[0],
-                    "bid_state": bid_state,
-                    "tx_state_a": tx_state_a if tx_state_a else "None",
-                    "tx_state_b": tx_state_b if tx_state_b else "None",
-                    "coin_from": swap_client.ci(bid[9]).coin_name(),
+                    "bid_id": bid_id.hex(),
+                    "offer_id": offer.offer_id.hex(),
+                    "created_at": bid.created_at,
+                    "expire_at": bid.expire_at,
+                    "bid_state": strBidState(bid.state),
+                    "tx_state_a": None,
+                    "tx_state_b": None,
+                    "coin_from": swap_client.ci(offer.coin_from).coin_name(),
                     "coin_to": swap_client.ci(offer.coin_to).coin_name(),
-                    "amount_from": swap_client.ci(bid[9]).format_amount(bid[4]),
-                    "amount_to": swap_client.ci(offer.coin_to).format_amount(
-                        (bid[4] * bid[10]) // swap_client.ci(bid[9]).COIN()
-                    ),
-                    "addr_from": bid[11],
-                    "status": {
-                        "main": bid_state,
-                        "initial_tx": tx_state_a if tx_state_a else "None",
-                        "payment_tx": tx_state_b if tx_state_b else "None",
-                    },
+                    "amount_from": swap_client.ci(offer.coin_from).format_amount(bid.amount),
+                    "amount_to": swap_client.ci(offer.coin_to).format_amount(bid.amount_to),
+                    "addr_from": bid.bid_addr if bid.was_received else offer.addr_from,
                 }
+
+                if offer.swap_type == SwapTypes.XMR_SWAP:
+                    swap_data["tx_state_a"] = strTxState(bid.xmr_a_lock_tx.state) if bid.xmr_a_lock_tx else None
+                    swap_data["tx_state_b"] = strTxState(bid.xmr_b_lock_tx.state) if bid.xmr_b_lock_tx else None
+                else:
+                    swap_data["tx_state_a"] = bid.getITxState()
+                    swap_data["tx_state_b"] = bid.getPTxState()
+
+                if hasattr(bid, 'rate'):
+                    swap_data["rate"] = bid.rate
+
                 all_bids.append(swap_data)
-                processed_bid_ids.add(bid_id_hex)
+
             except Exception:
-                continue
+                pass
     except Exception:
         return bytes(json.dumps([]), "UTF-8")
 
