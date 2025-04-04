@@ -44,6 +44,8 @@ from .js_server import (
 )
 from .ui.util import (
     getCoinName,
+    get_data_entry,
+    get_data_entry_or,
     listAvailableCoins,
 )
 from .ui.page_automation import (
@@ -189,21 +191,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         return os.urandom(8).hex()
 
     def checkForm(self, post_string, name, messages):
-        if not post_string:
+        if post_string == "":
             return None
-        post_data_str = (
-            post_string.decode("utf-8")
-            if isinstance(post_string, bytes)
-            else post_string
-        )
-        form_data = parse.parse_qs(post_data_str)
-        form_id_list = form_data.get("formid", [])
-        if not form_id_list:
-            return form_data
-
-        form_id = form_id_list[0]
-        if form_id == self.server.last_form_id.get(name):
-            messages.append("Form already submitted.")
+        form_data = parse.parse_qs(post_string)
+        form_id = form_data[b"formid"][0].decode("utf-8")
+        if self.server.last_form_id.get(name, None) == form_id:
+            messages.append("Prevented double submit for form {}.".format(form_id))
             return None
         self.server.last_form_id[name] = form_id
         return form_data
@@ -419,11 +412,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         err_messages = []
         form_data = self.checkForm(post_string, "explorers", err_messages)
-        if form_data and form_data is not None:
+        if form_data:
 
-            explorer = form_data.get("explorer", ["-1"])[0]
-            action = form_data.get("action", ["-1"])[0]
-            args = form_data.get("args", [""])[0]
+            explorer = get_data_entry(form_data, "explorer")
+            action = get_data_entry(form_data, "action")
+            args = get_data_entry_or(form_data, "args", "")
 
             try:
                 c, e = explorer.split("_")
@@ -472,12 +465,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         messages = []
         err_messages = []
         form_data = self.checkForm(post_string, "rpc", err_messages)
-        if form_data and form_data is not None:  # Check if not None (double submit)
+        if form_data:
             try:
-                call_type = form_data.get("call_type", ["cli"])[0]
-                type_map = form_data.get("type_map", [""])[0]
+                call_type = get_data_entry_or(form_data, "call_type", "cli")
+                type_map = get_data_entry_or(form_data, "type_map", "")
                 try:
-                    coin_type_selected = form_data.get("coin_type", ["-1"])[0]
+                    coin_type_selected = get_data_entry(form_data, "coin_type")
                     coin_type_split = coin_type_selected.split(",")
                     coin_type = Coins(int(coin_type_split[0]))
                     coin_variant = int(coin_type_split[1])
@@ -488,7 +481,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     call_type = "http"
 
                 try:
-                    cmd = form_data.get("cmd", [""])[0]
+                    cmd = get_data_entry(form_data, "cmd")
                 except Exception:
                     raise ValueError("Invalid command")
                 if coin_type in (Coins.XMR, Coins.WOW):
@@ -660,7 +653,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.send_header(header_tuple[0], header_tuple[1])
         self.end_headers()
 
-    def handle_http(self, status_code, path, post_string=b"", is_json=False):
+    def handle_http(self, status_code, path, post_string="", is_json=False):
         swap_client = self.server.swap_client
         parsed = parse.urlparse(self.path)
         url_split = parsed.path.split("/")
@@ -720,7 +713,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 return b""
 
         if not post_string and len(parsed.query) > 0:
-            post_string = parsed.query.encode("utf-8")
+            post_string = parsed.query
 
         if page == "json":
             try:
