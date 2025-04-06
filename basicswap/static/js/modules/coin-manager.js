@@ -16,7 +16,7 @@ const CoinManager = (function() {
             symbol: 'XMR',
             name: 'monero',
             displayName: 'Monero',
-            aliases: ['xmr'],
+            aliases: ['xmr', 'monero'],
             coingeckoId: 'monero',
             cryptocompareId: 'XMR',
             usesCryptoCompare: true,
