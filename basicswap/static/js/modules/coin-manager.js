@@ -4,7 +4,7 @@ const CoinManager = (function() {
             symbol: 'BTC',
             name: 'bitcoin',
             displayName: 'Bitcoin',
-            aliases: ['btc'],
+            aliases: ['btc', 'bitcoin'],
             coingeckoId: 'bitcoin',
             cryptocompareId: 'BTC',
             usesCryptoCompare: false,
