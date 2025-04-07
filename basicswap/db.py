@@ -929,15 +929,12 @@ class DBMethods:
         table_name: str = table_class.__tablename__
 
         query: str = "SELECT "
-
         columns = []
 
         for mc in inspect.getmembers(table_class):
             mc_name, mc_obj = mc
-
             if not hasattr(mc_obj, "__sqlite3_column__"):
                 continue
-
             if len(columns) > 0:
                 query += ", "
             query += mc_name
@@ -945,10 +942,29 @@ class DBMethods:
 
         query += f" FROM {table_name} WHERE 1=1 "
 
+        query_data = {}
         for ck in constraints:
             if not validColumnName(ck):
                 raise ValueError(f"Invalid constraint column: {ck}")
-            query += f" AND {ck} = :{ck} "
+
+            constraint_value = constraints[ck]
+            if isinstance(constraint_value, tuple) or isinstance(
+                constraint_value, list
+            ):
+                if len(constraint_value) < 2:
+                    raise ValueError(f"Too few constraint values for list: {ck}")
+                query += f" AND {ck} IN ("
+
+                for i, cv in enumerate(constraint_value):
+                    cv_name: str = f"{ck}_{i}"
+                    if i > 0:
+                        query += ","
+                    query += ":" + cv_name
+                    query_data[cv_name] = cv
+                query += ") "
+            else:
+                query += f" AND {ck} = :{ck} "
+                query_data[ck] = constraint_value
 
         for order_col, order_dir in order_by.items():
             if validColumnName(order_col) is False:
@@ -961,7 +977,6 @@ class DBMethods:
         if query_suffix:
             query += query_suffix
 
-        query_data = constraints.copy()
         query_data.update(extra_query_data)
         rows = cursor.execute(query, query_data)
         for row in rows:
