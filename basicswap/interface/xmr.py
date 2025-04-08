@@ -205,17 +205,18 @@ class XMRInterface(CoinInterface):
             if "no connection to daemon" in str(e):
                 self._log.debug(f"{self.coin_name()} {e}")
                 return  # bypass refresh error to allow startup with a busy daemon
+            if "invalid signature" in str(e):
+                self._log.debug(f"{self.coin_name()} wallet is corrupt")
+                raise
 
             try:
-                # TODO Remove `store` after upstream fix to autosave on close_wallet
-                self.rpc_wallet("store")
                 self.rpc_wallet("close_wallet")
-                self._log.debug(f"Attempt to save and close {self.coin_name()} wallet")
+                self._log.debug(f"Closing {self.coin_name()} wallet")
             except Exception as e:  # noqa: F841
                 pass
 
             self.rpc_wallet("open_wallet", params)
-            self._log.debug(f"Reattempt to open {self.coin_name()} wallet")
+            self._log.debug(f"Attempting to open {self.coin_name()} wallet")
 
     def initialiseWallet(
         self, key_view: bytes, key_spend: bytes, restore_height=None
