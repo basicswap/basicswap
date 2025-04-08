@@ -64,10 +64,10 @@ DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 NMC_VERSION = os.getenv("NMC_VERSION", "28.0")
 NMC_VERSION_TAG = os.getenv("NMC_VERSION_TAG", "")
 
-MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.3.4")
+MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.4.0")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
 XMR_SITE_COMMIT = (
-    "3751c0d7987a9e78324a718c32c008e2ec91b339"  # Lock hashes.txt to monero version
+    "375fe249c22af0b7cf5794179638b1842427b129"  # Lock hashes.txt to monero version
 )
 
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
