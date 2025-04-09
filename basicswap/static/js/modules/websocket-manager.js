@@ -168,6 +168,8 @@ const WebSocketManager = (function() {
             }
 
             state.isConnecting = false;
+            state.messageHandlers = {};
+
 
             if (ws) {
                 ws.onopen = null;

@@ -740,36 +740,39 @@ function updateClearFiltersButton() {
 }
 
 function cleanupRow(row) {
-    if (!row) return;
+  if (!row) return;
 
-    const tooltipTriggers = row.querySelectorAll('[data-tooltip-trigger-id]');
-    tooltipTriggers.forEach(trigger => {
-        if (window.TooltipManager) {
-            window.TooltipManager.destroy(trigger);
-        }
-    });
-
-    CleanupManager.removeListenersByElement(row);
-
-    row.removeAttribute('data-offer-id');
-
-    while (row.firstChild) {
-        const child = row.firstChild;
-        row.removeChild(child);
+  const tooltipTriggers = row.querySelectorAll('[data-tooltip-trigger-id]');
+  tooltipTriggers.forEach(trigger => {
+    if (window.TooltipManager) {
+      window.TooltipManager.destroy(trigger);
     }
+  });
+
+  CleanupManager.removeListenersByElement(row);
+
+  while (row.attributes && row.attributes.length > 0) {
+    row.removeAttribute(row.attributes[0].name);
+  }
+
+  while (row.firstChild) {
+    const child = row.firstChild;
+    row.removeChild(child);
+  }
 }
 
 function cleanupTable() {
-    if (!offersBody) return;
+  if (!offersBody) return;
 
-    const existingRows = offersBody.querySelectorAll('tr');
-    existingRows.forEach(row => cleanupRow(row));
+  const existingRows = Array.from(offersBody.querySelectorAll('tr'));
 
-    offersBody.innerHTML = '';
+  existingRows.forEach(row => cleanupRow(row));
 
-    if (window.TooltipManager) {
-        window.TooltipManager.cleanup();
-    }
+  offersBody.innerHTML = '';
+
+  if (window.TooltipManager) {
+    window.TooltipManager.cleanup();
+  }
 }
 
 function handleNoOffersScenario() {
@@ -2303,84 +2306,76 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 });
 
-async function cleanup() {
-    console.log('Starting offers.js cleanup process');
+function cleanup() {
+  console.log('Starting offers.js cleanup process');
 
-    try {
-        if (window.filterTimeout) {
-            clearTimeout(window.filterTimeout);
-            window.filterTimeout = null;
-        }
-
-        if (window.sortTimeout) {
-            clearTimeout(window.sortTimeout);
-            window.sortTimeout = null;
-        }
-
-        if (window.refreshInterval) {
-            clearInterval(window.refreshInterval);
-            window.refreshInterval = null;
-        }
-
-        if (window.countdownInterval) {
-            clearInterval(window.countdownInterval);
-            window.countdownInterval = null;
-        }
-
-        if (window._cleanupIntervals && Array.isArray(window._cleanupIntervals)) {
-            window._cleanupIntervals.forEach(interval => {
-                clearInterval(interval);
-            });
-            window._cleanupIntervals = [];
-        }
-
-        if (window.PriceManager) {
-            if (typeof window.PriceManager.removeEventListener === 'function') {
-                window.PriceManager.removeEventListener('priceUpdate');
-            }
-        }
-
-        if (window.TooltipManager) {
-            if (typeof window.TooltipManager.cleanup === 'function') {
-                window.TooltipManager.cleanup();
-            }
-        }
-
-        const filterForm = document.getElementById('filterForm');
-        if (filterForm) {
-            CleanupManager.removeListenersByElement(filterForm);
-            
-            filterForm.querySelectorAll('select').forEach(select => {
-                CleanupManager.removeListenersByElement(select);
-            });
-        }
-
-        const paginationButtons = document.querySelectorAll('#prevPage, #nextPage');
-        paginationButtons.forEach(button => {
-            CleanupManager.removeListenersByElement(button);
-        });
-
-        document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
-            CleanupManager.removeListenersByElement(header);
-        });
-
-        const offersBody = document.getElementById('offers-body');
-        if (offersBody) {
-            const rows = offersBody.querySelectorAll('tr');
-            rows.forEach(row => {
-                cleanupRow(row);
-            });
-            offersBody.innerHTML = '';
-        }
-
-        jsonData = null;
-        originalJsonData = null;
-        latestPrices = null;
-
-        console.log('Offers.js cleanup completed');
-    } catch (error) {
-        console.error('Error during cleanup:', error);
+  try {
+    if (window.filterTimeout) {
+      clearTimeout(window.filterTimeout);
+      window.filterTimeout = null;
     }
-}
 
+    if (window.sortTimeout) {
+      clearTimeout(window.sortTimeout);
+      window.sortTimeout = null;
+    }
+
+    if (window.refreshInterval) {
+      clearInterval(window.refreshInterval);
+      window.refreshInterval = null;
+    }
+
+    if (window.countdownInterval) {
+      clearInterval(window.countdownInterval);
+      window.countdownInterval = null;
+    }
+
+    if (window._cleanupIntervals && Array.isArray(window._cleanupIntervals)) {
+      window._cleanupIntervals.forEach(interval => {
+        clearInterval(interval);
+      });
+      window._cleanupIntervals = [];
+    }
+
+    if (window.PriceManager) {
+      if (typeof window.PriceManager.removeEventListener === 'function') {
+        window.PriceManager.removeEventListener('priceUpdate');
+      }
+    }
+
+    if (window.TooltipManager) {
+      if (typeof window.TooltipManager.cleanup === 'function') {
+        window.TooltipManager.cleanup();
+      }
+    }
+
+    const filterForm = document.getElementById('filterForm');
+    if (filterForm) {
+      CleanupManager.removeListenersByElement(filterForm);
+      
+      filterForm.querySelectorAll('select').forEach(select => {
+        CleanupManager.removeListenersByElement(select);
+      });
+    }
+
+    const paginationButtons = document.querySelectorAll('#prevPage, #nextPage');
+    paginationButtons.forEach(button => {
+      CleanupManager.removeListenersByElement(button);
+    });
+
+    document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
+      CleanupManager.removeListenersByElement(header);
+    });
+
+    cleanupTable();
+
+    jsonData = null;
+    originalJsonData = null;
+    latestPrices = null;
+
+    console.log('Offers.js cleanup completed');
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+  }
+}
 window.cleanup = cleanup;

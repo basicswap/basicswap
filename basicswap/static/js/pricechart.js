@@ -523,6 +523,7 @@ const chartModule = {
   currentCoin: 'BTC',
   loadStartTime: 0,
   chartRefs: new WeakMap(),
+  pendingAnimationFrame: null,
 
   verticalLinePlugin: {
     id: 'verticalLine',
@@ -554,34 +555,25 @@ const chartModule = {
   },
 
   destroyChart: function() {
-    if (chartModule.chart) {
-      try {
-        const canvas = document.getElementById('coin-chart');
-        if (canvas) {
-          const events = ['click', 'mousemove', 'mouseout', 'mouseover', 'mousedown', 'mouseup'];
-          events.forEach(eventType => {
-            canvas.removeEventListener(eventType, null);
-          });
-        }
+  if (chartModule.chart) {
+    try {
+      const chartInstance = chartModule.chart;
+      const canvas = document.getElementById('coin-chart');
 
-        chartModule.chart.destroy();
-        chartModule.chart = null;
+      chartModule.chart = null;
 
-        if (canvas) {
-          chartModule.chartRefs.delete(canvas);
-        }
-      } catch (e) {
-        try {
-          if (chartModule.chart) {
-            if (chartModule.chart.destroy && typeof chartModule.chart.destroy === 'function') {
-              chartModule.chart.destroy();
-            }
-            chartModule.chart = null;
-          }
-        } catch (finalError) {}
+      if (chartInstance && chartInstance.destroy && typeof chartInstance.destroy === 'function') {
+        chartInstance.destroy();
       }
+
+      if (canvas) {
+        chartModule.chartRefs.delete(canvas);
+      }
+    } catch (e) {
+      console.error('Error destroying chart:', e);
     }
-  },
+  }
+ },
 
   initChart: function() {
     this.destroyChart();
@@ -994,11 +986,18 @@ const chartModule = {
   },
 
   cleanup: function() {
-    this.destroyChart();
-    this.currentCoin = null;
-    this.loadStartTime = 0;
-    this.chartRefs = new WeakMap();
+  if (this.pendingAnimationFrame) {
+    cancelAnimationFrame(this.pendingAnimationFrame);
+    this.pendingAnimationFrame = null;
   }
+
+  if (!document.hidden) {
+    this.currentCoin = null;
+  }
+
+  this.loadStartTime = 0;
+  this.chartRefs = new WeakMap();
+}
 };
 
 Chart.register(chartModule.verticalLinePlugin);
@@ -1059,6 +1058,8 @@ const app = {
   lastRefreshedTime: null,
   isRefreshing: false,
   isAutoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') !== 'true',
+  updateNextRefreshTimeRAF: null,
+
   refreshTexts: {
     label: 'Auto-refresh in',
     disabled: 'Auto-refresh: disabled',
@@ -1259,6 +1260,52 @@ const app = {
       app.scheduleNextRefresh();
     }
   },
+  
+  updateNextRefreshTime: function() {
+  const nextRefreshSpan = document.getElementById('next-refresh-time');
+  const labelElement = document.getElementById('next-refresh-label');
+  const valueElement = document.getElementById('next-refresh-value');
+
+  if (nextRefreshSpan && labelElement && valueElement) {
+    if (app.isRefreshing) {
+      labelElement.textContent = '';
+      valueElement.textContent = 'Refreshing...';
+      valueElement.classList.add('text-blue-500');
+      return;
+    } else {
+      valueElement.classList.remove('text-blue-500');
+    }
+
+    if (app.nextRefreshTime) {
+      if (app.updateNextRefreshTimeRAF) {
+        cancelAnimationFrame(app.updateNextRefreshTimeRAF);
+        app.updateNextRefreshTimeRAF = null;
+      }
+
+      const updateDisplay = () => {
+        const timeUntilRefresh = Math.max(0, Math.ceil((app.nextRefreshTime - Date.now()) / 1000));
+
+        if (timeUntilRefresh === 0) {
+          labelElement.textContent = '';
+          valueElement.textContent = app.refreshTexts.justRefreshed;
+        } else {
+          const minutes = Math.floor(timeUntilRefresh / 60);
+          const seconds = timeUntilRefresh % 60;
+          labelElement.textContent = `${app.refreshTexts.label}: `;
+          valueElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        if (timeUntilRefresh > 0) {
+          app.updateNextRefreshTimeRAF = requestAnimationFrame(updateDisplay);
+        }
+      };
+      updateDisplay();
+    } else {
+      labelElement.textContent = '';
+      valueElement.textContent = app.refreshTexts.disabled;
+    }
+   }
+ },
 
   scheduleNextRefresh: function() {
     if (app.autoRefreshInterval) {
@@ -1474,52 +1521,6 @@ refreshAllData: async function() {
     }
 
     console.log(`Refresh process finished at ${new Date().toLocaleTimeString()}, next refresh scheduled: ${app.isAutoRefreshEnabled ? 'yes' : 'no'}`);
-  }
-},
-
-  updateNextRefreshTime: function() {
-  const nextRefreshSpan = document.getElementById('next-refresh-time');
-  const labelElement = document.getElementById('next-refresh-label');
-  const valueElement = document.getElementById('next-refresh-value');
-
-  if (nextRefreshSpan && labelElement && valueElement) {
-
-    if (app.isRefreshing) {
-      labelElement.textContent = '';
-      valueElement.textContent = 'Refreshing...';
-      valueElement.classList.add('text-blue-500');
-      return;
-    } else {
-      valueElement.classList.remove('text-blue-500');
-    }
-
-    if (app.nextRefreshTime) {
-      if (app.updateNextRefreshTimeRAF) {
-        cancelAnimationFrame(app.updateNextRefreshTimeRAF);
-      }
-
-      const updateDisplay = () => {
-        const timeUntilRefresh = Math.max(0, Math.ceil((app.nextRefreshTime - Date.now()) / 1000));
-
-        if (timeUntilRefresh === 0) {
-          labelElement.textContent = '';
-          valueElement.textContent = app.refreshTexts.justRefreshed;
-        } else {
-          const minutes = Math.floor(timeUntilRefresh / 60);
-          const seconds = timeUntilRefresh % 60;
-          labelElement.textContent = `${app.refreshTexts.label}: `;
-          valueElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-
-        if (timeUntilRefresh > 0) {
-          app.updateNextRefreshTimeRAF = requestAnimationFrame(updateDisplay);
-        }
-      };
-      updateDisplay();
-    } else {
-      labelElement.textContent = '';
-      valueElement.textContent = app.refreshTexts.disabled;
-    }
   }
 },
 
