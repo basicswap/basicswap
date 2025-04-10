@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 26
+CURRENT_DB_VERSION = 27
 CURRENT_DB_DATA_VERSION = 6
 
 
@@ -183,6 +183,7 @@ class Offer(Table):
 
     amount_negotiable = Column("bool")
     rate_negotiable = Column("bool")
+    auto_accept_type = Column("integer")
 
     # Local fields
     auto_accept_bids = Column("bool")

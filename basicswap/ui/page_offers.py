@@ -733,6 +733,9 @@ def page_offer(self, url_split, post_string):
         "swap_type": strSwapDesc(offer.swap_type),
         "reverse": reverse_bid,
         "form_id": get_data_entry_or(form_data, "formid", "") if form_data else "",
+        "auto_accept_type": (
+            offer.auto_accept_type if hasattr(offer, "auto_accept_type") else 0
+        ),
     }
     data.update(extend_data)
 

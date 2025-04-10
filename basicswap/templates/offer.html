@@ -219,16 +219,17 @@
             <td class="py-3 px-6 bold">Revoked</td>
             <td class="py-3 px-6">{{ data.was_revoked }}</td>
            </tr>
-           {% if data.sent %}
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-            <td class="py-3 px-6 bold">Auto Accept Strategy</td>
+            <td class="py-3 px-6 bold">Auto Accept Type</td>
             <td class="py-3 px-6">
-            {% if data.automation_strat_id == -1 %} None {% else %}
-            <a href="/automationstrategy/{{ data.automation_strat_id }}">{{ data.automation_strat_label }}</a>
+            {% if data.auto_accept_type is none %} Unknown
+            {% elif data.auto_accept_type == 0 %} Bids are accepted manually
+            {% elif data.auto_accept_type == 1 %} Bids are accepted automatically
+            {% elif data.auto_accept_type == 2 %} Bids are accepted automatically from known identities
+            {% else %} Unknown ({{ data.auto_accept_type }})
             {% endif %}
             </td>
            </tr>
-           {% endif %}
            {% if data.xmr_type == true %}
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <td class="py-3 px-6 bold">Chain A offer fee rate</td>
@@ -482,7 +483,7 @@ if (document.readyState === 'loading') {
                    name="bid_amount_send"
                    value=""
                    max="{{ data.amt_to }}"
-                   onchange="validateMaxAmount(this, {{ data.amt_to }}); updateBidParams('sending');">
+                   onchange="validateMaxAmount(this, parseFloat('{{ data.amt_to }}')); updateBidParams('sending');">
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
                 max {{ data.amt_to }} ({{ data.tla_to }})
             </div>
@@ -505,7 +506,7 @@ if (document.readyState === 'loading') {
                    name="bid_amount" 
                    value="" 
                    max="{{ data.amt_from }}"
-                   onchange="validateMaxAmount(this, {{ data.amt_from }}); updateBidParams('receiving');">
+                   onchange="validateMaxAmount(this, parseFloat('{{ data.amt_from }}')); updateBidParams('receiving');">
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
                 max {{ data.amt_from }} ({{ data.tla_from }})
             </div>

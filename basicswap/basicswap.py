@@ -2165,6 +2165,24 @@ class BasicSwap(BaseApp):
                     msg_buf.fee_rate_to
                 )  # Unused: TODO - Set priority?
 
+            # Set auto-accept type
+            automation_id = extra_options.get("automation_id", -1)
+            if automation_id == -1 and auto_accept_bids:
+                automation_id = 1  # Default strategy
+
+            if automation_id != -1:
+                strategy = self.queryOne(
+                    AutomationStrategy,
+                    cursor,
+                    {"active_ind": 1, "record_id": automation_id},
+                )
+                if strategy:
+                    msg_buf.auto_accept_type = (
+                        2 if strategy.only_known_identities else 1
+                    )
+            else:
+                msg_buf.auto_accept_type = 0
+
             # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
             if "prefunded_itx" not in extra_options:
                 # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
@@ -2217,6 +2235,7 @@ class BasicSwap(BaseApp):
                 security_token=security_token,
                 from_feerate=msg_buf.fee_rate_from,
                 to_feerate=msg_buf.fee_rate_to,
+                auto_accept_type=msg_buf.auto_accept_type,
             )
             offer.setState(OfferStates.OFFER_SENT)
 
@@ -7054,6 +7073,11 @@ class BasicSwap(BaseApp):
                     expire_at=msg["sent"] + offer_data.time_valid,
                     was_sent=False,
                     bid_reversed=bid_reversed,
+                    auto_accept_type=(
+                        offer_data.auto_accept_type
+                        if b"\xa0\x01" in offer_bytes
+                        else None
+                    ),
                 )
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 self.add(offer, cursor)
