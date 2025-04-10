@@ -10,6 +10,7 @@ import base64
 import hashlib
 import json
 import logging
+import os
 import traceback
 
 from io import BytesIO
@@ -377,7 +378,7 @@ class BTCInterface(Secp256k1Interface):
             last_block_header = prev_block_header
         raise ValueError(f"Block header not found at time: {time}")
 
-    def initialiseWallet(self, key_bytes: bytes) -> None:
+    def initialiseWallet(self, key_bytes: bytes, restore_time: int = -1) -> None:
         assert len(key_bytes) == 32
         self._have_checked_seed = False
         if self._use_descriptors:
@@ -387,6 +388,7 @@ class BTCInterface(Secp256k1Interface):
             ek_encoded: str = self.encode_secret_extkey(ek.encode_v())
             desc_external = descsum_create(f"wpkh({ek_encoded}/0h/0h/*h)")
             desc_internal = descsum_create(f"wpkh({ek_encoded}/0h/1h/*h)")
+
             rv = self.rpc_wallet(
                 "importdescriptors",
                 [
@@ -394,7 +396,7 @@ class BTCInterface(Secp256k1Interface):
                         {"desc": desc_external, "timestamp": "now", "active": True},
                         {
                             "desc": desc_internal,
-                            "timestamp": "now",
+                            "timestamp": "now" if restore_time == -1 else restore_time,
                             "active": True,
                             "internal": True,
                         },
@@ -455,10 +457,6 @@ class BTCInterface(Secp256k1Interface):
             self.close_rpc(rpc_conn)
         raise ValueError(f"{self.coin_name()} wallet restore height not found.")
 
-    def getWalletSeedID(self) -> str:
-        wi = self.rpc_wallet("getwalletinfo")
-        return "Not found" if "hdseedid" not in wi else wi["hdseedid"]
-
     def getActiveDescriptor(self):
         descriptors = self.rpc_wallet("listdescriptors")["descriptors"]
         for descriptor in descriptors:
@@ -470,21 +468,24 @@ class BTCInterface(Secp256k1Interface):
                 return descriptor
         return None
 
-    def checkExpectedSeed(self, expect_seedid: str) -> bool:
+    def getWalletSeedID(self) -> str:
         if self._use_descriptors:
             descriptor = self.getActiveDescriptor()
             if descriptor is None:
                 self._log.debug("Could not find active descriptor.")
-                return False
-
+                return "Not found"
             end = descriptor["desc"].find("/")
             if end < 10:
-                return False
+                return "Not found"
             extkey = descriptor["desc"][5:end]
             extkey_data = b58decode(extkey)[4:-4]
             extkey_data_hash: bytes = hash160(extkey_data)
-            return True if extkey_data_hash.hex() == expect_seedid else False
+            return extkey_data_hash.hex()
 
+        wi = self.rpc_wallet("getwalletinfo")
+        return "Not found" if "hdseedid" not in wi else wi["hdseedid"]
+
+    def checkExpectedSeed(self, expect_seedid: str) -> bool:
         wallet_seed_id = self.getWalletSeedID()
         self._expect_seedid_hex = expect_seedid
         self._have_checked_seed = True
@@ -1978,12 +1979,79 @@ class BTCInterface(Secp256k1Interface):
         locked = encrypted and wallet_info["unlocked_until"] <= 0
         return encrypted, locked
 
-    def changeWalletPassword(self, old_password: str, new_password: str):
+    def createWallet(self, wallet_name: str, password: str = ""):
+        self.rpc("createwallet", [wallet_name, False, True, password, False, False])
+
+    def encryptWallet(self, password: str, check_seed: bool = True):
+        # Watchonly wallets are not encrypted
+
+        seed_id_before: str = self.getWalletSeedID()
+
+        self.rpc_wallet("encryptwallet", [password])
+
+        if check_seed is False or seed_id_before == "Not found":
+            return
+        seed_id_after: str = self.getWalletSeedID()
+
+        if seed_id_before == seed_id_after:
+            return
+        self._log.warning(f"{self.ticker()} wallet seed changed after encryption.")
+        self._log.debug(
+            f"seed_id_before: {seed_id_before} seed_id_after: {seed_id_after}."
+        )
+        self.setWalletSeedWarning(True)
+        # Workaround for https://github.com/bitcoin/bitcoin/issues/26607
+        chain_client_settings = self._sc.getChainClientSettings(
+            self.coin_type()
+        )  # basicswap.json
+
+        if chain_client_settings.get("manage_daemon", False) is False:
+            self._log.warning(
+                f"{self.ticker()} manage_daemon is false. Please manually stop BSX, remove the wallet, start BSX, and reseed."
+            )
+            return
+        try:
+            self.rpc_wallet("unloadwallet", [self._rpc_wallet])
+            datadir = chain_client_settings["datadir"]
+            if self._network != "mainnet":
+                datadir = os.path.join(datadir, self._network)
+
+            try_wallet_path = os.path.join(datadir, self._rpc_wallet)
+            if os.path.exists(try_wallet_path):
+                new_wallet_path = os.path.join(datadir, self._rpc_wallet + ".old")
+                os.rename(try_wallet_path, new_wallet_path)
+            else:
+                try_wallet_path = os.path.join(datadir, "wallets", self._rpc_wallet)
+                if os.path.exists(try_wallet_path):
+                    new_wallet_path = os.path.join(
+                        datadir, "wallets", self._rpc_wallet + ".old"
+                    )
+                    os.rename(try_wallet_path, new_wallet_path)
+                else:
+                    raise ValueError("Can't find old wallet path.")
+
+            self.createWallet(self._rpc_wallet, password=password)
+            self._sc.ci(Coins.PART).unlockWallet(password, check_seed=False)
+            self.unlockWallet(password, check_seed=False)
+            restore_time = chain_client_settings.get("restore_time", 0)
+            self._sc.initialiseWallet(self.coin_type(), True, restore_time=restore_time)
+            self._sc.checkWalletSeed(self.coin_type())
+
+        except Exception as e:
+            self._log.error(f"{self.ticker()} recreating wallet failed: {e}.")
+            if self._sc.debug:
+                self._log.error(traceback.format_exc())
+        finally:
+            self._sc.ci(Coins.PART).lockWallet()
+
+    def changeWalletPassword(
+        self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
+    ):
         self._log.info("changeWalletPassword - {}".format(self.ticker()))
         if old_password == "":
             if self.isWalletEncrypted():
                 raise ValueError("Old password must be set")
-            return self.rpc_wallet("encryptwallet", [new_password])
+            return self.encryptWallet(new_password, check_seed=check_seed_if_encrypt)
         self.rpc_wallet("walletpassphrasechange", [old_password, new_password])
 
     def unlockWallet(self, password: str, check_seed: bool = True) -> None:
@@ -2001,9 +2069,9 @@ class BTCInterface(Secp256k1Interface):
                 )
                 # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                 self.rpc(
-                    "createwallet", [self._rpc_wallet, False, True, "", False, False]
+                    "createwallet",
+                    [self._rpc_wallet, False, True, password, False, False],
                 )
-                self.rpc_wallet("encryptwallet", [password])
 
         # Max timeout value, ~3 years
         self.rpc_wallet("walletpassphrase", [password, 100000000])

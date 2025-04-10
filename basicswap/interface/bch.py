@@ -106,6 +106,10 @@ class BCHInterface(BTCInterface):
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
 
+    def createWallet(self, wallet_name: str, password: str = ""):
+        self.rpc("createwallet", [wallet_name, False])
+        self.rpc_wallet("encryptwallet", [password])
+
     # returns pkh
     def decodeAddress(self, address: str) -> bytes:
         return bytes(Address.from_string(address).payload)

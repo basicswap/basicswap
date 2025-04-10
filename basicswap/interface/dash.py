@@ -47,7 +47,7 @@ class DASHInterface(BTCInterface):
     def entropyToMnemonic(self, key: bytes) -> None:
         return Mnemonic("english").to_mnemonic(key)
 
-    def initialiseWallet(self, key_bytes: bytes) -> None:
+    def initialiseWallet(self, key_bytes: bytes, restore_time: int = -1) -> None:
         self._have_checked_seed = False
         if self._wallet_v20_compatible:
             self._log.warning("Generating wallet compatible with v20 seed.")
@@ -66,7 +66,11 @@ class DASHInterface(BTCInterface):
 
     def checkExpectedSeed(self, expect_seedid: str) -> bool:
         self._expect_seedid_hex = expect_seedid
-        rv = self.rpc_wallet("dumphdinfo")
+        try:
+            rv = self.rpc_wallet("dumphdinfo")
+        except Exception as e:
+            self._log.debug(f"DASH dumphdinfo failed {e}.")
+            return False
         if rv["mnemonic"] != "":
             entropy = Mnemonic("english").to_entropy(rv["mnemonic"].split(" "))
             entropy_hash = self.getAddressHashFromKey(entropy)[::-1].hex()
@@ -120,3 +124,36 @@ class DASHInterface(BTCInterface):
     def lockWallet(self):
         super().lockWallet()
         self._wallet_passphrase = ""
+
+    def encryptWallet(
+        self, old_password: str, new_password: str, check_seed: bool = True
+    ):
+        if old_password != "":
+            self.unlockWallet(old_password, check_seed=False)
+        seed_id_before: str = self.getWalletSeedID()
+
+        self.rpc_wallet("encryptwallet", [new_password])
+
+        if check_seed is False or seed_id_before == "Not found":
+            return
+        self.unlockWallet(new_password, check_seed=False)
+        seed_id_after: str = self.getWalletSeedID()
+
+        self.lockWallet()
+        if seed_id_before == seed_id_after:
+            return
+        self._log.warning(f"{self.ticker()} wallet seed changed after encryption.")
+        self._log.debug(
+            f"seed_id_before: {seed_id_before} seed_id_after: {seed_id_after}."
+        )
+        self.setWalletSeedWarning(True)
+
+    def changeWalletPassword(
+        self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
+    ):
+        self._log.info("changeWalletPassword - {}".format(self.ticker()))
+        if old_password == "":
+            if self.isWalletEncrypted():
+                raise ValueError("Old password must be set")
+            return self.encryptWallet(old_password, new_password, check_seed_if_encrypt)
+        self.rpc_wallet("walletpassphrasechange", [old_password, new_password])

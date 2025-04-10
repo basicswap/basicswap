@@ -332,14 +332,14 @@ class DCRInterface(Secp256k1Interface):
 
     def testDaemonRPC(self, with_wallet=True) -> None:
         if with_wallet:
-            self.rpc_wallet("getinfo")
+            self.rpc_wallet("walletislocked")
         else:
             self.rpc("getblockchaininfo")
 
     def getChainHeight(self) -> int:
         return self.rpc("getblockcount")
 
-    def initialiseWallet(self, key: bytes) -> None:
+    def initialiseWallet(self, key: bytes, restore_time: int = -1) -> None:
         # Load with --create
         pass
 
@@ -354,7 +354,9 @@ class DCRInterface(Secp256k1Interface):
         walletislocked = self.rpc_wallet("walletislocked")
         return True, walletislocked
 
-    def changeWalletPassword(self, old_password: str, new_password: str):
+    def changeWalletPassword(
+        self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
+    ):
         self._log.info("changeWalletPassword - {}".format(self.ticker()))
         if old_password == "":
             # Read initial pwd from settings

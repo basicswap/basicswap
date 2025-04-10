@@ -182,6 +182,7 @@ BSX_UPDATE_UNMANAGED = toBool(
 UI_HTML_PORT = int(os.getenv("UI_HTML_PORT", 12700))
 UI_WS_PORT = int(os.getenv("UI_WS_PORT", 11700))
 COINS_RPCBIND_IP = os.getenv("COINS_RPCBIND_IP", "127.0.0.1")
+DEFAULT_RESTORE_TIME = int(os.getenv("DEFAULT_RESTORE_TIME", 1577833261))  # 2020
 
 PART_ZMQ_PORT = int(os.getenv("PART_ZMQ_PORT", 20792))
 PART_RPC_HOST = os.getenv("PART_RPC_HOST", "127.0.0.1")
@@ -1708,6 +1709,11 @@ def printHelp():
         )
     )
     print(
+        "--walletrestoretime=n     Time to restore wallets from, default:{}, -1 for now.".format(
+            DEFAULT_RESTORE_TIME
+        )
+    )
+    print(
         "--trustremotenode        Set trusted-daemon for XMR, defaults to auto: true when daemon rpchost value is a private ip address else false"
     )
     print(
@@ -1808,12 +1814,18 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
 
 def encrypt_wallet(swap_client, coin_type) -> None:
     ci = swap_client.ci(coin_type)
-    ci.changeWalletPassword("", WALLET_ENCRYPTION_PWD)
+    ci.changeWalletPassword("", WALLET_ENCRYPTION_PWD, check_seed_if_encrypt=False)
     ci.unlockWallet(WALLET_ENCRYPTION_PWD)
 
 
 def initialise_wallets(
-    particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy
+    particl_wallet_mnemonic,
+    with_coins,
+    data_dir,
+    settings,
+    chain,
+    use_tor_proxy,
+    extra_opts={},
 ):
     swap_client = None
     daemons = []
@@ -1922,7 +1934,7 @@ def initialise_wallets(
                         if WALLET_ENCRYPTION_PWD == ""
                         else WALLET_ENCRYPTION_PWD
                     )
-                    extra_opts = [
+                    extra_args = [
                         '--appdata="{}"'.format(coin_settings["datadir"]),
                         "--pass={}".format(dcr_password),
                     ]
@@ -1931,7 +1943,7 @@ def initialise_wallets(
                     args = [
                         os.path.join(coin_settings["bindir"], filename),
                         "--create",
-                    ] + extra_opts
+                    ] + extra_args
                     hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
                     createDCRWallet(args, hex_seed, logger, threading.Event())
                     continue
@@ -2028,6 +2040,7 @@ def initialise_wallets(
                     )
 
         for coin_name in with_coins:
+            coin_settings = settings["chainclients"][coin_name]
             c = swap_client.getCoinIdFromName(coin_name)
             if c in (Coins.PART,):
                 continue
@@ -2035,14 +2048,29 @@ def initialise_wallets(
                 # initialiseWallet only sets main_wallet_seedid_
                 swap_client.waitForDaemonRPC(c)
             try:
-                swap_client.initialiseWallet(c, raise_errors=True)
+                default_restore_time = (
+                    -1 if generated_mnemonic else DEFAULT_RESTORE_TIME
+                )  # Set to -1 (now) if key is newly generated
+                restore_time: int = extra_opts.get(
+                    "walletrestoretime", default_restore_time
+                )
+
+                swap_client.initialiseWallet(
+                    c, raise_errors=True, restore_time=restore_time
+                )
+                if c not in (Coins.XMR, Coins.WOW):
+                    if restore_time == -1:
+                        restore_time = int(time.time())
+                        coin_settings["restore_time"] = restore_time
             except Exception as e:
                 coins_failed_to_initialise.append((c, e))
             if WALLET_ENCRYPTION_PWD != "" and (
                 c not in coins_to_create_wallets_for or c in (Coins.DASH,)
             ):  # TODO: Remove DASH workaround
                 try:
-                    swap_client.ci(c).changeWalletPassword("", WALLET_ENCRYPTION_PWD)
+                    swap_client.ci(c).changeWalletPassword(
+                        "", WALLET_ENCRYPTION_PWD, check_seed_if_encrypt=False
+                    )
                 except Exception as e:  # noqa: F841
                     logger.warning(f"changeWalletPassword failed for {coin_name}.")
 
@@ -2362,6 +2390,9 @@ def main():
                 continue
             if name == "wowrestoreheight":
                 wow_restore_height = int(s[1])
+                continue
+            if name == "walletrestoretime":
+                extra_opts["walletrestoretime"] = int(s[1])
                 continue
             if name == "keysdirpath":
                 extra_opts["keysdirpath"] = os.path.expanduser(s[1].strip('"'))
@@ -2823,6 +2854,7 @@ def main():
             settings,
             chain,
             use_tor_proxy,
+            extra_opts=extra_opts,
         )
 
         print("Done.")
@@ -2944,6 +2976,7 @@ def main():
                     settings,
                     chain,
                     use_tor_proxy,
+                    extra_opts=extra_opts,
                 )
 
             save_config(config_path, settings)
@@ -3085,12 +3118,20 @@ def main():
     save_config(config_path, settings)
 
     if particl_wallet_mnemonic == "none":
+        save_config(config_path, settings)
         logger.info("Done.")
         return 0
 
     initialise_wallets(
-        particl_wallet_mnemonic, with_coins, data_dir, settings, chain, use_tor_proxy
+        particl_wallet_mnemonic,
+        with_coins,
+        data_dir,
+        settings,
+        chain,
+        use_tor_proxy,
+        extra_opts=extra_opts,
     )
+    save_config(config_path, settings)
     print("Done.")
 
 

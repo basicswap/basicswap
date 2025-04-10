@@ -766,7 +766,9 @@ class XMRInterface(CoinInterface):
             balance_info = self.rpc_wallet("get_balance")
             return balance_info["unlocked_balance"]
 
-    def changeWalletPassword(self, old_password, new_password):
+    def changeWalletPassword(
+        self, old_password, new_password, check_seed_if_encrypt: bool = True
+    ):
         self._log.info("changeWalletPassword - {}".format(self.ticker()))
         orig_password = self._wallet_password
         if old_password != "":

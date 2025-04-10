@@ -1358,7 +1358,9 @@ class BasicSwap(BaseApp):
             legacy_root_hash = ci.getSeedHash(root_key, 20)
             self.setStringKV(key_str, legacy_root_hash.hex(), cursor)
 
-    def initialiseWallet(self, interface_type, raise_errors: bool = False) -> None:
+    def initialiseWallet(
+        self, interface_type, raise_errors: bool = False, restore_time: int = -1
+    ) -> None:
         if interface_type == Coins.PART:
             return
         ci = self.ci(interface_type)
@@ -1377,7 +1379,7 @@ class BasicSwap(BaseApp):
 
         root_key = self.getWalletKey(interface_type, 1)
         try:
-            ci.initialiseWallet(root_key)
+            ci.initialiseWallet(root_key, restore_time)
         except Exception as e:
             # <  0.21: sethdseed cannot set a new HD seed while still in Initial Block Download.
             self.log.error(f"initialiseWallet failed: {e}")

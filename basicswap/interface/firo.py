@@ -51,7 +51,7 @@ class FIROInterface(BTCInterface):
     def getExchangeName(self, exchange_name: str) -> str:
         return "zcoin"
 
-    def initialiseWallet(self, key):
+    def initialiseWallet(self, key, restore_time: int = -1):
         # load with -hdseed= parameter
         pass
 

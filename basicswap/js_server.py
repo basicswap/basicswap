@@ -850,7 +850,12 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
     swap_client.checkSystemStatus()
     post_data = getFormData(post_string, is_json)
 
-    coin = getCoinType(get_data_entry(post_data, "coin"))
+    coin_in = get_data_entry(post_data, "coin")
+    try:
+        coin = getCoinIdFromName(coin_in)
+    except Exception:
+        coin = getCoinType(coin_in)
+
     if coin in (Coins.PART, Coins.PART_ANON, Coins.PART_BLIND):
         raise ValueError("Particl wallet seed is set from the Basicswap mnemonic.")
 
@@ -878,12 +883,17 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
         expect_seedid = swap_client.getStringKV(
             "main_wallet_seedid_" + ci.coin_name().lower()
         )
+        try:
+            wallet_seed_id = ci.getWalletSeedID()
+        except Exception as e:
+            wallet_seed_id = f"Error: {e}"
 
         rv.update(
             {
                 "seed": seed_key.hex(),
                 "seed_id": seed_id.hex(),
                 "expected_seed_id": "Unset" if expect_seedid is None else expect_seedid,
+                "current_seed_id": wallet_seed_id,
             }
         )
 
