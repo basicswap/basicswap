@@ -247,7 +247,7 @@ def ltcCli(cmd, node_id=0):
 
 
 def signal_handler(sig, frame):
-    logging.info("signal {} detected.".format(sig))
+    logging.info(f"signal {sig} detected.")
     signal_event.set()
     test_delay_event.set()
 
@@ -309,6 +309,7 @@ def run_loop(cls):
         for c in cls.swap_clients:
             c.update()
         test_delay_event.wait(1.0)
+    cls.run_loop_ended()
 
 
 class BaseTest(unittest.TestCase):
@@ -322,12 +323,13 @@ class BaseTest(unittest.TestCase):
     ltc_daemons = []
     xmr_daemons = []
     xmr_wallet_auth = []
-    restore_instance = False
-    extra_wait_time = 0
+    restore_instance: bool = False
+    extra_wait_time: int = 0
+    num_nodes: int = NUM_NODES
 
-    start_ltc_nodes = False
-    start_xmr_nodes = True
-    has_segwit = True
+    start_ltc_nodes: bool = False
+    start_xmr_nodes: bool = True
+    has_segwit: bool = True
 
     xmr_addr = None
     btc_addr = None
@@ -391,6 +393,8 @@ class BaseTest(unittest.TestCase):
         cls.stream_fp = logging.FileHandler(os.path.join(TEST_DIR, "test.log"))
         cls.stream_fp.setFormatter(formatter)
         logger.addHandler(cls.stream_fp)
+
+        cls.prepareTestDir()
 
         try:
             logging.info("Preparing coin nodes.")
@@ -645,6 +649,7 @@ class BaseTest(unittest.TestCase):
                         start_nodes,
                         cls,
                     )
+
                 basicswap_dir = os.path.join(
                     os.path.join(TEST_DIR, "basicswap_" + str(i))
                 )
@@ -967,6 +972,10 @@ class BaseTest(unittest.TestCase):
         super(BaseTest, cls).tearDownClass()
 
     @classmethod
+    def prepareTestDir(cls):
+        pass
+
+    @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
         pass
 
@@ -994,6 +1003,10 @@ class BaseTest(unittest.TestCase):
                 "generateblocks",
                 {"wallet_address": cls.xmr_addr, "amount_of_blocks": 1},
             )
+
+    @classmethod
+    def run_loop_ended(cls):
+        pass
 
     @classmethod
     def waitForParticlHeight(cls, num_blocks, node_id=0):

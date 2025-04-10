@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 27
+CURRENT_DB_VERSION = 28
 CURRENT_DB_DATA_VERSION = 6
 
 
@@ -174,6 +174,7 @@ class Offer(Table):
     secret_hash = Column("blob")
 
     addr_from = Column("string")
+    pk_from = Column("blob")
     addr_to = Column("string")
     created_at = Column("integer")
     expire_at = Column("integer")
@@ -216,6 +217,7 @@ class Bid(Table):
     created_at = Column("integer")
     expire_at = Column("integer")
     bid_addr = Column("string")
+    pk_bid_addr = Column("blob")
     proof_address = Column("string")
     proof_utxos = Column("blob")
     # Address to spend lock tx to - address from wallet if empty TODO

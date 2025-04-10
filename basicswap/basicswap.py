@@ -122,8 +122,16 @@ from .explorers import (
     ExplorerBitAps,
     ExplorerChainz,
 )
+from .network.simplex import (
+    initialiseSimplexNetwork,
+    sendSimplexMsg,
+    readSimplexMsgs,
+)
+from .network.util import (
+    getMsgPubkey,
+)
 import basicswap.config as cfg
-import basicswap.network as bsn
+import basicswap.network.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 from .basicswap_util import (
@@ -428,6 +436,9 @@ class BasicSwap(BaseApp):
 
         self.swaps_in_progress = dict()
 
+        self.dleag_split_size_init = 16000
+        self.dleag_split_size = 17000
+
         self.SMSG_SECONDS_IN_HOUR = (
             60 * 60
         )  # Note: Set smsgsregtestadjust=0 for regtest
@@ -526,6 +537,8 @@ class BasicSwap(BaseApp):
             self._network = None
 
         for t in self.threads:
+            if hasattr(t, "stop") and callable(t.stop):
+                t.stop()
             t.join()
 
         if sys.version_info[1] >= 9:
@@ -1077,6 +1090,17 @@ class BasicSwap(BaseApp):
         self.log.debug(
             f"network_key {self.network_key}\nnetwork_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"
         )
+
+        self.active_networks = []
+        network_config_list = self.settings.get("networks", [])
+        if len(network_config_list) < 1:
+            network_config_list = [{"type": "smsg", "enabled": True}]
+
+        for network in network_config_list:
+            if network["type"] == "smsg":
+                self.active_networks.append({"type": "smsg"})
+            elif network["type"] == "simplex":
+                initialiseSimplexNetwork(self, network)
 
         ro = self.callrpc("smsglocalkeys")
         found = False
@@ -1655,6 +1679,33 @@ class BasicSwap(BaseApp):
         bid_valid = (bid.expire_at - now) + 10 * 60  # Add 10 minute buffer
         return max(smsg_min_valid, min(smsg_max_valid, bid_valid))
 
+    def sendMessage(
+        self, addr_from: str, addr_to: str, payload_hex: bytes, msg_valid: int, cursor
+    ) -> bytes:
+        message_id: bytes = None
+        # First network in list will set message_id
+        for network in self.active_networks:
+            net_message_id = None
+            if network["type"] == "smsg":
+                net_message_id = self.sendSmsg(
+                    addr_from, addr_to, payload_hex, msg_valid
+                )
+            elif network["type"] == "simplex":
+                net_message_id = sendSimplexMsg(
+                    self,
+                    network,
+                    addr_from,
+                    addr_to,
+                    bytes.fromhex(payload_hex),
+                    msg_valid,
+                    cursor,
+                )
+            else:
+                raise ValueError("Unknown network: {}".format(network["type"]))
+            if not message_id:
+                message_id = net_message_id
+        return message_id
+
     def sendSmsg(
         self, addr_from: str, addr_to: str, payload_hex: bytes, msg_valid: int
     ) -> bytes:
@@ -2200,7 +2251,9 @@ class BasicSwap(BaseApp):
             offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-            offer_id = self.sendSmsg(offer_addr, offer_addr_to, payload_hex, msg_valid)
+            offer_id = self.sendMessage(
+                offer_addr, offer_addr_to, payload_hex, msg_valid, cursor
+            )
 
             security_token = extra_options.get("security_token", None)
             if security_token is not None and len(security_token) != 20:
@@ -2305,8 +2358,8 @@ class BasicSwap(BaseApp):
             )
 
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, offer.time_valid)
-            msg_id = self.sendSmsg(
-                offer.addr_from, self.network_addr, payload_hex, msg_valid
+            msg_id = self.sendMessage(
+                offer.addr_from, self.network_addr, payload_hex, msg_valid, cursor
             )
             self.log.debug(
                 f"Revoked offer {self.log.id(offer_id)} in msg {self.log.id(msg_id)}"
@@ -3152,7 +3205,9 @@ class BasicSwap(BaseApp):
 
             bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, cursor)
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-            bid_id = self.sendSmsg(bid_addr, offer.addr_from, payload_hex, msg_valid)
+            bid_id = self.sendMessage(
+                bid_addr, offer.addr_from, payload_hex, msg_valid, cursor
+            )
 
             bid = Bid(
                 protocol_version=msg_buf.protocol_version,
@@ -3488,8 +3543,8 @@ class BasicSwap(BaseApp):
                 )
 
                 msg_valid: int = self.getAcceptBidMsgValidTime(bid)
-                accept_msg_id = self.sendSmsg(
-                    offer.addr_from, bid.bid_addr, payload_hex, msg_valid
+                accept_msg_id = self.sendMessage(
+                    offer.addr_from, bid.bid_addr, payload_hex, msg_valid, cursor
                 )
 
                 self.addMessageLink(
@@ -3519,20 +3574,29 @@ class BasicSwap(BaseApp):
         dleag: bytes,
         msg_valid: int,
         bid_msg_ids,
+        cursor,
     ) -> None:
-        msg_buf2 = XmrSplitMessage(
-            msg_id=bid_id, msg_type=msg_type, sequence=1, dleag=dleag[16000:32000]
-        )
-        msg_bytes = msg_buf2.to_bytes()
-        payload_hex = str.format("{:02x}", MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-        bid_msg_ids[1] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
 
-        msg_buf3 = XmrSplitMessage(
-            msg_id=bid_id, msg_type=msg_type, sequence=2, dleag=dleag[32000:]
-        )
-        msg_bytes = msg_buf3.to_bytes()
-        payload_hex = str.format("{:02x}", MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
-        bid_msg_ids[2] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+        sent_bytes = self.dleag_split_size_init
+
+        num_sent = 1
+        while sent_bytes < len(dleag):
+            size_to_send: int = min(self.dleag_split_size, len(dleag) - sent_bytes)
+            msg_buf = XmrSplitMessage(
+                msg_id=bid_id,
+                msg_type=msg_type,
+                sequence=num_sent,
+                dleag=dleag[sent_bytes : sent_bytes + size_to_send],
+            )
+            msg_bytes = msg_buf.to_bytes()
+            payload_hex = (
+                str.format("{:02x}", MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
+            )
+            bid_msg_ids[num_sent] = self.sendMessage(
+                addr_from, addr_to, payload_hex, msg_valid, cursor
+            )
+            num_sent += 1
+            sent_bytes += size_to_send
 
     def postXmrBid(
         self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}
@@ -3608,8 +3672,8 @@ class BasicSwap(BaseApp):
                 )
 
                 msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-                xmr_swap.bid_id = self.sendSmsg(
-                    bid_addr, offer.addr_from, payload_hex, msg_valid
+                xmr_swap.bid_id = self.sendMessage(
+                    bid_addr, offer.addr_from, payload_hex, msg_valid, cursor
                 )
 
                 bid = Bid(
@@ -3691,7 +3755,7 @@ class BasicSwap(BaseApp):
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
                 xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
-                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[:16000]
+                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[: self.dleag_split_size_init]
             elif ci_to.curve_type() == Curves.secp256k1:
                 for i in range(10):
                     xmr_swap.kbsf_dleag = ci_to.signRecoverable(
@@ -3721,8 +3785,8 @@ class BasicSwap(BaseApp):
             bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, cursor)
 
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-            xmr_swap.bid_id = self.sendSmsg(
-                bid_addr, offer.addr_from, payload_hex, msg_valid
+            xmr_swap.bid_id = self.sendMessage(
+                bid_addr, offer.addr_from, payload_hex, msg_valid, cursor
             )
 
             bid_msg_ids = {}
@@ -3735,6 +3799,7 @@ class BasicSwap(BaseApp):
                     xmr_swap.kbsf_dleag,
                     msg_valid,
                     bid_msg_ids,
+                    cursor,
                 )
 
             bid = Bid(
@@ -4013,7 +4078,7 @@ class BasicSwap(BaseApp):
 
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
-                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:16000]
+                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[: self.dleag_split_size_init]
             elif ci_to.curve_type() == Curves.secp256k1:
                 for i in range(10):
                     xmr_swap.kbsl_dleag = ci_to.signRecoverable(
@@ -4048,7 +4113,9 @@ class BasicSwap(BaseApp):
 
             msg_valid: int = self.getAcceptBidMsgValidTime(bid)
             bid_msg_ids = {}
-            bid_msg_ids[0] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+            bid_msg_ids[0] = self.sendMessage(
+                addr_from, addr_to, payload_hex, msg_valid, use_cursor
+            )
 
             if ci_to.curve_type() == Curves.ed25519:
                 self.sendXmrSplitMessages(
@@ -4059,6 +4126,7 @@ class BasicSwap(BaseApp):
                     xmr_swap.kbsl_dleag,
                     msg_valid,
                     bid_msg_ids,
+                    use_cursor,
                 )
 
             bid.setState(BidStates.BID_ACCEPTED)  # ADS
@@ -4180,8 +4248,8 @@ class BasicSwap(BaseApp):
             msg_buf.kbvf = kbvf
             msg_buf.kbsf_dleag = (
                 xmr_swap.kbsf_dleag
-                if len(xmr_swap.kbsf_dleag) < 16000
-                else xmr_swap.kbsf_dleag[:16000]
+                if len(xmr_swap.kbsf_dleag) < self.dleag_split_size_init
+                else xmr_swap.kbsf_dleag[: self.dleag_split_size_init]
             )
 
             bid_bytes = msg_buf.to_bytes()
@@ -4193,7 +4261,9 @@ class BasicSwap(BaseApp):
             addr_to: str = bid.bid_addr
             msg_valid: int = self.getAcceptBidMsgValidTime(bid)
             bid_msg_ids = {}
-            bid_msg_ids[0] = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid)
+            bid_msg_ids[0] = self.sendMessage(
+                addr_from, addr_to, payload_hex, msg_valid, use_cursor
+            )
 
             if ci_to.curve_type() == Curves.ed25519:
                 self.sendXmrSplitMessages(
@@ -4204,6 +4274,7 @@ class BasicSwap(BaseApp):
                     xmr_swap.kbsf_dleag,
                     msg_valid,
                     bid_msg_ids,
+                    use_cursor,
                 )
 
             bid.setState(BidStates.BID_REQUEST_ACCEPTED)
@@ -6808,6 +6879,11 @@ class BasicSwap(BaseApp):
         now: int = self.getTime()
         ttl_xmr_split_messages = 60 * 60
         bid_cursor = None
+
+        dleag_proof_len: int = 48893  # coincurve.dleag.dleag_proof_len()
+        expect_segments: int = -(
+            (dleag_proof_len - self.dleag_split_size_init) // -self.dleag_split_size
+        )  # ceiling division
         try:
             cursor = self.openDB()
             bid_cursor = self.getNewDBCursor()
@@ -6820,7 +6896,7 @@ class BasicSwap(BaseApp):
                     {"bid_id": bid.bid_id, "msg_type": int(XmrSplitMsgTypes.BID)},
                 ).fetchone()
                 num_segments = q[0]
-                if num_segments > 1:
+                if num_segments >= expect_segments:
                     try:
                         self.receiveXmrBid(bid, cursor)
                     except Exception as ex:
@@ -6866,7 +6942,7 @@ class BasicSwap(BaseApp):
                     },
                 ).fetchone()
                 num_segments = q[0]
-                if num_segments > 1:
+                if num_segments >= expect_segments:
                     try:
                         self.receiveXmrBidAccept(bid, cursor)
                     except Exception as ex:
@@ -7029,6 +7105,7 @@ class BasicSwap(BaseApp):
         if self.isOfferRevoked(offer_id, msg["from"]):
             raise ValueError("Offer has been revoked {}.".format(offer_id.hex()))
 
+        pk_from: bytes = getMsgPubkey(self, msg)
         try:
             cursor = self.openDB()
             # Offers must be received on the public network_addr or manually created addresses
@@ -7069,6 +7146,7 @@ class BasicSwap(BaseApp):
                     rate_negotiable=offer_data.rate_negotiable,
                     addr_to=msg["to"],
                     addr_from=msg["from"],
+                    pk_from=pk_from,
                     created_at=msg["sent"],
                     expire_at=msg["sent"] + offer_data.time_valid,
                     was_sent=False,
@@ -7417,6 +7495,7 @@ class BasicSwap(BaseApp):
 
         bid = self.getBid(bid_id)
         if bid is None:
+            pk_from: bytes = getMsgPubkey(self, msg)
             bid = Bid(
                 active_ind=1,
                 bid_id=bid_id,
@@ -7431,6 +7510,7 @@ class BasicSwap(BaseApp):
                 created_at=msg["sent"],
                 expire_at=msg["sent"] + bid_data.time_valid,
                 bid_addr=msg["from"],
+                pk_bid_addr=pk_from,
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
@@ -7829,12 +7909,13 @@ class BasicSwap(BaseApp):
         )
 
         if ci_to.curve_type() == Curves.ed25519:
-            ensure(len(bid_data.kbsf_dleag) == 16000, "Invalid kbsf_dleag size")
+            ensure(len(bid_data.kbsf_dleag) <= 16000, "Invalid kbsf_dleag size")
 
         bid_id = bytes.fromhex(msg["msgid"])
 
         bid, xmr_swap = self.getXmrBid(bid_id)
         if bid is None:
+            pk_from: bytes = getMsgPubkey(self, msg)
             bid = Bid(
                 active_ind=1,
                 bid_id=bid_id,
@@ -7846,6 +7927,7 @@ class BasicSwap(BaseApp):
                 created_at=msg["sent"],
                 expire_at=msg["sent"] + bid_data.time_valid,
                 bid_addr=msg["from"],
+                pk_bid_addr=pk_from,
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
@@ -8175,8 +8257,8 @@ class BasicSwap(BaseApp):
             msg_valid: int = self.getActiveBidMsgValidTime()
             addr_send_from: str = offer.addr_from if reverse_bid else bid.bid_addr
             addr_send_to: str = bid.bid_addr if reverse_bid else offer.addr_from
-            coin_a_lock_tx_sigs_l_msg_id = self.sendSmsg(
-                addr_send_from, addr_send_to, payload_hex, msg_valid
+            coin_a_lock_tx_sigs_l_msg_id = self.sendMessage(
+                addr_send_from, addr_send_to, payload_hex, msg_valid, cursor
             )
             self.addMessageLink(
                 Concepts.BID,
@@ -8544,8 +8626,8 @@ class BasicSwap(BaseApp):
         addr_send_from: str = bid.bid_addr if reverse_bid else offer.addr_from
         addr_send_to: str = offer.addr_from if reverse_bid else bid.bid_addr
         msg_valid: int = self.getActiveBidMsgValidTime()
-        coin_a_lock_release_msg_id = self.sendSmsg(
-            addr_send_from, addr_send_to, payload_hex, msg_valid
+        coin_a_lock_release_msg_id = self.sendMessage(
+            addr_send_from, addr_send_to, payload_hex, msg_valid, cursor
         )
         self.addMessageLink(
             Concepts.BID,
@@ -8964,8 +9046,8 @@ class BasicSwap(BaseApp):
         )
 
         msg_valid: int = self.getActiveBidMsgValidTime()
-        xmr_swap.coin_a_lock_refund_spend_tx_msg_id = self.sendSmsg(
-            addr_send_from, addr_send_to, payload_hex, msg_valid
+        xmr_swap.coin_a_lock_refund_spend_tx_msg_id = self.sendMessage(
+            addr_send_from, addr_send_to, payload_hex, msg_valid, cursor
         )
 
         bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
@@ -9347,6 +9429,7 @@ class BasicSwap(BaseApp):
 
         bid, xmr_swap = self.getXmrBid(bid_id)
         if bid is None:
+            pk_from: bytes = getMsgPubkey(self, msg)
             bid = Bid(
                 active_ind=1,
                 bid_id=bid_id,
@@ -9358,6 +9441,7 @@ class BasicSwap(BaseApp):
                 created_at=msg["sent"],
                 expire_at=msg["sent"] + bid_data.time_valid,
                 bid_addr=msg["from"],
+                pk_bid_addr=pk_from,
                 was_sent=False,
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
@@ -9460,7 +9544,7 @@ class BasicSwap(BaseApp):
             "Invalid destination address",
         )
         if ci_to.curve_type() == Curves.ed25519:
-            ensure(len(msg_data.kbsf_dleag) == 16000, "Invalid kbsf_dleag size")
+            ensure(len(msg_data.kbsf_dleag) <= 16000, "Invalid kbsf_dleag size")
 
         xmr_swap.dest_af = msg_data.dest_af
         xmr_swap.pkaf = msg_data.pkaf
@@ -9495,6 +9579,14 @@ class BasicSwap(BaseApp):
 
     def processMsg(self, msg) -> None:
         try:
+            if "hex" not in msg:
+                if self.debug:
+                    if "error" in msg:
+                        self.log.debug(
+                            "Message error {}: {}.".format(msg["msgid"], msg["error"])
+                        )
+                    raise ValueError("Invalid msg received {}.".format(msg["msgid"]))
+                return
             msg_type = int(msg["hex"][:2], 16)
 
             if msg_type == MessageTypes.OFFER:
@@ -9708,6 +9800,10 @@ class BasicSwap(BaseApp):
                     self.processMsg(msg)
 
         try:
+            for network in self.active_networks:
+                if network["type"] == "simplex":
+                    readSimplexMsgs(self, network)
+
             # TODO: Wait for blocks / txns, would need to check multiple coins
             now: int = self.getTime()
             self.expireBidsAndOffers(now)

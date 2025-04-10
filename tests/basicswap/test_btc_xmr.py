@@ -46,8 +46,7 @@ from tests.basicswap.common import (
 )
 from basicswap.contrib.test_framework.descriptors import descsum_create
 from basicswap.contrib.test_framework.messages import (
-    ToHex,
-    FromHex,
+    from_hex,
     CTxIn,
     COutPoint,
     CTransaction,
@@ -860,7 +859,7 @@ class BasicSwapTest(TestFunctions):
                 addr_p2sh_segwit,
             ],
         )
-        decoded_tx = FromHex(CTransaction(), tx_funded)
+        decoded_tx = from_hex(CTransaction(), tx_funded)
         decoded_tx.vin[0].scriptSig = bytes.fromhex("16" + addr_p2sh_segwit_info["hex"])
         txid_with_scriptsig = decoded_tx.rehash()
         assert txid_with_scriptsig == tx_signed_decoded["txid"]
@@ -950,7 +949,7 @@ class BasicSwapTest(TestFunctions):
         tx = CTransaction()
         tx.nVersion = ci.txVersion()
         tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
-        tx_hex = ToHex(tx)
+        tx_hex = tx.serialize().hex()
         tx_funded = ci.rpc_wallet("fundrawtransaction", [tx_hex])
         utxo_pos = 0 if tx_funded["changepos"] == 1 else 1
         tx_signed = ci.rpc_wallet(
@@ -979,10 +978,10 @@ class BasicSwapTest(TestFunctions):
         tx_spend.wit.vtxinwit[0].scriptWitness.stack = [
             script,
         ]
-        tx_spend_hex = ToHex(tx_spend)
+        tx_spend_hex = tx_spend.serialize().hex()
 
         tx_spend.nLockTime = chain_height + 2
-        tx_spend_invalid_hex = ToHex(tx_spend)
+        tx_spend_invalid_hex = tx_spend.serialize().hex()
 
         for tx_hex in [tx_spend_invalid_hex, tx_spend_hex]:
             try:
@@ -1055,7 +1054,7 @@ class BasicSwapTest(TestFunctions):
         tx = CTransaction()
         tx.nVersion = ci.txVersion()
         tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
-        tx_hex = ToHex(tx)
+        tx_hex = tx.serialize().hex()
         tx_funded = ci.rpc_wallet("fundrawtransaction", [tx_hex])
         utxo_pos = 0 if tx_funded["changepos"] == 1 else 1
         tx_signed = ci.rpc_wallet(
@@ -1094,7 +1093,7 @@ class BasicSwapTest(TestFunctions):
         tx_spend.wit.vtxinwit[0].scriptWitness.stack = [
             script,
         ]
-        tx_spend_hex = ToHex(tx_spend)
+        tx_spend_hex = tx_spend.serialize().hex()
         try:
             txid = ci.rpc(
                 "sendrawtransaction",
@@ -1435,7 +1434,7 @@ class BasicSwapTest(TestFunctions):
         tx = CTransaction()
         tx.nVersion = ci.txVersion()
         tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
-        tx_hex = ToHex(tx)
+        tx_hex = tx.serialize().hex()
         tx_funded = ci.rpc_wallet("fundrawtransaction", [tx_hex])
         utxo_pos = 0 if tx_funded["changepos"] == 1 else 1
         tx_signed = ci.rpc_wallet(
@@ -1477,7 +1476,7 @@ class BasicSwapTest(TestFunctions):
             )
         )
         tx_spend.vout.append(ci.txoType()(ci.make_int(1.0999), script_out))
-        tx_spend_hex = ToHex(tx_spend)
+        tx_spend_hex = tx_spend.serialize().hex()
 
         txid = ci.rpc(
             "sendrawtransaction",
@@ -1525,7 +1524,7 @@ class BasicSwapTest(TestFunctions):
         tx = CTransaction()
         tx.nVersion = ci.txVersion()
         tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
-        tx_hex = ToHex(tx)
+        tx_hex = tx.serialize().hex()
         tx_funded = ci.rpc_wallet("fundrawtransaction", [tx_hex])
         utxo_pos = 0 if tx_funded["changepos"] == 1 else 1
         tx_signed = ci.rpc_wallet(
@@ -1567,7 +1566,7 @@ class BasicSwapTest(TestFunctions):
         tx_spend.wit.vtxinwit[0].scriptWitness.stack = [
             script,
         ]
-        tx_spend_hex = ToHex(tx_spend)
+        tx_spend_hex = tx_spend.serialize().hex()
 
         txid = ci.rpc(
             "sendrawtransaction",

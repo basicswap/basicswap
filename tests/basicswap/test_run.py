@@ -56,7 +56,6 @@ from basicswap.contrib.test_framework.messages import (
     CTransaction,
     CTxIn,
     CTxInWitness,
-    ToHex,
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
@@ -211,7 +210,7 @@ class Test(BaseTest):
         tx = CTransaction()
         tx.nVersion = ci.txVersion()
         tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
-        tx_hex = ToHex(tx)
+        tx_hex = tx.serialize().hex()
         tx_funded = callnoderpc(0, "fundrawtransaction", [tx_hex])
         utxo_pos = 0 if tx_funded["changepos"] == 1 else 1
         tx_signed = callnoderpc(
@@ -248,10 +247,10 @@ class Test(BaseTest):
         tx_spend.wit.vtxinwit[0].scriptWitness.stack = [
             script,
         ]
-        tx_spend_hex = ToHex(tx_spend)
+        tx_spend_hex = tx_spend.serialize().hex()
 
         tx_spend.nLockTime = chain_height + 2
-        tx_spend_invalid_hex = ToHex(tx_spend)
+        tx_spend_invalid_hex = tx_spend.serialize().hex()
 
         for tx_hex in [tx_spend_invalid_hex, tx_spend_hex]:
             try:

@@ -30,7 +30,6 @@ from basicswap.contrib.test_framework.messages import (
     CTransaction,
     CTxIn,
     COutPoint,
-    ToHex,
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
@@ -318,7 +317,7 @@ class Test(TestFunctions):
             tx = CTransaction()
             tx.nVersion = ci.txVersion()
             tx.vout.append(ci.txoType()(ci.make_int(1.1), script_dest))
-            tx_hex = ToHex(tx)
+            tx_hex = tx.serialize().hex()
             tx_funded = ci.rpc_wallet("fundrawtransaction", [tx_hex])
             utxo_pos = 0 if tx_funded["changepos"] == 1 else 1
             tx_signed = ci.rpc_wallet(
@@ -357,10 +356,10 @@ class Test(TestFunctions):
                 )
             )
             tx_spend.vout.append(ci.txoType()(ci.make_int(1.099), script_out))
-            tx_spend_hex = ToHex(tx_spend)
+            tx_spend_hex = tx_spend.serialize().hex()
 
             tx_spend.nLockTime = chain_height + 2
-            tx_spend_invalid_hex = ToHex(tx_spend)
+            tx_spend_invalid_hex = tx_spend.serialize().hex()
 
             for tx_hex in [tx_spend_invalid_hex, tx_spend_hex]:
                 try:
