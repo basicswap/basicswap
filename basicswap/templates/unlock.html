@@ -1,36 +1,68 @@
 {% from 'style.html' import circular_info_messages_svg, green_cross_close_svg, red_cross_close_svg, circular_error_messages_svg %}
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    {% if refresh %}
-    <meta http-equiv="refresh" content="{{ refresh }}">
-    {% endif %}
-    <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet" />
-    <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
-    <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
+<head>
+  <meta charset="UTF-8">
+  {% if refresh %}
+  <meta http-equiv="refresh" content="{{ refresh }}">
+  {% endif %}
+  <title>(BSX) BasicSwap - v{{ version }}</title>
+  <link rel="icon" sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
+  <!-- CSS Stylesheets -->>
+  <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet">
+  <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
+  <!-- Custom styles -->
+  <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
+  <script>
+    function getAPIKeys() {
+      return {
+        cryptoCompare: "{{ chart_api_key|safe }}",
+        coinGecko: "{{ coingecko_api_key|safe }}"
+      };
+    }
 
+    (function() {
+      Object.defineProperty(window, 'ws_port', {
+        value: "{{ ws_port|safe }}",
+        writable: false,
+        configurable: false,
+        enumerable: true
+      });
+      window.getWebSocketConfig = window.getWebSocketConfig || function() {
+        return {
+          port: window.ws_port || '11700',
+          fallbackPort: '11700'
+        };
+      };
+    })();
+
+    (function() {
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
+        (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      if (!localStorage.getItem('color-theme')) {
+        localStorage.setItem('color-theme', 'dark');
+      }
+      document.documentElement.classList.toggle('dark', isDarkMode);
+    })();
+  </script>
   <!-- Third-party Libraries -->
   <script src="/static/js/libs/chart.js"></script>
   <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script src="/static/js/libs/popper.js"></script>
   <script src="/static/js/libs/tippy.js"></script>
-  
   <!-- UI Components -->
   <script src="/static/js/ui/tabs.js"></script>
   <script src="/static/js/ui/dropdown.js"></script>
-  
-  <!-- Core Application Modules -->
+  <!-- Core functionality -->
+  <script src="/static/js/modules/coin-manager.js"></script>
   <script src="/static/js/modules/config-manager.js"></script>
   <script src="/static/js/modules/cache-manager.js"></script>
   <script src="/static/js/modules/cleanup-manager.js"></script>
-  
-  <!-- Connection & Communication Modules -->
   <script src="/static/js/modules/websocket-manager.js"></script>
   <script src="/static/js/modules/network-manager.js"></script>
   <script src="/static/js/modules/api-manager.js"></script>
-  
-  <!-- UI & Interaction Modules -->
+  <script src="/static/js/modules/price-manager.js"></script>
   <script src="/static/js/modules/tooltips-manager.js"></script>
   <script src="/static/js/modules/notification-manager.js"></script>
   <script src="/static/js/modules/identity-manager.js"></script>
@@ -38,8 +70,11 @@
   {% if current_page == 'wallets' or current_page == 'wallet' %}
   <script src="/static/js/modules/wallet-manager.js"></script>
   {% endif %}
+  <!-- Memory management -->
   <script src="/static/js/modules/memory-manager.js"></script>
-  
+  <!-- Main application script -->
+  <script src="/static/js/global.js"></script>
+</head>
     <script>
     (function() {
       const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 

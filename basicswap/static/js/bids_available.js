@@ -1,20 +1,4 @@
 const PAGE_SIZE = 50;
-const COIN_NAME_TO_SYMBOL = {
-    'Bitcoin': 'BTC',
-    'Litecoin': 'LTC',
-    'Monero': 'XMR',
-    'Particl': 'PART',
-    'Particl Blind': 'PART',
-    'Particl Anon': 'PART',
-    'PIVX': 'PIVX',
-    'Firo': 'FIRO',
-    'Dash': 'DASH',
-    'Decred': 'DCR',
-    'Namecoin': 'NMC',
-    'Wownero': 'WOW',
-    'Bitcoin Cash': 'BCH',
-    'Dogecoin': 'DOGE'
-};
 
 const state = {
     dentities: new Map(),
@@ -288,8 +272,8 @@ const createBidTableRow = async (bid) => {
     const rate = toAmount > 0 ? toAmount / fromAmount : 0;
     const inverseRate = fromAmount > 0 ? fromAmount / toAmount : 0;
 
-    const fromSymbol = COIN_NAME_TO_SYMBOL[bid.coin_from] || bid.coin_from;
-    const toSymbol = COIN_NAME_TO_SYMBOL[bid.coin_to] || bid.coin_to;
+    const fromSymbol = window.CoinManager.getSymbol(bid.coin_from) || bid.coin_from;
+    const toSymbol = window.CoinManager.getSymbol(bid.coin_to) || bid.coin_to;
 
     const timeColor = getTimeStrokeColor(bid.expire_at);
     const uniqueId = `${bid.bid_id}_${bid.created_at}`;

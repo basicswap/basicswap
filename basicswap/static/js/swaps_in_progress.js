@@ -1,20 +1,4 @@
 const PAGE_SIZE = 50;
-const COIN_NAME_TO_SYMBOL = {
-    'Bitcoin': 'BTC',
-    'Litecoin': 'LTC',
-    'Monero': 'XMR',
-    'Particl': 'PART',
-    'Particl Blind': 'PART',
-    'Particl Anon': 'PART',
-    'PIVX': 'PIVX',
-    'Firo': 'FIRO',
-    'Dash': 'DASH',
-    'Decred': 'DCR',
-    'Namecoin': 'NMC',
-    'Wownero': 'WOW',
-    'Bitcoin Cash': 'BCH',
-    'Dogecoin': 'DOGE'
-};
 
 const state = {
     identities: new Map(),
@@ -309,8 +293,8 @@ const createSwapTableRow = async (swap) => {
 
     const identity = await IdentityManager.getIdentityData(swap.addr_from);
     const uniqueId = `${swap.bid_id}_${swap.created_at}`;
-    const fromSymbol = COIN_NAME_TO_SYMBOL[swap.coin_from] || swap.coin_from;
-    const toSymbol = COIN_NAME_TO_SYMBOL[swap.coin_to] || swap.coin_to;
+    const fromSymbol = window.CoinManager.getSymbol(swap.coin_from) || swap.coin_from;
+    const toSymbol = window.CoinManager.getSymbol(swap.coin_to) || swap.coin_to;
     const timeColor = getTimeStrokeColor(swap.expire_at);
     const fromAmount = parseFloat(swap.amount_from) || 0;
     const toAmount = parseFloat(swap.amount_to) || 0;
@@ -630,31 +614,7 @@ async function updateSwapsTable(options = {}) {
 }
 
 function isActiveSwap(swap) {
-    const activeStates = [
-
-        'InProgress',
-        'Accepted',
-        'Delaying',
-        'Auto accept delay',
-        'Request accepted',
-        //'Received',
-
-        'Script coin locked',
-        'Scriptless coin locked',
-        'Script coin lock released',
-
-        'SendingInitialTx',
-        'SendingPaymentTx',
-
-        'Exchanged script lock tx sigs msg',
-        'Exchanged script lock spend tx msg',
-
-        'Script tx redeemed',
-        'Scriptless tx redeemed',
-        'Scriptless tx recovered'
-    ];
-
-    return activeStates.includes(swap.bid_state);
+    return true;
 }
 
 const setupEventListeners = () => {
