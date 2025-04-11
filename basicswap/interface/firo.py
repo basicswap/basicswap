@@ -58,6 +58,25 @@ class FIROInterface(BTCInterface):
     def checkWallets(self) -> int:
         return 1
 
+    def encryptWallet(self, password: str, check_seed: bool = True):
+        # Watchonly wallets are not encrypted
+        # Firo shuts down after encryptwallet
+        seed_id_before: str = self.getWalletSeedID() if check_seed else "Not found"
+
+        self.rpc_wallet("encryptwallet", [password])
+
+        if check_seed is False or seed_id_before == "Not found":
+            return
+        seed_id_after: str = self.getWalletSeedID()
+
+        if seed_id_before == seed_id_after:
+            return
+        self._log.warning(f"{self.ticker()} wallet seed changed after encryption.")
+        self._log.debug(
+            f"seed_id_before: {seed_id_before} seed_id_after: {seed_id_after}."
+        )
+        self.setWalletSeedWarning(True)
+
     def getNewAddress(self, use_segwit, label="swap_receive"):
         return self.rpc("getnewaddress", [label])
         # addr_plain = self.rpc('getnewaddress', [label])

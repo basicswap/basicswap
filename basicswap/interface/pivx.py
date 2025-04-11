@@ -59,7 +59,7 @@ class PIVXInterface(BTCInterface):
 
         if chain_client_settings.get("manage_daemon", False) is False:
             self._log.warning(
-                f"{self.ticker()} manage_daemon is false. Please manually stop BSX, remove the wallet, start BSX, and reseed."
+                f"{self.ticker()} manage_daemon is false. Can't attempt to fix."
             )
             return
 

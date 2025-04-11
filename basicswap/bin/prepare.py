@@ -3115,8 +3115,6 @@ def main():
     for c in with_coins:
         prepareDataDir(c, settings, chain, particl_wallet_mnemonic, extra_opts)
 
-    save_config(config_path, settings)
-
     if particl_wallet_mnemonic == "none":
         save_config(config_path, settings)
         logger.info("Done.")

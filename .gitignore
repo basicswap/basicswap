@@ -8,6 +8,8 @@ __pycache__
 /*.eggs
 .tox
 .eggs
+.ruff_cache
+.pytest_cache
 *~
 
 # geckodriver.log
