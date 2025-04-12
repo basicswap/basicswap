@@ -1994,13 +1994,31 @@ class BTCInterface(Secp256k1Interface):
         locked = encrypted and wallet_info["unlocked_until"] <= 0
         return encrypted, locked
 
-    def createWallet(self, wallet_name: str, password: str = ""):
-        self.rpc("createwallet", [wallet_name, False, True, password, False, False])
+    def createWallet(self, wallet_name: str, password: str = "") -> None:
+        self.rpc(
+            "createwallet",
+            [wallet_name, False, True, password, False, self._use_descriptors],
+        )
+
+    def setActiveWallet(self, wallet_name: str) -> None:
+        # For debugging
+        self.rpc_wallet = make_rpc_func(
+            self._rpcport, self._rpcauth, host=self._rpc_host, wallet=wallet_name
+        )
+        self._rpc_wallet = wallet_name
+
+    def newKeypool(self) -> None:
+        self._log.debug("Running newkeypool.")
+        self.rpc_wallet("newkeypool")
 
     def encryptWallet(self, password: str, check_seed: bool = True):
         # Watchonly wallets are not encrypted
         # Workaround for https://github.com/bitcoin/bitcoin/issues/26607
         seed_id_before: str = self.getWalletSeedID()
+        orig_active_descriptors = []
+        orig_hdchain_bytes = None
+        walletpath = None
+        max_hdchain_key_count: int = 4000000  # Arbitrary
 
         chain_client_settings = self._sc.getChainClientSettings(
             self.coin_type()
@@ -2010,14 +2028,8 @@ class BTCInterface(Secp256k1Interface):
             and check_seed is True
             and seed_id_before != "Not found"
         ):
-            self.rpc("unloadwallet", [self._rpc_wallet])
-
             # Store active keys
-            seedid_bytes: bytes = bytes.fromhex(seed_id_before)[::-1]
-            orig_active_descriptors = []
-            orig_hdchain_bytes = None
-            walletpath = None
-            max_hdchain_key_count: int = 4000000  # Arbitrary
+            self.rpc("unloadwallet", [self._rpc_wallet])
 
             datadir = chain_client_settings["datadir"]
             if self._network != "mainnet":
@@ -2056,6 +2068,7 @@ class BTCInterface(Secp256k1Interface):
                             k, v = row
                             orig_active_descriptors.append({"k": k, "v": v})
                 else:
+                    seedid_bytes: bytes = bytes.fromhex(seed_id_before)[::-1]
                     with open(walletfilepath, "rb") as fp:
                         with mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                             pos = mm.find(seedid_bytes)
@@ -2188,8 +2201,7 @@ class BTCInterface(Secp256k1Interface):
                 self.unlockWallet(password, check_seed=False)
                 seed_id_after_restore: str = self.getWalletSeedID()
                 if seed_id_after_restore == seed_id_before:
-                    self._log.debug("Running newkeypool.")
-                    self.rpc_wallet("newkeypool")
+                    self.newKeypool()
                 else:
                     self._log.warning(
                         f"Expected seed id not found: {seed_id_before}, have {seed_id_after_restore}."
@@ -2201,8 +2213,6 @@ class BTCInterface(Secp256k1Interface):
             self._log.error(f"{self.ticker()} recreating wallet failed: {e}.")
             if self._sc.debug:
                 self._log.error(traceback.format_exc())
-        finally:
-            self._sc.ci(Coins.PART).lockWallet()
 
     def changeWalletPassword(
         self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
@@ -2230,7 +2240,14 @@ class BTCInterface(Secp256k1Interface):
                 # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                 self.rpc(
                     "createwallet",
-                    [self._rpc_wallet, False, True, password, False, False],
+                    [
+                        self._rpc_wallet,
+                        False,
+                        True,
+                        password,
+                        False,
+                        self._use_descriptors,
+                    ],
                 )
 
         # Max timeout value, ~3 years

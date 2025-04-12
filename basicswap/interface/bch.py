@@ -108,7 +108,28 @@ class BCHInterface(BTCInterface):
 
     def createWallet(self, wallet_name: str, password: str = ""):
         self.rpc("createwallet", [wallet_name, False])
-        self.rpc_wallet("encryptwallet", [password])
+        if password != "":
+            self.rpc(
+                "encryptwallet",
+                [
+                    password,
+                ],
+                override_wallet=wallet_name,
+            )
+
+    def newKeypool(self) -> None:
+        self._log.debug("Refreshing keypool.")
+
+        # Use up current keypool
+        wi = self.rpc_wallet("getwalletinfo")
+        keypool_size: int = wi["keypoolsize"]
+        for i in range(keypool_size):
+            _ = self.rpc_wallet("getnewaddress")
+        keypoolsize_hd_internal: int = wi["keypoolsize_hd_internal"]
+        for i in range(keypoolsize_hd_internal):
+            _ = self.rpc_wallet("getrawchangeaddress")
+
+        self.rpc_wallet("keypoolrefill")
 
     # returns pkh
     def decodeAddress(self, address: str) -> bytes:

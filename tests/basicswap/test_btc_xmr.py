@@ -1740,6 +1740,74 @@ class BasicSwapTest(TestFunctions):
         self.callnoderpc("unloadwallet", [new_wallet_name])
         self.callnoderpc("unloadwallet", [new_watch_wallet_name])
 
+    def test_014_encrypt_existing_wallet(self):
+        logging.info(
+            f"---------- Test {self.test_coin_from.name} encrypt existing wallet"
+        )
+
+        ci = self.swap_clients[0].ci(self.test_coin_from)
+        wallet_name = "encrypt_existing_wallet"
+
+        ci.createWallet(wallet_name)
+        ci.setActiveWallet(wallet_name)
+        chain_client_settings = self.swap_clients[0].getChainClientSettings(
+            self.test_coin_from
+        )
+        try:
+            chain_client_settings["manage_daemon"] = True
+            ci.initialiseWallet(ci.getNewRandomKey())
+
+            original_seed_id = ci.getWalletSeedID()
+
+            addr1 = ci.getNewAddress(True)
+            addr1_info = ci.rpc_wallet(
+                "getaddressinfo",
+                [
+                    addr1,
+                ],
+            )
+
+            addr_int1 = ci.rpc_wallet("getrawchangeaddress")
+            addr_int1_info = ci.rpc_wallet(
+                "getaddressinfo",
+                [
+                    addr_int1,
+                ],
+            )
+
+            ci.encryptWallet("test.123")
+
+            after_seed_id = ci.getWalletSeedID()
+
+            addr2 = ci.getNewAddress(True)
+            addr2_info = ci.rpc_wallet(
+                "getaddressinfo",
+                [
+                    addr2,
+                ],
+            )
+
+            addr_int2 = ci.rpc_wallet("getrawchangeaddress")
+            addr_int2_info = ci.rpc_wallet(
+                "getaddressinfo",
+                [
+                    addr_int2,
+                ],
+            )
+
+            key_id_field: str = (
+                "hdmasterkeyid"
+                if "hdmasterkeyid" in addr1_info
+                else "hdmasterfingerprint"
+            )
+            assert addr1_info[key_id_field] == addr2_info[key_id_field]
+            assert addr_int1_info[key_id_field] == addr_int2_info[key_id_field]
+            assert addr1_info[key_id_field] == addr_int1_info[key_id_field]
+            assert original_seed_id == after_seed_id
+        finally:
+            ci.setActiveWallet("wallet.dat")
+            chain_client_settings["manage_daemon"] = False
+
     def test_01_0_lock_bad_prevouts(self):
         logging.info(
             "---------- Test {} lock_bad_prevouts".format(self.test_coin_from.name)
