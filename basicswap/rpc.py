@@ -1,15 +1,13 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
+# Copyright (c) 2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import json
-import shlex
-import urllib
 import traceback
-import subprocess
+import urllib
 from xmlrpc.client import (
     Fault,
     Transport,
@@ -104,7 +102,7 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
         r = json.loads(v.decode("utf-8"))
     except Exception as ex:
         traceback.print_exc()
-        raise ValueError("RPC server error " + str(ex) + ", method: " + method)
+        raise ValueError(f"RPC server error: {ex}, method: {method}")
 
     if "error" in r and r["error"] is not None:
         raise ValueError("RPC error " + str(r["error"]))
@@ -120,36 +118,7 @@ def openrpc(rpc_port, auth, wallet=None, host="127.0.0.1"):
         return Jsonrpc(url)
     except Exception as ex:
         traceback.print_exc()
-        raise ValueError("RPC error " + str(ex))
-
-
-def callrpc_cli(bindir, datadir, chain, cmd, cli_bin="particl-cli", wallet=None):
-    cli_bin = os.path.join(bindir, cli_bin)
-
-    args = [
-        cli_bin,
-    ]
-    if chain != "mainnet":
-        args.append("-" + chain)
-    args.append("-datadir=" + datadir)
-    if wallet is not None:
-        args.append("-rpcwallet=" + wallet)
-    args += shlex.split(cmd)
-
-    p = subprocess.Popen(
-        args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    out = p.communicate()
-
-    if len(out[1]) > 0:
-        raise ValueError("RPC error " + str(out[1]))
-
-    r = out[0].decode("utf-8").strip()
-    try:
-        r = json.loads(r)
-    except Exception:
-        pass
-    return r
+        raise ValueError(f"RPC error: {ex}")
 
 
 def make_rpc_func(port, auth, wallet=None, host="127.0.0.1"):
