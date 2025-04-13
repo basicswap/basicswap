@@ -809,6 +809,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             else:
                 architecture = "x86_64-apple-darwin11"
         elif USE_PLATFORM == "Windows":
+            if machine == "AMD64":
+                machine = "x86_64"
             architecture = machine + "-w64-mingw32"
 
         release_url = "https://codeberg.org/wownero/wownero/releases/download/v{}/wownero-{}-v{}.{}".format(
