@@ -1734,6 +1734,8 @@ def printHelp():
     print(
         "--dashv20compatible      Generate the same DASH wallet seed as for DASH v20 - Use only when importing an existing seed."
     )
+    print("--client-auth-password=  Set or update the password to protect the web UI.")
+    print("--disable-client-auth    Remove password protection from the web UI.")
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -2166,6 +2168,8 @@ def main():
     disable_tor = False
     initwalletsonly = False
     tor_control_password = None
+    client_auth_pwd_value = None
+    disable_client_auth_flag = False
     extra_opts = {}
 
     if os.getenv("SSL_CERT_DIR", "") == "" and GUIX_SSL_CERT_DIR is not None:
@@ -2298,7 +2302,15 @@ def main():
             if name == "trustremotenode":
                 extra_opts["trust_remote_node"] = toBool(s[1])
                 continue
+            if name == "client-auth-password":
+                client_auth_pwd_value = s[1].strip('"')
+                continue
 
+        if name == "disable-client-auth":
+            disable_client_auth_flag = True
+            continue
+        if len(s) != 2:
+            exitWithError("Unknown argument {}".format(v))
         exitWithError("Unknown argument {}".format(v))
 
     if print_versions:
@@ -2327,6 +2339,34 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
+
+    config_exists = os.path.exists(config_path)
+    if config_exists and (
+        client_auth_pwd_value is not None or disable_client_auth_flag
+    ):
+        try:
+            settings = load_config(config_path)
+            modified = False
+            if client_auth_pwd_value is not None:
+                settings["client_auth_hash"] = rfc2440_hash_password(
+                    client_auth_pwd_value
+                )
+                logger.info("Client authentication password updated.")
+                modified = True
+            elif disable_client_auth_flag:
+                if "client_auth_hash" in settings:
+                    del settings["client_auth_hash"]
+                    logger.info("Client authentication disabled.")
+                    modified = True
+                else:
+                    logger.info("Client authentication is already disabled.")
+
+            if modified:
+                with open(config_path, "w") as fp:
+                    json.dump(settings, fp, indent=4)
+            return 0
+        except Exception as e:
+            exitWithError(f"Failed to update client auth settings: {e}")
 
     if use_tor_proxy and extra_opts.get("no_tor_proxy", False):
         exitWithError("Can't use --usetorproxy and --notorproxy together")
@@ -2968,6 +3008,10 @@ def main():
     if use_tor_proxy:
         tor_control_password = generate_salt(24)
         addTorSettings(settings, tor_control_password)
+
+    if client_auth_pwd_value is not None:
+        settings["client_auth_hash"] = rfc2440_hash_password(client_auth_pwd_value)
+        logger.info("Client authentication password set.")
 
     if not no_cores:
         for c in with_coins:

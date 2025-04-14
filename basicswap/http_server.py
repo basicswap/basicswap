@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
 import json
 import shlex
+import secrets
 import traceback
 import threading
 import http.client
+import base64
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from jinja2 import Environment, PackageLoader
 from socket import error as SocketError
 from urllib import parse
+from datetime import datetime, timedelta, timezone
+from http.cookies import SimpleCookie
 
 from . import __version__
 from .util import (
@@ -32,6 +36,8 @@ from .basicswap_util import (
     strTxState,
     strBidState,
 )
+from .util.rfc2440 import verify_rfc2440_password
+
 from .js_server import (
     js_error,
     js_url_to_function,
@@ -57,6 +63,9 @@ from .ui.page_encryption import page_changepassword, page_unlock, page_lock
 from .ui.page_identity import page_identity
 from .ui.page_smsgaddresses import page_smsgaddresses
 from .ui.page_debug import page_debug
+
+SESSION_COOKIE_NAME = "basicswap_session_id"
+SESSION_DURATION_MINUTES = 60
 
 env = Environment(loader=PackageLoader("basicswap", "templates"))
 env.filters["formatts"] = format_timestamp
@@ -120,6 +129,57 @@ def parse_cmd(cmd: str, type_map: str):
 
 
 class HttpHandler(BaseHTTPRequestHandler):
+    def _get_session_cookie(self):
+        if "Cookie" in self.headers:
+            cookie = SimpleCookie(self.headers["Cookie"])
+            if SESSION_COOKIE_NAME in cookie:
+                return cookie[SESSION_COOKIE_NAME].value
+        return None
+
+    def _set_session_cookie(self, session_id):
+        cookie = SimpleCookie()
+        cookie[SESSION_COOKIE_NAME] = session_id
+        cookie[SESSION_COOKIE_NAME]["path"] = "/"
+        cookie[SESSION_COOKIE_NAME]["httponly"] = True
+        cookie[SESSION_COOKIE_NAME]["samesite"] = "Lax"
+        expires = datetime.now(timezone.utc) + timedelta(
+            minutes=SESSION_DURATION_MINUTES
+        )
+        cookie[SESSION_COOKIE_NAME]["expires"] = expires.strftime(
+            "%a, %d %b %Y %H:%M:%S GMT"
+        )
+        return ("Set-Cookie", cookie.output(header="").strip())
+
+    def _clear_session_cookie(self):
+        cookie = SimpleCookie()
+        cookie[SESSION_COOKIE_NAME] = ""
+        cookie[SESSION_COOKIE_NAME]["path"] = "/"
+        cookie[SESSION_COOKIE_NAME]["httponly"] = True
+        cookie[SESSION_COOKIE_NAME]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
+        return ("Set-Cookie", cookie.output(header="").strip())
+
+    def is_authenticated(self):
+        swap_client = self.server.swap_client
+        client_auth_hash = swap_client.settings.get("client_auth_hash")
+
+        if not client_auth_hash:
+            return True
+
+        session_id = self._get_session_cookie()
+        if not session_id:
+            return False
+
+        session_data = self.server.active_sessions.get(session_id)
+        if session_data and session_data["expires"] > datetime.now(timezone.utc):
+            session_data["expires"] = datetime.now(timezone.utc) + timedelta(
+                minutes=SESSION_DURATION_MINUTES
+            )
+            return True
+
+        if session_id in self.server.active_sessions:
+            del self.server.active_sessions[session_id]
+        return False
+
     def log_error(self, format, *args):
         super().log_message(format, *args)
 
@@ -142,7 +202,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         return form_data
 
     def render_template(
-        self, template, args_dict, status_code=200, version=__version__
+        self,
+        template,
+        args_dict,
+        status_code=200,
+        version=__version__,
+        extra_headers=None,
     ):
         swap_client = self.server.swap_client
         if swap_client.ws_server:
@@ -153,7 +218,6 @@ class HttpHandler(BaseHTTPRequestHandler):
             args_dict["debug_ui_mode"] = True
         if swap_client.use_tor_proxy:
             args_dict["use_tor_proxy"] = True
-            # TODO: Cache value?
             try:
                 tor_state = get_tor_established_state(swap_client)
                 args_dict["tor_established"] = True if tor_state == "1" else False
@@ -202,7 +266,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         args_dict["version"] = version
 
-        self.putHeaders(status_code, "text/html")
+        self.putHeaders(status_code, "text/html", extra_headers=extra_headers)
         return bytes(
             template.render(
                 title=self.server.title,
@@ -214,6 +278,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         )
 
     def render_simple_template(self, template, args_dict):
+        self.putHeaders(200, "text/html")
         return bytes(
             template.render(
                 title=self.server.title,
@@ -222,7 +287,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             "UTF-8",
         )
 
-    def page_info(self, info_str, post_string=None):
+    def page_info(self, info_str, post_string=None, extra_headers=None):
         template = env.get_template("info.html")
         swap_client = self.server.swap_client
         summary = swap_client.getSummary()
@@ -233,6 +298,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 "message_str": info_str,
                 "summary": summary,
             },
+            extra_headers=extra_headers,
         )
 
     def page_error(self, error_str, post_string=None):
@@ -248,6 +314,93 @@ class HttpHandler(BaseHTTPRequestHandler):
             },
         )
 
+    def page_login(self, url_split, post_string):
+        swap_client = self.server.swap_client
+        template = env.get_template("login.html")
+        err_messages = []
+        extra_headers = []
+        is_json_request = "application/json" in self.headers.get("Content-Type", "")
+        security_warning = None
+        if self.server.host_name not in ("127.0.0.1", "localhost"):
+            security_warning = "WARNING: Server is accessible on the network. Sending password over plain HTTP is insecure. Use HTTPS (e.g., via reverse proxy) for non-local access."
+            if not is_json_request:
+                err_messages.append(security_warning)
+
+        if post_string:
+            password = None
+            if is_json_request:
+                try:
+                    json_data = json.loads(post_string.decode("utf-8"))
+                    password = json_data.get("password")
+                except Exception as e:
+                    swap_client.log.error(f"Error parsing JSON login data: {e}")
+            else:
+                try:
+                    form_data = parse.parse_qs(post_string.decode("utf-8"))
+                    password = form_data.get("password", [None])[0]
+                except Exception as e:
+                    swap_client.log.error(f"Error parsing form login data: {e}")
+
+            client_auth_hash = swap_client.settings.get("client_auth_hash")
+
+            if (
+                client_auth_hash
+                and password is not None
+                and verify_rfc2440_password(client_auth_hash, password)
+            ):
+                session_id = secrets.token_urlsafe(32)
+                expires = datetime.now(timezone.utc) + timedelta(
+                    minutes=SESSION_DURATION_MINUTES
+                )
+                self.server.active_sessions[session_id] = {"expires": expires}
+                cookie_header = self._set_session_cookie(session_id)
+
+                if is_json_request:
+                    response_data = {"success": True, "session_id": session_id}
+                    if security_warning:
+                        response_data["warning"] = security_warning
+                    self.putHeaders(
+                        200, "application/json", extra_headers=[cookie_header]
+                    )
+                    return json.dumps(response_data).encode("utf-8")
+                else:
+                    self.send_response(302)
+                    self.send_header("Location", "/offers")
+                    self.send_header(cookie_header[0], cookie_header[1])
+                    self.end_headers()
+                    return b""
+            else:
+                if is_json_request:
+                    self.putHeaders(401, "application/json")
+                    return json.dumps({"error": "Invalid password"}).encode("utf-8")
+                else:
+                    err_messages.append("Invalid password.")
+                    clear_cookie_header = self._clear_session_cookie()
+                    extra_headers.append(clear_cookie_header)
+
+        if (
+            not is_json_request
+            and swap_client.settings.get("client_auth_hash")
+            and self.is_authenticated()
+        ):
+            self.send_response(302)
+            self.send_header("Location", "/offers")
+            self.end_headers()
+            return b""
+
+        return self.render_template(
+            template,
+            {
+                "title_str": "Login",
+                "err_messages": err_messages,
+                "summary": {},
+                "encrypted": False,
+                "locked": False,
+            },
+            status_code=401 if post_string and not is_json_request else 200,
+            extra_headers=extra_headers,
+        )
+
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
@@ -261,14 +414,10 @@ class HttpHandler(BaseHTTPRequestHandler):
         form_data = self.checkForm(post_string, "explorers", err_messages)
         if form_data:
 
-            explorer = form_data[b"explorer"][0].decode("utf-8")
-            action = form_data[b"action"][0].decode("utf-8")
+            explorer = get_data_entry(form_data, "explorer")
+            action = get_data_entry(form_data, "action")
+            args = get_data_entry_or(form_data, "args", "")
 
-            args = (
-                ""
-                if b"args" not in form_data
-                else form_data[b"args"][0].decode("utf-8")
-            )
             try:
                 c, e = explorer.split("_")
                 exp = swap_client.coin_clients[Coins(int(c))]["explorers"][int(e)]
@@ -457,6 +606,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
     def page_shutdown(self, url_split, post_string):
         swap_client = self.server.swap_client
+        extra_headers = []
 
         if len(url_split) > 2:
             token = url_split[2]
@@ -464,9 +614,15 @@ class HttpHandler(BaseHTTPRequestHandler):
             if token != expect_token:
                 return self.page_info("Unexpected token, still running.")
 
+        session_id = self._get_session_cookie()
+        if session_id and session_id in self.server.active_sessions:
+            del self.server.active_sessions[session_id]
+        clear_cookie_header = self._clear_session_cookie()
+        extra_headers.append(clear_cookie_header)
+
         swap_client.stopRunning()
 
-        return self.page_info("Shutting down")
+        return self.page_info("Shutting down", extra_headers=extra_headers)
 
     def page_index(self, url_split):
         swap_client = self.server.swap_client
@@ -487,22 +643,81 @@ class HttpHandler(BaseHTTPRequestHandler):
             },
         )
 
-    def putHeaders(self, status_code, content_type):
+    def putHeaders(self, status_code, content_type, extra_headers=None):
         self.send_response(status_code)
         if self.server.allow_cors:
             self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Type", content_type)
+        if extra_headers:
+            for header_tuple in extra_headers:
+                self.send_header(header_tuple[0], header_tuple[1])
         self.end_headers()
 
     def handle_http(self, status_code, path, post_string="", is_json=False):
         swap_client = self.server.swap_client
         parsed = parse.urlparse(self.path)
         url_split = parsed.path.split("/")
-        if post_string == "" and len(parsed.query) > 0:
-            post_string = parsed.query
-        if len(url_split) > 1 and url_split[1] == "json":
+        page = url_split[1] if len(url_split) > 1 else ""
+
+        exempt_pages = ["login", "static", "error", "info"]
+        auth_header = self.headers.get("Authorization")
+        basic_auth_ok = False
+
+        if auth_header and auth_header.startswith("Basic "):
             try:
-                self.putHeaders(status_code, "text/plain")
+                encoded_creds = auth_header.split(" ", 1)[1]
+                decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
+                _, password = decoded_creds.split(":", 1)
+
+                client_auth_hash = swap_client.settings.get("client_auth_hash")
+                if client_auth_hash and verify_rfc2440_password(
+                    client_auth_hash, password
+                ):
+                    basic_auth_ok = True
+                else:
+                    self.send_response(401)
+                    self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({"error": "Invalid Basic Auth credentials"}).encode(
+                            "utf-8"
+                        )
+                    )
+                    return b""
+            except Exception as e:
+                swap_client.log.error(f"Error processing Basic Auth header: {e}")
+                self.send_response(401)
+                self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(
+                    json.dumps({"error": "Malformed Basic Auth header"}).encode("utf-8")
+                )
+                return b""
+
+        if not basic_auth_ok and page not in exempt_pages:
+            if not self.is_authenticated():
+                if page == "json":
+                    self.putHeaders(401, "application/json")
+                    self.wfile.write(
+                        json.dumps({"error": "Unauthorized"}).encode("utf-8")
+                    )
+                    return b""
+                else:
+                    self.send_response(302)
+                    self.send_header("Location", "/login")
+                clear_cookie_header = self._clear_session_cookie()
+                self.send_header(clear_cookie_header[0], clear_cookie_header[1])
+                self.end_headers()
+                return b""
+
+        if not post_string and len(parsed.query) > 0:
+            post_string = parsed.query
+
+        if page == "json":
+            try:
+                self.putHeaders(status_code, "json")
                 func = js_url_to_function(url_split)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
@@ -510,18 +725,20 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.log.error(traceback.format_exc())
                 return js_error(self, str(ex))
 
-        if len(url_split) > 1 and url_split[1] == "static":
+        if page == "static":
             try:
                 static_path = os.path.join(os.path.dirname(__file__), "static")
+                content = None
+                mime_type = ""
+                filepath = ""
                 if len(url_split) > 3 and url_split[2] == "sequence_diagrams":
-                    with open(
-                        os.path.join(static_path, "sequence_diagrams", url_split[3]),
-                        "rb",
-                    ) as fp:
-                        self.putHeaders(status_code, "image/svg+xml")
-                        return fp.read()
+                    filepath = os.path.join(
+                        static_path, "sequence_diagrams", url_split[3]
+                    )
+                    mime_type = "image/svg+xml"
                 elif len(url_split) > 3 and url_split[2] == "images":
                     filename = os.path.join(*url_split[3:])
+                    filepath = os.path.join(static_path, "images", filename)
                     _, extension = os.path.splitext(filename)
                     mime_type = {
                         ".svg": "image/svg+xml",
@@ -530,25 +747,25 @@ class HttpHandler(BaseHTTPRequestHandler):
                         ".gif": "image/gif",
                         ".ico": "image/x-icon",
                     }.get(extension, "")
-                    if mime_type == "":
-                        raise ValueError("Unknown file type " + filename)
-                    with open(
-                        os.path.join(static_path, "images", filename), "rb"
-                    ) as fp:
-                        self.putHeaders(status_code, mime_type)
-                        return fp.read()
                 elif len(url_split) > 3 and url_split[2] == "css":
                     filename = os.path.join(*url_split[3:])
-                    with open(os.path.join(static_path, "css", filename), "rb") as fp:
-                        self.putHeaders(status_code, "text/css; charset=utf-8")
-                        return fp.read()
+                    filepath = os.path.join(static_path, "css", filename)
+                    mime_type = "text/css; charset=utf-8"
                 elif len(url_split) > 3 and url_split[2] == "js":
                     filename = os.path.join(*url_split[3:])
-                    with open(os.path.join(static_path, "js", filename), "rb") as fp:
-                        self.putHeaders(status_code, "application/javascript")
-                        return fp.read()
+                    filepath = os.path.join(static_path, "js", filename)
+                    mime_type = "application/javascript"
                 else:
                     return self.page_404(url_split)
+
+                if mime_type == "" or not filepath:
+                    raise ValueError("Unknown file type or path")
+
+                with open(filepath, "rb") as fp:
+                    content = fp.read()
+                self.putHeaders(status_code, mime_type)
+                return content
+
             except FileNotFoundError:
                 return self.page_404(url_split)
             except Exception as ex:
@@ -560,6 +777,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             if len(url_split) > 1:
                 page = url_split[1]
 
+                if page == "login":
+                    return self.page_login(url_split, post_string)
                 if page == "active":
                     return self.page_active(url_split, post_string)
                 if page == "wallets":
@@ -632,7 +851,8 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.server.swap_client.log.debug(f"do_GET SocketError {e}")
 
     def do_POST(self):
-        post_string = self.rfile.read(int(self.headers.get("Content-Length")))
+        content_length = int(self.headers.get("Content-Length", 0))
+        post_string = self.rfile.read(content_length)
 
         is_json = True if "json" in self.headers.get("Content-Type", "") else False
         response = self.handle_http(200, self.path, post_string, is_json)
@@ -664,6 +884,7 @@ class HttpThread(threading.Thread, HTTPServer):
         self.title = "BasicSwap - " + __version__
         self.last_form_id = dict()
         self.session_tokens = dict()
+        self.active_sessions = {}
         self.env = env
         self.msg_id_counter = 0
 
@@ -673,18 +894,19 @@ class HttpThread(threading.Thread, HTTPServer):
     def stop(self):
         self.stop_event.set()
 
-        # Send fake request
-        conn = http.client.HTTPConnection(self.host_name, self.port_no)
-        conn.connect()
-        conn.request("GET", "/none")
-        response = conn.getresponse()
-        _ = response.read()
-        conn.close()
+        try:
+            conn = http.client.HTTPConnection(self.host_name, self.port_no, timeout=0.5)
+            conn.request("GET", "/shutdown_ping")
+            conn.close()
+        except Exception:
+            pass
 
     def serve_forever(self):
+        self.timeout = 1
         while not self.stop_event.is_set():
             self.handle_request()
         self.socket.close()
+        self.swap_client.log.info("HTTP server stopped.")
 
     def run(self):
         self.serve_forever()

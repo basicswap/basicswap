@@ -1,4 +1,5 @@
 {
+    "auth": "admin:password",
     "offers": [
         {
             "enabled": true,
