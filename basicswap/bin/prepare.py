@@ -283,18 +283,23 @@ TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
 TOR_CONTROL_PORT = int(os.getenv("TOR_CONTROL_PORT", 9051))
 TOR_DNS_PORT = int(os.getenv("TOR_DNS_PORT", 5353))
-TOR_CONTROL_LISTEN_INTERFACE = os.getenv(
-    "TOR_CONTROL_LISTEN_INTERFACE", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
-)
-TORRC_PROXY_HOST = os.getenv(
-    "TORRC_PROXY_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
-)
-TORRC_CONTROL_HOST = os.getenv(
-    "TORRC_CONTROL_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
-)
-TORRC_DNS_HOST = os.getenv(
-    "TORRC_DNS_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
-)
+
+
+def setTorrcVars():
+    global TOR_CONTROL_LISTEN_INTERFACE, TORRC_PROXY_HOST, TORRC_CONTROL_HOST, TORRC_DNS_HOST
+    TOR_CONTROL_LISTEN_INTERFACE = os.getenv(
+        "TOR_CONTROL_LISTEN_INTERFACE", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+    )
+    TORRC_PROXY_HOST = os.getenv(
+        "TORRC_PROXY_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+    )
+    TORRC_CONTROL_HOST = os.getenv(
+        "TORRC_CONTROL_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+    )
+    TORRC_DNS_HOST = os.getenv(
+        "TORRC_DNS_HOST", "127.0.0.1" if BSX_LOCAL_TOR else "0.0.0.0"
+    )
+
 
 TEST_TOR_PROXY = toBool(
     os.getenv("TEST_TOR_PROXY", "true")
@@ -2077,7 +2082,68 @@ def load_config(config_path):
     if not os.path.exists(config_path):
         exitWithError("{} does not exist".format(config_path))
     with open(config_path) as fs:
-        return json.load(fs)
+        settings = json.load(fs)
+
+    BSX_ALLOW_ENV_OVERRIDE = toBool(os.getenv("BSX_ALLOW_ENV_OVERRIDE", "false"))
+
+    saved_env_var_settings = [
+        ("setup_docker_mode", "BSX_DOCKER_MODE"),
+        ("setup_local_tor", "BSX_LOCAL_TOR"),
+        ("setup_tor_control_listen_interface", "TOR_CONTROL_LISTEN_INTERFACE"),
+        ("setup_torrc_proxy_host", "TORRC_PROXY_HOST"),
+        ("setup_torrc_control_host", "TORRC_CONTROL_HOST"),
+        ("setup_torrc_dns_host", "TORRC_DNS_HOST"),
+        ("tor_proxy_host", "TOR_PROXY_HOST"),
+        ("tor_proxy_port", "TOR_PROXY_PORT"),
+        ("tor_control_port", "TOR_CONTROL_PORT"),
+    ]
+    for setting in saved_env_var_settings:
+        config_name, env_name = setting
+        env_value = globals()[env_name]
+        saved_config_value = settings.get(config_name, env_value)
+        if saved_config_value != env_value:
+            if os.getenv(env_name):
+                # If the env var was manually set override the saved config if allowed else fail.
+                if BSX_ALLOW_ENV_OVERRIDE:
+                    logger.warning(
+                        f"Env var {env_name} differs from saved config '{config_name}', overriding."
+                    )
+                else:
+                    print(
+                        f"Env var {env_name} differs from saved config '{config_name}', set 'BSX_ALLOW_ENV_OVERRIDE' to override.",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+            else:
+                logger.info(f"Setting {env_name} from saved config '{config_name}'.")
+                globals()[env_name] = saved_config_value
+                # Recalculate env vars that depend on the changed var
+                if env_name == "BSX_LOCAL_TOR":
+                    setTorrcVars()
+    return settings
+
+
+def save_config(config_path, settings, add_options: bool = True) -> None:
+
+    if add_options is True:
+        # Add to config file only if manually set
+        if os.getenv("BSX_DOCKER_MODE"):
+            settings["setup_docker_mode"] = BSX_DOCKER_MODE
+        if os.getenv("BSX_LOCAL_TOR"):
+            settings["setup_local_tor"] = BSX_LOCAL_TOR
+        if os.getenv("TOR_CONTROL_LISTEN_INTERFACE"):
+            settings["setup_tor_control_listen_interface"] = (
+                TOR_CONTROL_LISTEN_INTERFACE
+            )
+        if os.getenv("TORRC_PROXY_HOST"):
+            settings["setup_torrc_proxy_host"] = TORRC_PROXY_HOST
+        if os.getenv("TORRC_CONTROL_HOST"):
+            settings["setup_torrc_control_host"] = TORRC_CONTROL_HOST
+        if os.getenv("TORRC_DNS_HOST"):
+            settings["setup_torrc_dns_host"] = TORRC_DNS_HOST
+
+    with open(config_path, "w") as fp:
+        json.dump(settings, fp, indent=4)
 
 
 def signal_handler(sig, frame):
@@ -2147,6 +2213,7 @@ def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
 
 def main():
     global use_tor_proxy, with_coins_changed
+    setTorrcVars()
     data_dir = None
     bin_dir = None
     port_offset = None
@@ -2777,15 +2844,15 @@ def main():
                 settings, coin, tor_control_password, enable=True, extra_opts=extra_opts
             )
 
-        with open(config_path, "w") as fp:
-            json.dump(settings, fp, indent=4)
-
+        save_config(config_path, settings)
         logger.info("Done.")
         return 0
 
     if disable_tor:
         logger.info("Disabling TOR")
         settings = load_config(config_path)
+        if not settings.get("use_tor", False):
+            logger.info("TOR is not enabled.")  # Continue anyway to clear any config
         settings["use_tor"] = False
         for coin in settings["chainclients"]:
             modify_tor_config(
@@ -2796,9 +2863,7 @@ def main():
                 extra_opts=extra_opts,
             )
 
-        with open(config_path, "w") as fp:
-            json.dump(settings, fp, indent=4)
-
+        save_config(config_path, settings)
         logger.info("Done.")
         return 0
 
@@ -2823,9 +2888,7 @@ def main():
         if "manage_wallet_daemon" in coin_settings:
             coin_settings["manage_wallet_daemon"] = False
 
-        with open(config_path, "w") as fp:
-            json.dump(settings, fp, indent=4)
-
+        save_config(config_path, settings)
         logger.info("Done.")
         return 0
 
@@ -2847,8 +2910,7 @@ def main():
                 coin_settings["manage_daemon"] = True
                 if "manage_wallet_daemon" in coin_settings:
                     coin_settings["manage_wallet_daemon"] = True
-                with open(config_path, "w") as fp:
-                    json.dump(settings, fp, indent=4)
+                save_config(config_path, settings)
                 logger.info("Done.")
                 return 0
             exitWithError("{} is already in the settings file".format(add_coin))
@@ -2863,7 +2925,6 @@ def main():
             test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
 
         settings["chainclients"][add_coin] = chainclients[add_coin]
-        settings["use_tor_proxy"] = use_tor_proxy
 
         if not no_cores:
             prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
@@ -2885,8 +2946,7 @@ def main():
                     use_tor_proxy,
                 )
 
-            with open(config_path, "w") as fp:
-                json.dump(settings, fp, indent=4)
+            save_config(config_path, settings)
 
         logger.info(f"Done. Coin {add_coin} successfully added.")
         return 0
@@ -2905,8 +2965,7 @@ def main():
                 if c not in settings["chainclients"]:
                     settings["chainclients"][c] = chainclients[c]
         elif upgrade_cores:
-            with open(config_path) as fs:
-                settings = json.load(fs)
+            settings = load_config(config_path)
 
             with_coins_start = with_coins
             if not with_coins_changed:
@@ -2955,8 +3014,8 @@ def main():
             # Run second loop to update, so all versions are logged together.
             # Backup settings
             old_config_path = config_path[:-5] + "_" + str(int(time.time())) + ".json"
-            with open(old_config_path, "w") as fp:
-                json.dump(settings, fp, indent=4)
+            save_config(old_config_path, settings, add_options=False)
+
             for c in with_coins:
                 prepareCore(c, known_coins[c], settings, data_dir, extra_opts)
                 current_coin_settings = chainclients[c]
@@ -2969,8 +3028,7 @@ def main():
                     settings["chainclients"][c][
                         "core_version_group"
                     ] = current_version_group
-                with open(config_path, "w") as fp:
-                    json.dump(settings, fp, indent=4)
+                save_config(config_path, settings)
 
             logger.info("Done.")
             return 0
@@ -3024,8 +3082,7 @@ def main():
     for c in with_coins:
         prepareDataDir(c, settings, chain, particl_wallet_mnemonic, extra_opts)
 
-    with open(config_path, "w") as fp:
-        json.dump(settings, fp, indent=4)
+    save_config(config_path, settings)
 
     if particl_wallet_mnemonic == "none":
         logger.info("Done.")

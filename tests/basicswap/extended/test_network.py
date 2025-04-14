@@ -197,7 +197,7 @@ class Test(unittest.TestCase):
         logger.handlers = []
         logger.setLevel(logging.INFO)  # DEBUG shows many messages from requests.post
         formatter = logging.Formatter("%(asctime)s %(levelname)s : %(message)s")
-        stream_stdout = logging.StreamHandler()
+        stream_stdout = logging.StreamHandler(sys.stdout)
         stream_stdout.setFormatter(formatter)
         logger.addHandler(stream_stdout)
 
