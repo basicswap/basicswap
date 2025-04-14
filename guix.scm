@@ -21,6 +21,7 @@
 #:use-module (gnu packages python-check)
 #:use-module (gnu packages python-crypto)
 #:use-module (gnu packages python-science)
+#:use-module (gnu packages python-web)
 #:use-module (gnu packages python-xyz)
 #:use-module (gnu packages libffi)
 #:use-module (gnu packages license))
@@ -114,15 +115,15 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.14.3")
+  (version "0.14.4")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "3b60472c04a58f26e33665f0eb0e88a558050c74")))
+      (commit "3c18a3ed26222bac22a9c15795bd8c6fae0b01ba")))
     (sha256
       (base32
-        "0xrli8mzigm0ryn28y28xvy4gc0358ck2036ncx5f1sj5s8dwfkh"))
+        "02mwyklcw9320crcm8laiw4ba24xrazbg48whvdxnbmarcbipkd3"))
     (file-name (git-file-name name version))))
   (build-system pyproject-build-system)
 
@@ -145,7 +146,8 @@
     python-pyzmq
     python-gnupg
     python-jinja2
-    python-pysocks))
+    python-pysocks
+    python-websocket-client))
   (native-inputs
    (list
     python-hatchling
