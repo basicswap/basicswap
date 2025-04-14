@@ -1067,7 +1067,9 @@ class BasicSwap(BaseApp):
                 elif c in (Coins.XMR, Coins.WOW):
                     try:
                         ci.ensureWalletExists()
-                    except Exception as e:  # noqa: F841
+                    except Exception as e:
+                        if "invalid signature" in str(e):  # wallet is corrupt
+                            raise
                         self.log.warning(
                             f"Can't open {ci.coin_name()} wallet, could be locked."
                         )
