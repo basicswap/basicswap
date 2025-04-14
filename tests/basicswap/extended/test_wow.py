@@ -174,7 +174,8 @@ class Test(BaseTest):
                 "create_wallet",
                 {"filename": "testwallet", "language": "English"},
             )
-        cls.callwownodewallet(cls, i, "open_wallet", {"filename": "testwallet"})
+        else:
+            cls.callwownodewallet(cls, i, "open_wallet", {"filename": "testwallet"})
 
     @classmethod
     def addPIDInfo(cls, sc, i):

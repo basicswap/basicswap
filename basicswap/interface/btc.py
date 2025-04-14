@@ -10,7 +10,12 @@ import base64
 import hashlib
 import json
 import logging
+import mmap
+import os
+import shutil
+import sqlite3
 import traceback
+
 
 from io import BytesIO
 
@@ -377,7 +382,7 @@ class BTCInterface(Secp256k1Interface):
             last_block_header = prev_block_header
         raise ValueError(f"Block header not found at time: {time}")
 
-    def initialiseWallet(self, key_bytes: bytes) -> None:
+    def initialiseWallet(self, key_bytes: bytes, restore_time: int = -1) -> None:
         assert len(key_bytes) == 32
         self._have_checked_seed = False
         if self._use_descriptors:
@@ -387,6 +392,7 @@ class BTCInterface(Secp256k1Interface):
             ek_encoded: str = self.encode_secret_extkey(ek.encode_v())
             desc_external = descsum_create(f"wpkh({ek_encoded}/0h/0h/*h)")
             desc_internal = descsum_create(f"wpkh({ek_encoded}/0h/1h/*h)")
+
             rv = self.rpc_wallet(
                 "importdescriptors",
                 [
@@ -394,7 +400,7 @@ class BTCInterface(Secp256k1Interface):
                         {"desc": desc_external, "timestamp": "now", "active": True},
                         {
                             "desc": desc_internal,
-                            "timestamp": "now",
+                            "timestamp": "now" if restore_time == -1 else restore_time,
                             "active": True,
                             "internal": True,
                         },
@@ -411,7 +417,18 @@ class BTCInterface(Secp256k1Interface):
                 raise ValueError("Failed to import descriptors.")
         else:
             key_wif = self.encodeKey(key_bytes)
-            self.rpc_wallet("sethdseed", [True, key_wif])
+            try:
+                self.rpc_wallet("sethdseed", [True, key_wif])
+            except Exception as e:
+                self._log.debug(f"sethdseed failed: {e}")
+                """
+                # TODO: Find derived key counts
+                if "Already have this key" in str(e):
+                    key_id: bytes = self.getSeedHash(key_bytes)
+                    self.setActiveKeyChain(key_id)
+                else:
+                """
+                raise (e)
 
     def getWalletInfo(self):
         rv = self.rpc_wallet("getwalletinfo")
@@ -455,10 +472,6 @@ class BTCInterface(Secp256k1Interface):
             self.close_rpc(rpc_conn)
         raise ValueError(f"{self.coin_name()} wallet restore height not found.")
 
-    def getWalletSeedID(self) -> str:
-        wi = self.rpc_wallet("getwalletinfo")
-        return "Not found" if "hdseedid" not in wi else wi["hdseedid"]
-
     def getActiveDescriptor(self):
         descriptors = self.rpc_wallet("listdescriptors")["descriptors"]
         for descriptor in descriptors:
@@ -470,21 +483,24 @@ class BTCInterface(Secp256k1Interface):
                 return descriptor
         return None
 
-    def checkExpectedSeed(self, expect_seedid: str) -> bool:
+    def getWalletSeedID(self) -> str:
         if self._use_descriptors:
             descriptor = self.getActiveDescriptor()
             if descriptor is None:
                 self._log.debug("Could not find active descriptor.")
-                return False
-
+                return "Not found"
             end = descriptor["desc"].find("/")
             if end < 10:
-                return False
+                return "Not found"
             extkey = descriptor["desc"][5:end]
             extkey_data = b58decode(extkey)[4:-4]
             extkey_data_hash: bytes = hash160(extkey_data)
-            return True if extkey_data_hash.hex() == expect_seedid else False
+            return extkey_data_hash.hex()
 
+        wi = self.rpc_wallet("getwalletinfo")
+        return "Not found" if "hdseedid" not in wi else wi["hdseedid"]
+
+    def checkExpectedSeed(self, expect_seedid: str) -> bool:
         wallet_seed_id = self.getWalletSeedID()
         self._expect_seedid_hex = expect_seedid
         self._have_checked_seed = True
@@ -1978,12 +1994,234 @@ class BTCInterface(Secp256k1Interface):
         locked = encrypted and wallet_info["unlocked_until"] <= 0
         return encrypted, locked
 
-    def changeWalletPassword(self, old_password: str, new_password: str):
+    def createWallet(self, wallet_name: str, password: str = "") -> None:
+        self.rpc(
+            "createwallet",
+            [wallet_name, False, True, password, False, self._use_descriptors],
+        )
+
+    def setActiveWallet(self, wallet_name: str) -> None:
+        # For debugging
+        self.rpc_wallet = make_rpc_func(
+            self._rpcport, self._rpcauth, host=self._rpc_host, wallet=wallet_name
+        )
+        self._rpc_wallet = wallet_name
+
+    def newKeypool(self) -> None:
+        self._log.debug("Running newkeypool.")
+        self.rpc_wallet("newkeypool")
+
+    def encryptWallet(self, password: str, check_seed: bool = True):
+        # Watchonly wallets are not encrypted
+        # Workaround for https://github.com/bitcoin/bitcoin/issues/26607
+        seed_id_before: str = self.getWalletSeedID()
+        orig_active_descriptors = []
+        orig_hdchain_bytes = None
+        walletpath = None
+        max_hdchain_key_count: int = 4000000  # Arbitrary
+
+        chain_client_settings = self._sc.getChainClientSettings(
+            self.coin_type()
+        )  # basicswap.json
+        if (
+            chain_client_settings.get("manage_daemon", False)
+            and check_seed is True
+            and seed_id_before != "Not found"
+        ):
+            # Store active keys
+            self.rpc("unloadwallet", [self._rpc_wallet])
+
+            datadir = chain_client_settings["datadir"]
+            if self._network != "mainnet":
+                datadir = os.path.join(datadir, self._network)
+            try_wallet_path = os.path.join(datadir, self._rpc_wallet)
+            if os.path.exists(try_wallet_path):
+                walletpath = try_wallet_path
+            else:
+                try_wallet_path = os.path.join(datadir, "wallets", self._rpc_wallet)
+                if os.path.exists(try_wallet_path):
+                    walletpath = try_wallet_path
+
+            walletfilepath = walletpath
+            if os.path.isdir(walletpath):
+                walletfilepath = os.path.join(walletpath, "wallet.dat")
+
+            if walletpath is None:
+                self._log.warning(f"Unable to find {self.ticker()} wallet path.")
+            else:
+                if self._use_descriptors:
+                    orig_active_descriptors = []
+                    with sqlite3.connect(walletfilepath) as conn:
+                        c = conn.cursor()
+                        rows = c.execute(
+                            "SELECT * FROM main WHERE key in (:kext, :kint)",
+                            {
+                                "kext": bytes.fromhex(
+                                    "1161637469766565787465726e616c73706b02"
+                                ),
+                                "kint": bytes.fromhex(
+                                    "11616374697665696e7465726e616c73706b02"
+                                ),
+                            },
+                        )
+                        for row in rows:
+                            k, v = row
+                            orig_active_descriptors.append({"k": k, "v": v})
+                else:
+                    seedid_bytes: bytes = bytes.fromhex(seed_id_before)[::-1]
+                    with open(walletfilepath, "rb") as fp:
+                        with mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                            pos = mm.find(seedid_bytes)
+                            while pos != -1:
+                                mm.seek(pos - 8)
+                                hdchain_bytes = mm.read(12 + 20)
+                                version = int.from_bytes(hdchain_bytes[:4], "little")
+                                if version == 2:
+                                    external_counter = int.from_bytes(
+                                        hdchain_bytes[4:8], "little"
+                                    )
+                                    internal_counter = int.from_bytes(
+                                        hdchain_bytes[-4:], "little"
+                                    )
+                                    if (
+                                        external_counter > 0
+                                        and external_counter <= max_hdchain_key_count
+                                        and internal_counter > 0
+                                        and internal_counter <= max_hdchain_key_count
+                                    ):
+                                        orig_hdchain_bytes = hdchain_bytes
+                                        self._log.debug(
+                                            f"Found hdchain for: {seed_id_before} external_counter: {external_counter}, internal_counter: {internal_counter}."
+                                        )
+                                        break
+                                pos = mm.find(seedid_bytes, pos + 1)
+
+            self.rpc("loadwallet", [self._rpc_wallet])
+
+        self.rpc_wallet("encryptwallet", [password])
+
+        if check_seed is False or seed_id_before == "Not found" or walletpath is None:
+            return
+        seed_id_after: str = self.getWalletSeedID()
+
+        if seed_id_before == seed_id_after:
+            return
+        self._log.warning(f"{self.ticker()} wallet seed changed after encryption.")
+        self._log.debug(
+            f"seed_id_before: {seed_id_before} seed_id_after: {seed_id_after}."
+        )
+        self.setWalletSeedWarning(True)
+
+        if chain_client_settings.get("manage_daemon", False) is False:
+            self._log.warning(
+                f"{self.ticker()} manage_daemon is false. Can't attempt to fix."
+            )
+            return
+        if self._use_descriptors:
+            if len(orig_active_descriptors) < 2:
+                self._log.error(
+                    "Could not find original active descriptors for wallet."
+                )
+                return
+            self._log.info("Attempting to revert to last descriptors.")
+        else:
+            if orig_hdchain_bytes is None:
+                self._log.error("Could not find hdchain for wallet.")
+                return
+            self._log.info("Attempting to revert to last hdchain.")
+        try:
+            # Make a copy of the encrypted wallet before modifying it
+            bkp_path = walletpath + ".bkp"
+            for i in range(100):
+                if not os.path.exists(bkp_path):
+                    break
+                bkp_path = walletpath + f".bkp{i}"
+
+            if os.path.exists(bkp_path):
+                self._log.error("Could not find backup path for wallet.")
+                return
+
+            self.rpc("unloadwallet", [self._rpc_wallet])
+
+            if os.path.isfile(walletpath):
+                shutil.copy(walletpath, bkp_path)
+            else:
+                shutil.copytree(walletpath, bkp_path)
+
+            hdchain_replaced: bool = False
+            if self._use_descriptors:
+                with sqlite3.connect(walletfilepath) as conn:
+                    c = conn.cursor()
+                    c.executemany(
+                        "UPDATE main SET value = :v WHERE key = :k",
+                        orig_active_descriptors,
+                    )
+                    conn.commit()
+            else:
+                seedid_after_bytes: bytes = bytes.fromhex(seed_id_after)[::-1]
+                with open(walletfilepath, "r+b") as fp:
+                    with mmap.mmap(fp.fileno(), 0) as mm:
+                        pos = mm.find(seedid_after_bytes)
+                        while pos != -1:
+                            mm.seek(pos - 8)
+                            hdchain_bytes = mm.read(12 + 20)
+                            version = int.from_bytes(hdchain_bytes[:4], "little")
+                            if version == 2:
+                                external_counter = int.from_bytes(
+                                    hdchain_bytes[4:8], "little"
+                                )
+                                internal_counter = int.from_bytes(
+                                    hdchain_bytes[-4:], "little"
+                                )
+                                if (
+                                    external_counter > 0
+                                    and external_counter <= max_hdchain_key_count
+                                    and internal_counter > 0
+                                    and internal_counter <= max_hdchain_key_count
+                                ):
+                                    self._log.debug(
+                                        f"Replacing hdchain for: {seed_id_after} external_counter: {external_counter}, internal_counter: {internal_counter}."
+                                    )
+                                    offset: int = pos - 8
+                                    mm.seek(offset)
+                                    mm.write(orig_hdchain_bytes)
+                                    self._log.debug(
+                                        f"hdchain replaced at offset: {offset}."
+                                    )
+                                    hdchain_replaced = True
+                                    # Can appear multiple times in file, replace all.
+                            pos = mm.find(seedid_after_bytes, pos + 1)
+
+                if hdchain_replaced is False:
+                    self._log.error("Could not find new hdchain in wallet.")
+
+            self.rpc("loadwallet", [self._rpc_wallet])
+
+            if hdchain_replaced:
+                self.unlockWallet(password, check_seed=False)
+                seed_id_after_restore: str = self.getWalletSeedID()
+                if seed_id_after_restore == seed_id_before:
+                    self.newKeypool()
+                else:
+                    self._log.warning(
+                        f"Expected seed id not found: {seed_id_before}, have {seed_id_after_restore}."
+                    )
+
+                self.lockWallet()
+
+        except Exception as e:
+            self._log.error(f"{self.ticker()} recreating wallet failed: {e}.")
+            if self._sc.debug:
+                self._log.error(traceback.format_exc())
+
+    def changeWalletPassword(
+        self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
+    ):
         self._log.info("changeWalletPassword - {}".format(self.ticker()))
         if old_password == "":
             if self.isWalletEncrypted():
                 raise ValueError("Old password must be set")
-            return self.rpc_wallet("encryptwallet", [new_password])
+            return self.encryptWallet(new_password, check_seed=check_seed_if_encrypt)
         self.rpc_wallet("walletpassphrasechange", [old_password, new_password])
 
     def unlockWallet(self, password: str, check_seed: bool = True) -> None:
@@ -2001,9 +2239,16 @@ class BTCInterface(Secp256k1Interface):
                 )
                 # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                 self.rpc(
-                    "createwallet", [self._rpc_wallet, False, True, "", False, False]
+                    "createwallet",
+                    [
+                        self._rpc_wallet,
+                        False,
+                        True,
+                        password,
+                        False,
+                        self._use_descriptors,
+                    ],
                 )
-                self.rpc_wallet("encryptwallet", [password])
 
         # Max timeout value, ~3 years
         self.rpc_wallet("walletpassphrase", [password, 100000000])

@@ -557,12 +557,12 @@ def prepare_nodes(
 ):
     bins_path = os.path.join(TEST_PATH, "bin")
     for i in range(num_nodes):
-        logging.info("Preparing node: %d.", i)
-        client_path = os.path.join(TEST_PATH, "client{}".format(i))
+        logging.info(f"Preparing node: {i}.")
+        client_path = os.path.join(TEST_PATH, f"client{i}")
         try:
             shutil.rmtree(client_path)
         except Exception as ex:
-            logging.warning("setUpClass %s", str(ex))
+            logging.warning(f"setUpClass {ex}")
 
         run_prepare(
             i,

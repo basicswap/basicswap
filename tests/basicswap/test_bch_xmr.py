@@ -20,6 +20,7 @@ from basicswap.bin.run import startDaemon
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
 from tests.basicswap.common import (
+    callrpc_cli,
     make_rpc_func,
     prepareDataDir,
     stopDaemons,
@@ -37,9 +38,6 @@ from basicswap.contrib.test_framework.script import (
     OP_CHECKSEQUENCEVERIFY,
 )
 from basicswap.interface.bch import BCHInterface
-from basicswap.rpc import (
-    callrpc_cli,
-)
 from basicswap.util import ensure
 from .test_xmr import test_delay_event, callnoderpc
 
@@ -134,14 +132,20 @@ class TestBCH(BasicSwapTest):
                     if not line.startswith("findpeers"):
                         fp.write(line)
 
-            if os.path.exists(os.path.join(BITCOINCASH_BINDIR, "bitcoin-wallet")):
+            bch_wallet_bin = "bitcoin-wallet" + (".exe" if os.name == "nt" else "")
+            if os.path.exists(
+                os.path.join(
+                    BITCOINCASH_BINDIR,
+                    bch_wallet_bin,
+                )
+            ):
                 try:
                     callrpc_cli(
                         BITCOINCASH_BINDIR,
                         data_dir,
                         "regtest",
                         "-wallet=wallet.dat create",
-                        "bitcoin-wallet",
+                        bch_wallet_bin,
                     )
                 except Exception as e:
                     logging.warning("bch: bitcoin-wallet create failed")

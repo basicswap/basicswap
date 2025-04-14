@@ -6,10 +6,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
-import os
 import json
-import signal
 import logging
+import os
+import shlex
+import signal
+import subprocess
 from urllib.request import urlopen
 
 from .util import read_json_api
@@ -133,11 +135,12 @@ def checkForks(ro):
 
 def stopDaemons(daemons):
     for d in daemons:
-        logging.info("Interrupting %d", d.handle.pid)
+        logging.info(f"Interrupting {d.handle.pid}")
+        signal_type = signal.SIGTERM if os.name == "nt" else signal.SIGINT
         try:
-            d.handle.send_signal(signal.SIGINT)
+            d.handle.send_signal(signal_type)
         except Exception as e:
-            logging.info("Interrupting %d, error %s", d.handle.pid, str(e))
+            logging.info(f"Interrupting {d.handle.pid}, error: {e}")
     for d in daemons:
         try:
             d.handle.wait(timeout=20)
@@ -145,7 +148,7 @@ def stopDaemons(daemons):
                 if fp:
                     fp.close()
         except Exception as e:
-            logging.info("Closing %d, error %s", d.handle.pid, str(e))
+            logging.info(f"Closing {d.handle.pid}, error: {e}")
 
 
 def wait_for_bid(
@@ -494,3 +497,38 @@ def compare_bid_states_unordered(states, expect_states, ignore_states=[]) -> boo
         logging.info("Have states: {}".format(json.dumps(states, indent=4)))
         raise e
     return True
+
+
+def callrpc_cli(
+    bindir,
+    datadir,
+    chain,
+    cmd,
+    cli_bin="particl-cli" + (".exe" if os.name == "nt" else ""),
+    wallet=None,
+):
+    cli_bin = os.path.join(bindir, cli_bin)
+    args = [
+        cli_bin,
+    ]
+    if chain != "mainnet":
+        args.append("-" + chain)
+    args.append("-datadir=" + datadir)
+    if wallet is not None:
+        args.append("-rpcwallet=" + wallet)
+    args += shlex.split(cmd)
+
+    p = subprocess.Popen(
+        args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    out = p.communicate()
+
+    if len(out[1]) > 0:
+        raise ValueError(f"RPC error: {out[1]}")
+
+    r = out[0].decode("utf-8").strip()
+    try:
+        r = json.loads(r)
+    except Exception:
+        pass
+    return r

@@ -34,6 +34,35 @@ class PIVXInterface(BTCInterface):
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
 
+    def encryptWallet(self, password: str, check_seed: bool = True):
+        # Watchonly wallets are not encrypted
+
+        seed_id_before: str = self.getWalletSeedID()
+
+        self.rpc_wallet("encryptwallet", [password])
+
+        if check_seed is False or seed_id_before == "Not found":
+            return
+        seed_id_after: str = self.getWalletSeedID()
+
+        if seed_id_before == seed_id_after:
+            return
+        self._log.warning(f"{self.ticker()} wallet seed changed after encryption.")
+        self._log.debug(
+            f"seed_id_before: {seed_id_before} seed_id_after: {seed_id_after}."
+        )
+        self.setWalletSeedWarning(True)
+        # Workaround for https://github.com/bitcoin/bitcoin/issues/26607
+        chain_client_settings = self._sc.getChainClientSettings(
+            self.coin_type()
+        )  # basicswap.json
+
+        if chain_client_settings.get("manage_daemon", False) is False:
+            self._log.warning(
+                f"{self.ticker()} manage_daemon is false. Can't attempt to fix."
+            )
+            return
+
     def signTxWithWallet(self, tx):
         rv = self.rpc("signrawtransaction", [tx.hex()])
         return bytes.fromhex(rv["hex"])

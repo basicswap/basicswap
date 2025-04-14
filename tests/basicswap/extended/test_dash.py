@@ -40,9 +40,6 @@ from basicswap.basicswap_util import (
 from basicswap.util.address import (
     toWIF,
 )
-from basicswap.rpc import (
-    callrpc_cli,
-)
 from basicswap.contrib.key import (
     ECKey,
 )
@@ -53,6 +50,7 @@ from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
+    callrpc_cli,
     checkForks,
     stopDaemons,
     wait_for_offer,

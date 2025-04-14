@@ -32,7 +32,6 @@ from basicswap.util.address import (
 )
 from basicswap.rpc import (
     callrpc,
-    callrpc_cli,
 )
 from basicswap.contrib.key import (
     ECKey,
@@ -44,19 +43,20 @@ from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
-    prepareDataDir,
-    make_rpc_func,
-    checkForks,
-    stopDaemons,
-    delay_for,
-    TEST_HTTP_HOST,
-    TEST_HTTP_PORT,
     BASE_P2P_PORT,
     BASE_RPC_PORT,
     BASE_ZMQ_PORT,
     BTC_BASE_PORT,
     BTC_BASE_RPC_PORT,
+    callrpc_cli,
+    checkForks,
+    delay_for,
+    make_rpc_func,
     PREFIX_SECRET_KEY_REGTEST,
+    prepareDataDir,
+    stopDaemons,
+    TEST_HTTP_HOST,
+    TEST_HTTP_PORT,
     waitForRPC,
 )
 

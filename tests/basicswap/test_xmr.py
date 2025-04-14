@@ -39,7 +39,6 @@ from basicswap.util.address import (
 )
 from basicswap.rpc import (
     callrpc,
-    callrpc_cli,
 )
 from basicswap.rpc_xmr import (
     callrpc_xmr,
@@ -61,6 +60,7 @@ from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
+    callrpc_cli,
     prepareDataDir,
     make_rpc_func,
     checkForks,
@@ -376,7 +376,7 @@ class BaseTest(unittest.TestCase):
 
         if os.path.isdir(TEST_DIR):
             if RESET_TEST:
-                logging.info("Removing " + TEST_DIR)
+                logging.info("Removing test dir " + TEST_DIR)
                 for name in os.listdir(TEST_DIR):
                     if name == "pivx-params":
                         continue
@@ -388,6 +388,8 @@ class BaseTest(unittest.TestCase):
             else:
                 logging.info("Restoring instance from " + TEST_DIR)
                 cls.restore_instance = True
+        else:
+            logging.info("Creating test dir " + TEST_DIR)
         if not os.path.exists(TEST_DIR):
             os.makedirs(TEST_DIR)
 
@@ -399,19 +401,25 @@ class BaseTest(unittest.TestCase):
 
         try:
             logging.info("Preparing coin nodes.")
+            part_wallet_bin = "particl-wallet" + (".exe" if os.name == "nt" else "")
             for i in range(NUM_NODES):
                 if not cls.restore_instance:
                     data_dir = prepareDataDir(TEST_DIR, i, "particl.conf", "part_")
-                    if os.path.exists(
-                        os.path.join(cfg.PARTICL_BINDIR, "particl-wallet")
+                    if not os.path.exists(
+                        os.path.join(
+                            cfg.PARTICL_BINDIR,
+                            part_wallet_bin,
+                        )
                     ):
+                        logging.warning(f"{part_wallet_bin} not found.")
+                    else:
                         try:
                             callrpc_cli(
                                 cfg.PARTICL_BINDIR,
                                 data_dir,
                                 "regtest",
                                 "-wallet=wallet.dat -legacy create",
-                                "particl-wallet",
+                                part_wallet_bin,
                             )
                         except Exception as e:
                             logging.warning(
@@ -422,7 +430,7 @@ class BaseTest(unittest.TestCase):
                                 data_dir,
                                 "regtest",
                                 "-wallet=wallet.dat create",
-                                "particl-wallet",
+                                part_wallet_bin,
                             )
 
                 cls.part_daemons.append(
@@ -471,6 +479,7 @@ class BaseTest(unittest.TestCase):
                     )
                     rpc("reservebalance", [False])
 
+            btc_wallet_bin = "bitcoin-wallet" + (".exe" if os.name == "nt" else "")
             for i in range(NUM_BTC_NODES):
                 if not cls.restore_instance:
                     data_dir = prepareDataDir(
@@ -481,9 +490,14 @@ class BaseTest(unittest.TestCase):
                         base_p2p_port=BTC_BASE_PORT,
                         base_rpc_port=BTC_BASE_RPC_PORT,
                     )
-                    if os.path.exists(
-                        os.path.join(cfg.BITCOIN_BINDIR, "bitcoin-wallet")
+                    if not os.path.exists(
+                        os.path.join(
+                            cfg.BITCOIN_BINDIR,
+                            btc_wallet_bin,
+                        )
                     ):
+                        logging.warning(f"{btc_wallet_bin} not found.")
+                    else:
                         if BTC_USE_DESCRIPTORS:
                             # How to set blank and disable_private_keys with wallet util?
                             pass
@@ -494,7 +508,7 @@ class BaseTest(unittest.TestCase):
                                     data_dir,
                                     "regtest",
                                     "-wallet=wallet.dat -legacy create",
-                                    "bitcoin-wallet",
+                                    btc_wallet_bin,
                                 )
                             except Exception as e:
                                 logging.warning(
@@ -505,7 +519,7 @@ class BaseTest(unittest.TestCase):
                                     data_dir,
                                     "regtest",
                                     "-wallet=wallet.dat create",
-                                    "bitcoin-wallet",
+                                    btc_wallet_bin,
                                 )
 
                 cls.btc_daemons.append(
@@ -536,6 +550,7 @@ class BaseTest(unittest.TestCase):
                     )
 
             if cls.start_ltc_nodes:
+                ltc_wallet_bin = "litecoin-wallet" + (".exe" if os.name == "nt" else "")
                 for i in range(NUM_LTC_NODES):
                     if not cls.restore_instance:
                         data_dir = prepareDataDir(
@@ -547,14 +562,16 @@ class BaseTest(unittest.TestCase):
                             base_rpc_port=LTC_BASE_RPC_PORT,
                         )
                         if os.path.exists(
-                            os.path.join(cfg.LITECOIN_BINDIR, "litecoin-wallet")
+                            os.path.join(cfg.LITECOIN_BINDIR, ltc_wallet_bin)
                         ):
+                            logging.warning(f"{ltc_wallet_bin} not found.")
+                        else:
                             callrpc_cli(
                                 cfg.LITECOIN_BINDIR,
                                 data_dir,
                                 "regtest",
                                 "-wallet=wallet.dat create",
-                                "litecoin-wallet",
+                                ltc_wallet_bin,
                             )
 
                     cls.ltc_daemons.append(
@@ -620,9 +637,10 @@ class BaseTest(unittest.TestCase):
                             "create_wallet",
                             {"filename": "testwallet", "language": "English"},
                         )
-                    cls.callxmrnodewallet(
-                        cls, i, "open_wallet", {"filename": "testwallet"}
-                    )
+                    else:
+                        cls.callxmrnodewallet(
+                            cls, i, "open_wallet", {"filename": "testwallet"}
+                        )
 
             for i in range(NUM_NODES):
                 # Hook for descendant classes

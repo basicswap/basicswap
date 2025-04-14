@@ -110,7 +110,7 @@ class PARTInterface(BTCInterface):
         )
         return index_info["spentindex"]
 
-    def initialiseWallet(self, key: bytes) -> None:
+    def initialiseWallet(self, key: bytes, restore_time: int = -1) -> None:
         raise ValueError("TODO")
 
     def withdrawCoin(self, value, addr_to, subfee):

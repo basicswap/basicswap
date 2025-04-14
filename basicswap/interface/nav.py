@@ -87,7 +87,7 @@ class NAVInterface(BTCInterface):
         # p2sh-p2wsh
         return True
 
-    def initialiseWallet(self, key):
+    def initialiseWallet(self, key, restore_time: int = -1):
         # Load with -importmnemonic= parameter
         pass
 

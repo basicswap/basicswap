@@ -25,13 +25,11 @@ from basicswap.util import (
     make_int,
     format_amount,
 )
-from basicswap.rpc import (
-    callrpc_cli,
-)
 from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.common import (
+    callrpc_cli,
     stopDaemons,
     wait_for_bid,
     make_rpc_func,
