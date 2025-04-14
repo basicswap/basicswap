@@ -1089,6 +1089,62 @@ class Test(BaseTest):
     def notest_00_delay(self):
         test_delay_event.wait(100000)
 
+    def test_007_corrupt_wallet(self):
+        logging.info(f"---------- Test {Coins.XMR.name} corrupt wallet")
+        swap_clients = self.swap_clients
+        ci = swap_clients[0].ci(Coins.XMR)
+
+        chain_client_settings = swap_clients[0].getChainClientSettings(Coins.XMR)
+        wallet_name = chain_client_settings["wallet_name"]
+        try:
+            ci.rpc_wallet("close_wallet")
+            logging.info(f"Closing {ci.coin_name()} wallet")
+        except Exception as e:
+            logging.info(f"Closing {ci.coin_name()} wallet failed with: {e}")
+
+        walletpath = os.path.join(
+            chain_client_settings.get("datadir", "none"), "wallets", wallet_name
+        )
+        wallet_cache_bytes = os.path.getsize(walletpath)
+        logging.info(f"[rm] wallet_cache_bytes {wallet_cache_bytes}")
+        logging.info(f"[rm] walletpath {walletpath}")
+        shutil.copy(walletpath, walletpath + ".orig")
+
+        # Failed to open wallet : basic_string::_M_replace_aux
+        # with open(walletpath, "wb") as fp:
+        #    fp.write(os.urandom(wallet_cache_bytes))
+
+        # Failed to open wallet : std::bad_alloc
+        with open(walletpath, "ab") as fp:
+            fp.write(os.urandom(1000))
+
+        # TODO: Get "invalid signature"
+
+        try:
+            ci.openWallet(wallet_name)
+        except Exception as e:
+            logging.info(f"Opening {ci.coin_name()} wallet failed with: {e}")
+            assert any(
+                x in str(e)
+                for x in (
+                    "invalid signature",
+                    "std::bad_alloc",
+                    "basic_string::_M_replace_aux",
+                )
+            )
+        else:
+            raise ValueError("Should fail!")
+
+        try:
+            chain_client_settings["manage_wallet_daemon"] = True
+            try:
+                ci.openWallet(wallet_name)
+            except Exception as e:
+                logging.info(f"Opening {ci.coin_name()} wallet failed with: {e}")
+                raise
+        finally:
+            chain_client_settings["manage_wallet_daemon"] = False
+
     def test_010_txn_size(self):
         logging.info("---------- Test {} txn_size".format(Coins.PART))
 

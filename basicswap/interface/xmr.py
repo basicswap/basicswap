@@ -7,6 +7,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import logging
+import os
 
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
@@ -204,16 +205,51 @@ class XMRInterface(CoinInterface):
         except Exception as e:
             if "no connection to daemon" in str(e):
                 self._log.debug(f"{self.coin_name()} {e}")
-                return  # bypass refresh error to allow startup with a busy daemon
-            if "invalid signature" in str(e):
-                self._log.debug(f"{self.coin_name()} wallet is corrupt")
-                raise
-
-            try:
-                self.rpc_wallet("close_wallet")
-                self._log.debug(f"Closing {self.coin_name()} wallet")
-            except Exception as e:  # noqa: F841
-                pass
+                return  # Bypass refresh error to allow startup with a busy daemon
+            if any(
+                x in str(e)
+                for x in (
+                    "invalid signature",
+                    "std::bad_alloc",
+                    "basic_string::_M_replace_aux",
+                )
+            ):
+                self._log.error(f"{self.coin_name()} wallet is corrupt.")
+                chain_client_settings = self._sc.getChainClientSettings(
+                    self.coin_type()
+                )  # basicswap.json
+                if chain_client_settings.get("manage_wallet_daemon", False):
+                    self._log.info(f"Renaming {self.coin_name()} wallet cache file.")
+                    walletpath = os.path.join(
+                        chain_client_settings.get("datadir", "none"),
+                        "wallets",
+                        filename,
+                    )
+                    if not os.path.isfile(walletpath):
+                        self._log.warning(
+                            f"Could not find {self.coin_name()} wallet cache file."
+                        )
+                        raise
+                    bkp_path = walletpath + ".corrupt"
+                    for i in range(100):
+                        if not os.path.exists(bkp_path):
+                            break
+                        bkp_path = walletpath + f".corrupt{i}"
+                    if os.path.exists(bkp_path):
+                        self._log.error(
+                            f"Could not find backup path for {self.coin_name()} wallet."
+                        )
+                        raise
+                    os.rename(walletpath, bkp_path)
+                    # Drop through to open_wallet
+                else:
+                    raise
+            else:
+                try:
+                    self.rpc_wallet("close_wallet")
+                    self._log.debug(f"Closing {self.coin_name()} wallet")
+                except Exception as e:  # noqa: F841
+                    pass
 
             self.rpc_wallet("open_wallet", params)
             self._log.debug(f"Attempting to open {self.coin_name()} wallet")
