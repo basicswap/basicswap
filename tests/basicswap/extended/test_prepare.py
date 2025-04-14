@@ -189,10 +189,23 @@ class Test(unittest.TestCase):
             with open(config_path) as fs:
                 settings = json.load(fs)
             assert settings.get("use_tor", False) is False
-            assert settings["setup_docker_mode"] is False
-            assert settings["setup_local_tor"] is False
+            assert "setup_docker_mode" not in settings
+            assert "setup_local_tor" not in settings
             assert "setup_tor_control_listen_interface" not in settings
             assert "setup_torrc_dns_host" not in settings
+
+            # Set BSX_LOCAL_TOR to false
+            os.environ["BSX_LOCAL_TOR"] = "false"
+            # Reimport to reset globals and set env
+            importlib.reload(prepareSystem)
+
+            testargs = [
+                "basicswap-prepare",
+                "-datadir=" + test_path_plain,
+                "--disabletor",
+            ]
+            with patch.object(sys, "argv", testargs):
+                prepareSystem.main()
 
             os.environ["BSX_LOCAL_TOR"] = "true"
             # Reimport to reset globals and set env
@@ -224,7 +237,7 @@ class Test(unittest.TestCase):
             with open(config_path) as fs:
                 settings = json.load(fs)
             assert settings.get("use_tor", False) is True
-            assert settings["setup_docker_mode"] is False
+            assert "setup_docker_mode" not in settings
             assert settings["setup_local_tor"] is True
             assert settings["setup_tor_control_listen_interface"] == "127.1.1.1"
             assert "setup_torrc_dns_host" not in settings

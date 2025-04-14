@@ -2122,12 +2122,11 @@ def load_config(config_path):
 def save_config(config_path, settings, add_options: bool = True) -> None:
 
     if add_options is True:
-        if os.getenv("BSX_DOCKER_MODE") or "docker_mode" not in settings:
+        # Add to config file only if manually set
+        if os.getenv("BSX_DOCKER_MODE"):
             settings["setup_docker_mode"] = BSX_DOCKER_MODE
-        if os.getenv("BSX_LOCAL_TOR") or "local_tor" not in settings:
+        if os.getenv("BSX_LOCAL_TOR"):
             settings["setup_local_tor"] = BSX_LOCAL_TOR
-
-        # Add to settings only if manually set
         if os.getenv("TOR_CONTROL_LISTEN_INTERFACE"):
             settings["setup_tor_control_listen_interface"] = (
                 TOR_CONTROL_LISTEN_INTERFACE
@@ -2810,6 +2809,8 @@ def main():
     if disable_tor:
         logger.info("Disabling TOR")
         settings = load_config(config_path)
+        if not settings.get("use_tor", False):
+            logger.info("TOR is not enabled.")  # Continue anyway to clear any config
         settings["use_tor"] = False
         for coin in settings["chainclients"]:
             modify_tor_config(
