@@ -99,13 +99,21 @@ jobs:
         export PYTHONPATH=$(pwd)
         python tests/basicswap/extended/test_xmr_persistent.py > /tmp/log.txt 2>&1 & TEST_NETWORK_PID=$!
         echo "Starting test_xmr_persistent, PID $TEST_NETWORK_PID"
+        i=0
         until curl -s -f -o /dev/null "http://localhost:12701/json/coins"
         do
           tail -n 1 /tmp/log.txt
           sleep 2
+          ((++i))
+          if [ $i -ge 60 ]; then
+            echo "Timed out waiting for test_xmr_persistent, PID $TEST_NETWORK_PID"
+            kill $TEST_NETWORK_PID
+            (exit 1)  # Fail test
+            break
+          fi
         done
         echo "Running test_settings.py"
         python tests/basicswap/selenium/test_settings.py
         echo "Running test_swap_direction.py"
         python tests/basicswap/selenium/test_swap_direction.py
-        kill -9 $TEST_NETWORK_PID
+        kill $TEST_NETWORK_PID
