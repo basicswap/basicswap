@@ -61,7 +61,7 @@ class BaseApp(DBMethods):
 
         self._network = None
         self.prepareLogging()
-        self.log.info("Network: {}".format(self.chain))
+        self.log.info(f"Network: {self.chain}")
 
         self.use_tor_proxy = self.settings.get("use_tor", False)
         self.tor_proxy_host = self.settings.get("tor_proxy_host", "127.0.0.1")
@@ -78,7 +78,14 @@ class BaseApp(DBMethods):
 
     def stopRunning(self, with_code=0):
         self.fail_code = with_code
-        with self.mxDB:
+
+        # Wait for lock to shutdown gracefully.
+        if self.mxDB.acquire(timeout=5):
+            self.chainstate_delay_event.set()
+            self.delay_event.set()
+            self.mxDB.release()
+        else:
+            # Waiting for lock timed out, stop anyway
             self.chainstate_delay_event.set()
             self.delay_event.set()
 
@@ -143,7 +150,7 @@ class BaseApp(DBMethods):
         for c, params in chainparams.items():
             if coin_name.lower() == params["name"].lower():
                 return c
-        raise ValueError("Unknown coin: {}".format(coin_name))
+        raise ValueError(f"Unknown coin: {coin_name}")
 
     def callrpc(self, method, params=[], wallet=None):
         cc = self.coin_clients[Coins.PART]

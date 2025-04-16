@@ -91,7 +91,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     if add_datadir:
         args.append("-datadir=" + datadir_path)
     args += opts
-    logger.info("Starting node {}".format(daemon_bin))
+    logger.info(f"Starting node {daemon_bin}")
     logger.debug("Arguments {}".format(" ".join(args)))
 
     opened_files = []
@@ -137,7 +137,7 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
         "--non-interactive",
         "--config-file=" + os.path.join(datadir_path, config_filename),
     ] + opts
-    logger.info("Starting node {}".format(daemon_bin))
+    logger.info(f"Starting node {daemon_bin}")
     logger.debug("Arguments {}".format(" ".join(args)))
 
     # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -200,7 +200,7 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
                 ):
                     fp_to.write(line)
 
-    logger.info("Starting wallet daemon {}".format(wallet_bin))
+    logger.info(f"Starting wallet daemon {wallet_bin}")
     logger.debug("Arguments {}".format(" ".join(args)))
 
     # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
@@ -309,7 +309,7 @@ def runClient(
         with open(pids_path) as fd:
             for ln in fd:
                 # TODO: try close
-                logger.warning("Found pid for daemon {} ".format(ln.strip()))
+                logger.warning("Found pid for daemon {}".format(ln.strip()))
 
     # Ensure daemons are stopped
     swap_client.stopDaemons()
@@ -325,7 +325,7 @@ def runClient(
                 coin_id = swap_client.getCoinIdFromName(c)
                 display_name = getCoinName(coin_id)
             except Exception as e:  # noqa: F841
-                logger.warning("Not starting unknown coin: {}".format(c))
+                logger.warning(f"Not starting unknown coin: {c}")
                 continue
             if c in ("monero", "wownero"):
                 if v["manage_daemon"] is True:
@@ -334,7 +334,7 @@ def runClient(
 
                     daemons.append(startXmrDaemon(v["datadir"], v["bindir"], filename))
                     pid = daemons[-1].handle.pid
-                    swap_client.log.info("Started {} {}".format(filename, pid))
+                    swap_client.log.info(f"Started {filename} {pid}")
 
                 if v["manage_wallet_daemon"] is True:
                     swap_client.log.info(f"Starting {display_name} wallet daemon")
@@ -382,7 +382,7 @@ def runClient(
                         startXmrWalletDaemon(v["datadir"], v["bindir"], filename, opts)
                     )
                     pid = daemons[-1].handle.pid
-                    swap_client.log.info("Started {} {}".format(filename, pid))
+                    swap_client.log.info(f"Started {filename} {pid}")
 
                 continue  # /monero
 
@@ -412,7 +412,7 @@ def runClient(
                         )
                     )
                     pid = daemons[-1].handle.pid
-                    swap_client.log.info("Started {} {}".format(filename, pid))
+                    swap_client.log.info(f"Started {filename} {pid}")
 
                 if v["manage_wallet_daemon"] is True:
                     swap_client.log.info(f"Starting {display_name} wallet daemon")
@@ -457,7 +457,7 @@ def runClient(
                 pid = daemons[-1].handle.pid
                 pids.append((c, pid))
                 swap_client.setDaemonPID(c, pid)
-                swap_client.log.info("Started {} {}".format(filename, pid))
+                swap_client.log.info(f"Started {filename} {pid}")
         if len(pids) > 0:
             with open(pids_path, "w") as fd:
                 for p in pids:

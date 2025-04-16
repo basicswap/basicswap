@@ -166,12 +166,13 @@ def js_wallets(self, url_split, post_string, is_json):
                 return bytes(
                     json.dumps(swap_client.ci(coin_type).getNewMwebAddress()), "UTF-8"
                 )
-
             raise ValueError("Unknown command")
 
         if coin_type == Coins.LTC_MWEB:
             coin_type = Coins.LTC
         rv = swap_client.getWalletInfo(coin_type)
+        if not rv:
+            raise ValueError(f"getWalletInfo failed for coin: {coin_type}")
         rv.update(swap_client.getBlockchainInfo(coin_type))
         ci = swap_client.ci(coin_type)
         checkAddressesOwned(swap_client, ci, rv)

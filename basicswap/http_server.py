@@ -401,6 +401,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             extra_headers=extra_headers,
         )
 
+    def page_shutdown_ping(self, url_split, post_string):
+        if not self.server.stop_event.is_set():
+            raise ValueError("Unexpected shutdown ping.")
+        self.putHeaders(401, "application/json")
+        return json.dumps({"ack": True}).encode("utf-8")
+
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
@@ -779,6 +785,8 @@ class HttpHandler(BaseHTTPRequestHandler):
 
                 if page == "login":
                     return self.page_login(url_split, post_string)
+                if page == "shutdown_ping":
+                    return self.page_shutdown_ping(url_split, post_string)
                 if page == "active":
                     return self.page_active(url_split, post_string)
                 if page == "wallets":
