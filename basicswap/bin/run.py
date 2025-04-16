@@ -19,7 +19,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.ui.util import getCoinName
 from basicswap.basicswap import BasicSwap
-from basicswap.chainparams import chainparams, Coins
+from basicswap.chainparams import chainparams, Coins, isKnownCoinName
 from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
 
@@ -31,6 +31,8 @@ if not len(initial_logger.handlers):
 logger = initial_logger
 
 swap_client = None
+with_coins = set()
+without_coins = set()
 
 
 class Daemon:
@@ -39,13 +41,6 @@ class Daemon:
     def __init__(self, handle, files):
         self.handle = handle
         self.files = files
-
-
-def is_known_coin(coin_name: str) -> bool:
-    for k, v in chainparams.items():
-        if coin_name == v["name"]:
-            return True
-    return False
 
 
 def signal_handler(sig, frame):
@@ -302,7 +297,16 @@ def runClient(
     with open(settings_path) as fs:
         settings = json.load(fs)
 
-    swap_client = BasicSwap(data_dir, settings, chain, log_name=log_prefix)
+    extra_opts = dict()
+    if len(with_coins) > 0:
+        with_coins.add("particl")
+        extra_opts["with_coins"] = with_coins
+    if len(without_coins) > 0:
+        extra_opts["without_coins"] = without_coins
+
+    swap_client = BasicSwap(
+        data_dir, settings, chain, log_name=log_prefix, extra_opts=extra_opts
+    )
     logger = swap_client.log
 
     if os.path.exists(pids_path):
@@ -320,6 +324,14 @@ def runClient(
         # Try start daemons
         for c, v in settings["chainclients"].items():
             if len(start_only_coins) > 0 and c not in start_only_coins:
+                continue
+            if (len(with_coins) > 0 and c not in with_coins) or c in without_coins:
+                if v.get("manage_daemon", False) or v.get(
+                    "manage_wallet_daemon", False
+                ):
+                    logger.warning(
+                        f"Not starting coin {c.capitalize()}, disabled by arguments."
+                    )
                 continue
             try:
                 coin_id = swap_client.getCoinIdFromName(c)
@@ -576,6 +588,11 @@ def printVersion():
     )
 
 
+def ensure_coin_valid(coin: str) -> bool:
+    if isKnownCoinName(coin) is False:
+        raise ValueError(f"Unknown coin: {coin}")
+
+
 def printHelp():
     print("Usage: basicswap-run ")
     print("\n--help, -h               Print help.")
@@ -586,6 +603,8 @@ def printHelp():
     print("--mainnet                Run in mainnet mode.")
     print("--testnet                Run in testnet mode.")
     print("--regtest                Run in regtest mode.")
+    print("--withcoin=              Run only with coin/s.")
+    print("--withoutcoin=           Run without coin/s.")
     print(
         "--startonlycoin          Only start the provides coin daemon/s, use this if a chain requires extra processing."
     )
@@ -620,7 +639,18 @@ def main():
         if name in ("mainnet", "testnet", "regtest"):
             chain = name
             continue
-
+        if name in ("withcoin", "withcoins"):
+            for coin in [s.strip().lower() for s in s[1].split(",")]:
+                ensure_coin_valid(coin)
+                with_coins.add(coin)
+            continue
+        if name in ("withoutcoin", "withoutcoins"):
+            for coin in [s.strip().lower() for s in s[1].split(",")]:
+                if coin == "particl":
+                    raise ValueError("Particl is required.")
+                ensure_coin_valid(coin)
+                without_coins.add(coin)
+            continue
         if len(s) == 2:
             if name == "datadir":
                 data_dir = os.path.expanduser(s[1])
@@ -630,8 +660,7 @@ def main():
                 continue
         if name == "startonlycoin":
             for coin in [s.lower() for s in s[1].split(",")]:
-                if is_known_coin(coin) is False:
-                    raise ValueError(f"Unknown coin: {coin}")
+                ensure_coin_valid(coin)
                 start_only_coins.add(coin)
             continue
 

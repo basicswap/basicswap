@@ -125,6 +125,11 @@ Observe progress with
     tail -f /tmp/firo.log
 
 
+## Start a subset of the configured coins using docker
+
+    docker compose run --service-ports swapclient basicswap-run -datadir=/coindata -withcoins=monero
+
+
 
 ## FAQ
 

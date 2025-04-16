@@ -571,3 +571,7 @@ def getCoinIdFromName(name: str) -> str:
         return name_map[name.lower()]
     except Exception:
         raise ValueError(f"Unknown coin {name}")
+
+
+def isKnownCoinName(name: str) -> bool:
+    return params["name"].lower() in name_map

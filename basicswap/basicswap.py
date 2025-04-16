@@ -295,6 +295,7 @@ class BasicSwap(BaseApp):
         chain,
         log_name="BasicSwap",
         transient_instance=False,
+        extra_opts={},
     ):
         super().__init__(data_dir, settings, chain, log_name)
 
@@ -486,6 +487,9 @@ class BasicSwap(BaseApp):
             )
             self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
 
+        self.with_coins_override = extra_opts.get("with_coins", set())
+        self.without_coins_override = extra_opts.get("without_coins", set())
+
         for c in Coins:
             if c in chainparams:
                 self.setCoinConnectParams(c)
@@ -573,14 +577,22 @@ class BasicSwap(BaseApp):
         # Set anything that does not require the daemon to be running
         chain_client_settings = self.getChainClientSettings(coin)
 
+        coin_chainparams = chainparams[coin]
+        coin_name: str = coin_chainparams["name"]
+
         bindir = os.path.expanduser(chain_client_settings.get("bindir", ""))
         datadir = os.path.expanduser(
             chain_client_settings.get(
-                "datadir", os.path.join(cfg.TEST_DATADIRS, chainparams[coin]["name"])
+                "datadir", os.path.join(cfg.TEST_DATADIRS, coin_name)
             )
         )
 
         connection_type = chain_client_settings.get("connection_type", "none")
+        if (
+            len(self.with_coins_override) > 0
+            and coin_name not in self.with_coins_override
+        ) or coin_name in self.without_coins_override:
+            connection_type = "none"
         rpcauth = None
         if connection_type == "rpc":
             if "rpcauth" in chain_client_settings:
@@ -600,7 +612,6 @@ class BasicSwap(BaseApp):
 
         try:
             cursor = self.openDB()
-            coin_name: str = chainparams[coin]["name"]
             last_height_checked = self.getIntKV(
                 "last_height_checked_" + coin_name, cursor, 0
             )
@@ -613,12 +624,11 @@ class BasicSwap(BaseApp):
         finally:
             self.closeDB(cursor)
 
-        coin_chainparams = chainparams[coin]
         default_segwit = coin_chainparams.get("has_segwit", False)
         default_csv = coin_chainparams.get("has_csv", True)
         self.coin_clients[coin] = {
             "coin": coin,
-            "name": coin_chainparams["name"],
+            "name": coin_name,
             "connection_type": connection_type,
             "bindir": bindir,
             "datadir": datadir,

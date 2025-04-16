@@ -2232,11 +2232,11 @@ def check_btc_fastsync_data(base_dir, sync_filename):
         ensureValidSignatureBy(verified, "nicolasdorier")
 
 
-def ensure_coin_valid(coin: str, test_disabled: bool = True) -> None:
-    if coin not in known_coins:
-        exitWithError(f"Unknown coin {coin.capitalize()}")
-    if test_disabled and not OVERRIDE_DISABLED_COINS and coin in disabled_coins:
-        exitWithError(f"{coin.capitalize()} is disabled")
+def ensure_coin_valid(coin_name: str, test_disabled: bool = True) -> None:
+    if coin_name not in known_coins:
+        exitWithError(f"Unknown coin {coin_name.capitalize()}")
+    if test_disabled and not OVERRIDE_DISABLED_COINS and coin_name in disabled_coins:
+        exitWithError(f"{coin_name.capitalize()} is disabled")
 
 
 def main():
