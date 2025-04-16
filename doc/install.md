@@ -66,7 +66,7 @@ Adjust `--withcoins` and `--withoutcoins` as desired, eg: `--withcoins=monero,bi
 Append `--usebtcfastsync` to the below command to optionally initialise the Bitcoin datadir with a chain snapshot from btcpayserver FastSync.<br>
 [FastSync README.md](https://github.com/btcpayserver/btcpayserver-docker/blob/master/contrib/FastSync/README.md)
 
-##### FastSync
+##### Client Authentication
 
 Append `--client-auth-password=<YOUR_PASSWORD>` to the below command to optionally enable client authentication to protect your web UI from unauthorized access.<br>
 
