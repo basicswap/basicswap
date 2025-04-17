@@ -83,14 +83,14 @@ const PriceManager = (function() {
                     throw new Error('Network is offline');
                 }
 
-                const coinSymbols = window.CoinManager 
+                const coinSymbols = window.CoinManager
                     ? window.CoinManager.getAllCoins().map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                     : (window.config.coins
                         ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                         : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
 
                 console.log('PriceManager: lookupFiatRates ' + coinSymbols.join(', '));
-                
+
                 if (!coinSymbols.length) {
                     throw new Error('No valid coins configured');
                 }
@@ -114,7 +114,7 @@ const PriceManager = (function() {
                     if (!apiResponse.rates) {
                         throw new Error('No rates found in API response');
                     }
-                    
+
                     if (typeof apiResponse.rates !== 'object' || Object.keys(apiResponse.rates).length === 0) {
                         throw new Error('Empty rates object in API response');
                     }
@@ -122,12 +122,12 @@ const PriceManager = (function() {
                     console.error('API call error:', apiError);
                     throw new Error(`API error: ${apiError.message}`);
                 }
-                
+
                 const processedData = {};
-                
+
                 Object.entries(apiResponse.rates).forEach(([coinId, price]) => {
                     let normalizedCoinId;
-                    
+
                     if (window.CoinManager) {
                         const coin = window.CoinManager.getCoinByAnyIdentifier(coinId);
                         if (coin) {
@@ -138,19 +138,19 @@ const PriceManager = (function() {
                     } else {
                         normalizedCoinId = coinId === 'bitcoincash' ? 'bitcoin-cash' : coinId.toLowerCase();
                     }
-                    
+
                     if (coinId.toLowerCase() === 'zcoin') {
                         normalizedCoinId = 'firo';
                     }
-                    
+
                     processedData[normalizedCoinId] = {
                         usd: price,
                         btc: normalizedCoinId === 'bitcoin' ? 1 : price / (apiResponse.rates.bitcoin || 1)
                     };
                 });
-                
+
                 CacheManager.set(PRICES_CACHE_KEY, processedData, 'prices');
-                
+
                 Object.entries(processedData).forEach(([coin, prices]) => {
                     if (prices.usd) {
                         if (window.tableRateModule) {
@@ -158,18 +158,18 @@ const PriceManager = (function() {
                         }
                     }
                 });
-                
+
                 return processedData;
             } catch (error) {
                 console.error('Error fetching prices:', error);
                 NetworkManager.handleNetworkError(error);
-                
+
                 const cachedData = CacheManager.get(PRICES_CACHE_KEY);
                 if (cachedData) {
                     console.log('Using cached price data');
                     return cachedData.value;
                 }
-                
+
                 try {
                     const existingCache = localStorage.getItem(PRICES_CACHE_KEY);
                     if (existingCache) {
@@ -179,17 +179,17 @@ const PriceManager = (function() {
                 } catch (e) {
                     console.warn('Failed to parse existing cache:', e);
                 }
-                
+
                 const emptyData = {};
-                
-                const coinNames = window.CoinManager 
+
+                const coinNames = window.CoinManager
                     ? window.CoinManager.getAllCoins().map(c => c.name.toLowerCase())
                     : ['bitcoin', 'bitcoin-cash', 'dash', 'dogecoin', 'decred', 'namecoin', 'litecoin', 'particl', 'pivx', 'monero', 'wownero', 'firo'];
-                
+
                 coinNames.forEach(coin => {
                     emptyData[coin] = { usd: null, btc: null };
                 });
-                
+
                 return emptyData;
             }
         },
@@ -198,14 +198,14 @@ const PriceManager = (function() {
             if (!coinSymbol) return null;
             const prices = this.getPrices();
             if (!prices) return null;
-            
+
             let normalizedSymbol;
             if (window.CoinManager) {
                 normalizedSymbol = window.CoinManager.getPriceKey(coinSymbol);
             } else {
                 normalizedSymbol = coinSymbol.toLowerCase();
             }
-            
+
             return prices[normalizedSymbol] || null;
         },
 
