@@ -376,34 +376,43 @@
               </div>
             </div>
           </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex form-check form-check-inline">
-                    <div class="flex items-center h-5">
-                      <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
-                    </div>
-                    <div class="ml-2 text-sm">
-                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2" style="opacity: 0.40;">Amount Variable</label>
-                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different amount to the offer.</p>
-                    </div>
-                  </div>
-                  <div class="flex mt-2 form-check form-check-inline">
-                    <div class="flex items-center h-5">
-                      <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled> </div>
-                    <div class="ml-2 text-sm">
-                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3" style="opacity: 0.40;">Rate Variable</label>
-                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different rate to the offer.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+<div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
+  <div class="w-full md:w-10/12">
+    <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
+      <div class="w-full md:w-1/3 p-6">
+        <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
+      </div>
+      <div class="w-full md:flex-1 p-3">
+        <div class="flex form-check form-check-inline">
+          <div class="flex items-center h-5">
+            {% if debug_ui_mode == true %}
+            <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled>
+            {% else %}
+            <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} checked disabled>
+            {% endif %}
           </div>
+          <div class="ml-2 text-sm">
+            <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2" style="opacity: 0.40;">Amount Variable</label>
+            <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different amount to the offer.</p>
+          </div>
+        </div>
+        <div class="flex mt-2 form-check form-check-inline">
+          <div class="flex items-center h-5">
+            {% if debug_ui_mode == true %}
+            <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled>
+            {% else %}
+            <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled>
+            {% endif %}
+          </div>
+          <div class="ml-2 text-sm">
+            <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3" style="opacity: 0.40;">Rate Variable</label>
+            <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different rate to the offer.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
       </div>
     </div>
   </section>
