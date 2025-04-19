@@ -45,7 +45,7 @@ const WalletManager = (function() {
     }
 
     const coin = window.CoinManager.getCoinByAnyIdentifier(coinName);
-    
+
     if (!coin) {
       console.warn(`[WalletManager] No coin found for: ${coinName}`);
       return coinName;
@@ -78,15 +78,15 @@ const WalletManager = (function() {
 
         document.querySelectorAll('.coinname-value').forEach(el => {
           const coinName = el.getAttribute('data-coinname');
-          
+
           if (!coinName || processedCoins.has(coinName)) return;
 
-          const adjustedName = coinName === 'Zcoin' ? 'Firo' : 
-                               coinName.includes('Particl') ? 'Particl' : 
+          const adjustedName = coinName === 'Zcoin' ? 'Firo' :
+                               coinName.includes('Particl') ? 'Particl' :
                                coinName;
 
           const coinId = getCoingeckoId(adjustedName);
-          
+
           if (coinId && (shouldIncludeWow || coinId !== 'WOW')) {
             coinsToFetch.push(coinId);
             processedCoins.add(coinName);
@@ -116,8 +116,8 @@ const WalletManager = (function() {
             const coinName = el.getAttribute('data-coinname');
             if (!coinName) return;
 
-            const adjustedName = coinName === 'Zcoin' ? 'Firo' : 
-                                 coinName.includes('Particl') ? 'Particl' : 
+            const adjustedName = coinName === 'Zcoin' ? 'Firo' :
+                                 coinName.includes('Particl') ? 'Particl' :
                                  coinName;
 
             const coinId = getCoingeckoId(adjustedName);

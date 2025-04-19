@@ -180,7 +180,7 @@ const CoinManager = (function() {
         const normalizedId = identifier.toString().toLowerCase().trim();
         const coin = coinAliasesMap[normalizedId];
         if (coin) return coin;
-        if (normalizedId.includes('bitcoin') && normalizedId.includes('cash') || 
+        if (normalizedId.includes('bitcoin') && normalizedId.includes('cash') ||
             normalizedId === 'bch') {
             return symbolToInfo['bch'];
         }

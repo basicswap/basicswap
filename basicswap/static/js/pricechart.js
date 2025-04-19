@@ -1260,7 +1260,7 @@ const app = {
       app.scheduleNextRefresh();
     }
   },
-  
+
   updateNextRefreshTime: function() {
   const nextRefreshSpan = document.getElementById('next-refresh-time');
   const labelElement = document.getElementById('next-refresh-label');
@@ -1601,7 +1601,7 @@ refreshAllData: async function() {
         console.log('Using previously cached BTC price after error:', app.btcPriceUSD);
         return true;
       }
-      
+
       return false;
     }
   },
