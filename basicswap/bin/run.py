@@ -506,9 +506,12 @@ def runClient(
                 )
                 threads.append(thread_http)
                 thread_http.start()
-                webbrowser.open("http://%s:%d"
-                                % (settings["htmlhost"], settings["htmlport"])
-                                )
+                try: 
+                    webbrowser.open("http://%s:%d"
+                                    % (settings["htmlhost"], settings["htmlport"])
+                                    )
+                except:
+                    pass
 
             if "wshost" in settings:
                 ws_url = "ws://{}:{}".format(settings["wshost"], settings["wsport"])
