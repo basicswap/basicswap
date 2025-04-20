@@ -18,3 +18,8 @@ docker/.env
 
 # vscode dev container settings
 compose-dev.yaml
+
+# eclipse
+.project
+.pydevproject
+.settings

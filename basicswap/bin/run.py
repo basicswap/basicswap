@@ -14,6 +14,7 @@ import signal
 import subprocess
 import sys
 import traceback
+import webbrowser
 
 import basicswap.config as cfg
 from basicswap import __version__
@@ -505,6 +506,9 @@ def runClient(
                 )
                 threads.append(thread_http)
                 thread_http.start()
+                webbrowser.open("http://%s:%d"
+                                % (settings["htmlhost"], settings["htmlport"])
+                                )
 
             if "wshost" in settings:
                 ws_url = "ws://{}:{}".format(settings["wshost"], settings["wsport"])
