@@ -82,7 +82,7 @@ PIVX_VERSION_TAG = os.getenv("PIVX_VERSION_TAG", "")
 DASH_VERSION = os.getenv("DASH_VERSION", "22.0.0")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 
-FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.14.0")
+FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.14.1")
 FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 
 NAV_VERSION = os.getenv("NAV_VERSION", "7.0.3")
