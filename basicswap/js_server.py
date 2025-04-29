@@ -1010,10 +1010,10 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     "coin_from": swap_client.ci(offer.coin_from).coin_name(),
                     "coin_to": swap_client.ci(offer.coin_to).coin_name(),
                     "amount_from": swap_client.ci(offer.coin_from).format_amount(
-                        bid.amount
+                        bid.amount_to
                     ),
                     "amount_to": swap_client.ci(offer.coin_to).format_amount(
-                        bid.amount_to
+                        bid.amount
                     ),
                     "addr_from": bid.bid_addr if bid.was_received else offer.addr_from,
                 }
