@@ -1023,6 +1023,7 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     "amount_to": ci_to.format_amount(amount_to),
                     "rate": bid_rate,
                     "addr_from": bid.bid_addr if bid.was_received else offer.addr_from,
+                    "was_sent": bid.was_sent,
                 }
 
                 if offer.swap_type == SwapTypes.XMR_SWAP:
