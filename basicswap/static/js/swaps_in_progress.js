@@ -298,7 +298,28 @@ const createSwapTableRow = async (swap) => {
     const timeColor = getTimeStrokeColor(swap.expire_at);
     const fromAmount = parseFloat(swap.amount_from) || 0;
     const toAmount = parseFloat(swap.amount_to) || 0;
+    let send_column = "";
+    let recv_column = "";
+    if (swap.was_sent) {
+        send_column = `
+            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
+        `
+        recv_column = `
+            <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
+        `
+    } else {
+        send_column = `
+            <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
+        `
+        recv_column = `
+            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
 
+        `
+    }
     return `
         <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600" data-bid-id="${swap.bid_id}">
             <td class="relative w-0 p-0 m-0">
@@ -356,8 +377,7 @@ const createSwapTableRow = async (swap) => {
                 <div class="py-3 px-4 text-left">
                     <div class="items-center monospace">
                         <div class="pr-2">
-                            <div class="text-sm font-semibold">${fromAmount.toFixed(8)}</div>
-                            <div class="text-sm text-gray-500 dark:text-gray-400">${fromSymbol}</div>
+                            ${send_column}
                         </div>
                     </div>
                 </div>
@@ -390,8 +410,7 @@ const createSwapTableRow = async (swap) => {
             <td class="py-0">
                 <div class="py-3 px-4 text-right">
                     <div class="items-center monospace">
-                        <div class="text-sm font-semibold">${toAmount.toFixed(8)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400">${toSymbol}</div>
+                        ${recv_column}
                     </div>
                 </div>
             </td>

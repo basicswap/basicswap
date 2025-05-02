@@ -999,6 +999,16 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
     try:
         for bid_id, (bid, offer) in list(swap_client.swaps_in_progress.items()):
             try:
+                ci_from = swap_client.ci(offer.coin_from)
+                ci_to = swap_client.ci(offer.coin_to)
+                if offer.bid_reversed:
+                    amount_from: int = bid.amount_to
+                    amount_to: int = bid.amount
+                    bid_rate: int = ci_from.make_int(amount_to / amount_from, r=1)
+                else:
+                    amount_from: int = bid.amount
+                    amount_to: int = bid.amount_to
+                    bid_rate: int = bid.rate
                 swap_data = {
                     "bid_id": bid_id.hex(),
                     "offer_id": offer.offer_id.hex(),
@@ -1007,15 +1017,13 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                     "bid_state": strBidState(bid.state),
                     "tx_state_a": None,
                     "tx_state_b": None,
-                    "coin_from": swap_client.ci(offer.coin_from).coin_name(),
-                    "coin_to": swap_client.ci(offer.coin_to).coin_name(),
-                    "amount_from": swap_client.ci(offer.coin_from).format_amount(
-                        bid.amount
-                    ),
-                    "amount_to": swap_client.ci(offer.coin_to).format_amount(
-                        bid.amount_to
-                    ),
+                    "coin_from": ci_from.coin_name(),
+                    "coin_to": ci_to.coin_name(),
+                    "amount_from": ci_from.format_amount(amount_from),
+                    "amount_to": ci_to.format_amount(amount_to),
+                    "rate": bid_rate,
                     "addr_from": bid.bid_addr if bid.was_received else offer.addr_from,
+                    "was_sent": bid.was_sent,
                 }
 
                 if offer.swap_type == SwapTypes.XMR_SWAP:
@@ -1032,9 +1040,6 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
                 else:
                     swap_data["tx_state_a"] = bid.getITxState()
                     swap_data["tx_state_b"] = bid.getPTxState()
-
-                if hasattr(bid, "rate"):
-                    swap_data["rate"] = bid.rate
 
                 all_bids.append(swap_data)
 
