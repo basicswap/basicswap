@@ -423,38 +423,34 @@ const getStatusClass = (status) => {
     switch (status) {
         case 'Completed':
             return 'bg-green-300 text-black dark:bg-green-600 dark:text-white';
+        case 'Abandoned':
         case 'Expired':
         case 'Timed-out':
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
+        case 'Failed, refunded':
+        case 'Failed, swiped':
+            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
         case 'Error':
         case 'Failed':
+        case 'Rejected':
             return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
-        case 'Failed, swiped':
-        case 'Failed, refunded':
-            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
+        case 'Accepted':
+        case 'Request accepted':
         case 'InProgress':
         case 'Script coin locked':
         case 'Scriptless coin locked':
         case 'Script coin lock released':
         case 'SendingInitialTx':
         case 'SendingPaymentTx':
-            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
         case 'Received':
         case 'Exchanged script lock tx sigs msg':
         case 'Exchanged script lock spend tx msg':
         case 'Script tx redeemed':
         case 'Scriptless tx redeemed':
         case 'Scriptless tx recovered':
-            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
-        case 'Accepted':
-        case 'Request accepted':
-            return 'bg-green-300 text-black dark:bg-green-600 dark:text-white';
         case 'Delaying':
         case 'Auto accept delay':
             return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
-        case 'Abandoned':
-        case 'Rejected':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         default:
             return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
     }
@@ -1049,8 +1045,8 @@ const createTableRow = async (bid) => {
                 </div>
             </td>
         </tr>
-        
-        
+
+
         <!-- Tooltips -->
         <div id="tooltip-identity-${uniqueId}" role="tooltip" class="fixed z-50 py-3 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600 max-w-sm pointer-events-none">
             ${createIdentityTooltipContent(identity)}
