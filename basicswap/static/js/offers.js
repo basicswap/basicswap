@@ -2343,10 +2343,31 @@ function cleanup() {
       }
     }
 
-    if (window.TooltipManager) {
-      if (typeof window.TooltipManager.cleanup === 'function') {
-        window.TooltipManager.cleanup();
-      }
+    const offersBody = document.getElementById('offers-body');
+    if (offersBody) {
+      const existingRows = Array.from(offersBody.querySelectorAll('tr'));
+      existingRows.forEach(row => {
+        const tooltipTriggers = row.querySelectorAll('[data-tooltip-trigger-id]');
+        tooltipTriggers.forEach(trigger => {
+          if (window.TooltipManager) {
+            window.TooltipManager.destroy(trigger);
+          }
+        });
+
+        if (window.CleanupManager) {
+          window.CleanupManager.removeListenersByElement(row);
+        }
+
+        while (row.attributes && row.attributes.length > 0) {
+          row.removeAttribute(row.attributes[0].name);
+        }
+
+        while (row.firstChild) {
+          row.removeChild(row.firstChild);
+        }
+      });
+
+      offersBody.innerHTML = '';
     }
 
     const filterForm = document.getElementById('filterForm');
@@ -2358,20 +2379,20 @@ function cleanup() {
       });
     }
 
-    const paginationButtons = document.querySelectorAll('#prevPage, #nextPage');
-    paginationButtons.forEach(button => {
-      CleanupManager.removeListenersByElement(button);
-    });
-
-    document.querySelectorAll('th[data-sortable="true"]').forEach(header => {
-      CleanupManager.removeListenersByElement(header);
-    });
-
-    cleanupTable();
-
     jsonData = null;
     originalJsonData = null;
     latestPrices = null;
+
+    if (window.TooltipManager) {
+      window.TooltipManager.cleanup();
+    }
+
+    if (window.MemoryManager) {
+      if (window.MemoryManager.cleanupTooltips) {
+        window.MemoryManager.cleanupTooltips(true);
+      }
+      window.MemoryManager.forceCleanup();
+    }
 
     console.log('Offers.js cleanup completed');
   } catch (error) {
