@@ -175,10 +175,12 @@ Close the terminal and open a new one to update the python symlinks.
 
 ### Basicswap
 
+If installing on an older distro such as Debian 11 you may need to use a newer Python/SQLite version, see ["Use a Different Python Version" in notes.md](notes.md#Use-a-Different-Python-Version)
+
     export SWAP_DATADIR=$HOME/coinswaps
     python3 -m venv "$SWAP_DATADIR/venv"
-    . $SWAP_DATADIR/venv/bin/activate && python -V
 
+    . $SWAP_DATADIR/venv/bin/activate && python -V
     cd $SWAP_DATADIR
     git clone https://github.com/basicswap/basicswap.git
     cd $SWAP_DATADIR/basicswap

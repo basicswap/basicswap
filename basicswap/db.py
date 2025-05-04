@@ -658,82 +658,85 @@ class CoinRates(Table):
     last_updated = Column("integer")
 
 
+def create_db_(con, log) -> None:
+    c = con.cursor()
+
+    g = globals().copy()
+    for name, obj in g.items():
+        if not inspect.isclass(obj):
+            continue
+        if not hasattr(obj, "__sqlite3_table__"):
+            continue
+        if not hasattr(obj, "__tablename__"):
+            continue
+
+        table_name: str = obj.__tablename__
+        query: str = f"CREATE TABLE {table_name} ("
+
+        primary_key = None
+        constraints = []
+        indices = []
+        num_columns: int = 0
+        for m in inspect.getmembers(obj):
+            m_name, m_obj = m
+
+            if hasattr(m_obj, "__sqlite3_primary_key__"):
+                primary_key = m_obj
+                continue
+            if hasattr(m_obj, "__sqlite3_unique__"):
+                constraints.append(m_obj)
+                continue
+            if hasattr(m_obj, "__sqlite3_index__"):
+                indices.append(m_obj)
+                continue
+            if hasattr(m_obj, "__sqlite3_column__"):
+                if num_columns > 0:
+                    query += ","
+
+                col_type: str = m_obj.column_type.upper()
+                if col_type == "BOOL":
+                    col_type = "INTEGER"
+                query += f" {m_name} {col_type} "
+
+                if m_obj.primary_key:
+                    query += "PRIMARY KEY ASC "
+                if m_obj.unique:
+                    query += "UNIQUE "
+                num_columns += 1
+
+        if primary_key is not None:
+            query += f", PRIMARY KEY ({primary_key.column_1}"
+            if primary_key.column_2:
+                query += f", {primary_key.column_2}"
+            if primary_key.column_3:
+                query += f", {primary_key.column_3}"
+            query += ") "
+
+        for constraint in constraints:
+            query += f", UNIQUE ({constraint.column_1}"
+            if constraint.column_2:
+                query += f", {constraint.column_2}"
+            if constraint.column_3:
+                query += f", {constraint.column_3}"
+            query += ") "
+
+        query += ")"
+        c.execute(query)
+        for i in indices:
+            query: str = f"CREATE INDEX {i.name} ON {table_name} ({i.column_1}"
+            if i.column_2 is not None:
+                query += f", {i.column_2}"
+            if i.column_3 is not None:
+                query += f", {i.column_3}"
+            query += ")"
+            c.execute(query)
+
+
 def create_db(db_path: str, log) -> None:
     con = None
     try:
         con = sqlite3.connect(db_path)
-        c = con.cursor()
-
-        g = globals().copy()
-        for name, obj in g.items():
-            if not inspect.isclass(obj):
-                continue
-            if not hasattr(obj, "__sqlite3_table__"):
-                continue
-            if not hasattr(obj, "__tablename__"):
-                continue
-
-            table_name: str = obj.__tablename__
-            query: str = f"CREATE TABLE {table_name} ("
-
-            primary_key = None
-            constraints = []
-            indices = []
-            num_columns: int = 0
-            for m in inspect.getmembers(obj):
-                m_name, m_obj = m
-
-                if hasattr(m_obj, "__sqlite3_primary_key__"):
-                    primary_key = m_obj
-                    continue
-                if hasattr(m_obj, "__sqlite3_unique__"):
-                    constraints.append(m_obj)
-                    continue
-                if hasattr(m_obj, "__sqlite3_index__"):
-                    indices.append(m_obj)
-                    continue
-                if hasattr(m_obj, "__sqlite3_column__"):
-                    if num_columns > 0:
-                        query += ","
-
-                    col_type: str = m_obj.column_type.upper()
-                    if col_type == "BOOL":
-                        col_type = "INTEGER"
-                    query += f" {m_name} {col_type} "
-
-                    if m_obj.primary_key:
-                        query += "PRIMARY KEY ASC "
-                    if m_obj.unique:
-                        query += "UNIQUE "
-                    num_columns += 1
-
-            if primary_key is not None:
-                query += f", PRIMARY KEY ({primary_key.column_1}"
-                if primary_key.column_2:
-                    query += f", {primary_key.column_2}"
-                if primary_key.column_3:
-                    query += f", {primary_key.column_3}"
-                query += ") "
-
-            for constraint in constraints:
-                query += f", UNIQUE ({constraint.column_1}"
-                if constraint.column_2:
-                    query += f", {constraint.column_2}"
-                if constraint.column_3:
-                    query += f", {constraint.column_3}"
-                query += ") "
-
-            query += ")"
-            c.execute(query)
-            for i in indices:
-                query: str = f"CREATE INDEX {i.name} ON {table_name} ({i.column_1}"
-                if i.column_2 is not None:
-                    query += f", {i.column_2}"
-                if i.column_3 is not None:
-                    query += f", {i.column_3}"
-                query += ")"
-                c.execute(query)
-
+        create_db_(con, log)
         con.commit()
     finally:
         if con:

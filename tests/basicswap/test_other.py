@@ -2,13 +2,15 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import hashlib
+import logging
 import random
 import secrets
+import threading
 import unittest
 
 import basicswap.contrib.ed25519_fast as edf
@@ -24,6 +26,7 @@ from coincurve.ecdsaotves import (
 from coincurve.keys import PrivateKey
 
 from basicswap.contrib.mnemonic import Mnemonic
+from basicswap.db import create_db_, DBMethods, KnownIdentity
 from basicswap.util import i2b, h2b
 from basicswap.util.address import decodeAddress
 from basicswap.util.crypto import ripemd160, hash160, blake256
@@ -49,6 +52,9 @@ from basicswap.messages_npb import (
     BidMessage,
 )
 from basicswap.contrib.test_framework.script import hash160 as hash160_btc
+
+
+logger = logging.getLogger()
 
 
 class Test(unittest.TestCase):
@@ -555,6 +561,31 @@ class Test(unittest.TestCase):
         assert entropy0.hex() == "0002207e9b744ea2d7ab41702f31f000"
         mnemonic_recovered: str = Mnemonic("english").to_mnemonic(entropy0)
         assert mnemonic_recovered == mnemonics[0]
+
+    def test_db(self):
+        db_test = DBMethods()
+        db_test.sqlite_file = ":memory:"
+        db_test.mxDB = threading.Lock()
+        cursor = db_test.openDB()
+        try:
+            create_db_(db_test._db_con, logger)
+            # Test upsert
+            ki = KnownIdentity()
+            ki.address = "test"
+            ki.label = "test"
+            db_test.add(ki, cursor)
+            ki.record_id = 1
+            ki.address = "test1"
+            ki.label = "test1"
+            try:
+                db_test.add(ki, cursor, upsert=False)
+            except Exception as e:
+                assert "UNIQUE constraint failed" in str(e)
+            else:
+                raise ValueError("Should have errored.")
+            db_test.add(ki, cursor, upsert=True)
+        finally:
+            db_test.closeDB(cursor)
 
 
 if __name__ == "__main__":

@@ -103,6 +103,21 @@ Test:
     basicswap-prepare.exe --help
 
 
+## Use a Different Python Version
+
+[uv](https://github.com/astral-sh/uv) can create a virtual environment for a different version of Python (and consequently SQLite).
+
+Run:
+
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    source $HOME/.local/bin/env
+    uv venv -p 3.10 "$SWAP_DATADIR/venv" --seed
+
+Instead of:
+
+    python3 -m venv "$SWAP_DATADIR/venv"
+
+
 ## Private Offers
 
 To send a private offer:

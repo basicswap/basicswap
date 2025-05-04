@@ -1023,6 +1023,12 @@ class BasicSwap(BaseApp):
         self.log.info(f"SQLite version: {sqlite3.sqlite_version}")
         self.log.debug(f"Timezone offset: {time.timezone} ({time.tzname[0]})")
 
+        MIN_SQLITE_VERSION = (3, 35, 0)  # Upsert
+        if sqlite3.sqlite_version_info < MIN_SQLITE_VERSION:
+            raise RuntimeError(
+                "SQLite {} or higher required.".format(".".join(MIN_SQLITE_VERSION))
+            )
+
         upgradeDatabase(self, self.db_version)
         upgradeDatabaseData(self, self.db_data_version)
 
