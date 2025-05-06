@@ -1,3 +1,15 @@
+0.14.5
+==============
+
+- ui: Fixed incorrect swap direction shown on active swaps page.
+- ui: Fixed incorrect amounts shown on active swaps page for reverse swaps.
+- cores: Firo  v0.14.14.1
+  - Required for hardfork on 2025-05-28.
+- Allow starting with a subset of configured coins.
+  - New `--withcoin` and `--withoutcoin` options for basicswap-run.
+- Timeout waiting for mutex on shutdown.
+  - Waits a maximum of 5 seconds for any processing to complete.
+
 
 0.14.2
 ==============
