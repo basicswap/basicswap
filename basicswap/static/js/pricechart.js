@@ -1518,7 +1518,7 @@ refreshAllData: async function() {
         }
       }, 1000);
     }
-    console.log(`Price refresh completed at ${new Date().toLocaleTimeString()}. Updated ${window.config.coins.length - failedCoins.length}/${window.config.coins.length} coins.`);
+   //console.log(`Price refresh completed at ${new Date().toLocaleTimeString()}. Updated ${window.config.coins.length - failedCoins.length}/${window.config.coins.length} coins.`);
 
   } catch (error) {
     console.error('Critical error during refresh:', error);

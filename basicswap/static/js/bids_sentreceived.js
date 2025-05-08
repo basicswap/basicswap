@@ -1925,3 +1925,74 @@ if (document.readyState === 'loading') {
 } else {
     initialize();
 }
+
+(function() {
+    function handleBidsTabFromHash() {
+        if (window.location.pathname !== '/bids') {
+            return;
+        }
+
+        const hash = window.location.hash;
+
+        if (hash) {
+            const tabName = hash.substring(1);
+            let tabId;
+            switch (tabName.toLowerCase()) {
+                case 'sent':
+                    tabId = '#sent';
+                    break;
+                case 'received':
+                    tabId = '#received';
+                    break;
+                default:
+                    tabId = '#sent';
+            }
+            switchTab(tabId);
+        } else {
+            switchTab('#sent');
+        }
+    }
+
+    function switchTab(tabId) {
+        const targetTabBtn = document.querySelector(`[data-tabs-target="${tabId}"]`);
+        if (targetTabBtn) {
+            targetTabBtn.click();
+        }
+    }
+
+    function setupBidsTabNavigation() {
+        handleBidsTabFromHash();
+        window.addEventListener('hashchange', handleBidsTabFromHash);
+        const originalSwitchTab = window.switchTab || null;
+
+        window.switchTab = function(tabId) {
+            const newTabName = tabId.replace('#', '');
+            if (window.location.hash !== `#${newTabName}`) {
+                history.replaceState(null, null, `#${newTabName}`);
+            }
+            if (originalSwitchTab && typeof originalSwitchTab === 'function') {
+                originalSwitchTab(tabId);
+            } else {
+                const targetTabBtn = document.querySelector(`[data-tabs-target="${tabId}"]`);
+                if (targetTabBtn) {
+                    targetTabBtn.click();
+                }
+            }
+        };
+
+        const tabButtons = document.querySelectorAll('[data-tabs-target]');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tabs-target');
+                const tabName = tabId.replace('#', '');
+                history.replaceState(null, null, `#${tabName}`);
+            });
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupBidsTabNavigation);
+    } else {
+        setupBidsTabNavigation();
+    }
+})();

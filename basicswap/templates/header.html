@@ -63,6 +63,7 @@
   <script src="/static/js/libs/tippy.js"></script>
   <!-- UI Components -->
   <script src="/static/js/ui/tabs.js"></script>
+  <script src="/static/js/ui/bids-tab-navigation.js"></script>
   <script src="/static/js/ui/dropdown.js"></script>
   <!-- Core functionality -->
   <script src="/static/js/modules/coin-manager.js"></script>
@@ -84,6 +85,7 @@
   <script src="/static/js/modules/memory-manager.js"></script>
   <!-- Main application script -->
   <script src="/static/js/global.js"></script>
+
 </head>
 <body class="dark:bg-gray-700">
   <div id="shutdownModal" tabindex="-1" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden">
@@ -421,42 +423,30 @@
             </li>
 
             <!-- Bids -->
-           <li>
-             <a href="/bids" data-tooltip-target="tooltip-bids" class="flex items-center text-sm text-gray-400 
-               hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100">
-              <span class="inline-block mr-2">{{ bids_sent_svg | safe }}</span>
-              <span>Bids</span>
-              <span class="flex items-center ml-2">
-
-              <!-- Outgoing bids counter arrow -->
-               <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 py-1 
-               text-white {% if summary.num_sent_active_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} 
-               rounded-full">
-                <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                 <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(-90 12 12)"/>
-                </svg>
-              {{ summary.num_sent_active_bids }}
-               </span>
-               
-             <!-- Incoming bids counter arrow -->
-              <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold ml-2 px-2.5 
-              py-1 text-white {% if summary.num_recv_active_bids > 0 %}bg-blue-500{% else %}bg-gray-400
-              {% endif %} rounded-full">
-                <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                 <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(90 12 12)"/>
-                </svg>
-              {{ summary.num_recv_active_bids }}
-              </span>
-             </span>
-           </a>
-            <div id="tooltip-bids" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm 
-            font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 
-            tooltip">
-             <p><b>Sent bids:</b> {{ sent_bids_count }} ({{ summary.num_sent_active_bids }} active)</p>
-             <p><b>Received bids:</b> {{ received_bids_count }} ({{ summary.num_recv_active_bids }} active)</p>
-             </div>
+            <li>
+            <a href="/bids" data-tooltip-target="tooltip-bids" class="flex items-center text-sm text-gray-400  hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100">
+             <span class="inline-block mr-2">{{ bids_sent_svg | safe }}</span>
+             <span class="my-auto">Bids</span>
+             <span class="flex items-center ml-2 my-auto">
+             <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 py-1 text-white {% if summary.num_sent_active_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full bids-tab-link cursor-pointer" data-tab-target="#sent">
+             <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(-90 12 12)"/>
+             </svg>
+             {{ summary.num_sent_active_bids }}
+            </span>
+             <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold ml-2 px-2.5 py-1 text-white {% if summary.num_recv_active_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full bids-tab-link cursor-pointer" data-tab-target="#received">
+             <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(90 12 12)"/>
+              </svg>
+             {{ summary.num_recv_active_bids }}
+            </span>
+           </span>
+          </a>
+           <div id="tooltip-bids" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip">
+            <p><b>Sent bids:</b> {{ sent_bids_count }} ({{ summary.num_sent_active_bids }} active)</p>
+            <p><b>Received bids:</b> {{ received_bids_count }} ({{ summary.num_recv_active_bids }} active)</p>
+           </div>
             </li>
-
             <li>
               <span class="text-gray-300">|</span>
             </li>
@@ -554,29 +544,30 @@
           </a>
         </li>
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/bids">
-            {{ bids_received_svg | safe }}
-            <span>Bids</span>
-            <div class="flex ml-auto">
-              <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 
-                py-1 text-white {% if summary.num_sent_active_bids and summary.num_sent_active_bids > 0 %}
-                bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full mr-2">
-                <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(-90 12 12)"/>
-                </svg>
-                {{ summary.num_sent_active_bids }}
-              </span>
-              <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 
-                py-1 text-white {% if summary.num_recv_active_bids and summary.num_recv_active_bids > 0 %}
-                bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
-                <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(90 12 12)"/>
-                </svg>
-                {{ summary.num_recv_active_bids }}
-              </span>
-            </div>
-          </a>
-        </li>
+       <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/bids">
+         {{ bids_received_svg | safe }}
+       <span class="my-auto">Bids</span>
+       <div class="flex items-center ml-auto my-auto">
+       <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 
+        py-1 text-white {% if summary.num_sent_active_bids and summary.num_sent_active_bids > 0 %}
+        bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full mr-2 bids-tab-link cursor-pointer" 
+        data-tab-target="#sent">
+        <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(-90 12 12)"/>
+        </svg>
+        {{ summary.num_sent_active_bids }}
+       </span>
+       <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 
+        py-1 text-white {% if summary.num_recv_active_bids and summary.num_recv_active_bids > 0 %}
+        bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full bids-tab-link cursor-pointer"
+        data-tab-target="#received">
+        <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(90 12 12)"/>
+        </svg>
+        {{ summary.num_recv_active_bids }}
+       </span>
+       </div>
+        </a>
         <li>
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/active">
             <div id="swapContainer" class="inline-flex center-spin mr-2" 
