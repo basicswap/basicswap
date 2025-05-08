@@ -578,7 +578,7 @@ const chartModule = {
     this.chartRefs.set(element, chart);
   },
 
-  destroyChart: function() {
+destroyChart: function() {
   if (chartModule.chart) {
     try {
       const chartInstance = chartModule.chart;
@@ -592,12 +592,17 @@ const chartModule = {
 
       if (canvas) {
         chartModule.chartRefs.delete(canvas);
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
       }
     } catch (e) {
       console.error('Error destroying chart:', e);
     }
   }
- },
+},
 
   initChart: function() {
     this.destroyChart();

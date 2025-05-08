@@ -311,7 +311,6 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
             window.TooltipManager.cleanup();
         }
 
-        // Run memory optimization
         if (window.MemoryManager) {
             MemoryManager.forceCleanup();
         }
@@ -1883,7 +1882,6 @@ function setupMemoryMonitoring() {
     }, { once: true });
 }
 
-// Init
 function initialize() {
     const filterElements = {
         stateSelect: document.getElementById('state'),
@@ -1900,8 +1898,6 @@ function initialize() {
     if (filterElements.withExpiredSelect) filterElements.withExpiredSelect.value = 'true';
     if (filterElements.coinFrom) filterElements.coinFrom.value = 'any';
     if (filterElements.coinTo) filterElements.coinTo.value = 'any';
-
-    setupMemoryMonitoring();
 
     setTimeout(() => {
         WebSocketManager.initialize();
@@ -1920,12 +1916,6 @@ function initialize() {
         state.filters.state = -1;
         updateBidsTable();
     }, 100);
-
-    setInterval(() => {
-        if ((state.data.sent.length + state.data.received.length) > 1000) {
-            optimizeMemoryUsage();
-        }
-    }, 5 * 60 * 1000); // Check every 5 minutes
 
     window.cleanupBidsTable = cleanup;
 }

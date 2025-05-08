@@ -990,7 +990,7 @@ function createTableRow(offer, identity = null) {
    }
 
    let coinFromDisplay, coinToDisplay;
-   
+
    if (window.CoinManager) {
        coinFromDisplay = window.CoinManager.getDisplayName(coinFrom) || coinFrom;
        coinToDisplay = window.CoinManager.getDisplayName(coinTo) || coinTo;
@@ -1000,7 +1000,7 @@ function createTableRow(offer, identity = null) {
        if (coinFromDisplay.toLowerCase() === 'zcoin') coinFromDisplay = 'Firo';
        if (coinToDisplay.toLowerCase() === 'zcoin') coinToDisplay = 'Firo';
    }
-   
+
    const postedTime = formatTime(createdAt, true);
    const expiresIn = formatTime(expireAt);
    const currentTime = Math.floor(Date.now() / 1000);
@@ -1370,7 +1370,6 @@ function createRecipientTooltip(uniqueId, identityInfo, identity, successRate, t
         return 'text-red-600';
     };
 
-
     const truncateText = (text, maxLength) => {
         if (text.length <= maxLength) return text;
         return text.substring(0, maxLength) + '...';
@@ -1454,7 +1453,7 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 
     const getPriceKey = (coin) => {
         if (!coin) return null;
-        
+
         const lowerCoin = coin.toLowerCase();
 
         if (lowerCoin === 'zcoin') return 'firo';
@@ -2167,6 +2166,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             tableRateModule.init();
         }
 
+        document.addEventListener('memoryOptimized', (e) => {
+            if (jsonData && jsonData.length > e.detail.maxDataSize) {
+                console.log(`Trimming offers data from ${jsonData.length} to ${e.detail.maxDataSize} items`);
+                jsonData = jsonData.slice(0, e.detail.maxDataSize);
+            }
+
+            if (originalJsonData && originalJsonData.length > e.detail.maxDataSize) {
+                console.log(`Trimming original offers data from ${originalJsonData.length} to ${e.detail.maxDataSize} items`);
+                originalJsonData = originalJsonData.slice(0, e.detail.maxDataSize);
+            }
+        });
+
         await initializeTableAndData();
 
         if (window.PriceManager) {
@@ -2179,7 +2190,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (window.WebSocketManager) {
             WebSocketManager.addMessageHandler('message', async (data) => {
                 if (data.event === 'new_offer' || data.event === 'offer_revoked') {
-                    console.log('WebSocket event received:', data.event);
+                    //console.log('WebSocket event received:', data.event);
                     try {
 
                         const previousPrices = latestPrices;
@@ -2188,7 +2199,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         if (!offersResponse.ok) {
                             throw new Error(`HTTP error! status: ${offersResponse.status}`);
                         }
-                        
+
                         const newData = await offersResponse.json();
                         const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
                         jsonData = formatInitialData(processedNewData);
@@ -2200,7 +2211,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         } else {
                             priceData = await fetchLatestPrices();
                         }
-                        
+
                         if (priceData) {
                             latestPrices = priceData;
                             CacheManager.set('prices_coingecko', priceData, 'prices');
@@ -2230,7 +2241,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                         updatePaginationInfo();
 
-                        console.log('WebSocket-triggered refresh completed successfully');
+                        //console.log('WebSocket-triggered refresh completed successfully');
                     } catch (error) {
                         console.error('Error during WebSocket-triggered refresh:', error);
                         NetworkManager.handleNetworkError(error);
@@ -2357,26 +2368,8 @@ function cleanup() {
         if (window.CleanupManager) {
           window.CleanupManager.removeListenersByElement(row);
         }
-
-        while (row.attributes && row.attributes.length > 0) {
-          row.removeAttribute(row.attributes[0].name);
-        }
-
-        while (row.firstChild) {
-          row.removeChild(row.firstChild);
-        }
       });
-
       offersBody.innerHTML = '';
-    }
-
-    const filterForm = document.getElementById('filterForm');
-    if (filterForm) {
-      CleanupManager.removeListenersByElement(filterForm);
-      
-      filterForm.querySelectorAll('select').forEach(select => {
-        CleanupManager.removeListenersByElement(select);
-      });
     }
 
     jsonData = null;
@@ -2388,13 +2381,12 @@ function cleanup() {
     }
 
     if (window.MemoryManager) {
-      if (window.MemoryManager.cleanupTooltips) {
-        window.MemoryManager.cleanupTooltips(true);
+      if (window.MemoryManager.forceCleanup) {
+        window.MemoryManager.forceCleanup();
       }
-      window.MemoryManager.forceCleanup();
     }
 
-    console.log('Offers.js cleanup completed');
+    //console.log('Offers.js cleanup completed');
   } catch (error) {
     console.error('Error during cleanup:', error);
   }

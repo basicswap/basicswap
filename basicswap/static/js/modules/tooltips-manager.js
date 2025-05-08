@@ -1,6 +1,5 @@
 const TooltipManager = (function() {
     let instance = null;
-
     const tooltipInstanceMap = new WeakMap();
 
     class TooltipManagerImpl {
@@ -8,20 +7,22 @@ const TooltipManager = (function() {
             if (instance) {
                 return instance;
             }
-            this.pendingAnimationFrames = new Set();
-            this.pendingTimeouts = new Set();
+
             this.tooltipIdCounter = 0;
             this.maxTooltips = 200;
             this.cleanupThreshold = 1.2;
-            this.disconnectedCheckInterval = null;
-            this.cleanupInterval = null;
-            this.mutationObserver = null;
             this.debug = false;
             this.tooltipData = new WeakMap();
-            this.setupStyles();
-            this.setupMutationObserver();
-            this.startPeriodicCleanup();
-            this.startDisconnectedElementsCheck();
+            this.resources = {};
+
+            if (window.CleanupManager) {
+                CleanupManager.registerResource(
+                    'tooltipManager',
+                    this,
+                    (manager) => manager.dispose()
+                );
+            }
+
             instance = this;
         }
 
@@ -33,7 +34,7 @@ const TooltipManager = (function() {
 
         create(element, content, options = {}) {
             if (!element || !document.body.contains(element)) return null;
-            
+
             if (!document.contains(element)) {
                 this.log('Tried to create tooltip for detached element');
                 return null;
@@ -47,9 +48,7 @@ const TooltipManager = (function() {
                 this.performPeriodicCleanup(true);
             }
 
-            const rafId = requestAnimationFrame(() => {
-                this.pendingAnimationFrames.delete(rafId);
-
+            const createTooltip = () => {
                 if (!document.body.contains(element)) return;
 
                 const rect = element.getBoundingClientRect();
@@ -58,7 +57,7 @@ const TooltipManager = (function() {
                 } else {
                     let retryCount = 0;
                     const maxRetries = 3;
-                    
+
                     const retryCreate = () => {
                         const newRect = element.getBoundingClientRect();
                         if ((newRect.width > 0 && newRect.height > 0) || retryCount >= maxRetries) {
@@ -67,30 +66,29 @@ const TooltipManager = (function() {
                             }
                         } else {
                             retryCount++;
-                            const timeoutId = setTimeout(() => {
-                                this.pendingTimeouts.delete(timeoutId);
-                                const newRafId = requestAnimationFrame(retryCreate);
-                                this.pendingAnimationFrames.add(newRafId);
+                            CleanupManager.setTimeout(() => {
+                                CleanupManager.requestAnimationFrame(retryCreate);
                             }, 100);
-                            this.pendingTimeouts.add(timeoutId);
                         }
                     };
 
-                    const initialTimeoutId = setTimeout(() => {
-                        this.pendingTimeouts.delete(initialTimeoutId);
-                        const retryRafId = requestAnimationFrame(retryCreate);
-                        this.pendingAnimationFrames.add(retryRafId);
+                    CleanupManager.setTimeout(() => {
+                        CleanupManager.requestAnimationFrame(retryCreate);
                     }, 100);
-                    this.pendingTimeouts.add(initialTimeoutId);
                 }
-            });
+            };
 
-            this.pendingAnimationFrames.add(rafId);
+            CleanupManager.requestAnimationFrame(createTooltip);
             return null;
         }
-        
+
         createTooltipInstance(element, content, options = {}) {
-            if (!element || !document.body.contains(element) || !window.tippy) {
+            if (!element || !document.body.contains(element)) {
+                return null;
+            }
+
+            if (typeof window.tippy !== 'function') {
+                console.error('Tippy.js is not available.');
                 return null;
             }
 
@@ -130,7 +128,7 @@ const TooltipManager = (function() {
                     },
                     onHidden(instance) {
                         if (!document.body.contains(element)) {
-                            setTimeout(() => {
+                            CleanupManager.setTimeout(() => {
                                 if (instance && instance.destroy) {
                                     instance.destroy();
                                 }
@@ -168,9 +166,26 @@ const TooltipManager = (function() {
                     });
 
                     element.setAttribute('data-tooltip-trigger-id', tooltipId);
-
                     tooltipInstanceMap.set(element, tippyInstance[0]);
 
+                    const resourceId = CleanupManager.registerResource(
+                        'tooltip',
+                        { element, instance: tippyInstance[0] },
+                        (resource) => {
+                            try {
+                                if (resource.instance && resource.instance.destroy) {
+                                    resource.instance.destroy();
+                                }
+                                if (resource.element) {
+                                    resource.element.removeAttribute('data-tooltip-trigger-id');
+                                    resource.element.removeAttribute('aria-describedby');
+                                }
+                            } catch (e) {
+                                console.warn('Error destroying tooltip during cleanup:', e);
+                            }
+                        }
+                    );
+                    
                     return tippyInstance[0];
                 }
 
@@ -214,181 +229,292 @@ const TooltipManager = (function() {
             }
         }
 
+        getActiveTooltipInstances() {
+            const result = [];
+            try {
+                document.querySelectorAll('[data-tooltip-trigger-id]').forEach(element => {
+                    const instance = element._tippy ? [element._tippy] : null;
+                    if (instance) {
+                        result.push([element, instance]);
+                    }
+                });
+            } catch (error) {
+                console.error('Error getting active tooltip instances:', error);
+            }
+            return result;
+        }
+
         cleanup() {
             this.log('Running tooltip cleanup');
 
-            this.pendingAnimationFrames.forEach(id => {
-                cancelAnimationFrame(id);
-            });
-            this.pendingAnimationFrames.clear();
-
-            this.pendingTimeouts.forEach(id => {
-                clearTimeout(id);
-            });
-            this.pendingTimeouts.clear();
-
-            const elements = document.querySelectorAll('[data-tooltip-trigger-id]');
-            const batchSize = 20;
-
-            const processElementsBatch = (startIdx) => {
-                const endIdx = Math.min(startIdx + batchSize, elements.length);
-
-                for (let i = startIdx; i < endIdx; i++) {
-                    this.destroy(elements[i]);
+            try {
+                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) && 
+                    (document.querySelector('[data-tippy-root]:hover') || document.querySelector('[data-tooltip-trigger-id]:hover'))) {
+                    console.log('Skipping tooltip cleanup - tooltip is being hovered');
+                    return;
                 }
 
-                if (endIdx < elements.length) {
-                    const rafId = requestAnimationFrame(() => {
-                        this.pendingAnimationFrames.delete(rafId);
-                        processElementsBatch(endIdx);
-                    });
-                    this.pendingAnimationFrames.add(rafId);
+                const elements = document.querySelectorAll('[data-tooltip-trigger-id]:not(:hover)');
+                const batchSize = 20;
+
+                const processElementsBatch = (startIdx) => {
+                    const endIdx = Math.min(startIdx + batchSize, elements.length);
+
+                    for (let i = startIdx; i < endIdx; i++) {
+                        this.destroy(elements[i]);
+                    }
+
+                    if (endIdx < elements.length) {
+                        CleanupManager.requestAnimationFrame(() => {
+                            processElementsBatch(endIdx);
+                        });
+                    } else {
+                        this.cleanupOrphanedTooltips();
+                    }
+                };
+
+                if (elements.length > 0) {
+                    processElementsBatch(0);
                 } else {
                     this.cleanupOrphanedTooltips();
                 }
-            };
+            } catch (error) {
+                console.error('Error during cleanup:', error);
+            }
+        }
 
-            if (elements.length > 0) {
-                processElementsBatch(0);
-            } else {
-                this.cleanupOrphanedTooltips();
+        thoroughCleanup() {
+            this.log('Running thorough tooltip cleanup');
+
+            try {
+                this.cleanup();
+                this.cleanupAllTooltips();
+                this.log('Thorough tooltip cleanup completed');
+            } catch (error) {
+                console.error('Error in thorough tooltip cleanup:', error);
+            }
+        }
+
+        cleanupAllTooltips() {
+            this.log('Cleaning up all tooltips');
+
+            try {
+                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) && 
+                    document.querySelector('#offers-body tr:hover')) {
+                    this.log('Skipping all tooltips cleanup on offers/bids page with row hover');
+                    return;
+                }
+
+                const tooltipRoots = document.querySelectorAll('[data-tippy-root]');
+                const tooltipTriggers = document.querySelectorAll('[data-tooltip-trigger-id]');
+                const tooltipElements = document.querySelectorAll('.tooltip');
+
+                const isHovered = element => {
+                    try {
+                        return element.matches && element.matches(':hover');
+                    } catch (e) {
+
+                        return false;
+                    }
+                };
+
+                tooltipRoots.forEach(root => {
+                    if (!isHovered(root) && root.parentNode) {
+                        root.parentNode.removeChild(root);
+                    }
+                });
+
+                tooltipTriggers.forEach(trigger => {
+                    if (!isHovered(trigger)) {
+                        trigger.removeAttribute('data-tooltip-trigger-id');
+                        trigger.removeAttribute('aria-describedby');
+                        
+                        if (trigger._tippy) {
+                            try {
+                                trigger._tippy.destroy();
+                                trigger._tippy = null;
+                            } catch (e) {}
+                        }
+                    }
+                });
+
+                tooltipElements.forEach(tooltip => {
+                    if (!isHovered(tooltip) && tooltip.parentNode) {
+                        let closestHoveredRow = false;
+
+                        try {
+                            if (tooltip.closest && tooltip.closest('tr') && isHovered(tooltip.closest('tr'))) {
+                                closestHoveredRow = true;
+                            }
+                        } catch (e) {}
+
+                        if (!closestHoveredRow) {
+                            const style = window.getComputedStyle(tooltip);
+                            const isVisible = style.display !== 'none' && 
+                                        style.visibility !== 'hidden' &&
+                                        style.opacity !== '0';
+
+                            if (!isVisible) {
+                                tooltip.parentNode.removeChild(tooltip);
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Error cleaning up all tooltips:', error);
             }
         }
 
         cleanupOrphanedTooltips() {
-            const tippyElements = document.querySelectorAll('[data-tippy-root]');
-            let removed = 0;
+            try {
+                const tippyElements = document.querySelectorAll('[data-tippy-root]');
+                let removed = 0;
 
-            tippyElements.forEach(element => {
-                const tooltipId = element.getAttribute('data-for-tooltip-id');
-                const trigger = tooltipId ? 
-                    document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) : 
-                    null;
+                tippyElements.forEach(element => {
+                    const tooltipId = element.getAttribute('data-for-tooltip-id');
+                    const trigger = tooltipId ? 
+                        document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) : 
+                        null;
 
-                if (!trigger || !document.body.contains(trigger)) {
-                    if (element.parentNode) {
-                        element.parentNode.removeChild(element);
-                        removed++;
+                    if (!trigger || !document.body.contains(trigger)) {
+                        if (element.parentNode) {
+                            element.parentNode.removeChild(element);
+                            removed++;
+                        }
                     }
+                });
+
+                if (removed > 0) {
+                    this.log(`Removed ${removed} orphaned tooltip elements`);
                 }
-            });
 
-            if (removed > 0) {
-                this.log(`Removed ${removed} orphaned tooltip elements`);
+                return removed;
+            } catch (error) {
+                console.error('Error cleaning up orphaned tooltips:', error);
+                return 0;
             }
-
-            return removed;
         }
 
         setupMutationObserver() {
-            if (this.mutationObserver) {
-                this.mutationObserver.disconnect();
-            }
+            try {
+                const mutationObserver = new MutationObserver(mutations => {
+                    let needsCleanup = false;
 
-            this.mutationObserver = new MutationObserver(mutations => {
-                let needsCleanup = false;
-
-                mutations.forEach(mutation => {
-                    if (mutation.removedNodes.length) {
-                        Array.from(mutation.removedNodes).forEach(node => {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                if (node.hasAttribute && node.hasAttribute('data-tooltip-trigger-id')) {
-                                    this.destroy(node);
-                                    needsCleanup = true;
-                                }
-
-                                if (node.querySelectorAll) {
-                                    const tooltipTriggers = node.querySelectorAll('[data-tooltip-trigger-id]');
-                                    if (tooltipTriggers.length > 0) {
-                                        tooltipTriggers.forEach(trigger => {
-                                            this.destroy(trigger);
-                                        });
+                    mutations.forEach(mutation => {
+                        if (mutation.removedNodes.length) {
+                            Array.from(mutation.removedNodes).forEach(node => {
+                                if (node.nodeType === Node.ELEMENT_NODE) {
+                                    if (node.hasAttribute && node.hasAttribute('data-tooltip-trigger-id')) {
+                                        this.destroy(node);
                                         needsCleanup = true;
                                     }
+
+                                    if (node.querySelectorAll) {
+                                        const tooltipTriggers = node.querySelectorAll('[data-tooltip-trigger-id]');
+                                        if (tooltipTriggers.length > 0) {
+                                            tooltipTriggers.forEach(trigger => {
+                                                this.destroy(trigger);
+                                            });
+                                            needsCleanup = true;
+                                        }
+                                    }
                                 }
-                            }
-                        });
+                            });
+                        }
+                    });
+
+                    if (needsCleanup) {
+                        this.cleanupOrphanedTooltips();
                     }
                 });
-                
-                if (needsCleanup) {
-                    this.cleanupOrphanedTooltips();
-                }
-            });
 
-            this.mutationObserver.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
+                mutationObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
 
-            return this.mutationObserver;
+                this.resources.mutationObserver = CleanupManager.registerResource(
+                    'mutationObserver',
+                    mutationObserver,
+                    (observer) => observer.disconnect()
+                );
+
+                return mutationObserver;
+            } catch (error) {
+                console.error('Error setting up mutation observer:', error);
+                return null;
+            }
         }
 
         startDisconnectedElementsCheck() {
-            if (this.disconnectedCheckInterval) {
-                clearInterval(this.disconnectedCheckInterval);
+            try {
+                this.resources.disconnectedCheckInterval = CleanupManager.setInterval(() => {
+                    this.checkForDisconnectedElements();
+                }, 60000);
+            } catch (error) {
+                console.error('Error starting disconnected elements check:', error);
             }
-
-            this.disconnectedCheckInterval = setInterval(() => {
-                this.checkForDisconnectedElements();
-            }, 60000);
         }
 
         checkForDisconnectedElements() {
-            const elements = document.querySelectorAll('[data-tooltip-trigger-id]');
-            let removedCount = 0;
+            try {
+                const elements = document.querySelectorAll('[data-tooltip-trigger-id]');
+                let removedCount = 0;
 
-            elements.forEach(element => {
-                if (!document.body.contains(element)) {
-                    this.destroy(element);
-                    removedCount++;
+                elements.forEach(element => {
+                    if (!document.body.contains(element)) {
+                        this.destroy(element);
+                        removedCount++;
+                    }
+                });
+
+                if (removedCount > 0) {
+                    this.log(`Removed ${removedCount} tooltips for disconnected elements`);
+                    this.cleanupOrphanedTooltips();
                 }
-            });
-
-            if (removedCount > 0) {
-                this.log(`Removed ${removedCount} tooltips for disconnected elements`);
-                this.cleanupOrphanedTooltips();
+            } catch (error) {
+                console.error('Error checking for disconnected elements:', error);
             }
         }
 
         startPeriodicCleanup() {
-            if (this.cleanupInterval) {
-                clearInterval(this.cleanupInterval);
+            try {
+                this.resources.cleanupInterval = CleanupManager.setInterval(() => {
+                    this.performPeriodicCleanup();
+                }, 120000);
+            } catch (error) {
+                console.error('Error starting periodic cleanup:', error);
             }
-
-            this.cleanupInterval = setInterval(() => {
-                this.performPeriodicCleanup();
-            }, 120000);
         }
 
         performPeriodicCleanup(force = false) {
-            this.cleanupOrphanedTooltips();
-
-            this.checkForDisconnectedElements();
-
-            const tooltipCount = document.querySelectorAll('[data-tippy-root]').length;
-
-            if (force || tooltipCount > this.maxTooltips) {
-                this.log(`Performing aggressive cleanup (${tooltipCount} tooltips)`);
-
-                this.cleanup();
-
-                if (window.gc) {
-                    window.gc();
-                } else {
-                    const arr = new Array(1000);
-                    for (let i = 0; i < 1000; i++) {
-                        arr[i] = new Array(10000).join('x');
-                    }
+            try {
+                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) && 
+                    !force) {
+                    return;
                 }
+
+                this.cleanupOrphanedTooltips();
+                this.checkForDisconnectedElements();
+
+                const tooltipCount = document.querySelectorAll('[data-tippy-root]').length;
+
+                if (force || tooltipCount > this.maxTooltips) {
+                    this.log(`Performing aggressive cleanup (${tooltipCount} tooltips)`);
+                    this.cleanup();
+                }
+            } catch (error) {
+                console.error('Error performing periodic cleanup:', error);
             }
         }
 
         setupStyles() {
             if (document.getElementById('tooltip-styles')) return;
 
-            document.head.insertAdjacentHTML('beforeend', `
-                <style id="tooltip-styles">
+            try {
+                const style = document.createElement('style');
+                style.id = 'tooltip-styles';
+                style.textContent = `
                     [data-tippy-root] {
                         position: fixed !important;
                         z-index: 9999 !important;
@@ -472,62 +598,166 @@ const TooltipManager = (function() {
                     .tippy-box[data-placement^='right'] > .tippy-arrow {
                         left: 0;
                     }
-                </style>
-            `);
+                `;
+                document.head.appendChild(style);
+
+                this.resources.tooltipStyles = CleanupManager.registerResource(
+                    'tooltipStyles',
+                    style,
+                    (styleElement) => {
+                        if (styleElement && styleElement.parentNode) {
+                            styleElement.parentNode.removeChild(styleElement);
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error('Error setting up styles:', error);
+                try {
+                    document.head.insertAdjacentHTML('beforeend', `
+                        <style id="tooltip-styles">
+                            [data-tippy-root] {
+                                position: fixed !important;
+                                z-index: 9999 !important;
+                                pointer-events: none !important;
+                            }
+
+                            .tippy-box {
+                                font-size: 0.875rem;
+                                line-height: 1.25rem;
+                                font-weight: 500;
+                                border-radius: 0.5rem;
+                                color: white;
+                                position: relative !important;
+                                pointer-events: auto !important;
+                            }
+
+                            .tippy-content {
+                                padding: 0.5rem 0.75rem !important;
+                            }
+
+                            .tippy-box .bg-gray-400 {
+                                background-color: rgb(156 163 175);
+                                padding: 0.5rem 0.75rem;
+                            }
+                            .tippy-box:has(.bg-gray-400) .tippy-arrow {
+                                color: rgb(156 163 175);
+                            }
+
+                            .tippy-box .bg-red-500 {
+                                background-color: rgb(239 68 68);
+                                padding: 0.5rem 0.75rem;
+                            }
+                            .tippy-box:has(.bg-red-500) .tippy-arrow {
+                                color: rgb(239 68 68);
+                            }
+
+                            .tippy-box .bg-gray-300 {
+                                background-color: rgb(209 213 219);
+                                padding: 0.5rem 0.75rem;
+                            }
+                            .tippy-box:has(.bg-gray-300) .tippy-arrow {
+                                color: rgb(209 213 219);
+                            }
+
+                            .tippy-box .bg-green-700 {
+                                background-color: rgb(21 128 61);
+                                padding: 0.5rem 0.75rem;
+                            }
+                            .tippy-box:has(.bg-green-700) .tippy-arrow {
+                                color: rgb(21 128 61);
+                            }
+
+                            .tippy-box[data-placement^='top'] > .tippy-arrow::before {
+                                border-top-color: currentColor;
+                            }
+
+                            .tippy-box[data-placement^='bottom'] > .tippy-arrow::before {
+                                border-bottom-color: currentColor;
+                            }
+
+                            .tippy-box[data-placement^='left'] > .tippy-arrow::before {
+                                border-left-color: currentColor;
+                            }
+
+                            .tippy-box[data-placement^='right'] > .tippy-arrow::before {
+                                border-right-color: currentColor;
+                            }
+
+                            .tippy-box[data-placement^='top'] > .tippy-arrow {
+                                bottom: 0;
+                            }
+
+                            .tippy-box[data-placement^='bottom'] > .tippy-arrow {
+                                top: 0;
+                            }
+
+                            .tippy-box[data-placement^='left'] > .tippy-arrow {
+                                right: 0;
+                            }
+
+                            .tippy-box[data-placement^='right'] > .tippy-arrow {
+                                left: 0;
+                            }
+                        </style>
+                    `);
+
+                    const styleElement = document.getElementById('tooltip-styles');
+                    if (styleElement) {
+                        this.resources.tooltipStyles = CleanupManager.registerResource(
+                            'tooltipStyles',
+                            styleElement,
+                            (elem) => {
+                                if (elem && elem.parentNode) {
+                                    elem.parentNode.removeChild(elem);
+                                }
+                            }
+                        );
+                    }
+                } catch (e) {
+                    console.error('Failed to add tooltip styles:', e);
+                }
+            }
         }
 
         initializeTooltips(selector = '[data-tooltip-target]') {
-            document.querySelectorAll(selector).forEach(element => {
-                const targetId = element.getAttribute('data-tooltip-target');
-                if (!targetId) return;
+            try {
+                document.querySelectorAll(selector).forEach(element => {
+                    const targetId = element.getAttribute('data-tooltip-target');
+                    if (!targetId) return;
 
-                const tooltipContent = document.getElementById(targetId);
+                    const tooltipContent = document.getElementById(targetId);
 
-                if (tooltipContent) {
-                    this.create(element, tooltipContent.innerHTML, {
-                        placement: element.getAttribute('data-tooltip-placement') || 'top'
-                    });
-                }
-            });
+                    if (tooltipContent) {
+                        this.create(element, tooltipContent.innerHTML, {
+                            placement: element.getAttribute('data-tooltip-placement') || 'top'
+                        });
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing tooltips:', error);
+            }
         }
 
         dispose() {
             this.log('Disposing TooltipManager');
-            
-            this.cleanup();
 
-            this.pendingAnimationFrames.forEach(id => {
-                cancelAnimationFrame(id);
-            });
-            this.pendingAnimationFrames.clear();
+            try {
+                this.cleanup();
 
-            this.pendingTimeouts.forEach(id => {
-                clearTimeout(id);
-            });
-            this.pendingTimeouts.clear();
+                Object.values(this.resources).forEach(resourceId => {
+                    if (resourceId) {
+                        CleanupManager.unregisterResource(resourceId);
+                    }
+                });
 
-            if (this.disconnectedCheckInterval) {
-                clearInterval(this.disconnectedCheckInterval);
-                this.disconnectedCheckInterval = null;
+                this.resources = {};
+
+                instance = null;
+                return true;
+            } catch (error) {
+                console.error('Error disposing TooltipManager:', error);
+                return false;
             }
-
-            if (this.cleanupInterval) {
-                clearInterval(this.cleanupInterval);
-                this.cleanupInterval = null;
-            }
-
-            if (this.mutationObserver) {
-                this.mutationObserver.disconnect();
-                this.mutationObserver = null;
-            }
-
-            const styleElement = document.getElementById('tooltip-styles');
-            if (styleElement && styleElement.parentNode) {
-                styleElement.parentNode.removeChild(styleElement);
-            }
-
-            instance = null;
-            return true;
         }
 
         setDebugMode(enabled) {
@@ -536,16 +766,26 @@ const TooltipManager = (function() {
         }
 
         initialize(options = {}) {
-            if (options.maxTooltips) {
-                this.maxTooltips = options.maxTooltips;
-            }
+            try {
+                if (options.maxTooltips) {
+                    this.maxTooltips = options.maxTooltips;
+                }
 
-            if (options.debug !== undefined) {
-                this.setDebugMode(options.debug);
-            }
+                if (options.debug !== undefined) {
+                    this.setDebugMode(options.debug);
+                }
 
-            this.log('TooltipManager initialized');
-            return this;
+                this.setupStyles();
+                this.setupMutationObserver();
+                this.startPeriodicCleanup();
+                this.startDisconnectedElementsCheck();
+
+                this.log('TooltipManager initialized');
+                return this;
+            } catch (error) {
+                console.error('Error initializing TooltipManager:', error);
+                return this;
+            }
         }
     }
 
@@ -580,6 +820,11 @@ const TooltipManager = (function() {
             return manager.cleanup(...args);
         },
 
+        thoroughCleanup: function() {
+            const manager = this.getInstance();
+            return manager.thoroughCleanup();
+        },
+
         initializeTooltips: function(...args) {
             const manager = this.getInstance();
             return manager.initializeTooltips(...args);
@@ -590,6 +835,11 @@ const TooltipManager = (function() {
             return manager.setDebugMode(enabled);
         },
 
+        getActiveTooltipInstances: function() {
+            const manager = this.getInstance();
+            return manager.getActiveTooltipInstances();
+        },
+
         dispose: function(...args) {
             const manager = this.getInstance();
             return manager.dispose(...args);
@@ -597,37 +847,53 @@ const TooltipManager = (function() {
     };
 })();
 
-function installTooltipManager() {
-    const originalTooltipManager = window.TooltipManager;
-
-    window.TooltipManager = TooltipManager;
-
-    window.TooltipManager.initialize({
-        maxTooltips: 200,
-        debug: false
-    });
-
-    document.addEventListener('DOMContentLoaded', function() {
-        if (!window.tooltipManagerInitialized) {
-            window.TooltipManager.initializeTooltips();
-            window.tooltipManagerInitialized = true;
-        }
-    });
-    
-    return originalTooltipManager;
-}
-
-if (typeof document !== 'undefined') {
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        installTooltipManager();
-    } else {
-        document.addEventListener('DOMContentLoaded', installTooltipManager);
-    }
-}
-
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = TooltipManager;
 }
 
-window.TooltipManager = TooltipManager;
-console.log('TooltipManager initialized');
+if (typeof window !== 'undefined') {
+    window.TooltipManager = TooltipManager;
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    function initializeTooltipManager() {
+        if (!window.tooltipManagerInitialized) {
+
+            if (!window.CleanupManager) {
+                console.warn('CleanupManager not found. TooltipManager will run with limited functionality.');
+
+                window.CleanupManager = window.CleanupManager || {
+                    registerResource: (type, resource, cleanup) => {
+                        return Math.random().toString(36).substring(2, 9);
+                    },
+                    unregisterResource: () => {},
+                    setTimeout: (callback, delay) => setTimeout(callback, delay),
+                    setInterval: (callback, delay) => setInterval(callback, delay),
+                    requestAnimationFrame: (callback) => requestAnimationFrame(callback),
+                    addListener: (element, type, handler, options) => {
+                        element.addEventListener(type, handler, options);
+                        return handler;
+                    }
+                };
+            }
+
+            window.TooltipManager.initialize({
+                maxTooltips: 200,
+                debug: false
+            });
+
+            window.TooltipManager.initializeTooltips();
+            window.tooltipManagerInitialized = true;
+        }
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initializeTooltipManager();
+    } else {
+        document.addEventListener('DOMContentLoaded', initializeTooltipManager, { once: true });
+    }
+}
+
+if (typeof window !== 'undefined' && typeof console !== 'undefined') {
+    console.log('TooltipManager initialized');
+}

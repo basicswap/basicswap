@@ -1,132 +1,169 @@
 const MemoryManager = (function() {
   const config = {
-    tooltipCleanupInterval: 60000,
+    tooltipCleanupInterval: 300000,
+    diagnosticsInterval: 600000,
+    elementVerificationInterval: 300000,
     maxTooltipsThreshold: 100,
-    diagnosticsInterval: 300000,
-    tooltipLifespan: 240000,
+    maxTooltips: 300,
+    cleanupThreshold: 1.5,
+    minTimeBetweenCleanups: 180000,
+    memoryGrowthThresholdMB: 100,
     debug: false,
-    autoCleanup: true,
-    elementVerificationInterval: 50000,
-    tooltipSelectors: [
-      '[data-tippy-root]',
-      '[data-tooltip-trigger-id]',
-      '.tooltip',
-      '.tippy-box',
-      '.tippy-content'
+    protectedWebSockets: ['wsPort', 'ws_port'],
+    interactiveSelectors: [
+      'tr:hover', 
+      '[data-tippy-root]:hover', 
+      '.tooltip:hover', 
+      '[data-tooltip-trigger-id]:hover', 
+      '[data-tooltip-target]:hover'
+    ],
+    protectedContainers: [
+      '#sent-tbody', 
+      '#received-tbody', 
+      '#offers-body'
     ]
   };
 
-  let mutationObserver = null;
-
-  const safeGet = (obj, path, defaultValue = null) => {
-    if (!obj) return defaultValue;
-    const pathParts = path.split('.');
-    let result = obj;
-    for (const part of pathParts) {
-      if (result === null || result === undefined) return defaultValue;
-      result = result[part];
-    }
-    return result !== undefined ? result : defaultValue;
-  };
-
   const state = {
-    intervals: new Map(),
-    trackedTooltips: new Map(),
-    trackedElements: new WeakMap(),
-    startTime: Date.now(),
+    pendingAnimationFrames: new Set(),
+    pendingTimeouts: new Set(),
+    cleanupInterval: null,
+    diagnosticsInterval: null,
+    elementVerificationInterval: null,
+    mutationObserver: null,
     lastCleanupTime: Date.now(),
+    startTime: Date.now(),
+    isCleanupRunning: false,
     metrics: {
-      tooltipsCreated: 0,
-      tooltipsDestroyed: 0,
-      orphanedTooltipsRemoved: 0,
-      elementsProcessed: 0,
+      tooltipsRemoved: 0,
       cleanupRuns: 0,
-      manualCleanupRuns: 0,
-      lastMemoryUsage: null
+      lastMemoryUsage: null,
+      lastCleanupDetails: {},
+      history: []
+    },
+    originalTooltipFunctions: {}
+  };
+
+  function log(message, ...args) {
+    if (config.debug) {
+      console.log(`[MemoryManager] ${message}`, ...args);
     }
-  };
+  }
 
-  const log = (message, ...args) => {
-    if (!config.debug) return;
-    const now = new Date().toISOString();
-    console.log(`[MemoryManager ${now}]`, message, ...args);
-  };
+  function preserveTooltipFunctions() {
+    if (window.TooltipManager && !state.originalTooltipFunctions.destroy) {
+      state.originalTooltipFunctions = {
+        destroy: window.TooltipManager.destroy,
+        cleanup: window.TooltipManager.cleanup,
+        create: window.TooltipManager.create
+      };
+    }
+  }
 
-  const logError = (message, error) => {
-    console.error(`[MemoryManager] ${message}`, error);
-  };
+  function isInProtectedContainer(element) {
+    if (!element) return false;
 
-  const trackTooltip = (element, tooltipInstance) => {
+    for (const selector of config.protectedContainers) {
+      if (element.closest && element.closest(selector)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function shouldSkipCleanup() {
+    if (state.isCleanupRunning) return true;
+    
+    const selector = config.interactiveSelectors.join(', ');
+    const hoveredElements = document.querySelectorAll(selector);
+    
+    return hoveredElements.length > 0;
+  }
+
+  function performCleanup(force = false) {
+    if (shouldSkipCleanup() && !force) {
+      return false;
+    }
+
+    if (state.isCleanupRunning) {
+      return false;
+    }
+
+    const now = Date.now();
+    if (!force && now - state.lastCleanupTime < config.minTimeBetweenCleanups) {
+      return false;
+    }
+
     try {
-      if (!element || !tooltipInstance) return;
+      state.isCleanupRunning = true;
+      state.lastCleanupTime = now;
+      state.metrics.cleanupRuns++;
 
-      const timestamp = Date.now();
-      const tooltipId = element.getAttribute('data-tooltip-trigger-id') || `tooltip_${timestamp}_${Math.random().toString(36).substring(2, 9)}`;
+      const startTime = performance.now();
+      const startMemory = checkMemoryUsage();
 
-      state.trackedTooltips.set(tooltipId, {
-        timestamp,
-        element,
-        instance: tooltipInstance,
-        processed: false
+      state.pendingAnimationFrames.forEach(id => {
+        cancelAnimationFrame(id);
       });
+      state.pendingAnimationFrames.clear();
 
-      state.metrics.tooltipsCreated++;
+      state.pendingTimeouts.forEach(id => {
+        clearTimeout(id);
+      });
+      state.pendingTimeouts.clear();
 
-      setTimeout(() => {
-        if (state.trackedTooltips.has(tooltipId)) {
-          destroyTooltip(tooltipId);
-        }
-      }, config.tooltipLifespan);
+      const tooltipsResult = removeOrphanedTooltips();
+      state.metrics.tooltipsRemoved += tooltipsResult;
 
-      return tooltipId;
-    } catch (error) {
-      logError('Error tracking tooltip:', error);
-      return null;
-    }
-  };
+      const disconnectedResult = checkForDisconnectedElements();
 
-  const destroyTooltip = (tooltipId) => {
-    try {
-      const tooltipInfo = state.trackedTooltips.get(tooltipId);
-      if (!tooltipInfo) return false;
+      tryRunGarbageCollection(false);
 
-      const { element, instance } = tooltipInfo;
+      const endTime = performance.now();
+      const endMemory = checkMemoryUsage();
 
-      if (instance && typeof instance.destroy === 'function') {
-        instance.destroy();
+      const runStats = {
+        timestamp: new Date().toISOString(),
+        duration: endTime - startTime,
+        tooltipsRemoved: tooltipsResult,
+        disconnectedRemoved: disconnectedResult,
+        memoryBefore: startMemory ? startMemory.usedMB : null,
+        memoryAfter: endMemory ? endMemory.usedMB : null,
+        memorySaved: startMemory && endMemory ? 
+          (startMemory.usedMB - endMemory.usedMB).toFixed(2) : null
+      };
+
+      state.metrics.history.unshift(runStats);
+      if (state.metrics.history.length > 10) {
+        state.metrics.history.pop();
       }
 
-      if (element && element.removeAttribute) {
-        element.removeAttribute('data-tooltip-trigger-id');
-        element.removeAttribute('aria-describedby');
-      }
+      state.metrics.lastCleanupDetails = runStats;
 
-      const tippyRoot = document.querySelector(`[data-for-tooltip-id="${tooltipId}"]`);
-      if (tippyRoot && tippyRoot.parentNode) {
-        tippyRoot.parentNode.removeChild(tippyRoot);
+      if (config.debug) {
+        log(`Cleanup completed in ${runStats.duration.toFixed(2)}ms, removed ${tooltipsResult} tooltips`);
       }
-
-      state.trackedTooltips.delete(tooltipId);
-      state.metrics.tooltipsDestroyed++;
 
       return true;
     } catch (error) {
-      logError(`Error destroying tooltip ${tooltipId}:`, error);
+      console.error("Error during cleanup:", error);
       return false;
+    } finally {
+      state.isCleanupRunning = false;
     }
-  };
+  }
 
-  const removeOrphanedTooltips = () => {
+  function removeOrphanedTooltips() {
     try {
-      const tippyRoots = document.querySelectorAll('[data-tippy-root]');
+
+      const tippyRoots = document.querySelectorAll('[data-tippy-root]:not(:hover)');
       let removed = 0;
 
       tippyRoots.forEach(root => {
         const tooltipId = root.getAttribute('data-for-tooltip-id');
-
         const trigger = tooltipId ? 
-          document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) : 
-          null;
+          document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) : null;
 
         if (!trigger || !document.body.contains(trigger)) {
           if (root.parentNode) {
@@ -136,528 +173,410 @@ const MemoryManager = (function() {
         }
       });
 
-      document.querySelectorAll('[data-tooltip-trigger-id]').forEach(trigger => {
-        const tooltipId = trigger.getAttribute('data-tooltip-trigger-id');
-        const root = document.querySelector(`[data-for-tooltip-id="${tooltipId}"]`);
-
-        if (!root) {
-          trigger.removeAttribute('data-tooltip-trigger-id');
-          trigger.removeAttribute('aria-describedby');
-          removed++;
-        }
-      });
-
-      state.metrics.orphanedTooltipsRemoved += removed;
       return removed;
     } catch (error) {
-      logError('Error removing orphaned tooltips:', error);
+      console.error("Error removing orphaned tooltips:", error);
       return 0;
     }
-  };
+  }
 
-  const checkMemoryUsage = () => {
-    if (window.performance && window.performance.memory) {
-      const memoryUsage = {
-        usedJSHeapSize: window.performance.memory.usedJSHeapSize,
-        totalJSHeapSize: window.performance.memory.totalJSHeapSize,
-        jsHeapSizeLimit: window.performance.memory.jsHeapSizeLimit,
-        percentUsed: (window.performance.memory.usedJSHeapSize / window.performance.memory.jsHeapSizeLimit * 100).toFixed(2)
-      };
-
-      state.metrics.lastMemoryUsage = memoryUsage;
-      return memoryUsage;
-    }
-
-    return null;
-  };
-
-  const checkForDisconnectedElements = () => {
+  function checkForDisconnectedElements() {
     try {
+
+      const tooltipTriggers = document.querySelectorAll('[data-tooltip-trigger-id]:not(:hover)');
       const disconnectedElements = new Set();
 
-      state.trackedTooltips.forEach((info, id) => {
-        const { element } = info;
-        if (element && !document.body.contains(element)) {
-          disconnectedElements.add(id);
+      tooltipTriggers.forEach(el => {
+        if (!document.body.contains(el)) {
+          const tooltipId = el.getAttribute('data-tooltip-trigger-id');
+          disconnectedElements.add(tooltipId);
         }
       });
 
+      const tooltipRoots = document.querySelectorAll('[data-for-tooltip-id]');
+      let removed = 0;
+
       disconnectedElements.forEach(id => {
-        destroyTooltip(id);
+        for (const root of tooltipRoots) {
+          if (root.getAttribute('data-for-tooltip-id') === id && root.parentNode) {
+            root.parentNode.removeChild(root);
+            removed++;
+            break;
+          }
+        }
       });
 
       return disconnectedElements.size;
     } catch (error) {
-      logError('Error checking for disconnected elements:', error);
+      console.error("Error checking for disconnected elements:", error);
       return 0;
     }
-  };
+  }
 
-  const setupMutationObserver = () => {
-    if (mutationObserver) {
-      mutationObserver.disconnect();
+  function tryRunGarbageCollection(aggressive = false) {
+    setTimeout(() => {
+
+      const cache = {};
+      for (let i = 0; i < 100; i++) {
+        cache[`key${i}`] = {};
+      }
+
+      for (const key in cache) {
+        delete cache[key];
+      }
+    }, 100);
+
+    return true;
+  }
+  
+  function checkMemoryUsage() {
+    const result = {
+      usedJSHeapSize: 0,
+      totalJSHeapSize: 0,
+      jsHeapSizeLimit: 0,
+      percentUsed: "0",
+      usedMB: "0",
+      totalMB: "0",
+      limitMB: "0"
+    };
+
+    if (window.performance && window.performance.memory) {
+      result.usedJSHeapSize = window.performance.memory.usedJSHeapSize;
+      result.totalJSHeapSize = window.performance.memory.totalJSHeapSize;
+      result.jsHeapSizeLimit = window.performance.memory.jsHeapSizeLimit;
+      result.percentUsed = (result.usedJSHeapSize / result.jsHeapSizeLimit * 100).toFixed(2);
+      result.usedMB = (result.usedJSHeapSize / (1024 * 1024)).toFixed(2);
+      result.totalMB = (result.totalJSHeapSize / (1024 * 1024)).toFixed(2);
+      result.limitMB = (result.jsHeapSizeLimit / (1024 * 1024)).toFixed(2);
+    } else {
+      result.usedMB = "Unknown";
+      result.totalMB = "Unknown";
+      result.limitMB = "Unknown";
+      result.percentUsed = "Unknown";
     }
 
-    mutationObserver = new MutationObserver(mutations => {
-      let needsCleanup = false;
+    state.metrics.lastMemoryUsage = result;
+    return result;
+  }
 
-      mutations.forEach(mutation => {
-        if (mutation.removedNodes.length) {
-          Array.from(mutation.removedNodes).forEach(node => {
-            if (node.nodeType === 1) {
-              if (node.hasAttribute && node.hasAttribute('data-tooltip-trigger-id')) {
-                const tooltipId = node.getAttribute('data-tooltip-trigger-id');
-                destroyTooltip(tooltipId);
-                needsCleanup = true;
-              }
-
-              if (node.querySelectorAll) {
-                const tooltipTriggers = node.querySelectorAll('[data-tooltip-trigger-id]');
-                if (tooltipTriggers.length > 0) {
-                  tooltipTriggers.forEach(el => {
-                    const tooltipId = el.getAttribute('data-tooltip-trigger-id');
-                    destroyTooltip(tooltipId);
-                  });
-                  needsCleanup = true;
-                }
-              }
-            }
-          });
-        }
-      });
-
-      if (needsCleanup) {
-        removeOrphanedTooltips();
-      }
-    });
-
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    return mutationObserver;
-  };
-
-  const performCleanup = (force = false) => {
-    try {
-      log('Starting tooltip cleanup' + (force ? ' (forced)' : ''));
-
-      state.lastCleanupTime = Date.now();
-      state.metrics.cleanupRuns++;
-
-      if (force) {
-        state.metrics.manualCleanupRuns++;
-      }
-
-      document.querySelectorAll('[data-tippy-root]').forEach(root => {
-        const instance = safeGet(root, '_tippy');
-        if (instance && instance._animationFrame) {
-          cancelAnimationFrame(instance._animationFrame);
-          instance._animationFrame = null;
-        }
-      });
-
-      const orphanedRemoved = removeOrphanedTooltips();
-
-      const disconnectedRemoved = checkForDisconnectedElements();
-
-      const tooltipCount = document.querySelectorAll('[data-tippy-root]').length;
-      const triggerCount = document.querySelectorAll('[data-tooltip-trigger-id]').length;
-
-      if (force || tooltipCount > config.maxTooltipsThreshold) {
-        if (tooltipCount > config.maxTooltipsThreshold) {
-          document.querySelectorAll('[data-tooltip-trigger-id]').forEach(trigger => {
-            const tooltipId = trigger.getAttribute('data-tooltip-trigger-id');
-            destroyTooltip(tooltipId);
-          });
-
-          document.querySelectorAll('[data-tippy-root]').forEach(root => {
-            if (root.parentNode) {
-              root.parentNode.removeChild(root);
-            }
-          });
-        }
-
-        document.querySelectorAll('[data-tooltip-trigger-id], [aria-describedby]').forEach(el => {
-          if (window.CleanupManager && window.CleanupManager.removeListenersByElement) {
-            window.CleanupManager.removeListenersByElement(el);
-          } else {
-            if (el.parentNode) {
-              const clone = el.cloneNode(true);
-              el.parentNode.replaceChild(clone, el);
-            }
-          }
-        });
-      }
-
-      if (window.gc) {
-        window.gc();
-      } else if (force) {
-        const arr = new Array(1000);
-        for (let i = 0; i < 1000; i++) {
-          arr[i] = new Array(10000).join('x');
-        }
-      }
-
-      checkMemoryUsage();
-
-      const result = {
-        orphanedRemoved,
-        disconnectedRemoved,
-        tooltipCount: document.querySelectorAll('[data-tippy-root]').length,
-        triggerCount: document.querySelectorAll('[data-tooltip-trigger-id]').length,
-        memoryUsage: state.metrics.lastMemoryUsage
-      };
-
-      log('Cleanup completed', result);
-      return result;
-    } catch (error) {
-      logError('Error during cleanup:', error);
-      return { error: error.message };
+  function handleVisibilityChange() {
+    if (document.hidden) {
+      removeOrphanedTooltips();
+      checkForDisconnectedElements();
     }
-  };
+  }
 
-  const runDiagnostics = () => {
-    try {
-      log('Running memory diagnostics');
-
-      const memoryUsage = checkMemoryUsage();
-      const tooltipCount = document.querySelectorAll('[data-tippy-root]').length;
-      const triggerCount = document.querySelectorAll('[data-tooltip-trigger-id]').length;
-
-      const diagnostics = {
-        time: new Date().toISOString(),
-        uptime: Date.now() - state.startTime,
-        memoryUsage,
-        elementsCount: {
-          tippyRoots: tooltipCount,
-          tooltipTriggers: triggerCount,
-          orphanedTriggers: triggerCount - tooltipCount > 0 ? triggerCount - tooltipCount : 0,
-          orphanedTooltips: tooltipCount - triggerCount > 0 ? tooltipCount - triggerCount : 0
-        },
-        metrics: { ...state.metrics },
-        issues: []
-      };
-
-      if (tooltipCount > config.maxTooltipsThreshold) {
-        diagnostics.issues.push({
-          severity: 'high',
-          message: `Excessive tooltip count: ${tooltipCount} (threshold: ${config.maxTooltipsThreshold})`,
-          recommendation: 'Run cleanup and check for tooltip creation loops'
-        });
-      }
-
-      if (Math.abs(tooltipCount - triggerCount) > 10) {
-        diagnostics.issues.push({
-          severity: 'medium',
-          message: `Mismatch between tooltips (${tooltipCount}) and triggers (${triggerCount})`,
-          recommendation: 'Remove orphaned tooltips and tooltip triggers'
-        });
-      }
-
-      if (memoryUsage && memoryUsage.percentUsed > 80) {
-        diagnostics.issues.push({
-          severity: 'high',
-          message: `High memory usage: ${memoryUsage.percentUsed}%`,
-          recommendation: 'Force garbage collection and check for memory leaks'
-        });
-      }
-
-      if (config.autoCleanup && diagnostics.issues.some(issue => issue.severity === 'high')) {
-        log('Critical issues detected, triggering automatic cleanup');
-        performCleanup(true);
-      }
-
-      return diagnostics;
-    } catch (error) {
-      logError('Error running diagnostics:', error);
-      return { error: error.message };
+  function setupMutationObserver() {
+    if (state.mutationObserver) {
+      state.mutationObserver.disconnect();
+      state.mutationObserver = null;
     }
-  };
 
-  const patchTooltipManager = () => {
-    try {
-      if (!window.TooltipManager) {
-        log('TooltipManager not found');
-        return false;
+    let processingScheduled = false;
+    let lastProcessTime = 0;
+    const MIN_PROCESS_INTERVAL = 10000;
+
+    const processMutations = (mutations) => {
+      const now = Date.now();
+
+      if (now - lastProcessTime < MIN_PROCESS_INTERVAL || processingScheduled) {
+        return;
       }
 
-      log('Patching TooltipManager');
-
-      const originalCreate = window.TooltipManager.create;
-      const originalDestroy = window.TooltipManager.destroy;
-      const originalCleanup = window.TooltipManager.cleanup;
-
-      window.TooltipManager.create = function(element, content, options = {}) {
-        if (!element) return null;
-
-        try {
-          const result = originalCreate.call(this, element, content, options);
-          const tooltipId = element.getAttribute('data-tooltip-trigger-id');
-
-          if (tooltipId) {
-            const tippyInstance = safeGet(element, '_tippy') || null;
-            trackTooltip(element, tippyInstance);
-          }
-
-          return result;
-        } catch (error) {
-          logError('Error in patched create:', error);
-          return originalCreate.call(this, element, content, options);
-        }
-      };
-
-      window.TooltipManager.destroy = function(element) {
-        if (!element) return;
-
-        try {
-          const tooltipId = element.getAttribute('data-tooltip-trigger-id');
-
-          originalDestroy.call(this, element);
-
-          if (tooltipId) {
-            state.trackedTooltips.delete(tooltipId);
-            state.metrics.tooltipsDestroyed++;
-          }
-        } catch (error) {
-          logError('Error in patched destroy:', error);
-          originalDestroy.call(this, element);
-        }
-      };
-
-      window.TooltipManager.cleanup = function() {
-        try {
-          originalCleanup.call(this);
-          removeOrphanedTooltips();
-        } catch (error) {
-          logError('Error in patched cleanup:', error);
-          originalCleanup.call(this);
-        }
-      };
-
-      return true;
-    } catch (error) {
-      logError('Error patching TooltipManager:', error);
-      return false;
-    }
-  };
-
-  const patchTippy = () => {
-    try {
-      if (typeof tippy !== 'function') {
-        log('tippy.js not found globally');
-        return false;
-      }
-
-      log('Patching global tippy');
-
-      const originalTippy = window.tippy;
-
-      window.tippy = function(...args) {
-        const result = originalTippy.apply(this, args);
-        
-        if (Array.isArray(result)) {
-          result.forEach(instance => {
-            const reference = instance.reference;
-
-            if (reference) {
-              const originalShow = instance.show;
-              const originalHide = instance.hide;
-              const originalDestroy = instance.destroy;
-
-              instance.show = function(...showArgs) {
-                return originalShow.apply(this, showArgs);
-              };
-
-              instance.hide = function(...hideArgs) {
-                return originalHide.apply(this, hideArgs);
-              };
-
-              instance.destroy = function(...destroyArgs) {
-                return originalDestroy.apply(this, destroyArgs);
-              };
-            }
-          });
-        }
-
-        return result;
-      };
-
-      Object.assign(window.tippy, originalTippy);
-
-      return true;
-    } catch (error) {
-      logError('Error patching tippy:', error);
-      return false;
-    }
-  };
-
-  const startMonitoring = () => {
-    try {
-      stopMonitoring();
-
-      state.intervals.set('cleanup', setInterval(() => {
-        performCleanup();
-      }, config.tooltipCleanupInterval));
-
-      state.intervals.set('diagnostics', setInterval(() => {
-        runDiagnostics();
-      }, config.diagnosticsInterval));
-
-      state.intervals.set('elementVerification', setInterval(() => {
-        checkForDisconnectedElements();
-      }, config.elementVerificationInterval));
-
-      setupMutationObserver();
-
-      log('Monitoring started');
-      return true;
-    } catch (error) {
-      logError('Error starting monitoring:', error);
-      return false;
-    }
-  };
-
-  const stopMonitoring = () => {
-    try {
-      state.intervals.forEach((interval, key) => {
-        clearInterval(interval);
-      });
-
-      state.intervals.clear();
-
-      if (mutationObserver) {
-        mutationObserver.disconnect();
-        mutationObserver = null;
-      }
-
-      log('Monitoring stopped');
-      return true;
-    } catch (error) {
-      logError('Error stopping monitoring:', error);
-      return false;
-    }
-  };
-
-  const autoFix = () => {
-    try {
-      log('Running auto-fix');
-
-      performCleanup(true);
-
-      document.querySelectorAll('[data-tooltip-trigger-id]').forEach(element => {
-        const tooltipId = element.getAttribute('data-tooltip-trigger-id');
-        const duplicates = document.querySelectorAll(`[data-tooltip-trigger-id="${tooltipId}"]`);
-
-        if (duplicates.length > 1) {
-          for (let i = 1; i < duplicates.length; i++) {
-            duplicates[i].removeAttribute('data-tooltip-trigger-id');
-            duplicates[i].removeAttribute('aria-describedby');
-          }
-        }
-      });
-
-      const tippyRoots = document.querySelectorAll('[data-tippy-root]');
-      tippyRoots.forEach(root => {
-        if (!document.body.contains(root) && root.parentNode) {
-          root.parentNode.removeChild(root);
-        }
-      });
-
-      if (window.TooltipManager && window.TooltipManager.getInstance) {
-        const manager = window.TooltipManager.getInstance();
-        if (manager && manager.chartRefs && manager.chartRefs.clear) {
-          manager.chartRefs.clear();
-        }
-
-        if (manager && manager.tooltipElementsMap && manager.tooltipElementsMap.clear) {
-          manager.tooltipElementsMap.clear();
-        }
-      }
-
-      patchTooltipManager();
-      patchTippy();
-
-      return true;
-    } catch (error) {
-      logError('Error during auto-fix:', error);
-      return false;
-    }
-  };
-
-  const initialize = (options = {}) => {
-    try {
-      Object.assign(config, options);
-      
-      if (document.head) {
-        const metaCache = document.createElement('meta');
-        metaCache.setAttribute('http-equiv', 'Cache-Control');
-        metaCache.setAttribute('content', 'no-store, max-age=0');
-        document.head.appendChild(metaCache);
-      }
-
-      patchTooltipManager();
-      patchTippy();
-
-      startMonitoring();
-
-      if (window.CleanupManager && window.CleanupManager.registerResource) {
-        window.CleanupManager.registerResource('memorymanager', MemoryManager, (optimizer) => {
-          optimizer.dispose();
-        });
-      }
-
-      log('Memory Optimizer initialized', config);
+      processingScheduled = true;
 
       setTimeout(() => {
-        runDiagnostics();
+        processingScheduled = false;
+        lastProcessTime = Date.now();
+        
+        if (state.isCleanupRunning) {
+          return;
+        }
+
+        const tooltipSelectors = ['[data-tippy-root]', '[data-tooltip-trigger-id]', '.tooltip'];
+        let tooltipCount = 0;
+
+        tooltipCount = document.querySelectorAll(tooltipSelectors.join(', ')).length;
+
+        if (tooltipCount > config.maxTooltipsThreshold && 
+            (Date.now() - state.lastCleanupTime > config.minTimeBetweenCleanups)) {
+
+          removeOrphanedTooltips();
+          checkForDisconnectedElements();
+          state.lastCleanupTime = Date.now();
+        }
       }, 5000);
+    };
 
-      return MemoryManager;
-    } catch (error) {
-      logError('Error initializing Memory Optimizer:', error);
-      return null;
+    state.mutationObserver = new MutationObserver(processMutations);
+
+    state.mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+      characterData: false
+    });
+
+    return state.mutationObserver;
+  }
+
+  function enhanceTooltipManager() {
+    if (!window.TooltipManager || window.TooltipManager._memoryManagerEnhanced) return false;
+
+    preserveTooltipFunctions();
+
+    const originalDestroy = window.TooltipManager.destroy;
+    const originalCleanup = window.TooltipManager.cleanup;
+
+    window.TooltipManager.destroy = function(element) {
+      if (!element) return;
+
+      try {
+        const tooltipId = element.getAttribute('data-tooltip-trigger-id');
+
+        if (isInProtectedContainer(element)) {
+          if (originalDestroy) {
+            return originalDestroy.call(window.TooltipManager, element);
+          }
+          return;
+        }
+
+        if (tooltipId) {
+          if (originalDestroy) {
+            originalDestroy.call(window.TooltipManager, element);
+          }
+
+          const tooltipRoot = document.querySelector(`[data-for-tooltip-id="${tooltipId}"]`);
+          if (tooltipRoot && tooltipRoot.parentNode) {
+            tooltipRoot.parentNode.removeChild(tooltipRoot);
+          }
+
+          element.removeAttribute('data-tooltip-trigger-id');
+          element.removeAttribute('aria-describedby');
+
+          if (element._tippy) {
+            try {
+              element._tippy.destroy();
+              element._tippy = null;
+            } catch (e) {}
+          }
+        }
+      } catch (error) {
+        console.error('Error in enhanced tooltip destroy:', error);
+
+        if (originalDestroy) {
+          originalDestroy.call(window.TooltipManager, element);
+        }
+      }
+    };
+
+    window.TooltipManager.cleanup = function() {
+      try {
+        if (originalCleanup) {
+          originalCleanup.call(window.TooltipManager);
+        }
+
+        removeOrphanedTooltips();
+      } catch (error) {
+        console.error('Error in enhanced tooltip cleanup:', error);
+
+        if (originalCleanup) {
+          originalCleanup.call(window.TooltipManager);
+        }
+      }
+    };
+
+    window.TooltipManager._memoryManagerEnhanced = true;
+    window.TooltipManager._originalDestroy = originalDestroy;
+    window.TooltipManager._originalCleanup = originalCleanup;
+
+    return true;
+  }
+
+  function initializeScheduledCleanups() {
+    if (state.cleanupInterval) {
+      clearInterval(state.cleanupInterval);
+      state.cleanupInterval = null;
     }
-  };
 
-  const dispose = () => {
-    try {
-      log('Disposing Memory Optimizer');
-
-      performCleanup(true);
-
-      stopMonitoring();
-
-      state.trackedTooltips.clear();
-
-      return true;
-    } catch (error) {
-      logError('Error disposing Memory Optimizer:', error);
-      return false;
+    if (state.diagnosticsInterval) {
+      clearInterval(state.diagnosticsInterval);
+      state.diagnosticsInterval = null;
     }
-  };
+
+    if (state.elementVerificationInterval) {
+      clearInterval(state.elementVerificationInterval);
+      state.elementVerificationInterval = null;
+    }
+
+    state.cleanupInterval = setInterval(() => {
+      removeOrphanedTooltips();
+      checkForDisconnectedElements();
+    }, config.tooltipCleanupInterval);
+
+    state.diagnosticsInterval = setInterval(() => {
+      checkMemoryUsage();
+    }, config.diagnosticsInterval);
+
+    state.elementVerificationInterval = setInterval(() => {
+      checkForDisconnectedElements();
+    }, config.elementVerificationInterval);
+
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    setupMutationObserver();
+
+    return true;
+  }
+  
+  function initialize(options = {}) {
+    preserveTooltipFunctions();
+
+    if (options) {
+      Object.assign(config, options);
+    }
+
+    enhanceTooltipManager();
+
+    if (window.WebSocketManager && !window.WebSocketManager.cleanupOrphanedSockets) {
+      window.WebSocketManager.cleanupOrphanedSockets = function() {
+        return 0;
+      };
+    }
+
+    const manager = window.ApiManager || window.Api;
+    if (manager && !manager.abortPendingRequests) {
+      manager.abortPendingRequests = function() {
+        return 0;
+      };
+    }
+
+    initializeScheduledCleanups();
+
+    setTimeout(() => {
+      removeOrphanedTooltips();
+      checkForDisconnectedElements();
+    }, 5000);
+
+    return this;
+  }
+
+  function dispose() {
+    if (state.cleanupInterval) {
+      clearInterval(state.cleanupInterval);
+      state.cleanupInterval = null;
+    }
+
+    if (state.diagnosticsInterval) {
+      clearInterval(state.diagnosticsInterval);
+      state.diagnosticsInterval = null;
+    }
+
+    if (state.elementVerificationInterval) {
+      clearInterval(state.elementVerificationInterval);
+      state.elementVerificationInterval = null;
+    }
+
+    if (state.mutationObserver) {
+      state.mutationObserver.disconnect();
+      state.mutationObserver = null;
+    }
+
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+    return true;
+  }
+
+  function displayStats() {
+    const stats = getDetailedStats();
+
+    console.group('Memory Manager Stats');
+    console.log('Memory Usage:', stats.memory ? 
+      `${stats.memory.usedMB}MB / ${stats.memory.limitMB}MB (${stats.memory.percentUsed}%)` : 
+      'Not available');
+    console.log('Total Cleanups:', stats.metrics.cleanupRuns);
+    console.log('Total Tooltips Removed:', stats.metrics.tooltipsRemoved);
+    console.log('Current Tooltips:', stats.tooltips.total);
+    console.log('Last Cleanup:', stats.metrics.lastCleanupDetails);
+    console.log('Cleanup History:', stats.metrics.history);
+    console.groupEnd();
+
+    return stats;
+  }
+
+  function getDetailedStats() {
+
+    const allTooltipElements = document.querySelectorAll('[data-tippy-root], [data-tooltip-trigger-id], .tooltip');
+
+    const tooltips = {
+      roots: document.querySelectorAll('[data-tippy-root]').length,
+      triggers: document.querySelectorAll('[data-tooltip-trigger-id]').length,
+      tooltipElements: document.querySelectorAll('.tooltip').length,
+      total: allTooltipElements.length,
+      protectedContainers: {}
+    };
+
+    config.protectedContainers.forEach(selector => {
+      const container = document.querySelector(selector);
+      if (container) {
+        tooltips.protectedContainers[selector] = {
+          tooltips: container.querySelectorAll('.tooltip').length,
+          triggers: container.querySelectorAll('[data-tooltip-trigger-id]').length,
+          roots: document.querySelectorAll(`[data-tippy-root][data-for-tooltip-id]`).length
+        };
+      }
+    });
+
+    return {
+      memory: checkMemoryUsage(),
+      metrics: { ...state.metrics },
+      tooltips,
+      config: { ...config }
+    };
+  }
 
   return {
     initialize,
-    dispose,
-    performCleanup,
-    runDiagnostics,
-    autoFix,
-    getConfig: () => ({ ...config }),
-    getMetrics: () => ({ ...state.metrics }),
-    setDebugMode: (enabled) => {
+    cleanup: performCleanup,
+    forceCleanup: function() {
+      return performCleanup(true);
+    },
+    fullCleanup: function() {
+      return performCleanup(true);
+    },
+    getStats: getDetailedStats,
+    displayStats,
+    setDebugMode: function(enabled) {
       config.debug = Boolean(enabled);
       return config.debug;
-    }
+    },
+    addProtectedContainer: function(selector) {
+      if (!config.protectedContainers.includes(selector)) {
+        config.protectedContainers.push(selector);
+      }
+      return config.protectedContainers;
+    },
+    removeProtectedContainer: function(selector) {
+      const index = config.protectedContainers.indexOf(selector);
+      if (index !== -1) {
+        config.protectedContainers.splice(index, 1);
+      }
+      return config.protectedContainers;
+    },
+    dispose
   };
 })();
 
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', function() {
-    MemoryManager.initialize();
+document.addEventListener('DOMContentLoaded', function() {
+  const isDevMode = window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1';
+
+  MemoryManager.initialize({
+    debug: isDevMode
   });
-}
+
+  console.log('Memory Manager initialized');
+});
 
 window.MemoryManager = MemoryManager;
-console.log('Memory Manager initialized');
