@@ -1377,7 +1377,7 @@ const app = {
   },
 
 refreshAllData: async function() {
-  console.log('Price refresh started at', new Date().toLocaleTimeString());
+  //console.log('Price refresh started at', new Date().toLocaleTimeString());
 
   if (app.isRefreshing) {
     console.log('Refresh already in progress, skipping...');
@@ -1411,7 +1411,7 @@ refreshAllData: async function() {
     return;
   }
 
-  console.log('Starting refresh of all data...');
+  //console.log('Starting refresh of all data...');
   app.isRefreshing = true;
   app.updateNextRefreshTime();
   ui.showLoader();
@@ -1478,7 +1478,7 @@ refreshAllData: async function() {
         const cacheKey = `coinData_${coin.symbol}`;
         CacheManager.set(cacheKey, coinData, 'prices');
 
-        console.log(`Updated price for ${coin.symbol}: $${coinData.current_price}`);
+      //console.log(`Updated price for ${coin.symbol}: $${coinData.current_price}`);
 
       } catch (coinError) {
         console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
@@ -1549,7 +1549,7 @@ refreshAllData: async function() {
       app.scheduleNextRefresh();
     }
 
-    console.log(`Refresh process finished at ${new Date().toLocaleTimeString()}, next refresh scheduled: ${app.isAutoRefreshEnabled ? 'yes' : 'no'}`);
+    //console.log(`Refresh process finished at ${new Date().toLocaleTimeString()}, next refresh scheduled: ${app.isAutoRefreshEnabled ? 'yes' : 'no'}`);
   }
 },
 
