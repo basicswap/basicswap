@@ -328,7 +328,7 @@ const CacheManager = (function() {
         .filter(key => isCacheKey(key))
         .forEach(key => memoryCache.delete(key));
 
-      console.log("Cache cleared successfully");
+      //console.log("Cache cleared successfully");
       return true;
     },
 

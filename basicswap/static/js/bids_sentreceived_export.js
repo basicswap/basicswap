@@ -4,17 +4,18 @@ const BidExporter = {
             return 'No data to export';
         }
 
-        const isSent = type === 'sent';
+        const isAllTab = type === 'all';
 
         const headers = [
             'Date/Time',
             'Bid ID',
             'Offer ID',
             'From Address',
-            isSent ? 'You Send Amount' : 'You Receive Amount',
-            isSent ? 'You Send Coin' : 'You Receive Coin',
-            isSent ? 'You Receive Amount' : 'You Send Amount',
-            isSent ? 'You Receive Coin' : 'You Send Coin',
+            ...(isAllTab ? ['Type'] : []),
+            'You Send Amount',
+            'You Send Coin',
+            'You Receive Amount',
+            'You Receive Coin',
             'Status',
             'Created At',
             'Expires At'
@@ -23,11 +24,13 @@ const BidExporter = {
         let csvContent = headers.join(',') + '\n';
 
         bids.forEach(bid => {
+            const isSent = isAllTab ? (bid.source === 'sent') : (type === 'sent');
             const row = [
                 `"${formatTime(bid.created_at)}"`,
                 `"${bid.bid_id}"`,
                 `"${bid.offer_id}"`,
                 `"${bid.addr_from}"`,
+                ...(isAllTab ? [`"${bid.source}"`] : []),
                 isSent ? bid.amount_from : bid.amount_to,
                 `"${isSent ? bid.coin_from : bid.coin_to}"`,
                 isSent ? bid.amount_to : bid.amount_from,
@@ -103,6 +106,15 @@ const BidExporter = {
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(function() {
         if (typeof state !== 'undefined' && typeof EventManager !== 'undefined') {
+            const exportAllButton = document.getElementById('exportAllBids');
+            if (exportAllButton) {
+                EventManager.add(exportAllButton, 'click', (e) => {
+                    e.preventDefault();
+                    state.currentTab = 'all';
+                    BidExporter.exportCurrentView();
+                });
+            }
+
             const exportSentButton = document.getElementById('exportSentBids');
             if (exportSentButton) {
                 EventManager.add(exportSentButton, 'click', (e) => {
@@ -128,9 +140,14 @@ const originalCleanup = window.cleanup || function(){};
 window.cleanup = function() {
     originalCleanup();
 
+    const exportAllButton = document.getElementById('exportAllBids');
     const exportSentButton = document.getElementById('exportSentBids');
     const exportReceivedButton = document.getElementById('exportReceivedBids');
 
+    if (exportAllButton && typeof EventManager !== 'undefined') {
+        EventManager.remove(exportAllButton, 'click');
+    }
+    
     if (exportSentButton && typeof EventManager !== 'undefined') {
         EventManager.remove(exportSentButton, 'click');
     }

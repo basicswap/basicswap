@@ -260,29 +260,79 @@ const ApiManager = (function() {
         fetchVolumeData: async function() {
             return this.rateLimiter.queueRequest('coingecko', async () => {
                 try {
-                    const coins = (window.config && window.config.coins) ?
+                    let coinList = (window.config && window.config.coins) ?
                         window.config.coins
                             .filter(coin => coin.usesCoinGecko)
-                            .map(coin => getCoinBackendId ? getCoinBackendId(coin.name) : coin.name)
+                            .map(coin => {
+                                return window.config.getCoinBackendId ? 
+                                    window.config.getCoinBackendId(coin.name) : 
+                                    (typeof getCoinBackendId === 'function' ? 
+                                    getCoinBackendId(coin.name) : coin.name.toLowerCase());
+                            })
                             .join(',') :
-                        'bitcoin,monero,particl,bitcoin-cash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin';
+                        'bitcoin,monero,particl,bitcoin-cash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin,wownero';
 
-                    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coins}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`;
+                    if (!coinList.includes('zcoin') && coinList.includes('firo')) {
+                        coinList = coinList + ',zcoin';
+                    }
 
+                    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinList}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`;
+                    
                     const response = await this.makePostRequest(url, {
                         'User-Agent': 'Mozilla/5.0',
                         'Accept': 'application/json'
                     });
 
+                    if (!response || typeof response !== 'object') {
+                        throw new Error('Invalid response from CoinGecko API');
+                    }
+
                     const volumeData = {};
+                    
                     Object.entries(response).forEach(([coinId, data]) => {
-                        if (data && data.usd_24h_vol) {
+                        if (data && data.usd_24h_vol !== undefined) {
                             volumeData[coinId] = {
-                                total_volume: data.usd_24h_vol,
+                                total_volume: data.usd_24h_vol || 0,
                                 price_change_percentage_24h: data.usd_24h_change || 0
                             };
                         }
                     });
+
+                    const coinMappings = {
+                        'firo': ['firo', 'zcoin'],
+                        'zcoin': ['zcoin', 'firo'],
+                        'bitcoin-cash': ['bitcoin-cash', 'bitcoincash', 'bch'],
+                        'bitcoincash': ['bitcoincash', 'bitcoin-cash', 'bch'],
+                        'particl': ['particl', 'part']
+                    };
+
+                    if (response['zcoin'] && (!volumeData['firo'] || volumeData['firo'].total_volume === 0)) {
+                        volumeData['firo'] = {
+                            total_volume: response['zcoin'].usd_24h_vol || 0,
+                            price_change_percentage_24h: response['zcoin'].usd_24h_change || 0
+                        };
+                    }
+
+                    if (response['bitcoin-cash'] && (!volumeData['bitcoincash'] || volumeData['bitcoincash'].total_volume === 0)) {
+                        volumeData['bitcoincash'] = {
+                            total_volume: response['bitcoin-cash'].usd_24h_vol || 0,
+                            price_change_percentage_24h: response['bitcoin-cash'].usd_24h_change || 0
+                        };
+                    }
+
+                    for (const [mainCoin, alternativeIds] of Object.entries(coinMappings)) {
+                        if (!volumeData[mainCoin] || volumeData[mainCoin].total_volume === 0) {
+                            for (const altId of alternativeIds) {
+                                if (response[altId] && response[altId].usd_24h_vol) {
+                                    volumeData[mainCoin] = {
+                                        total_volume: response[altId].usd_24h_vol,
+                                        price_change_percentage_24h: response[altId].usd_24h_change || 0
+                                    };
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
                     return volumeData;
                 } catch (error) {
@@ -364,7 +414,6 @@ const ApiManager = (function() {
         },
 
         dispose: function() {
-            // Clear any pending requests or resources
             rateLimiter.requestQueue = {};
             rateLimiter.lastRequestTime = {};
             state.isInitialized = false;

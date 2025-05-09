@@ -120,18 +120,33 @@ const api = {
     fetchCoinGeckoDataXHR: async () => {
         try {
             const priceData = await window.PriceManager.getPrices();
-
             const transformedData = {};
+
+            const btcPriceUSD = priceData.bitcoin?.usd || 0;
+            if (btcPriceUSD > 0) {
+                window.btcPriceUSD = btcPriceUSD;
+            }
 
             window.config.coins.forEach(coin => {
                 const symbol = coin.symbol.toLowerCase();
                 const coinData = priceData[symbol] || priceData[coin.name.toLowerCase()];
 
                 if (coinData && coinData.usd) {
+                    let priceBtc;
+                    if (symbol === 'btc') {
+                        priceBtc = 1;
+                    } else if (window.btcPriceUSD && window.btcPriceUSD > 0) {
+                        priceBtc = coinData.usd / window.btcPriceUSD;
+                    } else {
+                        priceBtc = coinData.btc || 0;
+                    }
+
                     transformedData[symbol] = {
                         current_price: coinData.usd,
-                        price_btc: coinData.btc || (priceData.bitcoin ? coinData.usd / priceData.bitcoin.usd : 0),
-                        displayName: coin.displayName || coin.symbol
+                        price_btc: priceBtc,
+                        displayName: coin.displayName || coin.symbol,
+                        total_volume: coinData.total_volume,
+                        price_change_percentage_24h: coinData.price_change_percentage_24h
                     };
                 }
             });
@@ -274,63 +289,72 @@ const rateLimiter = {
 
 const ui = {
   displayCoinData: (coin, data) => {
-    let priceUSD, priceBTC, priceChange1d, volume24h;
-    const updateUI = (isError = false) => {
-      const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
-      const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
-      const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
-      const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
-      const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
-
-      if (priceUsdElement) {
-        priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
-      }
-
-      if (volumeDiv && volumeElement) {
-        if (isError || volume24h === null || volume24h === undefined) {
-          volumeElement.textContent = 'N/A';
-        } else {
-          volumeElement.textContent = `${utils.formatNumber(volume24h, 0)} USD`;
-        }
-        volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
-      }
-
-      if (btcPriceDiv && priceBtcElement) {
-        if (coin === 'BTC') {
-          btcPriceDiv.style.display = 'none';
-        } else {
-          priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)}`;
-          btcPriceDiv.style.display = 'flex';
-        }
-      }
-
-      ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
-    };
-
-    try {
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      if (!data || !data.current_price) {
-        throw new Error(`Invalid data structure for ${coin}`);
-      }
-
-      priceUSD = data.current_price;
-      priceBTC = coin === 'BTC' ? 1 : data.price_btc || (data.current_price / app.btcPriceUSD);
-      priceChange1d = data.price_change_percentage_24h || 0;
-      volume24h = data.total_volume || 0;
-
-      if (isNaN(priceUSD) || isNaN(priceBTC)) {
-        throw new Error(`Invalid numeric values in data for ${coin}`);
-      }
-
-      updateUI(false);
-    } catch (error) {
-      logger.error(`Failed to display data for ${coin}:`, error.message);
-      updateUI(true);
+  let priceUSD, priceBTC, priceChange1d, volume24h;
+  const updateUI = (isError = false) => {
+    const priceUsdElement = document.querySelector(`#${coin.toLowerCase()}-price-usd`);
+    const volumeDiv = document.querySelector(`#${coin.toLowerCase()}-volume-div`);
+    const volumeElement = document.querySelector(`#${coin.toLowerCase()}-volume-24h`);
+    const btcPriceDiv = document.querySelector(`#${coin.toLowerCase()}-btc-price-div`);
+    const priceBtcElement = document.querySelector(`#${coin.toLowerCase()}-price-btc`);
+    if (priceUsdElement) {
+      priceUsdElement.textContent = isError ? 'N/A' : `$ ${ui.formatPrice(coin, priceUSD)}`;
     }
-  },
+    if (volumeDiv && volumeElement) {
+      if (isError || volume24h === null || volume24h === undefined) {
+        volumeElement.textContent = 'N/A';
+      } else {
+        volumeElement.textContent = `${utils.formatNumber(volume24h, 0)} USD`;
+      }
+      volumeDiv.style.display = volumeToggle.isVisible ? 'flex' : 'none';
+    }
+    if (btcPriceDiv && priceBtcElement) {
+      if (coin === 'BTC') {
+        btcPriceDiv.style.display = 'none';
+      } else {
+        priceBtcElement.textContent = isError ? 'N/A' : `${priceBTC.toFixed(8)}`;
+        btcPriceDiv.style.display = 'flex';
+      }
+    }
+    ui.updatePriceChangeContainer(coin, isError ? null : priceChange1d);
+  };
+  try {
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    if (!data || !data.current_price) {
+      throw new Error(`Invalid data structure for ${coin}`);
+    }
+    priceUSD = data.current_price;
+
+    if (coin === 'BTC') {
+      priceBTC = 1;
+    } else {
+
+      if (data.price_btc !== undefined && data.price_btc !== null) {
+        priceBTC = data.price_btc;
+      } 
+      else if (window.btcPriceUSD && window.btcPriceUSD > 0) {
+        priceBTC = priceUSD / window.btcPriceUSD;
+      } 
+      else if (app && app.btcPriceUSD && app.btcPriceUSD > 0) {
+        priceBTC = priceUSD / app.btcPriceUSD;
+      }
+      else {
+        priceBTC = 0;
+      }
+    }
+    
+    priceChange1d = data.price_change_percentage_24h || 0;
+    volume24h = data.total_volume || 0;
+    if (isNaN(priceUSD) || isNaN(priceBTC)) {
+      throw new Error(`Invalid numeric values in data for ${coin}`);
+    }
+    updateUI(false);
+  } catch (error) {
+    logger.error(`Failed to display data for ${coin}:`, error.message);
+    updateUI(true);
+  }
+},
 
   showLoader: () => {
     const loader = document.getElementById('loader');
@@ -554,7 +578,7 @@ const chartModule = {
     this.chartRefs.set(element, chart);
   },
 
-  destroyChart: function() {
+destroyChart: function() {
   if (chartModule.chart) {
     try {
       const chartInstance = chartModule.chart;
@@ -568,12 +592,17 @@ const chartModule = {
 
       if (canvas) {
         chartModule.chartRefs.delete(canvas);
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
       }
     } catch (e) {
       console.error('Error destroying chart:', e);
     }
   }
- },
+},
 
   initChart: function() {
     this.destroyChart();
@@ -1348,7 +1377,7 @@ const app = {
   },
 
 refreshAllData: async function() {
-  console.log('Price refresh started at', new Date().toLocaleTimeString());
+  //console.log('Price refresh started at', new Date().toLocaleTimeString());
 
   if (app.isRefreshing) {
     console.log('Refresh already in progress, skipping...');
@@ -1382,7 +1411,7 @@ refreshAllData: async function() {
     return;
   }
 
-  console.log('Starting refresh of all data...');
+  //console.log('Starting refresh of all data...');
   app.isRefreshing = true;
   app.updateNextRefreshTime();
   ui.showLoader();
@@ -1449,7 +1478,7 @@ refreshAllData: async function() {
         const cacheKey = `coinData_${coin.symbol}`;
         CacheManager.set(cacheKey, coinData, 'prices');
 
-        console.log(`Updated price for ${coin.symbol}: $${coinData.current_price}`);
+      //console.log(`Updated price for ${coin.symbol}: $${coinData.current_price}`);
 
       } catch (coinError) {
         console.warn(`Failed to update ${coin.symbol}: ${coinError.message}`);
@@ -1489,7 +1518,7 @@ refreshAllData: async function() {
         }
       }, 1000);
     }
-    console.log(`Price refresh completed at ${new Date().toLocaleTimeString()}. Updated ${window.config.coins.length - failedCoins.length}/${window.config.coins.length} coins.`);
+   //console.log(`Price refresh completed at ${new Date().toLocaleTimeString()}. Updated ${window.config.coins.length - failedCoins.length}/${window.config.coins.length} coins.`);
 
   } catch (error) {
     console.error('Critical error during refresh:', error);
@@ -1520,7 +1549,7 @@ refreshAllData: async function() {
       app.scheduleNextRefresh();
     }
 
-    console.log(`Refresh process finished at ${new Date().toLocaleTimeString()}, next refresh scheduled: ${app.isAutoRefreshEnabled ? 'yes' : 'no'}`);
+    //console.log(`Refresh process finished at ${new Date().toLocaleTimeString()}, next refresh scheduled: ${app.isAutoRefreshEnabled ? 'yes' : 'no'}`);
   }
 },
 
@@ -1746,7 +1775,14 @@ document.addEventListener('DOMContentLoaded', () => {
     app.init();
 
     if (window.MemoryManager) {
+    if (typeof MemoryManager.enableAutoCleanup === 'function') {
         MemoryManager.enableAutoCleanup();
+    } else {
+        MemoryManager.initialize({
+            autoCleanup: true,
+            debug: false
+        });
+     }
     }
 
     CleanupManager.setInterval(() => {

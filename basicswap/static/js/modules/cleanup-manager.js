@@ -1,12 +1,12 @@
 const CleanupManager = (function() {
-
     const state = {
         eventListeners: [],
         timeouts: [],
         intervals: [],
         animationFrames: [],
         resources: new Map(),
-        debug: false
+        debug: false,
+        memoryOptimizationInterval: null
     };
 
     function log(message, ...args) {
@@ -232,6 +232,229 @@ const CleanupManager = (function() {
             };
         },
 
+        setupMemoryOptimization: function(options = {}) {
+            const memoryCheckInterval = options.interval || 2 * 60 * 1000; // Default: 2 minutes
+            const maxCacheSize = options.maxCacheSize || 100;
+            const maxDataSize = options.maxDataSize || 1000;
+
+            if (state.memoryOptimizationInterval) {
+                this.clearInterval(state.memoryOptimizationInterval);
+            }
+
+            this.addListener(document, 'visibilitychange', () => {
+                if (document.hidden) {
+                    log('Tab hidden - running memory optimization');
+                    this.optimizeMemory({
+                        maxCacheSize: maxCacheSize,
+                        maxDataSize: maxDataSize
+                    });
+                } else if (window.TooltipManager) {
+                    window.TooltipManager.cleanup();
+                }
+            });
+
+            state.memoryOptimizationInterval = this.setInterval(() => {
+                if (document.hidden) {
+                    log('Periodic memory optimization');
+                    this.optimizeMemory({
+                        maxCacheSize: maxCacheSize,
+                        maxDataSize: maxDataSize
+                    });
+                }
+            }, memoryCheckInterval);
+
+            log('Memory optimization setup complete');
+            return state.memoryOptimizationInterval;
+        },
+
+        optimizeMemory: function(options = {}) {
+            log('Running memory optimization');
+
+            if (window.TooltipManager && typeof window.TooltipManager.cleanup === 'function') {
+                window.TooltipManager.cleanup();
+            }
+
+            if (window.IdentityManager && typeof window.IdentityManager.limitCacheSize === 'function') {
+                window.IdentityManager.limitCacheSize(options.maxCacheSize || 100);
+            }
+
+            this.cleanupOrphanedResources();
+
+            if (window.gc) {
+                try {
+                    window.gc();
+                    log('Forced garbage collection');
+                } catch (e) {
+                }
+            }
+
+            document.dispatchEvent(new CustomEvent('memoryOptimized', { 
+                detail: { 
+                    timestamp: Date.now(),
+                    maxDataSize: options.maxDataSize || 1000
+                } 
+            }));
+
+            log('Memory optimization complete');
+        },
+
+        cleanupOrphanedResources: function() {
+            let removedListeners = 0;
+            const validListeners = [];
+
+            for (let i = 0; i < state.eventListeners.length; i++) {
+                const listener = state.eventListeners[i];
+                if (!listener.element) {
+                    removedListeners++;
+                    continue;
+                }
+
+                try {
+
+                    const isDetached = !(listener.element instanceof Node) || 
+                                    !document.body.contains(listener.element) || 
+                                    (listener.element.classList && listener.element.classList.contains('hidden')) ||
+                                    (listener.element.style && listener.element.style.display === 'none');
+                                    
+                    if (isDetached) {
+                        try {
+                            if (listener.element instanceof Node) {
+                                listener.element.removeEventListener(listener.type, listener.handler, listener.options);
+                            }
+                            removedListeners++;
+                        } catch (e) {
+
+                        }
+                    } else {
+                        validListeners.push(listener);
+                    }
+                } catch (e) {
+
+                    log(`Error checking listener (removing): ${e.message}`);
+                    removedListeners++;
+                }
+            }
+
+            if (removedListeners > 0) {
+                state.eventListeners = validListeners;
+                log(`Removed ${removedListeners} event listeners for detached/hidden elements`);
+            }
+
+            let removedResources = 0;
+            const resourcesForRemoval = [];
+
+            state.resources.forEach((info, id) => {
+                const resource = info.resource;
+
+                try {
+
+                    if (resource instanceof Element && !document.body.contains(resource)) {
+                        resourcesForRemoval.push(id);
+                    }
+
+                    if (resource && resource.element) {
+
+                        if (resource.element instanceof Node && !document.body.contains(resource.element)) {
+                            resourcesForRemoval.push(id);
+                        }
+                    }
+                } catch (e) {
+                    log(`Error checking resource ${id}: ${e.message}`);
+                }
+            });
+            
+            resourcesForRemoval.forEach(id => {
+                this.unregisterResource(id);
+                removedResources++;
+            });
+            
+            if (removedResources > 0) {
+                log(`Removed ${removedResources} orphaned resources`);
+            }
+
+            if (window.TooltipManager) {
+                if (typeof window.TooltipManager.cleanupOrphanedTooltips === 'function') {
+                    try {
+                        window.TooltipManager.cleanupOrphanedTooltips();
+                    } catch (e) {
+
+                        if (typeof window.TooltipManager.cleanup === 'function') {
+                            try {
+                                window.TooltipManager.cleanup();
+                            } catch (err) {
+                                log(`Error cleaning up tooltips: ${err.message}`);
+                            }
+                        }
+                    }
+                } else if (typeof window.TooltipManager.cleanup === 'function') {
+                    try {
+                        window.TooltipManager.cleanup();
+                    } catch (e) {
+                        log(`Error cleaning up tooltips: ${e.message}`);
+                    }
+                }
+            }
+
+            try {
+                this.cleanupTooltipDOM();
+            } catch (e) {
+                log(`Error in cleanupTooltipDOM: ${e.message}`);
+            }
+        },
+
+        cleanupTooltipDOM: function() {
+            let removedElements = 0;
+
+            try {
+
+                const tooltipSelectors = [
+                    '[role="tooltip"]', 
+                    '[id^="tooltip-"]', 
+                    '.tippy-box', 
+                    '[data-tippy-root]'
+                ];
+
+                tooltipSelectors.forEach(selector => {
+                    try {
+                        const elements = document.querySelectorAll(selector);
+                        
+                        elements.forEach(element => {
+                            try {
+
+                                if (!(element instanceof Element)) return;
+                                
+                                const isDetached = !element.parentElement || 
+                                                !document.body.contains(element.parentElement) ||
+                                                element.classList.contains('hidden') ||
+                                                element.style.display === 'none' ||
+                                                element.style.visibility === 'hidden';
+
+                                if (isDetached) {
+                                    try {
+                                        element.remove();
+                                        removedElements++;
+                                    } catch (e) {
+
+                                    }
+                                }
+                            } catch (err) {
+
+                            }
+                        });
+                    } catch (err) {
+
+                        log(`Error querying for ${selector}: ${err.message}`);
+                    }
+                });
+            } catch (e) {
+                log(`Error in tooltip DOM cleanup: ${e.message}`);
+            }
+
+            if (removedElements > 0) {
+                log(`Removed ${removedElements} detached tooltip elements`);
+            }
+        },
+
         setDebugMode: function(enabled) {
             state.debug = Boolean(enabled);
             log(`Debug mode ${state.debug ? 'enabled' : 'disabled'}`);
@@ -247,6 +470,17 @@ const CleanupManager = (function() {
             if (options.debug !== undefined) {
                 this.setDebugMode(options.debug);
             }
+
+            if (typeof window !== 'undefined' && !options.noAutoCleanup) {
+                this.addListener(window, 'beforeunload', () => {
+                    this.clearAll();
+                });
+            }
+
+            if (typeof window !== 'undefined' && !options.noMemoryOptimization) {
+                this.setupMemoryOptimization(options.memoryOptions || {});
+            }
+
             log('CleanupManager initialized');
             return this;
         }
@@ -255,16 +489,20 @@ const CleanupManager = (function() {
     return publicAPI;
 })();
 
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = CleanupManager;
+}
 
-window.CleanupManager = CleanupManager;
+if (typeof window !== 'undefined') {
+    window.CleanupManager = CleanupManager;
+}
 
-
-document.addEventListener('DOMContentLoaded', function() {
-    if (!window.cleanupManagerInitialized) {
-        CleanupManager.initialize();
-        window.cleanupManagerInitialized = true;
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        CleanupManager.initialize({ debug: false });
+    } else {
+        document.addEventListener('DOMContentLoaded', () => {
+            CleanupManager.initialize({ debug: false });
+        }, { once: true });
     }
-});
-
-//console.log('CleanupManager initialized with methods:', Object.keys(CleanupManager));
-console.log('CleanupManager initialized');
+}
