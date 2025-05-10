@@ -1,15 +1,19 @@
 const PAGE_SIZE = 50;
+let activeFetchController = null;
+
 const state = {
     currentPage: {
+        all: 1,
         sent: 1,
         received: 1
     },
     isLoading: false,
     isRefreshing: false,
-    currentTab: 'sent',
+    currentTab: 'all',
     wsConnected: false,
     refreshPromise: null,
     data: {
+        all: [],
         sent: [],
         received: []
     },
@@ -23,6 +27,16 @@ const state = {
         coin_to: 'any'
     }
 };
+
+document.addEventListener('tabactivated', function(event) {
+    if (event.detail && event.detail.tabId) {
+        const tabType = event.detail.type || (event.detail.tabId === '#all' ? 'all' : 
+                                             (event.detail.tabId === '#sent' ? 'sent' : 'received'));
+        //console.log('Tab activation event received for:', tabType);
+        state.currentTab = tabType;
+        updateBidsTable();
+    }
+});
 
 const STATE_MAP = {
     1: ['Sent'],
@@ -61,33 +75,43 @@ const STATE_MAP = {
 };
 
 const elements = {
-    sentBidsBody: document.querySelector('#sent tbody'),
-    receivedBidsBody: document.querySelector('#received tbody'),
+    allBidsBody: document.querySelector('#all-tbody'),
+    sentBidsBody: document.querySelector('#sent-tbody'),
+    receivedBidsBody: document.querySelector('#received-tbody'),
     filterForm: document.querySelector('form'),
     stateSelect: document.querySelector('select[name="state"]'),
     sortBySelect: document.querySelector('select[name="sort_by"]'),
     sortDirSelect: document.querySelector('select[name="sort_dir"]'),
     withExpiredSelect: document.querySelector('select[name="with_expired"]'),
     tabButtons: document.querySelectorAll('#myTab button'),
+    allContent: document.getElementById('all'),
     sentContent: document.getElementById('sent'),
     receivedContent: document.getElementById('received'),
 
+    allPaginationControls: document.getElementById('pagination-controls-all'),
     sentPaginationControls: document.getElementById('pagination-controls-sent'),
     receivedPaginationControls: document.getElementById('pagination-controls-received'),
+    prevPageAll: document.getElementById('prevPageAll'),
     prevPageSent: document.getElementById('prevPageSent'),
-    nextPageSent: document.getElementById('nextPageSent'),
     prevPageReceived: document.getElementById('prevPageReceived'),
+    nextPageAll: document.getElementById('nextPageAll'),
+    nextPageSent: document.getElementById('nextPageSent'),
     nextPageReceived: document.getElementById('nextPageReceived'),
+    currentPageAll: document.getElementById('currentPageAll'),
     currentPageSent: document.getElementById('currentPageSent'),
     currentPageReceived: document.getElementById('currentPageReceived'),
+    allBidsCount: document.getElementById('allBidsCount'),
     sentBidsCount: document.getElementById('sentBidsCount'),
     receivedBidsCount: document.getElementById('receivedBidsCount'),
 
+    statusDotAll: document.getElementById('status-dot-all'),
+    statusTextAll: document.getElementById('status-text-all'),
     statusDotSent: document.getElementById('status-dot-sent'),
     statusTextSent: document.getElementById('status-text-sent'),
     statusDotReceived: document.getElementById('status-dot-received'),
     statusTextReceived: document.getElementById('status-text-received'),
 
+    refreshAllBids: document.getElementById('refreshAllBids'),
     refreshSentBids: document.getElementById('refreshSentBids'),
     refreshReceivedBids: document.getElementById('refreshReceivedBids')
 };
@@ -213,6 +237,7 @@ function cleanup() {
             }
         };
 
+        cleanupTableBody('all-tbody');
         cleanupTableBody('sent-tbody');
         cleanupTableBody('received-tbody');
 
@@ -234,11 +259,13 @@ function cleanup() {
         clearAllAnimationFrames();
 
         state.data = {
+            all: [],
             sent: [],
             received: []
         };
 
         state.currentPage = {
+            all: 1,
             sent: 1,
             received: 1
         };
@@ -283,7 +310,7 @@ function cleanup() {
             if (window.CleanupManager) CleanupManager.clearAll();
             if (window.WebSocketManager) WebSocketManager.disconnect();
 
-            state.data = { sent: [], received: [] };
+            state.data = { all: [], sent: [], received: [] };
             state.isLoading = false;
 
             Object.keys(elements).forEach(key => {
@@ -311,7 +338,6 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
             window.TooltipManager.cleanup();
         }
 
-        // Run memory optimization
         if (window.MemoryManager) {
             MemoryManager.forceCleanup();
         }
@@ -367,7 +393,7 @@ function cleanupRow(row) {
 function optimizeMemoryUsage() {
     const MAX_BIDS_IN_MEMORY = 500;
 
-    ['sent', 'received'].forEach(type => {
+    ['all', 'sent', 'received'].forEach(type => {
         if (state.data[type] && state.data[type].length > MAX_BIDS_IN_MEMORY) {
             console.log(`Trimming ${type} bids data from ${state.data[type].length} to ${MAX_BIDS_IN_MEMORY}`);
             state.data[type] = state.data[type].slice(0, MAX_BIDS_IN_MEMORY);
@@ -529,7 +555,9 @@ function filterAndSortData(bids) {
             const coinName = selectedOption?.textContent.trim();
 
             if (coinName) {
-                const coinToMatch = state.currentTab === 'sent' ? bid.coin_to : bid.coin_from;
+                const coinToMatch = state.currentTab === 'all' 
+                    ? (bid.source === 'sent' ? bid.coin_to : bid.coin_from)
+                    : (state.currentTab === 'sent' ? bid.coin_to : bid.coin_from);
                 if (!coinMatches(coinToMatch, coinName)) {
                     return false;
                 }
@@ -542,7 +570,10 @@ function filterAndSortData(bids) {
             const coinName = selectedOption?.textContent.trim();
 
             if (coinName) {
-                const coinToMatch = state.currentTab === 'sent' ? bid.coin_from : bid.coin_to;
+                const coinToMatch = state.currentTab === 'all'
+                    ? (bid.source === 'sent' ? bid.coin_from : bid.coin_to)
+                    : (state.currentTab === 'sent' ? bid.coin_from : bid.coin_to);
+
                 if (!coinMatches(coinToMatch, coinName)) {
                     return false;
                 }
@@ -583,7 +614,8 @@ function filterAndSortData(bids) {
             let matchesDisplayedLabel = false;
             if (!matchesLabel && document) {
                 try {
-                    const tableId = state.currentTab === 'sent' ? 'sent' : 'received';
+                    const tableId = state.currentTab === 'sent' ? 'sent' : 
+                                   (state.currentTab === 'received' ? 'received' : 'all');
                     const cells = document.querySelectorAll(`#${tableId} a[href^="/identity/"]`);
 
                     for (const cell of cells) {
@@ -681,7 +713,7 @@ function updateCoinFilterImages() {
 const updateLoadingState = (isLoading) => {
     state.isLoading = isLoading;
 
-    ['Sent', 'Received'].forEach(type => {
+    ['All', 'Sent', 'Received'].forEach(type => {
         const refreshButton = elements[`refresh${type}Bids`];
         const refreshText = refreshButton?.querySelector(`#refresh${type}Text`);
         const refreshIcon = refreshButton?.querySelector('svg');
@@ -732,7 +764,7 @@ const updateConnectionStatus = (status) => {
 
     const config = statusConfig[status] || statusConfig.connected;
 
-    ['sent', 'received'].forEach(type => {
+    ['all', 'sent', 'received'].forEach(type => {
         const dot = elements[`statusDot${type.charAt(0).toUpperCase() + type.slice(1)}`];
         const text = elements[`statusText${type.charAt(0).toUpperCase() + type.slice(1)}`];
 
@@ -770,16 +802,69 @@ const processIdentityStats = (identity) => {
 
 const createIdentityTooltipContent = (identity) => {
     if (!identity) return '';
+    const address = identity.address || '';
+    let statsSection = '';
 
-    const stats = processIdentityStats(identity);
-    if (!stats) return '';
+    try {
+        const stats = processIdentityStats(identity);
+        if (stats) {
+            const getSuccessRateColor = (rate) => {
+                const numRate = parseFloat(rate);
+                if (numRate >= 80) return 'text-green-600';
+                if (numRate >= 60) return 'text-yellow-600';
+                return 'text-red-600';
+            };
 
-    const getSuccessRateColor = (rate) => {
-        const numRate = parseFloat(rate);
-        if (numRate >= 80) return 'text-green-600';
-        if (numRate >= 60) return 'text-yellow-600';
-        return 'text-red-600';
-    };
+            statsSection = `
+                <div class="pt-2 mt-2">
+                    <div class="text-white text-xs tracking-wide font-semibold mb-2">Swap History:</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="text-center p-2 bg-gray-500 rounded-md">
+                            <div class="text-lg font-bold ${getSuccessRateColor(stats.successRate)}">
+                                ${stats.successRate}%
+                            </div>
+                            <div class="text-xs text-white">Success Rate</div>
+                        </div>
+                        <div class="text-center p-2 bg-gray-500 rounded-md">
+                            <div class="text-lg font-bold text-blue-500">${stats.totalBids}</div>
+                            <div class="text-xs text-white">Total Trades</div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-2 text-center text-xs">
+                        <div>
+                            <div class="text-green-600 font-semibold">
+                                ${stats.totalSuccessful}
+                            </div>
+                            <div class="text-white">Successful</div>
+                        </div>
+                        <div>
+                            <div class="text-yellow-600 font-semibold">
+                                ${stats.totalRejected}
+                            </div>
+                            <div class="text-white">Rejected</div>
+                        </div>
+                        <div>
+                            <div class="text-red-600 font-semibold">
+                                ${stats.totalFailed}
+                            </div>
+                            <div class="text-white">Failed</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        console.warn('Error processing identity stats:', e);
+    }
+
+    const addressSection = `
+        <div class="space-y-1">
+            <div class="text-white text-xs tracking-wide font-semibold">Bid From Address:</div>
+            <div class="monospace text-xs break-all bg-gray-500 p-2 rounded-md text-white">
+                ${address || identity.address || ''}
+            </div>
+        </div>
+    `;
 
     return `
         <div class="identity-info space-y-2">
@@ -790,12 +875,7 @@ const createIdentityTooltipContent = (identity) => {
                 </div>
             ` : ''}
 
-            <div class="space-y-1">
-                <div class="text-white text-xs tracking-wide font-semibold">Bid From Address:</div>
-                <div class="monospace text-xs break-all bg-gray-500 p-2 rounded-md text-white">
-                    ${identity.address || ''}
-                </div>
-            </div>
+            ${addressSection}
 
             ${identity.note ? `
                 <div class="space-y-1">
@@ -804,41 +884,7 @@ const createIdentityTooltipContent = (identity) => {
                 </div>
             ` : ''}
 
-            <div class="pt-2 mt-2">
-                <div class="text-white text-xs tracking-wide font-semibold mb-2">Swap History:</div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div class="text-center p-2 bg-gray-500 rounded-md">
-                        <div class="text-lg font-bold ${getSuccessRateColor(stats.successRate)}">
-                            ${stats.successRate}%
-                        </div>
-                        <div class="text-xs text-white">Success Rate</div>
-                    </div>
-                    <div class="text-center p-2 bg-gray-500 rounded-md">
-                        <div class="text-lg font-bold text-blue-500">${stats.totalBids}</div>
-                        <div class="text-xs text-white">Total Trades</div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-3 gap-2 mt-2 text-center text-xs">
-                    <div>
-                        <div class="text-green-600 font-semibold">
-                            ${stats.totalSuccessful}
-                        </div>
-                        <div class="text-white">Successful</div>
-                    </div>
-                    <div>
-                        <div class="text-yellow-600 font-semibold">
-                            ${stats.totalRejected}
-                        </div>
-                        <div class="text-white">Rejected</div>
-                    </div>
-                    <div>
-                        <div class="text-red-600 font-semibold">
-                            ${stats.totalFailed}
-                        </div>
-                        <div class="text-white">Failed</div>
-                    </div>
-                </div>
-            </div>
+            ${statsSection}
         </div>
     `;
 };
@@ -955,12 +1001,117 @@ const forceTooltipDOMCleanup = () => {
     }
 }
 
+async function fetchAllBids() {
+    try {
+        const sentController = new AbortController();
+        const receivedController = new AbortController();
+
+        const sentPromise = fetch('/json/sentbids', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                sort_by: state.filters.sort_by || 'created_at',
+                sort_dir: state.filters.sort_dir || 'desc',
+                with_expired: true,
+                state: state.filters.state ?? -1,
+                with_extra_info: true
+            }),
+            signal: sentController.signal
+        });
+
+        const receivedPromise = fetch('/json/bids', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                sort_by: state.filters.sort_by || 'created_at',
+                sort_dir: state.filters.sort_dir || 'desc',
+                with_expired: true,
+                state: state.filters.state ?? -1,
+                with_extra_info: true
+            }),
+            signal: receivedController.signal
+        });
+
+        const timeoutId = setTimeout(() => {
+            sentController.abort();
+            receivedController.abort();
+        }, 30000);
+
+        const [sentResponse, receivedResponse] = await Promise.all([sentPromise, receivedPromise]);
+
+        clearTimeout(timeoutId);
+
+        if (!sentResponse.ok || !receivedResponse.ok) {
+            throw new Error(`HTTP error! Sent status: ${sentResponse.status}, Received status: ${receivedResponse.status}`);
+        }
+
+        const [sentData, receivedData] = await Promise.all([
+            sentResponse.json(),
+            receivedResponse.json()
+        ]);
+
+        const filteredSentData = filterAndSortData(sentData).map(bid => ({ ...bid, source: 'sent' }));
+        const filteredReceivedData = filterAndSortData(receivedData).map(bid => ({ ...bid, source: 'received' }));
+
+        const combined = [...filteredSentData, ...filteredReceivedData].sort((a, b) => {
+            const direction = state.filters.sort_dir === 'asc' ? 1 : -1;
+            return direction * (a.created_at - b.created_at);
+        });
+
+        return combined;
+    } catch (error) {
+        console.error('Error fetching all bids:', error);
+        throw error;
+    }
+}
+
 const createTableRow = async (bid) => {
-    const identity = await IdentityManager.getIdentityData(bid.addr_from);
+    const rawAddress = bid.addr_from || '';
+    let identity = null;
+    try {
+        identity = await IdentityManager.getIdentityData(rawAddress);
+    } catch (e) {
+        console.warn('Error loading identity for bid:', bid.bid_id, e);
+    }
+    if (!identity) {
+        identity = { address: rawAddress, label: null };
+    } else if (!identity.address) {
+        identity.address = rawAddress;
+    }
     const uniqueId = `${bid.bid_id}_${Date.now()}`;
     tooltipIdsToCleanup.add(`tooltip-identity-${uniqueId}`);
     tooltipIdsToCleanup.add(`tooltip-status-${uniqueId}`);
     const timeColor = getTimeStrokeColor(bid.expire_at);
+    const currentTabIsAll = state.currentTab === 'all';
+    const isSent = currentTabIsAll ? (bid.source === 'sent') : (state.currentTab === 'sent');
+    const sourceIndicator = currentTabIsAll ? 
+        `<span class="ml-1 px-1.5 py-0.5 text-xs font-medium ${isSent ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'} rounded">
+            ${isSent ? 'Sent' : 'Received'}
+        </span>` : '';
+    let tooltipContent = '';
+    try {
+        tooltipContent = createIdentityTooltipContent(identity);
+    } catch (e) {
+        console.warn('Error creating tooltip content:', e);
+    }
+    if (!tooltipContent) {
+        tooltipContent = `
+            <div class="identity-info space-y-2">
+                <div class="space-y-1">
+                    <div class="text-white text-xs tracking-wide font-semibold">Bid From Address:</div>
+                    <div class="monospace text-xs break-all bg-gray-500 p-2 rounded-md text-white">
+                        ${rawAddress}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
 
     return `
         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
@@ -973,7 +1124,10 @@ const createTableRow = async (bid) => {
                             <polyline points="12,6 12,12 18,12"></polyline>
                         </g>
                     </svg>
-                    <div class="text-xs">${formatTime(bid.created_at)}</div>
+                    <div class="text-xs flex items-center">
+                        ${formatTime(bid.created_at)}
+                        ${sourceIndicator}
+                    </div>
                 </div>
             </td>
 
@@ -982,11 +1136,11 @@ const createTableRow = async (bid) => {
                 <div class="flex flex-col">
                     <div class="flex items-center min-w-max">
                         <div class="relative" data-tooltip-target="tooltip-identity-${uniqueId}">
-                            <a href="/identity/${bid.addr_from}" class="text-xs font-mono">
+                            <a href="/identity/${rawAddress}" class="text-xs font-mono">
                                 <span>
-                                    ${state.currentTab === 'sent' ? 'Out:' : 'In:'}
+                                    ${isSent ? 'Out:' : 'In:'}
                                 </span>
-                                ${identity?.label || formatAddressSMSG(bid.addr_from)}
+                                ${identity?.label || formatAddressSMSG(rawAddress)}
                             </a>
                         </div>
                     </div>
@@ -1002,12 +1156,12 @@ const createTableRow = async (bid) => {
             <td class="p-3">
                 <div class="flex items-center min-w-max">
                     <img class="w-8 h-8 mr-2"
-                         src="/static/images/coins/${state.currentTab === 'sent' ? bid.coin_to.replace(' ', '-') : bid.coin_from.replace(' ', '-')}.png"
-                         alt="${state.currentTab === 'sent' ? bid.coin_to : bid.coin_from}"
+                         src="/static/images/coins/${isSent ? bid.coin_to.replace(' ', '-') : bid.coin_from.replace(' ', '-')}.png"
+                         alt="${isSent ? bid.coin_to : bid.coin_from}"
                          onerror="this.src='/static/images/coins/default.png'">
                     <div>
-                        <div class="text-sm font-medium monospace">${state.currentTab === 'sent' ? bid.amount_to : bid.amount_from}</div>
-                        <div class="text-xs opacity-75 monospace">${state.currentTab === 'sent' ? bid.coin_to : bid.coin_from}</div>
+                        <div class="text-sm font-medium monospace">${isSent ? bid.amount_to : bid.amount_from}</div>
+                        <div class="text-xs opacity-75 monospace">${isSent ? bid.coin_to : bid.coin_from}</div>
                     </div>
                 </div>
             </td>
@@ -1016,12 +1170,12 @@ const createTableRow = async (bid) => {
             <td class="p-3">
                 <div class="flex items-center min-w-max">
                     <img class="w-8 h-8 mr-2"
-                         src="/static/images/coins/${state.currentTab === 'sent' ? bid.coin_from.replace(' ', '-') : bid.coin_to.replace(' ', '-')}.png"
-                         alt="${state.currentTab === 'sent' ? bid.coin_from : bid.coin_to}"
+                         src="/static/images/coins/${isSent ? bid.coin_from.replace(' ', '-') : bid.coin_to.replace(' ', '-')}.png"
+                         alt="${isSent ? bid.coin_from : bid.coin_to}"
                          onerror="this.src='/static/images/coins/default.png'">
                     <div>
-                        <div class="text-sm font-medium monospace">${state.currentTab === 'sent' ? bid.amount_from : bid.amount_to}</div>
-                        <div class="text-xs opacity-75 monospace">${state.currentTab === 'sent' ? bid.coin_from : bid.coin_to}</div>
+                        <div class="text-sm font-medium monospace">${isSent ? bid.amount_from : bid.amount_to}</div>
+                        <div class="text-xs opacity-75 monospace">${isSent ? bid.coin_from : bid.coin_to}</div>
                     </div>
                 </div>
             </td>
@@ -1046,10 +1200,9 @@ const createTableRow = async (bid) => {
             </td>
         </tr>
 
-
         <!-- Tooltips -->
         <div id="tooltip-identity-${uniqueId}" role="tooltip" class="fixed z-50 py-3 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600 max-w-sm pointer-events-none">
-            ${createIdentityTooltipContent(identity)}
+            ${tooltipContent}
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
 
@@ -1071,6 +1224,131 @@ const createTableRow = async (bid) => {
         </div>
     `;
 };
+
+function cleanupOffscreenTooltips() {
+    if (!window.TooltipManager) return;
+
+    const selector = '#' + state.currentTab + ' [data-tooltip-target]';
+    const tooltipTriggers = document.querySelectorAll(selector);
+
+    const farOffscreenTriggers = Array.from(tooltipTriggers).filter(trigger => {
+        const rect = trigger.getBoundingClientRect();
+        return (rect.bottom < -window.innerHeight * 2 ||
+                rect.top > window.innerHeight * 3);
+    });
+
+    farOffscreenTriggers.forEach(trigger => {
+        const targetId = trigger.getAttribute('data-tooltip-target');
+        if (targetId) {
+            const tooltipElement = document.getElementById(targetId);
+            if (tooltipElement) {
+                window.TooltipManager.destroy(trigger);
+                trigger.addEventListener('mouseenter', () => {
+                    createTooltipForTrigger(trigger);
+                }, { once: true });
+            }
+        }
+    });
+}
+
+function implementVirtualizedRows() {
+    const tbody = elements[`${state.currentTab}BidsBody`];
+    if (!tbody) return;
+
+    const tableRows = tbody.querySelectorAll('tr');
+    if (tableRows.length < 30) return;
+
+    Array.from(tableRows).forEach(row => {
+        const rect = row.getBoundingClientRect();
+        const isVisible = (
+            rect.bottom >= 0 &&
+            rect.top <= window.innerHeight
+        );
+
+        if (!isVisible && (rect.bottom < -window.innerHeight || rect.top > window.innerHeight * 2)) {
+            const tooltipTriggers = row.querySelectorAll('[data-tooltip-target]');
+            tooltipTriggers.forEach(trigger => {
+                if (window.TooltipManager) {
+                    window.TooltipManager.destroy(trigger);
+                }
+            });
+        }
+    });
+}
+
+async function fetchBids(type = state.currentTab) {
+    if (type === 'all') {
+        return fetchAllBids();
+    }
+
+    try {
+        if (activeFetchController) {
+            activeFetchController.abort();
+        }
+        activeFetchController = new AbortController();
+        const endpoint = type === 'sent' ? '/json/sentbids' : '/json/bids';
+        const withExpiredSelect = document.getElementById('with_expired');
+        const includeExpired = withExpiredSelect ? withExpiredSelect.value === 'true' : true;
+
+        //console.log(`Fetching ${type} bids, include expired:`, includeExpired);
+
+        const timeoutId = setTimeout(() => {
+            if (activeFetchController) {
+                activeFetchController.abort();
+            }
+        }, 30000);
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                sort_by: state.filters.sort_by || 'created_at',
+                sort_dir: state.filters.sort_dir || 'desc',
+                with_expired: true,
+                state: state.filters.state ?? -1,
+                with_extra_info: true
+            }),
+            signal: activeFetchController.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        //console.log(`Received raw ${type} data:`, data.length, 'bids');
+
+        state.filters.with_expired = includeExpired;
+
+        let processedData;
+        if (data.length > 500) {
+            processedData = await new Promise(resolve => {
+                setTimeout(() => {
+                    const filtered = filterAndSortData(data);
+                    resolve(filtered);
+                }, 10);
+            });
+        } else {
+            processedData = filterAndSortData(data);
+        }
+
+        return processedData;
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('Fetch request was aborted');
+        } else {
+            console.error(`Error in fetch${type.charAt(0).toUpperCase() + type.slice(1)}Bids:`, error);
+        }
+        throw error;
+    } finally {
+        activeFetchController = null;
+    }
+}
 
 const updateTableContent = async (type) => {
     const tbody = elements[`${type}BidsBody`];
@@ -1221,146 +1499,6 @@ const createTooltipForTrigger = (trigger) => {
     }
 };
 
-function optimizeForLargeDatasets() {
-    if (state.data[state.currentTab]?.length > 50) {
-
-        const simplifyTooltips = tooltipIdsToCleanup.size > 50;
-
-        implementVirtualizedRows();
-
-        let scrollTimeout;
-        window.addEventListener('scroll', () => {
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                cleanupOffscreenTooltips();
-            }, 150);
-        }, { passive: true });
-    }
-}
-
-function cleanupOffscreenTooltips() {
-    if (!window.TooltipManager) return;
-
-    const selector = '#' + state.currentTab + ' [data-tooltip-target]';
-    const tooltipTriggers = document.querySelectorAll(selector);
-
-    const farOffscreenTriggers = Array.from(tooltipTriggers).filter(trigger => {
-        const rect = trigger.getBoundingClientRect();
-        return (rect.bottom < -window.innerHeight * 2 ||
-                rect.top > window.innerHeight * 3);
-    });
-
-    farOffscreenTriggers.forEach(trigger => {
-        const targetId = trigger.getAttribute('data-tooltip-target');
-        if (targetId) {
-            const tooltipElement = document.getElementById(targetId);
-            if (tooltipElement) {
-                window.TooltipManager.destroy(trigger);
-                trigger.addEventListener('mouseenter', () => {
-                    createTooltipForTrigger(trigger);
-                }, { once: true });
-            }
-        }
-    });
-}
-
-function implementVirtualizedRows() {
-    const tbody = elements[`${state.currentTab}BidsBody`];
-    if (!tbody) return;
-
-    const tableRows = tbody.querySelectorAll('tr');
-    if (tableRows.length < 30) return;
-
-    Array.from(tableRows).forEach(row => {
-        const rect = row.getBoundingClientRect();
-        const isVisible = (
-            rect.bottom >= 0 &&
-            rect.top <= window.innerHeight
-        );
-
-        if (!isVisible && (rect.bottom < -window.innerHeight || rect.top > window.innerHeight * 2)) {
-            const tooltipTriggers = row.querySelectorAll('[data-tooltip-target]');
-            tooltipTriggers.forEach(trigger => {
-                if (window.TooltipManager) {
-                    window.TooltipManager.destroy(trigger);
-                }
-            });
-        }
-    });
-}
-
-let activeFetchController = null;
-
-const fetchBids = async () => {
-    try {
-        if (activeFetchController) {
-            activeFetchController.abort();
-        }
-        activeFetchController = new AbortController();
-        const endpoint = state.currentTab === 'sent' ? '/json/sentbids' : '/json/bids';
-        const withExpiredSelect = document.getElementById('with_expired');
-        const includeExpired = withExpiredSelect ? withExpiredSelect.value === 'true' : true;
-
-        //console.log('Fetching bids, include expired:', includeExpired);
-
-        const timeoutId = setTimeout(() => {
-            if (activeFetchController) {
-                activeFetchController.abort();
-            }
-        }, 30000);
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                sort_by: state.filters.sort_by || 'created_at',
-                sort_dir: state.filters.sort_dir || 'desc',
-                with_expired: true,
-                state: state.filters.state ?? -1,
-                with_extra_info: true
-            }),
-            signal: activeFetchController.signal
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        //console.log('Received raw data:', data.length, 'bids');
-
-        state.filters.with_expired = includeExpired;
-
-        let processedData;
-        if (data.length > 500) {
-            processedData = await new Promise(resolve => {
-                setTimeout(() => {
-                    const filtered = filterAndSortData(data);
-                    resolve(filtered);
-                }, 10);
-            });
-        } else {
-            processedData = filterAndSortData(data);
-        }
-
-        return processedData;
-    } catch (error) {
-        if (error.name === 'AbortError') {
-            console.log('Fetch request was aborted');
-        } else {
-            console.error('Error in fetchBids:', error);
-        }
-        throw error;
-    } finally {
-        activeFetchController = null;
-    }
-};
-
 const updateBidsTable = async () => {
     if (state.isLoading) {
         return;
@@ -1370,7 +1508,13 @@ const updateBidsTable = async () => {
         state.isLoading = true;
         updateLoadingState(true);
 
-        const bids = await fetchBids();
+        let bids;
+        
+        if (state.currentTab === 'all') {
+            bids = await fetchAllBids();
+        } else {
+            bids = await fetchBids();
+        }
 
         // Add identity preloading if we're searching
         if (state.filters.searchQuery && state.filters.searchQuery.length > 0) {
@@ -1417,7 +1561,11 @@ const updatePaginationControls = (type) => {
     }
 
     if (currentPageSpan) {
-        currentPageSpan.textContent = totalPages > 0 ? state.currentPage[type] : 0;
+        if (totalPages > 0) {
+            currentPageSpan.innerHTML = `<span>${state.currentPage[type]}</span> of <span>${totalPages}</span>`;
+        } else {
+            currentPageSpan.textContent = "0";
+        }
     }
 
     if (prevButton) {
@@ -1582,7 +1730,7 @@ function setupFilterEventListeners() {
 }
 
 const setupRefreshButtons = () => {
-    ['Sent', 'Received'].forEach(type => {
+    ['All', 'Sent', 'Received'].forEach(type => {
         const refreshButton = elements[`refresh${type}Bids`];
         if (refreshButton) {
             EventManager.add(refreshButton, 'click', async () => {
@@ -1598,30 +1746,35 @@ const setupRefreshButtons = () => {
                     state.isLoading = true;
                     updateLoadingState(true);
 
-                    const response = await fetch(state.currentTab === 'sent' ? '/json/sentbids' : '/json/bids', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            sort_by: state.filters.sort_by,
-                            sort_dir: state.filters.sort_dir,
-                            with_expired: state.filters.with_expired,
-                            state: state.filters.state,
-                            with_extra_info: true
-                        })
-                    });
+                    if (lowerType === 'all') {
+                        state.data.all = await fetchAllBids();
+                    } else {
+                        const response = await fetch(lowerType === 'sent' ? '/json/sentbids' : '/json/bids', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                sort_by: state.filters.sort_by,
+                                sort_dir: state.filters.sort_dir,
+                                with_expired: state.filters.with_expired,
+                                state: state.filters.state,
+                                with_extra_info: true
+                            })
+                        });
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        if (!Array.isArray(data)) {
+                            throw new Error('Invalid response format');
+                        }
+
+                        state.data[lowerType] = data;
                     }
-
-                    const data = await response.json();
-                    if (!Array.isArray(data)) {
-                        throw new Error('Invalid response format');
-                    }
-
-                    state.data[lowerType] = data;
+                    
                     await updateTableContent(lowerType);
                     updatePaginationControls(lowerType);
 
@@ -1649,8 +1802,10 @@ const switchTab = (tabId) => {
 
     tooltipIdsToCleanup.clear();
 
-    state.currentTab = tabId === '#sent' ? 'sent' : 'received';
+    state.currentTab = tabId === '#all' ? 'all' : 
+                      (tabId === '#sent' ? 'sent' : 'received');
 
+    elements.allContent.classList.add('hidden');
     elements.sentContent.classList.add('hidden');
     elements.receivedContent.classList.add('hidden');
 
@@ -1670,10 +1825,30 @@ const switchTab = (tabId) => {
             tab.classList.add('hover:text-gray-600', 'hover:bg-gray-50', 'dark:hover:bg-gray-500');
         }
     });
+
     setTimeout(() => {
         updateBidsTable();
     }, 10);
 };
+
+window.switchTab = switchTab;
+
+function optimizeForLargeDatasets() {
+    if (state.data[state.currentTab]?.length > 50) {
+
+        const simplifyTooltips = tooltipIdsToCleanup.size > 50;
+
+        implementVirtualizedRows();
+
+        let scrollTimeout;
+        window.addEventListener('scroll', () => {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(() => {
+                cleanupOffscreenTooltips();
+            }, 150);
+        }, { passive: true });
+    }
+}
 
 const setupEventListeners = () => {
     const filterControls = document.querySelector('.flex.flex-wrap.justify-center');
@@ -1709,10 +1884,12 @@ const setupEventListeners = () => {
                     }
                 });
 
+                elements.allContent.classList.toggle('hidden', targetId !== '#all');
                 elements.sentContent.classList.toggle('hidden', targetId !== '#sent');
                 elements.receivedContent.classList.toggle('hidden', targetId !== '#received');
 
-                state.currentTab = targetId === '#sent' ? 'sent' : 'received';
+                state.currentTab = targetId === '#all' ? 'all' : 
+                                  (targetId === '#sent' ? 'sent' : 'received');
                 state.currentPage[state.currentTab] = 1;
 
                 if (window.TooltipManager) {
@@ -1725,7 +1902,7 @@ const setupEventListeners = () => {
         });
     }
 
-    ['Sent', 'Received'].forEach(type => {
+    ['All', 'Sent', 'Received'].forEach(type => {
         const lowerType = type.toLowerCase();
 
         if (elements[`prevPage${type}`]) {
@@ -1864,6 +2041,11 @@ function setupMemoryMonitoring() {
                 window.TooltipManager.cleanup();
             }
 
+            if (state.data.all.length > 1000) {
+                console.log('Trimming all bids data');
+                state.data.all = state.data.all.slice(0, 1000);
+            }
+
             if (state.data.sent.length > 1000) {
                 console.log('Trimming sent bids data');
                 state.data.sent = state.data.sent.slice(0, 1000);
@@ -1883,7 +2065,6 @@ function setupMemoryMonitoring() {
     }, { once: true });
 }
 
-// Init
 function initialize() {
     const filterElements = {
         stateSelect: document.getElementById('state'),
@@ -1901,8 +2082,6 @@ function initialize() {
     if (filterElements.coinFrom) filterElements.coinFrom.value = 'any';
     if (filterElements.coinTo) filterElements.coinTo.value = 'any';
 
-    setupMemoryMonitoring();
-
     setTimeout(() => {
         WebSocketManager.initialize();
         setupEventListeners();
@@ -1916,17 +2095,13 @@ function initialize() {
 
     setTimeout(() => {
         updateClearFiltersButton();
-        state.currentTab = 'sent';
+        state.currentTab = 'all';
         state.filters.state = -1;
         updateBidsTable();
     }, 100);
 
-    setInterval(() => {
-        if ((state.data.sent.length + state.data.received.length) > 1000) {
-            optimizeMemoryUsage();
-        }
-    }, 5 * 60 * 1000); // Check every 5 minutes
-
+    setupMemoryMonitoring();
+    
     window.cleanupBidsTable = cleanup;
 }
 

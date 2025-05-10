@@ -59,7 +59,7 @@ const PriceManager = (function() {
                 return fetchPromise;
             }
 
-            console.log('PriceManager: Fetching latest prices.');
+            //console.log('PriceManager: Fetching latest prices.');
             lastFetchTime = Date.now();
             fetchPromise = this.fetchPrices()
                 .then(prices => {
@@ -89,7 +89,7 @@ const PriceManager = (function() {
                         ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                         : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
 
-                console.log('PriceManager: lookupFiatRates ' + coinSymbols.join(', '));
+                //console.log('PriceManager: lookupFiatRates ' + coinSymbols.join(', '));
 
                 if (!coinSymbols.length) {
                     throw new Error('No valid coins configured');
