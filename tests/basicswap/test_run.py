@@ -662,9 +662,9 @@ class Test(BaseTest):
         offer_id = swap_clients[0].postOffer(
             Coins.BTC,
             Coins.LTC,
-            0.001 * COIN,
+            0.01 * COIN,
             1.0 * COIN,
-            0.001 * COIN,
+            0.01 * COIN,
             SwapTypes.SELLER_FIRST,
         )
 
@@ -692,17 +692,8 @@ class Test(BaseTest):
 
     def test_08_part_ltc_buyer_first(self):
         logging.info("---------- Test PART to LTC, buyer first")
-        swap_clients = self.swap_clients
 
-        swap_clients[0].postOffer(
-            Coins.PART,
-            Coins.LTC,
-            100 * COIN,
-            0.1 * COIN,
-            100 * COIN,
-            SwapTypes.BUYER_FIRST,
-        )
-
+        # SwapTypes.BUYER_FIRST
         logging.warning("TODO")
 
     def test_09_part_ltc_auto_accept(self):

@@ -561,7 +561,7 @@ class BaseTest(unittest.TestCase):
                             base_p2p_port=LTC_BASE_PORT,
                             base_rpc_port=LTC_BASE_RPC_PORT,
                         )
-                        if os.path.exists(
+                        if not os.path.exists(
                             os.path.join(cfg.LITECOIN_BINDIR, ltc_wallet_bin)
                         ):
                             logging.warning(f"{ltc_wallet_bin} not found.")
