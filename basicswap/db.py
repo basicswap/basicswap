@@ -966,8 +966,11 @@ class DBMethods:
                     query_data[cv_name] = cv
                 query += ") "
             else:
-                query += f" AND {ck} = :{ck} "
-                query_data[ck] = constraint_value
+                if constraint_value is None:
+                    query += f" AND {ck} IS NULL "
+                else:
+                    query += f" AND {ck} = :{ck} "
+                    query_data[ck] = constraint_value
 
         for order_col, order_dir in order_by.items():
             if validColumnName(order_col) is False:

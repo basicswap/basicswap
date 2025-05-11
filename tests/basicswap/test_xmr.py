@@ -1137,12 +1137,10 @@ class Test(BaseTest):
         walletpath = os.path.join(
             chain_client_settings.get("datadir", "none"), "wallets", wallet_name
         )
-        wallet_cache_bytes = os.path.getsize(walletpath)
-        logging.info(f"[rm] wallet_cache_bytes {wallet_cache_bytes}")
-        logging.info(f"[rm] walletpath {walletpath}")
         shutil.copy(walletpath, walletpath + ".orig")
 
         # Failed to open wallet : basic_string::_M_replace_aux
+        # wallet_cache_bytes = os.path.getsize(walletpath)
         # with open(walletpath, "wb") as fp:
         #    fp.write(os.urandom(wallet_cache_bytes))
 
