@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022 tecnovert
+# Copyright (c) 2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import struct
-import hashlib
 from basicswap.contrib.test_framework.script import (
     OP_PUSHDATA1,
     OP_PUSHDATA2,
@@ -87,14 +87,6 @@ def decodePushData(script_bytes, o):
 
     # return data and the number of bytes to skip forward
     return (data, i + datasize - o)
-
-
-def getP2SHScriptForHash(p2sh):
-    return bytes((OpCodes.OP_HASH160, 0x14)) + p2sh + bytes((OpCodes.OP_EQUAL,))
-
-
-def getP2WSH(script):
-    return bytes((OpCodes.OP_0, 0x20)) + hashlib.sha256(script).digest()
 
 
 def SerialiseNumCompact(v):

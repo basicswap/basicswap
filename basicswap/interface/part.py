@@ -14,7 +14,6 @@ from basicswap.contrib.test_framework.messages import (
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
-    OP_0,
     OP_DUP,
     OP_HASH160,
     OP_EQUALVERIFY,
@@ -25,7 +24,6 @@ from basicswap.util import (
     TemporaryError,
 )
 from basicswap.util.script import (
-    getP2WSH,
     getCompactSizeLen,
     getWitnessElementLen,
 )
@@ -256,7 +254,7 @@ class PARTInterfaceBlind(PARTInterface):
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
         assert len(ephemeral_pubkey) == 33
         nonce = self.getScriptLockTxNonce(vkbv)
-        p2wsh_addr = self.encode_p2wsh(getP2WSH(script))
+        p2wsh_addr = self.encode_p2wsh(self.getP2WSHScriptDest(script))
         inputs = []
         outputs = [
             {
@@ -330,7 +328,7 @@ class PARTInterfaceBlind(PARTInterface):
         locked_coin = input_blinded_info["amount"]
         tx_lock_id = lock_tx_obj["txid"]
         refund_script = self.genScriptLockRefundTxScript(Kal, Kaf, csv_val)
-        p2wsh_addr = self.encode_p2wsh(getP2WSH(refund_script))
+        p2wsh_addr = self.encode_p2wsh(self.getP2WSHScriptDest(refund_script))
 
         inputs = [
             {
@@ -495,7 +493,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_txo_scriptpk = bytes.fromhex(
             lock_tx_obj["vout"][lock_output_n]["scriptPubKey"]["hex"]
         )
-        script_pk = CScript([OP_0, hashlib.sha256(script_out).digest()])
+        script_pk = self.getP2WSHScriptDest(script_out)
         ensure(lock_txo_scriptpk == script_pk, "Bad output script")
         A, B = extractScriptLockScriptValues(script_out)
         ensure(A == Kal, "Bad script leader pubkey")
@@ -572,7 +570,7 @@ class PARTInterfaceBlind(PARTInterface):
         lock_refund_txo_scriptpk = bytes.fromhex(
             lock_refund_tx_obj["vout"][lock_refund_output_n]["scriptPubKey"]["hex"]
         )
-        script_pk = CScript([OP_0, hashlib.sha256(script_out).digest()])
+        script_pk = self.getP2WSHScriptDest(script_out)
         ensure(lock_refund_txo_scriptpk == script_pk, "Bad output script")
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")

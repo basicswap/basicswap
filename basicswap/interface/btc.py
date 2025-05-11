@@ -1393,6 +1393,9 @@ class BTCInterface(Secp256k1Interface):
     def getScriptDest(self, script):
         return CScript([OP_0, sha256(script)])
 
+    def getP2WSHScriptDest(self, script):
+        return CScript([OP_0, sha256(script)])
+
     def getScriptScriptSig(self, script: bytes) -> bytes:
         return bytes()
 

@@ -50,9 +50,6 @@ from .util import (
     make_int,
     ensure,
 )
-from .util.script import (
-    getP2SHScriptForHash,
-)
 from .util.address import (
     toWIF,
     decodeWif,
@@ -4536,7 +4533,7 @@ class BasicSwap(BaseApp):
             prev_p2wsh = ci.getScriptDest(txn_script)
             script_pub_key = prev_p2wsh.hex()
         else:
-            script_pub_key = getP2SHScriptForHash(ci.pkh(txn_script)).hex()
+            script_pub_key = ci.get_p2sh_script_pubkey(txn_script).hex()
 
         prevout = {
             "txid": prev_txnid,
