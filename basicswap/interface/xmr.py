@@ -455,16 +455,24 @@ class XMRInterface(CoinInterface):
                 params["priority"] = self._fee_priority
             rv = self.rpc_wallet("transfer", params)
             self._log.info(
-                "publishBLockTx %s to address_b58 %s",
-                self._log.id(rv["tx_hash"]),
-                self._log.addr(shared_addr),
+                "publishBLockTx {} to address_b58 {}".format(
+                    self._log.id(rv["tx_hash"]),
+                    self._log.addr(shared_addr),
+                )
             )
             tx_hash = bytes.fromhex(rv["tx_hash"])
 
             return tx_hash
 
     def findTxB(
-        self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender
+        self,
+        kbv,
+        Kbs,
+        cb_swap_value: int,
+        cb_block_confirmed: int,
+        restore_height: int,
+        bid_sender: bool,
+        check_amount: bool = True,
     ):
         with self._mx_wallet:
             Kbv = self.getPubkey(kbv)
@@ -516,7 +524,7 @@ class XMRInterface(CoinInterface):
                             )
                             rv = -1
                             continue
-                    if transfer["amount"] == cb_swap_value:
+                    if transfer["amount"] == cb_swap_value or check_amount is False:
                         return {
                             "txid": transfer["tx_hash"],
                             "amount": transfer["amount"],

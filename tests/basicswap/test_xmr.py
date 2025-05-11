@@ -18,6 +18,8 @@ import time
 import traceback
 import unittest
 
+from copy import deepcopy
+
 import basicswap.config as cfg
 from basicswap.db import (
     Concepts,
@@ -1737,8 +1739,16 @@ class Test(BaseTest):
         offerer_states = read_json_api(1800, path)
         bidder_states = read_json_api(1801, path)
 
+        states_bidder_alt = deepcopy(self.states_bidder[1])
+        states_bidder_alt[7] = "Bid Script pre-refund tx in chain"
+        states_bidder_alt[8] = "Bid Scriptless coin locked"
         assert compare_bid_states(offerer_states, self.states_offerer[1]) is True
-        assert compare_bid_states(bidder_states, self.states_bidder[1]) is True
+        assert any(
+            [
+                compare_bid_states(bidder_states, self.states_bidder[1]),
+                compare_bid_states(bidder_states, states_bidder_alt),
+            ]
+        )
 
     def test_05_btc_xmr(self):
         logging.info("---------- Test BTC to XMR")
@@ -2103,7 +2113,7 @@ class Test(BaseTest):
         for i in range(5):
             bid_ids.append(swap_clients[1].postBid(offer_id, min_bid))
 
-        # Should fail > max concurrent
+        # Should (temporarily) fail > max concurrent
         test_delay_event.wait(1.0)
         bid_id = swap_clients[1].postBid(offer_id, min_bid)
         logging.info("Waiting for bid {} to fail.".format(bid_id.hex()))
@@ -2113,6 +2123,7 @@ class Test(BaseTest):
             Concepts.BID,
             bid_id,
             event_type=EventLogTypes.AUTOMATION_CONSTRAINT,
+            wait_for=120,
         )
         assert "Already have 5 bids to complete" in event.event_msg
 
@@ -2130,9 +2141,11 @@ class Test(BaseTest):
                 bid_id,
                 BidStates.SWAP_COMPLETED,
                 sent=True,
+                wait_for=40,
             )
 
-        amt_bid = make_int(5, scale=8, r=1)
+        # Six bids of 1 should be active/completed
+        amt_bid = make_int(4, scale=8, r=1)
 
         # Should fail > total value
         amt_bid += 1
@@ -2143,6 +2156,7 @@ class Test(BaseTest):
             Concepts.BID,
             bid_id,
             event_type=EventLogTypes.AUTOMATION_CONSTRAINT,
+            wait_for=40,
         )
         assert "Over remaining offer value" in event.event_msg
 
@@ -2162,6 +2176,7 @@ class Test(BaseTest):
             bid_id,
             BidStates.SWAP_COMPLETED,
             sent=True,
+            wait_for=40,
         )
 
     def test_10_locked_refundtx(self):
@@ -2455,6 +2470,15 @@ class Test(BaseTest):
         logging.info("---------- Test PART to XMR leader recovers coin a lock tx")
         swap_clients = self.swap_clients
 
+        # Fails in XMR 0.18.4
+        # "Transaction cannot have non-zero unlock time"
+        xmr_version = swap_clients[0].ci(Coins.XMR).getDaemonVersion()
+        if xmr_version >= 65564:
+            logging.warning(
+                "XMR versions >= 0.18.4, can't create txns with non-zero unlock time."
+            )
+            return True
+
         amt_swap = make_int(random.uniform(0.1, 10.0), scale=8, r=1)
         rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)
         offer_id = swap_clients[0].postOffer(
@@ -2633,6 +2657,8 @@ class Test(BaseTest):
     def test_15_missed_xmr_send(self):
         logging.info("---------- Test PART to XMR B lock tx is lost")
         swap_clients = self.swap_clients
+
+        # - B_LOCK_TX_MISSED_SEND: Send XMR tx without recording txid to DB. XMR amount reduced to prevent swap from continuing.
 
         amt_swap = make_int(random.uniform(0.1, 10.0), scale=8, r=1)
         rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)

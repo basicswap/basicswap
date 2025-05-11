@@ -1495,7 +1495,14 @@ class BTCInterface(Secp256k1Interface):
         return (weight + wsf - 1) // wsf
 
     def findTxB(
-        self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender
+        self,
+        kbv,
+        Kbs,
+        cb_swap_value: int,
+        cb_block_confirmed: int,
+        restore_height: int,
+        bid_sender: bool,
+        check_amount: bool = True,
     ):
         dest_address = (
             self.pubkey_to_segwit_address(Kbs)

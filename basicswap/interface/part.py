@@ -1029,10 +1029,11 @@ class PARTInterfaceBlind(PARTInterface):
         self,
         kbv,
         Kbs,
-        cb_swap_value,
-        cb_block_confirmed,
+        cb_swap_value: int,
+        cb_block_confirmed: int,
         restore_height: int,
         bid_sender: bool,
+        check_amount: bool = True,
     ):
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
@@ -1063,7 +1064,10 @@ class PARTInterfaceBlind(PARTInterface):
             )  # Should not be possible
             ensure(tx["outputs"][0]["type"] == "blind", "Output is not anon")
 
-            if self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value:
+            if (
+                self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value
+                or check_amount is False
+            ):
                 height = 0
                 if tx["confirmations"] > 0:
                     chain_height = self.rpc("getblockcount")
@@ -1285,7 +1289,14 @@ class PARTInterfaceAnon(PARTInterface):
         return bytes.fromhex(txid)
 
     def findTxB(
-        self, kbv, Kbs, cb_swap_value, cb_block_confirmed, restore_height, bid_sender
+        self,
+        kbv,
+        Kbs,
+        cb_swap_value,
+        cb_block_confirmed,
+        restore_height,
+        bid_sender,
+        check_amount: bool = True,
     ):
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
@@ -1317,7 +1328,10 @@ class PARTInterfaceAnon(PARTInterface):
             )  # Should not be possible
             ensure(tx["outputs"][0]["type"] == "anon", "Output is not anon")
 
-            if self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value:
+            if (
+                self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value
+                or check_amount is False
+            ):
                 height = 0
                 if tx["confirmations"] > 0:
                     chain_height = self.rpc("getblockcount")

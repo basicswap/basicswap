@@ -2407,7 +2407,7 @@ class BasicSwap(BaseApp):
         cursor = self.openDB()
         try:
             offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
-            ensure(offer, f"Offer not found: {offer_id.hex()}.")
+            ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
             if "automation_strat_id" in data:
                 new_automation_strat_id = data["automation_strat_id"]
                 link = self.queryOne(
@@ -3152,7 +3152,7 @@ class BasicSwap(BaseApp):
         self.log.debug(f"postBid for offer: {self.log.id(offer_id)}")
 
         offer = self.getOffer(offer_id)
-        ensure(offer, f"Offer not found: {offer_id.hex()}.")
+        ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
         ensure(offer.expire_at > self.getTime(), "Offer has expired")
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
@@ -3868,8 +3868,8 @@ class BasicSwap(BaseApp):
         try:
             use_cursor = self.openDB(cursor)
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
-            ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-            ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
             ensure(bid.expire_at > now, "Bid expired")
 
             last_bid_state = bid.state
@@ -3882,9 +3882,9 @@ class BasicSwap(BaseApp):
             )
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=use_cursor)
-            ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
             ensure(
-                xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex())
+                xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
 
@@ -4171,8 +4171,8 @@ class BasicSwap(BaseApp):
         try:
             use_cursor = self.openDB(cursor)
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
-            ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-            ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
             ensure(bid.expire_at > now, "Bid expired")
 
             last_bid_state = bid.state
@@ -4185,9 +4185,9 @@ class BasicSwap(BaseApp):
             )
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=use_cursor)
-            ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
             ensure(
-                xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex())
+                xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
 
@@ -5102,6 +5102,9 @@ class BasicSwap(BaseApp):
                 ci_to.blocks_confirmed,
                 bid.chain_b_height_start,
                 bid_sender,
+                check_amount=(
+                    False if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND else True
+                ),
             )
 
         if isinstance(found_tx, int) and found_tx == -1:
@@ -5160,10 +5163,10 @@ class BasicSwap(BaseApp):
             xmr_offer = self.queryOne(XmrOffer, cursor, {"offer_id": offer.offer_id})
             ensure(
                 xmr_offer,
-                "Adaptor-sig offer not found: {}.".format(offer.offer_id.hex()),
+                f"Adaptor-sig offer not found: {self.log.id(offer.offer_id)}.",
             )
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
-            ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
+            ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid.bid_id)}.")
 
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
@@ -5548,7 +5551,8 @@ class BasicSwap(BaseApp):
                             cursor,
                         )
                     elif (
-                        chain_height - bid.xmr_b_lock_tx.chain_height
+                        bid.xmr_b_lock_tx.state != TxStates.TX_CONFIRMED
+                        and chain_height - bid.xmr_b_lock_tx.chain_height
                         >= ci_to.blocks_confirmed
                     ):
                         self.logBidEvent(
@@ -6149,17 +6153,17 @@ class BasicSwap(BaseApp):
         try:
             use_cursor = self.openDB(cursor)
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
-            ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-            ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
             if BidStates(bid.state) == BidStates.BID_STALLED_FOR_TEST:
                 self.log.debug(f"Bid stalled{self.log.id(bid_id)}")
                 return
 
             offer, xmr_offer = self.getXmrOfferFromSession(use_cursor, bid.offer_id)
-            ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
             ensure(
-                xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex())
+                xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -6271,13 +6275,13 @@ class BasicSwap(BaseApp):
         try:
             cursor = self.openDB()
             bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-            ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-            ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
             offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-            ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
             ensure(
-                xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex())
+                xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -7556,12 +7560,12 @@ class BasicSwap(BaseApp):
         ensure(len(bid_accept_data.initiate_txid) == 32, "Bad initiate_txid length")
         ensure(len(bid_accept_data.contract_script) < 100, "Bad contract_script length")
 
-        self.log.debug("for bid {self.log.id(bid_accept_data.bid_msg_id)}.")
+        self.log.debug(f"for bid {self.log.id(bid_accept_data.bid_msg_id)}.")
 
         bid_id: bytes = bid_accept_data.bid_msg_id
         bid, offer = self.getBidAndOffer(bid_id)
         ensure(bid is not None and bid.was_sent is True, "Unknown bid_id")
-        ensure(offer, "Offer not found " + bid.offer_id.hex())
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
         ensure(bid.expire_at > now + self._bid_expired_leeway, "Bid expired")
         ensure(msg["to"] == bid.bid_addr, "Received on incorrect address")
@@ -7673,9 +7677,9 @@ class BasicSwap(BaseApp):
         self.log.debug(f"Receiving adaptor-sig bid {self.log.id(bid.bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
         xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
         ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
 
@@ -7771,8 +7775,8 @@ class BasicSwap(BaseApp):
         self.log.debug(f"Receiving adaptor-sig bid accept {self.log.id(bid.bid_id)}.")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=cursor)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
         xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
         ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
 
@@ -7874,9 +7878,9 @@ class BasicSwap(BaseApp):
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id)
-        ensure(offer and offer.was_sent, "Offer not found: {}.".format(offer_id.hex()))
+        ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}.")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(offer_id.hex()))
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
 
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
@@ -7981,15 +7985,15 @@ class BasicSwap(BaseApp):
 
         self.log.debug(f"for bid {self.log.id(msg_data.bid_msg_id)}.")
         bid, xmr_swap = self.getXmrBid(msg_data.bid_msg_id)
-        ensure(bid, "Bid not found: {}.".format(msg_data.bid_msg_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(msg_data.bid_msg_id)}.")
         ensure(
             xmr_swap,
-            "Adaptor-sig swap not found: {}.".format(msg_data.bid_msg_id.hex()),
+            f"Adaptor-sig swap not found: {self.log.id(msg_data.bid_msg_id)}.",
         )
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -8197,12 +8201,12 @@ class BasicSwap(BaseApp):
         self.log.debug(f"Signing adaptor-sig bid lock txns {self.logIDB(bid_id)}.")
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -8312,12 +8316,12 @@ class BasicSwap(BaseApp):
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -8453,12 +8457,12 @@ class BasicSwap(BaseApp):
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
@@ -8496,7 +8500,7 @@ class BasicSwap(BaseApp):
         ):
             bid.amount_to -= int(bid.amount_to * 0.1)
             self.log.debug(
-                f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Reducing lock b txn amount by 10%% to {ci_to.format_amount(bid.amount_to)}.",
+                f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Reducing lock b txn amount by 10% to {ci_to.format_amount(bid.amount_to)}.",
             )
             self.logBidEvent(
                 bid.bid_id,
@@ -8507,7 +8511,7 @@ class BasicSwap(BaseApp):
         if bid.debug_ind == DebugTypes.SEND_LOCKED_XMR:
             unlock_time = 10000
             self.log.debug(
-                f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {id.debug_ind} - Sending locked XMR."
+                f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Sending locked XMR."
             )
             self.logBidEvent(
                 bid.bid_id,
@@ -8526,7 +8530,7 @@ class BasicSwap(BaseApp):
             )
             if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
-                    f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing xmr lock tx {self.log.id(b_lock_tx_id)}."
+                    f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing XMR lock tx {self.log.id(b_lock_tx_id)}."
                 )
                 self.logBidEvent(
                     bid.bid_id,
@@ -8553,7 +8557,7 @@ class BasicSwap(BaseApp):
             ):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
-                    "Retrying sending adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
+                    f"Retrying sending adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                 )
                 self.createActionInSession(
                     delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
@@ -8600,12 +8604,12 @@ class BasicSwap(BaseApp):
         self.log.debug(f"Sending bid secret for adaptor-sig bid {self.log.id(bid_id)}.")
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
 
@@ -8642,12 +8646,12 @@ class BasicSwap(BaseApp):
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
             self.log.warning(
@@ -8765,12 +8769,12 @@ class BasicSwap(BaseApp):
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -8903,12 +8907,12 @@ class BasicSwap(BaseApp):
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -8959,6 +8963,9 @@ class BasicSwap(BaseApp):
                 b_fee_rate,
                 bid.chain_b_height_start,
                 lock_tx_vout=lock_tx_vout,
+                spend_actual_balance=(
+                    True if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND else False
+                ),
             )
             self.log.debug(
                 f"Submitted lock B refund txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
@@ -9017,12 +9024,12 @@ class BasicSwap(BaseApp):
         )
 
         bid, xmr_swap = self.getXmrBidFromSession(cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         addr_send_from: str = bid.bid_addr if reverse_bid else offer.addr_from
@@ -9064,12 +9071,12 @@ class BasicSwap(BaseApp):
         bid_id = msg_data.bid_msg_id
 
         bid, xmr_swap = self.getXmrBid(bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -9205,12 +9212,12 @@ class BasicSwap(BaseApp):
         bid_id = msg_data.bid_msg_id
 
         bid, xmr_swap = self.getXmrBid(bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -9319,16 +9326,16 @@ class BasicSwap(BaseApp):
 
         bid_id = msg_data.bid_msg_id
         bid, xmr_swap = self.getXmrBid(bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         if BidStates(bid.state) in (BidStates.BID_STALLED_FOR_TEST,):
             self.log.debug(f"Bid stalled {self.log.id(bid_id)}.")
             return
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -9397,9 +9404,9 @@ class BasicSwap(BaseApp):
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id)
-        ensure(offer and offer.was_sent, "Offer not found: {}.".format(offer_id.hex()))
+        ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}.")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(offer_id.hex()))
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
 
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
@@ -9506,12 +9513,12 @@ class BasicSwap(BaseApp):
 
         bid_id = msg_data.bid_msg_id
         bid, xmr_swap = self.getXmrBid(bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         ensure(msg["to"] == bid.bid_addr, "Received on incorrect address")
         ensure(msg["from"] == offer.addr_from, "Sent from incorrect address")
@@ -9922,8 +9929,8 @@ class BasicSwap(BaseApp):
         try:
             cursor = self.openDB()
             bid, offer = self.getBidAndOffer(bid_id, cursor)
-            ensure(bid, "Bid not found {}".format(bid_id.hex()))
-            ensure(offer, "Offer not found {}".format(bid.offer_id.hex()))
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
             has_changed = False
             if bid.state != data["bid_state"]:

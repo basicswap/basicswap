@@ -476,9 +476,10 @@ def compare_bid_states(states, expect_states, exact_match: bool = True) -> bool:
                 raise ValueError(f"Expected state {expect_states[i]}, found {s[1]}")
             assert s[1] == expect_states[i]
     except Exception as e:
+        logging.error(f"compare_bid_states failed: {e}")
         logging.info("Expecting states: {}".format(json.dumps(expect_states, indent=4)))
         logging.info("Have states: {}".format(json.dumps(states, indent=4)))
-        raise e
+        return False
     return True
 
 
