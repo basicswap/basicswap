@@ -209,6 +209,15 @@ class PARTInterfaceBlind(PARTInterface):
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         return 980
 
+    @staticmethod
+    def compareFeeRates(actual: int, expected: int) -> bool:
+        # Allow the fee to be up to 10% larger than expected
+        if actual < expected - 20:
+            return False
+        if actual > expected + expected * 0.1:
+            return False
+        return True
+
     def coin_name(self) -> str:
         return super().coin_name() + " Blind"
 
@@ -678,6 +687,7 @@ class PARTInterfaceBlind(PARTInterface):
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(self.loadTx(tx_bytes), add_witness_bytes=witness_bytes)
         fee_paid = self.make_int(lock_refund_spend_tx_obj["vout"][0]["ct_fee"])
+
         fee_rate_paid = fee_paid * 1000 // vsize
         ensure(
             self.compareFeeRates(fee_rate_paid, feerate),

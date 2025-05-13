@@ -98,6 +98,7 @@ class LTCInterfaceMWEB(LTCInterface):
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host, wallet=self._rpc_wallet
         )
+        self.rpc_wallet_watch = self.rpc_wallet
 
     def chainparams(self):
         return chainparams[Coins.LTC]

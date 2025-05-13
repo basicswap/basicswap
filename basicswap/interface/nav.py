@@ -79,6 +79,7 @@ class NAVInterface(BTCInterface):
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
+        self.rpc_wallet_watch = self.rpc_wallet
 
         if "wallet_name" in coin_settings:
             raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")

@@ -61,6 +61,7 @@ from tests.basicswap.common_xmr import (
     XMR_BASE_RPC_PORT,
     DOGE_BASE_RPC_PORT,
     NMC_BASE_RPC_PORT,
+    FIRO_RPC_PORT_BASE,
 )
 from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
@@ -126,7 +127,7 @@ def callltcrpc(
 
 
 def calldcrrpc(
-    node_id, method, params=[], wallet=None, base_rpc_port=DECRED_WALLET_RPC_PORT_BASE
+    node_id, method, params=[], base_rpc_port=DECRED_WALLET_RPC_PORT_BASE + PORT_OFS
 ):
     auth = "user:dcr_pwd"
     return callrpc_dcr(base_rpc_port + node_id, auth, method, params)
@@ -141,6 +142,16 @@ def callnmcrpc(
 ):
     auth = "test_nmc_{0}:test_nmc_pwd_{0}".format(node_id)
     return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
+
+
+def callfirorpc(
+    node_id,
+    method,
+    params=[],
+    base_rpc_port=FIRO_RPC_PORT_BASE + PORT_OFS,
+):
+    auth = "test_firo_{0}:test_firo_pwd_{0}".format(node_id)
+    return callrpc(base_rpc_port + node_id, auth, method, params)
 
 
 def callbchrpc(
@@ -172,12 +183,14 @@ def updateThread(cls):
                 callbtcrpc(0, "generatetoaddress", [1, cls.btc_addr])
             if cls.ltc_addr is not None:
                 callltcrpc(0, "generatetoaddress", [1, cls.ltc_addr])
+            if cls.nmc_addr is not None:
+                callnmcrpc(0, "generatetoaddress", [1, cls.nmc_addr])
+            if cls.firo_addr is not None:
+                callfirorpc(0, "generatetoaddress", [1, cls.firo_addr])
             if cls.bch_addr is not None:
                 callbchrpc(0, "generatetoaddress", [1, cls.bch_addr])
             if cls.doge_addr is not None:
                 calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
-            if cls.nmc_addr is not None:
-                callnmcrpc(0, "generatetoaddress", [1, cls.nmc_addr])
         except Exception as e:
             print("updateThread error", str(e))
         cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
@@ -370,6 +383,22 @@ def start_processes(self):
         self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
         self.update_thread_dcr.start()
 
+    if "firo" in TEST_COINS_LIST:
+        self.firo_addr = callfirorpc(0, "getnewaddress", ["mining_addr"])
+        num_blocks: int = 200
+        have_blocks: int = callfirorpc(0, "getblockcount")
+        if have_blocks < num_blocks:
+            logging.info(
+                "Mining %d Firo blocks to %s",
+                num_blocks - have_blocks,
+                self.firo_addr,
+            )
+            callfirorpc(
+                0,
+                "generatetoaddress",
+                [num_blocks - have_blocks, self.firo_addr],
+            )
+
     if "bitcoincash" in TEST_COINS_LIST:
         self.bch_addr = callbchrpc(
             0, "getnewaddress", ["mining_addr"], wallet="wallet.dat"
@@ -466,13 +495,13 @@ class BaseTestWithPrepare(unittest.TestCase):
     processes = []
     btc_addr = None
     ltc_addr = None
-    bch_addr = None
-    xmr_addr = None
     dcr_addr = "SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH"
     dcr_acc = None
-    doge_addr = None
     nmc_addr = None
-
+    xmr_addr = None
+    firo_addr = None
+    bch_addr = None
+    doge_addr = None
     initialised = False
 
     @classmethod

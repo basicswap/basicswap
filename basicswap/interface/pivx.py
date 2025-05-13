@@ -33,6 +33,7 @@ class PIVXInterface(BTCInterface):
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
+        self.rpc_wallet_watch = self.rpc_wallet
 
     def encryptWallet(self, password: str, check_seed: bool = True):
         # Watchonly wallets are not encrypted

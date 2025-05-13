@@ -79,6 +79,7 @@ class BCHInterface(BTCInterface):
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host
         )
+        self.rpc_wallet_watch = self.rpc_wallet
 
     def has_segwit(self) -> bool:
         # bch does not have segwit, but we return true here to avoid extra checks in basicswap.py
