@@ -40,6 +40,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .[dev]
         pip install -r requirements.txt --require-hashes
+        npm install -g eslint
     - name: Install
       run: |
         pip install .
@@ -55,6 +56,11 @@ jobs:
     - name: Run black
       run: |
         black --check --diff --exclude="contrib" .
+    - name: Run ESLint
+      run: eslint
+    - name: Run djlint
+      run: |
+        djlint basicswap/templates/ --lint
     - name: Run test_other
       run: |
         pytest tests/basicswap/test_other.py

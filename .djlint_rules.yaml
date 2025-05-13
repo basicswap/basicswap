@@ -1,0 +1,7 @@
+
+- rule:
+    name: E001
+    message: Trailing whitespace found.
+    flags: re.MULTILINE
+    patterns:
+      - "[ \t]+$"
