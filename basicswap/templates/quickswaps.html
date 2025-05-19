@@ -1,0 +1,534 @@
+{% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, start_process_svg %}
+
+<div class="container mx-auto">
+    <section class="p-5 mt-5">
+        <div class="flex flex-wrap items-center -m-2">
+            <div class="w-full md:w-1/2 p-2">
+                <ul class="flex flex-wrap items-center gap-x-3 mb-2">
+                    <li>
+                        <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
+                            <p>Home</p>
+                        </a>
+                    </li>
+                    <li>{{ breadcrumb_line_svg | safe }}</li>
+                    <li>
+                        <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/debug">
+                            Swap
+                        </a>
+                    </li>
+                    <li>{{ breadcrumb_line_svg | safe }}</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-4">
+        <div class="container px-4 mx-auto">
+            <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-gray-500 rounded-md overflow-hidden">
+                <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+                <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+                <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" 
+                     src="/static/images/elements/wave.svg" alt="">
+                <div class="relative z-20 flex flex-wrap items-center -m-3">
+                    <div class="w-full md:w-1/2 p-3">
+                        <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Quick Swaps</h2>
+                        <p class="font-normal text-coolGray-200 dark:text-white">
+                            Select best rate offers in the order book and initiate a coin swap.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% include 'inc_messages.html' %}
+
+    <section>
+        <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden min-height-50">
+            <div class="border-coolGray-100">
+                <div class="flex flex-wrap items-center justify-between -m-2">
+                    <div class="w-full pt-2">
+                        <div class="container mt-5 mx-auto">
+                            <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+                                <div class="w-full mt-6 pb-6 overflow-x-auto">
+                                    <div class="max-w-8xl mx-auto flex gap-8">
+                                        <div class="max-w-2xl rounded-xl space-y-3">
+                                            <div class="bg-gray-600 rounded-xl p-6">
+                                                <div class="flex justify-between text-sm text-white mb-4">
+                                                    <span class="bold">SEND</span>
+                                                    <span>Balance: 4.253 XMR</span>
+                                                </div>
+                                                
+                                                <div class="relative">
+                                                    <button onclick="toggleDropdown('sell-dropdown')" 
+                                                            class="w-full bg-gray-700 rounded-xl p-4 flex items-center gap-3 mb-4 border border-gray-400">
+                                                        <img src="/static/images/coins/Monero.png" class="w-8 h-8 rounded-full" alt="XMR" />
+                                                        <span class="text-white">Monero (XMR)</span>
+                                                        <svg class="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </button>
+                                                    
+                                                    <div id="sell-dropdown" 
+                                                         class="hidden absolute w-full z-10 mt-2 bg-gray-700 rounded-xl border border-gray-700 shadow-lg">
+                                                        <div class="p-2 space-y-1">
+                                                            <button onclick="selectCoin('sell', 'Monero', 'XMR')" 
+                                                                    class="w-full flex items-center gap-3 p-2 hover:bg-gray-700 rounded-lg">
+                                                                <img src="/static/images/coins/Monero.png" class="w-8 h-8 rounded-full" alt="XMR" />
+                                                                <span class="text-white">Monero (XMR)</span>
+                                                            </button>
+                                                            <button onclick="selectCoin('sell', 'Litecoin', 'LTC')" 
+                                                                    class="w-full flex items-center gap-3 p-2 hover:bg-gray-700 rounded-lg">
+                                                                <img src="/static/images/coins/Litecoin.png" class="w-8 h-8 rounded-full" alt="LTC" />
+                                                                <span class="text-white">Litecoin (LTC)</span>
+                                                            </button>
+                                                            <button onclick="selectCoin('sell', 'Bitcoin', 'BTC')" 
+                                                                    class="w-full flex items-center gap-3 p-2 hover:bg-gray-700 rounded-lg">
+                                                                <img src="/static/images/coins/Bitcoin.png" class="w-8 h-8 rounded-full" alt="BTC" />
+                                                                <span class="text-white">Bitcoin (BTC)</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <input type="text" 
+                                                       class="w-full bg-gray-700 border border-gray-400 rounded-xl p-4 text-2xl text-white mb-3 outline-none" 
+                                                       placeholder="0.00" />
+
+                                                <div class="flex gap-2">
+                                                    <button onclick="selectPercentage(this, 25)" 
+                                                            class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors percentage-btn">
+                                                        25%
+                                                    </button>
+                                                    <button onclick="selectPercentage(this, 50)" 
+                                                            class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors percentage-btn">
+                                                        50%
+                                                    </button>
+                                                    <button onclick="selectPercentage(this, 75)" 
+                                                            class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors percentage-btn">
+                                                        75%
+                                                    </button>
+                                                    <button onclick="selectPercentage(this, 100)" 
+                                                            class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors percentage-btn">
+                                                        100%
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <button class="relative left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 -my-2 z-10">
+                                                ⇅
+                                            </button>
+
+                                            <div class="bg-gray-600 rounded-xl p-6">
+                                                <div class="flex justify-between text-sm text-white mb-4">
+                                                    <span class="bold">RECEIVE</span>
+                                                    <span>Balance: 7.131 LTC</span>
+                                                </div>
+                                                
+                                                <div class="relative">
+                                                    <button onclick="toggleDropdown('buy-dropdown')" 
+                                                            class="w-full bg-gray-700 rounded-xl p-4 flex items-center gap-3 mb-4 border border-gray-400">
+                                                        <img src="/static/images/coins/Litecoin.png" class="w-8 h-8 rounded-full" alt="LTC" />
+                                                        <span class="text-white">Litecoin (LTC)</span>
+                                                        <svg class="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </button>
+                                                    
+                                                    <div id="buy-dropdown" 
+                                                         class="hidden absolute w-full z-10 mt-2 bg-gray-800 rounded-xl border border-gray-700 shadow-lg">
+                                                        <div class="p-2 space-y-1">
+                                                            <button onclick="selectCoin('buy', 'Monero', 'XMR')" 
+                                                                    class="w-full flex items-center gap-3 p-2 hover:bg-gray-700 rounded-lg">
+                                                                <img src="/static/images/coins/Monero.png" class="w-8 h-8 rounded-full" alt="XMR" />
+                                                                <span class="text-white">Monero (XMR)</span>
+                                                            </button>
+                                                            <button onclick="selectCoin('buy', 'Litecoin', 'LTC')" 
+                                                                    class="w-full flex items-center gap-3 p-2 hover:bg-gray-700 rounded-lg">
+                                                                <img src="/static/images/coins/Litecoin.png" class="w-8 h-8 rounded-full" alt="LTC" />
+                                                                <span class="text-white">Litecoin (LTC)</span>
+                                                            </button>
+                                                            <button onclick="selectCoin('buy', 'Bitcoin', 'BTC')" 
+                                                                    class="w-full flex items-center gap-3 p-2 hover:bg-gray-700 rounded-lg">
+                                                                <img src="/static/images/coins/Bitcoin.png" class="w-8 h-8 rounded-full" alt="BTC" />
+                                                                <span class="text-white">Bitcoin (BTC)</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <input type="text" 
+                                                       class="w-full bg-gray-700 rounded-xl p-4 text-2xl text-white mb-3 outline-none" 
+                                                       placeholder="0.00" />
+
+                                                <div class="flex gap-2">
+                                                    <button class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors">
+                                                        25%
+                                                    </button>
+                                                    <button class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors">
+                                                        50%
+                                                    </button>
+                                                    <button class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors">
+                                                        75%
+                                                    </button>
+                                                    <button class="flex-1 bg-gray-700 rounded-lg p-2 text-sm text-white hover:bg-gray-800 transition-colors">
+                                                        100%
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="bg-gray-600 rounded-xl p-6">
+                                                <div class="flex justify-between text-sm text-white mb-2">
+                                                    <span>Best Rate:</span>
+                                                    <span>1 XMR = 2.45000000 LTC</span>
+                                                </div>
+                                                <div class="flex justify-between text-sm text-white mb-2">
+                                                    <span>Network Fee:</span>
+                                                    <span>~0.000005 XMR</span>
+                                                </div>
+                                                <button class="w-full py-3 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm text-white transition-colors my-2">
+                                                    Search for Better Rates
+                                                </button>
+                                            </div>
+
+                                            <button class="w-full py-4 bg-blue-500 text-white hover:bg-blue-600 rounded-xl font-medium transition-colors">
+                                                Start Swap
+                                            </button>
+                                        </div>
+
+                                        <div class="flex-1 bg-gray-600 rounded-xl p-6">
+                                            <div class="flex justify-between items-center mb-4">
+                                                <h2 class="text-lg text-white bold">Available Swaps</h2>
+                                                <button class="px-4 h-8 rounded-lg text-white bg-blue-500 hover:bg-blue-600 transition-colors">
+                                                    Auto Refresh
+                                                </button>
+                                            </div>
+
+                                            <div class="w-full overflow-x-auto">
+                                                <table class="w-full min-w-max">
+                                                    <thead class="uppercase">
+                                                        <tr>
+                                                            <th class="p-0" data-sortable="true" data-column-index="0">
+                                                                <div class="py-3 pl-4 flex text-left rounded-tl-xl bg-gray-700">
+                                                                    <span class="text-sm text-white font-semibold pl-8">Time</span>
+                                                                </div>
+                                                            </th>
+                                                            <th class="p-0">
+                                                                <div class="py-3 px-4 bg-gray-700 text-left">
+                                                                    <span class="text-sm text-white font-semibold">Max Send</span>
+                                                                </div>
+                                                            </th>
+                                                            <th class="p-0">
+                                                                <div class="py-3 px-4 bg-gray-700 text-center">
+                                                                    <span class="text-sm text-white font-semibold">Swap</span>
+                                                                </div>
+                                                            </th>
+                                                            <th class="p-0">
+                                                                <div class="py-3 px-4 bg-gray-700 text-right">
+                                                                    <span class="text-sm text-white font-semibold">Max Recv</span>
+                                                                </div>
+                                                            </th>
+                                                            <th class="p-0" data-sortable="true" data-column-index="5">
+                                                                <div class="py-3 px-4 bg-gray-700 text-right flex items-center justify-end rounded-tr-xl">
+                                                                    <span class="text-sm text-white font-semibold">Rate</span>
+                                                                    <span class="sort-icon ml-1 text-white" id="sort-icon-5">↓</span>
+                                                                </div>
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="orders">
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            <div class="flex flex-wrap justify-between items-center pl-6 pt-6 pr-6 border-t border-gray-700">
+                                                <div class="flex items-center">
+                                                    <p class="text-sm text-gray-300 mr-4">
+                                                        Last refreshed: <span id="lastRefreshTime">Just now</span>
+                                                    </p>
+                                                    <p class="text-sm text-gray-300 mr-4">
+                                                        Network Listings: <span id="newEntriesCount">34</span>
+                                                    </p>
+                                                    <p class="text-sm text-gray-300 mr-4 hidden">
+                                                        Next refresh: <span id="nextRefreshTime">59s</span>
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center space-x-2">
+                                                    <button type="button" id="prevPage" 
+                                                            class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200">
+                                                        ← Previous
+                                                    </button>
+                                                    <p class="text-sm text-white">
+                                                        Page: <span id="currentPage">1</span> of <span id="totalPages">3</span>
+                                                    </p>
+                                                    <button type="button" id="nextPage" 
+                                                            class="inline-flex items-center h-9 py-1 px-4 text-xs text-blue-50 font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg transition duration-200">
+                                                        Next →
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
+            <div class="pb-6">
+                <div class="flex flex-wrap items-center justify-between -m-2">
+                    <div class="w-full pt-2">
+                        <div class="container mx-auto">
+                            <div class="pt-3 pb-3 bg-coolGray-100 border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
+                                <div class="px-6"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+{% include 'footer.html' %}
+
+<script>
+    document.addEventListener('click', function(event) {
+        if (!event.target.closest('.relative')) {
+            document.querySelectorAll('[id$="-dropdown"]').forEach(dropdown => {
+                dropdown.classList.add('hidden');
+            });
+        }
+    });
+
+    function toggleDropdown(dropdownId) {
+        document.querySelectorAll('[id$="-dropdown"]').forEach(dropdown => {
+            if (dropdown.id !== dropdownId) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        const dropdown = document.getElementById(dropdownId);
+        dropdown.classList.toggle('hidden');
+        event.stopPropagation();
+    }
+
+    function selectCoin(type, name, symbol) {
+        const button = document.querySelector(`#${type}-dropdown`).previousElementSibling;
+        button.innerHTML = `
+            <img src="/static/images/coins/${name}.png" class="w-8 h-8 rounded-full" alt="${symbol}" />
+            <span class="text-white">${name} (${symbol})</span>
+            <svg class="w-4 h-4 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+        `;
+        document.getElementById(`${type}-dropdown`).classList.add('hidden');
+    }
+
+    function selectPercentage(button, value) {
+        const parent = button.parentElement;
+        parent.querySelectorAll('.percentage-btn').forEach(btn => {
+            btn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+            btn.classList.add('bg-gray-700', 'hover:bg-gray-800');
+        });
+        
+        button.classList.remove('bg-gray-700', 'hover:bg-gray-800');
+        button.classList.add('bg-blue-500', 'hover:bg-blue-600');
+        console.log(`Selected ${value}%`);
+    }
+
+    let selectedRowId = null;
+    let orders = [];
+
+    // Generate dummy data (temp)
+    const generateDummyData = () => {
+        const rates = [
+            2.45000000, // Best rate
+            2.43000000,
+            2.41000000,
+            2.40500000,
+            2.40000000,
+            2.39500000,
+            2.39000000,
+            2.38500000,
+            2.38000000,
+            2.37500000,
+            2.37000000,
+            2.36500000,
+            2.36000000,
+            2.35500000,
+            2.35000000  // Worst rate
+        ];
+
+        return rates.map((rate, index) => ({
+            id: `order-${index}`,
+            time: {
+                posted: `${5 + index}m ago`,
+                expires: `${55 - index}m`
+            },
+            maxSend: {
+                amount: (13 + index * 0.5).toFixed(8),
+                coin: 'Monero'
+            },
+            maxRecv: {
+                amount: (rate * (13 + index * 0.5)).toFixed(8),
+                coin: 'Litecoin'
+            },
+            rate: rate.toFixed(8),
+            coins: {
+                from: {
+                    name: 'Monero',
+                    image: '/static/images/coins/Monero.png'
+                },
+                to: {
+                    name: 'Litecoin',
+                    image: '/static/images/coins/Litecoin.png'
+                }
+            }
+        }));
+    };
+
+    function selectRow(rowId) {
+        if (selectedRowId) {
+            const prevRow = document.querySelector(`tr[data-row-id="${selectedRowId}"]`);
+            if (prevRow) {
+                prevRow.classList.remove('row-selected');
+            }
+        }
+
+        const newRow = document.querySelector(`tr[data-row-id="${rowId}"]`);
+        if (newRow) {
+            newRow.classList.add('row-selected');
+            selectedRowId = rowId;
+        }
+    }
+
+    const renderOrders = () => {
+        const ordersContainer = document.getElementById('orders');
+        if (!ordersContainer) return;
+
+        ordersContainer.innerHTML = orders.map(order => `
+            <tr class="hover:bg-gray-700/50 transition-colors cursor-pointer ${order.id === selectedRowId ? 'row-selected' : ''}"
+                data-row-id="${order.id}"
+                onclick="selectRow('${order.id}')">
+                <td class="p-0">
+                    <div class="py-3 pl-4 flex items-center">
+                        <div class="relative" data-tooltip-target="tooltip-active">
+                            <svg class="w-5 h-5 rounded-full mr-3 cursor-pointer" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <g stroke-linecap="round" stroke-width="2" fill="none" stroke="#3B82F6" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="11"></circle>
+                                    <polyline points="12,6 12,12 18,12"></polyline>
+                                </g>
+                            </svg>
+                        </div>
+                        <div class="flex flex-col">
+                            <div class="text-xs text-white"><span class="bold">Posted:</span> ${order.time.posted}</div>
+                            <div class="text-xs text-white"><span class="bold">Expires in:</span> ${order.time.expires}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="p-0">
+                    <div class="py-3 px-4">
+                        <div class="text-sm text-white monospace">${order.maxSend.amount}</div>
+                        <div class="text-sm text-gray-300 monospace">${order.maxSend.coin}</div>
+                    </div>
+                </td>
+                <td class="p-0">
+                    <div class="py-3 px-4 flex items-center justify-center gap-3">
+                        <span class="inline-flex items-center">
+                            <img src="${order.coins.from.image}" alt="${order.coins.from.name}" class="h-12">
+                        </span>
+                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span class="inline-flex items-center">
+                            <img src="${order.coins.to.image}" alt="${order.coins.to.name}" class="h-12">
+                        </span>
+                    </div>
+                </td>
+                <td class="p-0">
+                    <div class="py-3 px-4">
+                        <div class="text-sm text-white text-right monospace">${order.maxRecv.amount}</div>
+                        <div class="text-sm text-gray-300 text-right monospace">${order.maxRecv.coin}</div>
+                    </div>
+                </td>
+                <td class="p-0">
+                    <div class="py-3 px-4 text-right">
+                        <div class="text-sm text-white monospace">${order.rate}</div>
+                        <div class="text-sm text-gray-300 monospace">LTC/XMR</div>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        const entriesCount = document.getElementById('newEntriesCount');
+        if (entriesCount) {
+            entriesCount.textContent = orders.length;
+        }
+    };
+
+    const style = document.createElement('style');
+    style.textContent = `
+        .row-selected {
+            outline: 2px solid #3B82F6 !important;
+            outline-offset: -1px;
+        }
+        
+        .monospace {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+    `;
+    document.head.appendChild(style);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        orders = generateDummyData();
+        
+        renderOrders();
+        const refreshButton = document.querySelector('button');
+        if (refreshButton) {
+            refreshButton.addEventListener('click', () => {
+                orders = generateDummyData();
+                renderOrders();
+
+                const now = new Date();
+                const lastRefreshTime = document.getElementById('lastRefreshTime');
+                if (lastRefreshTime) {
+                    lastRefreshTime.textContent = now.toLocaleTimeString();
+                }
+            });
+        }
+
+        let refreshCountdown = 60;
+        setInterval(() => {
+            refreshCountdown = refreshCountdown > 0 ? refreshCountdown - 1 : 60;
+            const nextRefreshTime = document.getElementById('nextRefreshTime');
+            if (nextRefreshTime) {
+                nextRefreshTime.textContent = `${refreshCountdown}s`;
+            }
+        }, 1000);
+    });
+</script>
+
+<script>
+    function confirmRemoveExpired() {
+        return confirm("This will remove all expired offers and bids from the database - Are you sure?");
+    }
+</script>
+
+<style>
+    .row-selected {
+        outline: 2px solid #3B82F6 !important;
+        outline-offset: -1px;
+    }
+
+    .row-selected-alt {
+        border: 2px solid #3B82F6;
+        background: rgba(59, 130, 246, 0.05);
+    }
+</style>
