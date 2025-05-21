@@ -229,6 +229,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.log.error(traceback.format_exc())
 
         from .ui.page_amm import get_amm_status, get_amm_active_count
+
         try:
             args_dict["current_status"] = get_amm_status()
             args_dict["amm_active_count"] = get_amm_active_count(swap_client)
@@ -849,8 +850,12 @@ class HttpHandler(BaseHTTPRequestHandler):
                     if len(url_split) > 2 and url_split[2] == "status":
                         query_params = {}
                         if parsed.query:
-                            query_params = {k: v[0] for k, v in parse.parse_qs(parsed.query).items()}
-                        status_data = amm_status_api(swap_client, self.path, query_params)
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        status_data = amm_status_api(
+                            swap_client, self.path, query_params
+                        )
                         self.putHeaders(200, "application/json")
                         return json.dumps(status_data).encode("utf-8")
                     return page_amm(self, url_split, post_string)
