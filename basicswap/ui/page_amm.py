@@ -83,7 +83,9 @@ def log_capture_thread(process, swap_client):
         swap_client.log.info("AMM process has stopped.")
 
 
-def start_amm_process(swap_client, host, port, config_file=None, state_file=None, debug=False):
+def start_amm_process(
+    swap_client, host, port, config_file=None, state_file=None, debug=False
+):
     """Start the AMM process"""
     global amm_process, amm_log_buffer, amm_status, amm_config_file, amm_state_file
 
@@ -109,7 +111,7 @@ def start_amm_process(swap_client, host, port, config_file=None, state_file=None
             "prune_state_after_seconds": 604800,
             "adjust_rates_based_on_market": True,
             "offers": [],
-            "bids": []
+            "bids": [],
         }
 
         with open(config_path, "w") as f:
@@ -117,11 +119,17 @@ def start_amm_process(swap_client, host, port, config_file=None, state_file=None
 
     module_path = get_amm_module_path()
     cmd = [
-        sys.executable, "-m", module_path,
-        "--host", host,
-        "--port", str(port),
-        "--configfile", config_path,
-        "--statefile", state_path
+        sys.executable,
+        "-m",
+        module_path,
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--configfile",
+        config_path,
+        "--statefile",
+        state_path,
     ]
 
     cmd_str = " ".join(cmd)
@@ -136,7 +144,7 @@ def start_amm_process(swap_client, host, port, config_file=None, state_file=None
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=False,
-            bufsize=1
+            bufsize=1,
         )
 
         with amm_log_lock:
@@ -147,9 +155,7 @@ def start_amm_process(swap_client, host, port, config_file=None, state_file=None
             amm_log_buffer.append(f"Using state file: {state_path}")
 
         log_thread = threading.Thread(
-            target=log_capture_thread,
-            args=(amm_process, swap_client),
-            daemon=True
+            target=log_capture_thread, args=(amm_process, swap_client), daemon=True
         )
         log_thread.start()
 
@@ -212,13 +218,17 @@ def get_amm_active_count(swap_client, debug_override=False):
     status = get_amm_status()
     if status != "running":
         if debug_enabled:
-            swap_client.log.info(f"AMM not running (status: {status}), returning count 0")
+            swap_client.log.info(
+                f"AMM not running (status: {status}), returning count 0"
+            )
         return 0
 
     state_path = get_amm_state_path(swap_client)
     if not os.path.exists(state_path):
         if debug_enabled:
-            swap_client.log.info(f"AMM state file not found at {state_path}, returning count 0")
+            swap_client.log.info(
+                f"AMM state file not found at {state_path}, returning count 0"
+            )
         return 0
 
     state_data = {}
@@ -241,18 +251,36 @@ def get_amm_active_count(swap_client, debug_override=False):
 
             for offer in network_offers:
                 try:
-                    if hasattr(offer, 'offer_id'):
-                        offer_id = offer.offer_id.hex() if hasattr(offer.offer_id, 'hex') else str(offer.offer_id)
-                    elif hasattr(offer, 'id'):
-                        offer_id = offer.id.hex() if hasattr(offer.id, 'hex') else str(offer.id)
+                    if hasattr(offer, "offer_id"):
+                        offer_id = (
+                            offer.offer_id.hex()
+                            if hasattr(offer.offer_id, "hex")
+                            else str(offer.offer_id)
+                        )
+                    elif hasattr(offer, "id"):
+                        offer_id = (
+                            offer.id.hex()
+                            if hasattr(offer.id, "hex")
+                            else str(offer.id)
+                        )
                     elif isinstance(offer, (list, tuple)) and len(offer) > 0:
-                        offer_id = offer[0].hex() if hasattr(offer[0], 'hex') else str(offer[0])
-                    elif isinstance(offer, dict) and 'offer_id' in offer:
-                        offer_id = offer['offer_id'].hex() if hasattr(offer['offer_id'], 'hex') else str(offer['offer_id'])
+                        offer_id = (
+                            offer[0].hex()
+                            if hasattr(offer[0], "hex")
+                            else str(offer[0])
+                        )
+                    elif isinstance(offer, dict) and "offer_id" in offer:
+                        offer_id = (
+                            offer["offer_id"].hex()
+                            if hasattr(offer["offer_id"], "hex")
+                            else str(offer["offer_id"])
+                        )
                     else:
                         offer_str = str(offer)
                         if debug_enabled:
-                            swap_client.log.info(f"Offer string representation: {offer_str}")
+                            swap_client.log.info(
+                                f"Offer string representation: {offer_str}"
+                            )
                         continue
 
                     active_network_offers[offer_id] = True
@@ -265,9 +293,13 @@ def get_amm_active_count(swap_client, debug_override=False):
                     continue
 
             if debug_enabled:
-                swap_client.log.info(f"Found {len(active_network_offers)} active offers in the network")
+                swap_client.log.info(
+                    f"Found {len(active_network_offers)} active offers in the network"
+                )
                 if len(active_network_offers) > 0:
-                    swap_client.log.info(f"Active offer IDs: {list(active_network_offers.keys())}")
+                    swap_client.log.info(
+                        f"Active offer IDs: {list(active_network_offers.keys())}"
+                    )
         except Exception as e:
             if debug_enabled:
                 swap_client.log.error(f"Error getting network offers: {str(e)}")
@@ -275,32 +307,40 @@ def get_amm_active_count(swap_client, debug_override=False):
 
         if len(active_network_offers) == 0:
             if debug_enabled:
-                swap_client.log.info("No active network offers found, trying direct API call")
+                swap_client.log.info(
+                    "No active network offers found, trying direct API call"
+                )
 
             try:
                 global amm_host, amm_port
-                if 'amm_host' not in globals() or 'amm_port' not in globals():
+                if "amm_host" not in globals() or "amm_port" not in globals():
                     amm_host = "127.0.0.1"
                     amm_port = 12700
                     if debug_enabled:
-                        swap_client.log.info(f"Using default host {amm_host} and port {amm_port} for API call")
+                        swap_client.log.info(
+                            f"Using default host {amm_host} and port {amm_port} for API call"
+                        )
 
                 api_url = f"http://{amm_host}:{amm_port}/api/v1/offers"
 
                 req = Request(api_url)
                 response = urlopen(req)
-                data = json.loads(response.read().decode('utf-8'))
+                data = json.loads(response.read().decode("utf-8"))
 
-                if 'offers' in data:
-                    for offer in data['offers']:
-                        if 'id' in offer:
-                            offer_id = offer['id']
+                if "offers" in data:
+                    for offer in data["offers"]:
+                        if "id" in offer:
+                            offer_id = offer["id"]
                             active_network_offers[offer_id] = True
 
                 if debug_enabled:
-                    swap_client.log.info(f"Found {len(active_network_offers)} active offers via API")
+                    swap_client.log.info(
+                        f"Found {len(active_network_offers)} active offers via API"
+                    )
                     if len(active_network_offers) > 0:
-                        swap_client.log.info(f"Active offer IDs via API: {list(active_network_offers.keys())}")
+                        swap_client.log.info(
+                            f"Active offer IDs via API: {list(active_network_offers.keys())}"
+                        )
             except Exception as e:
                 if debug_enabled:
                     swap_client.log.error(f"Error getting offers via API: {str(e)}")
@@ -310,13 +350,18 @@ def get_amm_active_count(swap_client, debug_override=False):
             for template_name, offers in state_data["offers"].items():
                 active_offer_count = 0
                 for offer in offers:
-                    if "offer_id" in offer and offer["offer_id"] in active_network_offers:
+                    if (
+                        "offer_id" in offer
+                        and offer["offer_id"] in active_network_offers
+                    ):
                         active_offer_count += 1
 
                 amm_count += active_offer_count
                 if debug_enabled:
                     total_offers = len(offers)
-                    swap_client.log.info(f"Template '{template_name}': {active_offer_count} active out of {total_offers} total offers")
+                    swap_client.log.info(
+                        f"Template '{template_name}': {active_offer_count} active out of {total_offers} total offers"
+                    )
 
         if "bids" in state_data:
             for template_name, bids in state_data["bids"].items():
@@ -328,14 +373,22 @@ def get_amm_active_count(swap_client, debug_override=False):
                 amm_count += active_bid_count
                 if debug_enabled:
                     total_bids = len(bids)
-                    swap_client.log.info(f"Template '{template_name}': {active_bid_count} active out of {total_bids} total bids")
+                    swap_client.log.info(
+                        f"Template '{template_name}': {active_bid_count} active out of {total_bids} total bids"
+                    )
 
         if debug_enabled:
             swap_client.log.info(f"Total active AMM count: {amm_count}")
 
-        if amm_count == 0 and len(active_network_offers) == 0 and "offers" in state_data:
+        if (
+            amm_count == 0
+            and len(active_network_offers) == 0
+            and "offers" in state_data
+        ):
             if debug_enabled:
-                swap_client.log.info("No active network offers found, using most recent offer from state file")
+                swap_client.log.info(
+                    "No active network offers found, using most recent offer from state file"
+                )
 
             most_recent_time = 0
             most_recent_offer = None
@@ -353,13 +406,19 @@ def get_amm_active_count(swap_client, debug_override=False):
                 if offer_age < 3600:
                     amm_count = 1
                     if debug_enabled:
-                        swap_client.log.info(f"Using most recent offer as active (age: {offer_age} seconds)")
+                        swap_client.log.info(
+                            f"Using most recent offer as active (age: {offer_age} seconds)"
+                        )
                         if "offer_id" in most_recent_offer:
-                            swap_client.log.info(f"Most recent offer ID: {most_recent_offer['offer_id']}")
+                            swap_client.log.info(
+                                f"Most recent offer ID: {most_recent_offer['offer_id']}"
+                            )
 
         if amm_count == 0 and "delay_next_offer_before" in state_data:
             if debug_enabled:
-                swap_client.log.info("Found delay_next_offer_before in state, AMM is running but waiting to create next offer")
+                swap_client.log.info(
+                    "Found delay_next_offer_before in state, AMM is running but waiting to create next offer"
+                )
 
             config_path = get_amm_config_path(swap_client)
             if os.path.exists(config_path):
@@ -370,15 +429,24 @@ def get_amm_active_count(swap_client, debug_override=False):
                     for offer in config_data.get("offers", []):
                         if offer.get("enabled", False):
                             if debug_enabled:
-                                swap_client.log.info(f"Found enabled offer '{offer.get('name')}', but no active offers in network")
+                                swap_client.log.info(
+                                    f"Found enabled offer '{offer.get('name')}', but no active offers in network"
+                                )
                             break
                 except Exception as e:
                     if debug_enabled:
                         swap_client.log.error(f"Error reading config file: {str(e)}")
 
-        if amm_count == 0 and status == "running" and "offers" in state_data and len(state_data["offers"]) > 0:
+        if (
+            amm_count == 0
+            and status == "running"
+            and "offers" in state_data
+            and len(state_data["offers"]) > 0
+        ):
             if debug_enabled:
-                swap_client.log.info("AMM is running with offers in state file, but none are active. Setting count to 1.")
+                swap_client.log.info(
+                    "AMM is running with offers in state file, but none are active. Setting count to 1."
+                )
             amm_count = 1
     except Exception as e:
         if debug_enabled:
@@ -445,7 +513,7 @@ def page_amm(self, _, post_string):
                     "amount_variable": True,
                     "address": "auto",
                     "min_coin_from_amt": 10.0,
-                    "offer_valid_seconds": 3600
+                    "offer_valid_seconds": 3600,
                 }
             ],
             "bids": [
@@ -459,9 +527,9 @@ def page_amm(self, _, post_string):
                     "min_coin_to_balance": 1.0,
                     "max_concurrent": 1,
                     "amount_variable": True,
-                    "address": "auto"
+                    "address": "auto",
                 }
-            ]
+            ],
         }
 
         try:
@@ -476,14 +544,20 @@ def page_amm(self, _, post_string):
 
     if post_string:
         try:
-            form_data = parse.parse_qs(post_string.decode('utf-8') if isinstance(post_string, bytes) else post_string)
+            form_data = parse.parse_qs(
+                post_string.decode("utf-8")
+                if isinstance(post_string, bytes)
+                else post_string
+            )
 
             if "start" in form_data:
                 amm_host = form_data.get("host", ["127.0.0.1"])[0]
                 amm_port = int(form_data.get("port", ["12700"])[0])
                 amm_debug = "debug" in form_data
 
-                success, msg = start_amm_process(swap_client, amm_host, amm_port, debug=amm_debug)
+                success, msg = start_amm_process(
+                    swap_client, amm_host, amm_port, debug=amm_debug
+                )
                 if success:
                     messages.append(msg)
                 else:
@@ -506,7 +580,9 @@ def page_amm(self, _, post_string):
                 amm_port = int(form_data.get("port", ["12700"])[0])
                 amm_debug = "debug" in form_data
 
-                success, msg = start_amm_process(swap_client, amm_host, amm_port, debug=amm_debug)
+                success, msg = start_amm_process(
+                    swap_client, amm_host, amm_port, debug=amm_debug
+                )
                 if success:
                     messages.append("AMM process restarted: " + msg)
                 else:
@@ -538,10 +614,17 @@ def page_amm(self, _, post_string):
                         current_config = json.load(f)
 
                     import uuid
+
                     offer_id = str(uuid.uuid4())[:8]
 
-                    if not form_data.get("offer_name", [""])[0] or not form_data.get("offer_coin_from", [""])[0] or not form_data.get("offer_coin_to", [""])[0]:
-                        err_messages.append("Missing required fields for offer: Name, Coin From, and Coin To are required")
+                    if (
+                        not form_data.get("offer_name", [""])[0]
+                        or not form_data.get("offer_coin_from", [""])[0]
+                        or not form_data.get("offer_coin_to", [""])[0]
+                    ):
+                        err_messages.append(
+                            "Missing required fields for offer: Name, Coin From, and Coin To are required"
+                        )
                         raise ValueError("Missing required fields")
 
                     new_offer = {
@@ -551,21 +634,32 @@ def page_amm(self, _, post_string):
                         "coin_from": form_data.get("offer_coin_from", [""])[0],
                         "coin_to": form_data.get("offer_coin_to", [""])[0],
                         "amount": float(form_data.get("offer_amount", ["0"])[0] or "0"),
-                        "minrate": float(form_data.get("offer_minrate", ["0"])[0] or "0"),
-                        "ratetweakpercent": float(form_data.get("offer_ratetweakpercent", ["0"])[0] or "0"),
+                        "minrate": float(
+                            form_data.get("offer_minrate", ["0"])[0] or "0"
+                        ),
+                        "ratetweakpercent": float(
+                            form_data.get("offer_ratetweakpercent", ["0"])[0] or "0"
+                        ),
                         "amount_variable": "offer_amount_variable" in form_data,
-                        "address": form_data.get("offer_address", ["auto"])[0] or "auto",
+                        "address": form_data.get("offer_address", ["auto"])[0]
+                        or "auto",
                     }
 
                     if form_data.get("offer_min_coin_from_amt", [""])[0]:
                         try:
-                            new_offer["min_coin_from_amt"] = float(form_data.get("offer_min_coin_from_amt", ["0"])[0] or "0")
+                            new_offer["min_coin_from_amt"] = float(
+                                form_data.get("offer_min_coin_from_amt", ["0"])[0]
+                                or "0"
+                            )
                         except ValueError:
                             pass
 
                     if form_data.get("offer_valid_seconds", [""])[0]:
                         try:
-                            new_offer["offer_valid_seconds"] = int(form_data.get("offer_valid_seconds", ["3600"])[0] or "3600")
+                            new_offer["offer_valid_seconds"] = int(
+                                form_data.get("offer_valid_seconds", ["3600"])[0]
+                                or "3600"
+                            )
                         except ValueError:
                             pass
 
@@ -580,7 +674,9 @@ def page_amm(self, _, post_string):
                     config_content = json.dumps(current_config, indent=4)
                     config_data = current_config
 
-                    messages.append(f"New offer '{new_offer['name']}' added successfully")
+                    messages.append(
+                        f"New offer '{new_offer['name']}' added successfully"
+                    )
                 except Exception as e:
                     err_messages.append(f"Failed to add offer: {str(e)}")
 
@@ -590,10 +686,17 @@ def page_amm(self, _, post_string):
                         current_config = json.load(f)
 
                     import uuid
+
                     bid_id = str(uuid.uuid4())[:8]
 
-                    if not form_data.get("bid_name", [""])[0] or not form_data.get("bid_coin_from", [""])[0] or not form_data.get("bid_coin_to", [""])[0]:
-                        err_messages.append("Missing required fields for bid: Name, Coin From, and Coin To are required")
+                    if (
+                        not form_data.get("bid_name", [""])[0]
+                        or not form_data.get("bid_coin_from", [""])[0]
+                        or not form_data.get("bid_coin_to", [""])[0]
+                    ):
+                        err_messages.append(
+                            "Missing required fields for bid: Name, Coin From, and Coin To are required"
+                        )
                         raise ValueError("Missing required fields")
 
                     new_bid = {
@@ -603,26 +706,35 @@ def page_amm(self, _, post_string):
                         "coin_from": form_data.get("bid_coin_from", [""])[0],
                         "coin_to": form_data.get("bid_coin_to", [""])[0],
                         "amount": float(form_data.get("bid_amount", ["0"])[0] or "0"),
-                        "max_rate": float(form_data.get("bid_max_rate", ["0"])[0] or "0"),
+                        "max_rate": float(
+                            form_data.get("bid_max_rate", ["0"])[0] or "0"
+                        ),
                         "amount_variable": "bid_amount_variable" in form_data,
                         "address": form_data.get("bid_address", ["auto"])[0] or "auto",
                     }
 
                     if form_data.get("bid_min_coin_to_balance", [""])[0]:
                         try:
-                            new_bid["min_coin_to_balance"] = float(form_data.get("bid_min_coin_to_balance", ["0"])[0] or "0")
+                            new_bid["min_coin_to_balance"] = float(
+                                form_data.get("bid_min_coin_to_balance", ["0"])[0]
+                                or "0"
+                            )
                         except ValueError:
                             pass
 
                     if form_data.get("bid_max_concurrent", [""])[0]:
                         try:
-                            new_bid["max_concurrent"] = int(form_data.get("bid_max_concurrent", ["1"])[0] or "1")
+                            new_bid["max_concurrent"] = int(
+                                form_data.get("bid_max_concurrent", ["1"])[0] or "1"
+                            )
                         except ValueError:
                             pass
 
                     if form_data.get("bid_min_swap_amount", [""])[0]:
                         try:
-                            new_bid["min_swap_amount"] = float(form_data.get("bid_min_swap_amount", ["0"])[0] or "0")
+                            new_bid["min_swap_amount"] = float(
+                                form_data.get("bid_min_swap_amount", ["0"])[0] or "0"
+                            )
                         except ValueError:
                             pass
 
@@ -653,15 +765,12 @@ def page_amm(self, _, post_string):
                     "prune_state_delay": 120,  # Seconds between pruning old state data (0 to disable)
                     "prune_state_after_seconds": 604800,  # How long to keep old state data (7 days)
                     "adjust_rates_based_on_market": True,  # Adjust rates based on existing market offers
-
                     # Auto-accept settings
                     "auto_accept_bids": "none",  # Options: "all", "known", "none" - Whether to auto-accept bids
                     "auto_accept_offers": "none",  # Options: "all", "known", "none" - Whether to auto-accept offers
-
                     # Optional settings
                     "auth": "",  # BasicSwap API auth string, e.g., "admin:password" (if auth is enabled)
                     # "wallet_port_override": 12345,  # Override wallet API port (for testing only) - uncomment and set if needed
-
                     # Offer templates
                     "offers": [
                         {
@@ -678,14 +787,12 @@ def page_amm(self, _, post_string):
                             "address": "auto",  # Address offer is sent from (auto = generate new address per offer)
                             "min_coin_from_amt": 10.0,  # Won't generate offers if wallet balance would drop below this
                             "offer_valid_seconds": 3600,  # How long generated offers will be valid for
-
                             # Optional settings
                             "swap_type": "adaptor_sig",  # Type of swap, defaults to "adaptor_sig"
                             "min_swap_amount": 0.001,  # Minimum purchase quantity when offer amount is variable
                             # "amount_step": 1.0  # If set, offers will be created between "amount" and "min_coin_from_amt" in decrements
                         }
                     ],
-
                     # Bid templates
                     "bids": [
                         {
@@ -698,15 +805,14 @@ def page_amm(self, _, post_string):
                             "amount": 0.01,  # Amount to bid
                             "max_rate": 10000.0,  # Maximum rate for bids
                             "min_coin_to_balance": 1.0,  # Won't send bids if wallet amount would drop below this
-
                             # Optional settings
                             "max_concurrent": 1,  # Maximum number of bids to have active at once
                             "amount_variable": True,  # Can send bids below the set amount where possible
                             # "max_coin_from_balance": 100.0,  # Won't send bids if wallet amount would be above this
                             "address": "auto",  # Address bid is sent from (auto = generate new address per bid)
-                            "min_swap_amount": 0.001  # Minimum swap amount
+                            "min_swap_amount": 0.001,  # Minimum swap amount
                         }
-                    ]
+                    ],
                 }
 
                 try:
@@ -715,7 +821,9 @@ def page_amm(self, _, post_string):
                     config_content = json.dumps(default_config, indent=4)
                     messages.append("Created default configuration file")
                 except Exception as e:
-                    err_messages.append(f"Failed to create default config file: {str(e)}")
+                    err_messages.append(
+                        f"Failed to create default config file: {str(e)}"
+                    )
 
         except Exception as e:
             if swap_client.debug:
@@ -728,7 +836,9 @@ def page_amm(self, _, post_string):
     amm_count = get_amm_active_count(swap_client, amm_debug)
     if swap_client.debug and amm_debug:
         swap_client.log.info(f"AMM active count: {amm_count}")
-        logs.append(f"AMM active count: {amm_count} (only counting offers that are currently active in the network)")
+        logs.append(
+            f"AMM active count: {amm_count} (only counting offers that are currently active in the network)"
+        )
 
     state_content = ""
     state_data = {}
@@ -776,12 +886,9 @@ def amm_status_api(swap_client, _, params=None):
     status = get_amm_status()
 
     debug_enabled = False
-    if params and 'debug' in params:
-        debug_enabled = params['debug'].lower() == 'true'
+    if params and "debug" in params:
+        debug_enabled = params["debug"].lower() == "true"
 
     amm_count = get_amm_active_count(swap_client, debug_enabled)
 
-    return {
-        'status': status,
-        'amm_active_count': amm_count
-    }
+    return {"status": status, "amm_active_count": amm_count}

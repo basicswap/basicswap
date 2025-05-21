@@ -202,7 +202,9 @@ def make_json_api_func(host: str, port: int, auth_string: str = None):
 
 def signal_handler(sig, _) -> None:
     global shutdown_in_progress
-    os.write(sys.stdout.fileno(), f"Signal {sig} detected, ending program.\n".encode("utf-8"))
+    os.write(
+        sys.stdout.fileno(), f"Signal {sig} detected, ending program.\n".encode("utf-8")
+    )
     shutdown_in_progress = True
     delay_event.set()
 
@@ -476,20 +478,25 @@ def process_offers(args, config, script_state) -> None:
         # Get existing offers to adjust our rate based on market conditions
         # Only if the feature is enabled in config
         if config.get("adjust_rates_based_on_market", True):
-            received_offers = read_json_api('offers', {
-                'active': 'active',
-                'include_sent': False,
-                'coin_from': coin_from_data['id'],
-                'coin_to': coin_to_data['id']
-            })
+            received_offers = read_json_api(
+                "offers",
+                {
+                    "active": "active",
+                    "include_sent": False,
+                    "coin_from": coin_from_data["id"],
+                    "coin_to": coin_to_data["id"],
+                },
+            )
 
             if args.debug:
-                print(f"Found {len(received_offers)} existing offers for {coin_from_data['ticker']} to {coin_to_data['ticker']}")
+                print(
+                    f"Found {len(received_offers)} existing offers for {coin_from_data['ticker']} to {coin_to_data['ticker']}"
+                )
 
             # Adjust rates based on existing offers
             if received_offers:
                 # Calculate average market rate from existing offers
-                market_rates = [float(offer['rate']) for offer in received_offers]
+                market_rates = [float(offer["rate"]) for offer in received_offers]
                 if market_rates:
                     avg_market_rate = sum(market_rates) / len(market_rates)
                     min_market_rate = min(market_rates)
@@ -500,19 +507,29 @@ def process_offers(args, config, script_state) -> None:
                     # If our minrate is higher than market rates, respect that limit
                     if min_market_rate < use_rate:
                         # Calculate a competitive rate that's slightly better than average market rate
-                        competitive_rate = min_market_rate * 0.99  # 1% better than best offer
+                        competitive_rate = (
+                            min_market_rate * 0.99
+                        )  # 1% better than best offer
 
                         # Don't go below our minimum rate
                         if competitive_rate >= offer_template["minrate"]:
                             use_rate = competitive_rate
-                            print(f"Adjusting rate to be competitive: {use_rate} (1% better than best market rate {min_market_rate})")
+                            print(
+                                f"Adjusting rate to be competitive: {use_rate} (1% better than best market rate {min_market_rate})"
+                            )
                         else:
-                            print(f"Market rate {min_market_rate} is below our minimum rate {offer_template['minrate']}")
+                            print(
+                                f"Market rate {min_market_rate} is below our minimum rate {offer_template['minrate']}"
+                            )
                     else:
-                        print(f"Our CoinGecko rate {use_rate} is already better than best market rate {min_market_rate}")
+                        print(
+                            f"Our CoinGecko rate {use_rate} is already better than best market rate {min_market_rate}"
+                        )
 
                     # Log market statistics
-                    print(f"Market statistics - Avg: {avg_market_rate}, Min: {min_market_rate}, Max: {max_market_rate}")
+                    print(
+                        f"Market statistics - Avg: {avg_market_rate}, Min: {min_market_rate}, Max: {max_market_rate}"
+                    )
                 else:
                     print("No valid market rates found in existing offers")
         else:
