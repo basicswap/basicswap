@@ -376,7 +376,6 @@ def write_state(statefile, script_state):
 
 
 def process_offers(args, config, script_state) -> None:
-    global shutdown_in_progress
     if shutdown_in_progress:
         return
 
@@ -580,7 +579,6 @@ def process_offers(args, config, script_state) -> None:
 
 
 def process_bids(args, config, script_state) -> None:
-    global shutdown_in_progress
     if shutdown_in_progress:
         return
 
@@ -862,7 +860,6 @@ def process_bids(args, config, script_state) -> None:
 
 
 def prune_script_state(now, args, config, script_state):
-    global shutdown_in_progress
     if shutdown_in_progress:
         return
 
