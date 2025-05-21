@@ -160,7 +160,7 @@ def start_amm_process(swap_client, host, port, config_file=None, state_file=None
 
 def stop_amm_process():
     """Stop the AMM process"""
-    global amm_process, amm_status
+    global amm_status
 
     if amm_process is None or amm_process.poll() is not None:
         return False, "AMM process is not running"
@@ -188,8 +188,6 @@ def stop_amm_process():
 
 def get_amm_status():
     """Get the current status of the AMM process"""
-    global amm_process
-
     if amm_process is not None:
         if amm_process.poll() is None:
             return "running"
