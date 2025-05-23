@@ -73,11 +73,20 @@ def log_capture_thread(process, swap_client):
                 if len(amm_log_buffer) > 1000:
                     amm_log_buffer.pop(0)
 
-            debug_enabled = globals().get('amm_debug', False)
-            if debug_enabled or any(important in line_str for important in [
-                "Error:", "Failed to", "New offer created", "New bid created", "Revoking offer",
-                "AMM process", "Offer revoked", "Server failed"
-            ]):
+            debug_enabled = globals().get("amm_debug", False)
+            if debug_enabled or any(
+                important in line_str
+                for important in [
+                    "Error:",
+                    "Failed to",
+                    "New offer created",
+                    "New bid created",
+                    "Revoking offer",
+                    "AMM process",
+                    "Offer revoked",
+                    "Server failed",
+                ]
+            ):
                 swap_client.log.info(f"AMM: {line_str}")
         except Exception as e:
             swap_client.log.error(f"Error capturing AMM log: {str(e)}")
@@ -786,7 +795,9 @@ def page_amm(self, _, post_string):
                     except Exception as e:
                         err_messages.append(f"Failed to clear AMM state file: {str(e)}")
                 else:
-                    err_messages.append("Debug UI mode must be enabled to clear the AMM state file")
+                    err_messages.append(
+                        "Debug UI mode must be enabled to clear the AMM state file"
+                    )
 
             elif "create_default" in form_data:
                 # Create default config with all available options
@@ -827,10 +838,18 @@ def page_amm(self, _, post_string):
                 }
 
                 if swap_client.debug:
-                    default_config["prune_state_delay"] = 120  # Seconds between pruning old state data (0 to disable)
-                    default_config["prune_state_after_seconds"] = 604800  # How long to keep old state data (7 days)
-                    default_config["min_seconds_between_bids"] = 60  # Minimum delay between creating bids
-                    default_config["max_seconds_between_bids"] = 240  # Maximum delay between creating bids
+                    default_config["prune_state_delay"] = (
+                        120  # Seconds between pruning old state data (0 to disable)
+                    )
+                    default_config["prune_state_after_seconds"] = (
+                        604800  # How long to keep old state data (7 days)
+                    )
+                    default_config["min_seconds_between_bids"] = (
+                        60  # Minimum delay between creating bids
+                    )
+                    default_config["max_seconds_between_bids"] = (
+                        240  # Maximum delay between creating bids
+                    )
 
                 if include_bids:
                     default_config["bids"] = [

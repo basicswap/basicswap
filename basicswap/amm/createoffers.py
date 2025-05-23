@@ -446,7 +446,9 @@ def process_offers(args, config, script_state) -> None:
                     if args.debug:
                         print(f"Using blind balance: {wallet_balance}")
                 else:
-                    raise ValueError(f"{coin_ticker} variant {coin_variant} not handled")
+                    raise ValueError(
+                        f"{coin_ticker} variant {coin_variant} not handled"
+                    )
             else:
                 wallet_balance = float(wallet_from["balance"])
                 if args.debug:
@@ -483,7 +485,9 @@ def process_offers(args, config, script_state) -> None:
 
         try:
             max_offer_amount: float = float(offer_template["amount"])
-            min_offer_amount: float = float(offer_template.get("amount_step", max_offer_amount))
+            min_offer_amount: float = float(
+                offer_template.get("amount_step", max_offer_amount)
+            )
             min_wallet_from_amount: float = float(offer_template["min_coin_from_amt"])
 
             if wallet_balance - min_offer_amount <= min_wallet_from_amount:
@@ -513,19 +517,35 @@ def process_offers(args, config, script_state) -> None:
         delay_next_offer_before = script_state.get("delay_next_offer_before", 0)
         if delay_next_offer_before > int(time.time()):
             if args.debug:
-                print("Delaying offers until {}".format(time.ctime(delay_next_offer_before)))
+                print(
+                    "Delaying offers until {}".format(
+                        time.ctime(delay_next_offer_before)
+                    )
+                )
             break
 
         coin_from_id_for_rates = coin_from_data["id"]
         coin_to_id_for_rates = coin_to_data["id"]
 
-        if "ticker" in coin_from_data and coin_from_data["ticker"] == "PART" and "variant" in coin_from_data:
+        if (
+            "ticker" in coin_from_data
+            and coin_from_data["ticker"] == "PART"
+            and "variant" in coin_from_data
+        ):
             coin_from_id_for_rates = Coins.PART
-            print(f"Using base PART (ID: {coin_from_id_for_rates}) for rate lookup instead of {coin_from_data_name}")
+            print(
+                f"Using base PART (ID: {coin_from_id_for_rates}) for rate lookup instead of {coin_from_data_name}"
+            )
 
-        if "ticker" in coin_to_data and coin_to_data["ticker"] == "PART" and "variant" in coin_to_data:
+        if (
+            "ticker" in coin_to_data
+            and coin_to_data["ticker"] == "PART"
+            and "variant" in coin_to_data
+        ):
             coin_to_id_for_rates = Coins.PART
-            print(f"Using base PART (ID: {coin_to_id_for_rates}) for rate lookup instead of {coin_to_data['ticker']}")
+            print(
+                f"Using base PART (ID: {coin_to_id_for_rates}) for rate lookup instead of {coin_to_data['ticker']}"
+            )
 
         is_part_to_part = False
 
@@ -553,7 +573,9 @@ def process_offers(args, config, script_state) -> None:
                 use_rate = coingecko_rate
                 print(f"Using CoinGecko rate: {use_rate}")
             else:
-                print(f"No CoinGecko rate available for {coin_from_data_name} to {coin_to_data['ticker']}, skipping offer")
+                print(
+                    f"No CoinGecko rate available for {coin_from_data_name} to {coin_to_data['ticker']}, skipping offer"
+                )
                 continue
 
         if config.get("adjust_rates_based_on_market", True):
@@ -631,8 +653,14 @@ def process_offers(args, config, script_state) -> None:
         if args.debug:
             print("Creating offer for: {} at rate: {}".format(offer_template, use_rate))
         else:
-            print("Creating offer for: {} {} -> {} at rate: {}".format(
-                offer_amount, coin_from_data["ticker"], coin_to_data["ticker"], use_rate))
+            print(
+                "Creating offer for: {} {} -> {} at rate: {}".format(
+                    offer_amount,
+                    coin_from_data["ticker"],
+                    coin_to_data["ticker"],
+                    use_rate,
+                )
+            )
         template_from_addr = offer_template["address"]
 
         coin_from_id = coin_from_data["id"]
@@ -693,7 +721,9 @@ def process_offers(args, config, script_state) -> None:
         script_state["delay_next_offer_before"] = next_offer_time
 
         if args.debug:
-            print(f"Next offer will be created after {time_between_offers} seconds (at {time.ctime(next_offer_time)})")
+            print(
+                f"Next offer will be created after {time_between_offers} seconds (at {time.ctime(next_offer_time)})"
+            )
 
         write_state(args.statefile, script_state)
 
@@ -720,7 +750,9 @@ def process_bids(args, config, script_state) -> None:
         delay_next_bid_before = script_state.get("delay_next_bid_before", 0)
         if delay_next_bid_before > int(time.time()):
             if args.debug:
-                print("Delaying bids until {}".format(time.ctime(delay_next_bid_before)))
+                print(
+                    "Delaying bids until {}".format(time.ctime(delay_next_bid_before))
+                )
             break
 
         # Check bids in progress
@@ -980,7 +1012,9 @@ def process_bids(args, config, script_state) -> None:
             script_state["delay_next_bid_before"] = next_bid_time
 
             if args.debug:
-                print(f"Next bid will be created after {time_between_bids} seconds (at {time.ctime(next_bid_time)})")
+                print(
+                    f"Next bid will be created after {time_between_bids} seconds (at {time.ctime(next_bid_time)})"
+                )
 
             write_state(args.statefile, script_state)
             break  # Create max one bid per iteration
