@@ -78,6 +78,7 @@ import urllib
 import urllib.error
 import base64
 from urllib.request import urlopen
+from basicswap.chainparams import Coins
 
 delay_event = threading.Event()
 shutdown_in_progress = False
@@ -210,6 +211,14 @@ def signal_handler(sig, _) -> None:
 
 
 def findCoin(coin: str, known_coins) -> str:
+    if coin.lower() in ["particl anon", "particl_anon", "part_anon"]:
+        return "Particl Anon"
+    if coin.lower() in ["particl blind", "particl_blind", "part_blind"]:
+        return "Particl Blind"
+    if coin.lower() in ["particl", "part"]:
+        return "Particl"
+
+    # Regular coin lookup
     for known_coin in known_coins:
         if (
             known_coin["name"].lower() == coin.lower()
@@ -218,7 +227,9 @@ def findCoin(coin: str, known_coins) -> str:
             if known_coin["active"] is False:
                 raise ValueError(f"Inactive coin {coin}")
             return known_coin["name"]
-    raise ValueError(f"Unknown coin {coin}")
+
+    print(f"Warning: Unknown coin {coin}, using as-is")
+    return coin
 
 
 def readConfig(args, known_coins):
@@ -269,9 +280,22 @@ def readConfig(args, known_coins):
             num_changes += 1
         offer_templates_map[offer_template["name"]] = offer_template
 
+        if "amount" not in offer_template or offer_template["amount"] is None:
+            print(f"Setting default amount for {offer_template['name']}")
+            offer_template["amount"] = 1.0  # Default amount
+            num_changes += 1
+
         if "amount_step" not in offer_template:
-            if offer_template.get("min_coin_from_amt", 0) < offer_template["amount"]:
-                print("Setting min_coin_from_amt for", offer_template["name"])
+            min_from = offer_template.get("min_coin_from_amt", 0)
+            amount = offer_template["amount"]
+            try:
+                if float(min_from) < float(amount):
+                    print("Setting min_coin_from_amt for", offer_template["name"])
+                    offer_template["min_coin_from_amt"] = offer_template["amount"]
+                    num_changes += 1
+            except (TypeError, ValueError) as e:
+                print(f"Error comparing min_coin_from_amt and amount: {e}")
+                print(f"Setting default min_coin_from_amt for {offer_template['name']}")
                 offer_template["min_coin_from_amt"] = offer_template["amount"]
                 num_changes += 1
         else:
@@ -405,20 +429,32 @@ def process_offers(args, config, script_state) -> None:
         wallet_from = read_json_api_wallet(
             "wallets/{}".format(coin_from_data["ticker"])
         )
+
         coin_ticker = coin_from_data["ticker"]
-        if coin_ticker == "PART" and "variant" in coin_from_data:
-            coin_variant = coin_from_data["variant"]
-            if coin_variant == "Anon":
-                coin_from_data_name = "PART_ANON"
-                wallet_balance: float = float(wallet_from["anon_balance"])
-            elif coin_variant == "Blind":
-                coin_from_data_name = "PART_BLIND"
-                wallet_balance: float = float(wallet_from["blind_balance"])
+
+        coin_from_data_name = offer_template["coin_from"]
+
+        if coin_ticker == "PART":
+            if "variant" in coin_from_data:
+                coin_variant = coin_from_data["variant"]
+                if coin_variant == "Anon":
+                    wallet_balance = float(wallet_from["anon_balance"])
+                    if args.debug:
+                        print(f"Using anon balance: {wallet_balance}")
+                elif coin_variant == "Blind":
+                    wallet_balance = float(wallet_from["blind_balance"])
+                    if args.debug:
+                        print(f"Using blind balance: {wallet_balance}")
+                else:
+                    raise ValueError(f"{coin_ticker} variant {coin_variant} not handled")
             else:
-                raise ValueError(f"{coin_ticker} variant {coin_variant} not handled")
+                wallet_balance = float(wallet_from["balance"])
+                if args.debug:
+                    print(f"Using regular balance: {wallet_balance}")
         else:
-            coin_from_data_name = coin_ticker
-            wallet_balance: float = float(wallet_from["balance"])
+            wallet_balance = float(wallet_from["balance"])
+            if args.debug:
+                print(f"Using balance for {coin_ticker}: {wallet_balance}")
 
         for offer in sent_offers:
             created_offers = script_state.get("offers", {})
@@ -437,46 +473,89 @@ def process_offers(args, config, script_state) -> None:
                         )
                     )
                     result = read_json_api(f"revokeoffer/{offer_id}")
-                    print("revokeoffer", result)
+                    if args.debug:
+                        print("revokeoffer", result)
+                    else:
+                        print("Offer revoked successfully")
 
         if offers_found > 0:
             continue
 
-        max_offer_amount: float = offer_template["amount"]
-        min_offer_amount: float = offer_template.get("amount_step", max_offer_amount)
+        try:
+            max_offer_amount: float = float(offer_template["amount"])
+            min_offer_amount: float = float(offer_template.get("amount_step", max_offer_amount))
+            min_wallet_from_amount: float = float(offer_template["min_coin_from_amt"])
 
-        min_wallet_from_amount: float = float(offer_template["min_coin_from_amt"])
-        if wallet_balance - min_offer_amount <= min_wallet_from_amount:
-            print(
-                "Skipping template {}, wallet from balance below minimum".format(
-                    offer_template["name"]
+            if wallet_balance - min_offer_amount <= min_wallet_from_amount:
+                print(
+                    "Skipping template {}, wallet from balance below minimum".format(
+                        offer_template["name"]
+                    )
                 )
-            )
+                continue
+        except (TypeError, ValueError) as e:
+            print(f"Error processing amounts for {offer_template['name']}: {e}")
+            print("Skipping template due to invalid amount values")
             continue
 
         offer_amount: float = max_offer_amount
         if wallet_balance - max_offer_amount <= min_wallet_from_amount:
             available_balance: float = wallet_balance - min_wallet_from_amount
-            min_steps: int = available_balance // min_offer_amount
-            assert min_steps > 0  # Should not be possible, checked above
-            offer_amount = min_offer_amount * min_steps
+            try:
+                min_steps: int = int(available_balance / min_offer_amount)
+                if min_steps <= 0:
+                    min_steps = 1  # Ensure at least one step
+                offer_amount = min_offer_amount * min_steps
+            except (TypeError, ValueError) as e:
+                print(f"Error calculating steps: {e}. Using max available amount.")
+                offer_amount = min(max_offer_amount, available_balance)
 
         delay_next_offer_before = script_state.get("delay_next_offer_before", 0)
         if delay_next_offer_before > int(time.time()):
-            print("Delaying offers until {}".format(delay_next_offer_before))
+            if args.debug:
+                print("Delaying offers until {}".format(time.ctime(delay_next_offer_before)))
             break
 
-        # Get market rates from CoinGecko
-        rates = read_json_api(
-            "rates",
-            {"coin_from": coin_from_data["id"], "coin_to": coin_to_data["id"]},
-        )
-        print("CoinGecko Rates:", rates)
-        coingecko_rate = float(rates["coingecko"]["rate_inferred"])
-        use_rate = coingecko_rate
+        coin_from_id_for_rates = coin_from_data["id"]
+        coin_to_id_for_rates = coin_to_data["id"]
 
-        # Get existing offers to adjust our rate based on market conditions
-        # Only if the feature is enabled in config
+        if "ticker" in coin_from_data and coin_from_data["ticker"] == "PART" and "variant" in coin_from_data:
+            coin_from_id_for_rates = Coins.PART
+            print(f"Using base PART (ID: {coin_from_id_for_rates}) for rate lookup instead of {coin_from_data_name}")
+
+        if "ticker" in coin_to_data and coin_to_data["ticker"] == "PART" and "variant" in coin_to_data:
+            coin_to_id_for_rates = Coins.PART
+            print(f"Using base PART (ID: {coin_to_id_for_rates}) for rate lookup instead of {coin_to_data['ticker']}")
+
+        is_part_to_part = False
+
+        if "ticker" in coin_from_data and "ticker" in coin_to_data:
+            if coin_from_data["ticker"] == "PART" and coin_to_data["ticker"] == "PART":
+                is_part_to_part = True
+
+        if coin_from_id_for_rates == Coins.PART and coin_to_id_for_rates == Coins.PART:
+            is_part_to_part = True
+
+        if is_part_to_part:
+            use_rate = 1.0
+            print(f"Using fixed rate 1.0 for PART to PART (or variants)")
+        else:
+            rates = read_json_api(
+                "rates",
+                {"coin_from": coin_from_id_for_rates, "coin_to": coin_to_id_for_rates},
+            )
+            print("Rates response:", rates)
+
+            use_rate = None
+
+            if "coingecko" in rates and "rate_inferred" in rates["coingecko"]:
+                coingecko_rate = float(rates["coingecko"]["rate_inferred"])
+                use_rate = coingecko_rate
+                print(f"Using CoinGecko rate: {use_rate}")
+            else:
+                print(f"No CoinGecko rate available for {coin_from_data_name} to {coin_to_data['ticker']}, skipping offer")
+                continue
+
         if config.get("adjust_rates_based_on_market", True):
             received_offers = read_json_api(
                 "offers",
@@ -549,12 +628,23 @@ def process_offers(args, config, script_state) -> None:
             print("Warning: Clamping rate to minimum.")
             use_rate = offer_template["minrate"]
 
-        print("Creating offer for: {} at rate: {}".format(offer_template, use_rate))
+        if args.debug:
+            print("Creating offer for: {} at rate: {}".format(offer_template, use_rate))
+        else:
+            print("Creating offer for: {} {} -> {} at rate: {}".format(
+                offer_amount, coin_from_data["ticker"], coin_to_data["ticker"], use_rate))
         template_from_addr = offer_template["address"]
+
+        coin_from_id = coin_from_data["id"]
+        coin_to_id = coin_to_data["id"]
+
+        if args.debug:
+            print(f"Using coin IDs for API: {coin_from_id} -> {coin_to_id}")
+
         offer_data = {
             "addr_from": (-1 if template_from_addr == "auto" else template_from_addr),
-            "coin_from": coin_from_data_name,
-            "coin_to": coin_to_data["ticker"],
+            "coin_from": coin_from_id,
+            "coin_to": coin_to_id,
             "amt_from": offer_amount,
             "amt_var": offer_template["amount_variable"],
             "valid_for_seconds": offer_template.get(
@@ -565,24 +655,32 @@ def process_offers(args, config, script_state) -> None:
             "lockhrs": "24",
             "automation_strat_id": 1,
         }
+
         if "min_swap_amount" in offer_template:
             offer_data["amt_bid_min"] = offer_template["min_swap_amount"]
+
         if args.debug:
             print("offer data {}".format(offer_data))
-        new_offer = read_json_api("offers/new", offer_data)
-        if "error" in new_offer:
-            raise ValueError(
-                "Server failed to create offer: {}".format(new_offer["error"])
+
+        try:
+            new_offer = read_json_api("offers/new", offer_data)
+            if "error" in new_offer:
+                raise ValueError(
+                    "Server failed to create offer: {}".format(new_offer["error"])
+                )
+            print("New offer created with ID: {}".format(new_offer["offer_id"]))
+            if "offers" not in script_state:
+                script_state["offers"] = {}
+            template_name = offer_template["name"]
+            if template_name not in script_state["offers"]:
+                script_state["offers"][template_name] = []
+            script_state["offers"][template_name].append(
+                {"offer_id": new_offer["offer_id"], "time": int(time.time())}
             )
-        print("New offer: {}".format(new_offer["offer_id"]))
-        if "offers" not in script_state:
-            script_state["offers"] = {}
-        template_name = offer_template["name"]
-        if template_name not in script_state["offers"]:
-            script_state["offers"][template_name] = []
-        script_state["offers"][template_name].append(
-            {"offer_id": new_offer["offer_id"], "time": int(time.time())}
-        )
+        except Exception as e:
+            print(f"Error creating offer: {e}")
+            continue
+
         max_seconds_between_offers = config["max_seconds_between_offers"]
         min_seconds_between_offers = config["min_seconds_between_offers"]
         time_between_offers = min_seconds_between_offers
@@ -591,7 +689,12 @@ def process_offers(args, config, script_state) -> None:
                 min_seconds_between_offers, max_seconds_between_offers
             )
 
-        script_state["delay_next_offer_before"] = int(time.time()) + time_between_offers
+        next_offer_time = int(time.time()) + time_between_offers
+        script_state["delay_next_offer_before"] = next_offer_time
+
+        if args.debug:
+            print(f"Next offer will be created after {time_between_offers} seconds (at {time.ctime(next_offer_time)})")
+
         write_state(args.statefile, script_state)
 
 
@@ -616,7 +719,8 @@ def process_bids(args, config, script_state) -> None:
             continue
         delay_next_bid_before = script_state.get("delay_next_bid_before", 0)
         if delay_next_bid_before > int(time.time()):
-            print("Delaying bids until {}".format(delay_next_bid_before))
+            if args.debug:
+                print("Delaying bids until {}".format(time.ctime(delay_next_bid_before)))
             break
 
         # Check bids in progress
@@ -656,7 +760,8 @@ def process_bids(args, config, script_state) -> None:
             bids_in_progress += 1
 
         if bids_in_progress >= max_concurrent:
-            print("Max concurrent bids reached for template")
+            if args.debug:
+                print("Max concurrent bids reached for template")
             continue
 
         # Bidder sends coin_to and receives coin_from
@@ -853,7 +958,7 @@ def process_bids(args, config, script_state) -> None:
                         "Server failed to create bid: {}".format(new_bid["error"])
                     )
                 print(
-                    "New bid: {} on offer {}".format(
+                    "New bid created with ID: {} on offer {}".format(
                         new_bid["bid_id"], offer["offer_id"]
                     )
                 )
@@ -871,7 +976,12 @@ def process_bids(args, config, script_state) -> None:
                 )
             else:
                 time_between_bids = min_seconds_between_bids
-            script_state["delay_next_bid_before"] = int(time.time()) + time_between_bids
+            next_bid_time = int(time.time()) + time_between_bids
+            script_state["delay_next_bid_before"] = next_bid_time
+
+            if args.debug:
+                print(f"Next bid will be created after {time_between_bids} seconds (at {time.ctime(next_bid_time)})")
+
             write_state(args.statefile, script_state)
             break  # Create max one bid per iteration
 
@@ -1081,7 +1191,7 @@ def main():
             if args.oneshot or shutdown_in_progress:
                 break
 
-            if not shutdown_in_progress:
+            if not shutdown_in_progress and args.debug:
                 print("Looping indefinitely, ctrl+c to exit.")
 
             delay_event.wait(config["main_loop_delay"])

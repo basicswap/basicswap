@@ -58,7 +58,7 @@ def get_amm_module_path():
 
 def log_capture_thread(process, swap_client):
     """Thread to capture and store logs from the AMM process"""
-    global amm_status
+    global amm_status, amm_debug
 
     while process.poll() is None:
         try:
@@ -73,7 +73,11 @@ def log_capture_thread(process, swap_client):
                 if len(amm_log_buffer) > 1000:
                     amm_log_buffer.pop(0)
 
-            swap_client.log.info(f"AMM: {line_str}")
+            if amm_debug or any(important in line_str for important in [
+                "Error:", "Failed to", "New offer created", "New bid created", "Revoking offer",
+                "AMM process", "Offer revoked", "Server failed"
+            ]):
+                swap_client.log.info(f"AMM: {line_str}")
         except Exception as e:
             swap_client.log.error(f"Error capturing AMM log: {str(e)}")
 
@@ -104,15 +108,16 @@ def start_amm_process(
         default_config = {
             "min_seconds_between_offers": 60,
             "max_seconds_between_offers": 240,
-            "min_seconds_between_bids": 60,
-            "max_seconds_between_bids": 240,
             "main_loop_delay": 60,
-            "prune_state_delay": 120,
-            "prune_state_after_seconds": 604800,
-            "adjust_rates_based_on_market": True,
             "offers": [],
             "bids": [],
         }
+
+        if swap_client.debug:
+            default_config["prune_state_delay"] = 120
+            default_config["prune_state_after_seconds"] = 604800
+            default_config["min_seconds_between_bids"] = 60
+            default_config["max_seconds_between_bids"] = 240
 
         with open(config_path, "w") as f:
             json.dump(default_config, f, indent=4)
@@ -144,7 +149,7 @@ def start_amm_process(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=False,
-            bufsize=1,
+            bufsize=-1,
         )
 
         with amm_log_lock:
@@ -217,10 +222,6 @@ def get_amm_active_count(swap_client, debug_override=False):
 
     status = get_amm_status()
     if status != "running":
-        if debug_enabled:
-            swap_client.log.info(
-                f"AMM not running (status: {status}), returning count 0"
-            )
         return 0
 
     state_path = get_amm_state_path(swap_client)
@@ -472,6 +473,13 @@ def page_amm(self, _, post_string):
     messages = []
     err_messages = []
 
+    basicswap_host = swap_client.settings.get("htmlhost", "127.0.0.1")
+    basicswap_port = swap_client.settings.get("htmlport", 12700)
+
+    if amm_host == "127.0.0.1" and amm_port == 12700:
+        amm_host = basicswap_host
+        amm_port = basicswap_port
+
     amm_dir = ensure_amm_dir(swap_client)
     config_path = get_amm_config_path(swap_client)
     state_path = get_amm_state_path(swap_client)
@@ -495,14 +503,10 @@ def page_amm(self, _, post_string):
         default_config = {
             "min_seconds_between_offers": 60,
             "max_seconds_between_offers": 240,
-            "min_seconds_between_bids": 60,
-            "max_seconds_between_bids": 240,
             "main_loop_delay": 60,
-            "prune_state_delay": 120,
-            "prune_state_after_seconds": 604800,  # 7 days
-            "adjust_rates_based_on_market": True,
             "offers": [
                 {
+                    "id": "offer1234",
                     "name": "Example Offer",
                     "enabled": False,
                     "coin_from": "PART",
@@ -510,14 +514,27 @@ def page_amm(self, _, post_string):
                     "amount": 10.0,
                     "minrate": 0.0001,
                     "ratetweakpercent": 0,
+                    "adjust_rates_based_on_market": True,
                     "amount_variable": True,
                     "address": "auto",
                     "min_coin_from_amt": 10.0,
                     "offer_valid_seconds": 3600,
                 }
             ],
-            "bids": [
+            "bids": [],
+        }
+
+        # Add debug-only settings if in debug mode
+        if swap_client.debug:
+            default_config["prune_state_delay"] = 120
+            default_config["prune_state_after_seconds"] = 604800
+            default_config["min_seconds_between_bids"] = 60
+            default_config["max_seconds_between_bids"] = 240
+
+            # Add example bid in debug mode
+            default_config["bids"] = [
                 {
+                    "id": "bid5678",
                     "name": "Example Bid",
                     "enabled": False,
                     "coin_from": "BTC",
@@ -529,8 +546,7 @@ def page_amm(self, _, post_string):
                     "amount_variable": True,
                     "address": "auto",
                 }
-            ],
-        }
+            ]
 
         try:
             with open(config_path, "w") as f:
@@ -753,21 +769,31 @@ def page_amm(self, _, post_string):
                 except Exception as e:
                     err_messages.append(f"Failed to add bid: {str(e)}")
 
+            elif "prune_state" in form_data:
+                if swap_client.debug_ui:
+                    try:
+                        if os.path.exists(state_path):
+                            with open(state_path, "w") as f:
+                                f.write("{}")
+                            messages.append("AMM state file cleared successfully")
+                            state_content = "{}"
+                            state_data = {}
+                        else:
+                            messages.append("AMM state file does not exist")
+                    except Exception as e:
+                        err_messages.append(f"Failed to clear AMM state file: {str(e)}")
+                else:
+                    err_messages.append("Debug UI mode must be enabled to clear the AMM state file")
+
             elif "create_default" in form_data:
                 # Create default config with all available options
+                include_bids = "include_bids" in form_data and swap_client.debug
+
                 default_config = {
                     # General settings
                     "min_seconds_between_offers": 60,  # Minimum delay between creating offers
                     "max_seconds_between_offers": 240,  # Maximum delay between creating offers
-                    "min_seconds_between_bids": 60,  # Minimum delay between creating bids
-                    "max_seconds_between_bids": 240,  # Maximum delay between creating bids
                     "main_loop_delay": 60,  # Seconds between main loop iterations (10-1000)
-                    "prune_state_delay": 120,  # Seconds between pruning old state data (0 to disable)
-                    "prune_state_after_seconds": 604800,  # How long to keep old state data (7 days)
-                    "adjust_rates_based_on_market": True,  # Adjust rates based on existing market offers
-                    # Auto-accept settings
-                    "auto_accept_bids": "none",  # Options: "all", "known", "none" - Whether to auto-accept bids
-                    "auto_accept_offers": "none",  # Options: "all", "known", "none" - Whether to auto-accept offers
                     # Optional settings
                     "auth": "",  # BasicSwap API auth string, e.g., "admin:password" (if auth is enabled)
                     # "wallet_port_override": 12345,  # Override wallet API port (for testing only) - uncomment and set if needed
@@ -783,6 +809,7 @@ def page_amm(self, _, post_string):
                             "amount": 10.0,  # Amount to create the offer for
                             "minrate": 0.0001,  # Rate below which the offer won't drop
                             "ratetweakpercent": 0,  # Modify the offer rate from the fetched value (can be negative)
+                            "adjust_rates_based_on_market": True,  # Whether to adjust rates based on existing market offers
                             "amount_variable": True,  # Whether bidder can set a different amount
                             "address": "auto",  # Address offer is sent from (auto = generate new address per offer)
                             "min_coin_from_amt": 10.0,  # Won't generate offers if wallet balance would drop below this
@@ -793,8 +820,17 @@ def page_amm(self, _, post_string):
                             # "amount_step": 1.0  # If set, offers will be created between "amount" and "min_coin_from_amt" in decrements
                         }
                     ],
-                    # Bid templates
-                    "bids": [
+                    "bids": [],  # Empty by default
+                }
+
+                if swap_client.debug:
+                    default_config["prune_state_delay"] = 120  # Seconds between pruning old state data (0 to disable)
+                    default_config["prune_state_after_seconds"] = 604800  # How long to keep old state data (7 days)
+                    default_config["min_seconds_between_bids"] = 60  # Minimum delay between creating bids
+                    default_config["max_seconds_between_bids"] = 240  # Maximum delay between creating bids
+
+                if include_bids:
+                    default_config["bids"] = [
                         {
                             # Required settings
                             "id": "bid5678",  # Unique identifier for this bid
@@ -812,8 +848,7 @@ def page_amm(self, _, post_string):
                             "address": "auto",  # Address bid is sent from (auto = generate new address per bid)
                             "min_swap_amount": 0.001,  # Minimum swap amount
                         }
-                    ],
-                }
+                    ]
 
                 try:
                     with open(config_path, "w") as f:
@@ -876,6 +911,7 @@ def page_amm(self, _, post_string):
             "amm_host": amm_host,
             "amm_port": amm_port,
             "amm_debug": amm_debug,
+            "debug_ui_mode": swap_client.debug_ui,
             "coins": coins,
         },
     )
