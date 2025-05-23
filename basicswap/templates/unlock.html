@@ -8,7 +8,7 @@
   {% endif %}
   <title>(BSX) BasicSwap - v{{ version }}</title>
   <link rel="icon" sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-  <!-- CSS Stylesheets -->>
+  <!-- CSS Stylesheets -->
   <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
   <!-- Custom styles -->
@@ -37,7 +37,7 @@
     })();
 
     (function() {
-      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
         (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
       if (!localStorage.getItem('color-theme')) {
@@ -77,9 +77,9 @@
 </head>
     <script>
     (function() {
-      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
         (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-      
+
       if (!localStorage.getItem('color-theme')) {
         localStorage.setItem('color-theme', 'dark');
       }
@@ -169,7 +169,7 @@
         </div>
       </div>
     </section>
-    
+
     <script>
     document.addEventListener('DOMContentLoaded', () => {
       const passwordToggle = document.querySelector('.js-password-toggle');
