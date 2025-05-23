@@ -91,7 +91,9 @@ def start_amm_process(
     swap_client, host, port, config_file=None, state_file=None, debug=False
 ):
     """Start the AMM process"""
-    global amm_process, amm_log_buffer, amm_status, amm_config_file, amm_state_file
+    global amm_process, amm_log_buffer, amm_status, amm_config_file, amm_state_file, amm_debug
+
+    amm_debug = debug
 
     if amm_process is not None and amm_process.poll() is None:
         return False, "AMM process is already running"

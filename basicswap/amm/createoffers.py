@@ -538,7 +538,7 @@ def process_offers(args, config, script_state) -> None:
 
         if is_part_to_part:
             use_rate = 1.0
-            print(f"Using fixed rate 1.0 for PART to PART (or variants)")
+            print("Using fixed rate 1.0 for PART to PART (or variants)")
         else:
             rates = read_json_api(
                 "rates",
