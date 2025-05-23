@@ -1002,7 +1002,7 @@ const AmmTablesManager = (function() {
                 coin_from: document.getElementById('edit-amm-coin-from').value,
                 coin_to: document.getElementById('edit-amm-coin-to').value,
                 amount: parseFloat(document.getElementById('edit-amm-amount').value),
-                amount_variable: true,
+                amount_variable: true
             };
 
             if (id) {
