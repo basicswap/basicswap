@@ -58,7 +58,7 @@ def get_amm_module_path():
 
 def log_capture_thread(process, swap_client):
     """Thread to capture and store logs from the AMM process"""
-    global amm_status, amm_debug
+    global amm_status
 
     while process.poll() is None:
         try:
@@ -73,7 +73,8 @@ def log_capture_thread(process, swap_client):
                 if len(amm_log_buffer) > 1000:
                     amm_log_buffer.pop(0)
 
-            if amm_debug or any(important in line_str for important in [
+            debug_enabled = globals().get('amm_debug', False)
+            if debug_enabled or any(important in line_str for important in [
                 "Error:", "Failed to", "New offer created", "New bid created", "Revoking offer",
                 "AMM process", "Offer revoked", "Server failed"
             ]):
