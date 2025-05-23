@@ -725,7 +725,8 @@ const AmmTablesManager = (function() {
                 coin_from: document.getElementById('add-amm-coin-from').value,
                 coin_to: document.getElementById('add-amm-coin-to').value,
                 amount: parseFloat(document.getElementById('add-amm-amount').value),
-                amount_variable: true,
+                amount_variable: true
+            };
 
             if (type === 'offer') {
                 newItem.minrate = parseFloat(document.getElementById('add-amm-rate').value);
