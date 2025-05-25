@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
+# Copyright (c) 2025 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +24,13 @@ protobuf ParseFromString would reset the whole object, from_bytes won't.
 from basicswap.util.integer import encode_varint, decode_varint
 
 
+NPBW_INT = 0
+NPBW_BYTES = 2
+
+NPBF_STR = 1
+NPBF_BOOL = 2
+
+
 class NonProtobufClass:
     def __init__(self, init_all: bool = True, **kwargs):
         for key, value in kwargs.items():
@@ -34,7 +42,7 @@ class NonProtobufClass:
                     found_field = True
                     break
             if found_field is False:
-                raise ValueError(f"got an unexpected keyword argument '{key}'")
+                raise ValueError(f"Got an unexpected keyword argument '{key}'")
 
         if init_all:
             self.init_fields()
@@ -117,151 +125,160 @@ class NonProtobufClass:
 
 class OfferMessage(NonProtobufClass):
     _map = {
-        1: ("protocol_version", 0, 0),
-        2: ("coin_from", 0, 0),
-        3: ("coin_to", 0, 0),
-        4: ("amount_from", 0, 0),
-        5: ("amount_to", 0, 0),
-        6: ("min_bid_amount", 0, 0),
-        7: ("time_valid", 0, 0),
-        8: ("lock_type", 0, 0),
-        9: ("lock_value", 0, 0),
-        10: ("swap_type", 0, 0),
-        11: ("proof_address", 2, 1),
-        12: ("proof_signature", 2, 1),
-        13: ("pkhash_seller", 2, 0),
-        14: ("secret_hash", 2, 0),
-        15: ("fee_rate_from", 0, 0),
-        16: ("fee_rate_to", 0, 0),
-        17: ("amount_negotiable", 0, 2),
-        18: ("rate_negotiable", 0, 2),
-        19: ("proof_utxos", 2, 0),
+        1: ("protocol_version", NPBW_INT, 0),
+        2: ("coin_from", NPBW_INT, 0),
+        3: ("coin_to", NPBW_INT, 0),
+        4: ("amount_from", NPBW_INT, 0),
+        5: ("amount_to", NPBW_INT, 0),
+        6: ("min_bid_amount", NPBW_INT, 0),
+        7: ("time_valid", NPBW_INT, 0),
+        8: ("lock_type", NPBW_INT, 0),
+        9: ("lock_value", NPBW_INT, 0),
+        10: ("swap_type", NPBW_INT, 0),
+        11: ("proof_address", NPBW_BYTES, NPBF_STR),
+        12: ("proof_signature", NPBW_BYTES, NPBF_STR),
+        13: ("pkhash_seller", NPBW_BYTES, 0),
+        14: ("secret_hash", NPBW_BYTES, 0),
+        15: ("fee_rate_from", NPBW_INT, 0),
+        16: ("fee_rate_to", NPBW_INT, 0),
+        17: ("amount_negotiable", NPBW_INT, NPBF_BOOL),
+        18: ("rate_negotiable", NPBW_INT, NPBF_BOOL),
+        19: ("proof_utxos", NPBW_BYTES, 0),
         20: ("auto_accept_type", 0, 0),
     }
 
 
 class BidMessage(NonProtobufClass):
     _map = {
-        1: ("protocol_version", 0, 0),
-        2: ("offer_msg_id", 2, 0),
-        3: ("time_valid", 0, 0),
-        4: ("amount", 0, 0),
-        5: ("amount_to", 0, 0),
-        6: ("pkhash_buyer", 2, 0),
-        7: ("proof_address", 2, 1),
-        8: ("proof_signature", 2, 1),
-        9: ("proof_utxos", 2, 0),
-        10: ("pkhash_buyer_to", 2, 0),
+        1: ("protocol_version", NPBW_INT, 0),
+        2: ("offer_msg_id", NPBW_BYTES, 0),
+        3: ("time_valid", NPBW_INT, 0),
+        4: ("amount", NPBW_INT, 0),
+        5: ("amount_to", NPBW_INT, 0),
+        6: ("pkhash_buyer", NPBW_BYTES, 0),
+        7: ("proof_address", NPBW_BYTES, NPBF_STR),
+        8: ("proof_signature", NPBW_BYTES, NPBF_STR),
+        9: ("proof_utxos", NPBW_BYTES, 0),
+        10: ("pkhash_buyer_to", NPBW_BYTES, 0),
     }
 
 
 class BidAcceptMessage(NonProtobufClass):
     # Step 3, seller -> buyer
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("initiate_txid", 2, 0),
-        3: ("contract_script", 2, 0),
-        4: ("pkhash_seller", 2, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("initiate_txid", NPBW_BYTES, 0),
+        3: ("contract_script", NPBW_BYTES, 0),
+        4: ("pkhash_seller", NPBW_BYTES, 0),
     }
 
 
 class OfferRevokeMessage(NonProtobufClass):
     _map = {
-        1: ("offer_msg_id", 2, 0),
-        2: ("signature", 2, 0),
+        1: ("offer_msg_id", NPBW_BYTES, 0),
+        2: ("signature", NPBW_BYTES, 0),
     }
 
 
 class BidRejectMessage(NonProtobufClass):
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("reject_code", 0, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("reject_code", NPBW_INT, 0),
     }
 
 
 class XmrBidMessage(NonProtobufClass):
     # MSG1L, F -> L
     _map = {
-        1: ("protocol_version", 0, 0),
-        2: ("offer_msg_id", 2, 0),
-        3: ("time_valid", 0, 0),
-        4: ("amount", 0, 0),
-        5: ("amount_to", 0, 0),
-        6: ("pkaf", 2, 0),
-        7: ("kbvf", 2, 0),
-        8: ("kbsf_dleag", 2, 0),
-        9: ("dest_af", 2, 0),
+        1: ("protocol_version", NPBW_INT, 0),
+        2: ("offer_msg_id", NPBW_BYTES, 0),
+        3: ("time_valid", NPBW_INT, 0),
+        4: ("amount", NPBW_INT, 0),
+        5: ("amount_to", NPBW_INT, 0),
+        6: ("pkaf", NPBW_BYTES, 0),
+        7: ("kbvf", NPBW_BYTES, 0),
+        8: ("kbsf_dleag", NPBW_BYTES, 0),
+        9: ("dest_af", NPBW_BYTES, 0),
     }
 
 
 class XmrSplitMessage(NonProtobufClass):
     _map = {
-        1: ("msg_id", 2, 0),
-        2: ("msg_type", 0, 0),
-        3: ("sequence", 0, 0),
-        4: ("dleag", 2, 0),
+        1: ("msg_id", NPBW_BYTES, 0),
+        2: ("msg_type", NPBW_INT, 0),
+        3: ("sequence", NPBW_INT, 0),
+        4: ("dleag", NPBW_BYTES, 0),
     }
 
 
 class XmrBidAcceptMessage(NonProtobufClass):
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("pkal", 2, 0),
-        3: ("kbvl", 2, 0),
-        4: ("kbsl_dleag", 2, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("pkal", NPBW_BYTES, 0),
+        3: ("kbvl", NPBW_BYTES, 0),
+        4: ("kbsl_dleag", NPBW_BYTES, 0),
         # MSG2F
-        5: ("a_lock_tx", 2, 0),
-        6: ("a_lock_tx_script", 2, 0),
-        7: ("a_lock_refund_tx", 2, 0),
-        8: ("a_lock_refund_tx_script", 2, 0),
-        9: ("a_lock_refund_spend_tx", 2, 0),
-        10: ("al_lock_refund_tx_sig", 2, 0),
+        5: ("a_lock_tx", NPBW_BYTES, 0),
+        6: ("a_lock_tx_script", NPBW_BYTES, 0),
+        7: ("a_lock_refund_tx", NPBW_BYTES, 0),
+        8: ("a_lock_refund_tx_script", NPBW_BYTES, 0),
+        9: ("a_lock_refund_spend_tx", NPBW_BYTES, 0),
+        10: ("al_lock_refund_tx_sig", NPBW_BYTES, 0),
     }
 
 
 class XmrBidLockTxSigsMessage(NonProtobufClass):
     # MSG3L
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("af_lock_refund_spend_tx_esig", 2, 0),
-        3: ("af_lock_refund_tx_sig", 2, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("af_lock_refund_spend_tx_esig", NPBW_BYTES, 0),
+        3: ("af_lock_refund_tx_sig", NPBW_BYTES, 0),
     }
 
 
 class XmrBidLockSpendTxMessage(NonProtobufClass):
     # MSG4F
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("a_lock_spend_tx", 2, 0),
-        3: ("kal_sig", 2, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("a_lock_spend_tx", NPBW_BYTES, 0),
+        3: ("kal_sig", NPBW_BYTES, 0),
     }
 
 
 class XmrBidLockReleaseMessage(NonProtobufClass):
     # MSG5F
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("al_lock_spend_tx_esig", 2, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("al_lock_spend_tx_esig", NPBW_BYTES, 0),
     }
 
 
 class ADSBidIntentMessage(NonProtobufClass):
     # L -> F Sent from bidder, construct a reverse bid
     _map = {
-        1: ("protocol_version", 0, 0),
-        2: ("offer_msg_id", 2, 0),
-        3: ("time_valid", 0, 0),
-        4: ("amount_from", 0, 0),
-        5: ("amount_to", 0, 0),
+        1: ("protocol_version", NPBW_INT, 0),
+        2: ("offer_msg_id", NPBW_BYTES, 0),
+        3: ("time_valid", NPBW_INT, 0),
+        4: ("amount_from", NPBW_INT, 0),
+        5: ("amount_to", NPBW_INT, 0),
     }
 
 
 class ADSBidIntentAcceptMessage(NonProtobufClass):
     # F -> L Sent from offerer, construct a reverse bid
     _map = {
-        1: ("bid_msg_id", 2, 0),
-        2: ("pkaf", 2, 0),
-        3: ("kbvf", 2, 0),
-        4: ("kbsf_dleag", 2, 0),
-        5: ("dest_af", 2, 0),
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("pkaf", NPBW_BYTES, 0),
+        3: ("kbvf", NPBW_BYTES, 0),
+        4: ("kbsf_dleag", NPBW_BYTES, 0),
+        5: ("dest_af", NPBW_BYTES, 0),
+    }
+
+
+class ConnectReqMessage(NonProtobufClass):
+    _map = {
+        1: ("network_type", NPBW_INT, 0),
+        2: ("network_data", NPBW_BYTES, 0),
+        3: ("request_type", NPBW_INT, 0),
+        4: ("request_data", NPBW_BYTES, 0),
     }

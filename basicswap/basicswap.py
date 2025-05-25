@@ -27,13 +27,50 @@ import zmq
 
 from typing import Optional
 
-from .interface.base import Curves
-from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
-
 from . import __version__
+from .base import BaseApp
+from .basicswap_util import (
+    ActionTypes,
+    AddressTypes,
+    AutomationOverrideOptions,
+    BidStates,
+    canAcceptBidState,
+    ConnectionRequestTypes,
+    DebugTypes,
+    describeEventEntry,
+    EventLogTypes,
+    fiatTicker,
+    get_api_key_setting,
+    getLastBidState,
+    getVoutByAddress,
+    getVoutByScriptPubKey,
+    inactive_states,
+    isActiveBidState,
+    KeyTypes,
+    MessageNetworks,
+    MessageTypes,
+    NotificationTypes as NT,
+    OfferStates,
+    strBidState,
+    SwapTypes,
+    TxLockTypes,
+    TxStates,
+    TxTypes,
+    VisibilityOverrideOptions,
+    XmrSplitMsgTypes,
+)
+from .chainparams import (
+    Coins,
+    chainparams,
+    Fiat,
+    ticker_map,
+)
+from .db_upgrades import upgradeDatabase, upgradeDatabaseData
+from .db_util import remove_expired_data
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
 from .ui.util import getCoinName
+from .ui.app import UIApp
 from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
@@ -56,28 +93,22 @@ from .util.address import (
     decodeAddress,
     pubkeyToAddress,
 )
-from .util.crypto import (
-    sha256,
-)
-from basicswap.util.network import is_private_ip_address
-from .chainparams import (
-    Coins,
-    chainparams,
-    Fiat,
-    ticker_map,
-)
+from .util.crypto import sha256
+from .util.network import is_private_ip_address
+from .util.smsg import smsgGetID
+from .interface.base import Curves
+from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from .explorers import (
     default_chart_api_key,
     default_coingecko_api_key,
 )
-from .script import (
-    OpCodes,
-)
+from .script import OpCodes
 from .messages_npb import (
     ADSBidIntentAcceptMessage,
     ADSBidIntentMessage,
     BidAcceptMessage,
     BidMessage,
+    ConnectReqMessage,
     OfferMessage,
     OfferRevokeMessage,
     XmrBidAcceptMessage,
@@ -95,6 +126,8 @@ from .db import (
     Concepts,
     create_db,
     CURRENT_DB_VERSION,
+    DirectMessageRoute,
+    DirectMessageRouteLink,
     EventLog,
     getOrderByStr,
     KnownIdentity,
@@ -112,17 +145,17 @@ from .db import (
     XmrSplitData,
     XmrSwap,
 )
-from .db_upgrades import upgradeDatabase, upgradeDatabaseData
-from .base import BaseApp
 from .explorers import (
     ExplorerInsight,
     ExplorerBitAps,
     ExplorerChainz,
 )
 from .network.simplex import (
+    encryptMsg,
     initialiseSimplexNetwork,
-    sendSimplexMsg,
     readSimplexMsgs,
+    sendSimplexMsg,
+    closeSimplexChat,
 )
 from .network.util import (
     getMsgPubkey,
@@ -131,37 +164,7 @@ import basicswap.config as cfg
 import basicswap.network.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 import basicswap.protocols.xmr_swap_1 as xmr_swap_1
-from .basicswap_util import (
-    ActionTypes,
-    AddressTypes,
-    AutomationOverrideOptions,
-    BidStates,
-    DebugTypes,
-    EventLogTypes,
-    fiatTicker,
-    get_api_key_setting,
-    KeyTypes,
-    MessageTypes,
-    NotificationTypes as NT,
-    OfferStates,
-    SwapTypes,
-    TxLockTypes,
-    TxStates,
-    TxTypes,
-    VisibilityOverrideOptions,
-    XmrSplitMsgTypes,
-    canAcceptBidState,
-    describeEventEntry,
-    getLastBidState,
-    getVoutByAddress,
-    getVoutByScriptPubKey,
-    inactive_states,
-    isActiveBidState,
-    strBidState,
-)
-from basicswap.db_util import (
-    remove_expired_data,
-)
+
 
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
@@ -277,7 +280,7 @@ class WatchedTransaction:
         self.swap_type = swap_type
 
 
-class BasicSwap(BaseApp):
+class BasicSwap(BaseApp, UIApp):
     ws_server = None
     _read_zmq_queue: bool = True
     protocolInterfaces = {
@@ -358,6 +361,11 @@ class BasicSwap(BaseApp):
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
+        self._expire_message_routes_after = self._expire_db_records_after = (
+            self.get_int_setting(
+                "expire_message_routes_after", 48 * 3600, 10 * 60, 31 * 86400
+            )
+        )  # Seconds
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
         )  # In MB 0 to disable truncation
@@ -369,6 +377,9 @@ class BasicSwap(BaseApp):
         self._is_encrypted = None
         self._is_locked = None
 
+        self.num_group_simplex_messages_received = 0
+        self.num_direct_simplex_messages_received = 0
+
         # Keep sensitive info out of the log file (WIP)
         self.log.safe_logs = self.settings.get("safe_logs", False)
         if self.log.safe_logs and self.debug:
@@ -378,7 +389,7 @@ class BasicSwap(BaseApp):
             self.log.warning("Safe log enabled.")
             if "safe_logs_prefix" in self.settings:
                 self.log.safe_logs_prefix = self.settings["safe_logs_prefix"].encode(
-                    encoding="utf-8"
+                    encoding="UTF-8"
                 )
             else:
                 self.log.warning('Using random "safe_logs_prefix".')
@@ -434,8 +445,9 @@ class BasicSwap(BaseApp):
 
         self.swaps_in_progress = dict()
 
-        self.dleag_split_size_init = 16000
-        self.dleag_split_size = 17000
+        self._dleag_split_size_init = 16000
+        self._dleag_split_size = 17000
+        self._use_direct_message_routes = False
 
         self.SMSG_SECONDS_IN_HOUR = (
             60 * 60
@@ -992,7 +1004,7 @@ class BasicSwap(BaseApp):
                         pass
                     else:
                         with open(pidfilepath, "rb") as fp:
-                            datadir_pid = int(fp.read().decode("utf-8"))
+                            datadir_pid = int(fp.read().decode("UTF-8"))
                         assert datadir_pid == cc["pid"], "Mismatched pid"
                     assert os.path.exists(authcookiepath)
                     break
@@ -1006,7 +1018,7 @@ class BasicSwap(BaseApp):
                 ):  # Litecoin on windows doesn't write a pid file
                     assert datadir_pid == cc["pid"], "Mismatched pid"
                 with open(authcookiepath, "rb") as fp:
-                    cc["rpcauth"] = escape_rpcauth(fp.read().decode("utf-8"))
+                    cc["rpcauth"] = escape_rpcauth(fp.read().decode("UTF-8"))
             except Exception as e:
                 self.log.error(
                     "Unable to read authcookie for %s, %s, datadir pid %d, daemon pid %s. Error: %s",
@@ -1033,6 +1045,10 @@ class BasicSwap(BaseApp):
         self.log.info(f"Python version: {platform.python_version()}")
         self.log.info(f"SQLite version: {sqlite3.sqlite_version}")
         self.log.debug(f"Timezone offset: {time.timezone} ({time.tzname[0]})")
+        gil_status: bool = True
+        if sys.version_info >= (3, 13):
+            gil_status = sys._is_gil_enabled()
+        self.log.debug(f"GIL enabled: {gil_status}")
 
         MIN_SQLITE_VERSION = (3, 35, 0)  # Upsert
         if sqlite3.sqlite_version_info < MIN_SQLITE_VERSION:
@@ -1543,6 +1559,25 @@ class BasicSwap(BaseApp):
             if cursor is None:
                 self.closeDB(use_cursor)
 
+    def getMessageRoute(
+        self, network_id: int, address_from: str, address_to: str, cursor=None
+    ):
+        try:
+            use_cursor = self.openDB(cursor)
+            route = self.queryOne(
+                DirectMessageRoute,
+                use_cursor,
+                {
+                    "network_id": network_id,
+                    "smsg_addr_local": address_from,
+                    "smsg_addr_remote": address_to,
+                },
+            )
+            return route
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor)
+
     def activateBid(self, cursor, bid) -> None:
         if bid.bid_id in self.swaps_in_progress:
             self.log.debug(f"Bid {self.log.id(bid.bid_id)} is already in progress")
@@ -1759,10 +1794,87 @@ class BasicSwap(BaseApp):
         bid_valid = (bid.expire_at - now) + 10 * 60  # Add 10 minute buffer
         return max(smsg_min_valid, min(smsg_max_valid, bid_valid))
 
+    def getActiveNetwork(self, network_id: int):
+        # TODO: Add more network types
+        for network in self.active_networks:
+            if network["type"] == "simplex":
+                return network
+        raise RuntimeError("Network not found.")
+
+    def getActiveNetworkInterface(self, network_id: int):
+        network = self.getActiveNetwork(network_id)
+        return network["ws_thread"]
+
     def sendMessage(
-        self, addr_from: str, addr_to: str, payload_hex: bytes, msg_valid: int, cursor
+        self,
+        addr_from: str,
+        addr_to: str,
+        payload_hex: bytes,
+        msg_valid: int,
+        cursor,
+        linked_type=None,
+        linked_id=None,
+        timestamp=None,
+        deterministic=False,
     ) -> bytes:
         message_id: bytes = None
+
+        message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
+        if message_route:
+            raise RuntimeError("Trying to send through an unestablished direct route.")
+
+        message_route = self.getMessageRoute(2, addr_from, addr_to, cursor=cursor)
+        if message_route:
+            network = self.getActiveNetwork(2)
+            net_i = network["ws_thread"]
+
+            remote_name = None
+            route_data = json.loads(message_route.route_data.decode("UTF-8"))
+            if "localDisplayName" in route_data:
+                remote_name = route_data["localDisplayName"]
+            else:
+                pccConnId = route_data["pccConnId"]
+                self.log.debug(f"Finding name for Simplex chat, ID: {pccConnId}")
+                cmd_id = net_i.send_command("/chats")
+                response = net_i.wait_for_command_response(cmd_id)
+                for chat in response["resp"]["chats"]:
+                    if (
+                        "chatInfo" not in chat
+                        or "type" not in chat["chatInfo"]
+                        or chat["chatInfo"]["type"] != "direct"
+                    ):
+                        continue
+                    try:
+                        if (
+                            chat["chatInfo"]["contact"]["activeConn"]["connId"]
+                            == pccConnId
+                        ):
+                            remote_name = chat["chatInfo"]["contact"][
+                                "localDisplayName"
+                            ]
+                            break
+                    except Exception as e:
+                        self.log.debug(f"Error parsing chat: {e}")
+
+            if remote_name is None:
+                raise RuntimeError(
+                    f"Unable to find remote name for simplex direct chat, pccConnId: {pccConnId}"
+                )
+
+            message_id = sendSimplexMsg(
+                self,
+                network,
+                addr_from,
+                addr_to,
+                bytes.fromhex(payload_hex),
+                msg_valid,
+                cursor,
+                timestamp,
+                deterministic,
+                to_user_name=remote_name,
+            )
+            return message_id
+
         # First network in list will set message_id
         for network in self.active_networks:
             net_message_id = None
@@ -1779,6 +1891,8 @@ class BasicSwap(BaseApp):
                     bytes.fromhex(payload_hex),
                     msg_valid,
                     cursor,
+                    timestamp,
+                    deterministic,
                 )
             else:
                 raise ValueError("Unknown network: {}".format(network["type"]))
@@ -2000,7 +2114,7 @@ class BasicSwap(BaseApp):
             )
             query_data: dict = {}
 
-            address = filters.get("address", None)
+            address: str = filters.get("address", None)
             if address is not None:
                 query_str += " AND address = :address "
                 query_data["address"] = address
@@ -2215,7 +2329,7 @@ class BasicSwap(BaseApp):
         try:
             cursor = self.openDB()
             self.checkCoinsReady(coin_from_t, coin_to_t)
-            offer_addr = self.prepareSMSGAddress(
+            offer_addr: str = self.prepareSMSGAddress(
                 addr_send_from, AddressTypes.OFFER, cursor
             )
 
@@ -2648,7 +2762,7 @@ class BasicSwap(BaseApp):
                 self.callcoinrpc(Coins.PART, "extkey", ["info", evkey, path])[
                     "key_info"
                 ]["result"],
-                "utf-8",
+                "UTF-8",
             )
         )
 
@@ -2830,7 +2944,7 @@ class BasicSwap(BaseApp):
             _, is_locked = self.getLockedState()
             if is_locked is False:
                 self.log.warning(
-                    f"Setting seed id for coin {ci.coin_name()} from master key."
+                    f"Setting seed ID for coin {ci.coin_name()} from master key."
                 )
                 root_key = self.getWalletKey(c, 1)
                 self.storeSeedIDForCoin(root_key, c)
@@ -3254,68 +3368,93 @@ class BasicSwap(BaseApp):
             cursor = self.openDB()
             self.checkCoinsReady(coin_from, coin_to)
 
-            msg_buf = BidMessage()
-            msg_buf.protocol_version = PROTOCOL_VERSION_SECRET_HASH
-            msg_buf.offer_msg_id = offer_id
-            msg_buf.time_valid = valid_for_seconds
-            msg_buf.amount = amount  # amount of coin_from
-            msg_buf.amount_to = amount_to
-
             now: int = self.getTime()
+            encoded_proof_utxos = None
             if offer.swap_type == SwapTypes.SELLER_FIRST:
                 proof_addr, proof_sig, proof_utxos = self.getProofOfFunds(
                     coin_to, amount_to, offer_id
                 )
-                msg_buf.proof_address = proof_addr
-                msg_buf.proof_signature = proof_sig
-
                 if len(proof_utxos) > 0:
-                    msg_buf.proof_utxos = ci_to.encodeProofUtxos(proof_utxos)
-
-                contract_count = self.getNewContractId(cursor)
-                contract_pubkey = self.getContractPubkey(
-                    dt.datetime.fromtimestamp(now).date(), contract_count
-                )
-                msg_buf.pkhash_buyer = ci_from.pkh(contract_pubkey)
-                pkhash_buyer_to = ci_to.pkh(contract_pubkey)
-                if pkhash_buyer_to != msg_buf.pkhash_buyer:
-                    # Different pubkey hash
-                    msg_buf.pkhash_buyer_to = pkhash_buyer_to
+                    encoded_proof_utxos = ci_to.encodeProofUtxos(proof_utxos)
             else:
                 raise ValueError("TODO")
 
-            bid_bytes = msg_buf.to_bytes()
-            payload_hex = str.format("{:02x}", MessageTypes.BID) + bid_bytes.hex()
+            bid_addr: str = self.prepareSMSGAddress(
+                addr_send_from, AddressTypes.BID, cursor
+            )
+            request_data = {
+                "offer_id": offer_id.hex(),
+                "amount_from": amount,
+                "amount_to": amount_to,
+            }
+            route_id, route_established = self.prepareMessageRoute(
+                MessageNetworks.SIMPLEX,
+                request_data,
+                bid_addr,
+                offer.addr_from,
+                cursor,
+                valid_for_seconds,
+            )
 
-            bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, cursor)
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-            bid_id = self.sendMessage(
-                bid_addr, offer.addr_from, payload_hex, msg_valid, cursor
+            contract_count = self.getNewContractId(cursor)
+            contract_pubkey = self.getContractPubkey(
+                dt.datetime.fromtimestamp(now).date(), contract_count
             )
 
             bid = Bid(
-                protocol_version=msg_buf.protocol_version,
+                protocol_version=PROTOCOL_VERSION_SECRET_HASH,
                 active_ind=1,
-                bid_id=bid_id,
                 offer_id=offer_id,
-                amount=msg_buf.amount,
-                amount_to=msg_buf.amount_to,
+                amount=amount,  # amount of coin_from
+                amount_to=amount_to,
                 rate=bid_rate,
-                pkhash_buyer=msg_buf.pkhash_buyer,
-                proof_address=msg_buf.proof_address,
-                proof_utxos=msg_buf.proof_utxos,
+                pkhash_buyer=ci_from.pkh(contract_pubkey),
+                proof_address=proof_addr,
+                proof_signature=proof_sig,
+                proof_utxos=encoded_proof_utxos,
                 created_at=now,
                 contract_count=contract_count,
-                expire_at=now + msg_buf.time_valid,
+                expire_at=now + valid_for_seconds,
                 bid_addr=bid_addr,
                 was_sent=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
             )
-            bid.setState(BidStates.BID_SENT)
 
-            if len(msg_buf.pkhash_buyer_to) > 0:
-                bid.pkhash_buyer_to = msg_buf.pkhash_buyer_to
+            pkhash_buyer_to = ci_to.pkh(contract_pubkey)
+            if pkhash_buyer_to != bid.pkhash_buyer:
+                # Different pubkey hash
+                bid.pkhash_buyer_to = pkhash_buyer_to
+
+            if route_id and route_established is False:
+                msg_buf = self.getBidMessage(bid, offer)
+                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+                encrypted_msg = encryptMsg(
+                    self,
+                    bid.bid_addr,
+                    offer.addr_from,
+                    bytes((MessageTypes.BID,)) + msg_buf.to_bytes(),
+                    msg_valid,
+                    cursor,
+                    timestamp=bid.created_at,
+                    deterministic=True,
+                )
+                bid_id = smsgGetID(encrypted_msg)
+                bid.setState(BidStates.CONNECT_REQ_SENT)
+            else:
+                bid_id = self.sendBidMessage(bid, offer, cursor)
+                bid.setState(BidStates.BID_SENT)
+            if route_id:
+                message_route_link = DirectMessageRouteLink(
+                    active_ind=2 if route_established else 1,
+                    direct_message_route_id=route_id,
+                    linked_type=Concepts.BID,
+                    linked_id=bid_id,
+                    created_at=bid.created_at,
+                )
+                self.add(message_route_link, cursor)
+
+            bid.bid_id = bid_id
 
             self.saveBidInSession(bid_id, bid, cursor)
 
@@ -3628,7 +3767,7 @@ class BasicSwap(BaseApp):
 
                 msg_valid: int = self.getAcceptBidMsgValidTime(bid)
                 accept_msg_id = self.sendMessage(
-                    offer.addr_from, bid.bid_addr, payload_hex, msg_valid, cursor
+                    offer.addr_from, bid.bid_addr, payload_hex, msg_valid, use_cursor
                 )
 
                 self.addMessageLink(
@@ -3661,11 +3800,11 @@ class BasicSwap(BaseApp):
         cursor,
     ) -> None:
 
-        sent_bytes = self.dleag_split_size_init
+        sent_bytes = self._dleag_split_size_init
 
         num_sent = 1
         while sent_bytes < len(dleag):
-            size_to_send: int = min(self.dleag_split_size, len(dleag) - sent_bytes)
+            size_to_send: int = min(self._dleag_split_size, len(dleag) - sent_bytes)
             msg_buf = XmrSplitMessage(
                 msg_id=bid_id,
                 msg_type=msg_type,
@@ -3681,6 +3820,216 @@ class BasicSwap(BaseApp):
             )
             num_sent += 1
             sent_bytes += size_to_send
+
+    def getADSBidIntentMessage(self, bid, offer) -> bytes:
+        valid_for_seconds: int = bid.expire_at - bid.created_at
+        msg_buf = ADSBidIntentMessage()
+        msg_buf.protocol_version = bid.protocol_version
+        msg_buf.offer_msg_id = bid.offer_id
+        msg_buf.time_valid = valid_for_seconds
+        msg_buf.amount_from = bid.amount_to
+        msg_buf.amount_to = bid.amount
+
+        return msg_buf
+
+    def sendADSBidIntentMessage(self, bid, offer, cursor) -> bytes:
+        valid_for_seconds: int = bid.expire_at - bid.created_at
+        msg_buf = self.getADSBidIntentMessage(bid, offer)
+        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.ADS_BID_LF) + msg_buf.to_bytes().hex()
+        )
+        return self.sendMessage(
+            bid.bid_addr,
+            offer.addr_from,
+            payload_hex,
+            msg_valid,
+            cursor,
+            timestamp=bid.created_at,
+            deterministic=(False if bid.bid_id is None else True),
+        )
+
+    def getXmrBidMessage(self, bid, xmr_swap, offer) -> XmrBidMessage:
+        valid_for_seconds: int = bid.expire_at - bid.created_at
+        msg_buf = XmrBidMessage()
+        msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
+        msg_buf.offer_msg_id = bid.offer_id
+        msg_buf.time_valid = valid_for_seconds
+        msg_buf.amount = bid.amount
+        msg_buf.amount_to = bid.amount_to
+
+        msg_buf.dest_af = xmr_swap.dest_af
+        msg_buf.pkaf = xmr_swap.pkaf
+        msg_buf.kbvf = xmr_swap.vkbvf
+
+        if len(xmr_swap.kbsf_dleag) > self._dleag_split_size_init:
+            msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[: self._dleag_split_size_init]
+        else:
+            msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
+
+        return msg_buf
+
+    def sendXmrBidMessage(self, bid, xmr_swap, offer, cursor) -> bytes:
+        valid_for_seconds: int = bid.expire_at - bid.created_at
+
+        ci_to = self.ci(offer.coin_to)
+
+        msg_buf = self.getXmrBidMessage(bid, xmr_swap, offer)
+
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.XMR_BID_FL) + msg_buf.to_bytes().hex()
+        )
+        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+
+        bid_msg_id = self.sendMessage(
+            bid.bid_addr,
+            offer.addr_from,
+            payload_hex,
+            msg_valid,
+            cursor,
+            timestamp=bid.created_at,
+            deterministic=(False if bid.bid_id is None else True),
+        )
+        bid_id = bid_msg_id
+        if bid.bid_id and bid_msg_id != bid.bid_id:
+            self.log.warning(
+                f"sendXmrBidMessage: Mismatched bid ids: {bid.bid_id.hex()}, {bid_msg_id.hex()}."
+            )
+
+        bid_msg_ids = {}
+        if ci_to.curve_type() == Curves.ed25519:
+            self.sendXmrSplitMessages(
+                XmrSplitMsgTypes.BID,
+                bid.bid_addr,
+                offer.addr_from,
+                bid_id,
+                xmr_swap.kbsf_dleag,
+                msg_valid,
+                bid_msg_ids,
+                cursor,
+            )
+        for k, msg_id in bid_msg_ids.items():
+            self.addMessageLink(
+                Concepts.BID,
+                bid_id,
+                MessageTypes.BID,
+                msg_id,
+                msg_sequence=k,
+                cursor=cursor,
+            )
+
+        return bid_msg_id
+
+    def getBidMessage(self, bid, offer) -> BidMessage:
+        valid_for_seconds: int = bid.expire_at - bid.created_at
+        msg_buf = BidMessage()
+        msg_buf.protocol_version = bid.protocol_version
+        msg_buf.offer_msg_id = bid.offer_id
+        msg_buf.time_valid = valid_for_seconds
+        msg_buf.amount = bid.amount
+        msg_buf.amount_to = bid.amount_to
+
+        msg_buf.pkhash_buyer = bid.pkhash_buyer
+        if bid.pkhash_buyer_to:
+            msg_buf.pkhash_buyer_to = bid.pkhash_buyer_to
+
+        msg_buf.proof_address = bid.proof_address
+        msg_buf.proof_signature = bid.proof_signature
+
+        if bid.proof_utxos:
+            msg_buf.proof_utxos = bid.proof_utxos
+
+        return msg_buf
+
+    def sendBidMessage(self, bid, offer, cursor) -> bytes:
+        valid_for_seconds: int = bid.expire_at - bid.created_at
+
+        msg_buf = self.getBidMessage(bid, offer)
+
+        payload_hex = str.format("{:02x}", MessageTypes.BID) + msg_buf.to_bytes().hex()
+        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+
+        bid_msg_id = self.sendMessage(
+            bid.bid_addr,
+            offer.addr_from,
+            payload_hex,
+            msg_valid,
+            cursor,
+            timestamp=bid.created_at,
+            deterministic=(False if bid.bid_id is None else True),
+        )
+        if bid.bid_id and bid_msg_id != bid.bid_id:
+            self.log.warning(
+                f"sendBidMessage: Mismatched bid ids: {bid.bid_id.hex()}, {bid_msg_id.hex()}."
+            )
+        return bid_msg_id
+
+    def prepareMessageRoute(
+        self,
+        network_id,
+        req_data,
+        addr_from: str,
+        addr_to: str,
+        cursor,
+        valid_for_seconds,
+    ) -> (int, bool):
+        if self._use_direct_message_routes is False:
+            return None, False
+
+        # Look for active route
+        message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
+        self.log.debug(f"Using active message route: {message_route}")
+        if message_route:
+            return message_route.record_id, True
+
+        # Look for route being established
+        message_route = self.getMessageRoute(2, addr_from, addr_to, cursor=cursor)
+        self.log.debug(f"Waiting for message route: {message_route}")
+        if message_route:
+            return message_route.record_id, False
+
+        net_i = self.getActiveNetworkInterface(2)
+        cmd_id = net_i.send_command("/connect")
+        response = net_i.wait_for_command_response(cmd_id)
+        connReqInvitation = response["resp"]["connReqInvitation"]
+        pccConnId = response["resp"]["connection"]["pccConnId"]
+        req_data["bsx_address"] = addr_from
+        req_data["connection_req"] = connReqInvitation
+
+        msg_buf = ConnectReqMessage()
+        msg_buf.network_type = MessageNetworks.SIMPLEX
+        msg_buf.network_data = b"bsx"
+        msg_buf.request_type = ConnectionRequestTypes.BID
+        msg_buf.request_data = json.dumps(req_data).encode("UTF-8")
+
+        bid_bytes = msg_buf.to_bytes()
+        payload_hex = str.format("{:02x}", MessageTypes.CONNECT_REQ) + bid_bytes.hex()
+
+        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+        connect_req_msgid = self.sendMessage(
+            addr_from, addr_to, payload_hex, msg_valid, cursor
+        )
+
+        now: int = self.getTime()
+        message_route = DirectMessageRoute(
+            active_ind=2,
+            network_id=2,
+            linked_type=Concepts.OFFER,
+            smsg_addr_local=addr_from,
+            smsg_addr_remote=addr_to,
+            route_data=json.dumps(
+                {
+                    "connection_req": connReqInvitation,
+                    "connect_req_msgid": connect_req_msgid.hex(),
+                    "pccConnId": pccConnId,
+                }
+            ).encode("UTF-8"),
+            created_at=now,
+        )
+        message_route_id = self.add(message_route, cursor)
+
+        self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
+        return message_route_id, False
 
     def postXmrBid(
         self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}
@@ -3732,51 +4081,76 @@ class BasicSwap(BaseApp):
                 ci_to, offer.swap_type, int(amount_to), estimated_fee, for_offer=False
             )
 
+            bid_addr: str = self.prepareSMSGAddress(
+                addr_send_from, AddressTypes.BID, cursor
+            )
+
+            # return id of route waiting to be established
+            request_data = {
+                "offer_id": offer_id.hex(),
+                "amount_from": amount,
+                "amount_to": amount_to,
+            }
+            route_id, route_established = self.prepareMessageRoute(
+                MessageNetworks.SIMPLEX,
+                request_data,
+                bid_addr,
+                offer.addr_from,
+                cursor,
+                valid_for_seconds,
+            )
+
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
 
-                msg_buf = ADSBidIntentMessage()
-                msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
-                msg_buf.offer_msg_id = offer_id
-                msg_buf.time_valid = valid_for_seconds
-                msg_buf.amount_from = amount
-                msg_buf.amount_to = amount_to
-
-                bid_bytes = msg_buf.to_bytes()
-                payload_hex = (
-                    str.format("{:02x}", MessageTypes.ADS_BID_LF) + bid_bytes.hex()
-                )
-
                 xmr_swap = XmrSwap()
                 xmr_swap.contract_count = self.getNewContractId(cursor)
 
-                bid_addr = self.prepareSMSGAddress(
-                    addr_send_from, AddressTypes.BID, cursor
-                )
-
-                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-                xmr_swap.bid_id = self.sendMessage(
-                    bid_addr, offer.addr_from, payload_hex, msg_valid, cursor
-                )
-
                 bid = Bid(
-                    protocol_version=msg_buf.protocol_version,
+                    protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
                     active_ind=1,
-                    bid_id=xmr_swap.bid_id,
                     offer_id=offer_id,
-                    amount=msg_buf.amount_to,
-                    amount_to=msg_buf.amount_from,
+                    amount=amount_to,
+                    amount_to=amount,
                     rate=reversed_rate,
                     created_at=bid_created_at,
                     contract_count=xmr_swap.contract_count,
-                    expire_at=bid_created_at + msg_buf.time_valid,
+                    expire_at=bid_created_at + valid_for_seconds,
                     bid_addr=bid_addr,
                     was_sent=True,
                     was_received=False,
                 )
 
-                bid.setState(BidStates.BID_REQUEST_SENT)
+                if route_id and route_established is False:
+                    msg_buf = self.getADSBidIntentMessage(bid, offer)
+                    msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+                    encrypted_msg = encryptMsg(
+                        self,
+                        bid.bid_addr,
+                        offer.addr_from,
+                        bytes((MessageTypes.ADS_BID_LF,)) + msg_buf.to_bytes(),
+                        msg_valid,
+                        cursor,
+                        timestamp=bid.created_at,
+                        deterministic=True,
+                    )
+                    bid_id = smsgGetID(encrypted_msg)
+                    bid.setState(BidStates.CONNECT_REQ_SENT)
+                else:
+                    bid_id = self.sendADSBidIntentMessage(bid, offer, cursor)
+                    bid.setState(BidStates.BID_REQUEST_SENT)
+                if route_id:
+                    message_route_link = DirectMessageRouteLink(
+                        active_ind=2 if route_established else 1,
+                        direct_message_route_id=route_id,
+                        linked_type=Concepts.BID,
+                        linked_id=bid_id,
+                        created_at=bid_created_at,
+                    )
+                    self.add(message_route_link, cursor)
+                bid.bid_id = bid_id
+                xmr_swap.bid_id = bid.bid_id
 
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
                 self.commitDB()
@@ -3784,25 +4158,17 @@ class BasicSwap(BaseApp):
                 self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
                 return xmr_swap.bid_id
 
-            msg_buf = XmrBidMessage()
-            msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
-            msg_buf.offer_msg_id = offer_id
-            msg_buf.time_valid = valid_for_seconds
-            msg_buf.amount = int(amount)  # Amount of coin_from
-            msg_buf.amount_to = amount_to
+            xmr_swap = XmrSwap()
+            xmr_swap.contract_count = self.getNewContractId(cursor)
 
             address_out = self.getReceiveAddressFromPool(
                 coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK, cursor=cursor
             )
             if coin_from in (Coins.PART_BLIND,):
                 addrinfo = ci_from.rpc("getaddressinfo", [address_out])
-                msg_buf.dest_af = bytes.fromhex(addrinfo["pubkey"])
+                xmr_swap.dest_af = bytes.fromhex(addrinfo["pubkey"])
             else:
-                msg_buf.dest_af = ci_from.decodeAddress(address_out)
-
-            xmr_swap = XmrSwap()
-            xmr_swap.contract_count = self.getNewContractId(cursor)
-            xmr_swap.dest_af = msg_buf.dest_af
+                xmr_swap.dest_af = ci_from.decodeAddress(address_out)
 
             for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbvf = self.getPathKey(
@@ -3839,7 +4205,6 @@ class BasicSwap(BaseApp):
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
                 xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
-                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[: self.dleag_split_size_init]
             elif ci_to.curve_type() == Curves.secp256k1:
                 for i in range(10):
                     xmr_swap.kbsf_dleag = ci_to.signRecoverable(
@@ -3853,53 +4218,53 @@ class BasicSwap(BaseApp):
                     self.log.debug("kbsl recovered pubkey mismatch, retrying.")
                 assert pk_recovered == xmr_swap.pkbsf
                 xmr_swap.pkasf = xmr_swap.pkbsf
-                msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
             else:
                 raise ValueError("Unknown curve")
             assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
 
-            msg_buf.pkaf = xmr_swap.pkaf
-            msg_buf.kbvf = kbvf
-
-            bid_bytes = msg_buf.to_bytes()
-            payload_hex = (
-                str.format("{:02x}", MessageTypes.XMR_BID_FL) + bid_bytes.hex()
-            )
-
-            bid_addr = self.prepareSMSGAddress(addr_send_from, AddressTypes.BID, cursor)
-
-            msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-            xmr_swap.bid_id = self.sendMessage(
-                bid_addr, offer.addr_from, payload_hex, msg_valid, cursor
-            )
-
-            bid_msg_ids = {}
-            if ci_to.curve_type() == Curves.ed25519:
-                self.sendXmrSplitMessages(
-                    XmrSplitMsgTypes.BID,
-                    bid_addr,
-                    offer.addr_from,
-                    xmr_swap.bid_id,
-                    xmr_swap.kbsf_dleag,
-                    msg_valid,
-                    bid_msg_ids,
-                    cursor,
-                )
-
             bid = Bid(
-                protocol_version=msg_buf.protocol_version,
+                protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
                 active_ind=1,
-                bid_id=xmr_swap.bid_id,
                 offer_id=offer_id,
-                amount=msg_buf.amount,
-                amount_to=msg_buf.amount_to,
+                amount=amount,
+                amount_to=amount_to,
                 rate=bid_rate,
                 created_at=bid_created_at,
                 contract_count=xmr_swap.contract_count,
-                expire_at=bid_created_at + msg_buf.time_valid,
+                expire_at=bid_created_at + valid_for_seconds,
                 bid_addr=bid_addr,
                 was_sent=True,
             )
+
+            if route_id and route_established is False:
+                msg_buf = self.getXmrBidMessage(bid, xmr_swap, offer)
+                msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+                encrypted_msg = encryptMsg(
+                    self,
+                    bid.bid_addr,
+                    offer.addr_from,
+                    bytes((MessageTypes.XMR_BID_FL,)) + msg_buf.to_bytes(),
+                    msg_valid,
+                    cursor,
+                    timestamp=bid.created_at,
+                    deterministic=True,
+                )
+                bid_id = smsgGetID(encrypted_msg)
+                bid.setState(BidStates.CONNECT_REQ_SENT)
+            else:
+                bid_id = self.sendXmrBidMessage(bid, xmr_swap, offer, cursor)
+                bid.setState(BidStates.BID_SENT)
+            if route_id:
+                message_route_link = DirectMessageRouteLink(
+                    active_ind=2 if route_established else 1,
+                    direct_message_route_id=route_id,
+                    linked_type=Concepts.BID,
+                    linked_id=bid_id,
+                    created_at=bid_created_at,
+                )
+                self.add(message_route_link, cursor)
+            bid.bid_id = bid_id
+            xmr_swap.bid_id = bid.bid_id
 
             bid.chain_a_height_start = ci_from.getChainHeight()
             bid.chain_b_height_start = ci_to.getChainHeight()
@@ -3911,19 +4276,7 @@ class BasicSwap(BaseApp):
                     f"Adaptor-sig swap restore height clamped to {wallet_restore_height}"
                 )
 
-            bid.setState(BidStates.BID_SENT)
-
-            self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
-            for k, msg_id in bid_msg_ids.items():
-                self.addMessageLink(
-                    Concepts.BID,
-                    xmr_swap.bid_id,
-                    MessageTypes.BID,
-                    msg_id,
-                    msg_sequence=k,
-                    cursor=cursor,
-                )
-
+            self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
             self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
             return xmr_swap.bid_id
         finally:
@@ -4162,7 +4515,7 @@ class BasicSwap(BaseApp):
 
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
-                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[: self.dleag_split_size_init]
+                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[: self._dleag_split_size_init]
             elif ci_to.curve_type() == Curves.secp256k1:
                 for i in range(10):
                     xmr_swap.kbsl_dleag = ci_to.signRecoverable(
@@ -4332,8 +4685,8 @@ class BasicSwap(BaseApp):
             msg_buf.kbvf = kbvf
             msg_buf.kbsf_dleag = (
                 xmr_swap.kbsf_dleag
-                if len(xmr_swap.kbsf_dleag) < self.dleag_split_size_init
-                else xmr_swap.kbsf_dleag[: self.dleag_split_size_init]
+                if len(xmr_swap.kbsf_dleag) < self._dleag_split_size_init
+                else xmr_swap.kbsf_dleag[: self._dleag_split_size_init]
             )
 
             bid_bytes = msg_buf.to_bytes()
@@ -6776,9 +7129,80 @@ class BasicSwap(BaseApp):
             last_height_checked += 1
             self.updateCheckedBlock(ci, c, block)
 
+    def expireMessageRoutes(self) -> None:
+        if self._is_locked is True:
+            self.log.debug("Not expiring message routes while system is locked")
+            return
+
+        num_removed: int = 0
+        now: int = self.getTime()
+        cursor = self.openDB()
+        try:
+            query_str = (
+                "SELECT record_id, network_id, created_at, active_ind, route_data FROM direct_message_routes "
+                + "WHERE 1 = 1 "
+            )
+            rows = cursor.execute(query_str).fetchall()
+            for row in rows:
+                record_id, network_id, created_at, active_ind, route_data = row
+
+                route_data = json.loads(route_data.decode("UTF-8"))
+
+                if now - created_at < self._expire_message_routes_after:
+                    continue
+
+                # unestablished routes
+                if active_ind == 2:
+                    pass
+                else:
+                    query_str = (
+                        "SELECT MAX(created_at) FROM direct_message_route_links "
+                        + "WHERE direct_message_route_id = :message_route_id "
+                    )
+                    max_link_created_at = cursor.execute(
+                        query_str, {"message_route_id": record_id}
+                    ).fetchone()[0]
+
+                    if now - max_link_created_at < self._expire_message_routes_after:
+                        continue
+
+                    query_str = (
+                        "SELECT COUNT(*) FROM direct_message_route_links rl "
+                        + "INNER JOIN bids b ON b.bid_id = rl.linked_id "
+                        + "INNER JOIN bidstates s ON s.state_id = b.state "
+                        + "WHERE rl.direct_message_route_id = :message_route_id AND rl.linked_type = :link_type_bid "
+                        + "AND (b.in_progress OR s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))"
+                    )
+                    num_active_bids = cursor.execute(
+                        query_str,
+                        {
+                            "message_route_id": record_id,
+                            "link_type_bid": Concepts.BID,
+                            "now": now,
+                        },
+                    ).fetchone()[0]
+                    if num_active_bids > 0:
+                        self.log.warning(
+                            f"Not expiring message route {record_id} with {num_active_bids} active bids."
+                        )
+                        continue
+
+                self.closeMessageRoute(record_id, network_id, route_data, cursor)
+                num_removed += 1
+        finally:
+            self.closeDB(cursor)
+
+        if num_removed > 0:
+            self.log.info(
+                "Expired {} message route{}.".format(
+                    num_removed,
+                    "s" if num_removed != 1 else "",
+                )
+            )
+
     def expireMessages(self) -> None:
         if self._is_locked is True:
-            self.log.debug("Not expiring messages while system locked")
+            self.log.debug("Not expiring messages while system is locked")
             return
 
         self.mxDB.acquire()
@@ -7288,7 +7712,7 @@ class BasicSwap(BaseApp):
                 )
                 return
 
-            signature_enc = base64.b64encode(msg_data.signature).decode("utf-8")
+            signature_enc = base64.b64encode(msg_data.signature).decode("UTF-8")
 
             passed = self.callcoinrpc(
                 Coins.PART,
@@ -7392,7 +7816,7 @@ class BasicSwap(BaseApp):
                 use_cursor,
                 {"active_ind": 1, "record_id": link.strategy_id},
             )
-            opts = json.loads(strategy.data.decode("utf-8"))
+            opts = json.loads(strategy.data.decode("UTF-8"))
 
             bid_amount: int = bid.amount
             bid_rate: int = bid.rate
@@ -7504,6 +7928,35 @@ class BasicSwap(BaseApp):
             if cursor is None:
                 self.closeDB(use_cursor)
 
+    def addRecvBidNetworkLink(self, msg, bid_id):
+        if "chat_type" not in msg or msg["chat_type"] != "direct":
+            return
+        conn_id = msg["conn_id"]
+        query_str = (
+            "SELECT record_id, network_id, route_data FROM direct_message_routes"
+        )
+        try:
+            cursor = self.openDB()
+
+            rows = cursor.execute(query_str).fetchall()
+
+            for row in rows:
+                record_id, network_id, route_data = row
+                route_data = json.loads(route_data.decode("UTF-8"))
+
+                if conn_id == route_data["pccConnId"]:
+                    message_route_link = DirectMessageRouteLink(
+                        active_ind=2,
+                        direct_message_route_id=record_id,
+                        linked_type=Concepts.BID,
+                        linked_id=bid_id,
+                        created_at=self.getTime(),
+                    )
+                    self.add(message_route_link, cursor)
+                    break
+        finally:
+            self.closeDB(cursor)
+
     def processBid(self, msg) -> None:
         self.log.debug("Processing bid msg {}.".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
@@ -7598,6 +8051,7 @@ class BasicSwap(BaseApp):
             bid.proof_address = bid_data.proof_address
 
         bid.setState(BidStates.BID_RECEIVED)
+        self.addRecvBidNetworkLink(msg, bid_id)
 
         self.saveBid(bid_id, bid)
         self.notify(
@@ -8025,6 +8479,7 @@ class BasicSwap(BaseApp):
             bid.was_received = True
 
         bid.setState(BidStates.BID_RECEIVING)
+        self.addRecvBidNetworkLink(msg, bid_id)
 
         self.log.info(
             f"Receiving adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid_data.offer_msg_id)}."
@@ -8210,7 +8665,7 @@ class BasicSwap(BaseApp):
                 )  # TODO: Split BID_ACCEPTED into received and sent
             ensure(
                 bid.state in allowed_states,
-                "Invalid state for bid {}".format(bid.state),
+                f"Invalid state for bid {bid.state}",
             )
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
@@ -9538,6 +9993,7 @@ class BasicSwap(BaseApp):
             bid.was_received = True
 
         bid.setState(BidStates.BID_RECEIVED)  # BID_REQUEST_RECEIVED
+        self.addRecvBidNetworkLink(msg, bid_id)
 
         self.log.info(
             f"Received reverse adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid_data.offer_msg_id)}."
@@ -9648,6 +10104,200 @@ class BasicSwap(BaseApp):
         finally:
             self.closeDB(cursor)
 
+    def processConnectRequest(self, msg) -> None:
+        self.log.debug(
+            "Processing connection request msg {}.".format(self.log.id(msg["msgid"]))
+        )
+        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_data = ConnectReqMessage(init_all=False)
+        msg_data.from_bytes(msg_bytes)
+
+        req_data = json.loads(msg_data.request_data)
+
+        offer_id = bytes.fromhex(req_data["offer_id"])
+        bidder_addr = req_data["bsx_address"]
+
+        net_i = self.getActiveNetworkInterface(2)
+        try:
+            cursor = self.openDB()
+            offer = self.getOffer(offer_id, cursor)
+            ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
+            ensure(offer.expire_at > self.getTime(), "Offer has expired")
+            ensure(msg["from"] == bidder_addr, "Mismatched from address")
+            ensure(msg["to"] == offer.addr_from, "Mismatched to address")
+
+            self.log.debug(
+                f"Opening direct message route from {offer.addr_from} to {bidder_addr}"
+            )
+            message_route = self.getMessageRoute(
+                2, bidder_addr, offer.addr_from, cursor=cursor
+            )
+            if message_route:
+                raise ValueError("Direct message route already exists")
+
+            connReqInvitation = req_data["connection_req"]
+            cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
+            response = net_i.wait_for_command_response(cmd_id)
+            pccConnId = response["resp"]["connection"]["pccConnId"]
+
+            now: int = self.getTime()
+            message_route = DirectMessageRoute(
+                active_ind=2,
+                network_id=2,
+                linked_type=Concepts.OFFER,
+                smsg_addr_local=offer.addr_from,
+                smsg_addr_remote=bidder_addr,
+                route_data=json.dumps(
+                    {"connection_req": connReqInvitation, "pccConnId": pccConnId}
+                ).encode("UTF-8"),
+                created_at=now,
+            )
+            message_route_id = self.add(message_route, cursor)
+
+            message_route_link = DirectMessageRouteLink(
+                active_ind=1,
+                direct_message_route_id=message_route_id,
+                linked_type=Concepts.OFFER,
+                linked_id=offer_id,
+                created_at=now,
+            )
+            self.add(message_route_link, cursor)
+
+        finally:
+            self.closeDB(cursor)
+
+    def routeEstablishedForBid(self, bid_id: bytes, cursor):
+        self.log.info(f"Route established for bid {self.log.id(bid_id)}")
+
+        bid, offer = self.getBidAndOffer(bid_id, cursor)
+        ensure(bid, "Bid not found")
+        ensure(offer, "Offer not found")
+
+        coin_from = Coins(offer.coin_from)
+        coin_to = Coins(offer.coin_to)
+
+        if offer.swap_type == SwapTypes.XMR_SWAP:
+            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
+
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
+            if reverse_bid:
+                bid_id = self.sendADSBidIntentMessage(bid, offer, cursor)
+                bid.setState(BidStates.BID_REQUEST_SENT)
+                self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
+            else:
+                bid_id = self.sendXmrBidMessage(bid, xmr_swap, offer, cursor)
+                bid.setState(BidStates.BID_SENT)
+                self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
+            self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
+        else:
+            bid_id = self.sendBidMessage(bid, offer, cursor)
+            bid.setState(BidStates.BID_SENT)
+            self.log.info(f"Sent BID {self.log.id(bid_id)}")
+            self.saveBidInSession(bid_id, bid, cursor)
+
+    def processContactConnected(self, event_data) -> None:
+        connId = event_data["resp"]["contact"]["activeConn"]["connId"]
+        localDisplayName = event_data["resp"]["contact"]["localDisplayName"]
+        self.log.debug(f"Processing Contact Connected event, ID: {connId}, contact name: {localDisplayName}.")
+
+        try:
+            cursor = self.openDB()
+
+            query_str = (
+                "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
+                + "WHERE active_ind = 2"
+            )
+            rows = cursor.execute(query_str).fetchall()
+
+            found_direct_message_route = None
+            for row in rows:
+                record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = (
+                    row
+                )
+                route_data = json.loads(route_data.decode("UTF-8"))
+
+                if connId == route_data["pccConnId"]:
+                    self.log.debug(
+                        f"Direct message route established local: {smsg_addr_local}, remote: {smsg_addr_remote}."
+                    )
+                    # route_data["localDisplayName"] = localDisplayName
+
+                    cursor.execute(query_str)
+                    # query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
+                    query = "UPDATE direct_message_routes SET active_ind = 1 WHERE record_id = :record_id "
+                    cursor.execute(query, {"record_id": record_id})
+                    found_direct_message_route = record_id
+                    break
+
+            if found_direct_message_route:
+                query_str = (
+                    "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
+                    + "WHERE active_ind = 1"
+                )
+                rows = cursor.execute(query_str).fetchall()
+                for row in rows:
+                    record_id, linked_type, linked_id = row
+
+                    if linked_type == Concepts.BID:
+                        self.routeEstablishedForBid(linked_id, cursor)
+                        query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
+                        cursor.execute(query, {"record_id": record_id})
+                    elif linked_type == Concepts.OFFER:
+                        pass
+                    else:
+                        self.log.warning(
+                            f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
+                        )
+            else:
+                self.log.warning(
+                    f"Unknown direct message route connected, connId: {connId}"
+                )
+        finally:
+            self.closeDB(cursor)
+
+    def processContactDisconnected(self, event_data) -> None:
+        net_i = self.getActiveNetworkInterface(2)
+        connId = event_data["resp"]["contact"]["activeConn"]["connId"]
+        self.log.info(f"Direct message route disconnected, connId: {connId}")
+        closeSimplexChat(self, net_i, connId)
+
+        query_str = "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes"
+        try:
+            cursor = self.openDB()
+
+            rows = cursor.execute(query_str).fetchall()
+
+            for row in rows:
+                record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = (
+                    row
+                )
+                route_data = json.loads(route_data.decode("UTF-8"))
+
+                if connId == route_data["pccConnId"]:
+                    self.log.debug(f"Removing direct message route: {record_id}.")
+                    cursor.execute(
+                        "DELETE FROM direct_message_routes WHERE record_id = :record_id ",
+                        {"record_id": record_id},
+                    )
+                    break
+        finally:
+            self.closeDB(cursor)
+
+    def closeMessageRoute(self, record_id, network_id, route_data, cursor):
+        net_i = self.getActiveNetworkInterface(2)
+
+        connId = route_data["pccConnId"]
+
+        self.log.info(f"Closing Simplex chat, id: {connId}")
+        closeSimplexChat(self, net_i, connId)
+
+        self.log.debug(f"Removing direct message route: {record_id}.")
+        cursor.execute(
+            "DELETE FROM direct_message_routes WHERE record_id = :record_id ",
+            {"record_id": record_id},
+        )
+        self.commitDB()
+
     def processMsg(self, msg) -> None:
         try:
             if "hex" not in msg:
@@ -9685,6 +10335,8 @@ class BasicSwap(BaseApp):
                 self.processADSBidReversed(msg)
             elif msg_type == MessageTypes.ADS_BID_ACCEPT_FL:
                 self.processADSBidReversedAccept(msg)
+            elif msg_type == MessageTypes.CONNECT_REQ:
+                self.processConnectRequest(msg)
 
         except InactiveCoin as ex:
             self.log.debug(
@@ -9920,6 +10572,7 @@ class BasicSwap(BaseApp):
 
             if now - self._last_checked_expired >= self.check_expired_seconds:
                 self.expireMessages()
+                self.expireMessageRoutes()
                 self.expireDBRecords()
                 self.checkAcceptedBids()
                 self._last_checked_expired = now
@@ -10105,7 +10758,7 @@ class BasicSwap(BaseApp):
                         settings_changed = True
                 else:
                     # Encode value as hex to avoid escaping
-                    new_value = new_value.encode("utf-8").hex()
+                    new_value = new_value.encode("UTF-8").hex()
                     if settings_copy.get("chart_api_key_enc", "") != new_value:
                         settings_copy["chart_api_key_enc"] = new_value
                         if "chart_api_key" in settings_copy:
@@ -10127,7 +10780,7 @@ class BasicSwap(BaseApp):
                         settings_changed = True
                 else:
                     # Encode value as hex to avoid escaping
-                    new_value = new_value.encode("utf-8").hex()
+                    new_value = new_value.encode("UTF-8").hex()
                     if settings_copy.get("coingecko_api_key_enc", "") != new_value:
                         settings_copy["coingecko_api_key_enc"] = new_value
                         if "coingecko_api_key" in settings_copy:
@@ -10963,7 +11616,7 @@ class BasicSwap(BaseApp):
                 AutomationStrategy, cursor, {"record_id": strategy_id}
             )
             if "data" in data:
-                strategy.data = json.dumps(data["data"]).encode("utf-8")
+                strategy.data = json.dumps(data["data"]).encode("UTF-8")
                 self.log.debug("data {}".format(data["data"]))
             if "note" in data:
                 strategy.note = data["note"]
@@ -10981,10 +11634,10 @@ class BasicSwap(BaseApp):
                 strategy_data = (
                     {}
                     if strategy.data is None
-                    else json.loads(strategy.data.decode("utf-8"))
+                    else json.loads(strategy.data.decode("UTF-8"))
                 )
                 strategy_data["max_concurrent_bids"] = new_max_concurrent_bids
-                strategy.data = json.dumps(strategy_data).encode("utf-8")
+                strategy.data = json.dumps(strategy_data).encode("UTF-8")
 
             self.updateDB(strategy, cursor, ["record_id"])
         finally:
@@ -11267,7 +11920,7 @@ class BasicSwap(BaseApp):
     def isOfferRevoked(self, offer_id: bytes, offer_addr_from) -> bool:
         for pair in self._possibly_revoked_offers:
             if offer_id == pair[0]:
-                signature_enc = base64.b64encode(pair[1]).decode("utf-8")
+                signature_enc = base64.b64encode(pair[1]).decode("UTF-8")
                 passed = self.callcoinrpc(
                     Coins.PART,
                     "verifymessage",
