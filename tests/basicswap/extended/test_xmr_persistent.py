@@ -87,6 +87,9 @@ TEST_COINS_LIST = os.getenv("TEST_COINS_LIST", "bitcoin,monero")
 NUM_NODES = int(os.getenv("NUM_NODES", 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
 
+SIMPLEX_SERVER_ADDRESS = os.getenv("SIMPLEX_SERVER_ADDRESS", "")
+SIMPLEX_CLIENT_PATH = os.path.expanduser(os.getenv("SIMPLEX_CLIENT_PATH", ""))
+
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):

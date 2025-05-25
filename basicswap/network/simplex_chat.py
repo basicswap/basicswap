@@ -76,7 +76,6 @@ def startSimplexClient(
         os.makedirs(data_path)
 
     db_path = os.path.join(data_path, "simplex_client_data")
-
     args = [bin_path, "-d", db_path, "-s", server_address, "-p", str(websocket_port)]
 
     if not os.path.exists(db_path):

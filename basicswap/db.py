@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 28
+CURRENT_DB_VERSION = 29
 CURRENT_DB_DATA_VERSION = 6
 
 
@@ -219,6 +219,7 @@ class Bid(Table):
     bid_addr = Column("string")
     pk_bid_addr = Column("blob")
     proof_address = Column("string")
+    proof_signature = Column("blob")
     proof_utxos = Column("blob")
     # Address to spend lock tx to - address from wallet if empty TODO
     withdraw_to_addr = Column("string")
@@ -658,6 +659,41 @@ class CoinRates(Table):
     last_updated = Column("integer")
 
 
+class MessageNetworks(Table):
+    __tablename__ = "message_networks"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    name = Column("string")
+    created_at = Column("integer")
+
+
+class DirectMessageRoute(Table):
+    __tablename__ = "direct_message_routes"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    network_id = Column("integer")
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    smsg_addr_local = Column("string")
+    smsg_addr_remote = Column("string")
+    # smsg_addr_id_local = Column("integer")  # SmsgAddress
+    # smsg_addr_id_remote = Column("integer")  # KnownIdentity
+    route_data = Column("blob")
+    created_at = Column("integer")
+
+
+class DirectMessageRouteLink(Table):
+    __tablename__ = "direct_message_route_links"
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    direct_message_route_id = Column("integer")
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    created_at = Column("integer")
+
+
 def create_db_(con, log) -> None:
     c = con.cursor()
 
@@ -915,6 +951,7 @@ class DBMethods:
                 query += f"{key}=:{key}"
 
         cursor.execute(query, values)
+        return cursor.lastrowid
 
     def query(
         self,
