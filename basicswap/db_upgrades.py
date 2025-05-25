@@ -12,8 +12,10 @@ from .db import (
     AutomationStrategy,
     BidState,
     Concepts,
+    create_table,
     CURRENT_DB_DATA_VERSION,
     CURRENT_DB_VERSION,
+    extract_schema,
 )
 
 from .basicswap_util import (
@@ -49,10 +51,9 @@ def upgradeDatabaseData(self, data_version):
         return
 
     self.log.info(
-        "Upgrading database records from version %d to %d.",
-        data_version,
-        CURRENT_DB_DATA_VERSION,
+        f"Upgrading database records from version {data_version} to {CURRENT_DB_DATA_VERSION}."
     )
+
     cursor = self.openDB()
     try:
         now = int(time.time())
@@ -138,313 +139,137 @@ def upgradeDatabaseData(self, data_version):
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
         self.commitDB()
-        self.log.info(
-            "Upgraded database records to version {}".format(self.db_data_version)
-        )
+        self.log.info(f"Upgraded database records to version {self.db_data_version}")
     finally:
         self.closeDB(cursor, commit=False)
 
 
 def upgradeDatabase(self, db_version):
-    if db_version >= CURRENT_DB_VERSION:
+    if self._force_db_upgrade is False and db_version >= CURRENT_DB_VERSION:
         return
 
     self.log.info(
         f"Upgrading database from version {db_version} to {CURRENT_DB_VERSION}."
     )
 
-    while True:
-        try:
-            cursor = self.openDB()
+    # db_version, tablename, oldcolumnname, newcolumnname
+    rename_columns = [
+        (13, "actions", "event_id", "action_id"),
+        (13, "actions", "event_type", "action_type"),
+        (13, "actions", "event_data", "action_data"),
+        (
+            14,
+            "xmr_swaps",
+            "coin_a_lock_refund_spend_tx_msg_id",
+            "coin_a_lock_spend_tx_msg_id",
+        ),
+    ]
 
-            current_version = db_version
-            if current_version == 6:
-                cursor.execute("ALTER TABLE bids ADD COLUMN security_token BLOB")
-                cursor.execute("ALTER TABLE offers ADD COLUMN security_token BLOB")
-                db_version += 1
-            elif current_version == 7:
-                cursor.execute("ALTER TABLE transactions ADD COLUMN block_hash BLOB")
+    expect_schema = extract_schema()
+    have_tables = {}
+    try:
+        cursor = self.openDB()
+
+        for rename_column in rename_columns:
+            dbv, table_name, colname_from, colname_to = rename_column
+            if db_version < dbv:
                 cursor.execute(
-                    "ALTER TABLE transactions ADD COLUMN block_height INTEGER"
-                )
-                cursor.execute("ALTER TABLE transactions ADD COLUMN block_time INTEGER")
-                db_version += 1
-            elif current_version == 8:
-                cursor.execute(
-                    """
-                    CREATE TABLE wallets (
-                        record_id INTEGER NOT NULL,
-                        coin_id INTEGER,
-                        wallet_name VARCHAR,
-                        wallet_data VARCHAR,
-                        balance_type INTEGER,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-                db_version += 1
-            elif current_version == 9:
-                cursor.execute("ALTER TABLE wallets ADD COLUMN wallet_data VARCHAR")
-                db_version += 1
-            elif current_version == 10:
-                cursor.execute(
-                    "ALTER TABLE smsgaddresses ADD COLUMN active_ind INTEGER"
-                )
-                cursor.execute(
-                    "ALTER TABLE smsgaddresses ADD COLUMN created_at INTEGER"
-                )
-                cursor.execute("ALTER TABLE smsgaddresses ADD COLUMN note VARCHAR")
-                cursor.execute("ALTER TABLE smsgaddresses ADD COLUMN pubkey VARCHAR")
-                cursor.execute(
-                    "UPDATE smsgaddresses SET active_ind = 1, created_at = 1"
+                    f"ALTER TABLE {table_name} RENAME COLUMN {colname_from} TO {colname_to}"
                 )
 
-                cursor.execute("ALTER TABLE offers ADD COLUMN addr_to VARCHAR")
-                cursor.execute(f'UPDATE offers SET addr_to = "{self.network_addr}"')
-                db_version += 1
-            elif current_version == 11:
-                cursor.execute(
-                    "ALTER TABLE bids ADD COLUMN chain_a_height_start INTEGER"
-                )
-                cursor.execute(
-                    "ALTER TABLE bids ADD COLUMN chain_b_height_start INTEGER"
-                )
-                cursor.execute("ALTER TABLE bids ADD COLUMN protocol_version INTEGER")
-                cursor.execute("ALTER TABLE offers ADD COLUMN protocol_version INTEGER")
-                cursor.execute("ALTER TABLE transactions ADD COLUMN tx_data BLOB")
-                db_version += 1
-            elif current_version == 12:
-                cursor.execute(
-                    """
-                    CREATE TABLE knownidentities (
-                        record_id INTEGER NOT NULL,
-                        address VARCHAR,
-                        label VARCHAR,
-                        publickey BLOB,
-                        num_sent_bids_successful INTEGER,
-                        num_recv_bids_successful INTEGER,
-                        num_sent_bids_rejected INTEGER,
-                        num_recv_bids_rejected INTEGER,
-                        num_sent_bids_failed INTEGER,
-                        num_recv_bids_failed INTEGER,
-                        note VARCHAR,
-                        updated_at BIGINT,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-                cursor.execute("ALTER TABLE bids ADD COLUMN reject_code INTEGER")
-                cursor.execute("ALTER TABLE bids ADD COLUMN rate INTEGER")
-                cursor.execute(
-                    "ALTER TABLE offers ADD COLUMN amount_negotiable INTEGER"
-                )
-                cursor.execute("ALTER TABLE offers ADD COLUMN rate_negotiable INTEGER")
-                db_version += 1
-            elif current_version == 13:
-                db_version += 1
-                cursor.execute(
-                    """
-                    CREATE TABLE automationstrategies (
-                        record_id INTEGER NOT NULL,
-                        active_ind INTEGER,
-                        label VARCHAR,
-                        type_ind INTEGER,
-                        only_known_identities INTEGER,
-                        num_concurrent INTEGER,
-                        data BLOB,
-
-                        note VARCHAR,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-
-                cursor.execute(
-                    """
-                    CREATE TABLE automationlinks (
-                        record_id INTEGER NOT NULL,
-                        active_ind INTEGER,
-
-                        linked_type INTEGER,
-                        linked_id BLOB,
-                        strategy_id INTEGER,
-
-                        data BLOB,
-                        repeat_limit INTEGER,
-                        repeat_count INTEGER,
-
-                        note VARCHAR,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-
-                cursor.execute(
-                    """
-                    CREATE TABLE history (
-                        record_id INTEGER NOT NULL,
-                        concept_type INTEGER,
-                        concept_id INTEGER,
-                        changed_data BLOB,
-
-                        note VARCHAR,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-
-                cursor.execute(
-                    """
-                    CREATE TABLE bidstates (
-                        record_id INTEGER NOT NULL,
-                        active_ind INTEGER,
-                        state_id INTEGER,
-                        label VARCHAR,
-                        in_progress INTEGER,
-
-                        note VARCHAR,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-
-                cursor.execute("ALTER TABLE wallets ADD COLUMN active_ind INTEGER")
-                cursor.execute(
-                    "ALTER TABLE knownidentities ADD COLUMN active_ind INTEGER"
-                )
-                cursor.execute("ALTER TABLE eventqueue RENAME TO actions")
-                cursor.execute(
-                    "ALTER TABLE actions RENAME COLUMN event_id TO action_id"
-                )
-                cursor.execute(
-                    "ALTER TABLE actions RENAME COLUMN event_type TO action_type"
-                )
-                cursor.execute(
-                    "ALTER TABLE actions RENAME COLUMN event_data TO action_data"
-                )
-            elif current_version == 14:
-                db_version += 1
-                cursor.execute(
-                    "ALTER TABLE xmr_swaps ADD COLUMN coin_a_lock_release_msg_id BLOB"
-                )
-                cursor.execute(
-                    "ALTER TABLE xmr_swaps RENAME COLUMN coin_a_lock_refund_spend_tx_msg_id TO coin_a_lock_spend_tx_msg_id"
-                )
-            elif current_version == 15:
-                db_version += 1
-                cursor.execute(
-                    """
-                    CREATE TABLE notifications (
-                        record_id INTEGER NOT NULL,
-                        active_ind INTEGER,
-                        event_type INTEGER,
-                        event_data BLOB,
-                        created_at BIGINT,
-                        PRIMARY KEY (record_id))"""
-                )
-            elif current_version == 16:
-                db_version += 1
-                cursor.execute(
-                    """
-                    CREATE TABLE prefunded_transactions (
-                        record_id INTEGER NOT NULL,
-                        active_ind INTEGER,
-                        created_at BIGINT,
-                        linked_type INTEGER,
-                        linked_id BLOB,
-                        tx_type INTEGER,
-                        tx_data BLOB,
-                        used_by BLOB,
-                        PRIMARY KEY (record_id))"""
-                )
-            elif current_version == 17:
-                db_version += 1
-                cursor.execute(
-                    "ALTER TABLE knownidentities ADD COLUMN automation_override INTEGER"
-                )
-                cursor.execute(
-                    "ALTER TABLE knownidentities ADD COLUMN visibility_override INTEGER"
-                )
-                cursor.execute("ALTER TABLE knownidentities ADD COLUMN data BLOB")
-                cursor.execute("UPDATE knownidentities SET active_ind = 1")
-            elif current_version == 18:
-                db_version += 1
-                cursor.execute("ALTER TABLE xmr_split_data ADD COLUMN addr_from STRING")
-                cursor.execute("ALTER TABLE xmr_split_data ADD COLUMN addr_to STRING")
-            elif current_version == 19:
-                db_version += 1
-                cursor.execute("ALTER TABLE bidstates ADD COLUMN in_error INTEGER")
-                cursor.execute("ALTER TABLE bidstates ADD COLUMN swap_failed INTEGER")
-                cursor.execute("ALTER TABLE bidstates ADD COLUMN swap_ended INTEGER")
-            elif current_version == 20:
-                db_version += 1
-                cursor.execute(
-                    """
-                    CREATE TABLE message_links (
-                        record_id INTEGER NOT NULL,
-                        active_ind INTEGER,
-                        created_at BIGINT,
-
-                        linked_type INTEGER,
-                        linked_id BLOB,
-
-                        msg_type INTEGER,
-                        msg_sequence INTEGER,
-                        msg_id BLOB,
-                        PRIMARY KEY (record_id))"""
-                )
-                cursor.execute("ALTER TABLE offers ADD COLUMN bid_reversed INTEGER")
-            elif current_version == 21:
-                db_version += 1
-                cursor.execute("ALTER TABLE offers ADD COLUMN proof_utxos BLOB")
-                cursor.execute("ALTER TABLE bids ADD COLUMN proof_utxos BLOB")
-            elif current_version == 22:
-                db_version += 1
-                cursor.execute("ALTER TABLE offers ADD COLUMN amount_to INTEGER")
-            elif current_version == 23:
-                db_version += 1
-                cursor.execute(
-                    """
-                    CREATE TABLE checkedblocks (
-                        record_id INTEGER NOT NULL,
-                        created_at BIGINT,
-                        coin_type INTEGER,
-                        block_height INTEGER,
-                        block_hash BLOB,
-                        block_time INTEGER,
-                        PRIMARY KEY (record_id))"""
-                )
-                cursor.execute("ALTER TABLE bids ADD COLUMN pkhash_buyer_to BLOB")
-            elif current_version == 24:
-                db_version += 1
-                cursor.execute("ALTER TABLE bidstates ADD COLUMN can_accept INTEGER")
-            elif current_version == 25:
-                db_version += 1
-                cursor.execute(
-                    """
-                    CREATE TABLE coinrates (
-                        record_id INTEGER NOT NULL,
-                        currency_from INTEGER,
-                        currency_to INTEGER,
-                        rate VARCHAR,
-                        source VARCHAR,
-                        last_updated INTEGER,
-                        PRIMARY KEY (record_id))"""
-                )
-            elif current_version == 26:
-                db_version += 1
-                cursor.execute("ALTER TABLE offers ADD COLUMN auto_accept_type INTEGER")
-            elif current_version == 27:
-                db_version += 1
-                cursor.execute("ALTER TABLE offers ADD COLUMN pk_from BLOB")
-                cursor.execute("ALTER TABLE bids ADD COLUMN pk_bid_addr BLOB")
-
-            if current_version != db_version:
-                self.db_version = db_version
-                self.setIntKV("db_version", db_version, cursor)
-                self.commitDB()
-                self.log.info("Upgraded database to version {}".format(self.db_version))
+        query = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+        tables = cursor.execute(query).fetchall()
+        for table in tables:
+            table_name = table[0]
+            if table_name in ("sqlite_sequence",):
                 continue
-        except Exception as e:
-            self.log.error("Upgrade failed {}".format(e))
-            self.rollbackDB()
-        finally:
-            self.closeDB(cursor, commit=False)
-        break
 
-    if db_version != CURRENT_DB_VERSION:
-        raise ValueError("Unable to upgrade database.")
+            have_table = {}
+            have_columns = {}
+            query = "SELECT * FROM PRAGMA_TABLE_INFO(:table_name) ORDER BY cid DESC;"
+            columns = cursor.execute(query, {"table_name": table_name}).fetchall()
+            for column in columns:
+                cid, name, data_type, notnull, default_value, primary_key = column
+                have_columns[name] = {"type": data_type, "primary_key": primary_key}
+
+            have_table["columns"] = have_columns
+
+            cursor.execute(f"PRAGMA INDEX_LIST('{table_name}');")
+            indices = cursor.fetchall()
+            for index in indices:
+                seq, index_name, unique, origin, partial = index
+
+                if origin == "pk":  # Created by a PRIMARY KEY constraint
+                    continue
+
+                cursor.execute(f"PRAGMA INDEX_INFO('{index_name}');")
+                index_info = cursor.fetchall()
+
+                add_index = {"index_name": index_name}
+                for index_columns in index_info:
+                    seqno, cid, name = index_columns
+                    if origin == "u":  # Created by a UNIQUE constraint
+                        have_columns[name]["unique"] = 1
+                    else:
+                        if "column_1" not in add_index:
+                            add_index["column_1"] = name
+                        elif "column_2" not in add_index:
+                            add_index["column_2"] = name
+                        elif "column_3" not in add_index:
+                            add_index["column_3"] = name
+                        else:
+                            raise RuntimeError("Add more index columns.")
+                if origin == "c":
+                    if "indices" not in table:
+                        have_table["indices"] = []
+                    have_table["indices"].append(add_index)
+
+            have_tables[table_name] = have_table
+
+        for table_name, table in expect_schema.items():
+            if table_name not in have_tables:
+                self.log.info(f"Creating table {table_name}.")
+                create_table(cursor, table_name, table)
+                continue
+
+            have_table = have_tables[table_name]
+            have_columns = have_table["columns"]
+            for colname, column in table["columns"].items():
+                if colname not in have_columns:
+                    col_type = column["type"]
+                    self.log.info(f"Adding column {colname} to table {table_name}.")
+                    cursor.execute(
+                        f"ALTER TABLE {table_name} ADD COLUMN {colname} {col_type}"
+                    )
+            indices = table.get("indices", [])
+            have_indices = have_table.get("indices", [])
+            for index in indices:
+                index_name = index["index_name"]
+                if not any(
+                    have_idx.get("index_name") == index_name
+                    for have_idx in have_indices
+                ):
+                    self.log.info(f"Adding index {index_name} to table {table_name}.")
+                    column_1 = index["column_1"]
+                    column_2 = index.get("column_2", None)
+                    column_3 = index.get("column_3", None)
+                    query: str = (
+                        f"CREATE INDEX {index_name} ON {table_name} ({column_1}"
+                    )
+                    if column_2:
+                        query += f", {column_2}"
+                    if column_3:
+                        query += f", {column_3}"
+                    query += ")"
+                    cursor.execute(query)
+
+        if CURRENT_DB_VERSION != db_version:
+            self.db_version = CURRENT_DB_VERSION
+            self.setIntKV("db_version", CURRENT_DB_VERSION, cursor)
+            self.log.info(f"Upgraded database to version {self.db_version}")
+        self.commitDB()
+    except Exception as e:
+        self.log.error(f"Upgrade failed {e}")
+        self.rollbackDB()
+    finally:
+        self.closeDB(cursor, commit=False)
