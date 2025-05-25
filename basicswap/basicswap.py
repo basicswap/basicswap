@@ -498,6 +498,7 @@ class BasicSwap(BaseApp, UIApp):
 
         self.with_coins_override = extra_opts.get("with_coins", set())
         self.without_coins_override = extra_opts.get("without_coins", set())
+        self._force_db_upgrade = extra_opts.get("force_db_upgrade", False)
 
         for c in Coins:
             if c in chainparams:
@@ -10198,7 +10199,9 @@ class BasicSwap(BaseApp, UIApp):
     def processContactConnected(self, event_data) -> None:
         connId = event_data["resp"]["contact"]["activeConn"]["connId"]
         localDisplayName = event_data["resp"]["contact"]["localDisplayName"]
-        self.log.debug(f"Processing Contact Connected event, ID: {connId}, contact name: {localDisplayName}.")
+        self.log.debug(
+            f"Processing Contact Connected event, ID: {connId}, contact name: {localDisplayName}."
+        )
 
         try:
             cursor = self.openDB()
