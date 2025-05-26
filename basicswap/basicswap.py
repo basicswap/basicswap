@@ -368,7 +368,7 @@ class BasicSwap(BaseApp, UIApp):
         )  # Seconds
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
-        )  # In MB 0 to disable truncation
+        )  # In MB. Set to 0 to disable truncation
         if self._max_logfile_bytes > 0:
             self._max_logfile_bytes *= 1024 * 1024
         self._max_logfiles = self.get_int_setting("max_logfiles", 10, 1, 100)
@@ -379,6 +379,10 @@ class BasicSwap(BaseApp, UIApp):
 
         self.num_group_simplex_messages_received = 0
         self.num_direct_simplex_messages_received = 0
+
+        self._max_transient_errors = self.settings.get(
+            "max_transient_errors", 100
+        )  # Number of retries before a bid will stop when encountering transient errors.
 
         # Keep sensitive info out of the log file (WIP)
         self.log.safe_logs = self.settings.get("safe_logs", False)
@@ -9074,10 +9078,10 @@ class BasicSwap(BaseApp, UIApp):
                 bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
             )
             if num_retries > 0:
-                error_msg += ", retry no. {}".format(num_retries)
+                error_msg += f", retry no. {num_retries} / {self._max_transient_errors}"
             self.log.error(error_msg)
 
-            if num_retries < 5 and (
+            if num_retries < self._max_transient_errors and (
                 ci_to.is_transient_error(ex) or self.is_transient_error(ex)
             ):
                 delay = self.get_delay_retry_seconds()
@@ -9391,10 +9395,10 @@ class BasicSwap(BaseApp, UIApp):
                 bid, EventLogTypes.FAILED_TX_B_SPEND, cursor
             )
             if num_retries > 0:
-                error_msg += ", retry no. {}".format(num_retries)
+                error_msg += f", retry no. {num_retries} / {self._max_transient_errors}"
             self.log.error(error_msg)
 
-            if num_retries < 100 and (
+            if num_retries < self._max_transient_errors and (
                 ci_to.is_transient_error(ex) or self.is_transient_error(ex)
             ):
                 delay = self.get_delay_retry_seconds()
@@ -9505,11 +9509,11 @@ class BasicSwap(BaseApp, UIApp):
                 bid, EventLogTypes.FAILED_TX_B_REFUND, cursor
             )
             if num_retries > 0:
-                error_msg += ", retry no. {}".format(num_retries)
+                error_msg += f", retry no. {num_retries} / {self._max_transient_errors}"
             self.log.error(error_msg)
 
             str_error = str(ex)
-            if num_retries < 100 and (
+            if num_retries < self._max_transient_errors and (
                 ci_to.is_transient_error(ex) or self.is_transient_error(ex)
             ):
                 delay = self.get_delay_retry_seconds()
