@@ -463,8 +463,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_messages = False
 
         assert len(swap_clients[0].active_networks) == 1
@@ -523,8 +521,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_messages = False
 
         assert len(swap_clients[0].active_networks) == 1
@@ -583,8 +579,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_message_routes = True
 
         assert len(swap_clients[0].active_networks) == 1
@@ -659,8 +653,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_message_routes = True
 
         assert len(swap_clients[0].active_networks) == 1
@@ -733,8 +725,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_message_routes = False
 
         assert len(swap_clients[0].active_networks) == 1
@@ -816,8 +806,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_message_routes = True
 
         assert len(swap_clients[0].active_networks) == 1
@@ -906,8 +894,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._dleag_split_size_init = 9000
-            sc._dleag_split_size = 11000
             sc._use_direct_message_routes = True
 
         assert len(swap_clients[0].active_networks) == 1
