@@ -34,7 +34,6 @@ class UIApp:
                 query_str: str = (
                     "SELECT record_id, network_id, route_data"
                     + " FROM direct_message_routes "
-                    + " WHERE active_ind = 1 "
                 )
                 query_str += filter_query_str
                 rows = cursor.execute(query_str, query_data).fetchall()
@@ -47,10 +46,10 @@ class UIApp:
                 raise ValueError("Unknown action")
 
             query_str: str = (
-                "SELECT record_id, network_id, linked_type, linked_id, "
+                "SELECT record_id, network_id, active_ind, linked_type, linked_id, "
                 + "       smsg_addr_local, smsg_addr_remote, route_data, created_at"
                 + " FROM direct_message_routes "
-                + " WHERE active_ind = 1 "
+                + " WHERE active_ind > 0 "
             )
 
             query_str += filter_query_str
@@ -71,6 +70,7 @@ class UIApp:
                 (
                     record_id,
                     network_id,
+                    active_ind,
                     linked_type,
                     linked_id,
                     smsg_addr_local,
@@ -82,6 +82,7 @@ class UIApp:
                     {
                         "record_id": record_id,
                         "network_id": network_id,
+                        "active_ind": active_ind,
                         "smsg_addr_local": smsg_addr_local,
                         "smsg_addr_remote": smsg_addr_remote,
                         "route_data": json.loads(route_data.decode("UTF-8")),

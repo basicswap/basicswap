@@ -486,6 +486,14 @@ class XmrSwap(Table):
 
     b_lock_tx_id = Column("blob")
 
+    msg_split_info = Column("string")
+
+    def getMsgSplitInfo(self):
+        if self.msg_split_info is None:
+            return 16000, 17000
+        msg_split_info = self.msg_split_info.split(":")
+        return int(msg_split_info[0]), int(msg_split_info[1])
+
 
 class XmrSplitData(Table):
     __tablename__ = "xmr_split_data"

@@ -444,14 +444,10 @@ class BasicSwap(BaseApp, UIApp):
             "restrict_unknown_seed_wallets", True
         )
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
-
         self._bid_expired_leeway = 5
+        self._use_direct_message_routes = False
 
         self.swaps_in_progress = dict()
-
-        self._dleag_split_size_init = 16000
-        self._dleag_split_size = 17000
-        self._use_direct_message_routes = False
 
         self.SMSG_SECONDS_IN_HOUR = (
             60 * 60
@@ -3798,20 +3794,21 @@ class BasicSwap(BaseApp, UIApp):
         msg_type,
         addr_from: str,
         addr_to: str,
-        bid_id: bytes,
+        xmr_swap,
         dleag: bytes,
         msg_valid: int,
         bid_msg_ids,
         cursor,
     ) -> None:
 
-        sent_bytes = self._dleag_split_size_init
+        dleag_split_size_init, dleag_split_size = xmr_swap.getMsgSplitInfo()
+        sent_bytes = dleag_split_size_init
 
         num_sent = 1
         while sent_bytes < len(dleag):
-            size_to_send: int = min(self._dleag_split_size, len(dleag) - sent_bytes)
+            size_to_send: int = min(dleag_split_size, len(dleag) - sent_bytes)
             msg_buf = XmrSplitMessage(
-                msg_id=bid_id,
+                msg_id=xmr_swap.bid_id,
                 msg_type=msg_type,
                 sequence=num_sent,
                 dleag=dleag[sent_bytes : sent_bytes + size_to_send],
@@ -3867,8 +3864,9 @@ class BasicSwap(BaseApp, UIApp):
         msg_buf.pkaf = xmr_swap.pkaf
         msg_buf.kbvf = xmr_swap.vkbvf
 
-        if len(xmr_swap.kbsf_dleag) > self._dleag_split_size_init:
-            msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[: self._dleag_split_size_init]
+        dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
+        if len(xmr_swap.kbsf_dleag) > dleag_split_size_init:
+            msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag[:dleag_split_size_init]
         else:
             msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
 
@@ -3902,12 +3900,14 @@ class BasicSwap(BaseApp, UIApp):
             )
 
         bid_msg_ids = {}
+        if xmr_swap.bid_id is None:
+            xmr_swap.bid_id = bid_id
         if ci_to.curve_type() == Curves.ed25519:
             self.sendXmrSplitMessages(
                 XmrSplitMsgTypes.BID,
                 bid.bid_addr,
                 offer.addr_from,
-                bid_id,
+                xmr_swap,
                 xmr_swap.kbsf_dleag,
                 msg_valid,
                 bid_msg_ids,
@@ -4111,6 +4111,7 @@ class BasicSwap(BaseApp, UIApp):
 
                 xmr_swap = XmrSwap()
                 xmr_swap.contract_count = self.getNewContractId(cursor)
+                self.setMsgSplitInfo(xmr_swap)
 
                 bid = Bid(
                     protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
@@ -4165,6 +4166,7 @@ class BasicSwap(BaseApp, UIApp):
 
             xmr_swap = XmrSwap()
             xmr_swap.contract_count = self.getNewContractId(cursor)
+            self.setMsgSplitInfo(xmr_swap)
 
             address_out = self.getReceiveAddressFromPool(
                 coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK, cursor=cursor
@@ -4518,9 +4520,10 @@ class BasicSwap(BaseApp, UIApp):
             msg_buf.pkal = xmr_swap.pkal
             msg_buf.kbvl = kbvl
 
+            dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
-                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[: self._dleag_split_size_init]
+                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:dleag_split_size_init]
             elif ci_to.curve_type() == Curves.secp256k1:
                 for i in range(10):
                     xmr_swap.kbsl_dleag = ci_to.signRecoverable(
@@ -4564,7 +4567,7 @@ class BasicSwap(BaseApp, UIApp):
                     XmrSplitMsgTypes.BID_ACCEPT,
                     addr_from,
                     addr_to,
-                    xmr_swap.bid_id,
+                    xmr_swap,
                     xmr_swap.kbsl_dleag,
                     msg_valid,
                     bid_msg_ids,
@@ -4683,6 +4686,7 @@ class BasicSwap(BaseApp, UIApp):
             xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
             assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
 
+            dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
             msg_buf = ADSBidIntentAcceptMessage()
             msg_buf.bid_msg_id = bid_id
             msg_buf.dest_af = xmr_swap.dest_af
@@ -4690,8 +4694,8 @@ class BasicSwap(BaseApp, UIApp):
             msg_buf.kbvf = kbvf
             msg_buf.kbsf_dleag = (
                 xmr_swap.kbsf_dleag
-                if len(xmr_swap.kbsf_dleag) < self._dleag_split_size_init
-                else xmr_swap.kbsf_dleag[: self._dleag_split_size_init]
+                if len(xmr_swap.kbsf_dleag) < dleag_split_size_init
+                else xmr_swap.kbsf_dleag[:dleag_split_size_init]
             )
 
             bid_bytes = msg_buf.to_bytes()
@@ -4712,7 +4716,7 @@ class BasicSwap(BaseApp, UIApp):
                     XmrSplitMsgTypes.BID,
                     addr_from,
                     addr_to,
-                    xmr_swap.bid_id,
+                    xmr_swap,
                     xmr_swap.kbsf_dleag,
                     msg_valid,
                     bid_msg_ids,
@@ -8468,6 +8472,7 @@ class BasicSwap(BaseApp, UIApp):
                 pkbvf=ci_to.getPubkey(bid_data.kbvf),
                 kbsf_dleag=bid_data.kbsf_dleag,
             )
+            self.setMsgSplitInfo(xmr_swap)
             wallet_restore_height = self.getWalletRestoreHeight(ci_to)
             if bid.chain_b_height_start < wallet_restore_height:
                 bid.chain_b_height_start = wallet_restore_height
@@ -9982,6 +9987,7 @@ class BasicSwap(BaseApp, UIApp):
             xmr_swap = XmrSwap(
                 bid_id=bid_id,
             )
+            self.setMsgSplitInfo(xmr_swap)
             wallet_restore_height = self.getWalletRestoreHeight(ci_to)
             if bid.chain_b_height_start < wallet_restore_height:
                 bid.chain_b_height_start = wallet_restore_height
@@ -12204,6 +12210,13 @@ class BasicSwap(BaseApp, UIApp):
             return rv_array
 
         return rv
+
+    def setMsgSplitInfo(self, xmr_swap) -> None:
+        for network in self.active_networks:
+            if network["type"] == "simplex":
+                xmr_swap.msg_split_info = "9000:11000"
+                return
+        xmr_swap.msg_split_info = "16000:17000"
 
     def setFilters(self, prefix, filters):
         key_str = "saved_filters_" + prefix

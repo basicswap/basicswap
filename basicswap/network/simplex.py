@@ -119,9 +119,9 @@ class WebSocketThread(threading.Thread):
             self.ws.send(cmd)
             return self.corrId
 
-    def wait_for_command_response(self, cmd_id):
+    def wait_for_command_response(self, cmd_id, num_tries: int = 200):
         cmd_id = str(cmd_id)
-        for i in range(100):
+        for i in range(num_tries):
             message = self.cmd_queue_get()
             if message is not None:
                 data = json.loads(message)
@@ -129,7 +129,9 @@ class WebSocketThread(threading.Thread):
                     if data["corrId"] == cmd_id:
                         return data
             self.delay_event.wait(0.5)
-        raise ValueError(f"waitForResponse timed-out waiting for id: {cmd_id}")
+        raise ValueError(
+            f"wait_for_command_response timed-out waiting for ID: {cmd_id}"
+        )
 
     def run(self):
         self.ws = websocket.WebSocketApp(
@@ -151,7 +153,7 @@ class WebSocketThread(threading.Thread):
 
 def waitForResponse(ws_thread, sent_id, delay_event):
     sent_id = str(sent_id)
-    for i in range(100):
+    for i in range(200):
         message = ws_thread.cmd_queue_get()
         if message is not None:
             data = json.loads(message)
@@ -159,7 +161,7 @@ def waitForResponse(ws_thread, sent_id, delay_event):
                 if data["corrId"] == sent_id:
                     return data
         delay_event.wait(0.5)
-    raise ValueError(f"waitForResponse timed-out waiting for id: {sent_id}")
+    raise ValueError(f"waitForResponse timed-out waiting for ID: {sent_id}")
 
 
 def waitForConnected(ws_thread, delay_event):
@@ -457,34 +459,41 @@ def initialiseSimplexNetwork(self, network_config) -> None:
 
 
 def closeSimplexChat(self, net_i, connId) -> bool:
-    cmd_id = net_i.send_command("/chats")
-    response = net_i.wait_for_command_response(cmd_id)
-    remote_name = None
-    for chat in response["resp"]["chats"]:
-        if (
-            "chatInfo" not in chat
-            or "type" not in chat["chatInfo"]
-            or chat["chatInfo"]["type"] != "direct"
-        ):
-            continue
-        try:
-            if chat["chatInfo"]["contact"]["activeConn"]["connId"] == connId:
-                remote_name = chat["chatInfo"]["contact"]["localDisplayName"]
-                break
-        except Exception as e:
-            self.log.debug(f"Error parsing chat: {e}")
+    try:
+        cmd_id = net_i.send_command("/chats")
+        response = net_i.wait_for_command_response(cmd_id, num_tries=500)
+        remote_name = None
+        for chat in response["resp"]["chats"]:
+            if (
+                "chatInfo" not in chat
+                or "type" not in chat["chatInfo"]
+                or chat["chatInfo"]["type"] != "direct"
+            ):
+                continue
+            try:
+                if chat["chatInfo"]["contact"]["activeConn"]["connId"] == connId:
+                    remote_name = chat["chatInfo"]["contact"]["localDisplayName"]
+                    break
+            except Exception as e:
+                self.log.debug(f"Error parsing chat: {e}")
 
-    if remote_name is None:
-        self.log.warning(
-            f"Unable to find remote name for simplex direct chat, ID: {connId}"
-        )
-        return False
+        if remote_name is None:
+            self.log.warning(
+                f"Unable to find remote name for simplex direct chat, ID: {connId}"
+            )
+            return False
 
-    self.log.debug(f"Deleting simplex chat @{remote_name}, connID {connId}")
-    cmd_id = net_i.send_command(f"/delete @{remote_name}")
-    cmd_response = net_i.wait_for_command_response(cmd_id)
-    if cmd_response["resp"]["type"] != "contactDeleted":
-        self.log.warning(f"Failed to delete simplex chat, ID: {connId}")
-        self.log.debug("cmd_response: {}".format(json.dumps(cmd_response, indent=4)))
+        self.log.debug(f"Deleting simplex chat @{remote_name}, connID {connId}")
+        cmd_id = net_i.send_command(f"/delete @{remote_name}")
+        cmd_response = net_i.wait_for_command_response(cmd_id)
+
+        if cmd_response["resp"]["type"] != "contactDeleted":
+            self.log.warning(f"Failed to delete simplex chat, ID: {connId}")
+            self.log.debug(
+                "cmd_response: {}".format(json.dumps(cmd_response, indent=4))
+            )
+            return False
+    except Exception as e:
+        self.log.warning(f"Error deleting simplex chat, ID: {connId} - {e}")
         return False
     return True
