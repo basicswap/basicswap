@@ -35,6 +35,9 @@ import sys
 import threading
 import time
 import unittest
+
+import basicswap.config as cfg
+
 from unittest.mock import patch
 
 from basicswap.rpc_xmr import (
@@ -87,7 +90,16 @@ TEST_COINS_LIST = os.getenv("TEST_COINS_LIST", "bitcoin,monero")
 NUM_NODES = int(os.getenv("NUM_NODES", 3))
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
 
-SIMPLEX_SERVER_ADDRESS = os.getenv("SIMPLEX_SERVER_ADDRESS", "")
+SIMPLEX_SERVER_FINGERPRINT = os.getenv("SIMPLEX_SERVER_FINGERPRINT", "")
+SIMPLEX_SERVER_PASSWORD = os.getenv("SIMPLEX_SERVER_PASSWORD", "password")
+SIMPLEX_SERVER_HOST = os.getenv("SIMPLEX_SERVER_HOST", "127.0.0.1")
+SIMPLEX_SERVER_PORT = os.getenv("SIMPLEX_SERVER_PORT", "5223")
+SIMPLEX_SERVER_ADDRESS = os.getenv(
+    "SIMPLEX_SERVER_ADDRESS",
+    f"smp://{SIMPLEX_SERVER_FINGERPRINT}:{SIMPLEX_SERVER_PASSWORD}@{SIMPLEX_SERVER_HOST}:{SIMPLEX_SERVER_PORT}",
+)
+SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", "5225"))
+SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", "")
 SIMPLEX_CLIENT_PATH = os.path.expanduser(os.getenv("SIMPLEX_CLIENT_PATH", ""))
 
 logger = logging.getLogger()
@@ -321,7 +333,7 @@ def start_processes(self):
     self.btc_addr = callbtcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
     num_blocks: int = 500  # Mine enough to activate segwit
     if callbtcrpc(0, "getblockcount") < num_blocks:
-        logging.info("Mining %d Bitcoin blocks to %s", num_blocks, self.btc_addr)
+        logging.info(f"Mining {num_blocks} Bitcoin blocks to {self.btc_addr}")
         callbtcrpc(0, "generatetoaddress", [num_blocks, self.btc_addr])
     logging.info("BTC blocks: %d", callbtcrpc(0, "getblockcount"))
 
@@ -479,6 +491,26 @@ def start_processes(self):
     assert particl_blocks >= num_blocks
 
 
+def modifyConfig(test_path, i):
+    config_path = os.path.join(test_path, f"client{i}", cfg.CONFIG_FILENAME)
+    with open(config_path) as fp:
+        settings = json.load(fp)
+
+    if SIMPLEX_CLIENT_PATH != "":
+        settings["networks"] = [
+            {
+                "type": "simplex",
+                "server_address": SIMPLEX_SERVER_ADDRESS,
+                "client_path": SIMPLEX_CLIENT_PATH,
+                "ws_port": SIMPLEX_WS_PORT + i,
+                "group_link": SIMPLEX_GROUP_LINK,
+            },
+        ]
+
+    with open(config_path, "w") as fp:
+        json.dump(settings, fp, indent=4)
+
+
 class BaseTestWithPrepare(unittest.TestCase):
     __test__ = False
 
@@ -524,6 +556,9 @@ class BaseTestWithPrepare(unittest.TestCase):
                 {"min_sequence_lock_seconds": 60},
                 PORT_OFS,
             )
+
+            for i in range(NUM_NODES):
+                modifyConfig(test_path, i)
 
         signal.signal(
             signal.SIGINT, lambda signal, frame: signal_handler(cls, signal, frame)
