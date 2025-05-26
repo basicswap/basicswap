@@ -78,7 +78,7 @@ def startSimplexClient(
     db_path = os.path.join(data_path, "simplex_client_data")
     args = [bin_path, "-d", db_path, "-s", server_address, "-p", str(websocket_port)]
 
-    if not os.path.exists(db_path):
+    if not os.path.exists(db_path + "_chat.db"):
         # Need to set initial profile through CLI
         # TODO: Must be a better way?
         init_args = args + ["-e", "/help"]  # Run command ro exit client
@@ -103,4 +103,5 @@ def startSimplexClient(
             cwd=data_path,
         ),
         opened_files,
+        "simplex-chat",
     )

@@ -108,6 +108,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
             cwd=datadir_path,
         ),
         opened_files,
+        os.path.basename(daemon_bin),
     )
 
 
@@ -138,6 +139,7 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
             cwd=datadir_path,
         ),
         [file_stdout, file_stderr],
+        os.path.basename(daemon_bin),
     )
 
 
@@ -201,6 +203,7 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
             cwd=data_dir,
         ),
         [wallet_stdout, wallet_stderr],
+        os.path.basename(wallet_bin),
     )
 
 
@@ -326,7 +329,7 @@ def runClient(
                     )
                 )
                 pid = daemons[-1].handle.pid
-                swap_client.log.info(f"Started Simpelx client {pid}")
+                swap_client.log.info(f"Started Simplex client {pid}")
 
         for c, v in settings["chainclients"].items():
             if len(start_only_coins) > 0 and c not in start_only_coins:
@@ -555,13 +558,13 @@ def runClient(
 
     closed_pids = []
     for d in daemons:
-        swap_client.log.info(f"Interrupting {d.handle.pid}")
+        swap_client.log.info(f"Interrupting {d.name} {d.handle.pid}")
         try:
             d.handle.send_signal(
                 signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
             )
         except Exception as e:
-            swap_client.log.info(f"Interrupting {d.handle.pid}, error {e}")
+            swap_client.log.info(f"Interrupting {d.name} {d.handle.pid}, error {e}")
     for d in daemons:
         try:
             d.handle.wait(timeout=120)
