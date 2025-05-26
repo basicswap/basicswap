@@ -6,8 +6,9 @@
 
 
 class Daemon:
-    __slots__ = ("handle", "files")
+    __slots__ = ("handle", "files", "name")
 
-    def __init__(self, handle, files):
+    def __init__(self, handle, files, name):
         self.handle = handle
         self.files = files
+        self.name = name

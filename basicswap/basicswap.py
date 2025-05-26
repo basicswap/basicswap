@@ -445,7 +445,7 @@ class BasicSwap(BaseApp, UIApp):
         )
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
         self._bid_expired_leeway = 5
-        self._use_direct_message_routes = False
+        self._use_direct_message_routes = True
 
         self.swaps_in_progress = dict()
 
@@ -3981,6 +3981,11 @@ class BasicSwap(BaseApp, UIApp):
         if self._use_direct_message_routes is False:
             return None, False
 
+        try:
+            net_i = self.getActiveNetworkInterface(2)
+        except Exception as e:  # noqa: F841
+            return None, False
+
         # Look for active route
         message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
         self.log.debug(f"Using active message route: {message_route}")
@@ -3993,7 +3998,6 @@ class BasicSwap(BaseApp, UIApp):
         if message_route:
             return message_route.record_id, False
 
-        net_i = self.getActiveNetworkInterface(2)
         cmd_id = net_i.send_command("/connect")
         response = net_i.wait_for_command_response(cmd_id)
         connReqInvitation = response["resp"]["connReqInvitation"]

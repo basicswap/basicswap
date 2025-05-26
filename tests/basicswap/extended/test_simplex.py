@@ -446,7 +446,6 @@ class Test(BaseTest):
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
-
         settings["networks"] = [
             {
                 "type": "simplex",
@@ -463,7 +462,7 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._use_direct_messages = False
+            sc._use_direct_message_routes = False
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -521,7 +520,7 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         for sc in swap_clients:
-            sc._use_direct_messages = False
+            sc._use_direct_message_routes = False
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
