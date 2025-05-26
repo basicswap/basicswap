@@ -10,7 +10,7 @@ import select
 import subprocess
 import time
 
-from basicswap.bin.run import Daemon
+from basicswap.util.daemon import Daemon
 
 
 def initSimplexClient(args, logger, delay_event):
@@ -29,7 +29,7 @@ def initSimplexClient(args, logger, delay_event):
     def readOutput():
         buf = os.read(pipe_r, 1024).decode("utf-8")
         response = None
-        # logging.debug(f"simplex-chat output: {buf}")
+        # logger.debug(f"simplex-chat output: {buf}")
         if "display name:" in buf:
             logger.debug("Setting display name")
             response = b"user\n"
@@ -45,7 +45,7 @@ def initSimplexClient(args, logger, delay_event):
         max_wait_seconds: int = 60
         while p.poll() is None:
             if time.time() > start_time + max_wait_seconds:
-                raise ValueError("Timed out")
+                raise RuntimeError("Timed out")
             if os.name == "nt":
                 readOutput()
                 delay_event.wait(0.1)

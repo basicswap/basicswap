@@ -17,12 +17,13 @@ import traceback
 
 import basicswap.config as cfg
 from basicswap import __version__
-from basicswap.ui.util import getCoinName
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import chainparams, Coins, isKnownCoinName
-from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
-
+from basicswap.http_server import HttpThread
+from basicswap.network.simplex_chat import startSimplexClient
+from basicswap.ui.util import getCoinName
+from basicswap.util.daemon import Daemon
 
 initial_logger = logging.getLogger()
 initial_logger.level = logging.DEBUG
@@ -31,14 +32,6 @@ if not len(initial_logger.handlers):
 logger = initial_logger
 
 swap_client = None
-
-
-class Daemon:
-    __slots__ = ("handle", "files")
-
-    def __init__(self, handle, files):
-        self.handle = handle
-        self.files = files
 
 
 def signal_handler(sig, frame):
@@ -332,6 +325,23 @@ def runClient(
 
     try:
         # Try start daemons
+        for network in settings.get("networks", []):
+            network_type = network.get("type", "unknown")
+            if network_type == "simplex":
+                simplex_dir = os.path.join(data_dir, "simplex")
+                daemons.append(
+                    startSimplexClient(
+                        network["client_path"],
+                        simplex_dir,
+                        network["server_address"],
+                        network["ws_port"],
+                        logger,
+                        swap_client.delay_event,
+                    )
+                )
+                pid = daemons[-1].handle.pid
+                swap_client.log.info(f"Started Simpelx client {pid}")
+
         for c, v in settings["chainclients"].items():
             if len(start_only_coins) > 0 and c not in start_only_coins:
                 continue
