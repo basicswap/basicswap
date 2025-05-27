@@ -189,6 +189,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
     except Exception as e:
         from basicswap.util import LockedCoinError
         from basicswap.ui.util import getCoinName
+
         if isinstance(e, LockedCoinError):
             error_msg = f"Wallet must be unlocked to view offers. Please unlock your {getCoinName(e.coinid)} wallet."
             return bytes(json.dumps({"error": error_msg, "locked": True}), "UTF-8")
@@ -531,6 +532,7 @@ def js_sentbids(self, url_split, post_string, is_json) -> bytes:
     except Exception as e:
         from basicswap.util import LockedCoinError
         from basicswap.ui.util import getCoinName
+
         if isinstance(e, LockedCoinError):
             error_msg = f"Wallet must be unlocked to view bids. Please unlock your {getCoinName(e.coinid)} wallet."
             return bytes(json.dumps({"error": error_msg, "locked": True}), "UTF-8")
@@ -659,6 +661,7 @@ def js_index(self, url_split, post_string, is_json) -> bytes:
     except Exception as e:
         from basicswap.util import LockedCoinError
         from basicswap.ui.util import getCoinName
+
         if isinstance(e, LockedCoinError):
             error_msg = f"Wallet must be unlocked to view summary. Please unlock your {getCoinName(e.coinid)} wallet."
             return bytes(json.dumps({"error": error_msg, "locked": True}), "UTF-8")
