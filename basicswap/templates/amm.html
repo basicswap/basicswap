@@ -1315,7 +1315,6 @@
   </div>
 </div>
 
-<!-- Error Modal -->
 <div id="errorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
   <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
   <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
@@ -1339,7 +1338,6 @@
   </div>
 </div>
 
-<!-- Confirm Modal -->
 <div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
   <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
   <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
@@ -1384,7 +1382,6 @@
     function saveAutostartSetting(checked) {
       const bodyData = `autostart=${checked ? 'true' : 'false'}`;
 
-      // Save to backend via API
       fetch('/amm/autostart', {
         method: 'POST',
         headers: {
@@ -1395,10 +1392,8 @@
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          // Also save to localStorage as backup
           localStorage.setItem('amm_autostart_enabled', checked);
 
-          // Only warn if there's a mismatch
           if (data.autostart !== checked) {
             console.warn('WARNING: API returned different autostart value than expected!', {
               sent: checked,
@@ -1407,7 +1402,6 @@
           }
         } else {
           console.error('Failed to save autostart setting:', data.error);
-          // Revert checkbox state on error
           const autostartCheckbox = document.getElementById('autostart-amm');
           if (autostartCheckbox) {
             autostartCheckbox.checked = !checked;
@@ -1416,7 +1410,6 @@
       })
       .catch(error => {
         console.error('Error saving autostart setting:', error);
-        // Revert checkbox state on error
         const autostartCheckbox = document.getElementById('autostart-amm');
         if (autostartCheckbox) {
           autostartCheckbox.checked = !checked;
