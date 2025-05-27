@@ -28,6 +28,7 @@ amm_state_file = DEFAULT_AMM_STATE_FILE
 amm_host = "127.0.0.1"
 amm_port = 12700
 amm_debug = False
+amm_ui_debug = False
 
 
 def ensure_amm_dir(swap_client):
@@ -51,9 +52,9 @@ def get_amm_state_path(swap_client, state_file=None):
     return os.path.join(ensure_amm_dir(swap_client), state_file)
 
 
-def get_amm_module_path():
-    """Get the path to the AMM module"""
-    return "basicswap.amm.createoffers"
+def get_amm_script_path(swap_client):
+    """Get the path to the AMM script"""
+    return os.path.join(swap_client.data_dir, "basicswap", "scripts", "createoffers.py")
 
 
 def log_capture_thread(process, swap_client):
@@ -97,13 +98,109 @@ def log_capture_thread(process, swap_client):
         swap_client.log.info("AMM process has stopped.")
 
 
+def check_existing_amm_processes():
+    """Check for existing AMM processes and return their PIDs"""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["ps", "aux"], capture_output=True, text=True, timeout=10
+        )
+
+        existing_pids = []
+        for line in result.stdout.split("\n"):
+            if (
+                (
+                    "basicswap.amm.createoffers" in line
+                    or "scripts/createoffers.py" in line
+                    or "createoffers.py" in line
+                )
+                and "grep" not in line
+                and "python" in line
+            ):
+                parts = line.split()
+                if len(parts) > 1:
+                    try:
+                        pid = int(parts[1])
+                        existing_pids.append(pid)
+                    except (ValueError, IndexError):
+                        continue
+
+        return existing_pids
+    except Exception as e:
+        print(f"Error checking for existing AMM processes: {e}")
+        return []
+
+
+def kill_existing_amm_processes(swap_client):
+    """Kill any existing AMM processes"""
+    existing_pids = check_existing_amm_processes()
+
+    if not existing_pids:
+        return True, "No existing AMM processes found"
+
+    killed_pids = []
+    failed_pids = []
+
+    for pid in existing_pids:
+        try:
+            import os
+            import signal
+
+            os.kill(pid, signal.SIGTERM)
+
+            import time
+
+            time.sleep(1)
+
+            try:
+                os.kill(pid, 0)
+                os.kill(pid, signal.SIGKILL)
+                swap_client.log.warning(f"Force killed AMM process {pid}")
+            except ProcessLookupError:
+                pass
+
+            killed_pids.append(pid)
+            swap_client.log.info(f"Terminated existing AMM process {pid}")
+
+        except ProcessLookupError:
+            killed_pids.append(pid)
+        except PermissionError:
+            failed_pids.append(pid)
+            swap_client.log.error(f"Permission denied killing AMM process {pid}")
+        except Exception as e:
+            failed_pids.append(pid)
+            swap_client.log.error(f"Failed to kill AMM process {pid}: {e}")
+
+    if failed_pids:
+        return (
+            False,
+            f"Failed to kill processes: {failed_pids}. You may need to kill them manually with: sudo kill -9 {' '.join(map(str, failed_pids))}",
+        )
+
+    if killed_pids:
+        return (
+            True,
+            f"Terminated {len(killed_pids)} existing AMM process(es): {killed_pids}",
+        )
+
+    return True, "No AMM processes needed termination"
+
+
 def start_amm_process(
     swap_client, host, port, config_file=None, state_file=None, debug=False
 ):
-    """Start the AMM process"""
+    """Start the AMM process with proper duplicate prevention"""
     global amm_process, amm_log_buffer, amm_status, amm_config_file, amm_state_file, amm_debug
 
     amm_debug = debug
+
+    existing_pids = check_existing_amm_processes()
+    if existing_pids:
+        return (
+            False,
+            f"AMM processes already running with PIDs: {existing_pids}. Please stop them first or use the 'Force Start' option.",
+        )
 
     if amm_process is not None and amm_process.poll() is None:
         return False, "AMM process is already running"
@@ -134,11 +231,10 @@ def start_amm_process(
         with open(config_path, "w") as f:
             json.dump(default_config, f, indent=4)
 
-    module_path = get_amm_module_path()
+    script_path = get_amm_script_path(swap_client)
     cmd = [
         sys.executable,
-        "-m",
-        module_path,
+        script_path,
         "--host",
         host,
         "--port",
@@ -181,32 +277,72 @@ def start_amm_process(
         return False, f"Failed to start AMM process: {str(e)}"
 
 
-def stop_amm_process():
-    """Stop the AMM process"""
-    global amm_status
+def start_amm_process_force(
+    swap_client, host, port, config_file=None, state_file=None, debug=False
+):
+    """Force start AMM process by killing existing ones first"""
+    kill_success, kill_msg = kill_existing_amm_processes(swap_client)
 
-    if amm_process is None or amm_process.poll() is not None:
-        return False, "AMM process is not running"
+    if not kill_success:
+        return False, f"Failed to kill existing processes: {kill_msg}"
 
-    try:
-        amm_process.terminate()
+    import time
 
-        for _ in range(10):
-            if amm_process.poll() is not None:
-                break
-            time.sleep(0.1)
+    time.sleep(2)
 
-        if amm_process.poll() is None:
-            amm_process.kill()
-            amm_process.wait(timeout=5)
+    return start_amm_process(swap_client, host, port, config_file, state_file, debug)
 
-        with amm_log_lock:
-            amm_status = "stopped"
-            amm_log_buffer.append("AMM process stopped.")
 
-        return True, "AMM process stopped"
-    except Exception as e:
-        return False, f"Failed to stop AMM process: {str(e)}"
+def stop_amm_process(swap_client=None):
+    """Stop the AMM process and any orphaned processes"""
+    global amm_status, amm_process
+
+    stopped_processes = []
+    errors = []
+
+    if amm_process is not None and amm_process.poll() is None:
+        try:
+            amm_process.terminate()
+
+            for _ in range(30):
+                if amm_process.poll() is not None:
+                    break
+                time.sleep(0.1)
+
+            if amm_process.poll() is None:
+                amm_process.kill()
+                amm_process.wait(timeout=5)
+
+            stopped_processes.append(f"Main AMM process (PID: {amm_process.pid})")
+
+        except Exception as e:
+            errors.append(f"Failed to stop main AMM process: {str(e)}")
+
+    if swap_client:
+        try:
+            kill_success, kill_msg = kill_existing_amm_processes(swap_client)
+            if kill_success and "Terminated" in kill_msg:
+                stopped_processes.append("Orphaned AMM processes")
+            elif not kill_success:
+                errors.append(kill_msg)
+        except Exception as e:
+            errors.append(f"Failed to check for orphaned processes: {str(e)}")
+
+    with amm_log_lock:
+        amm_status = "stopped"
+        if stopped_processes:
+            amm_log_buffer.append(f"Stopped: {', '.join(stopped_processes)}")
+        if errors:
+            amm_log_buffer.append(f"Errors: {', '.join(errors)}")
+
+    amm_process = None
+
+    if errors:
+        return False, f"Stopped with errors: {'; '.join(errors)}"
+    elif stopped_processes:
+        return True, f"Successfully stopped: {', '.join(stopped_processes)}"
+    else:
+        return True, "No AMM processes were running"
 
 
 def get_amm_status():
@@ -243,6 +379,33 @@ def get_amm_active_count(swap_client, debug_override=False):
                 f"AMM state file not found at {state_path}, returning count 0"
             )
         return 0
+
+    config_path = get_amm_config_path(swap_client)
+    enabled_offers = set()
+    enabled_bids = set()
+
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r") as f:
+                config_data = json.load(f)
+
+            for offer in config_data.get("offers", []):
+                if offer.get("enabled", False):
+                    enabled_offers.add(offer.get("name", ""))
+
+            for bid in config_data.get("bids", []):
+                if bid.get("enabled", False):
+                    enabled_bids.add(bid.get("name", ""))
+
+            if debug_enabled:
+                swap_client.log.info(f"Enabled offer templates: {enabled_offers}")
+                swap_client.log.info(f"Enabled bid templates: {enabled_bids}")
+
+        except Exception as e:
+            if debug_enabled:
+                swap_client.log.error(f"Error reading config file: {str(e)}")
+            enabled_offers = None
+            enabled_bids = None
 
     state_data = {}
     active_network_offers = {}
@@ -361,33 +524,53 @@ def get_amm_active_count(swap_client, debug_override=False):
 
         if "offers" in state_data:
             for template_name, offers in state_data["offers"].items():
-                active_offer_count = 0
-                for offer in offers:
-                    if (
-                        "offer_id" in offer
-                        and offer["offer_id"] in active_network_offers
-                    ):
-                        active_offer_count += 1
+                if enabled_offers is None or template_name in enabled_offers:
+                    active_offer_count = 0
+                    for offer in offers:
+                        if (
+                            "offer_id" in offer
+                            and offer["offer_id"] in active_network_offers
+                        ):
+                            active_offer_count += 1
 
-                amm_count += active_offer_count
-                if debug_enabled:
-                    total_offers = len(offers)
+                    amm_count += active_offer_count
+                    if debug_enabled:
+                        total_offers = len(offers)
+                        enabled_status = (
+                            "enabled"
+                            if enabled_offers is None or template_name in enabled_offers
+                            else "disabled"
+                        )
+                        swap_client.log.info(
+                            f"Template '{template_name}' ({enabled_status}): {active_offer_count} active out of {total_offers} total offers"
+                        )
+                elif debug_enabled:
                     swap_client.log.info(
-                        f"Template '{template_name}': {active_offer_count} active out of {total_offers} total offers"
+                        f"Template '{template_name}' is disabled, skipping {len(offers)} offers"
                     )
 
         if "bids" in state_data:
             for template_name, bids in state_data["bids"].items():
-                active_bid_count = 0
-                for bid in bids:
-                    if "bid_id" in bid and bid.get("active", False):
-                        active_bid_count += 1
+                if enabled_bids is None or template_name in enabled_bids:
+                    active_bid_count = 0
+                    for bid in bids:
+                        if "bid_id" in bid and bid.get("active", False):
+                            active_bid_count += 1
 
-                amm_count += active_bid_count
-                if debug_enabled:
-                    total_bids = len(bids)
+                    amm_count += active_bid_count
+                    if debug_enabled:
+                        total_bids = len(bids)
+                        enabled_status = (
+                            "enabled"
+                            if enabled_bids is None or template_name in enabled_bids
+                            else "disabled"
+                        )
+                        swap_client.log.info(
+                            f"Template '{template_name}' ({enabled_status}): {active_bid_count} active out of {total_bids} total bids"
+                        )
+                elif debug_enabled:
                     swap_client.log.info(
-                        f"Template '{template_name}': {active_bid_count} active out of {total_bids} total bids"
+                        f"Template '{template_name}' is disabled, skipping {len(bids)} bids"
                     )
 
         if debug_enabled:
@@ -475,7 +658,7 @@ def get_amm_active_count(swap_client, debug_override=False):
 
 def page_amm(self, _, post_string):
     """Render the AMM page"""
-    global amm_host, amm_port, amm_debug
+    global amm_host, amm_port, amm_debug, amm_ui_debug
 
     server = self.server
     swap_client = server.swap_client
@@ -499,8 +682,8 @@ def page_amm(self, _, post_string):
     config_exists = os.path.exists(config_path)
     state_exists = os.path.exists(state_path)
 
-    script_exists = True
-    script_path = get_amm_module_path()
+    script_path = get_amm_script_path(swap_client)
+    script_exists = os.path.exists(script_path)
 
     config_content = ""
     config_data = {}
@@ -536,14 +719,12 @@ def page_amm(self, _, post_string):
             "bids": [],
         }
 
-        # Add debug-only settings if in debug mode
         if swap_client.debug:
             default_config["prune_state_delay"] = 120
             default_config["prune_state_after_seconds"] = 604800
             default_config["min_seconds_between_bids"] = 60
             default_config["max_seconds_between_bids"] = 240
 
-            # Add example bid in debug mode
             default_config["bids"] = [
                 {
                     "id": "bid5678",
@@ -581,7 +762,8 @@ def page_amm(self, _, post_string):
             if "start" in form_data:
                 amm_host = form_data.get("host", ["127.0.0.1"])[0]
                 amm_port = int(form_data.get("port", ["12700"])[0])
-                amm_debug = "debug" in form_data
+                amm_ui_debug = "debug" in form_data
+                amm_debug = amm_ui_debug
 
                 success, msg = start_amm_process(
                     swap_client, amm_host, amm_port, debug=amm_debug
@@ -591,32 +773,93 @@ def page_amm(self, _, post_string):
                 else:
                     err_messages.append(msg)
 
-            elif "stop" in form_data:
-                # Stop AMM process
-                success, msg = stop_amm_process()
-                if success:
-                    messages.append(msg)
-                else:
-                    err_messages.append(msg)
-
-            elif "restart" in form_data:
-                # Restart AMM process
-                stop_amm_process()
-                time.sleep(1)
-
+            elif "force_start" in form_data:
                 amm_host = form_data.get("host", ["127.0.0.1"])[0]
                 amm_port = int(form_data.get("port", ["12700"])[0])
-                amm_debug = "debug" in form_data
+                amm_ui_debug = "debug" in form_data
+                amm_debug = amm_ui_debug
 
-                success, msg = start_amm_process(
+                success, msg = start_amm_process_force(
                     swap_client, amm_host, amm_port, debug=amm_debug
                 )
                 if success:
-                    messages.append("AMM process restarted: " + msg)
+                    messages.append(f"Force started: {msg}")
                 else:
-                    err_messages.append("Failed to restart AMM process: " + msg)
+                    err_messages.append(f"Force start failed: {msg}")
 
-            elif "save_config" in form_data:
+            elif "stop" in form_data:
+                success, msg = stop_amm_process(swap_client)
+                if success:
+                    messages.append(msg)
+                else:
+                    err_messages.append(msg)
+
+            elif "check_processes" in form_data:
+                existing_pids = check_existing_amm_processes()
+                if existing_pids:
+                    messages.append(f"Found existing AMM processes: {existing_pids}")
+                else:
+                    messages.append("No existing AMM processes found")
+
+            elif "kill_orphans" in form_data:
+                # Kill orphaned AMM processes
+                success, msg = kill_existing_amm_processes(swap_client)
+                if success:
+                    messages.append(msg)
+                else:
+                    err_messages.append(msg)
+
+            if "autostart" in form_data:
+                swap_client.settings["amm_autostart"] = True
+                swap_client.log.info("AMM autostart enabled")
+                messages.append("AMM autostart enabled")
+                try:
+                    import shutil
+                    from basicswap import config as cfg
+
+                    settings_path = os.path.join(
+                        swap_client.data_dir, cfg.CONFIG_FILENAME
+                    )
+                    settings_path_new = settings_path + ".new"
+                    shutil.copyfile(settings_path, settings_path + ".last")
+                    with open(settings_path_new, "w") as fp:
+                        json.dump(swap_client.settings, fp, indent=4)
+                    shutil.move(settings_path_new, settings_path)
+                    swap_client.log.info(
+                        "AMM autostart setting saved to basicswap.json"
+                    )
+                except Exception as e:
+                    swap_client.log.error(f"Failed to save autostart setting: {str(e)}")
+                    err_messages.append(f"Failed to save autostart setting: {str(e)}")
+            else:
+                if "amm_autostart" in swap_client.settings:
+                    del swap_client.settings["amm_autostart"]
+                    swap_client.log.info("AMM autostart disabled")
+                    messages.append("AMM autostart disabled")
+                    try:
+                        import shutil
+                        from basicswap import config as cfg
+
+                        settings_path = os.path.join(
+                            swap_client.data_dir, cfg.CONFIG_FILENAME
+                        )
+                        settings_path_new = settings_path + ".new"
+                        shutil.copyfile(settings_path, settings_path + ".last")
+                        with open(settings_path_new, "w") as fp:
+                            json.dump(swap_client.settings, fp, indent=4)
+                        shutil.move(settings_path_new, settings_path)
+                        swap_client.log.info(
+                            "AMM autostart setting removed from basicswap.json"
+                        )
+                    except Exception as e:
+                        swap_client.log.error(
+                            f"Failed to save autostart setting: {str(e)}"
+                        )
+                        err_messages.append(
+                            f"Failed to save autostart setting: {str(e)}"
+                        )
+
+            if "save_config" in form_data:
                 config_content = form_data.get("config_content", [""])[0]
 
                 try:
@@ -823,15 +1066,16 @@ def page_amm(self, _, post_string):
                             "amount": 10.0,  # Amount to create the offer for
                             "minrate": 0.0001,  # Rate below which the offer won't drop
                             "ratetweakpercent": 0,  # Modify the offer rate from the fetched value (can be negative)
-                            "adjust_rates_based_on_market": True,  # Whether to adjust rates based on existing market offers
+                            "adjust_rates_based_on_market": False,  # Whether to adjust rates based on existing market offers
                             "amount_variable": True,  # Whether bidder can set a different amount
                             "address": "auto",  # Address offer is sent from (auto = generate new address per offer)
                             "min_coin_from_amt": 10.0,  # Won't generate offers if wallet balance would drop below this
                             "offer_valid_seconds": 3600,  # How long generated offers will be valid for
+                            "automation_strategy": "accept_all",  # Auto accept bids: "accept_all", "accept_known", or "none"
+                            "amount_step": 1.0,  # REQUIRED: Offer size increment for privacy (prevents revealing exact wallet balance)
                             # Optional settings
                             "swap_type": "adaptor_sig",  # Type of swap, defaults to "adaptor_sig"
                             "min_swap_amount": 0.001,  # Minimum purchase quantity when offer amount is variable
-                            # "amount_step": 1.0  # If set, offers will be created between "amount" and "min_coin_from_amt" in decrements
                         }
                     ],
                     "bids": [],  # Empty by default
@@ -863,6 +1107,7 @@ def page_amm(self, _, post_string):
                             "amount": 0.01,  # Amount to bid
                             "max_rate": 10000.0,  # Maximum rate for bids
                             "min_coin_to_balance": 1.0,  # Won't send bids if wallet amount would drop below this
+                            "offers_to_bid_on": "all",  # Which offers to bid on: "all", "auto_accept_only", or "known_only"
                             # Optional settings
                             "max_concurrent": 1,  # Maximum number of bids to have active at once
                             "amount_variable": True,  # Can send bids below the set amount where possible
@@ -890,8 +1135,8 @@ def page_amm(self, _, post_string):
     current_status = get_amm_status()
     logs = get_amm_logs()
 
-    amm_count = get_amm_active_count(swap_client, amm_debug)
-    if swap_client.debug and amm_debug:
+    amm_count = get_amm_active_count(swap_client, amm_ui_debug)
+    if swap_client.debug and amm_ui_debug:
         swap_client.log.info(f"AMM active count: {amm_count}")
         logs.append(
             f"AMM active count: {amm_count} (only counting offers that are currently active in the network)"
@@ -932,11 +1177,89 @@ def page_amm(self, _, post_string):
             "current_page": "amm",
             "amm_host": amm_host,
             "amm_port": amm_port,
-            "amm_debug": amm_debug,
+            "amm_debug": amm_ui_debug,
+            "amm_autostart": swap_client.settings.get("amm_autostart", False),
             "debug_ui_mode": swap_client.debug_ui,
             "coins": coins,
         },
     )
+
+
+def amm_autostart_api(swap_client, post_string, params=None):
+    """API endpoint to save AMM autostart setting"""
+    try:
+        if post_string:
+            if isinstance(post_string, bytes):
+                post_string_decoded = post_string.decode("utf-8")
+            else:
+                post_string_decoded = post_string
+
+            post_data = parse.parse_qs(post_string_decoded)
+            autostart_value = post_data.get("autostart", ["false"])[0]
+            autostart = autostart_value.lower() == "true"
+        else:
+            autostart_value = params.get("autostart", "false") if params else "false"
+            autostart = autostart_value.lower() == "true"
+
+        if autostart:
+            swap_client.settings["amm_autostart"] = True
+            swap_client.log.info("AMM autostart enabled via API")
+        else:
+            if "amm_autostart" in swap_client.settings:
+                del swap_client.settings["amm_autostart"]
+            swap_client.log.info("AMM autostart disabled via API")
+
+        try:
+            import shutil
+            from basicswap import config as cfg
+
+            settings_path = os.path.join(swap_client.data_dir, cfg.CONFIG_FILENAME)
+            settings_path_new = settings_path + ".new"
+            shutil.copyfile(settings_path, settings_path + ".last")
+            with open(settings_path_new, "w") as fp:
+                json.dump(swap_client.settings, fp, indent=4)
+            shutil.move(settings_path_new, settings_path)
+
+            return {
+                "success": True,
+                "autostart": autostart,
+                "message": f"Autostart {'enabled' if autostart else 'disabled'}",
+            }
+        except Exception as e:
+            swap_client.log.error(f"Failed to save autostart setting via API: {str(e)}")
+            return {"success": False, "error": f"Failed to save setting: {str(e)}"}
+
+    except Exception as e:
+        swap_client.log.error(f"AMM autostart API error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def amm_debug_api(swap_client, post_string, params=None):
+    """API endpoint to save AMM debug setting"""
+    try:
+        if post_string:
+            post_data = parse.parse_qs(post_string)
+            debug_enabled = post_data.get("debug", ["false"])[0].lower() == "true"
+        else:
+            debug_enabled = (
+                params.get("debug", "false").lower() == "true" if params else False
+            )
+
+        global amm_ui_debug
+        amm_ui_debug = debug_enabled
+        swap_client.log.info(
+            f"AMM UI debug {'enabled' if debug_enabled else 'disabled'} via API"
+        )
+
+        return {
+            "success": True,
+            "debug": debug_enabled,
+            "message": f"Debug {'enabled' if debug_enabled else 'disabled'}",
+        }
+
+    except Exception as e:
+        swap_client.log.error(f"AMM debug API error: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 
 def amm_status_api(swap_client, _, params=None):

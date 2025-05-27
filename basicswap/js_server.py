@@ -183,7 +183,18 @@ def js_wallets(self, url_split, post_string, is_json):
 
 def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
     swap_client = self.server.swap_client
-    swap_client.checkSystemStatus()
+
+    try:
+        swap_client.checkSystemStatus()
+    except Exception as e:
+        from basicswap.util import LockedCoinError
+        from basicswap.ui.util import getCoinName
+        if isinstance(e, LockedCoinError):
+            error_msg = f"Wallet must be unlocked to view offers. Please unlock your {getCoinName(e.coinid)} wallet."
+            return bytes(json.dumps({"error": error_msg, "locked": True}), "UTF-8")
+        else:
+            return bytes(json.dumps({"error": str(e)}), "UTF-8")
+
     offer_id = None
     if len(url_split) > 3:
         if url_split[3] == "new":
@@ -514,7 +525,18 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
 
 def js_sentbids(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
-    swap_client.checkSystemStatus()
+
+    try:
+        swap_client.checkSystemStatus()
+    except Exception as e:
+        from basicswap.util import LockedCoinError
+        from basicswap.ui.util import getCoinName
+        if isinstance(e, LockedCoinError):
+            error_msg = f"Wallet must be unlocked to view bids. Please unlock your {getCoinName(e.coinid)} wallet."
+            return bytes(json.dumps({"error": error_msg, "locked": True}), "UTF-8")
+        else:
+            return bytes(json.dumps({"error": str(e)}), "UTF-8")
+
     post_data = getFormData(post_string, is_json)
     offer_id, filters = parseBidFilters(post_data)
 
@@ -631,7 +653,18 @@ def js_rate(self, url_split, post_string, is_json) -> bytes:
 
 def js_index(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
-    swap_client.checkSystemStatus()
+
+    try:
+        swap_client.checkSystemStatus()
+    except Exception as e:
+        from basicswap.util import LockedCoinError
+        from basicswap.ui.util import getCoinName
+        if isinstance(e, LockedCoinError):
+            error_msg = f"Wallet must be unlocked to view summary. Please unlock your {getCoinName(e.coinid)} wallet."
+            return bytes(json.dumps({"error": error_msg, "locked": True}), "UTF-8")
+        else:
+            return bytes(json.dumps({"error": str(e)}), "UTF-8")
+
     return bytes(json.dumps(swap_client.getSummary()), "UTF-8")
 
 

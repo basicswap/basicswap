@@ -25,7 +25,6 @@ from . import __version__
 from .util import (
     dumpj,
     toBool,
-    LockedCoinError,
     format_timestamp,
 )
 from .chainparams import (
@@ -54,7 +53,7 @@ from .ui.page_automation import (
     page_automation_strategy_new,
 )
 
-from .ui.page_amm import page_amm, amm_status_api
+from .ui.page_amm import page_amm, amm_status_api, amm_autostart_api, amm_debug_api
 from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
 from .ui.page_tor import page_tor, get_tor_established_state
@@ -639,6 +638,20 @@ class HttpHandler(BaseHTTPRequestHandler):
         clear_cookie_header = self._clear_session_cookie()
         extra_headers.append(clear_cookie_header)
 
+        try:
+            from basicswap.ui.page_amm import stop_amm_process, get_amm_status
+
+            amm_status = get_amm_status()
+            if amm_status == "running":
+                swap_client.log.info("Web shutdown stopping AMM process...")
+                success, msg = stop_amm_process(swap_client)
+                if success:
+                    swap_client.log.info(f"AMM web shutdown: {msg}")
+                else:
+                    swap_client.log.warning(f"AMM web shutdown warning: {msg}")
+        except Exception as e:
+            swap_client.log.error(f"Error stopping AMM in web shutdown: {e}")
+
         swap_client.stopRunning()
 
         return self.page_info("Shutting down", extra_headers=extra_headers)
@@ -673,6 +686,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def handle_http(self, status_code, path, post_string="", is_json=False):
+        from basicswap.util import LockedCoinError
+        from basicswap.ui.util import getCoinName
+
         swap_client = self.server.swap_client
         parsed = parse.urlparse(self.path)
         url_split = parsed.path.split("/")
@@ -740,7 +756,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 func = js_url_to_function(url_split)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
-                if swap_client.debug is True:
+                if isinstance(ex, LockedCoinError):
+                    clean_msg = f"Wallet locked: {getCoinName(ex.coinid)} wallet must be unlocked"
+                    swap_client.log.warning(clean_msg)
+                    return js_error(self, clean_msg)
+                elif swap_client.debug is True:
                     swap_client.log.error(traceback.format_exc())
                 return js_error(self, str(ex))
 
@@ -858,6 +878,28 @@ class HttpHandler(BaseHTTPRequestHandler):
                         )
                         self.putHeaders(200, "application/json")
                         return json.dumps(status_data).encode("utf-8")
+                    elif len(url_split) > 2 and url_split[2] == "autostart":
+                        query_params = {}
+                        if parsed.query:
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        autostart_data = amm_autostart_api(
+                            swap_client, post_string, query_params
+                        )
+                        self.putHeaders(200, "application/json")
+                        return json.dumps(autostart_data).encode("utf-8")
+                    elif len(url_split) > 2 and url_split[2] == "debug":
+                        query_params = {}
+                        if parsed.query:
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        debug_data = amm_debug_api(
+                            swap_client, post_string, query_params
+                        )
+                        self.putHeaders(200, "application/json")
+                        return json.dumps(debug_data).encode("utf-8")
                     return page_amm(self, url_split, post_string)
                 if page == "shutdown":
                     return self.page_shutdown(url_split, post_string)

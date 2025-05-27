@@ -56,21 +56,19 @@
       <div class="flex justify-between items-center mb-4">
         <h3 class="text-xl font-bold text-coolGray-900 dark:text-white">AMM</h3>
         <div class="flex space-x-2">
-          <button id="add-new-offer-btn" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+          <button id="add-new-offer-btn" class="flex items-center px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Offer
           </button>
-          {% if debug_mode %}
-          <button id="add-new-bid-btn" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300">
+          <button id="add-new-bid-btn" class="flex items-center px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Bid
           </button>
-          {% endif %}
-          <button id="refreshAmmTables" class="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
+          <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
@@ -86,13 +84,11 @@
               Offers <span class="text-gray-500 dark:text-gray-400" id="offers-count">(0)</span>
             </button>
           </li>
-          {% if debug_mode %}
           <li class="mr-2" role="presentation">
             <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="bids-tab" data-tabs-target="#bids-content" type="button" role="tab" aria-controls="bids" aria-selected="false">
               Bids <span class="text-gray-500 dark:text-gray-400" id="bids-count">(0)</span>
             </button>
           </li>
-          {% endif %}
         </ul>
       </div>
 
@@ -104,7 +100,7 @@
                 <tr>
                   <th class="p-0">
                     <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Name & Settings</span>
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Name</span>
                     </div>
                   </th>
                   <th class="p-0">
@@ -124,11 +120,16 @@
                   </th>
                   <th class="p-0">
                     <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
+                    </div>
+                  </th>
+                  <th class="p-0">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
                       <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Status</span>
                     </div>
                   </th>
                   <th class="p-0">
-                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 rounded-tr-xl">
                       <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Actions</span>
                     </div>
                   </th>
@@ -136,7 +137,7 @@
               </thead>
               <tbody id="amm-offers-body">
                 <tr>
-                  <td colspan="6" class="py-4 px-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colspan="7" class="py-4 px-4 text-center text-gray-500 dark:text-gray-400">
                     Loading offers data...
                   </td>
                 </tr>
@@ -145,7 +146,6 @@
           </div>
         </div>
 
-        {% if debug_mode %}
         <div class="hidden" id="bids-content" role="tabpanel" aria-labelledby="bids-tab">
           <div class="overflow-x-auto">
             <table class="w-full min-w-max">
@@ -153,7 +153,7 @@
                 <tr>
                   <th class="p-0">
                     <div class="py-3 pl-4 justify-center rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Name & Settings</span>
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Name</span>
                     </div>
                   </th>
                   <th class="p-0">
@@ -173,6 +173,11 @@
                   </th>
                   <th class="p-0">
                     <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
+                      <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
+                    </div>
+                  </th>
+                  <th class="p-0">
+                    <div class="py-3 px-4 bg-coolGray-200 dark:bg-gray-600 text-center">
                       <span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Status</span>
                     </div>
                   </th>
@@ -185,7 +190,7 @@
               </thead>
               <tbody id="amm-bids-body">
                 <tr>
-                  <td colspan="6" class="py-4 px-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colspan="7" class="py-4 px-4 text-center text-gray-500 dark:text-gray-400">
                     Loading bids data...
                   </td>
                 </tr>
@@ -193,7 +198,6 @@
             </table>
           </div>
         </div>
-        {% endif %}
       </div>
      </div>
     </div>
@@ -223,6 +227,26 @@
         </div>
        </div>
 
+       <div id="startup-feedback" class="mb-4 hidden">
+        <div class="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+          <div class="flex items-center">
+            <svg id="startup-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <div>
+              <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200" id="startup-title">Starting AMM...</h4>
+              <p class="text-sm text-blue-700 dark:text-blue-300 mt-1" id="startup-message">Validating configuration and checking requirements...</p>
+            </div>
+          </div>
+          <div id="startup-progress" class="mt-3">
+            <div class="bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+              <div id="startup-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+       </div>
+
        {% if debug_ui_mode %}
        <div class="mb-4">
         <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Host</label>
@@ -240,28 +264,67 @@
 
        <div class="mb-4">
         <label class="flex items-center">
-         <input type="checkbox" id="amm_debug" name="debug" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" {% if amm_debug %}checked{% endif %}>
+         <input type="checkbox" id="debug-mode" name="debug" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" {% if amm_debug %}checked{% endif %}>
          <span class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Debug Mode</span>
         </label>
        </div>
 
+       <div class="mb-4">
+        <label class="flex items-center">
+         <input type="checkbox" id="autostart-amm" name="autostart" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" {% if amm_autostart %}checked{% endif %}>
+         <span class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Auto-start with BasicSwap</span>
+        </label>
+        <small class="text-xs text-gray-500 dark:text-gray-400 ml-6">Automatically start AMM when BasicSwap starts</small>
+       </div>
+
        <div class="flex flex-wrap gap-2">
-        <button type="submit" name="start" value="1" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:outline-none focus:ring-green-300 dark:bg-green-600 dark:hover:bg-green-700 dark:focus:ring-green-800"
+        <button type="submit" name="start" value="1" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'running' %}disabled{% endif %}>
+         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-6V7a3 3 0 00-3-3H6a3 3 0 00-3 3v1"></path>
+         </svg>
          Start
         </button>
-        <button type="submit" name="stop" value="1" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-800"
+        <button type="submit" name="force_start" value="1" class="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 font-medium text-sm text-white border border-orange-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" title="Kill existing AMM processes and start fresh">
+         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+         </svg>
+         Force Start
+        </button>
+        <button type="submit" name="stop" value="1" class="px-4 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'stopped' %}disabled{% endif %}>
+         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6v4H9z"></path>
+         </svg>
          Stop
         </button>
-        <button type="submit" name="restart" value="1" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
-         Restart
-        </button>
+       </div>
+
+       <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+         <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Process Management</h4>
+         <div class="flex flex-wrap gap-2">
+           <button type="submit" name="check_processes" value="1" class="inline-flex items-center px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-md shadow-sm focus:ring-0 focus:outline-none">
+             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+             </svg>
+             Check Processes
+           </button>
+           <button type="submit" name="kill_orphans" value="1" class="inline-flex items-center px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-medium rounded-md shadow-sm focus:ring-0 focus:outline-none" title="Kill orphaned AMM processes">
+             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+             </svg>
+             Kill Orphans
+           </button>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+           Use "Check Processes" to see running AMM processes. Use "Kill Orphans" to clean up duplicate processes. Use "Force Start" to automatically clean up and start fresh.
+         </p>
        </div>
       </form>
      </div>
 
-     {% if debug_mode %}
+     {% if debug_ui_mode %}
      <div class="mt-6 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
       <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">Files</h3>
       <div class="mb-4">
@@ -289,6 +352,8 @@
         <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Integrated</span>
        </p>
       </div>
+
+
      </div>
      {% endif %}
     </div>
@@ -327,8 +392,8 @@
                 </div>
                 {% endif %}
                 <div class="flex justify-between">
-                  <button type="submit" name="create_default" value="true" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg">Create Default Config</button>
-                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg">Save Config</button>
+                  <button type="submit" name="create_default" value="true" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Default Config</button>
+                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Config</button>
                 </div>
               </div>
             </div>
@@ -390,7 +455,7 @@
               </div>
 
               <div class="flex justify-end">
-                <button type="button" id="save_settings_btn" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg">Save Settings</button>
+                <button type="button" id="save_settings_btn" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Settings</button>
               </div>
             </div>
           </div>
@@ -403,45 +468,45 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
-              <div id="general-settings-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+              <div id="general-settings-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden overflow-hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Offer Timing</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">min_seconds_between_offers:</span> Minimum delay between creating offers (default: 60)</li>
-                      <li><span class="font-semibold">max_seconds_between_offers:</span> Maximum delay between creating offers (default: 240)</li>
+                      <li class="break-words"><span class="font-semibold">min_seconds_between_offers:</span> Minimum delay between creating offers (default: 60)</li>
+                      <li class="break-words"><span class="font-semibold">max_seconds_between_offers:</span> Maximum delay between creating offers (default: 240)</li>
                     </ul>
                   </div>
-                  <div>
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Bid Timing</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids (default: 60)</li>
-                      <li><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids (default: 240)</li>
+                      <li class="break-words"><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids (default: 60)</li>
+                      <li class="break-words"><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids (default: 240)</li>
                     </ul>
                   </div>
                 </div>
 
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
+                <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Script Behavior</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">main_loop_delay:</span> Seconds between main loop iterations (10-1000)</li>
-                      <li><span class="font-semibold">auth:</span> Basicswap API auth string, e.g., "admin:password". Ignored if client auth is not enabled.</li>
-                      <li><span class="font-semibold">wallet_port_override:</span> If needed, uncomment and set to override wallet API port (for testing only)</li>
+                      <li class="break-words"><span class="font-semibold">main_loop_delay:</span> Seconds between main loop iterations (10-1000)</li>
+                      <li class="break-words"><span class="font-semibold">auth:</span> Basicswap API auth string, e.g., "admin:password". Ignored if client auth is not enabled.</li>
+                      <li class="break-words"><span class="font-semibold">wallet_port_override:</span> If needed, uncomment and set to override wallet API port (for testing only)</li>
                     </ul>
                   </div>
-                  <div>
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>State Management</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">prune_state_delay:</span> Seconds between pruning old state data (0 to disable)</li>
-                      <li><span class="font-semibold">prune_state_after_seconds:</span> How long to keep old state data (default: 7 days)</li>
+                      <li class="break-words"><span class="font-semibold">prune_state_delay:</span> Seconds between pruning old state data (0 to disable)</li>
+                      <li class="break-words"><span class="font-semibold">prune_state_after_seconds:</span> How long to keep old state data (default: 7 days)</li>
                     </ul>
                   </div>
-                  <div>
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Bid Settings</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids</li>
-                      <li><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids</li>
+                      <li class="break-words"><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids</li>
+                      <li class="break-words"><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids</li>
                     </ul>
                   </div>
                 </div>
@@ -455,35 +520,35 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
               </button>
-              <div id="offer-templates-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden">
-                <p class="text-sm font-bold text-gray-600 dark:text-gray-400 mb-3">
+              <div id="offer-templates-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden overflow-hidden">
+                <p class="text-sm font-bold text-gray-600 dark:text-gray-400 mb-3 break-words">
                   Offer templates define how the AMM creates offers. Each template can have the following settings:
                 </p>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Required Settings</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">name:</span> Template name, must be unique</li>
-                      <li><span class="font-semibold">enabled:</span> Set to true to enable this offer</li>
-                      <li><span class="font-semibold">coin_from:</span> Coin you send</li>
-                      <li><span class="font-semibold">coin_to:</span> Coin you receive</li>
-                      <li><span class="font-semibold">amount:</span> Amount to create the offer for</li>
-                      <li><span class="font-semibold">minrate:</span> Rate below which the offer won't drop</li>
-                      <li><span class="font-semibold">min_coin_from_amt:</span> Won't generate offers if wallet balance would drop below this</li>
+                      <li class="break-words"><span class="font-semibold">name:</span> Template name, must be unique</li>
+                      <li class="break-words"><span class="font-semibold">enabled:</span> Set to true to enable this offer</li>
+                      <li class="break-words"><span class="font-semibold">coin_from:</span> Coin you send</li>
+                      <li class="break-words"><span class="font-semibold">coin_to:</span> Coin you receive</li>
+                      <li class="break-words"><span class="font-semibold">amount:</span> Amount to create the offer for</li>
+                      <li class="break-words"><span class="font-semibold">minrate:</span> Rate below which the offer won't drop</li>
+                      <li class="break-words"><span class="font-semibold">min_coin_from_amt:</span> Won't generate offers if wallet balance would drop below this</li>
                     </ul>
                   </div>
-                  <div>
+                  <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Optional Settings</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">ratetweakpercent:</span> Modify the offer rate from the fetched value (can be negative)</li>
-                      <li><span class="font-semibold">adjust_rates_based_on_market:</span> Whether to adjust rates based on existing market offers (uses ratetweakpercent)</li>
-                      <li><span class="font-semibold">amount_variable:</span> Whether bidder can set a different amount</li>
-                      <li><span class="font-semibold">address:</span> Address offer is sent from (auto = generate new address per offer)</li>
-                      <li><span class="font-semibold">offer_valid_seconds:</span> How long generated offers will be valid for</li>
-                      <li><span class="font-semibold">swap_type:</span> Type of swap, defaults to "adaptor_sig"</li>
-                      <li><span class="font-semibold">min_swap_amount:</span> Minimum purchase quantity when offer amount is variable</li>
-                      <li><span class="font-semibold">amount_step:</span> If needed, uncomment and set to create offers between "amount" and "min_coin_from_amt" in decrements</li>
+                      <li class="break-words"><span class="font-semibold">ratetweakpercent:</span> Modify the offer rate from the fetched value (can be negative)</li>
+                      <li class="break-words"><span class="font-semibold">adjust_rates_based_on_market:</span> Whether to adjust rates based on existing market offers (uses ratetweakpercent)</li>
+                      <li class="break-words"><span class="font-semibold">amount_variable:</span> Whether bidder can set a different amount</li>
+                      <li class="break-words"><span class="font-semibold">address:</span> Address offer is sent from (auto = generate new address per offer)</li>
+                      <li class="break-words"><span class="font-semibold">offer_valid_seconds:</span> How long generated offers will be valid for</li>
+                      <li class="break-words"><span class="font-semibold">swap_type:</span> Type of swap, defaults to "adaptor_sig"</li>
+                      <li class="break-words"><span class="font-semibold">min_swap_amount:</span> Minimum purchase quantity when offer amount is variable</li>
+                      <li class="break-words"><span class="font-semibold">offer_size_increment (amount_step):</span> How much to adjust offer size when partially filled. Must be between 0.001 and your offer amount.</li>
                     </ul>
                   </div>
                 </div>
@@ -536,17 +601,6 @@
 
        <script>
          document.addEventListener('DOMContentLoaded', function() {
-           const debugCheckbox = document.getElementById('amm_debug');
-           if (debugCheckbox) {
-             const savedDebugState = localStorage.getItem('amm_debug_enabled');
-             if (savedDebugState !== null) {
-               debugCheckbox.checked = savedDebugState === 'true';
-             }
-
-             debugCheckbox.addEventListener('change', function() {
-               localStorage.setItem('amm_debug_enabled', this.checked ? 'true' : 'false');
-             });
-           }
 
            const configForm = document.querySelector('form[method="post"]');
            const saveConfigBtn = document.getElementById('save_config_btn');
@@ -684,8 +738,6 @@
                  config.auth = document.getElementById('auth').value;
 
                  delete config.adjust_rates_based_on_market;
-                 delete config.auto_accept_offers;
-                 delete config.auto_accept_bids;
 
                  configTextarea.value = JSON.stringify(config, null, 4);
 
@@ -789,7 +841,7 @@
        {% if debug_ui_mode %}
        <div class="mt-4">
          <form method="post">
-           <button type="submit" name="prune_state" value="true" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg" onclick="return confirm('This will clear the AMM state file. All running offers/bids will be lost. Are you sure?');">
+           <button type="button" id="clearStateBtn" class="px-4 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
              Clear AMM State
            </button>
            <input type="hidden" name="formid" value="{{ form_id }}">
@@ -838,8 +890,8 @@
                 <input type="hidden" id="add-amm-type">
 
                 <div>
-                  <label for="add-amm-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
-                  <input type="text" id="add-amm-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                  <label for="add-amm-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name <span class="text-red-500">*</span></label>
+                  <input type="text" id="add-amm-name" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g., Offer 1" required>
                 </div>
 
                 <div class="flex items-center">
@@ -850,38 +902,48 @@
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <label for="add-amm-coin-from" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coin From</label>
-                    <select id="add-amm-coin-from" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                      {% for c in coins %}
-                      <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                        {{ c[1] }}
-                      </option>
-                      {% endfor %}
-                    </select>
+                    <div class="relative">
+                      <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                      <select id="add-amm-coin-from" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                        {% for c in coins %}
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
+                          {{ c[1] }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
                     <label for="add-amm-coin-to" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coin To</label>
-                    <select id="add-amm-coin-to" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                      {% for c in coins %}
-                      <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                        {{ c[1] }}
-                      </option>
-                      {% endfor %}
-                    </select>
+                    <div class="relative">
+                      <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                      <select id="add-amm-coin-to" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                        {% for c in coins %}
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
+                          {{ c[1] }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <label for="add-amm-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
-                    <input type="text" id="add-amm-amount" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.0">
+                    <input type="text" id="add-amm-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
                   </div>
 
                   <div>
                     <label id="add-amm-rate-label" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate</label>
                     <div class="flex items-center gap-2">
-                      <input type="text" id="add-amm-rate" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.0">
-                      <button type="button" id="add-get-rate-button" class="mt-1 px-2 py-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm focus:outline-none">Get Rate</button>
+                      <input type="text" id="add-amm-rate" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                      <button type="button" id="add-get-rate-button" class="px-2 py-1.5 bg-blue-500 hover:bg-blue-600 font-medium text-xs text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Get Rate</button>
                     </div>
                   </div>
                 </div>
@@ -891,85 +953,128 @@
 
                     <div>
                       <label for="add-offer-ratetweakpercent" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate Tweak Percent</label>
-                      <input type="text" id="add-offer-ratetweakpercent" pattern="-?[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="0" placeholder="0">
+                      <input type="text" id="add-offer-ratetweakpercent" pattern="-?[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0" placeholder="0">
                     </div>
 
                     <div>
                       <label for="add-offer-min-coin-from-amt" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Coin From Amount</label>
-                      <input type="text" id="add-offer-min-coin-from-amt" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.0">
+                      <input type="text" id="add-offer-min-coin-from-amt" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="add-offer-valid-seconds" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Valid Seconds</label>
-                      <input type="text" id="add-offer-valid-seconds" pattern="[0-9]+" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="3600" placeholder="3600">
-                      <small class="text-xs text-gray-500 dark:text-gray-400">Minimum 600 seconds (10 minutes)</small>
+                      <input type="text" id="add-offer-valid-seconds" pattern="[0-9]+" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="3600" placeholder="3600">
+                      <small class="text-xs text-gray-500 dark:text-gray-400">Minimum 600 seconds (10 minutes). 3600 = 1 hour</small>
                     </div>
 
                     <div>
                       <label for="add-offer-address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                      <input type="text" id="add-offer-address" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="auto" value="auto">
+                      <input type="text" id="add-offer-address" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="auto" value="auto">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="add-offer-swap-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Swap Type</label>
-                      <select id="add-offer-swap-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                        <option value="adaptor_sig" data-desc="Adaptor Sig">Adaptor Sig</option>
-                        <option value="seller_first" data-desc="Secret Hash">Secret Hash</option>
-                      </select>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="add-offer-swap-type" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="adaptor_sig" data-desc="Adaptor Sig">Adaptor Sig</option>
+                          <option value="seller_first" data-desc="Secret Hash">Secret Hash</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div>
                       <label for="add-offer-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
-                      <input type="text" id="add-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="0.001" placeholder="0.001">
+                      <input type="text" id="add-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
-                      <label for="add-offer-amount-step" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Step (Optional)</label>
-                      <input type="text" id="add-offer-amount-step" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Leave empty for no stepping">
-                      <small class="text-xs text-gray-500 dark:text-gray-400">Default value when enabled is 1.0. Enter a decimal value (e.g., 0.1 or 0.00000001)</small>
+                      <label for="add-offer-amount-step" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Step <span class="text-red-500">*</span></label>
+                      <input type="text" id="add-offer-amount-step" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g., 5.0" required>
+                      <small class="text-xs text-gray-500 dark:text-gray-400">
+                        How much to adjust offer size when partially filled. Must be between 0.001 and your offer amount.
+                      </small>
                     </div>
 
-                    <div class="flex items-center h-full pt-6">
-                      <input type="checkbox" id="add-offer-adjust-rates" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600" checked>
-                      <label for="add-offer-adjust-rates" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Adjust Rates Based on Market</label>
+                    <div>
+                      <label for="add-offer-automation-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto Accept Bids</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="add-offer-automation-strategy" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="accept_known">Accept Known Identities</option>
+                          <option value="accept_all">Accept All Bids</option>
+                          <option value="none">No Auto Accept</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label for="add-offer-adjust-rates" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Adjust Rates Based on Market</label>
+                    <div class="relative">
+                      <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                      <select id="add-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                        <option value="false">No - Use CoinGecko only, fail if unavailable</option>
+                        <option value="true">Yes - Use higher of CoinGecko + orderbook, fail if both unavailable</option>
+                        <option value="only">Market Only - Use orderbook only, fail if no market rates</option>
+                      </select>
                     </div>
                   </div>
                 </div>
 
-                {% if debug_mode %}
                 <div id="add-bid-fields" class="hidden space-y-4">
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="add-bid-min-coin-to-balance" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Coin To Balance</label>
-                      <input type="text" id="add-bid-min-coin-to-balance" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="1.0" placeholder="1.0">
+                      <input type="text" id="add-bid-min-coin-to-balance" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="1.0" placeholder="1.0">
                     </div>
 
                     <div>
                       <label for="add-bid-max-concurrent" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Max Concurrent</label>
-                      <input type="text" id="add-bid-max-concurrent" pattern="[0-9]+" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="1" placeholder="1">
+                      <input type="text" id="add-bid-max-concurrent" pattern="[0-9]+" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="1" placeholder="1">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label for="add-bid-offers-to-bid-on" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offers to Bid On</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="add-bid-offers-to-bid-on" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="all">All Offers</option>
+                          <option value="auto_accept_only">Auto-Accept Offers Only</option>
+                          <option value="known_only">Known Identities Only</option>
+                        </select>
+                      </div>
+                    </div>
 
                     <div>
                       <label for="add-bid-address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                      <input type="text" id="add-bid-address" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="auto" value="auto">
+                      <input type="text" id="add-bid-address" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="auto" value="auto">
                     </div>
+                  </div>
 
+                  <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="add-bid-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
-                      <input type="text" id="add-bid-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" value="0.001" placeholder="0.001">
+                      <input type="text" id="add-bid-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
                     </div>
                   </div>
                 </div>
-                {% endif %}
 
               </form>
             </div>
@@ -977,10 +1082,10 @@
         </div>
       </div>
       <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-        <button type="button" id="add-amm-save" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+        <button type="button" id="add-amm-save" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:ring-0 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
           Add Item
         </button>
-        <button type="button" id="add-amm-cancel" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 dark:border-gray-500">
+        <button type="button" id="add-amm-cancel" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:ring-0 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 dark:border-gray-500">
           Cancel
         </button>
       </div>
@@ -1006,50 +1111,60 @@
                 <input type="hidden" id="edit-amm-original-name">
 
                 <div>
-                  <label for="edit-amm-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
-                  <input type="text" id="edit-amm-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                  <label for="edit-amm-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Name <span class="text-red-500">*</span></label>
+                  <input type="text" id="edit-amm-name" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" required>
                 </div>
 
                 <div class="flex items-center">
-                  <input type="checkbox" id="edit-amm-enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600">
+                  <input type="checkbox" id="edit-amm-enabled" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
                   <label for="edit-amm-enabled" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Enabled</label>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <label for="edit-amm-coin-from" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coin From</label>
-                    <select id="edit-amm-coin-from" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                      {% for c in coins %}
-                      <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                        {{ c[1] }}
-                      </option>
-                      {% endfor %}
-                    </select>
+                    <div class="relative">
+                      <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                      <select id="edit-amm-coin-from" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                        {% for c in coins %}
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
+                          {{ c[1] }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
                   </div>
 
                   <div>
                     <label for="edit-amm-coin-to" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Coin To</label>
-                    <select id="edit-amm-coin-to" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                      {% for c in coins %}
-                      <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                        {{ c[1] }}
-                      </option>
-                      {% endfor %}
-                    </select>
+                    <div class="relative">
+                      <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                      <select id="edit-amm-coin-to" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                        {% for c in coins %}
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
+                          {{ c[1] }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                   <div>
                     <label for="edit-amm-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
-                    <input type="text" id="edit-amm-amount" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.0">
+                    <input type="text" id="edit-amm-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
                   </div>
 
                   <div>
                     <label id="edit-amm-rate-label" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate</label>
                     <div class="flex items-center gap-2">
-                      <input type="text" id="edit-amm-rate" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.0">
-                      <button type="button" id="edit-get-rate-button" class="mt-1 px-2 py-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm focus:outline-none">Get Rate</button>
+                      <input type="text" id="edit-amm-rate" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                      <button type="button" id="edit-get-rate-button" class="px-2 py-1.5 bg-blue-500 hover:bg-blue-600 font-medium text-xs text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Get Rate</button>
                     </div>
                   </div>
                 </div>
@@ -1058,84 +1173,128 @@
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="edit-offer-ratetweakpercent" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate Tweak Percent</label>
-                      <input type="text" id="edit-offer-ratetweakpercent" pattern="-?[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0">
+                      <input type="text" id="edit-offer-ratetweakpercent" pattern="-?[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0">
                     </div>
 
                     <div>
                       <label for="edit-offer-min-coin-from-amt" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Coin From Amount</label>
-                      <input type="text" id="edit-offer-min-coin-from-amt" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.0">
+                      <input type="text" id="edit-offer-min-coin-from-amt" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="edit-offer-valid-seconds" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Valid Seconds</label>
-                      <input type="text" id="edit-offer-valid-seconds" pattern="[0-9]+" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="3600">
-                      <small class="text-xs text-gray-500 dark:text-gray-400">Minimum 600 seconds (10 minutes)</small>
+                      <input type="text" id="edit-offer-valid-seconds" pattern="[0-9]+" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="3600">
+                      <small class="text-xs text-gray-500 dark:text-gray-400">Minimum 600 seconds (10 minutes). 3600 = 1 hour</small>
                     </div>
 
                     <div>
                       <label for="edit-offer-address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                      <input type="text" id="edit-offer-address" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="auto">
+                      <input type="text" id="edit-offer-address" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="auto">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="edit-offer-swap-type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Swap Type</label>
-                      <select id="edit-offer-swap-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                        <option value="adaptor_sig" data-desc="Adaptor Sig">Adaptor Sig</option>
-                        <option value="seller_first" data-desc="Secret Hash">Secret Hash</option>
-                      </select>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="edit-offer-swap-type" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="adaptor_sig" data-desc="Adaptor Sig">Adaptor Sig</option>
+                          <option value="seller_first" data-desc="Secret Hash">Secret Hash</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div>
                       <label for="edit-offer-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
-                      <input type="text" id="edit-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.001">
+                      <input type="text" id="edit-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.001">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
-                      <label for="edit-offer-amount-step" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Step (Optional)</label>
-                      <input type="text" id="edit-offer-amount-step" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Leave empty for no stepping">
-                      <small class="text-xs text-gray-500 dark:text-gray-400">Default value when enabled is 1.0. Enter a decimal value (e.g., 0.1 or 0.00000001)</small>
+                      <label for="edit-offer-amount-step" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Step <span class="text-red-500">*</span></label>
+                      <input type="text" id="edit-offer-amount-step" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g., 5.0" required>
+                      <small class="text-xs text-gray-500 dark:text-gray-400">
+                        How much to adjust offer size when partially filled. Must be between 0.001 and your offer amount.
+                      </small>
                     </div>
 
-                    <div class="flex items-center h-full pt-6">
-                      <input type="checkbox" id="edit-offer-adjust-rates" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600">
-                      <label for="edit-offer-adjust-rates" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Adjust Rates Based on Market</label>
+                    <div>
+                      <label for="edit-offer-automation-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto Accept Bids</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="edit-offer-automation-strategy" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="accept_known">Accept Known Identities</option>
+                          <option value="accept_all">Accept All Bids</option>
+                          <option value="none">No Auto Accept</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label for="edit-offer-adjust-rates" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Adjust Rates Based on Market</label>
+                    <div class="relative">
+                      <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                      </svg>
+                      <select id="edit-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                        <option value="false">No - Use CoinGecko only, fail if unavailable</option>
+                        <option value="true">Yes - Use higher of CoinGecko + orderbook, fail if both unavailable</option>
+                        <option value="only">Market Only - Use orderbook only, fail if no market rates</option>
+                      </select>
                     </div>
                   </div>
                 </div>
 
-                {% if debug_mode %}
                 <div id="edit-bid-fields" class="hidden space-y-4">
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="edit-bid-min-coin-to-balance" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Coin To Balance</label>
-                      <input type="text" id="edit-bid-min-coin-to-balance" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="1.0">
+                      <input type="text" id="edit-bid-min-coin-to-balance" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="1.0">
                     </div>
 
                     <div>
                       <label for="edit-bid-max-concurrent" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Max Concurrent</label>
-                      <input type="text" id="edit-bid-max-concurrent" pattern="[0-9]+" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="1">
+                      <input type="text" id="edit-bid-max-concurrent" pattern="[0-9]+" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="1">
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
                     <div>
-                      <label for="edit-bid-address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                      <input type="text" id="edit-bid-address" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="auto">
+                      <label for="edit-bid-offers-to-bid-on" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offers to Bid On</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="edit-bid-offers-to-bid-on" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="all">All Offers</option>
+                          <option value="auto_accept_only">Auto-Accept Offers Only</option>
+                          <option value="known_only">Known Identities Only</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div>
+                      <label for="edit-bid-address" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
+                      <input type="text" id="edit-bid-address" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="auto">
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
                       <label for="edit-bid-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
-                      <input type="text" id="edit-bid-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="0.001">
+                      <input type="text" id="edit-bid-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.001">
                     </div>
                   </div>
                 </div>
-                {% endif %}
 
               </form>
             </div>
@@ -1143,10 +1302,10 @@
         </div>
       </div>
       <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-        <button type="button" id="edit-amm-save" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+        <button type="button" id="edit-amm-save" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:ring-0 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
           Save Changes
         </button>
-        <button type="button" id="edit-amm-cancel" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 dark:border-gray-500">
+        <button type="button" id="edit-amm-cancel" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:ring-0 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 dark:border-gray-500">
           Cancel
         </button>
       </div>
@@ -1154,5 +1313,395 @@
   </div>
 </div>
 
+<!-- Error Modal -->
+<div id="errorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
+          <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="errorTitle">Error</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="errorMessage">An error occurred</p>
+        <div class="flex justify-center">
+          <button type="button" id="errorOk"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="confirmTitle">Confirm Action</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+        <div class="flex justify-center gap-4">
+          <button type="button" id="confirmYes"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Confirm
+          </button>
+          <button type="button" id="confirmNo"
+                  class="px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/static/js/amm_tables.js"></script>
+  <script>
+    function saveDebugSetting() {
+      const debugCheckbox = document.getElementById('debug-mode');
+      if (debugCheckbox) {
+        localStorage.setItem('amm_debug_enabled', debugCheckbox.checked);
+        console.log('Debug setting saved:', debugCheckbox.checked);
+      }
+    }
+
+    function loadDebugSetting() {
+      const debugCheckbox = document.getElementById('debug-mode');
+      if (debugCheckbox) {
+        const savedSetting = localStorage.getItem('amm_debug_enabled');
+        if (savedSetting !== null) {
+          debugCheckbox.checked = savedSetting === 'true';
+          console.log('Debug setting loaded:', savedSetting);
+        }
+      }
+    }
+
+    function saveAutostartSetting() {
+      const autostartCheckbox = document.getElementById('autostart-amm');
+      if (autostartCheckbox) {
+        localStorage.setItem('amm_autostart_enabled', autostartCheckbox.checked);
+        console.log('Autostart setting saved:', autostartCheckbox.checked);
+      }
+    }
+
+    function loadAutostartSetting() {
+      const autostartCheckbox = document.getElementById('autostart-amm');
+      if (autostartCheckbox) {
+        const savedSetting = localStorage.getItem('amm_autostart_enabled');
+        if (savedSetting !== null) {
+          autostartCheckbox.checked = savedSetting === 'true';
+          console.log('Autostart setting loaded:', savedSetting);
+        }
+      }
+    }
+
+    function showErrorModal(title, message) {
+      document.getElementById('errorTitle').textContent = title || 'Error';
+      document.getElementById('errorMessage').textContent = message || 'An error occurred';
+      const modal = document.getElementById('errorModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+    }
+
+    function hideErrorModal() {
+      const modal = document.getElementById('errorModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function showConfirmModal(title, message, callback) {
+      document.getElementById('confirmTitle').textContent = title || 'Confirm Action';
+      document.getElementById('confirmMessage').textContent = message || 'Are you sure?';
+      const modal = document.getElementById('confirmModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+
+      window.confirmCallback = callback;
+    }
+
+    function hideConfirmModal() {
+      const modal = document.getElementById('confirmModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+      window.confirmCallback = null;
+    }
+
+    function setupStartupValidation() {
+      const controlForm = document.querySelector('form[method="post"]');
+      if (!controlForm) return;
+
+      const startButton = controlForm.querySelector('input[name="start"]');
+      if (!startButton) return;
+
+      startButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        performStartupValidation();
+      });
+    }
+
+    function performStartupValidation() {
+      const feedbackDiv = document.getElementById('startup-feedback');
+      const titleEl = document.getElementById('startup-title');
+      const messageEl = document.getElementById('startup-message');
+      const progressBar = document.getElementById('startup-progress-bar');
+
+      feedbackDiv.classList.remove('hidden');
+
+      let progress = 0;
+      const steps = [
+        { message: 'Checking configuration...', progress: 20 },
+        { message: 'Validating offers and bids...', progress: 40 },
+        { message: 'Checking wallet balances...', progress: 60 },
+        { message: 'Verifying API connection...', progress: 80 },
+        { message: 'Starting AMM process...', progress: 100 }
+      ];
+
+      let currentStep = 0;
+
+      function runNextStep() {
+        if (currentStep >= steps.length) {
+          submitStartForm();
+          return;
+        }
+
+        const step = steps[currentStep];
+        messageEl.textContent = step.message;
+        progressBar.style.width = step.progress + '%';
+
+        setTimeout(() => {
+          validateStep(currentStep).then(result => {
+            if (result.success) {
+              currentStep++;
+              runNextStep();
+            } else {
+              showStartupError(result.error);
+            }
+          }).catch(error => {
+            showStartupError('Validation failed: ' + error.message);
+          });
+        }, 500);
+      }
+
+      runNextStep();
+    }
+
+    async function validateStep(stepIndex) {
+      try {
+        switch (stepIndex) {
+          case 0:
+            return await validateConfiguration();
+          case 1:
+            return await validateOffersAndBids();
+          case 2:
+            return await validateWalletBalances();
+          case 3:
+            return await validateApiConnection();
+          case 4:
+            return { success: true };
+          default:
+            return { success: true };
+        }
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+
+    async function validateConfiguration() {
+      const configData = window.ammTablesConfig?.configData;
+      if (!configData) {
+        return { success: false, error: 'No configuration found. Please save a configuration first.' };
+      }
+
+      if (!configData.min_seconds_between_offers || !configData.max_seconds_between_offers) {
+        return { success: false, error: 'Missing timing configuration. Please check your settings.' };
+      }
+
+      return { success: true };
+    }
+
+    async function validateOffersAndBids() {
+      const configData = window.ammTablesConfig?.configData;
+      if (!configData) {
+        return { success: false, error: 'Configuration not available for validation.' };
+      }
+
+      const offers = configData.offers || [];
+      const bids = configData.bids || [];
+      const enabledOffers = offers.filter(o => o.enabled);
+      const enabledBids = bids.filter(b => b.enabled);
+
+      if (enabledOffers.length === 0 && enabledBids.length === 0) {
+        return { success: false, error: 'No enabled offers or bids found. Please enable at least one offer or bid before starting.' };
+      }
+
+      for (const offer of enabledOffers) {
+        if (!offer.amount_step) {
+          return { success: false, error: `Offer "${offer.name}" is missing required Amount Step (privacy feature).` };
+        }
+
+        const amountStep = parseFloat(offer.amount_step);
+        const amount = parseFloat(offer.amount);
+
+        if (amountStep <= 0 || amountStep < 0.001) {
+          return { success: false, error: `Offer "${offer.name}" has invalid Amount Step. Must be >= 0.001.` };
+        }
+
+        if (amountStep > amount) {
+          return { success: false, error: `Offer "${offer.name}" Amount Step (${amountStep}) cannot be greater than offer amount (${amount}).` };
+        }
+      }
+
+      return { success: true };
+    }
+
+    async function validateWalletBalances() {
+      const configData = window.ammTablesConfig?.configData;
+      if (!configData) return { success: true };
+
+      const offers = configData.offers || [];
+      const enabledOffers = offers.filter(o => o.enabled);
+
+      for (const offer of enabledOffers) {
+        if (!offer.min_coin_from_amt || parseFloat(offer.min_coin_from_amt) <= 0) {
+          return { success: false, error: `Offer "${offer.name}" needs a minimum coin amount to protect your wallet balance.` };
+        }
+      }
+
+      return { success: true };
+    }
+
+    async function validateApiConnection() {
+      return { success: true };
+    }
+
+    function showStartupError(errorMessage) {
+      const feedbackDiv = document.getElementById('startup-feedback');
+      feedbackDiv.classList.add('hidden');
+
+      if (window.showErrorModal) {
+        window.showErrorModal('AMM Startup Failed', errorMessage);
+      } else {
+        alert('AMM Startup Failed: ' + errorMessage);
+      }
+    }
+
+    function submitStartForm() {
+      const feedbackDiv = document.getElementById('startup-feedback');
+      const titleEl = document.getElementById('startup-title');
+      const messageEl = document.getElementById('startup-message');
+
+      titleEl.textContent = 'Starting AMM...';
+      messageEl.textContent = 'AMM process is starting. Please wait...';
+
+      const controlForm = document.querySelector('form[method="post"]');
+      if (controlForm) {
+        const formData = new FormData(controlForm);
+        formData.append('start', 'Start');
+
+        fetch(window.location.pathname, {
+          method: 'POST',
+          body: formData
+        }).then(response => {
+          if (response.ok) {
+            window.location.reload();
+          } else {
+            throw new Error('Failed to start AMM');
+          }
+        }).catch(error => {
+          showStartupError('Failed to start AMM: ' + error.message);
+        });
+      }
+    }
+
+    window.showErrorModal = showErrorModal;
+    window.hideErrorModal = hideErrorModal;
+    window.showConfirmModal = showConfirmModal;
+    window.hideConfirmModal = hideConfirmModal;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadDebugSetting();
+      loadAutostartSetting();
+
+      setupStartupValidation();
+
+      const debugCheckbox = document.getElementById('debug-mode');
+      if (debugCheckbox) {
+        debugCheckbox.addEventListener('change', saveDebugSetting);
+      }
+
+      const autostartCheckbox = document.getElementById('autostart-amm');
+      if (autostartCheckbox) {
+        autostartCheckbox.addEventListener('change', saveAutostartSetting);
+      }
+
+      const errorOkBtn = document.getElementById('errorOk');
+      if (errorOkBtn) {
+        errorOkBtn.addEventListener('click', hideErrorModal);
+      }
+
+      const errorModal = document.getElementById('errorModal');
+      if (errorModal) {
+        errorModal.addEventListener('click', function(e) {
+          if (e.target === errorModal) {
+            hideErrorModal();
+          }
+        });
+      }
+
+      const confirmYesBtn = document.getElementById('confirmYes');
+      if (confirmYesBtn) {
+        confirmYesBtn.addEventListener('click', function() {
+          if (window.confirmCallback && typeof window.confirmCallback === 'function') {
+            window.confirmCallback();
+          }
+          hideConfirmModal();
+        });
+      }
+
+      const confirmNoBtn = document.getElementById('confirmNo');
+      if (confirmNoBtn) {
+        confirmNoBtn.addEventListener('click', hideConfirmModal);
+      }
+
+      const confirmModal = document.getElementById('confirmModal');
+      if (confirmModal) {
+        confirmModal.addEventListener('click', function(e) {
+          if (e.target === confirmModal) {
+            hideConfirmModal();
+          }
+        });
+      }
+
+      const clearStateBtn = document.getElementById('clearStateBtn');
+      if (clearStateBtn) {
+        clearStateBtn.addEventListener('click', function() {
+          showConfirmModal(
+            'Clear AMM State',
+            'This will clear the AMM state file. All running offers/bids will be lost. Are you sure?',
+            function() {
+              const form = clearStateBtn.closest('form');
+              if (form) {
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = 'prune_state';
+                hiddenInput.value = 'true';
+                form.appendChild(hiddenInput);
+                form.submit();
+              }
+            }
+          );
+        });
+      }
+    });
+  </script>
+
 {% include 'footer.html' %}

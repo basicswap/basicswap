@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 {% from 'style.html' import change_password_svg, notifications_network_offer_svg,
   notifications_bid_accepted_svg, notifications_unknow_event_svg,
   notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg,
@@ -596,7 +595,7 @@
             href="/sentoffers">
             {{ your_offers_svg | safe }}
             <span>Your Offers</span>
-            <span id="offers-counter" class="inline-flex justify-center items-center text-xs font-semibold
+            <span id="offers-counter-mobile" class="inline-flex justify-center items-center text-xs font-semibold
               ml-auto px-2.5 py-1 text-white {% if summary.num_sent_active_offers and
               summary.num_sent_active_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %}
               rounded-full">

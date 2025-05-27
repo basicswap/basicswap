@@ -42,6 +42,72 @@ const AmmCounterManager = (function() {
             ammCounterMobile.classList.remove('bg-blue-500', 'bg-gray-400');
             ammCounterMobile.classList.add(status === 'running' && count > 0 ? 'bg-blue-500' : 'bg-gray-400');
         }
+
+        updateAmmTooltips(count, status);
+    }
+
+    function updateAmmTooltips(count, status) {
+        debugLog(`updateAmmTooltips called with count=${count}, status=${status}`);
+
+        const subheaderTooltip = document.getElementById('tooltip-amm-subheader');
+        debugLog('Looking for tooltip-amm-subheader element:', subheaderTooltip);
+
+        if (subheaderTooltip) {
+            const statusText = status === 'running' ? 'Active' : 'Inactive';
+
+            const newContent = `
+                <p><b>Status:</b> ${statusText}</p>
+                <p><b>Currently active offers/bids:</b> ${count}</p>
+            `;
+
+            const statusParagraph = subheaderTooltip.querySelector('p:first-child');
+            const countParagraph = subheaderTooltip.querySelector('p:last-child');
+
+            if (statusParagraph && countParagraph) {
+                statusParagraph.innerHTML = `<b>Status:</b> ${statusText}`;
+                countParagraph.innerHTML = `<b>Currently active offers/bids:</b> ${count}`;
+                debugLog(`Updated AMM subheader tooltip paragraphs: status=${statusText}, count=${count}`);
+            } else {
+                subheaderTooltip.innerHTML = newContent;
+                debugLog(`Replaced AMM subheader tooltip content: status=${statusText}, count=${count}`);
+            }
+
+            refreshTooltipInstances('tooltip-amm-subheader', newContent);
+        } else {
+            debugLog('AMM subheader tooltip element not found - checking all tooltip elements');
+            const allTooltips = document.querySelectorAll('[id*="tooltip"]');
+            debugLog('All tooltip elements found:', Array.from(allTooltips).map(el => el.id));
+        }
+    }
+
+    function refreshTooltipInstances(tooltipId, newContent) {
+        const triggers = document.querySelectorAll(`[data-tooltip-target="${tooltipId}"]`);
+
+        triggers.forEach(trigger => {
+            if (trigger._tippy) {
+                trigger._tippy.setContent(newContent);
+                debugLog(`Updated Tippy instance content for ${tooltipId}`);
+            } else {
+                if (window.TooltipManager && typeof window.TooltipManager.create === 'function') {
+                    window.TooltipManager.create(trigger, newContent, {
+                        placement: trigger.getAttribute('data-tooltip-placement') || 'top'
+                    });
+                    debugLog(`Created new Tippy instance for ${tooltipId}`);
+                }
+            }
+        });
+
+        if (window.TooltipManager && typeof window.TooltipManager.refreshTooltip === 'function') {
+            window.TooltipManager.refreshTooltip(tooltipId, newContent);
+            debugLog(`Refreshed tooltip via TooltipManager for ${tooltipId}`);
+        }
+
+        if (window.TooltipManager && typeof window.TooltipManager.initializeTooltips === 'function') {
+            setTimeout(() => {
+                window.TooltipManager.initializeTooltips(`[data-tooltip-target="${tooltipId}"]`);
+                debugLog(`Re-initialized tooltips for ${tooltipId}`);
+            }, 50);
+        }
     }
 
     function fetchAmmStatus() {
@@ -163,6 +229,10 @@ const AmmCounterManager = (function() {
         },
 
         fetchAmmStatus: fetchAmmStatus,
+
+        updateCounter: updateAmmCounter,
+
+        updateTooltips: updateAmmTooltips,
 
         startRefreshTimer: startRefreshTimer,
 

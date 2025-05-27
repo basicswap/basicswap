@@ -121,21 +121,75 @@ const AmmTablesManager = (function() {
         return result;
     }
 
+    function getCoinDisplayName(coinId) {
+        if (config.debug) {
+            console.log('[AMM Tables] getCoinDisplayName called with:', coinId, typeof coinId);
+        }
+
+        if (typeof coinId === 'string') {
+            const lowerCoinId = coinId.toLowerCase();
+
+            if (lowerCoinId === 'part_anon' ||
+                lowerCoinId === 'particl_anon' ||
+                lowerCoinId === 'particl anon') {
+                if (config.debug) {
+                    console.log('[AMM Tables] Matched Particl Anon variant:', coinId);
+                }
+                return 'Particl Anon';
+            }
+
+            if (lowerCoinId === 'part_blind' ||
+                lowerCoinId === 'particl_blind' ||
+                lowerCoinId === 'particl blind') {
+                if (config.debug) {
+                    console.log('[AMM Tables] Matched Particl Blind variant:', coinId);
+                }
+                return 'Particl Blind';
+            }
+
+            if (lowerCoinId === 'ltc_mweb' ||
+                lowerCoinId === 'litecoin_mweb' ||
+                lowerCoinId === 'litecoin mweb') {
+                if (config.debug) {
+                    console.log('[AMM Tables] Matched Litecoin MWEB variant:', coinId);
+                }
+                return 'Litecoin MWEB';
+            }
+        }
+
+        if (window.CoinManager && window.CoinManager.getDisplayName) {
+            const displayName = window.CoinManager.getDisplayName(coinId);
+            if (displayName) {
+                if (config.debug) {
+                    console.log('[AMM Tables] CoinManager returned:', displayName);
+                }
+                return displayName;
+            }
+        }
+
+        if (config.debug) {
+            console.log('[AMM Tables] Returning coin name as-is:', coinId);
+        }
+        return coinId;
+    }
+
     function createSwapColumn(coinFrom, coinTo) {
         const fromImage = getImageFilename(coinFrom);
         const toImage = getImageFilename(coinTo);
+        const fromDisplayName = getCoinDisplayName(coinFrom);
+        const toDisplayName = getCoinDisplayName(coinTo);
 
         return `
             <td class="py-0 px-0 text-right text-sm">
                 <div class="flex items-center justify-center monospace">
                     <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                        <img class="h-12" src="/static/images/coins/${fromImage}" alt="${coinFrom}">
+                        <img class="h-12" src="/static/images/coins/${fromImage}" alt="${fromDisplayName}">
                     </span>
                     <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
                     <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                        <img class="h-12" src="/static/images/coins/${toImage}" alt="${coinTo}">
+                        <img class="h-12" src="/static/images/coins/${toImage}" alt="${toDisplayName}">
                     </span>
                 </div>
             </td>
@@ -176,8 +230,14 @@ const AmmTablesManager = (function() {
         if (offers.length === 0) {
             offersBody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="py-4 px-4 text-center text-gray-500 dark:text-gray-400">
-                        No offers configured. Edit the AMM configuration to add offers.
+                    <td colspan="7" class="py-8 px-4 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center justify-center">
+                            <svg class="w-12 h-12 mb-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p class="text-lg font-medium">No offers configured</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Edit the AMM configuration to add offers</p>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -200,6 +260,9 @@ const AmmTablesManager = (function() {
             const minCoinFromAmt = parseFloat(offer.min_coin_from_amt || 0);
             const offerValidSeconds = parseInt(offer.offer_valid_seconds || 3600);
             const rateTweakPercent = parseFloat(offer.ratetweakpercent || 0);
+            const adjustRatesValue = offer.adjust_rates_based_on_market || 'false';
+            const adjustRates = adjustRatesValue !== 'false';
+            const amountStep = offer.amount_step || 'N/A';
 
             const amountToReceive = amount * minrate;
 
@@ -210,19 +273,11 @@ const AmmTablesManager = (function() {
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                     <td class="py-3 px-4">
                         <div class="font-medium">${name}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${amountVariable ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
-                                ${amountVariable ? 'Variable Amount' : 'Fixed Amount'}
-                            </span>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ml-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                                Valid: ${formatDuration(offerValidSeconds)}
-                            </span>
-                        </div>
                     </td>
                     ${createSwapColumn(coinFrom, coinTo)}
                     <td class="py-3 px-4 text-right">
                         <div class="text-sm font-semibold dark:text-white">${amount.toFixed(8)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-300">${coinFrom}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-300">${getCoinDisplayName(coinFrom)}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
                             Min: ${minCoinFromAmt.toFixed(8)}
                         </div>
@@ -233,7 +288,31 @@ const AmmTablesManager = (function() {
                             Tweak: ${rateTweakPercent > 0 ? '+' : ''}${rateTweakPercent}%
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            Receive: ~${amountToReceive.toFixed(8)} ${coinTo}
+                            Receive: ~${amountToReceive.toFixed(8)} ${getCoinDisplayName(coinTo)}
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="space-y-1">
+                            <div class="flex flex-wrap gap-1 justify-center">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${amountVariable ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                                    ${amountVariable ? 'Variable' : 'Fixed'}
+                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                    ${formatDuration(offerValidSeconds)}
+                                </span>
+                            </div>
+                            <div class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${adjustRates ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                                </svg>
+                                Auto Rates: ${adjustRatesValue === 'only' ? 'Market Only' : adjustRates ? 'On' : 'Off'}
+                            </div>
+                            <div class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                                </svg>
+                                Step: ${amountStep}
+                            </div>
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -254,13 +333,13 @@ const AmmTablesManager = (function() {
                     </td>
                     <td class="py-3 px-4 text-center">
                         <div class="flex items-center justify-center space-x-2">
-                            <button type="button" class="edit-amm-item text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            <button type="button" class="edit-amm-item text-gray-500 hover:text-gray-700 dark:text-white dark:hover:text-gray-300 focus:ring-0 focus:outline-none"
                                 data-type="offer" data-id="${offer.id || ''}" data-name="${name}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
                                 </svg>
                             </button>
-                            <button type="button" class="delete-amm-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            <button type="button" class="delete-amm-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 focus:ring-0 focus:outline-none"
                                 data-type="offer" data-id="${offer.id || ''}" data-name="${name}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
@@ -294,8 +373,14 @@ const AmmTablesManager = (function() {
         if (bids.length === 0) {
             bidsBody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="py-4 px-4 text-center text-gray-500 dark:text-gray-400">
-                        No bids configured. Edit the AMM configuration to add bids.
+                    <td colspan="7" class="py-8 px-4 text-center text-gray-500 dark:text-gray-400">
+                        <div class="flex flex-col items-center justify-center">
+                            <svg class="w-12 h-12 mb-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p class="text-lg font-medium">No bids configured</p>
+                            <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">Edit the AMM configuration to add bids</p>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -325,27 +410,31 @@ const AmmTablesManager = (function() {
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                     <td class="py-3 px-4">
                         <div class="font-medium">${name}</div>
-                        <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${amountVariable ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
-                                ${amountVariable ? 'Variable Amount' : 'Fixed Amount'}
-                            </span>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ml-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                                Max Concurrent: ${maxConcurrent}
-                            </span>
-                        </div>
                     </td>
                     ${createSwapColumn(coinTo, coinFrom)}
                     <td class="py-3 px-4 text-right">
                         <div class="text-sm font-semibold dark:text-white">${amount.toFixed(8)}</div>
-                        <div class="text-sm text-gray-500 dark:text-gray-300">${coinFrom}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-300">${getCoinDisplayName(coinFrom)}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            Min ${coinTo} Balance: ${minCoinToBalance.toFixed(8)}
+                            Min ${getCoinDisplayName(coinTo)} Balance: ${minCoinToBalance.toFixed(8)}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-right">
                         <div class="text-sm font-semibold dark:text-white">${maxRate.toFixed(8)}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            Send: ~${amountToSend.toFixed(8)} ${coinTo}
+                            Send: ~${amountToSend.toFixed(8)} ${getCoinDisplayName(coinTo)}
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <div class="space-y-1">
+                            <div class="flex flex-wrap gap-1 justify-center">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${amountVariable ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                                    ${amountVariable ? 'Variable' : 'Fixed'}
+                                </span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                    Max: ${maxConcurrent}
+                                </span>
+                            </div>
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -356,7 +445,7 @@ const AmmTablesManager = (function() {
                                     : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'}">
                                 ${enabled ? 'Enabled' : 'Disabled'}
                             </span>
-                            <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full
+                            <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full hidden
                                 ${activeBidsCount > 0
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
                                     : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
@@ -366,13 +455,13 @@ const AmmTablesManager = (function() {
                     </td>
                     <td class="py-3 px-4 text-center">
                         <div class="flex items-center justify-center space-x-2">
-                            <button type="button" class="edit-amm-item text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                            <button type="button" class="edit-amm-item text-gray-500 hover:text-gray-700 dark:text-white dark:hover:text-gray-300 focus:ring-0 focus:outline-none"
                                 data-type="bid" data-id="${bid.id || ''}" data-name="${name}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
                                 </svg>
                             </button>
-                            <button type="button" class="delete-amm-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            <button type="button" class="delete-amm-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 focus:ring-0 focus:outline-none"
                                 data-type="bid" data-id="${bid.id || ''}" data-name="${name}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
@@ -560,12 +649,26 @@ const AmmTablesManager = (function() {
                 const name = button.getAttribute('data-name');
 
                 if (!id && !name) {
-                    alert('Error: Could not identify the item to delete.');
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Error', 'Could not identify the item to delete.');
+                    } else {
+                        alert('Error: Could not identify the item to delete.');
+                    }
                     return;
                 }
 
-                if (confirm(`Are you sure you want to delete this ${type}?`)) {
-                    deleteAmmItem(type, id, name);
+                if (window.showConfirmModal) {
+                    window.showConfirmModal(
+                        'Confirm Deletion',
+                        `Are you sure you want to delete this ${type}?\n\nName: ${name || 'Unnamed'}\n\nThis action cannot be undone.`,
+                        function() {
+                            deleteAmmItem(type, id, name);
+                        }
+                    );
+                } else {
+                    if (confirm(`Are you sure you want to delete this ${type}?`)) {
+                        deleteAmmItem(type, id, name);
+                    }
                 }
             }
 
@@ -606,6 +709,18 @@ const AmmTablesManager = (function() {
     function openAddModal(type) {
         debugLog(`Opening add modal for ${type}`);
 
+        const coinFromCheck = document.getElementById('add-amm-coin-from');
+        const coinToCheck = document.getElementById('add-amm-coin-to');
+
+        if (!coinFromCheck || !coinToCheck || coinFromCheck.options.length < 2 || coinToCheck.options.length < 2) {
+            if (window.showErrorModal) {
+                window.showErrorModal('Configuration Error', 'At least 2 different coins must be configured in BasicSwap to create AMM offers/bids. Please configure additional coins first.');
+            } else {
+                alert('At least 2 different coins must be configured in BasicSwap to create AMM offers/bids. Please configure additional coins first.');
+            }
+            return;
+        }
+
         const modalTitle = document.getElementById('add-modal-title');
         if (modalTitle) {
             modalTitle.textContent = `Add New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
@@ -624,16 +739,19 @@ const AmmTablesManager = (function() {
             coinFromSelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        if (coinToSelect && coinToSelect.options.length > 0) {
+        if (coinToSelect && coinToSelect.options.length > 1) {
+            coinToSelect.selectedIndex = 1;
+            coinToSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        } else if (coinToSelect && coinToSelect.options.length > 0) {
             coinToSelect.selectedIndex = 0;
             coinToSelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
         document.getElementById('add-amm-amount').value = '';
 
-        const adjustRatesCheckbox = document.getElementById('add-offer-adjust-rates');
-        if (adjustRatesCheckbox) {
-            adjustRatesCheckbox.checked = true;
+        const adjustRatesSelect = document.getElementById('add-offer-adjust-rates');
+        if (adjustRatesSelect) {
+            adjustRatesSelect.value = 'false';
         }
 
         if (type === 'offer') {
@@ -654,7 +772,7 @@ const AmmTablesManager = (function() {
             document.getElementById('add-offer-valid-seconds').value = '3600';
             document.getElementById('add-offer-address').value = 'auto';
             document.getElementById('add-offer-min-swap-amount').value = '0.001';
-            document.getElementById('add-offer-amount-step').value = '';
+            document.getElementById('add-offer-amount-step').value = '1.0';
 
             const coinFrom = document.getElementById('add-amm-coin-from');
             const coinTo = document.getElementById('add-amm-coin-to');
@@ -680,6 +798,25 @@ const AmmTablesManager = (function() {
                 document.getElementById('add-bid-address').value = 'auto';
                 document.getElementById('add-bid-min-swap-amount').value = '0.001';
             }
+        }
+
+        if (coinFromSelect && coinToSelect) {
+            const handleCoinChange = function() {
+                const fromValue = coinFromSelect.value;
+                const toValue = coinToSelect.value;
+
+                if (fromValue && toValue && fromValue === toValue) {
+                    for (let i = 0; i < coinToSelect.options.length; i++) {
+                        if (coinToSelect.options[i].value !== fromValue) {
+                            coinToSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            };
+
+            coinFromSelect.addEventListener('change', handleCoinChange);
+            coinToSelect.addEventListener('change', handleCoinChange);
         }
 
         const modal = document.getElementById('add-amm-modal');
@@ -718,9 +855,41 @@ const AmmTablesManager = (function() {
 
             const uniqueId = `${type}_${Date.now()}`;
 
+            const name = document.getElementById('add-amm-name').value.trim();
+
+            if (!name || name === '') {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', 'Name is required and cannot be empty.');
+                } else {
+                    alert('Name is required and cannot be empty.');
+                }
+                return;
+            }
+
+            const coinFrom = document.getElementById('add-amm-coin-from').value;
+            const coinTo = document.getElementById('add-amm-coin-to').value;
+
+            if (!coinFrom || !coinTo) {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', 'Please select both Coin From and Coin To.');
+                } else {
+                    alert('Please select both Coin From and Coin To.');
+                }
+                return;
+            }
+
+            if (coinFrom === coinTo) {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', 'Coin From and Coin To must be different.');
+                } else {
+                    alert('Coin From and Coin To must be different.');
+                }
+                return;
+            }
+
             const newItem = {
                 id: uniqueId,
-                name: document.getElementById('add-amm-name').value,
+                name: name,
                 enabled: document.getElementById('add-amm-enabled').checked,
                 coin_from: document.getElementById('add-amm-coin-from').value,
                 coin_to: document.getElementById('add-amm-coin-to').value,
@@ -731,8 +900,10 @@ const AmmTablesManager = (function() {
             if (type === 'offer') {
                 newItem.minrate = parseFloat(document.getElementById('add-amm-rate').value);
                 newItem.ratetweakpercent = parseFloat(document.getElementById('add-offer-ratetweakpercent').value || '0');
-                newItem.adjust_rates_based_on_market = document.getElementById('add-offer-adjust-rates').checked;
+                newItem.adjust_rates_based_on_market = document.getElementById('add-offer-adjust-rates').value;
                 newItem.swap_type = document.getElementById('add-offer-swap-type').value || 'adaptor_sig';
+                const automationStrategyElement = document.getElementById('add-offer-automation-strategy');
+                newItem.automation_strategy = automationStrategyElement ? automationStrategyElement.value : 'accept_all';
 
                 const minCoinFromAmt = document.getElementById('add-offer-min-coin-from-amt').value;
                 if (minCoinFromAmt) {
@@ -743,7 +914,11 @@ const AmmTablesManager = (function() {
                 if (validSeconds) {
                     const seconds = parseInt(validSeconds);
                     if (seconds < 600) {
-                        alert('Offer valid seconds must be at least 600 (10 minutes)');
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Offer valid seconds must be at least 600 (10 minutes)');
+                        } else {
+                            alert('Offer valid seconds must be at least 600 (10 minutes)');
+                        }
                         return;
                     }
                     newItem.offer_valid_seconds = seconds;
@@ -760,23 +935,56 @@ const AmmTablesManager = (function() {
                 }
 
                 const amountStep = document.getElementById('add-offer-amount-step').value;
-                if (amountStep) {
-                    if (/^[0-9]*\.?[0-9]*$/.test(amountStep)) {
-                        const parsedValue = parseFloat(amountStep);
-                        if (parsedValue > 0) {
-                            newItem.amount_step = parsedValue.toString();
-                            console.log(`Amount step set to: ${newItem.amount_step}`);
-                        } else {
-                            alert('Amount step must be greater than zero.');
-                            return;
-                        }
+                const offerAmount = parseFloat(document.getElementById('add-amm-amount').value);
+
+                if (!amountStep || amountStep.trim() === '') {
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Validation Error', 'Offer Size Increment is required. This privacy feature prevents revealing your exact wallet balance.');
                     } else {
-                        alert('Invalid amount step value. Please enter a valid decimal number.');
+                        alert('Offer Size Increment is required. This privacy feature prevents revealing your exact wallet balance.');
+                    }
+                    return;
+                }
+
+                if (/^[0-9]*\.?[0-9]*$/.test(amountStep)) {
+                    const parsedValue = parseFloat(amountStep);
+                    if (parsedValue <= 0) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Offer Size Increment must be greater than zero.');
+                        } else {
+                            alert('Offer Size Increment must be greater than zero.');
+                        }
                         return;
                     }
+                    if (parsedValue < 0.001) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Offer Size Increment must be at least 0.001.');
+                        } else {
+                            alert('Offer Size Increment must be at least 0.001.');
+                        }
+                        return;
+                    }
+                    if (parsedValue > offerAmount) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', `Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                        } else {
+                            alert(`Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                        }
+                        return;
+                    }
+                    newItem.amount_step = parsedValue.toString();
+                    console.log(`Offer Size Increment set to: ${newItem.amount_step}`);
+                } else {
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Validation Error', 'Invalid Offer Size Increment value. Please enter a valid decimal number.');
+                    } else {
+                        alert('Invalid Offer Size Increment value. Please enter a valid decimal number.');
+                    }
+                    return;
                 }
             } else if (type === 'bid') {
                 newItem.max_rate = parseFloat(document.getElementById('add-amm-rate').value);
+                newItem.offers_to_bid_on = document.getElementById('add-bid-offers-to-bid-on').value || 'all';
 
                 const minCoinToBalance = document.getElementById('add-bid-min-coin-to-balance').value;
                 if (minCoinToBalance) {
@@ -810,8 +1018,17 @@ const AmmTablesManager = (function() {
                 }
                 config.bids.push(newItem);
             } else {
-                alert(`Error: Invalid type ${type}`);
+                if (window.showErrorModal) {
+                    window.showErrorModal('Error', `Invalid type ${type}`);
+                } else {
+                    alert(`Error: Invalid type ${type}`);
+                }
                 return;
+            }
+
+            const wasReadonly = configTextarea.hasAttribute('readonly');
+            if (wasReadonly) {
+                configTextarea.removeAttribute('readonly');
             }
 
             configTextarea.value = JSON.stringify(config, null, 4);
@@ -819,8 +1036,17 @@ const AmmTablesManager = (function() {
             closeAddModal();
 
             const saveButton = document.getElementById('save_config_btn');
-            if (saveButton) {
+            if (saveButton && !saveButton.disabled) {
                 saveButton.click();
+
+                setTimeout(() => {
+                    if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
+                        window.AmmCounterManager.fetchAmmStatus();
+                    }
+                    if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
+                        window.SummaryManager.fetchSummaryData();
+                    }
+                }, 1000);
             } else {
                 const form = configTextarea.closest('form');
                 if (form) {
@@ -831,11 +1057,23 @@ const AmmTablesManager = (function() {
                     form.appendChild(hiddenInput);
                     form.submit();
                 } else {
-                    alert('Error: Could not save the configuration.');
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Error', 'Could not save the configuration. Please try using the Settings tab instead.');
+                    } else {
+                        alert('Error: Could not save the configuration.');
+                    }
                 }
             }
+
+            if (wasReadonly) {
+                configTextarea.setAttribute('readonly', '');
+            }
         } catch (error) {
-            alert(`Error processing the configuration: ${error.message}`);
+            if (window.showErrorModal) {
+                window.showErrorModal('Configuration Error', `Error processing the configuration: ${error.message}`);
+            } else {
+                alert(`Error processing the configuration: ${error.message}`);
+            }
             debugLog('Error saving new item:', error);
         }
     }
@@ -916,10 +1154,14 @@ const AmmTablesManager = (function() {
                 document.getElementById('edit-offer-min-coin-from-amt').value = item.min_coin_from_amt || '';
                 document.getElementById('edit-offer-valid-seconds').value = item.offer_valid_seconds || '3600';
                 document.getElementById('edit-offer-address').value = item.address || 'auto';
-                document.getElementById('edit-offer-adjust-rates').checked = item.adjust_rates_based_on_market !== false;
+                document.getElementById('edit-offer-adjust-rates').value = item.adjust_rates_based_on_market || 'false';
                 document.getElementById('edit-offer-swap-type').value = item.swap_type || 'adaptor_sig';
                 document.getElementById('edit-offer-min-swap-amount').value = item.min_swap_amount || '0.001';
-                document.getElementById('edit-offer-amount-step').value = item.amount_step || '';
+                document.getElementById('edit-offer-amount-step').value = item.amount_step || '1.0';
+                const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
+                if (editAutomationStrategyElement) {
+                    editAutomationStrategyElement.value = item.automation_strategy || 'accept_all';
+                }
 
                 const coinFrom = document.getElementById('edit-amm-coin-from');
                 const coinTo = document.getElementById('edit-amm-coin-to');
@@ -945,7 +1187,33 @@ const AmmTablesManager = (function() {
                     document.getElementById('edit-bid-max-concurrent').value = item.max_concurrent || '1';
                     document.getElementById('edit-bid-address').value = item.address || 'auto';
                     document.getElementById('edit-bid-min-swap-amount').value = item.min_swap_amount || '';
+                    document.getElementById('edit-bid-offers-to-bid-on').value = item.offers_to_bid_on || 'all';
                 }
+            }
+
+            const editCoinFromSelect = coinFromSelect;
+            const editCoinToSelect = coinToSelect;
+
+            if (editCoinFromSelect && editCoinToSelect) {
+                const handleEditCoinChange = function() {
+                    const fromValue = editCoinFromSelect.value;
+                    const toValue = editCoinToSelect.value;
+
+                    if (fromValue && toValue && fromValue === toValue) {
+                        for (let i = 0; i < editCoinToSelect.options.length; i++) {
+                            if (editCoinToSelect.options[i].value !== fromValue) {
+                                editCoinToSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                };
+
+                editCoinFromSelect.removeEventListener('change', handleEditCoinChange);
+                editCoinToSelect.removeEventListener('change', handleEditCoinChange);
+
+                editCoinFromSelect.addEventListener('change', handleEditCoinChange);
+                editCoinToSelect.addEventListener('change', handleEditCoinChange);
             }
 
             const modal = document.getElementById('edit-amm-modal');
@@ -996,8 +1264,40 @@ const AmmTablesManager = (function() {
 
             const config = JSON.parse(configText);
 
+            const name = document.getElementById('edit-amm-name').value.trim();
+
+            if (!name || name === '') {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', 'Name is required and cannot be empty.');
+                } else {
+                    alert('Name is required and cannot be empty.');
+                }
+                return;
+            }
+
+            const coinFrom = document.getElementById('edit-amm-coin-from').value;
+            const coinTo = document.getElementById('edit-amm-coin-to').value;
+
+            if (!coinFrom || !coinTo) {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', 'Please select both Coin From and Coin To.');
+                } else {
+                    alert('Please select both Coin From and Coin To.');
+                }
+                return;
+            }
+
+            if (coinFrom === coinTo) {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', 'Coin From and Coin To must be different.');
+                } else {
+                    alert('Coin From and Coin To must be different.');
+                }
+                return;
+            }
+
             const updatedItem = {
-                name: document.getElementById('edit-amm-name').value,
+                name: name,
                 enabled: document.getElementById('edit-amm-enabled').checked,
                 coin_from: document.getElementById('edit-amm-coin-from').value,
                 coin_to: document.getElementById('edit-amm-coin-to').value,
@@ -1012,8 +1312,10 @@ const AmmTablesManager = (function() {
             if (type === 'offer') {
                 updatedItem.minrate = parseFloat(document.getElementById('edit-amm-rate').value);
                 updatedItem.ratetweakpercent = parseFloat(document.getElementById('edit-offer-ratetweakpercent').value || '0');
-                updatedItem.adjust_rates_based_on_market = document.getElementById('edit-offer-adjust-rates').checked;
+                updatedItem.adjust_rates_based_on_market = document.getElementById('edit-offer-adjust-rates').value;
                 updatedItem.swap_type = document.getElementById('edit-offer-swap-type').value || 'adaptor_sig';
+                const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
+                updatedItem.automation_strategy = editAutomationStrategyElement ? editAutomationStrategyElement.value : 'accept_all';
 
                 const minCoinFromAmt = document.getElementById('edit-offer-min-coin-from-amt').value;
                 if (minCoinFromAmt) {
@@ -1024,7 +1326,11 @@ const AmmTablesManager = (function() {
                 if (validSeconds) {
                     const seconds = parseInt(validSeconds);
                     if (seconds < 600) {
-                        alert('Offer valid seconds must be at least 600 (10 minutes)');
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Offer valid seconds must be at least 600 (10 minutes)');
+                        } else {
+                            alert('Offer valid seconds must be at least 600 (10 minutes)');
+                        }
                         return;
                     }
                     updatedItem.offer_valid_seconds = seconds;
@@ -1041,23 +1347,56 @@ const AmmTablesManager = (function() {
                 }
 
                 const amountStep = document.getElementById('edit-offer-amount-step').value;
-                if (amountStep) {
-                    if (/^[0-9]*\.?[0-9]*$/.test(amountStep)) {
-                        const parsedValue = parseFloat(amountStep);
-                        if (parsedValue > 0) {
-                            updatedItem.amount_step = parsedValue.toString();
-                            console.log(`Amount step set to: ${updatedItem.amount_step}`);
-                        } else {
-                            alert('Amount step must be greater than zero.');
-                            return;
-                        }
+                const offerAmount = parseFloat(document.getElementById('edit-amm-amount').value);
+
+                if (!amountStep || amountStep.trim() === '') {
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Validation Error', 'Offer Size Increment is required. This privacy feature prevents revealing your exact wallet balance.');
                     } else {
-                        alert('Invalid amount step value. Please enter a valid decimal number.');
+                        alert('Offer Size Increment is required. This privacy feature prevents revealing your exact wallet balance.');
+                    }
+                    return;
+                }
+
+                if (/^[0-9]*\.?[0-9]*$/.test(amountStep)) {
+                    const parsedValue = parseFloat(amountStep);
+                    if (parsedValue <= 0) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Offer Size Increment must be greater than zero.');
+                        } else {
+                            alert('Offer Size Increment must be greater than zero.');
+                        }
                         return;
                     }
+                    if (parsedValue < 0.001) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Offer Size Increment must be at least 0.001.');
+                        } else {
+                            alert('Offer Size Increment must be at least 0.001.');
+                        }
+                        return;
+                    }
+                    if (parsedValue > offerAmount) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', `Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                        } else {
+                            alert(`Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                        }
+                        return;
+                    }
+                    updatedItem.amount_step = parsedValue.toString();
+                    console.log(`Offer Size Increment set to: ${updatedItem.amount_step}`);
+                } else {
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Validation Error', 'Invalid Offer Size Increment value. Please enter a valid decimal number.');
+                    } else {
+                        alert('Invalid Offer Size Increment value. Please enter a valid decimal number.');
+                    }
+                    return;
                 }
             } else if (type === 'bid') {
                 updatedItem.max_rate = parseFloat(document.getElementById('edit-amm-rate').value);
+                updatedItem.offers_to_bid_on = document.getElementById('edit-bid-offers-to-bid-on').value || 'all';
 
                 const minCoinToBalance = document.getElementById('edit-bid-min-coin-to-balance').value;
                 if (minCoinToBalance) {
@@ -1109,13 +1448,27 @@ const AmmTablesManager = (function() {
                 return;
             }
 
+            const wasReadonly = configTextarea.hasAttribute('readonly');
+            if (wasReadonly) {
+                configTextarea.removeAttribute('readonly');
+            }
+
             configTextarea.value = JSON.stringify(config, null, 4);
 
             closeEditModal();
 
             const saveButton = document.getElementById('save_config_btn');
-            if (saveButton) {
+            if (saveButton && !saveButton.disabled) {
                 saveButton.click();
+
+                setTimeout(() => {
+                    if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
+                        window.AmmCounterManager.fetchAmmStatus();
+                    }
+                    if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
+                        window.SummaryManager.fetchSummaryData();
+                    }
+                }, 1000);
             } else {
                 const form = configTextarea.closest('form');
                 if (form) {
@@ -1126,8 +1479,16 @@ const AmmTablesManager = (function() {
                     form.appendChild(hiddenInput);
                     form.submit();
                 } else {
-                    alert('Error: Could not save the configuration.');
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Error', 'Could not save the configuration. Please try using the Settings tab instead.');
+                    } else {
+                        alert('Error: Could not save the configuration.');
+                    }
                 }
+            }
+
+            if (wasReadonly) {
+                configTextarea.setAttribute('readonly', '');
             }
         } catch (error) {
             alert(`Error processing the configuration: ${error.message}`);
@@ -1182,13 +1543,26 @@ const AmmTablesManager = (function() {
                 return;
             }
 
+            const wasReadonly = configTextarea.hasAttribute('readonly');
+            if (wasReadonly) {
+                configTextarea.removeAttribute('readonly');
+            }
+
             configTextarea.value = JSON.stringify(config, null, 4);
 
             const saveButton = document.getElementById('save_config_btn');
-            if (saveButton) {
+            if (saveButton && !saveButton.disabled) {
                 saveButton.click();
-            } else {
 
+                setTimeout(() => {
+                    if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
+                        window.AmmCounterManager.fetchAmmStatus();
+                    }
+                    if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
+                        window.SummaryManager.fetchSummaryData();
+                    }
+                }, 1000);
+            } else {
                 const form = configTextarea.closest('form');
                 if (form) {
                     const hiddenInput = document.createElement('input');
@@ -1198,8 +1572,16 @@ const AmmTablesManager = (function() {
                     form.appendChild(hiddenInput);
                     form.submit();
                 } else {
-                    alert('Error: Could not save the configuration.');
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Error', 'Could not save the configuration. Please try using the Settings tab instead.');
+                    } else {
+                        alert('Error: Could not save the configuration.');
+                    }
                 }
+            }
+
+            if (wasReadonly) {
+                configTextarea.setAttribute('readonly', '');
             }
         } catch (error) {
             alert(`Error processing the configuration: ${error.message}`);
@@ -1269,7 +1651,11 @@ const AmmTablesManager = (function() {
 
             const arrow = document.createElement('span');
             arrow.className = 'ml-2';
-            arrow.innerHTML = '▼';
+            arrow.innerHTML = `
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            `;
 
             display.appendChild(icon);
             display.appendChild(text);
@@ -1368,7 +1754,11 @@ const AmmTablesManager = (function() {
 
             const arrow = document.createElement('span');
             arrow.className = 'ml-2';
-            arrow.innerHTML = '▼';
+            arrow.innerHTML = `
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            `;
 
             display.appendChild(text);
             display.appendChild(arrow);
@@ -1454,7 +1844,11 @@ const AmmTablesManager = (function() {
         const coinToOption = coinToSelect.options[coinToSelect.selectedIndex];
 
         if (!coinFromOption || !coinToOption) {
-            alert('Coins from and to must be set first.');
+            if (window.showErrorModal) {
+                window.showErrorModal('Rate Lookup Error', 'Please select both coins before getting the rate.');
+            } else {
+                alert('Coins from and to must be set first.');
+            }
             return;
         }
 
@@ -1462,13 +1856,31 @@ const AmmTablesManager = (function() {
         const coinToSymbol = coinToOption.getAttribute('data-symbol');
 
         if (!coinFromSymbol || !coinToSymbol) {
-            alert('Coin symbols not found.');
+            if (window.showErrorModal) {
+                window.showErrorModal('Rate Lookup Error', 'Coin information is incomplete. Please try selecting the coins again.');
+            } else {
+                alert('Coin symbols not found.');
+            }
             return;
         }
 
         const originalValue = rateInput.value;
         rateInput.value = 'Loading...';
         rateInput.disabled = true;
+
+        const getRateButton = rateInput.parentElement.querySelector('button');
+        let originalButtonText = '';
+        if (getRateButton) {
+            originalButtonText = getRateButton.textContent;
+            getRateButton.disabled = true;
+            getRateButton.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading...
+            `;
+        }
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/json/rates');
@@ -1481,35 +1893,120 @@ const AmmTablesManager = (function() {
 
                     if (response.coingecko && response.coingecko.rate_inferred) {
                         rateInput.value = response.coingecko.rate_inferred;
+
+                        if (getRateButton && originalButtonText) {
+                            getRateButton.disabled = false;
+                            getRateButton.textContent = originalButtonText;
+                        }
                     } else if (response.error) {
                         console.error('API error:', response.error);
                         rateInput.value = originalValue || '';
-                        alert('Error: ' + response.error);
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Rate Service Error', `Unable to retrieve rate information: ${response.error}\n\nThis could be due to:\n• Temporary service unavailability\n• Network connectivity issues\n• Invalid coin pair\n\nPlease try again in a few moments.`);
+                        } else {
+                            alert('Error: ' + response.error);
+                        }
                     } else if (response.coingecko_error) {
                         console.error('CoinGecko error:', response.coingecko_error);
                         rateInput.value = originalValue || '';
-                        alert('Unable to get rate from CoinGecko: ' + response.coingecko_error);
+
+                        let userMessage = 'Unable to get current market rate from CoinGecko.';
+                        let details = '';
+
+                        if (typeof response.coingecko_error === 'number') {
+                            switch(response.coingecko_error) {
+                                case 8:
+                                    details = 'This usually means:\n• One or both coins are not supported by CoinGecko\n• The trading pair is not available\n• Temporary API limitations\n\nYou can manually enter a rate or try again later.';
+                                    break;
+                                case 429:
+                                    details = 'Rate limit exceeded. Please wait a moment and try again.';
+                                    break;
+                                case 404:
+                                    details = 'The requested coin pair was not found on CoinGecko.';
+                                    break;
+                                case 500:
+                                    details = 'CoinGecko service is temporarily unavailable. Please try again later.';
+                                    break;
+                                default:
+                                    details = `Error code: ${response.coingecko_error}\n\nThis may be a temporary issue. Please try again or enter the rate manually.`;
+                            }
+                        } else {
+                            details = `${response.coingecko_error}\n\nPlease try again or enter the rate manually.`;
+                        }
+
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Market Rate Unavailable', `${userMessage}\n\n${details}`);
+                        } else {
+                            alert('Unable to get rate from CoinGecko: ' + response.coingecko_error);
+                        }
                     } else {
                         rateInput.value = originalValue || '';
-                        alert('No rate available from CoinGecko for this pair.');
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Rate Not Available', `No current market rate is available for this ${coinFromSymbol}/${coinToSymbol} trading pair.\n\nThis could mean:\n• The coins are not traded together on major exchanges\n• CoinGecko doesn't have data for this pair\n• The coins may not be supported\n\nPlease enter a rate manually based on your research.`);
+                        } else {
+                            alert('No rate available from CoinGecko for this pair.');
+                        }
                     }
                 } catch (e) {
                     console.error('Error parsing rate data:', e);
                     rateInput.value = originalValue || '';
-                    alert('Error retrieving rate information. Please try again later.');
+                    if (window.showErrorModal) {
+                        window.showErrorModal('Data Processing Error', 'Unable to process the rate information received from the server.\n\nThis could be due to:\n• Temporary server issues\n• Data format problems\n• Network interference\n\nPlease try again in a moment.');
+                    } else {
+                        alert('Error retrieving rate information. Please try again later.');
+                    }
                 }
             } else {
                 console.error('Error fetching rate data:', xhr.status, xhr.statusText);
                 rateInput.value = originalValue || '';
-                alert(`Unable to retrieve rate information (HTTP ${xhr.status}). The rate service may be unavailable.`);
+                let errorMessage = 'Unable to retrieve rate information from the server.';
+                let details = '';
+
+                switch(xhr.status) {
+                    case 404:
+                        details = 'The rate service endpoint was not found. This may be a configuration issue.';
+                        break;
+                    case 500:
+                        details = 'The server encountered an internal error. Please try again later.';
+                        break;
+                    case 503:
+                        details = 'The rate service is temporarily unavailable. Please try again in a few minutes.';
+                        break;
+                    case 429:
+                        details = 'Too many requests. Please wait a moment before trying again.';
+                        break;
+                    default:
+                        details = `Server returned error ${xhr.status}. The rate service may be temporarily unavailable.`;
+                }
+
+                if (window.showErrorModal) {
+                    window.showErrorModal('Rate Service Unavailable', `${errorMessage}\n\n${details}\n\nYou can enter the rate manually if needed.`);
+                } else {
+                    alert(`Unable to retrieve rate information (HTTP ${xhr.status}). The rate service may be unavailable.`);
+                }
             }
             rateInput.disabled = false;
+
+            if (getRateButton && originalButtonText) {
+                getRateButton.disabled = false;
+                getRateButton.textContent = originalButtonText;
+            }
         };
         xhr.onerror = function(e) {
             console.error('Network error when fetching rate data:', e);
             rateInput.value = originalValue || '';
             rateInput.disabled = false;
-            alert('Unable to connect to the rate service. Please check your network connection and try again.');
+
+            if (getRateButton && originalButtonText) {
+                getRateButton.disabled = false;
+                getRateButton.textContent = originalButtonText;
+            }
+
+            if (window.showErrorModal) {
+                window.showErrorModal('Network Connection Error', 'Unable to connect to the rate service.\n\nPlease check:\n• Your internet connection\n• BasicSwap server status\n• Firewall settings\n\nTry again once your connection is stable, or enter the rate manually.');
+            } else {
+                alert('Unable to connect to the rate service. Please check your network connection and try again.');
+            }
         };
 
         const params = `coin_from=${encodeURIComponent(coinFromSymbol)}&coin_to=${encodeURIComponent(coinToSymbol)}`;
@@ -1559,7 +2056,18 @@ const AmmTablesManager = (function() {
 
         if (refreshButton) {
             refreshButton.addEventListener('click', function() {
+                const icon = refreshButton.querySelector('svg');
+                if (icon) {
+                    icon.classList.add('animate-spin');
+                }
+
                 updateTables();
+
+                setTimeout(() => {
+                    if (icon) {
+                        icon.classList.remove('animate-spin');
+                    }
+                }, 1000);
             });
         }
 

@@ -217,8 +217,8 @@ function filterAndSortData() {
 
     const sentFromFilter = filters.sent_from || 'any';
     filteredData = filteredData.filter(offer => {
-        const isMatch = sentFromFilter === 'public' ? offer.is_public : 
-                        sentFromFilter === 'private' ? !offer.is_public : 
+        const isMatch = sentFromFilter === 'public' ? offer.is_public :
+                        sentFromFilter === 'private' ? !offer.is_public :
                         true;
         return isMatch;
     });
@@ -232,7 +232,7 @@ function filterAndSortData() {
             const coinToSelect = document.getElementById('coin_to');
             const selectedOption = coinToSelect?.querySelector(`option[value="${filters.coin_to}"]`);
             const coinName = selectedOption?.textContent.trim();
-            
+
             if (coinName && !coinMatches(offer.coin_to, coinName)) {
                 return false;
             }
@@ -254,13 +254,13 @@ function filterAndSortData() {
 
             let statusMatch = false;
             switch (filters.status) {
-                case 'active': 
+                case 'active':
                     statusMatch = !isExpired && !isRevoked;
                     break;
-                case 'expired': 
+                case 'expired':
                     statusMatch = isExpired && !isRevoked;
                     break;
-                case 'revoked': 
+                case 'revoked':
                     statusMatch = isRevoked;
                     break;
             }
@@ -275,7 +275,7 @@ function filterAndSortData() {
 
     if (currentSortColumn === 7) {
         const offersWithPercentages = [];
-        
+
         for (const offer of filteredData) {
             const fromAmount = parseFloat(offer.amount_from) || 0;
             const toAmount = parseFloat(offer.amount_to) || 0;
@@ -293,7 +293,7 @@ function filterAndSortData() {
             if (fromPriceUSD && toPriceUSD && !isNaN(fromPriceUSD) && !isNaN(toPriceUSD)) {
                 const fromValueUSD = fromAmount * fromPriceUSD;
                 const toValueUSD = toAmount * toPriceUSD;
-                
+
                 if (fromValueUSD && toValueUSD) {
                     if (offer.is_own_offer || isSentOffers) {
                         percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
@@ -302,7 +302,7 @@ function filterAndSortData() {
                     }
                 }
             }
-            
+
             offersWithPercentages.push({
                 offer: offer,
                 percentDiff: percentDiff
@@ -353,7 +353,7 @@ function filterAndSortData() {
                     const bRate = parseFloat(b.rate) || 0;
                     const aPriceUSD = latestPrices && aSymbol ? latestPrices[aSymbol]?.usd : null;
                     const bPriceUSD = latestPrices && bSymbol ? latestPrices[bSymbol]?.usd : null;
-                    
+
                     aValue = aPriceUSD && !isNaN(aPriceUSD) ? aRate * aPriceUSD : 0;
                     bValue = bPriceUSD && !isNaN(bPriceUSD) ? bRate * bPriceUSD : 0;
                     break;
@@ -367,8 +367,8 @@ function filterAndSortData() {
             }
 
             if (typeof aValue === 'string' && typeof bValue === 'string') {
-                return currentSortDirection === 'asc' 
-                    ? aValue.localeCompare(bValue) 
+                return currentSortDirection === 'asc'
+                    ? aValue.localeCompare(bValue)
                     : bValue.localeCompare(aValue);
             }
 
@@ -395,7 +395,7 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
                 normalizedCoin = window.CoinManager.getPriceKey(coin) || normalizedCoin;
             } else {
                 if (normalizedCoin === 'zcoin') normalizedCoin = 'firo';
-                if (normalizedCoin === 'bitcoincash' || normalizedCoin === 'bitcoin cash') 
+                if (normalizedCoin === 'bitcoincash' || normalizedCoin === 'bitcoin cash')
                     normalizedCoin = 'bitcoin-cash';
                 if (normalizedCoin.includes('particl')) normalizedCoin = 'particl';
             }
@@ -481,6 +481,29 @@ async function fetchOffers() {
         }
 
         const data = await offersResponse.json();
+
+        if (data.error) {
+            if (data.locked) {
+                if (typeof ui !== 'undefined' && ui.displayErrorMessage) {
+                    ui.displayErrorMessage(data.error);
+                } else {
+                    offersBody.innerHTML = `
+                        <tr>
+                            <td colspan="9" class="text-center py-8">
+                                <div class="flex flex-col items-center justify-center text-yellow-600 dark:text-yellow-400">
+                                    <svg class="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                    <span class="font-medium">${data.error}</span>
+                                </div>
+                            </td>
+                        </tr>`;
+                }
+                return;
+            } else {
+                throw new Error(data.error);
+            }
+        }
         const processedData = Array.isArray(data) ? data : Object.values(data);
 
         jsonData = formatInitialData(processedData);
@@ -980,7 +1003,7 @@ function createTableRow(offer, identity = null) {
    } = offer;
 
    let coinFromSymbol, coinToSymbol;
-   
+
    if (window.CoinManager) {
        coinFromSymbol = window.CoinManager.getSymbol(coinFrom) || coinFrom.toLowerCase();
        coinToSymbol = window.CoinManager.getSymbol(coinTo) || coinTo.toLowerCase();
@@ -1572,7 +1595,7 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
 
     const getPriceKey = (coin) => {
         if (!coin) return null;
-        
+
         const lowerCoin = coin.toLowerCase();
 
         if (lowerCoin === 'zcoin') return 'firo';
@@ -1807,7 +1830,7 @@ function getPriceKey(coin) {
     }
 
     if (!coin) return null;
-    
+
     const lowerCoin = coin.toLowerCase();
 
     if (lowerCoin === 'zcoin') {
@@ -1818,7 +1841,7 @@ function getPriceKey(coin) {
         return 'bitcoin-cash';
     }
 
-    if (lowerCoin === 'part' || lowerCoin === 'particl' || 
+    if (lowerCoin === 'part' || lowerCoin === 'particl' ||
         lowerCoin.includes('particl')) {
         return 'particl';
     }
@@ -2221,7 +2244,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         }
 
                         await updateOffersTable();
- 
+
                         updateProfitLossDisplays();
 
                         document.querySelectorAll('.usd-value').forEach(usdValue => {
