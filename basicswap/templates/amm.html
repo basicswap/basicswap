@@ -62,12 +62,14 @@
             </svg>
             Add Offer
           </button>
+          {% if debug_ui_mode %}
           <button id="add-new-bid-btn" class="flex items-center px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Bid
           </button>
+          {% endif %}
           <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -84,11 +86,13 @@
               Offers <span class="text-gray-500 dark:text-gray-400" id="offers-count">(0)</span>
             </button>
           </li>
+          {% if debug_ui_mode %}
           <li class="mr-2" role="presentation">
             <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="bids-tab" data-tabs-target="#bids-content" type="button" role="tab" aria-controls="bids" aria-selected="false">
               Bids <span class="text-gray-500 dark:text-gray-400" id="bids-count">(0)</span>
             </button>
           </li>
+          {% endif %}
         </ul>
       </div>
 
@@ -146,6 +150,7 @@
           </div>
         </div>
 
+        {% if debug_ui_mode %}
         <div class="hidden" id="bids-content" role="tabpanel" aria-labelledby="bids-tab">
           <div class="overflow-x-auto">
             <table class="w-full min-w-max">
@@ -198,6 +203,7 @@
             </table>
           </div>
         </div>
+        {% endif %}
       </div>
      </div>
     </div>
@@ -264,56 +270,43 @@
 
        <div class="mb-4">
         <label class="flex items-center">
-         <input type="checkbox" id="debug-mode" name="debug" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" {% if amm_debug %}checked{% endif %}>
-         <span class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Debug Mode</span>
-        </label>
-       </div>
-
-       <div class="mb-4">
-        <label class="flex items-center">
          <input type="checkbox" id="autostart-amm" name="autostart" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" {% if amm_autostart %}checked{% endif %}>
          <span class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Auto-start with BasicSwap</span>
         </label>
         <small class="text-xs text-gray-500 dark:text-gray-400 ml-6">Automatically start AMM when BasicSwap starts</small>
        </div>
 
+       {% if debug_ui_mode %}
+       <div class="mb-4">
+        <label class="flex items-center">
+         <input type="checkbox" id="debug-mode" name="debug" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" {% if amm_debug %}checked{% endif %}>
+         <span class="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">Debug Mode</span>
+        </label>
+       </div>
+       {% endif %}
+
        <div class="flex flex-wrap gap-2">
         <button type="submit" name="start" value="1" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'running' %}disabled{% endif %}>
-         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h1m4 0h1m6-6V7a3 3 0 00-3-3H6a3 3 0 00-3 3v1"></path>
-         </svg>
          Start
-        </button>
-        <button type="submit" name="force_start" value="1" class="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 font-medium text-sm text-white border border-orange-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" title="Kill existing AMM processes and start fresh">
-         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-         </svg>
-         Force Start
         </button>
         <button type="submit" name="stop" value="1" class="px-4 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'stopped' %}disabled{% endif %}>
-         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6v4H9z"></path>
-         </svg>
          Stop
         </button>
        </div>
 
+       {% if debug_ui_mode %}
        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Process Management</h4>
          <div class="flex flex-wrap gap-2">
+           <button type="submit" name="force_start" value="1" class="px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 font-medium text-sm text-white border border-yellow-500 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" title="Kill existing AMM processes and start fresh">
+             Force Start
+           </button>
            <button type="submit" name="check_processes" value="1" class="inline-flex items-center px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-md shadow-sm focus:ring-0 focus:outline-none">
-             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-             </svg>
              Check Processes
            </button>
-           <button type="submit" name="kill_orphans" value="1" class="inline-flex items-center px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-medium rounded-md shadow-sm focus:ring-0 focus:outline-none" title="Kill orphaned AMM processes">
-             <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-             </svg>
+           <button type="submit" name="kill_orphans" value="1" class="inline-flex items-center px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-md shadow-sm focus:ring-0 focus:outline-none" title="Kill orphaned AMM processes">
              Kill Orphans
            </button>
          </div>
@@ -321,6 +314,7 @@
            Use "Check Processes" to see running AMM processes. Use "Kill Orphans" to clean up duplicate processes. Use "Force Start" to automatically clean up and start fresh.
          </p>
        </div>
+       {% endif %}
       </form>
      </div>
 
@@ -382,7 +376,8 @@
           <div class="block" id="json-content" role="tabpanel" aria-labelledby="json-tab">
             <div class="mb-4">
               <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Config File (JSON)</label>
-              <textarea name="config_content" id="config_content" rows="20" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">{{ config_content }}</textarea>
+              <textarea name="config_content" id="config_content" rows="20" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" {% if not debug_ui_mode %}readonly{% endif %}>{{ config_content }}</textarea>
+
 
               <div class="flex flex-col space-y-4 mt-4">
                 {% if debug_mode %}
@@ -393,7 +388,7 @@
                 {% endif %}
                 <div class="flex justify-between">
                   <button type="submit" name="create_default" value="true" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Default Config</button>
-                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Config</button>
+                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none" {% if not debug_ui_mode %}disabled{% endif %}>Save Config</button>
                 </div>
               </div>
             </div>
@@ -503,10 +498,11 @@
                     </ul>
                   </div>
                   <div class="break-words">
-                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Bid Settings</strong></p>
+                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Automation Strategies</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li class="break-words"><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids</li>
-                      <li class="break-words"><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids</li>
+                      <li class="break-words"><span class="font-semibold">accept_all:</span> Auto-accept all bids (default)</li>
+                      <li class="break-words"><span class="font-semibold">accept_known:</span> Only accept bids from known identities</li>
+                      <li class="break-words"><span class="font-semibold">none:</span> Manual acceptance required</li>
                     </ul>
                   </div>
                 </div>
@@ -542,13 +538,13 @@
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Optional Settings</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                       <li class="break-words"><span class="font-semibold">ratetweakpercent:</span> Modify the offer rate from the fetched value (can be negative)</li>
-                      <li class="break-words"><span class="font-semibold">adjust_rates_based_on_market:</span> Whether to adjust rates based on existing market offers (uses ratetweakpercent)</li>
+                      <li class="break-words"><span class="font-semibold">adjust_rates_based_on_market:</span> Per-offer setting with 3 modes: <strong>true</strong> (fail if no market data), <strong>false</strong> (use CoinGecko only), <strong>"only"</strong> (market rates only, no CoinGecko). Algorithm: Competitive rate = min_market_rate × (rate_tweak_percent/100 + 1 or 0.99)</li>
                       <li class="break-words"><span class="font-semibold">amount_variable:</span> Whether bidder can set a different amount</li>
                       <li class="break-words"><span class="font-semibold">address:</span> Address offer is sent from (auto = generate new address per offer)</li>
-                      <li class="break-words"><span class="font-semibold">offer_valid_seconds:</span> How long generated offers will be valid for</li>
+                      <li class="break-words"><span class="font-semibold">offer_valid_seconds:</span> How long generated offers will be valid for (minimum 600 seconds)</li>
                       <li class="break-words"><span class="font-semibold">swap_type:</span> Type of swap, defaults to "adaptor_sig"</li>
                       <li class="break-words"><span class="font-semibold">min_swap_amount:</span> Minimum purchase quantity when offer amount is variable</li>
-                      <li class="break-words"><span class="font-semibold">offer_size_increment (amount_step):</span> How much to adjust offer size when partially filled. Must be between 0.001 and your offer amount.</li>
+                      <li class="break-words"><span class="font-semibold">amount_step:</span> <strong>Mandatory privacy feature</strong> that sets the offer size increment. Prevents revealing exact wallet balance by creating stepped offers. Must be between 0.001 and your offer amount.</li>
                     </ul>
                   </div>
                 </div>
@@ -584,17 +580,20 @@
                   <div>
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Optional Settings</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li><span class="font-semibold">max_concurrent:</span> Maximum number of bids to have active at once</li>
+                      <li><span class="font-semibold">max_concurrent:</span> Maximum number of bids to have active at once (default: 1)</li>
                       <li><span class="font-semibold">amount_variable:</span> Can send bids below the set amount where possible</li>
                       <li><span class="font-semibold">max_coin_from_balance:</span> If needed, uncomment and set to limit bids when wallet amount is above this</li>
                       <li><span class="font-semibold">address:</span> Address bid is sent from (auto = generate new address per bid)</li>
-                      <li><span class="font-semibold">min_swap_amount:</span> Minimum swap amount</li>
+                      <li><span class="font-semibold">min_swap_amount:</span> Minimum swap amount for variable amount bids</li>
+                      <li><span class="font-semibold">offers_to_bid_on:</span> Filter offers to bid on: <strong>"all"</strong> (any offer), <strong>"auto_accept_only"</strong> (only auto-accept offers), <strong>"known_only"</strong> (known identities only)</li>
                     </ul>
                   </div>
                 </div>
               </div>
             </div>
             {% endif %}
+
+
 
           </div>
         </div>
@@ -1004,6 +1003,7 @@
                       </small>
                     </div>
 
+                    {% if debug_ui_mode %}
                     <div>
                       <label for="add-offer-automation-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto Accept Bids</label>
                       <div class="relative">
@@ -1011,12 +1011,13 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                         <select id="add-offer-automation-strategy" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
-                          <option value="accept_known">Accept Known Identities</option>
                           <option value="accept_all">Accept All Bids</option>
+                          <option value="accept_known">Accept Known Identities</option>
                           <option value="none">No Auto Accept</option>
                         </select>
                       </div>
                     </div>
+                    {% endif %}
                   </div>
 
                   <div>
@@ -1083,8 +1084,7 @@
       </div>
       <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
         <button type="button" id="add-amm-save" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:ring-0 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
-          Add Item
-        </button>
+          Add
         <button type="button" id="add-amm-cancel" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:ring-0 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 dark:border-gray-500">
           Cancel
         </button>
@@ -1224,6 +1224,7 @@
                       </small>
                     </div>
 
+                    {% if debug_ui_mode %}
                     <div>
                       <label for="edit-offer-automation-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto Accept Bids</label>
                       <div class="relative">
@@ -1231,12 +1232,13 @@
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                         <select id="edit-offer-automation-strategy" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
-                          <option value="accept_known">Accept Known Identities</option>
                           <option value="accept_all">Accept All Bids</option>
+                          <option value="accept_known">Accept Known Identities</option>
                           <option value="none">No Auto Accept</option>
                         </select>
                       </div>
                     </div>
+                    {% endif %}
                   </div>
 
                   <div>
@@ -1366,7 +1368,6 @@
       const debugCheckbox = document.getElementById('debug-mode');
       if (debugCheckbox) {
         localStorage.setItem('amm_debug_enabled', debugCheckbox.checked);
-        console.log('Debug setting saved:', debugCheckbox.checked);
       }
     }
 
@@ -1376,27 +1377,59 @@
         const savedSetting = localStorage.getItem('amm_debug_enabled');
         if (savedSetting !== null) {
           debugCheckbox.checked = savedSetting === 'true';
-          console.log('Debug setting loaded:', savedSetting);
         }
       }
     }
 
-    function saveAutostartSetting() {
-      const autostartCheckbox = document.getElementById('autostart-amm');
-      if (autostartCheckbox) {
-        localStorage.setItem('amm_autostart_enabled', autostartCheckbox.checked);
-        console.log('Autostart setting saved:', autostartCheckbox.checked);
-      }
+    function saveAutostartSetting(checked) {
+      const bodyData = `autostart=${checked ? 'true' : 'false'}`;
+
+      // Save to backend via API
+      fetch('/amm/autostart', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: bodyData
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Also save to localStorage as backup
+          localStorage.setItem('amm_autostart_enabled', checked);
+
+          // Only warn if there's a mismatch
+          if (data.autostart !== checked) {
+            console.warn('WARNING: API returned different autostart value than expected!', {
+              sent: checked,
+              received: data.autostart
+            });
+          }
+        } else {
+          console.error('Failed to save autostart setting:', data.error);
+          // Revert checkbox state on error
+          const autostartCheckbox = document.getElementById('autostart-amm');
+          if (autostartCheckbox) {
+            autostartCheckbox.checked = !checked;
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error saving autostart setting:', error);
+        // Revert checkbox state on error
+        const autostartCheckbox = document.getElementById('autostart-amm');
+        if (autostartCheckbox) {
+          autostartCheckbox.checked = !checked;
+        }
+      });
     }
 
-    function loadAutostartSetting() {
+    function setupAutostartCheckbox() {
       const autostartCheckbox = document.getElementById('autostart-amm');
       if (autostartCheckbox) {
-        const savedSetting = localStorage.getItem('amm_autostart_enabled');
-        if (savedSetting !== null) {
-          autostartCheckbox.checked = savedSetting === 'true';
-          console.log('Autostart setting loaded:', savedSetting);
-        }
+        autostartCheckbox.addEventListener('change', function() {
+          saveAutostartSetting(this.checked);
+        });
       }
     }
 
@@ -1629,18 +1662,13 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       loadDebugSetting();
-      loadAutostartSetting();
+      setupAutostartCheckbox();
 
       setupStartupValidation();
 
       const debugCheckbox = document.getElementById('debug-mode');
       if (debugCheckbox) {
         debugCheckbox.addEventListener('change', saveDebugSetting);
-      }
-
-      const autostartCheckbox = document.getElementById('autostart-amm');
-      if (autostartCheckbox) {
-        autostartCheckbox.addEventListener('change', saveAutostartSetting);
       }
 
       const errorOkBtn = document.getElementById('errorOk');
