@@ -275,6 +275,8 @@ def findCoin(coin: str, known_coins) -> str:
 def readConfig(args, known_coins):
     config_path: str = args.configfile
     num_changes: int = 0
+    min_swap_size = 0.001
+
     with open(config_path) as fs:
         config = json.load(fs)
 
@@ -284,7 +286,7 @@ def readConfig(args, known_coins):
         config["bids"] = []
 
     if "min_seconds_between_offers" not in config:
-        config["min_seconds_between_offers"] = 60
+        config["min_seconds_between_offers"] = 15
         print("Set min_seconds_between_offers", config["min_seconds_between_offers"])
         num_changes += 1
     if "max_seconds_between_offers" not in config:
@@ -293,7 +295,7 @@ def readConfig(args, known_coins):
         num_changes += 1
 
     if "min_seconds_between_bids" not in config:
-        config["min_seconds_between_bids"] = 60
+        config["min_seconds_between_bids"] = 15
         print("Set min_seconds_between_bids", config["min_seconds_between_bids"])
         num_changes += 1
     if "max_seconds_between_bids" not in config:
@@ -320,32 +322,30 @@ def readConfig(args, known_coins):
             num_changes += 1
         offer_templates_map[offer_template["name"]] = offer_template
 
-        if "amount" not in offer_template or offer_template["amount"] is None:
-            print(f"Setting default amount for {offer_template['name']}")
-            offer_template["amount"] = 1.0  # Default amount
+        amount = float(offer_template["amount"])
+        if (
+            "amount" not in offer_template
+            or offer_template["amount"] is None
+            or amount < min_swap_size
+        ):
+            print(f"{offer_template['name']} Offer amount invalid. Disabling offer")
+            offer_template["enabled"] = False
             num_changes += 1
 
+        amount_step = float(offer_template["amount_step"])
         if "amount_step" not in offer_template:
             print(
                 f"Adding mandatory amount_step for {offer_template['name']} (privacy feature)"
             )
-            offer_template["amount_step"] = 1.0
+            offer_template["amount_step"] = min_swap_size
             num_changes += 1
         else:
             try:
-                amount_step = float(offer_template["amount_step"])
-                amount = float(offer_template["amount"])
-                if amount_step <= 0:
+                if amount_step < min_swap_size:
                     print(
-                        f"Invalid amount_step for {offer_template['name']}: must be > 0, setting to 1.0"
+                        f"Invalid amount_step for {offer_template['name']}: must be >= {min_swap_size}, setting to {min_swap_size}"
                     )
-                    offer_template["amount_step"] = 1.0
-                    num_changes += 1
-                elif amount_step < 0.001:
-                    print(
-                        f"Invalid amount_step for {offer_template['name']}: must be >= 0.001, setting to 0.001"
-                    )
-                    offer_template["amount_step"] = 0.001
+                    offer_template["amount_step"] = min_swap_size
                     num_changes += 1
                 elif amount_step > amount:
                     print(
@@ -355,22 +355,14 @@ def readConfig(args, known_coins):
                     num_changes += 1
             except (TypeError, ValueError) as e:
                 print(
-                    f"Error validating amount_step for {offer_template['name']}: {e}, setting to 1.0"
+                    f"Error validating amount_step for {offer_template['name']}: {e}, setting to {min_swap_size}"
                 )
-                offer_template["amount_step"] = 1.0
+                offer_template["amount_step"] = min_swap_size
                 num_changes += 1
 
-        min_from = offer_template.get("min_coin_from_amt", 0)
-        amount = offer_template["amount"]
-        try:
-            if float(min_from) < float(amount):
-                print("Setting min_coin_from_amt for", offer_template["name"])
-                offer_template["min_coin_from_amt"] = offer_template["amount"]
-                num_changes += 1
-        except (TypeError, ValueError) as e:
-            print(f"Error comparing min_coin_from_amt and amount: {e}")
-            print(f"Setting default min_coin_from_amt for {offer_template['name']}")
-            offer_template["min_coin_from_amt"] = offer_template["amount"]
+        if "min_coin_from_amt" not in offer_template:
+            print("Setting min_coin_from_amt for", offer_template["name"])
+            offer_template["min_coin_from_amt"] = 0
             num_changes += 1
 
         if "address" not in offer_template:
@@ -411,9 +403,9 @@ def readConfig(args, known_coins):
             num_changes += 1
         bid_templates_map[bid_template["name"]] = bid_template
 
-        if bid_template.get("min_swap_amount", 0.0) < 0.001:
+        if bid_template.get("min_swap_amount", 0.0) < min_swap_size:
             print("Setting min_swap_amount for bid template", bid_template["name"])
-            bid_template["min_swap_amount"] = 0.001
+            bid_template["min_swap_amount"] = min_swap_size
 
         if "address" not in bid_template:
             print("Setting address to auto for bid", bid_template["name"])
@@ -441,7 +433,6 @@ def readConfig(args, known_coins):
     # When enabled, the script will analyze existing offers in the market
     # and adjust rates to be competitive (slightly better than the best existing offer)
     # This helps ensure your offers are more likely to be taken
-    # Note: This is now a per-offer setting, global setting is deprecated
     if "adjust_rates_based_on_market" not in config:
         config["adjust_rates_based_on_market"] = False
         print(
@@ -608,7 +599,7 @@ def process_offers(args, config, script_state) -> None:
             try:
                 min_steps: int = int(available_balance / min_offer_amount)
                 if min_steps <= 0:
-                    min_steps = 1  # Ensure at least one step
+                    min_steps = 1
                 offer_amount = min_offer_amount * min_steps
             except (TypeError, ValueError) as e:
                 print(f"Error calculating steps: {e}. Using max available amount.")
@@ -707,12 +698,36 @@ def process_offers(args, config, script_state) -> None:
                     print(f"Skipping {offer_template['name']} - rates unavailable")
                 continue
 
-        adjust_rates_enabled = offer_template.get("adjust_rates_based_on_market", False)
+        # Get adjust_rates_based_on_market setting (WIP)
+        adjust_rates_value = offer_template.get("adjust_rates_based_on_market", "false")
 
+        if isinstance(adjust_rates_value, bool):
+            adjust_rates_value = "true" if adjust_rates_value else "false"
+        elif adjust_rates_value is True:
+            adjust_rates_value = "true"
+        elif adjust_rates_value is False:
+            adjust_rates_value = "false"
+
+        # Fallback to global config
         if "adjust_rates_based_on_market" not in offer_template:
-            adjust_rates_enabled = config.get("adjust_rates_based_on_market", False)
+            global_setting = config.get("adjust_rates_based_on_market", False)
+            if isinstance(global_setting, bool):
+                adjust_rates_value = "true" if global_setting else "false"
+            else:
+                adjust_rates_value = str(global_setting)
 
-        if adjust_rates_enabled:
+        if args.debug:
+            print(
+                f"Adjust rates mode for {offer_template['name']}: {adjust_rates_value}"
+            )
+
+        # Get CoinGecko rate first
+        coingecko_rate = use_rate
+        market_rate = None
+        market_offers_available = False
+
+        # Fetch market data if needed (for "true" or "only" modes)
+        if adjust_rates_value in ["true", "only"]:
             try:
                 received_offers = read_json_api(
                     "offers",
@@ -741,64 +756,88 @@ def process_offers(args, config, script_state) -> None:
                     f"Found {len(received_offers)} existing offers for {coin_from_data['ticker']} to {coin_to_data['ticker']}"
                 )
 
-            # Adjust rates based on existing offers
+            # Calculate market rate if offers are available
             if received_offers:
-                # Calculate market rates from existing offers
-                # TODO: This may be inaccurate if not accounting for offer sizes
-                # Future improvement: Weight rates by offer amounts for more accurate market analysis
-                # For example: weighted_avg = sum(rate * amount for rate, amount in offers) / sum(amounts)
                 market_rates = [float(offer["rate"]) for offer in received_offers]
                 if market_rates:
+                    market_offers_available = True
                     min_market_rate = min(market_rates)
                     max_market_rate = max(market_rates)
-
-                    # Calculate simple average (future improvement: weight by offer amounts)
                     avg_market_rate = sum(market_rates) / len(market_rates)
 
-                    # Apply competitive rate calculation using your specified formula:
+                    # Apply competitive rate calculation specified formula:
                     # if ratetweakpercent then tweak = (ratetweak / 100 + 1) else tweak = 0.99
                     # competitive_rate = min_market_rate * tweak
 
-                    if offer_template["ratetweakpercent"] != 0:
-                        tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
-                        print(
-                            f"Using ratetweakpercent {offer_template['ratetweakpercent']}% for market adjustment, tweak factor: {tweak}"
-                        )
-                    else:
-                        tweak = 0.99  # Default 1% better than best market rate
-                        print(
-                            f"Using default 1% improvement for market adjustment, tweak factor: {tweak}"
-                        )
+                    tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
+                    print(
+                        f"Using ratetweakpercent {offer_template['ratetweakpercent']}% for market adjustment, tweak factor: {tweak}"
+                    )
 
-                    competitive_rate = min_market_rate * tweak
-
-                    # Don't go below our minimum rate
-                    if competitive_rate >= offer_template["minrate"]:
-                        original_rate = use_rate
-                        use_rate = competitive_rate
-                        print(
-                            f"Market-adjusted rate: {use_rate} (was {original_rate}, min market: {min_market_rate}, tweak: {tweak})"
-                        )
-                    else:
-                        print(
-                            f"Calculated competitive rate {competitive_rate} is below our minimum rate {offer_template['minrate']}, keeping minimum"
-                        )
+                    market_rate = min_market_rate * tweak
 
                     # Log market statistics
                     print(
                         f"Market statistics - Count: {len(market_rates)}, Avg: {avg_market_rate:.8f}, Min: {min_market_rate:.8f}, Max: {max_market_rate:.8f}"
                     )
+                    print(
+                        f"Calculated market rate: {market_rate} (min market: {min_market_rate}, tweak: {tweak})"
+                    )
                 else:
                     print("No valid market rates found in existing offers")
             else:
-                print("No existing offers found for market rate adjustment")
-        else:
-            if args.debug:
-                print("Market-based rate adjustment is disabled for this offer")
+                print("No existing offers found for market rate analysis")
 
-        # Apply ratetweakpercent if market adjustment is disabled
+        if adjust_rates_value == "false":
+            #  Use CoinGecko only, fail if unavailable
+            print(f"Using CoinGecko rate only: {coingecko_rate}")
+            use_rate = coingecko_rate
+
+        elif adjust_rates_value == "true":
+            # Use higher of CoinGecko + orderbook, fail if both unavailable
+            if market_offers_available and market_rate is not None:
+                # Use the higher rate between CoinGecko and market
+                use_rate = max(coingecko_rate, market_rate)
+                print(
+                    f"Using higher rate - CoinGecko: {coingecko_rate}, Market: {market_rate}, Selected: {use_rate}"
+                )
+            else:
+                # Fall back to CoinGecko if no market data
+                use_rate = coingecko_rate
+                print(
+                    f"No market data available, using CoinGecko rate: {coingecko_rate}"
+                )
+
+        elif adjust_rates_value == "only":
+            # Use orderbook only, fail if no market rates
+            if market_offers_available and market_rate is not None:
+                use_rate = market_rate
+                print(f"Using market rate only: {use_rate}")
+            else:
+                print(
+                    f"ERROR: No market data available for 'only' mode for {offer_template['name']}"
+                )
+                print(
+                    f"Skipping {offer_template['name']} - market-only mode requires existing offers"
+                )
+                continue
+        else:
+            # Unknown mode, default to CoinGecko
+            print(
+                f"Unknown adjust_rates_based_on_market value: {adjust_rates_value}, defaulting to CoinGecko"
+            )
+            use_rate = coingecko_rate
+
+        # Ensure we don't go below minimum rate
+        if use_rate < offer_template["minrate"]:
+            print(
+                f"Calculated rate {use_rate} is below minimum rate {offer_template['minrate']}, using minimum"
+            )
+            use_rate = offer_template["minrate"]
+
+        # Apply ratetweakpercent if market adjustment is disabled (false mode)
         # (if market adjustment is enabled, ratetweakpercent is already applied in the market calculation)
-        if offer_template["ratetweakpercent"] != 0 and not adjust_rates_enabled:
+        if offer_template["ratetweakpercent"] != 0 and adjust_rates_value == "false":
             print(
                 "Adjusting rate {} by {}%.".format(
                     use_rate, offer_template["ratetweakpercent"]
@@ -806,17 +845,25 @@ def process_offers(args, config, script_state) -> None:
             )
             tweak = offer_template["ratetweakpercent"] / 100.0
             use_rate += use_rate * tweak
-        elif offer_template["ratetweakpercent"] != 0 and adjust_rates_enabled:
+        elif offer_template["ratetweakpercent"] != 0 and adjust_rates_value in [
+            "true",
+            "only",
+        ]:
             print(
                 f"Rate tweak {offer_template['ratetweakpercent']}% already applied in market adjustment"
             )
 
+        # Final minimum rate check after all adjustments
         if use_rate < offer_template["minrate"]:
-            print("Warning: Clamping rate to minimum.")
+            print("Warning: Final rate clamping to minimum after all adjustments.")
             use_rate = offer_template["minrate"]
 
         if args.debug:
-            print("Creating offer for: {} at rate: {}".format(offer_template, use_rate))
+            print(
+                "Creating offer for: {} at rate: {}".format(
+                    offer_template["name"], use_rate
+                )
+            )
         else:
             print(
                 "Creating offer for: {} {} -> {} at rate: {}".format(
@@ -865,12 +912,13 @@ def process_offers(args, config, script_state) -> None:
             offer_data["amt_bid_min"] = offer_template["min_swap_amount"]
 
         if args.debug:
-            print("offer data {}".format(offer_data))
+            print(
+                f"Offer data: {offer_amount} {coin_from_data['ticker']} -> {coin_to_data['ticker']} at {use_rate}"
+            )
 
         try:
             new_offer = read_json_api("offers/new", offer_data)
 
-            # Check if new_offer is a valid dictionary response
             if not isinstance(new_offer, dict):
                 if args.debug:
                     print(
@@ -883,9 +931,7 @@ def process_offers(args, config, script_state) -> None:
                 continue
 
             if "error" in new_offer:
-                raise ValueError(
-                    "Server failed to create offer: {}".format(new_offer["error"])
-                )
+                raise ValueError(f"Server failed to create offer: {new_offer['error']}")
 
             if "offer_id" not in new_offer:
                 if args.debug:
@@ -896,7 +942,7 @@ def process_offers(args, config, script_state) -> None:
                     )
                 continue
 
-            print("New offer created with ID: {}".format(new_offer["offer_id"]))
+            print(f"New offer created with ID: {new_offer['offer_id']}")
             if "offers" not in script_state:
                 script_state["offers"] = {}
             template_name = offer_template["name"]
@@ -1045,7 +1091,7 @@ def process_bids(args, config, script_state) -> None:
                 break
 
         if args.debug:
-            print("Received Offers", received_offers)
+            print(f"Found {len(received_offers)} offers for bidding analysis")
 
         for offer in received_offers:
             try:
@@ -1073,7 +1119,7 @@ def process_bids(args, config, script_state) -> None:
                 continue
 
             min_swap_amount = bid_template.get(
-                "min_swap_amount", 0.01
+                "min_swap_amount", 0.001
             )  # TODO: Make default vary per coin
             can_adjust_offer_amount: bool = offer["amount_negotiable"]
             can_adjust_bid_amount: bool = bid_template.get("amount_variable", True)
@@ -1130,7 +1176,7 @@ def process_bids(args, config, script_state) -> None:
 
             # Check if we should bid on offers based on their auto-accept settings
             offers_to_bid_on = bid_template.get(
-                "offers_to_bid_on", "all"
+                "offers_to_bid_on", "auto_accept_only"
             )  # all, auto_accept_only, known_only
 
             try:
@@ -1260,7 +1306,6 @@ def process_bids(args, config, script_state) -> None:
                                 print(f"Reduced bid amount to {bid_amount}")
                                 swap_amount_to = adjusted_bid_amount * offer_rate
 
-                    if total_balance_to - swap_amount_to < min_coin_to_balance:
                         if args.debug:
                             print(
                                 f"Bid amount would exceed minimum coin to wallet total for offer {offer_id}"
@@ -1314,7 +1359,9 @@ def process_bids(args, config, script_state) -> None:
                 bid_id = "simulated"
             else:
                 if args.debug:
-                    print("Creating bid: {}".format(bid_data))
+                    print(
+                        f"Creating bid: {bid_amount} {coin_to_data['ticker']} for offer {offer_id}"
+                    )
                 try:
                     new_bid = read_json_api("bids/new", bid_data)
 
@@ -1558,6 +1605,10 @@ def main():
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    last_summary_time = 0
+    summary_interval = 600
+
     try:
         while not delay_event.is_set():
             # Read config each iteration so it can be modified without restarting
@@ -1589,8 +1640,26 @@ def main():
 
                 except Exception as e:
                     error_msg = str(e)
-                    if "balance" in error_msg.lower() and not args.debug:
-                        pass
+
+                    if (
+                        any(
+                            keyword in error_msg.lower()
+                            for keyword in ["balance", "insufficient", "not enough"]
+                        )
+                        and not args.debug
+                    ):
+
+                        current_time = int(time.time())
+                        if (
+                            not hasattr(process_offers, "_last_balance_error")
+                            or current_time
+                            - getattr(process_offers, "_last_balance_error", 0)
+                            > 3600
+                        ):
+                            print(
+                                "AMM Info: Insufficient balance for some offers (use --debug for details)"
+                            )
+                            process_offers._last_balance_error = current_time
                     else:
                         print(f"AMM Error: {error_msg}")
 
@@ -1601,8 +1670,20 @@ def main():
             if args.oneshot or shutdown_in_progress:
                 break
 
-            if not shutdown_in_progress and args.debug:
-                print("Looping indefinitely, ctrl+c to exit.")
+            current_time = int(time.time())
+            if args.debug and current_time - last_summary_time > summary_interval:
+                active_offers = sum(
+                    len(template_group)
+                    for template_group in script_state.get("offers", {}).values()
+                )
+                active_bids = sum(
+                    len(template_group)
+                    for template_group in script_state.get("bids", {}).values()
+                )
+                print(
+                    f"AMM Summary: {active_offers} active offers, {active_bids} active bids, next check in {config['main_loop_delay']}s"
+                )
+                last_summary_time = current_time
 
             delay_event.wait(config["main_loop_delay"])
 

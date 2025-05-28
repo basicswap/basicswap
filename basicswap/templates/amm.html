@@ -470,15 +470,15 @@
                   <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Offer Timing</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li class="break-words"><span class="font-semibold">min_seconds_between_offers:</span> Minimum delay between creating offers (default: 60)</li>
-                      <li class="break-words"><span class="font-semibold">max_seconds_between_offers:</span> Maximum delay between creating offers (default: 240)</li>
+                      <li class="break-words"><span class="font-semibold">min_seconds_between_offers:</span> Minimum delay between creating offers (default: 15)</li>
+                      <li class="break-words"><span class="font-semibold">max_seconds_between_offers:</span> Maximum delay between creating offers (default: 60)</li>
                     </ul>
                   </div>
                   <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Bid Timing</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <li class="break-words"><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids (default: 60)</li>
-                      <li class="break-words"><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids (default: 240)</li>
+                      <li class="break-words"><span class="font-semibold">min_seconds_between_bids:</span> Minimum delay between creating bids (default: 15)</li>
+                      <li class="break-words"><span class="font-semibold">max_seconds_between_bids:</span> Maximum delay between creating bids (default: 60)</li>
                     </ul>
                   </div>
                 </div>
@@ -533,20 +533,20 @@
                       <li class="break-words"><span class="font-semibold">coin_to:</span> Coin you receive</li>
                       <li class="break-words"><span class="font-semibold">amount:</span> Amount to create the offer for</li>
                       <li class="break-words"><span class="font-semibold">minrate:</span> Rate below which the offer won't drop</li>
-                      <li class="break-words"><span class="font-semibold">min_coin_from_amt:</span> Won't generate offers if wallet balance would drop below this</li>
+                      <li class="break-words"><span class="font-semibold">min_coin_from_amt:</span> Won't generate offers if wallet balance would drop below this (default: 0)</li>
                     </ul>
                   </div>
                   <div class="break-words">
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Optional Settings</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                       <li class="break-words"><span class="font-semibold">ratetweakpercent:</span> Modify the offer rate from the fetched value (can be negative)</li>
-                      <li class="break-words"><span class="font-semibold">adjust_rates_based_on_market:</span> Per-offer setting with 3 modes: <strong>true</strong> (fail if no market data), <strong>false</strong> (use CoinGecko only), <strong>"only"</strong> (market rates only, no CoinGecko). Algorithm: Competitive rate = min_market_rate × (rate_tweak_percent/100 + 1 or 0.99)</li>
+                      <li class="break-words"><span class="font-semibold">adjust_rates_based_on_market:</span> Per-offer setting with 3 modes: <strong>true</strong> (use higher of market/CoinGecko), <strong>false</strong> (use CoinGecko only), <strong>"only"</strong> (market rates only, no CoinGecko). Algorithm: Competitive rate = min_market_rate × (ratetweakpercent/100 + 1)</li>
                       <li class="break-words"><span class="font-semibold">amount_variable:</span> Whether bidder can set a different amount</li>
                       <li class="break-words"><span class="font-semibold">address:</span> Address offer is sent from (auto = generate new address per offer)</li>
                       <li class="break-words"><span class="font-semibold">offer_valid_seconds:</span> How long generated offers will be valid for (minimum 600 seconds)</li>
                       <li class="break-words"><span class="font-semibold">swap_type:</span> Type of swap, defaults to "adaptor_sig"</li>
                       <li class="break-words"><span class="font-semibold">min_swap_amount:</span> Minimum purchase quantity when offer amount is variable</li>
-                      <li class="break-words"><span class="font-semibold">amount_step:</span> <strong>Mandatory privacy feature</strong> that sets the offer size increment. Prevents revealing exact wallet balance by creating stepped offers. Must be between 0.001 and your offer amount.</li>
+                      <li class="break-words"><span class="font-semibold">amount_step:</span> <strong>Mandatory privacy feature</strong> that sets the offer size increment. Prevents revealing exact wallet balance by creating stepped offers. Must be >= 0.001 and <= your offer amount. Default: 0.001</li>
                     </ul>
                   </div>
                 </div>
@@ -574,7 +574,7 @@
                       <li><span class="font-semibold">enabled:</span> Set to true to enable this bid</li>
                       <li><span class="font-semibold">coin_from:</span> Coin you receive</li>
                       <li><span class="font-semibold">coin_to:</span> Coin you send</li>
-                      <li><span class="font-semibold">amount:</span> Amount to bid</li>
+                      <li><span class="font-semibold">amount:</span> Amount to bid (minimum: 0.001)</li>
                       <li><span class="font-semibold">max_rate:</span> Maximum rate for bids</li>
                       <li><span class="font-semibold">min_coin_to_balance:</span> Won't send bids if wallet amount would drop below this</li>
                     </ul>
@@ -587,7 +587,7 @@
                       <li><span class="font-semibold">max_coin_from_balance:</span> If needed, uncomment and set to limit bids when wallet amount is above this</li>
                       <li><span class="font-semibold">address:</span> Address bid is sent from (auto = generate new address per bid)</li>
                       <li><span class="font-semibold">min_swap_amount:</span> Minimum swap amount for variable amount bids</li>
-                      <li><span class="font-semibold">offers_to_bid_on:</span> Filter offers to bid on: <strong>"all"</strong> (any offer), <strong>"auto_accept_only"</strong> (only auto-accept offers), <strong>"known_only"</strong> (known identities only)</li>
+                      <li><span class="font-semibold">offers_to_bid_on:</span> Filter offers to bid on: <strong>"auto_accept_only"</strong> (only auto-accept offers, default), <strong>"all"</strong> (any offer), <strong>"known_only"</strong> (known identities only)</li>
                     </ul>
                   </div>
                 </div>
@@ -663,8 +663,8 @@
 
                  const config = JSON.parse(configText);
 
-                 document.getElementById('min_seconds_between_offers').value = config.min_seconds_between_offers || 60;
-                 document.getElementById('max_seconds_between_offers').value = config.max_seconds_between_offers || 240;
+                 document.getElementById('min_seconds_between_offers').value = config.min_seconds_between_offers || 15;
+                 document.getElementById('max_seconds_between_offers').value = config.max_seconds_between_offers || 60;
                  document.getElementById('main_loop_delay').value = config.main_loop_delay || 60;
 
                  const minSecondsBetweenBidsEl = document.getElementById('min_seconds_between_bids');
@@ -672,8 +672,8 @@
                  const pruneStateDelayEl = document.getElementById('prune_state_delay');
                  const pruneStateAfterSecondsEl = document.getElementById('prune_state_after_seconds');
 
-                 if (minSecondsBetweenBidsEl) minSecondsBetweenBidsEl.value = config.min_seconds_between_bids || 60;
-                 if (maxSecondsBetweenBidsEl) maxSecondsBetweenBidsEl.value = config.max_seconds_between_bids || 240;
+                 if (minSecondsBetweenBidsEl) minSecondsBetweenBidsEl.value = config.min_seconds_between_bids || 15;
+                 if (maxSecondsBetweenBidsEl) maxSecondsBetweenBidsEl.value = config.max_seconds_between_bids || 60;
                  if (pruneStateDelayEl) pruneStateDelayEl.value = config.prune_state_delay || 120;
                  if (pruneStateAfterSecondsEl) pruneStateAfterSecondsEl.value = config.prune_state_after_seconds || 604800;
                  document.getElementById('auth').value = config.auth || '';
@@ -723,8 +723,8 @@
 
                  const config = JSON.parse(configText);
 
-                 config.min_seconds_between_offers = parseInt(document.getElementById('min_seconds_between_offers').value) || 60;
-                 config.max_seconds_between_offers = parseInt(document.getElementById('max_seconds_between_offers').value) || 240;
+                 config.min_seconds_between_offers = parseInt(document.getElementById('min_seconds_between_offers').value) || 15;
+                 config.max_seconds_between_offers = parseInt(document.getElementById('max_seconds_between_offers').value) || 60;
                  config.main_loop_delay = parseInt(document.getElementById('main_loop_delay').value) || 60;
 
                  const minSecondsBetweenBidsEl = document.getElementById('min_seconds_between_bids');
@@ -732,8 +732,8 @@
                  const pruneStateDelayEl = document.getElementById('prune_state_delay');
                  const pruneStateAfterSecondsEl = document.getElementById('prune_state_after_seconds');
 
-                 config.min_seconds_between_bids = minSecondsBetweenBidsEl ? parseInt(minSecondsBetweenBidsEl.value) || 60 : (config.min_seconds_between_bids || 60);
-                 config.max_seconds_between_bids = maxSecondsBetweenBidsEl ? parseInt(maxSecondsBetweenBidsEl.value) || 240 : (config.max_seconds_between_bids || 240);
+                 config.min_seconds_between_bids = minSecondsBetweenBidsEl ? parseInt(minSecondsBetweenBidsEl.value) || 15 : (config.min_seconds_between_bids || 15);
+                 config.max_seconds_between_bids = maxSecondsBetweenBidsEl ? parseInt(maxSecondsBetweenBidsEl.value) || 60 : (config.max_seconds_between_bids || 60);
                  config.prune_state_delay = pruneStateDelayEl ? parseInt(pruneStateDelayEl.value) || 120 : (config.prune_state_delay || 120);
                  config.prune_state_after_seconds = pruneStateAfterSecondsEl ? parseInt(pruneStateAfterSecondsEl.value) || 604800 : (config.prune_state_after_seconds || 604800);
                  config.auth = document.getElementById('auth').value;

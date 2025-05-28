@@ -67,15 +67,22 @@ def log_capture_thread(process, swap_client):
             if not line:
                 break
 
-            line_str = line.decode("utf-8", errors="replace").rstrip()
+            line_str = (
+                line.rstrip()
+                if isinstance(line, str)
+                else line.decode("utf-8", errors="replace").rstrip()
+            )
 
             with amm_log_lock:
                 amm_log_buffer.append(line_str)
                 if len(amm_log_buffer) > 1000:
                     amm_log_buffer.pop(0)
 
-            debug_enabled = globals().get("amm_debug", False)
-            if debug_enabled or any(
+            debug_enabled = globals().get("amm_debug", False) or globals().get(
+                "amm_ui_debug", False
+            )
+
+            always_show = any(
                 important in line_str
                 for important in [
                     "Error:",
@@ -86,9 +93,32 @@ def log_capture_thread(process, swap_client):
                     "AMM process",
                     "Offer revoked",
                     "Server failed",
+                    "Created default configuration",
+                    "API connection successful",
+                    "Done.",
                 ]
-            ):
-                swap_client.log.info(f"AMM: {line_str}")
+            )
+
+            debug_messages = debug_enabled and not any(
+                spam in line_str.lower()
+                for spam in [
+                    "processing 0 offer template",
+                    "processing 0 bid template",
+                    "looping indefinitely",
+                ]
+            )
+
+            if always_show or debug_messages:
+                if debug_enabled and any(
+                    spam in line_str.lower()
+                    for spam in [
+                        "processing 0 offer template",
+                        "processing 0 bid template",
+                    ]
+                ):
+                    pass
+                else:
+                    swap_client.log.info(f"AMM: {line_str}")
         except Exception as e:
             swap_client.log.error(f"Error capturing AMM log: {str(e)}")
 
@@ -217,7 +247,7 @@ def start_amm_process(
         default_config = {
             "min_seconds_between_offers": 60,
             "max_seconds_between_offers": 240,
-            "main_loop_delay": 60,
+            "main_loop_delay": 300,
             "offers": [],
             "bids": [],
         }
@@ -256,8 +286,9 @@ def start_amm_process(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            universal_newlines=False,
-            bufsize=-1,
+            universal_newlines=True,
+            bufsize=1,
+            env=dict(os.environ, PYTHONUNBUFFERED="1"),
         )
 
         with amm_log_lock:
@@ -366,7 +397,11 @@ def get_amm_active_count(swap_client, debug_override=False):
     """Get the count of active AMM offers and bids"""
     amm_count = 0
 
-    debug_enabled = swap_client.debug and debug_override
+    debug_enabled = debug_override and (
+        swap_client.debug
+        or globals().get("amm_ui_debug", False)
+        or globals().get("amm_debug", False)
+    )
 
     status = get_amm_status()
     if status != "running":
@@ -398,8 +433,9 @@ def get_amm_active_count(swap_client, debug_override=False):
                     enabled_bids.add(bid.get("name", ""))
 
             if debug_enabled:
-                swap_client.log.info(f"Enabled offer templates: {enabled_offers}")
-                swap_client.log.info(f"Enabled bid templates: {enabled_bids}")
+                swap_client.log.info(
+                    f"Enabled templates: {len(enabled_offers)} offers, {len(enabled_bids)} bids"
+                )
 
         except Exception as e:
             if debug_enabled:
@@ -415,15 +451,12 @@ def get_amm_active_count(swap_client, debug_override=False):
             state_data = json.load(f)
 
         if debug_enabled:
-            swap_client.log.info(f"AMM state data: {json.dumps(state_data, indent=2)}")
+            swap_client.log.info(
+                f"AMM state data loaded with {len(state_data.get('offers', {}))} offer templates"
+            )
 
         try:
             network_offers = swap_client.listOffers()
-
-            if debug_enabled:
-                swap_client.log.info(f"Network offers type: {type(network_offers)}")
-                if network_offers and len(network_offers) > 0:
-                    swap_client.log.info(f"First offer type: {type(network_offers[0])}")
 
             for offer in network_offers:
                 try:
@@ -472,10 +505,7 @@ def get_amm_active_count(swap_client, debug_override=False):
                 swap_client.log.info(
                     f"Found {len(active_network_offers)} active offers in the network"
                 )
-                if len(active_network_offers) > 0:
-                    swap_client.log.info(
-                        f"Active offer IDs: {list(active_network_offers.keys())}"
-                    )
+
         except Exception as e:
             if debug_enabled:
                 swap_client.log.error(f"Error getting network offers: {str(e)}")
@@ -513,10 +543,7 @@ def get_amm_active_count(swap_client, debug_override=False):
                     swap_client.log.info(
                         f"Found {len(active_network_offers)} active offers via API"
                     )
-                    if len(active_network_offers) > 0:
-                        swap_client.log.info(
-                            f"Active offer IDs via API: {list(active_network_offers.keys())}"
-                        )
+
             except Exception as e:
                 if debug_enabled:
                     swap_client.log.error(f"Error getting offers via API: {str(e)}")
@@ -696,8 +723,8 @@ def page_amm(self, _, post_string):
             err_messages.append(f"Failed to read config file: {str(e)}")
     else:
         default_config = {
-            "min_seconds_between_offers": 60,
-            "max_seconds_between_offers": 240,
+            "min_seconds_between_offers": 15,
+            "max_seconds_between_offers": 60,
             "main_loop_delay": 60,
             "offers": [
                 {
@@ -706,13 +733,14 @@ def page_amm(self, _, post_string):
                     "enabled": False,
                     "coin_from": "PART",
                     "coin_to": "BTC",
-                    "amount": 10.0,
+                    "amount": 1.0,
                     "minrate": 0.0001,
                     "ratetweakpercent": 0,
                     "adjust_rates_based_on_market": True,
                     "amount_variable": True,
+                    "amount_step": 0.001,
                     "address": "auto",
-                    "min_coin_from_amt": 10.0,
+                    "min_coin_from_amt": 0,
                     "offer_valid_seconds": 3600,
                 }
             ],
@@ -722,8 +750,8 @@ def page_amm(self, _, post_string):
         if swap_client.debug:
             default_config["prune_state_delay"] = 120
             default_config["prune_state_after_seconds"] = 604800
-            default_config["min_seconds_between_bids"] = 60
-            default_config["max_seconds_between_bids"] = 240
+            default_config["min_seconds_between_bids"] = 15
+            default_config["max_seconds_between_bids"] = 60
 
             default_config["bids"] = [
                 {
@@ -732,12 +760,14 @@ def page_amm(self, _, post_string):
                     "enabled": False,
                     "coin_from": "BTC",
                     "coin_to": "PART",
-                    "amount": 0.01,
+                    "amount": 0.001,
                     "max_rate": 10000.0,
                     "min_coin_to_balance": 1.0,
                     "max_concurrent": 1,
                     "amount_variable": True,
                     "address": "auto",
+                    "offers_to_bid_on": "auto_accept_only",
+                    "min_swap_amount": 0.001,
                 }
             ]
 
@@ -802,7 +832,6 @@ def page_amm(self, _, post_string):
                     messages.append("No existing AMM processes found")
 
             elif "kill_orphans" in form_data:
-                # Kill orphaned AMM processes
                 success, msg = kill_existing_amm_processes(swap_client)
                 if success:
                     messages.append(msg)
@@ -1048,8 +1077,8 @@ def page_amm(self, _, post_string):
 
                 default_config = {
                     # General settings
-                    "min_seconds_between_offers": 60,  # Minimum delay between creating offers
-                    "max_seconds_between_offers": 240,  # Maximum delay between creating offers
+                    "min_seconds_between_offers": 15,  # Minimum delay between creating offers
+                    "max_seconds_between_offers": 60,  # Maximum delay between creating offers
                     "main_loop_delay": 60,  # Seconds between main loop iterations (10-1000)
                     # Optional settings
                     "auth": "",  # BasicSwap API auth string, e.g., "admin:password" (if auth is enabled)
@@ -1063,16 +1092,16 @@ def page_amm(self, _, post_string):
                             "enabled": False,  # Set to true to enable this offer
                             "coin_from": "Particl",  # Coin you send
                             "coin_to": "Monero",  # Coin you receive
-                            "amount": 10.0,  # Amount to create the offer for
+                            "amount": 1.0,  # Amount to create the offer for
                             "minrate": 0.0001,  # Rate below which the offer won't drop
                             "ratetweakpercent": 0,  # Modify the offer rate from the fetched value (can be negative)
                             "adjust_rates_based_on_market": False,  # Whether to adjust rates based on existing market offers
                             "amount_variable": True,  # Whether bidder can set a different amount
+                            "amount_step": 0.001,  # Offer size increment (privacy/offer management feature)
                             "address": "auto",  # Address offer is sent from (auto = generate new address per offer)
-                            "min_coin_from_amt": 10.0,  # Won't generate offers if wallet balance would drop below this
+                            "min_coin_from_amt": 0,  # Won't generate offers if wallet balance would drop below this
                             "offer_valid_seconds": 3600,  # How long generated offers will be valid for
                             "automation_strategy": "accept_all",  # Auto accept bids: "accept_all", "accept_known", or "none"
-                            "amount_step": 1.0,  # REQUIRED: Offer size increment for privacy (prevents revealing exact wallet balance)
                             # Optional settings
                             "swap_type": "adaptor_sig",  # Type of swap, defaults to "adaptor_sig"
                             "min_swap_amount": 0.001,  # Minimum purchase quantity when offer amount is variable
@@ -1089,10 +1118,10 @@ def page_amm(self, _, post_string):
                         604800  # How long to keep old state data (7 days)
                     )
                     default_config["min_seconds_between_bids"] = (
-                        60  # Minimum delay between creating bids
+                        15  # Minimum delay between creating bids
                     )
                     default_config["max_seconds_between_bids"] = (
-                        240  # Maximum delay between creating bids
+                        60  # Maximum delay between creating bids
                     )
 
                 if include_bids:
@@ -1104,10 +1133,10 @@ def page_amm(self, _, post_string):
                             "enabled": False,  # Set to true to enable this bid
                             "coin_from": "Monero",  # Coin you receive
                             "coin_to": "Particl",  # Coin you send
-                            "amount": 0.01,  # Amount to bid
+                            "amount": 0.001,  # Amount to bid
                             "max_rate": 10000.0,  # Maximum rate for bids
                             "min_coin_to_balance": 1.0,  # Won't send bids if wallet amount would drop below this
-                            "offers_to_bid_on": "all",  # Which offers to bid on: "all", "auto_accept_only", or "known_only"
+                            "offers_to_bid_on": "auto_accept_only",  # Which offers to bid on: "all", "auto_accept_only", or "known_only"
                             # Optional settings
                             "max_concurrent": 1,  # Maximum number of bids to have active at once
                             "amount_variable": True,  # Can send bids below the set amount where possible
