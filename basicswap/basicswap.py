@@ -2408,6 +2408,10 @@ class BasicSwap(BaseApp):
         finally:
             self.closeDB(cursor)
         self.log.info(f"Sent OFFER {self.log.id(offer_id)}")
+
+        if self.ws_server:
+            self.ws_server.send_message_to_all('{"event": "offer_created"}')
+
         return offer_id
 
     def revokeOffer(self, offer_id, security_token=None) -> None:
