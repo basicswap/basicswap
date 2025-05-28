@@ -837,21 +837,19 @@ def process_offers(args, config, script_state) -> None:
 
         # Apply ratetweakpercent if market adjustment is disabled (false mode)
         # (if market adjustment is enabled, ratetweakpercent is already applied in the market calculation)
-        if offer_template["ratetweakpercent"] != 0 and adjust_rates_value == "false":
+        if adjust_rates_value == "false":
             print(
                 "Adjusting rate {} by {}%.".format(
                     use_rate, offer_template["ratetweakpercent"]
                 )
             )
-            tweak = offer_template["ratetweakpercent"] / 100.0
-            use_rate += use_rate * tweak
-        elif offer_template["ratetweakpercent"] != 0 and adjust_rates_value in [
-            "true",
-            "only",
-        ]:
-            print(
-                f"Rate tweak {offer_template['ratetweakpercent']}% already applied in market adjustment"
-            )
+            tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
+            use_rate = use_rate * tweak
+        elif adjust_rates_value in ["true", "only"]:
+            if offer_template["ratetweakpercent"] != 0:
+                print(
+                    f"Rate tweak {offer_template['ratetweakpercent']}% already applied in market adjustment"
+                )
 
         # Final minimum rate check after all adjustments
         if use_rate < offer_template["minrate"]:
