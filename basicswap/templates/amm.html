@@ -387,8 +387,10 @@
                 </div>
                 {% endif %}
                 <div class="flex justify-between">
-                  <button type="submit" name="create_default" value="true" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Default Config</button>
-                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none" {% if not debug_ui_mode %}disabled{% endif %}>Save Config</button>
+                  <button type="submit" name="create_default" value="true" id="create_default_btn" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Default Config</button>
+                  {% if debug_ui_mode %}
+                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Config</button>
+                  {% endif %}
                 </div>
               </div>
             </div>
@@ -750,7 +752,6 @@
                }
              }
 
-
            }
 
            const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
@@ -826,6 +827,51 @@
                  }
                }, 500);
              }
+           }
+
+           if (localStorage.getItem('amm_create_default_refresh') === 'true') {
+             localStorage.removeItem('amm_create_default_refresh');
+             console.log('[AMM] Page reloaded after create default config - forcing page refresh to load new config');
+
+             setTimeout(function() {
+               window.location.reload();
+             }, 500);
+           }
+
+           const createDefaultBtn = document.getElementById('create_default_btn');
+           if (createDefaultBtn && configForm) {
+             createDefaultBtn.addEventListener('click', function(e) {
+               e.preventDefault();
+
+               const title = 'Create Default Configuration';
+               const message = 'This will overwrite your current configuration with a default template.\n\nAre you sure you want to continue?';
+
+               if (window.showConfirmModal) {
+                 window.showConfirmModal(title, message, function() {
+
+                   const hiddenInput = document.createElement('input');
+                   hiddenInput.type = 'hidden';
+                   hiddenInput.name = 'create_default';
+                   hiddenInput.value = 'true';
+                   configForm.appendChild(hiddenInput);
+
+                   localStorage.setItem('amm_create_default_refresh', 'true');
+
+                   configForm.submit();
+                 });
+               } else {
+                 if (confirm('This will overwrite your current configuration with a default template.\n\nAre you sure you want to continue?')) {
+                   const hiddenInput = document.createElement('input');
+                   hiddenInput.type = 'hidden';
+                   hiddenInput.name = 'create_default';
+                   hiddenInput.value = 'true';
+                   configForm.appendChild(hiddenInput);
+
+                   localStorage.setItem('amm_create_default_refresh', 'true');
+                   configForm.submit();
+                 }
+               }
+             });
            }
          });
        </script>
