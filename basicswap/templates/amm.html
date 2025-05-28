@@ -831,10 +831,10 @@
 
            if (localStorage.getItem('amm_create_default_refresh') === 'true') {
              localStorage.removeItem('amm_create_default_refresh');
-             console.log('[AMM] Page reloaded after create default config - forcing page refresh to load new config');
+             console.log('[AMM] Page loaded after create default config - redirecting to fresh page');
 
              setTimeout(function() {
-               window.location.reload();
+               window.location.href = window.location.pathname + window.location.search;
              }, 500);
            }
 
