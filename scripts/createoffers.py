@@ -322,43 +322,57 @@ def readConfig(args, known_coins):
             num_changes += 1
         offer_templates_map[offer_template["name"]] = offer_template
 
-        amount = float(offer_template["amount"])
+        if "enabled" not in offer_template:
+            offer_template["enabled"] = True
+            num_changes += 1
         if (
             "amount" not in offer_template
             or offer_template["amount"] is None
-            or amount < min_swap_size
+            or float(offer_template["amount"]) < min_swap_size
         ):
             print(f"{offer_template['name']} Offer amount invalid. Disabling offer")
+            offer_template["amount"] = None
             offer_template["enabled"] = False
             num_changes += 1
 
-        amount_step = float(offer_template["amount_step"])
+        if offer_template["enabled"] is False:
+            continue
+        amount = float(offer_template["amount"])
         if "amount_step" not in offer_template:
             print(
                 f"Adding mandatory amount_step for {offer_template['name']} (privacy feature)"
             )
             offer_template["amount_step"] = min_swap_size
             num_changes += 1
-        else:
-            try:
-                if amount_step < min_swap_size:
-                    print(
-                        f"Invalid amount_step for {offer_template['name']}: must be >= {min_swap_size}, setting to {min_swap_size}"
-                    )
-                    offer_template["amount_step"] = min_swap_size
-                    num_changes += 1
-                elif amount_step > amount:
-                    print(
-                        f"Invalid amount_step for {offer_template['name']}: must be <= amount ({amount}), setting to {amount}"
-                    )
-                    offer_template["amount_step"] = amount
-                    num_changes += 1
-            except (TypeError, ValueError) as e:
-                print(
-                    f"Error validating amount_step for {offer_template['name']}: {e}, setting to {min_swap_size}"
-                )
-                offer_template["amount_step"] = min_swap_size
-                num_changes += 1
+        amount_step = float(offer_template["amount_step"])
+        if amount_step < min_swap_size:
+            print(
+                f"Invalid amount_step for {offer_template['name']}: must be >= {min_swap_size}, setting to {min_swap_size}"
+            )
+            offer_template["amount_step"] = min_swap_size
+            num_changes += 1
+        elif amount_step > amount:
+            print(
+                f"Invalid amount_step for {offer_template['name']}: must be <= amount ({amount}), setting to {amount}"
+            )
+            offer_template["amount_step"] = amount
+            num_changes += 1
+
+        if (
+            "min_swap_amount" not in offer_template
+            or float(offer_template["min_swap_amount"]) < min_swap_size
+        ):
+            print("Setting min_swap_amount for", offer_template["name"])
+            offer_template["min_swap_amount"] = min_swap_size
+            num_changes += 1
+        elif float(offer_template["min_swap_amount"]) > amount:
+            print(
+                f"min_swap_amount cannot be larger than offer amount ({amount}) Setting min_swap_amount for",
+                offer_template["name"],
+                "to {amount}",
+            )
+            offer_template["min_swap_amount"] = amount
+            num_changes += 1
 
         if "min_coin_from_amt" not in offer_template:
             print("Setting min_coin_from_amt for", offer_template["name"])
