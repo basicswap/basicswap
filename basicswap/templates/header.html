@@ -6,7 +6,7 @@
   shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg,
   wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg,
   swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg,
-  bids_sent_svg, header_arrow_down_svg, love_svg, amm_active_svg, amm_inactive_svg %}
+  bids_sent_svg, header_arrow_down_svg, love_svg, mobile_love_svg,  amm_active_svg, amm_inactive_svg %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -169,8 +169,18 @@
           </li>
         </ul>
 
-        <!-- Settings Dropdown -->
+        <!-- Donation Link -->
         <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto">
+          <li>
+            <a href="/donation" class="flex items-center py-2 pr-4 pl-3 text-gray-50 text-sm hover:text-gray-100">
+              {{ love_svg | safe }}
+              <span class="ml-2">Donate</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- Settings Dropdown -->
+        <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6">
           <div id="dropdownNavbarLink" data-dropdown-toggle="dropdownNavbar" class="flex justify-between
             items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm md:border-0 md:p-0 md:w-auto
             text-gray-50 hover:text-gray-100">
@@ -317,7 +327,7 @@
                   py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
                   transition-opacity duration-300 tooltip">
                   <p><b>AMM:</b> Active</p>
-                  <p><b>Currently active offers/bids:</b> {{ amm_active_count }}</p>
+                  <p><b>Currently offers/bids:</b> {{ amm_active_count }}</p>
                 </div>
               </a>
               {% else %}
@@ -570,6 +580,13 @@
             href="/wallets">
             {{ wallet_svg | safe }}
             <span>Wallets</span>
+          </a>
+        </li>
+        <li>
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
+            href="/donation">
+            {{ mobile_love_svg | safe }}
+            <span>Donate</span>
           </a>
         </li>
 
