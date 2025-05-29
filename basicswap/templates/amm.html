@@ -1,5 +1,5 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, input_arrow_down_svg, arrow_right_svg %}
+{% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, input_arrow_down_svg, arrow_right_svg, input_time_svg %}
 
 <script>
   window.ammTablesConfig = {
@@ -9,27 +9,7 @@
   };
 </script>
 
-<div class="container mx-auto">
- <section class="p-5 mt-5">
-  <div class="flex flex-wrap items-center -m-2">
-   <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-     <li>{{ breadcrumb_line_svg | safe }}</li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/amm">
-       <p>Automated Market Maker</p>
-      </a>
-     </li>
-    </ul>
-   </div>
-  </div>
- </section>
- <section class="py-4">
+<section class="py-3 px-4 mt-6">
   <div class="container px-4 mx-auto">
    <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
     <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
@@ -46,7 +26,10 @@
    </div>
   </div>
  </section>
+
  {% include 'inc_messages.html' %}
+ 
+<div class="xl:container mx-auto">
 
  <section>
   <div class="container px-4 mx-auto">
@@ -940,7 +923,7 @@
                 </div>
 
                 <div class="flex items-center">
-                  <input type="checkbox" id="add-amm-enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600">
+                  <input type="checkbox" id="add-amm-enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600" checked>
                   <label for="add-amm-enabled" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Enabled</label>
                 </div>
 
@@ -1162,7 +1145,7 @@
                 </div>
 
                 <div class="flex items-center">
-                  <input type="checkbox" id="edit-amm-enabled" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                  <input type="checkbox" id="edit-amm-enabled" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" checked>
                   <label for="edit-amm-enabled" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Enabled</label>
                 </div>
 

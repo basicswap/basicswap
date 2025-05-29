@@ -23,13 +23,13 @@ const AmmTablesManager = (function() {
     }
 
     function debugLog(message, data) {
-        if (isDebugEnabled()) {
-            if (data) {
-                console.log(`[AmmTables] ${message}`, data);
-            } else {
-                console.log(`[AmmTables] ${message}`);
-            }
-        }
+        // if (isDebugEnabled()) {
+        //     if (data) {
+        //         console.log(`[AmmTables] ${message}`, data);
+        //     } else {
+        //         console.log(`[AmmTables] ${message}`);
+        //     }
+        // }
     }
 
     function initializeTabs() {
@@ -289,6 +289,10 @@ const AmmTablesManager = (function() {
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
                             Receive: ~${amountToReceive.toFixed(8)} ${getCoinDisplayName(coinTo)}
+                            ${(() => {
+                                const usdValue = calculateUSDPrice(amountToReceive, coinTo);
+                                return usdValue ? `<br/><span class="text-green-600 dark:text-green-400">${formatUSDPrice(usdValue)}</span>` : '<br/><span class="text-gray-400">USD: N/A</span>';
+                            })()}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -298,6 +302,9 @@ const AmmTablesManager = (function() {
                                     ${amountVariable ? 'Variable' : 'Fixed'}
                                 </span>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                                    <svg class="w-3 h-3 mr-1 text-gray-600 dark:text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                                    </svg>
                                     ${formatDuration(offerValidSeconds)}
                                 </span>
                             </div>
@@ -423,6 +430,10 @@ const AmmTablesManager = (function() {
                         <div class="text-sm font-semibold dark:text-white">${maxRate.toFixed(8)}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
                             Send: ~${amountToSend.toFixed(8)} ${getCoinDisplayName(coinTo)}
+                            ${(() => {
+                                const usdValue = calculateUSDPrice(amountToSend, coinTo);
+                                return usdValue ? `<br/><span class="text-red-600 dark:text-red-400">${formatUSDPrice(usdValue)}</span>` : '<br/><span class="text-gray-400">USD: N/A</span>';
+                            })()}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -481,6 +492,143 @@ const AmmTablesManager = (function() {
         if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
         if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
         return `${Math.floor(seconds / 86400)}d`;
+    }
+
+    function getPriceKey(coin) {
+        if (!coin) return null;
+
+        const lowerCoin = coin.toLowerCase();
+
+        const coinToTicker = {
+            'particl': 'PART',
+            'particl anon': 'PART',
+            'particl blind': 'PART',
+            'part': 'PART',
+            'part anon': 'PART',
+            'part blind': 'PART',
+            'bitcoin': 'BTC',
+            'btc': 'BTC',
+            'monero': 'XMR',
+            'xmr': 'XMR',
+            'litecoin': 'LTC',
+            'ltc': 'LTC',
+            'wownero': 'WOW',
+            'wow': 'WOW',
+            'dash': 'DASH',
+            'pivx': 'PIVX',
+            'firo': 'FIRO',
+            'xzc': 'FIRO',
+            'zcoin': 'FIRO',
+            'BTC': 'BTC',
+            'LTC': 'LTC',
+            'XMR': 'XMR',
+            'PART': 'PART',
+            'WOW': 'WOW',
+            'FIRO': 'FIRO',
+            'DASH': 'DASH',
+            'PIVX': 'PIVX'
+        };
+
+        if (coinToTicker[lowerCoin]) {
+            return coinToTicker[lowerCoin];
+        }
+
+        if (coinToTicker[coin.toUpperCase()]) {
+            return coinToTicker[coin.toUpperCase()];
+        }
+
+        for (const [key, value] of Object.entries(coinToTicker)) {
+            if (lowerCoin.includes(key.toLowerCase())) {
+                return value;
+            }
+        }
+
+        if (lowerCoin.includes('particl') || lowerCoin.includes('part')) {
+            return 'PART';
+        }
+
+        return coin.toUpperCase();
+    }
+
+    function calculateUSDPrice(amount, coinName) {
+        if (!window.latestPrices || !coinName || !amount) {
+            return null;
+        }
+
+        const ticker = getPriceKey(coinName);
+        let coinPrice = null;
+
+        if (typeof window.latestPrices[ticker] === 'number') {
+            coinPrice = window.latestPrices[ticker];
+        }
+
+        else if (typeof window.latestPrices[coinName] === 'number') {
+            coinPrice = window.latestPrices[coinName];
+        }
+
+        else if (typeof window.latestPrices[coinName.toUpperCase()] === 'number') {
+            coinPrice = window.latestPrices[coinName.toUpperCase()];
+        }
+
+
+        if (!coinPrice || isNaN(coinPrice)) {
+            return null;
+        }
+
+        return amount * coinPrice;
+    }
+
+    function formatUSDPrice(usdValue) {
+        if (!usdValue || isNaN(usdValue)) return '';
+        return `($${usdValue.toFixed(2)} USD)`;
+    }
+
+    async function fetchLatestPrices() {
+        try {
+            const coins = 'BTC,LTC,XMR,PART,WOW,FIRO,DASH,PIVX';
+
+            const response = await fetch('/json/coinprices', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `coins=${encodeURIComponent(coins)}&currency_to=USD&source=coingecko.com&match_input_key=true`
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+
+            if (data && data.rates) {
+                return data.rates;
+            }
+            return data;
+        } catch (error) {
+            console.error('Error fetching prices:', error);
+            return null;
+        }
+    }
+
+    async function initializePrices() {
+
+        if (window.priceManager && typeof window.priceManager.getLatestPrices === 'function') {
+            const prices = window.priceManager.getLatestPrices();
+            if (prices && Object.keys(prices).length > 0) {
+                window.latestPrices = prices;
+                setTimeout(() => {
+                    updateTables();
+                }, 100);
+                return;
+            }
+        }
+
+        const prices = await fetchLatestPrices();
+        if (prices) {
+            window.latestPrices = prices;
+            setTimeout(() => {
+                updateTables();
+            }, 100);
+        }
     }
 
     function getInitialData() {
@@ -729,7 +877,7 @@ const AmmTablesManager = (function() {
         document.getElementById('add-amm-type').value = type;
 
         document.getElementById('add-amm-name').value = '';
-        document.getElementById('add-amm-enabled').checked = false;
+        document.getElementById('add-amm-enabled').checked = true;
 
         const coinFromSelect = document.getElementById('add-amm-coin-from');
         const coinToSelect = document.getElementById('add-amm-coin-to');
@@ -2046,7 +2194,7 @@ const AmmTablesManager = (function() {
         }
     }
 
-    function initialize(options = {}) {
+    async function initialize(options = {}) {
         Object.assign(config, options);
 
         initializeTabs();
@@ -2054,13 +2202,16 @@ const AmmTablesManager = (function() {
         initializeCustomSelects();
         setupRateButtons();
 
+        await initializePrices();
+
         if (refreshButton) {
-            refreshButton.addEventListener('click', function() {
+            refreshButton.addEventListener('click', async function() {
                 const icon = refreshButton.querySelector('svg');
                 if (icon) {
                     icon.classList.add('animate-spin');
                 }
 
+                await initializePrices();
                 updateTables();
 
                 setTimeout(() => {
@@ -2089,8 +2240,8 @@ const AmmTablesManager = (function() {
     };
 })();
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     if (typeof AmmTablesManager !== 'undefined') {
-        window.ammTablesManager = AmmTablesManager.initialize();
+        window.ammTablesManager = await AmmTablesManager.initialize();
     }
 });

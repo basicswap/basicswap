@@ -16,13 +16,13 @@ const AmmCounterManager = (function() {
     }
 
     function debugLog(message, data) {
-        if (isDebugEnabled()) {
-            if (data) {
-                console.log(`[AmmCounter] ${message}`, data);
-            } else {
-                console.log(`[AmmCounter] ${message}`);
-            }
-        }
+        // if (isDebugEnabled()) {
+        //     if (data) {
+        //         console.log(`[AmmCounter] ${message}`, data);
+        //     } else {
+        //         console.log(`[AmmCounter] ${message}`);
+        //     }
+        // }
     }
 
     function updateAmmCounter(count, status) {
