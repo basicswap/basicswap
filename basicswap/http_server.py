@@ -656,6 +656,19 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         return self.page_info("Shutting down", extra_headers=extra_headers)
 
+    def page_donation(self, url_split, post_string):
+        swap_client = self.server.swap_client
+        swap_client.checkSystemStatus()
+        summary = swap_client.getSummary()
+
+        template = env.get_template("donation.html")
+        return self.render_template(
+            template,
+            {
+                "summary": summary,
+            },
+        )
+
     def page_index(self, url_split):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
@@ -854,6 +867,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_bids(self, url_split, post_string, available=True)
                 if page == "watched":
                     return self.page_watched(url_split, post_string)
+                if page == "donation":
+                    return self.page_donation(url_split, post_string)
                 if page == "smsgaddresses":
                     return page_smsgaddresses(self, url_split, post_string)
                 if page == "identity":
