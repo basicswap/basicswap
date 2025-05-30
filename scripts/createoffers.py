@@ -439,15 +439,12 @@ def readConfig(args, known_coins):
         num_changes += 1
     config["prune_state_delay"] = config.get("prune_state_delay", 120)
 
-    # Add market-based rate adjustment option (default: disabled)
-    # When enabled, the script will analyze existing offers in the market
-    # and adjust rates to be competitive (slightly better than the best existing offer)
-    # This helps ensure your offers are more likely to be taken
+    # Add market-based rate adjustment option (default: false)
+    # When enabled, the script will analyze existing offers on the orderbook
+    # and adjust rates based on your ratetweakpercent
     if "adjust_rates_based_on_market" not in config:
         config["adjust_rates_based_on_market"] = False
-        print(
-            "Setting adjust_rates_based_on_market to False (deprecated, use per-offer setting)"
-        )
+        print("Setting global adjust_rates_based_on_market to False")
         num_changes += 1
 
     seconds_in_day: int = 86400
@@ -657,57 +654,6 @@ def process_offers(args, config, script_state) -> None:
         if coin_from_id_for_rates == 1 and coin_to_id_for_rates == 1:  # Both PART
             is_part_to_part = True
 
-        if is_part_to_part:
-            use_rate = 1.0
-            print("Using fixed rate 1.0 for PART to PART (or variants)")
-        else:
-            try:
-                rates = read_json_api(
-                    "rates",
-                    {
-                        "coin_from": coin_from_id_for_rates,
-                        "coin_to": coin_to_id_for_rates,
-                    },
-                )
-
-                if not isinstance(rates, dict):
-                    if args.debug:
-                        print(
-                            f"Invalid rates response type: {type(rates)}, content: {rates}"
-                        )
-                    else:
-                        print(
-                            f"Skipping {offer_template['name']} - invalid rates response"
-                        )
-                    continue
-
-                if args.debug:
-                    print("Rates response:", rates)
-
-                use_rate = None
-
-                if (
-                    "coingecko" in rates
-                    and isinstance(rates["coingecko"], dict)
-                    and "rate_inferred" in rates["coingecko"]
-                ):
-                    coingecko_rate = float(rates["coingecko"]["rate_inferred"])
-                    use_rate = coingecko_rate
-                    print(f"Using CoinGecko rate: {use_rate}")
-                else:
-                    print(
-                        f"No CoinGecko rate available for {coin_from_data_name} to {coin_to_data['ticker']}, skipping offer"
-                    )
-                    continue
-            except Exception as e:
-                if args.debug:
-                    print(
-                        f"Error getting rates for {coin_from_data_name} to {coin_to_data['ticker']}: {e}"
-                    )
-                else:
-                    print(f"Skipping {offer_template['name']} - rates unavailable")
-                continue
-
         # Get adjust_rates_based_on_market setting (WIP)
         adjust_rates_value = offer_template.get("adjust_rates_based_on_market", "false")
 
@@ -731,11 +677,58 @@ def process_offers(args, config, script_state) -> None:
                 f"Adjust rates mode for {offer_template['name']}: {adjust_rates_value}"
             )
 
-        # Get CoinGecko rate first
-        coingecko_rate = use_rate
-        market_rate = None
+        coingecko_rate = None
+        # Get CoinGecko rates if needed (for "true", "false", "all", and unknown modes)
+        if is_part_to_part:
+            use_rate = 1.0
+            print("Using fixed rate 1.0 for PART to PART (or variants)")
+            offer_template["adjust_rates_based_on_market"] = "static"
 
-        # Fetch market data if needed (for "true","only", "all", and "minrate" modes)
+        elif adjust_rates_value not in ["only", "minrate", "static"]:
+            try:
+                rates = read_json_api(
+                    "rates",
+                    {
+                        "coin_from": coin_from_id_for_rates,
+                        "coin_to": coin_to_id_for_rates,
+                    },
+                )
+
+                if not isinstance(rates, dict):
+                    if args.debug:
+                        print(
+                            f"Invalid rates response type: {type(rates)}, content: {rates}"
+                        )
+                    else:
+                        print(
+                            f"Skipping {offer_template['name']} - invalid rates response"
+                        )
+
+                if args.debug:
+                    print("Rates response:", rates)
+
+                use_rate = None
+
+                if (
+                    "coingecko" in rates
+                    and isinstance(rates["coingecko"], dict)
+                    and "rate_inferred" in rates["coingecko"]
+                ):
+                    coingecko_rate = float(rates["coingecko"]["rate_inferred"])
+                    use_rate = coingecko_rate
+                    print(f"Using CoinGecko rate: {use_rate}")
+                else:
+                    print(
+                        f"No CoinGecko rate available for {coin_from_data_name} to {coin_to_data['ticker']}"
+                    )
+            except Exception as e:
+                if args.debug:
+                    print(
+                        f"Error getting rates for {coin_from_data_name} to {coin_to_data['ticker']}: {e}"
+                    )
+
+        # Fetch Orderbook data if needed (for "true","only", "all", and "minrate" modes)
+        market_rate = None
         if adjust_rates_value in ["true", "only", "all", "minrate"]:
             try:
                 received_offers = read_json_api(
@@ -773,33 +766,26 @@ def process_offers(args, config, script_state) -> None:
                     max_market_rate = max(market_rates)
                     avg_market_rate = sum(market_rates) / len(market_rates)
 
-                    # Apply competitive rate calculation specified formula:
-                    # if ratetweakpercent then tweak = (ratetweak / 100 + 1) else tweak = 0.99
-                    # competitive_rate = min_market_rate * tweak
-
-                    tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
-                    print(
-                        f"Using ratetweakpercent {offer_template['ratetweakpercent']}% for market adjustment, tweak factor: {tweak}"
-                    )
-
-                    market_rate = min_market_rate * tweak
+                    # Set market rate to the best rate found
+                    market_rate = min_market_rate
 
                     # Log market statistics
                     print(
                         f"Market statistics - Count: {len(market_rates)}, Avg: {avg_market_rate:.8f}, Min: {min_market_rate:.8f}, Max: {max_market_rate:.8f}"
                     )
-                    print(
-                        f"Calculated market rate: {market_rate} (min market: {min_market_rate}, tweak: {tweak})"
-                    )
                 else:
                     print("No valid market rates found in existing offers")
-            else:
-                print("No existing offers found for market rate analysis")
 
         if adjust_rates_value == "false":
             #  Use CoinGecko only, fail if unavailable
-            print(f"Using CoinGecko rate only: {coingecko_rate}")
-            use_rate = coingecko_rate
+            if is_part_to_part:
+                use_rate = 1
+            elif coingecko_rate:
+                print(f"Using CoinGecko rate only: {coingecko_rate}")
+                use_rate = coingecko_rate
+            else:
+                print(f"CoinGecko rate unavailable. Skipping {offer_template['name']}")
+                continue
 
         elif adjust_rates_value == "true":
             # Use higher of CoinGecko + orderbook, fail if both unavailable
@@ -807,17 +793,19 @@ def process_offers(args, config, script_state) -> None:
                 # Use the higher rate between CoinGecko and market
                 use_rate = max(coingecko_rate, market_rate)
                 print(
-                    f"Using higher rate - CoinGecko: {coingecko_rate}, Market: {market_rate}, Selected: {use_rate}"
+                    f"Using higher base rate - CoinGecko: {coingecko_rate}, Market: {market_rate}, Selected: {use_rate}"
                 )
             elif market_rate:
+                # Fallback to Orderbook data if no CoinGecko
                 use_rate = market_rate
                 print(f"CoinGecko unavailable. using orderbook: {use_rate}")
-            else:
-                # Fall back to CoinGecko if no market data
+            elif coingecko_rate:
+                # Fallback to CoinGecko if no Orderbook data
                 use_rate = coingecko_rate
-                print(
-                    f"No market data available, using CoinGecko rate: {coingecko_rate}"
-                )
+                print(f"Using CoinGecko rate only: {coingecko_rate}")
+            else:
+                print(f"Rates unavailable. Skipping {offer_template['name']}")
+                continue
 
         elif adjust_rates_value == "all":
             # Use higher of CoinGecko + orderbook, fail if either unavailable
@@ -860,15 +848,38 @@ def process_offers(args, config, script_state) -> None:
                 print(f"No market data available. Using minrate: {use_rate}")
 
         elif adjust_rates_value == "static":
+            # Use static / fixed rate + tweak
             use_rate = offer_template["minrate"]
-            print(f"Using minrate: {use_rate}")
+            print(f"Using minrate as base: {use_rate}")
 
         else:
             # Unknown mode, default to CoinGecko
             print(
                 f"Unknown adjust_rates_based_on_market value: {adjust_rates_value}, defaulting to CoinGecko"
             )
-            use_rate = coingecko_rate
+            if coingecko_rate:
+                use_rate = coingecko_rate
+                print(f"Using CoinGecko rate only: {coingecko_rate}")
+            else:
+                print(f"CoinGecko rate unavailable. Skipping {offer_template['name']}")
+                continue
+
+        # Apply ratetweakpercent
+        tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
+        print(
+            f"Using ratetweakpercent {offer_template['ratetweakpercent']}% for adjustment, tweak factor: {tweak}"
+        )
+        # tweak market_rate, coingecko_rate and static type only. Dont tweak minrate when it's a fallback
+        if use_rate in [coingecko_rate, market_rate] or adjust_rates_value == "static":
+            use_rate = use_rate * tweak
+        if market_rate:
+            market_rate = market_rate * tweak
+            print(
+                f"Calculated market rate: {market_rate} (min market: {min_market_rate}, tweak: {tweak})"
+            )
+        if coingecko_rate:
+            coingecko_rate = coingecko_rate * tweak
+            print(f"Calculated CoinGecko rate: {coingecko_rate}, tweak: {tweak}")
 
         # Ensure we don't go below minimum rate
         if use_rate < offer_template["minrate"]:
@@ -876,22 +887,6 @@ def process_offers(args, config, script_state) -> None:
                 f"Calculated rate {use_rate} is below minimum rate {offer_template['minrate']}, using minimum"
             )
             use_rate = offer_template["minrate"]
-
-        # Apply ratetweakpercent if market adjustment is disabled (false mode)
-        # (if market adjustment is enabled, ratetweakpercent is already applied in the market calculation)
-        if use_rate == coingecko_rate or adjust_rates_value == "static":
-            print(
-                "Adjusting rate {} by {}%.".format(
-                    use_rate, offer_template["ratetweakpercent"]
-                )
-            )
-            tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
-            use_rate = use_rate * tweak
-        elif use_rate == market_rate:
-            if offer_template["ratetweakpercent"] != 0:
-                print(
-                    f"Rate tweak {offer_template['ratetweakpercent']}% already applied in market adjustment"
-                )
 
         # Final minimum rate check after all adjustments
         if use_rate < offer_template["minrate"]:
