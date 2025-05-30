@@ -888,7 +888,90 @@ def page_amm(self, _, post_string):
                             f"Failed to save autostart setting: {str(e)}"
                         )
 
-            if "save_config" in form_data:
+            if "save_global_settings" in form_data:
+                try:
+                    with open(config_path, "r") as f:
+                        current_config = json.load(f)
+
+                    if "min_seconds_between_offers" in form_data:
+                        try:
+                            current_config["min_seconds_between_offers"] = int(
+                                form_data.get("min_seconds_between_offers", ["15"])[0]
+                                or "15"
+                            )
+                        except ValueError:
+                            pass
+
+                    if "max_seconds_between_offers" in form_data:
+                        try:
+                            current_config["max_seconds_between_offers"] = int(
+                                form_data.get("max_seconds_between_offers", ["60"])[0]
+                                or "60"
+                            )
+                        except ValueError:
+                            pass
+
+                    if "main_loop_delay" in form_data:
+                        try:
+                            current_config["main_loop_delay"] = int(
+                                form_data.get("main_loop_delay", ["60"])[0] or "60"
+                            )
+                        except ValueError:
+                            pass
+
+                    if "auth" in form_data:
+                        current_config["auth"] = form_data.get("auth", [""])[0]
+
+                    if swap_client.debug_ui:
+                        if "min_seconds_between_bids" in form_data:
+                            try:
+                                current_config["min_seconds_between_bids"] = int(
+                                    form_data.get("min_seconds_between_bids", ["15"])[0]
+                                    or "15"
+                                )
+                            except ValueError:
+                                pass
+
+                        if "max_seconds_between_bids" in form_data:
+                            try:
+                                current_config["max_seconds_between_bids"] = int(
+                                    form_data.get("max_seconds_between_bids", ["60"])[0]
+                                    or "60"
+                                )
+                            except ValueError:
+                                pass
+
+                        if "prune_state_delay" in form_data:
+                            try:
+                                current_config["prune_state_delay"] = int(
+                                    form_data.get("prune_state_delay", ["120"])[0]
+                                    or "120"
+                                )
+                            except ValueError:
+                                pass
+
+                        if "prune_state_after_seconds" in form_data:
+                            try:
+                                current_config["prune_state_after_seconds"] = int(
+                                    form_data.get(
+                                        "prune_state_after_seconds", ["604800"]
+                                    )[0]
+                                    or "604800"
+                                )
+                            except ValueError:
+                                pass
+
+                    with open(config_path, "w") as f:
+                        json.dump(current_config, f, indent=4)
+
+                    config_content = json.dumps(current_config, indent=4)
+                    config_data = current_config
+
+                    messages.append("Global settings saved successfully")
+                except Exception as e:
+                    err_messages.append(f"Failed to save global settings: {str(e)}")
+
+            elif "save_config" in form_data:
                 config_content = form_data.get("config_content", [""])[0]
 
                 try:

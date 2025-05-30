@@ -380,64 +380,67 @@
           </div>
 
           <div class="hidden" id="settings-content" role="tabpanel" aria-labelledby="settings-tab">
-            <div class="space-y-6">
-              <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Global Settings</h4>
+            <form method="post" id="global-settings-form">
+              <div class="space-y-6">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Global Settings</h4>
 
-              <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <h5 class="mb-3 text-base font-medium text-gray-900 dark:text-white">Timing Settings</h5>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label for="min_seconds_between_offers" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Min Seconds Between Offers</label>
-                    <input type="number" id="min_seconds_between_offers" name="min_seconds_between_offers" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  <div>
-                    <label for="max_seconds_between_offers" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Max Seconds Between Offers</label>
-                    <input type="number" id="max_seconds_between_offers" name="max_seconds_between_offers" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  <div>
-                    <label for="main_loop_delay" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Main Loop Delay (seconds)</label>
-                    <input type="number" id="main_loop_delay" name="main_loop_delay" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  {% if debug_ui_mode %}
-                  <div>
-                    <label for="min_seconds_between_bids" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Min Seconds Between Bids</label>
-                    <input type="number" id="min_seconds_between_bids" name="min_seconds_between_bids" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  <div>
-                    <label for="max_seconds_between_bids" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Max Seconds Between Bids</label>
-                    <input type="number" id="max_seconds_between_bids" name="max_seconds_between_bids" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  <div>
-                    <label for="prune_state_delay" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Prune State Delay (seconds)</label>
-                    <input type="number" id="prune_state_delay" name="prune_state_delay" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  <div>
-                    <label for="prune_state_after_seconds" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Prune State After (seconds)</label>
-                    <input type="number" id="prune_state_after_seconds" name="prune_state_after_seconds" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  </div>
-                  {% else %}
-                  <input type="hidden" id="min_seconds_between_bids" name="min_seconds_between_bids">
-                  <input type="hidden" id="max_seconds_between_bids" name="max_seconds_between_bids">
-                  <input type="hidden" id="prune_state_delay" name="prune_state_delay">
-                  <input type="hidden" id="prune_state_after_seconds" name="prune_state_after_seconds">
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <h5 class="mb-3 text-base font-medium text-gray-900 dark:text-white">Settings</h5>
-                <div class="grid grid-cols-1 gap-4">
-                  <div>
-                    <label for="auth" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Authentication</label>
-                    <input type="text" id="auth" name="auth" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h5 class="mb-3 text-base font-medium text-gray-900 dark:text-white">Timing Settings</h5>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label for="min_seconds_between_offers" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Min Seconds Between Offers</label>
+                      <input type="number" id="min_seconds_between_offers" name="min_seconds_between_offers" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    <div>
+                      <label for="max_seconds_between_offers" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Max Seconds Between Offers</label>
+                      <input type="number" id="max_seconds_between_offers" name="max_seconds_between_offers" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    <div>
+                      <label for="main_loop_delay" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Main Loop Delay (seconds)</label>
+                      <input type="number" id="main_loop_delay" name="main_loop_delay" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    {% if debug_ui_mode %}
+                    <div>
+                      <label for="min_seconds_between_bids" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Min Seconds Between Bids</label>
+                      <input type="number" id="min_seconds_between_bids" name="min_seconds_between_bids" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    <div>
+                      <label for="max_seconds_between_bids" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Max Seconds Between Bids</label>
+                      <input type="number" id="max_seconds_between_bids" name="max_seconds_between_bids" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    <div>
+                      <label for="prune_state_delay" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Prune State Delay (seconds)</label>
+                      <input type="number" id="prune_state_delay" name="prune_state_delay" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    <div>
+                      <label for="prune_state_after_seconds" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Prune State After (seconds)</label>
+                      <input type="number" id="prune_state_after_seconds" name="prune_state_after_seconds" min="1" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    {% else %}
+                    <input type="hidden" id="min_seconds_between_bids" name="min_seconds_between_bids">
+                    <input type="hidden" id="max_seconds_between_bids" name="max_seconds_between_bids">
+                    <input type="hidden" id="prune_state_delay" name="prune_state_delay">
+                    <input type="hidden" id="prune_state_after_seconds" name="prune_state_after_seconds">
+                    {% endif %}
                   </div>
                 </div>
-              </div>
 
-              <div class="flex justify-end">
-                <button type="button" id="save_settings_btn" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Settings</button>
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h5 class="mb-3 text-base font-medium text-gray-900 dark:text-white">Settings</h5>
+                  <div class="grid grid-cols-1 gap-4">
+                    <div>
+                      <label for="auth" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Authentication</label>
+                      <input type="text" id="auth" name="auth" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end">
+                  <button type="submit" name="save_global_settings" value="true" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Settings</button>
+                </div>
+                <input type="hidden" name="formid" value="{{ form_id }}">
               </div>
-            </div>
+            </form>
           </div>
 
           <div class="hidden" id="overview-content" role="tabpanel" aria-labelledby="overview-tab">
@@ -687,14 +690,14 @@
                switchConfigTab('json-tab');
              }
 
-             const saveSettingsBtn = document.getElementById('save_settings_btn');
-             if (saveSettingsBtn) {
-               saveSettingsBtn.addEventListener('click', function() {
-                 saveSettingsToJson();
+             const globalSettingsForm = document.getElementById('global-settings-form');
+             if (globalSettingsForm) {
+               globalSettingsForm.addEventListener('submit', function(e) {
+                 updateJsonFromSettings();
                });
              }
 
-             function saveSettingsToJson() {
+             function updateJsonFromSettings() {
                const configTextarea = document.querySelector('textarea[name="config_content"]');
                if (!configTextarea) return;
 
@@ -722,14 +725,8 @@
                  delete config.adjust_rates_based_on_market;
 
                  configTextarea.value = JSON.stringify(config, null, 4);
-
-                 const saveConfigBtn = document.getElementById('save_config_btn');
-                 if (saveConfigBtn) {
-                   saveConfigBtn.click();
-                 }
                } catch (error) {
-                 console.error('Error saving settings to JSON:', error);
-                 alert('Error saving settings: ' + error.message);
+                 console.error('Error updating JSON from settings:', error);
                }
              }
 
