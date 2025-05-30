@@ -325,17 +325,16 @@ def readConfig(args, known_coins):
         if "enabled" not in offer_template:
             offer_template["enabled"] = True
             num_changes += 1
-        if (
-            "amount" not in offer_template
-            or offer_template["amount"] is None
+        elif offer_template["enabled"] is not True:
+            continue
+        if "amount" not in offer_template:
+            offer_template["amount"] = None
+            print(f"{offer_template['name']} amount missing. Skipping offer")
+        elif (
+            offer_template["amount"] is None
             or float(offer_template["amount"]) < min_swap_size
         ):
-            print(f"{offer_template['name']} Offer amount invalid. Disabling offer")
-            offer_template["amount"] = None
-            offer_template["enabled"] = False
-            num_changes += 1
-
-        if offer_template["enabled"] is False:
+            print(f"{offer_template['name']} Offer amount invalid. Skipping offer")
             continue
         amount = float(offer_template["amount"])
         if "amount_step" not in offer_template:
@@ -357,7 +356,6 @@ def readConfig(args, known_coins):
             )
             offer_template["amount_step"] = amount
             num_changes += 1
-
         if (
             "min_swap_amount" not in offer_template
             or float(offer_template["min_swap_amount"]) < min_swap_size
@@ -373,12 +371,10 @@ def readConfig(args, known_coins):
             )
             offer_template["min_swap_amount"] = amount
             num_changes += 1
-
         if "min_coin_from_amt" not in offer_template:
             print("Setting min_coin_from_amt for", offer_template["name"])
             offer_template["min_coin_from_amt"] = 0
             num_changes += 1
-
         if "address" not in offer_template:
             print("Setting address to auto for offer", offer_template["name"])
             offer_template["address"] = "auto"
@@ -738,10 +734,9 @@ def process_offers(args, config, script_state) -> None:
         # Get CoinGecko rate first
         coingecko_rate = use_rate
         market_rate = None
-        market_offers_available = False
 
-        # Fetch market data if needed (for "true" or "only" modes)
-        if adjust_rates_value in ["true", "only"]:
+        # Fetch market data if needed (for "true","only", "all", and "minrate" modes)
+        if adjust_rates_value in ["true", "only", "all", "minrate"]:
             try:
                 received_offers = read_json_api(
                     "offers",
@@ -774,7 +769,6 @@ def process_offers(args, config, script_state) -> None:
             if received_offers:
                 market_rates = [float(offer["rate"]) for offer in received_offers]
                 if market_rates:
-                    market_offers_available = True
                     min_market_rate = min(market_rates)
                     max_market_rate = max(market_rates)
                     avg_market_rate = sum(market_rates) / len(market_rates)
@@ -809,12 +803,15 @@ def process_offers(args, config, script_state) -> None:
 
         elif adjust_rates_value == "true":
             # Use higher of CoinGecko + orderbook, fail if both unavailable
-            if market_offers_available and market_rate is not None:
+            if all((coingecko_rate, market_rate)):
                 # Use the higher rate between CoinGecko and market
                 use_rate = max(coingecko_rate, market_rate)
                 print(
                     f"Using higher rate - CoinGecko: {coingecko_rate}, Market: {market_rate}, Selected: {use_rate}"
                 )
+            elif market_rate:
+                use_rate = market_rate
+                print(f"CoinGecko unavailable. using orderbook: {use_rate}")
             else:
                 # Fall back to CoinGecko if no market data
                 use_rate = coingecko_rate
@@ -822,9 +819,26 @@ def process_offers(args, config, script_state) -> None:
                     f"No market data available, using CoinGecko rate: {coingecko_rate}"
                 )
 
+        elif adjust_rates_value == "all":
+            # Use higher of CoinGecko + orderbook, fail if either unavailable
+            if all((coingecko_rate, market_rate)):
+                # Use the higher rate between CoinGecko and market
+                use_rate = max(coingecko_rate, market_rate)
+                print(
+                    f"Using higher rate - CoinGecko: {coingecko_rate}, Market: {market_rate}, Selected: {use_rate}"
+                )
+            else:
+                print(
+                    f"ERROR: Failed to obtain market data available in 'all' mode for {offer_template['name']}"
+                )
+                print(
+                    f"Skipping {offer_template['name']} - 'all' mode requires external rates from all sources"
+                )
+                continue
+
         elif adjust_rates_value == "only":
             # Use orderbook only, fail if no market rates
-            if market_offers_available and market_rate is not None:
+            if market_rate:
                 use_rate = market_rate
                 print(f"Using market rate only: {use_rate}")
             else:
@@ -835,6 +849,20 @@ def process_offers(args, config, script_state) -> None:
                     f"Skipping {offer_template['name']} - market-only mode requires existing offers"
                 )
                 continue
+
+        elif adjust_rates_value == "minrate":
+            # Use orderbook, fallback to minrate if no market rates
+            if market_rate:
+                use_rate = market_rate
+                print(f"Using market rate only: {use_rate}")
+            else:
+                use_rate = offer_template["minrate"]
+                print(f"No market data available. Using minrate: {use_rate}")
+
+        elif adjust_rates_value == "static":
+            use_rate = offer_template["minrate"]
+            print(f"Using minrate: {use_rate}")
+
         else:
             # Unknown mode, default to CoinGecko
             print(
@@ -851,7 +879,7 @@ def process_offers(args, config, script_state) -> None:
 
         # Apply ratetweakpercent if market adjustment is disabled (false mode)
         # (if market adjustment is enabled, ratetweakpercent is already applied in the market calculation)
-        if adjust_rates_value == "false":
+        if use_rate == coingecko_rate or adjust_rates_value == "static":
             print(
                 "Adjusting rate {} by {}%.".format(
                     use_rate, offer_template["ratetweakpercent"]
@@ -859,7 +887,7 @@ def process_offers(args, config, script_state) -> None:
             )
             tweak = (offer_template["ratetweakpercent"] / 100.0) + 1.0
             use_rate = use_rate * tweak
-        elif adjust_rates_value in ["true", "only"]:
+        elif use_rate == market_rate:
             if offer_template["ratetweakpercent"] != 0:
                 print(
                     f"Rate tweak {offer_template['ratetweakpercent']}% already applied in market adjustment"
