@@ -876,7 +876,7 @@ const AmmTablesManager = (function() {
 
         document.getElementById('add-amm-type').value = type;
 
-        document.getElementById('add-amm-name').value = '';
+        document.getElementById('add-amm-name').value = 'Unnamed Offer';
         document.getElementById('add-amm-enabled').checked = true;
 
         const coinFromSelect = document.getElementById('add-amm-coin-from');
@@ -913,14 +913,13 @@ const AmmTablesManager = (function() {
                 bidFields.classList.add('hidden');
             }
 
-            document.getElementById('add-amm-rate-label').textContent = 'Min Rate';
             document.getElementById('add-amm-rate').value = '0.0001';
             document.getElementById('add-offer-ratetweakpercent').value = '0';
             document.getElementById('add-offer-min-coin-from-amt').value = '';
             document.getElementById('add-offer-valid-seconds').value = '3600';
             document.getElementById('add-offer-address').value = 'auto';
             document.getElementById('add-offer-min-swap-amount').value = '0.001';
-            document.getElementById('add-offer-amount-step').value = '1.0';
+            document.getElementById('add-offer-amount-step').value = '0.001';
 
             const coinFrom = document.getElementById('add-amm-coin-from');
             const coinTo = document.getElementById('add-amm-coin-to');
@@ -1295,8 +1294,6 @@ const AmmTablesManager = (function() {
                     bidFields.classList.add('hidden');
                 }
 
-                document.getElementById('edit-amm-rate-label').textContent = 'Min Rate';
-
                 document.getElementById('edit-amm-rate').value = item.minrate || '';
                 document.getElementById('edit-offer-ratetweakpercent').value = item.ratetweakpercent || '0';
                 document.getElementById('edit-offer-min-coin-from-amt').value = item.min_coin_from_amt || '';
@@ -1305,7 +1302,7 @@ const AmmTablesManager = (function() {
                 document.getElementById('edit-offer-adjust-rates').value = item.adjust_rates_based_on_market || 'false';
                 document.getElementById('edit-offer-swap-type').value = item.swap_type || 'adaptor_sig';
                 document.getElementById('edit-offer-min-swap-amount').value = item.min_swap_amount || '0.001';
-                document.getElementById('edit-offer-amount-step').value = item.amount_step || '1.0';
+                document.getElementById('edit-offer-amount-step').value = item.amount_step || '0.001';
                 const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
                 if (editAutomationStrategyElement) {
                     editAutomationStrategyElement.value = item.automation_strategy || 'accept_all';
