@@ -68,7 +68,7 @@
             <li class="font-semibold text-sm text-green-500 error_msg"><span class="bold">INFO:</span></li>
                 <li class="font-medium text-sm text-green-500 infomsg">Sent Bid {{ sent_bid_id }}</li>
         </ul>
-           </div>             
+           </div>
         </div>
         <div class="w-auto p-2">
           <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" data-dismiss-target="#messages_send_bid_id" aria-label="Close"><span class="sr-only">Close</span>
@@ -110,7 +110,7 @@
            </tr>
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <td class="py-3 px-6 bold">Swap Type</td>
-            <td class="py-3 px-6">{{ data.swap_type }}{% if data.reverse == true %} (Reversed){% endif %}</td>
+            <td class="py-3 px-6">{{ data.swap_type }}{% if data.reverse == true %} (Transposed){% endif %}</td>
            </tr>
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <td class="py-3 px-6 bold">{% if data.sent %}You Send{% else %}You Get{% endif %}</td>
@@ -418,7 +418,7 @@
 function handleBidsPageAddress() {
     const selectElement = document.querySelector('select[name="addr_from"]');
     const STORAGE_KEY = 'lastUsedAddressBids';
-    
+
     if (!selectElement) return;
 
     function loadInitialAddress() {
@@ -476,8 +476,8 @@ if (document.readyState === 'loading') {
     </td>
     <td class="py-3 px-6">
         <div class="relative">
-            <input type="text" 
-                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" 
+            <input type="text"
+                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0"
                    id="bid_amount_send"
                    autocomplete="off"
                    name="bid_amount_send"
@@ -499,12 +499,12 @@ if (document.readyState === 'loading') {
     </td>
     <td class="py-3 px-6">
         <div class="relative">
-            <input type="text" 
-                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" 
-                   id="bid_amount" 
+            <input type="text"
+                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0"
+                   id="bid_amount"
                    autocomplete="off"
-                   name="bid_amount" 
-                   value="" 
+                   name="bid_amount"
+                   value=""
                    max="{{ data.amt_from }}"
                    onchange="validateMaxAmount(this, parseFloat('{{ data.amt_from }}')); updateBidParams('receiving');">
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
@@ -528,9 +528,9 @@ if (document.readyState === 'loading') {
     </td>
     <td class="py-3 px-6">
         <div class="relative">
-            <input type="text" 
-                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed" 
-                   id="bid_amount_send" 
+            <input type="text"
+                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed"
+                   id="bid_amount_send"
                    autocomplete="off"
                    name="bid_amount_send"
                    value="{{ data.amt_to }}"
@@ -552,12 +552,12 @@ if (document.readyState === 'loading') {
     </td>
     <td class="py-3 px-6">
         <div class="relative">
-            <input type="text" 
-                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed" 
-                   id="bid_amount" 
+            <input type="text"
+                   class="bg-gray-50 text-gray-900 appearance-none pr-28 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed"
+                   id="bid_amount"
                    autocomplete="off"
-                   name="bid_amount" 
-                   value="{{ data.bid_amount }}" 
+                   name="bid_amount"
+                   value="{{ data.bid_amount }}"
                    max="{{ data.amt_from }}"
                    disabled>
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
@@ -576,18 +576,18 @@ if (document.readyState === 'loading') {
     <td class="py-3 px-6 bold">Rate </td>
     <td class="py-3 px-6">
         {% if data.rate_negotiable == true %}
-        <input type="text" 
-               class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" 
-               id="bid_rate" 
-               name="bid_rate" 
-               value="{{ data.bid_rate }}" 
+        <input type="text"
+               class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0"
+               id="bid_rate"
+               name="bid_rate"
+               value="{{ data.bid_rate }}"
                placeholder="Current rate: {{ data.rate }}"
                onchange="updateBidParams('rate')">
         {% else %}
-            <input type="text" 
-           class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed" 
-           id="bid_rate" 
-           name="bid_rate" 
+            <input type="text"
+           class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 cursor-not-allowed"
+           id="bid_rate"
+           name="bid_rate"
            value="{{ data.rate }}"
            title="Rate is not negotiable"
            disabled>
@@ -662,7 +662,7 @@ if (document.readyState === 'loading') {
           <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-4">
             <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Amount you will get:</div>
             <div class="font-medium text-gray-900 dark:text-white text-lg">
-              <span id="modal-amt-receive"></span> 
+              <span id="modal-amt-receive"></span>
               <span id="modal-receive-currency"></span>
               <div class="text-sm text-gray-500 dark:text-gray-400 mt-1" id="modal-fee-info"></div>
             </div>
@@ -686,7 +686,7 @@ if (document.readyState === 'loading') {
           </div>
         </div>
         <div class="flex justify-center gap-4">
-          <button type="submit" name="sendbid" value="confirm" 
+          <button type="submit" name="sendbid" value="confirm"
                   class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             Confirm
           </button>
@@ -727,17 +727,17 @@ xhr_bid_params.onload = () => {
 function lookup_rates() {
     const coin_from = document.getElementById('coin_from')?.value;
     const coin_to = document.getElementById('coin_to')?.value;
-    
+
     if (!coin_from || !coin_to || coin_from === '-1' || coin_to === '-1') {
         alert('Coins from and to must be set first.');
         return;
     }
-    
+
     const ratesDisplay = document.getElementById('rates_display');
     if (ratesDisplay) {
         ratesDisplay.innerHTML = '<h4>Rates</h4><p>Updating...</p>';
     }
-    
+
     xhr_rates.open('POST', '/json/rates');
     xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
     xhr_rates.send(`coin_from=${coin_from}&coin_to=${coin_to}`);
@@ -785,11 +785,11 @@ function updateBidParams(value_changed) {
     const amountFromInput = document.getElementById('amount_from');
     const bidRateInput = document.getElementById('bid_rate');
     const offerRateInput = document.getElementById('offer_rate');
-    
+
     if (!coin_from || !coin_to || !amt_var || !rate_var) return;
-    
-    const rate = rate_var === 'True' && bidRateInput ? 
-        parseFloat(bidRateInput.value) || 0 : 
+
+    const rate = rate_var === 'True' && bidRateInput ?
+        parseFloat(bidRateInput.value) || 0 :
         parseFloat(offerRateInput?.value || '0');
 
     if (!rate) return;
@@ -826,7 +826,7 @@ function updateBidParams(value_changed) {
 function validateAmountsAfterChange() {
     const bidAmountSendInput = document.getElementById('bid_amount_send');
     const bidAmountInput = document.getElementById('bid_amount');
-    
+
     if (bidAmountSendInput) {
         const maxSend = parseFloat(bidAmountSendInput.getAttribute('max'));
         validateMaxAmount(bidAmountSendInput, maxSend);
@@ -871,7 +871,7 @@ function updateModalValues() {
         if (modalAmtReceive) {
             modalAmtReceive.textContent = bidAmountInput.value;
         }
-        
+
         const modalReceiveCurrency = document.getElementById('modal-receive-currency');
         if (modalReceiveCurrency) {
             modalReceiveCurrency.textContent = ' {{ data.tla_from }}';
@@ -883,7 +883,7 @@ function updateModalValues() {
         if (modalAmtSend) {
             modalAmtSend.textContent = bidAmountSendInput.value;
         }
-        
+
         const modalSendCurrency = document.getElementById('modal-send-currency');
         if (modalSendCurrency) {
             modalSendCurrency.textContent = ' {{ data.tla_to }}';
@@ -921,7 +921,7 @@ function updateModalValues() {
 function handleBidsPageAddress() {
     const selectElement = document.querySelector('select[name="addr_from"]');
     const STORAGE_KEY = 'lastUsedAddressBids';
-    
+
     if (!selectElement) return;
 
     function loadInitialAddress() {
@@ -1003,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (validMinsInput) {
         validMinsInput.addEventListener('input', updateModalValues);
     }
-    
+
     const addrFromSelect = document.querySelector('select[name="addr_from"]');
     if (addrFromSelect) {
         addrFromSelect.addEventListener('change', updateModalValues);

@@ -329,7 +329,9 @@ const SwapTypeManager = {
         } else {
             swapTypeElement.disabled = false;
             swapTypeElement.classList.remove('select-disabled');
-            swapTypeElement.value = 'xmr_swap';
+            if (['xmr_swap', 'seller_first'].includes(swapTypeElement.value) == false) {
+                swapTypeElement.value = 'xmr_swap';
+            }
         }
 
         let swapTypeHidden = DOM.get('swap_type_hidden');
@@ -352,10 +354,6 @@ const SwapTypeManager = {
         }
     }
 };
-
-function set_swap_type_enabled(coinFrom, coinTo, swapTypeElement) {
-    SwapTypeManager.setSwapTypeEnabled(coinFrom, coinTo, swapTypeElement);
-}
 
 const UIEnhancer = {
     handleErrorHighlighting: () => {
