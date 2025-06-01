@@ -332,6 +332,17 @@ def runClient(
             network_type = network.get("type", "unknown")
             if network_type == "simplex":
                 simplex_dir = os.path.join(data_dir, "simplex")
+
+                log_level = "debug" if swap_client.debug else "info"
+
+                socks_proxy = None
+                if "socks_proxy_override" in network:
+                    socks_proxy = network["socks_proxy_override"]
+                elif swap_client.use_tor_proxy:
+                    socks_proxy = (
+                        f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"
+                    )
+
                 daemons.append(
                     startSimplexClient(
                         network["client_path"],
@@ -340,6 +351,8 @@ def runClient(
                         network["ws_port"],
                         logger,
                         swap_client.delay_event,
+                        socks_proxy=socks_proxy,
+                        log_level=log_level,
                     )
                 )
                 pid = daemons[-1].handle.pid

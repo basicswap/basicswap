@@ -101,6 +101,7 @@ SIMPLEX_SERVER_ADDRESS = os.getenv(
 SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", "5225"))
 SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", "")
 SIMPLEX_CLIENT_PATH = os.path.expanduser(os.getenv("SIMPLEX_CLIENT_PATH", ""))
+SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "")
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -497,15 +498,17 @@ def modifyConfig(test_path, i):
         settings = json.load(fp)
 
     if SIMPLEX_CLIENT_PATH != "":
-        settings["networks"] = [
-            {
-                "type": "simplex",
-                "server_address": SIMPLEX_SERVER_ADDRESS,
-                "client_path": SIMPLEX_CLIENT_PATH,
-                "ws_port": SIMPLEX_WS_PORT + i,
-                "group_link": SIMPLEX_GROUP_LINK,
-            },
-        ]
+        simplex_options = {
+            "type": "simplex",
+            "server_address": SIMPLEX_SERVER_ADDRESS,
+            "client_path": SIMPLEX_CLIENT_PATH,
+            "ws_port": SIMPLEX_WS_PORT + i,
+            "group_link": SIMPLEX_GROUP_LINK,
+        }
+        if SIMPLEX_SERVER_SOCKS_PROXY != "":
+            simplex_options["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
+
+        settings["networks"] = [simplex_options]
 
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)
