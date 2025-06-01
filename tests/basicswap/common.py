@@ -184,7 +184,7 @@ def wait_for_bid(
                     swap_client.log.debug(
                         f"TEST: wait_for_bid {bid_id.hex()}: Bid not found."
                     )
-    raise ValueError("wait_for_bid timed out.")
+    raise ValueError(f"wait_for_bid timed out {bid_id.hex()}.")
 
 
 def wait_for_bid_tx_state(
@@ -331,7 +331,7 @@ def wait_for_balance(
         delay_event.wait(delay_time)
         i += 1
         if i > iterations:
-            raise ValueError("Expect {} {}".format(balance_key, expect_amount))
+            raise ValueError(f"Expect {balance_key} {expect_amount}")
 
 
 def wait_for_unspent(
@@ -347,11 +347,11 @@ def wait_for_unspent(
         delay_event.wait(delay_time)
         i += 1
         if i > iterations:
-            raise ValueError("wait_for_unspent {}".format(expect_amount))
+            raise ValueError(f"wait_for_unspent {expect_amount}")
 
 
 def delay_for(delay_event, delay_for=60):
-    logging.info("Delaying for {} seconds.".format(delay_for))
+    logging.info(f"Delaying for {delay_for} seconds.")
     delay_event.wait(delay_for)
 
 
@@ -375,9 +375,7 @@ def waitForRPC(rpc_func, delay_event, rpc_command="getwalletinfo", max_tries=7):
         except Exception as ex:
             if i < max_tries:
                 logging.warning(
-                    "Can't connect to RPC: %s. Retrying in %d second/s.",
-                    str(ex),
-                    (i + 1),
+                    f"Can't connect to RPC: {ex}. Retrying in {i + 1} second/s."
                 )
                 delay_event.wait(i + 1)
     raise ValueError("waitForRPC failed")

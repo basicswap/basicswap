@@ -89,15 +89,19 @@ DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_P
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
 
 
-def waitForBidState(delay_event, port, bid_id, state_str, wait_for=60):
+def waitForBidState(delay_event, port, bid_id, wait_for_state, wait_for=60):
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError("Test stopped.")
         bid = json.loads(
             urlopen("http://127.0.0.1:12700/json/bids/{}".format(bid_id)).read()
         )
-        if bid["bid_state"] == state_str:
-            return
+        if isinstance(wait_for_state, (list, tuple)):
+            if bid["bid_state"] in wait_for_state:
+                return
+        else:
+            if bid["bid_state"] == wait_for_state:
+                return
         delay_event.wait(1)
     raise ValueError("waitForBidState failed")
 

@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 28
+CURRENT_DB_VERSION = 29
 CURRENT_DB_DATA_VERSION = 6
 
 
@@ -219,6 +219,7 @@ class Bid(Table):
     bid_addr = Column("string")
     pk_bid_addr = Column("blob")
     proof_address = Column("string")
+    proof_signature = Column("blob")
     proof_utxos = Column("blob")
     # Address to spend lock tx to - address from wallet if empty TODO
     withdraw_to_addr = Column("string")
@@ -485,6 +486,14 @@ class XmrSwap(Table):
 
     b_lock_tx_id = Column("blob")
 
+    msg_split_info = Column("string")
+
+    def getMsgSplitInfo(self):
+        if self.msg_split_info is None:
+            return 16000, 17000
+        msg_split_info = self.msg_split_info.split(":")
+        return int(msg_split_info[0]), int(msg_split_info[1])
+
 
 class XmrSplitData(Table):
     __tablename__ = "xmr_split_data"
@@ -658,10 +667,44 @@ class CoinRates(Table):
     last_updated = Column("integer")
 
 
-def create_db_(con, log) -> None:
-    c = con.cursor()
+class MessageNetworks(Table):
+    __tablename__ = "message_networks"
 
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    name = Column("string")
+    created_at = Column("integer")
+
+
+class DirectMessageRoute(Table):
+    __tablename__ = "direct_message_routes"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    network_id = Column("integer")
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    smsg_addr_local = Column("string")
+    smsg_addr_remote = Column("string")
+    # smsg_addr_id_local = Column("integer")  # SmsgAddress
+    # smsg_addr_id_remote = Column("integer")  # KnownIdentity
+    route_data = Column("blob")
+    created_at = Column("integer")
+
+
+class DirectMessageRouteLink(Table):
+    __tablename__ = "direct_message_route_links"
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    direct_message_route_id = Column("integer")
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+    created_at = Column("integer")
+
+
+def extract_schema() -> dict:
     g = globals().copy()
+    tables = {}
     for name, obj in g.items():
         if not inspect.isclass(obj):
             continue
@@ -671,15 +714,13 @@ def create_db_(con, log) -> None:
             continue
 
         table_name: str = obj.__tablename__
-        query: str = f"CREATE TABLE {table_name} ("
-
+        table = {}
+        columns = {}
         primary_key = None
         constraints = []
         indices = []
-        num_columns: int = 0
         for m in inspect.getmembers(obj):
             m_name, m_obj = m
-
             if hasattr(m_obj, "__sqlite3_primary_key__"):
                 primary_key = m_obj
                 continue
@@ -690,46 +731,103 @@ def create_db_(con, log) -> None:
                 indices.append(m_obj)
                 continue
             if hasattr(m_obj, "__sqlite3_column__"):
-                if num_columns > 0:
-                    query += ","
-
                 col_type: str = m_obj.column_type.upper()
                 if col_type == "BOOL":
                     col_type = "INTEGER"
-                query += f" {m_name} {col_type} "
-
-                if m_obj.primary_key:
-                    query += "PRIMARY KEY ASC "
-                if m_obj.unique:
-                    query += "UNIQUE "
-                num_columns += 1
-
+                columns[m_name] = {
+                    "type": col_type,
+                    "primary_key": m_obj.primary_key,
+                    "unique": m_obj.unique,
+                }
+        table["columns"] = columns
         if primary_key is not None:
-            query += f", PRIMARY KEY ({primary_key.column_1}"
+            table["primary_key"] = {"column_1": primary_key.column_1}
             if primary_key.column_2:
-                query += f", {primary_key.column_2}"
+                table["primary_key"]["column_2"] = primary_key.column_2
             if primary_key.column_3:
-                query += f", {primary_key.column_3}"
-            query += ") "
+                table["primary_key"]["column_3"] = primary_key.column_3
 
         for constraint in constraints:
-            query += f", UNIQUE ({constraint.column_1}"
+            if "constraints" not in table:
+                table["constraints"] = []
+            table_constraint = {"column_1": constraint.column_1}
             if constraint.column_2:
-                query += f", {constraint.column_2}"
+                table_constraint["column_2"] = constraint.column_2
             if constraint.column_3:
-                query += f", {constraint.column_3}"
-            query += ") "
+                table_constraint["column_3"] = constraint.column_3
+            table["constraints"].append(table_constraint)
 
+        for i in indices:
+            if "indices" not in table:
+                table["indices"] = []
+            table_index = {"index_name": i.name, "column_1": i.column_1}
+            if i.column_2 is not None:
+                table_index["column_2"] = i.column_2
+            if i.column_3 is not None:
+                table_index["column_3"] = i.column_3
+            table["indices"].append(table_index)
+
+        tables[table_name] = table
+    return tables
+
+
+def create_table(c, table_name, table) -> None:
+    query: str = f"CREATE TABLE {table_name} ("
+
+    for i, (colname, column) in enumerate(table["columns"].items()):
+        col_type = column["type"]
+        query += ("," if i > 0 else "") + f" {colname} {col_type} "
+        if column["primary_key"]:
+            query += "PRIMARY KEY ASC "
+        if column["unique"]:
+            query += "UNIQUE "
+
+    if "primary_key" in table:
+        column_1 = table["primary_key"]["column_1"]
+        column_2 = table["primary_key"].get("column_2", None)
+        column_3 = table["primary_key"].get("column_3", None)
+        query += f", PRIMARY KEY ({column_1}"
+        if column_2:
+            query += f", {column_2}"
+        if column_3:
+            query += f", {column_3}"
+        query += ") "
+
+    constraints = table.get("constraints", [])
+    for constraint in constraints:
+        column_1 = constraint["column_1"]
+        column_2 = constraint.get("column_2", None)
+        column_3 = constraint.get("column_3", None)
+        query += f", UNIQUE ({column_1}"
+        if column_2:
+            query += f", {column_2}"
+        if column_3:
+            query += f", {column_3}"
+        query += ") "
+
+    query += ")"
+    c.execute(query)
+
+    indices = table.get("indices", [])
+    for index in indices:
+        index_name = index["index_name"]
+        column_1 = index["column_1"]
+        column_2 = index.get("column_2", None)
+        column_3 = index.get("column_3", None)
+        query: str = f"CREATE INDEX {index_name} ON {table_name} ({column_1}"
+        if column_2:
+            query += f", {column_2}"
+        if column_3:
+            query += f", {column_3}"
         query += ")"
         c.execute(query)
-        for i in indices:
-            query: str = f"CREATE INDEX {i.name} ON {table_name} ({i.column_1}"
-            if i.column_2 is not None:
-                query += f", {i.column_2}"
-            if i.column_3 is not None:
-                query += f", {i.column_3}"
-            query += ")"
-            c.execute(query)
+
+
+def create_db_(con, log) -> None:
+    db_schema = extract_schema()
+    c = con.cursor()
+    for table_name, table in db_schema.items():
+        create_table(c, table_name, table)
 
 
 def create_db(db_path: str, log) -> None:
@@ -915,6 +1013,7 @@ class DBMethods:
                 query += f"{key}=:{key}"
 
         cursor.execute(query, values)
+        return cursor.lastrowid
 
     def query(
         self,

@@ -36,6 +36,11 @@ class KeyTypes(IntEnum):
     KAF = 6
 
 
+class MessageNetworks(IntEnum):
+    SMSG = auto()
+    SIMPLEX = auto()
+
+
 class MessageTypes(IntEnum):
     OFFER = auto()
     BID = auto()
@@ -52,6 +57,8 @@ class MessageTypes(IntEnum):
 
     ADS_BID_LF = auto()
     ADS_BID_ACCEPT_FL = auto()
+
+    CONNECT_REQ = auto()
 
 
 class AddressTypes(IntEnum):
@@ -111,6 +118,7 @@ class BidStates(IntEnum):
     BID_EXPIRED = 31
     BID_AACCEPT_DELAY = 32
     BID_AACCEPT_FAIL = 33
+    CONNECT_REQ_SENT = 34
 
 
 class TxStates(IntEnum):
@@ -228,6 +236,10 @@ class NotificationTypes(IntEnum):
     BID_ACCEPTED = auto()
 
 
+class ConnectionRequestTypes(IntEnum):
+    BID = 1
+
+
 class AutomationOverrideOptions(IntEnum):
     DEFAULT = 0
     ALWAYS_ACCEPT = 1
@@ -339,6 +351,8 @@ def strBidState(state):
         return "Auto accept delay"
     if state == BidStates.BID_AACCEPT_FAIL:
         return "Auto accept failed"
+    if state == BidStates.CONNECT_REQ_SENT:
+        return "Connect request sent"
     return "Unknown" + " " + str(state)
 
 

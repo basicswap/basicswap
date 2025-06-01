@@ -83,18 +83,34 @@ def smsgGetID(smsg_message: bytes) -> bytes:
     return smsg_timestamp.to_bytes(8, byteorder="big") + ripemd160(smsg_message[8:])
 
 
-def smsgEncrypt(privkey_from: bytes, pubkey_to: bytes, payload: bytes) -> bytes:
+def smsgEncrypt(
+    privkey_from: bytes,
+    pubkey_to: bytes,
+    payload: bytes,
+    smsg_timestamp: int = None,
+    deterministic: bool = False,
+) -> bytes:
     # assert len(payload) < 128  # Requires lz4 if payload > 128 bytes
     # TODO: Add lz4 to match core smsg
-    smsg_timestamp = int(time.time())
-    r = getSecretInt().to_bytes(32, byteorder="big")
+    if deterministic:
+        assert smsg_timestamp is not None
+        h = hashlib.sha256(b"smsg")
+        h.update(privkey_from)
+        h.update(pubkey_to)
+        h.update(payload)
+        h.update(smsg_timestamp.to_bytes(8, byteorder="big"))
+        r = h.digest()
+        smsg_iv: bytes = hashlib.sha256(b"smsg_iv" + r).digest()[:16]
+    else:
+        r = getSecretInt().to_bytes(32, byteorder="big")
+        smsg_iv: bytes = secrets.token_bytes(16)
+    if smsg_timestamp is None:
+        smsg_timestamp = int(time.time())
     R = PublicKey.from_secret(r).format()
     p = PrivateKey(r).ecdh(pubkey_to)
     H = hashlib.sha512(p).digest()
     key_e: bytes = H[:32]
     key_m: bytes = H[32:]
-
-    smsg_iv: bytes = secrets.token_bytes(16)
 
     payload_hash: bytes = sha256(sha256(payload))
     signature: bytes = PrivateKey(privkey_from).sign_recoverable(

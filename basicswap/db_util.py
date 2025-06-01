@@ -76,6 +76,10 @@ def remove_expired_data(self, time_offset: int = 0):
                     "DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :linked_id",
                     {"type_ind": int(Concepts.BID), "linked_id": bid_row[0]},
                 )
+                cursor.execute(
+                    "DELETE FROM direct_message_route_links WHERE linked_type = :type_ind AND linked_id = :linked_id",
+                    {"type_ind": int(Concepts.BID), "linked_id": bid_row[0]},
+                )
 
             cursor.execute(
                 "DELETE FROM eventlog WHERE eventlog.linked_type = :type_ind AND eventlog.linked_id = :offer_id",

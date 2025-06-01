@@ -142,7 +142,7 @@ Observe progress with
 
 ## Start a subset of the configured coins using docker
 
-    docker compose run --service-ports swapclient basicswap-run -datadir=/coindata -withcoins=monero
+    docker compose run --rm --service-ports swapclient basicswap-run -datadir=/coindata -withcoins=monero
 
 
 
