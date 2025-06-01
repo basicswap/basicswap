@@ -70,6 +70,8 @@ def startSimplexClient(
     websocket_port: int,
     logger,
     delay_event,
+    socks_proxy=None,
+    log_level: str = "debug",
 ) -> Daemon:
     logger.info("Starting Simplex client")
     if not os.path.exists(data_path):
@@ -78,13 +80,16 @@ def startSimplexClient(
     db_path = os.path.join(data_path, "simplex_client_data")
     args = [bin_path, "-d", db_path, "-s", server_address, "-p", str(websocket_port)]
 
+    if socks_proxy:
+        args += ["--socks-proxy", socks_proxy]
+
     if not os.path.exists(db_path + "_chat.db"):
         # Need to set initial profile through CLI
         # TODO: Must be a better way?
-        init_args = args + ["-e", "/help"]  # Run command ro exit client
+        init_args = args + ["-e", "/help"]  # Run command to exit client
         initSimplexClient(init_args, logger, delay_event)
 
-    args += ["-l", "debug"]
+    args += ["-l", log_level]
 
     opened_files = []
     stdout_dest = open(
