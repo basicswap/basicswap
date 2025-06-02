@@ -219,6 +219,12 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
     if offer_id:
         filters["offer_id"] = offer_id
 
+    parsed_url = urllib.parse.urlparse(self.path)
+    query_params = urllib.parse.parse_qs(parsed_url.query) if parsed_url.query else {}
+
+    if "with_extra_info" in query_params:
+        with_extra_info = toBool(query_params["with_extra_info"][0])
+
     if post_string != "":
         post_data = getFormData(post_string, is_json)
         filters["coin_from"] = setCoinFilter(post_data, "coin_from")
@@ -288,8 +294,20 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
 
             try:
                 strategy = swap_client.getLinkedStrategy(Concepts.OFFER, o.offer_id)
-                offer_data["automation_strat_id"] = strategy[0]
-            except Exception:
+                if strategy:
+                    offer_data["automation_strat_id"] = strategy[0]
+                    swap_client.log.debug(
+                        f"Found automation strategy for offer {o.offer_id.hex()}: {strategy[0]}"
+                    )
+                else:
+                    offer_data["automation_strat_id"] = 0
+                    swap_client.log.debug(
+                        f"No automation strategy found for offer {o.offer_id.hex()}"
+                    )
+            except Exception as e:
+                swap_client.log.warning(
+                    f"Error getting automation strategy for offer {o.offer_id.hex()}: {e}"
+                )
                 offer_data["automation_strat_id"] = 0
 
         rv.append(offer_data)
