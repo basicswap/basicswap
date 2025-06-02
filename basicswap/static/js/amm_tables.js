@@ -271,24 +271,24 @@ const AmmTablesManager = (function() {
 
             tableHtml += `
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-                    <td class="py-3 px-4">
+                    <td class="py-3 pl-4 text-center">
                         <div class="font-medium">${name}</div>
                     </td>
                     ${createSwapColumn(coinFrom, coinTo)}
                     <td class="py-3 px-4 text-right">
-                        <div class="text-sm font-semibold dark:text-white">${amount.toFixed(8)}</div>
+                        <div class="text-sm font-semibold dark:text-white">${coinFrom == "Bitcoin" ? amount.toFixed(8) : amount.toFixed(4)}</div>
                         <div class="text-sm text-gray-500 dark:text-gray-300">${getCoinDisplayName(coinFrom)}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            Min: ${minCoinFromAmt.toFixed(8)}
+                            Min bal: ${coinFrom == "Bitcoin" ? minCoinFromAmt.toFixed(8) : minCoinFromAmt.toFixed(4)}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-right">
-                        <div class="text-sm font-semibold dark:text-white">${minrate.toFixed(8)}</div>
+                        <div class="text-xs font-semibold dark:text-white">${minrate.toFixed(8)}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-300">
                             Tweak: ${rateTweakPercent > 0 ? '+' : ''}${rateTweakPercent}%
                         </div>
                         <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
-                            Receive: ~${amountToReceive.toFixed(8)} ${getCoinDisplayName(coinTo)}
+                            Receive: ~${(amountToReceive * (rateTweakPercent / 100 + 1)).toFixed(4)} ${getCoinDisplayName(coinTo)}
                             ${(() => {
                                 const usdValue = calculateUSDPrice(amountToReceive, coinTo);
                                 return usdValue ? `<br/><span class="text-green-600 dark:text-green-400">${formatUSDPrice(usdValue)}</span>` : '<br/><span class="text-gray-400">USD: N/A</span>';
@@ -913,6 +913,7 @@ const AmmTablesManager = (function() {
                 bidFields.classList.add('hidden');
             }
 
+            document.getElementById('add-amm-rate-label').textContent = 'Minimum Rate';
             document.getElementById('add-amm-rate').value = '0.0001';
             document.getElementById('add-offer-ratetweakpercent').value = '0';
             document.getElementById('add-offer-min-coin-from-amt').value = '';

@@ -838,33 +838,11 @@ def page_amm(self, _, post_string):
                 else:
                     err_messages.append(msg)
 
-            if "autostart" in form_data:
-                swap_client.settings["amm_autostart"] = True
-                swap_client.log.info("AMM autostart enabled")
-                messages.append("AMM autostart enabled")
-                try:
-                    import shutil
-                    from basicswap import config as cfg
-
-                    settings_path = os.path.join(
-                        swap_client.data_dir, cfg.CONFIG_FILENAME
-                    )
-                    settings_path_new = settings_path + ".new"
-                    shutil.copyfile(settings_path, settings_path + ".last")
-                    with open(settings_path_new, "w") as fp:
-                        json.dump(swap_client.settings, fp, indent=4)
-                    shutil.move(settings_path_new, settings_path)
-                    swap_client.log.info(
-                        "AMM autostart setting saved to basicswap.json"
-                    )
-                except Exception as e:
-                    swap_client.log.error(f"Failed to save autostart setting: {str(e)}")
-                    err_messages.append(f"Failed to save autostart setting: {str(e)}")
-            else:
-                if "amm_autostart" in swap_client.settings:
-                    del swap_client.settings["amm_autostart"]
-                    swap_client.log.info("AMM autostart disabled")
-                    messages.append("AMM autostart disabled")
+            if "save_global_settings" not in form_data:
+                if "autostart" in form_data:
+                    swap_client.settings["amm_autostart"] = True
+                    swap_client.log.info("AMM autostart enabled")
+                    messages.append("AMM autostart enabled")
                     try:
                         import shutil
                         from basicswap import config as cfg
@@ -878,7 +856,7 @@ def page_amm(self, _, post_string):
                             json.dump(swap_client.settings, fp, indent=4)
                         shutil.move(settings_path_new, settings_path)
                         swap_client.log.info(
-                            "AMM autostart setting removed from basicswap.json"
+                            "AMM autostart setting saved to basicswap.json"
                         )
                     except Exception as e:
                         swap_client.log.error(
@@ -887,6 +865,33 @@ def page_amm(self, _, post_string):
                         err_messages.append(
                             f"Failed to save autostart setting: {str(e)}"
                         )
+                else:
+                    if "amm_autostart" in swap_client.settings:
+                        del swap_client.settings["amm_autostart"]
+                        swap_client.log.info("AMM autostart disabled")
+                        messages.append("AMM autostart disabled")
+                        try:
+                            import shutil
+                            from basicswap import config as cfg
+
+                            settings_path = os.path.join(
+                                swap_client.data_dir, cfg.CONFIG_FILENAME
+                            )
+                            settings_path_new = settings_path + ".new"
+                            shutil.copyfile(settings_path, settings_path + ".last")
+                            with open(settings_path_new, "w") as fp:
+                                json.dump(swap_client.settings, fp, indent=4)
+                            shutil.move(settings_path_new, settings_path)
+                            swap_client.log.info(
+                                "AMM autostart setting removed from basicswap.json"
+                            )
+                        except Exception as e:
+                            swap_client.log.error(
+                                f"Failed to save autostart setting: {str(e)}"
+                            )
+                            err_messages.append(
+                                f"Failed to save autostart setting: {str(e)}"
+                            )
 
             if "save_global_settings" in form_data:
                 try:
