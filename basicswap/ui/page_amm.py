@@ -451,7 +451,7 @@ def get_amm_active_count(swap_client, debug_override=False):
             state_data = json.load(f)
 
         if debug_enabled:
-            swap_client.log.info(
+            swap_client.log.debug(
                 f"AMM state data loaded with {len(state_data.get('offers', {}))} offer templates"
             )
 
@@ -502,7 +502,7 @@ def get_amm_active_count(swap_client, debug_override=False):
                     continue
 
             if debug_enabled:
-                swap_client.log.info(
+                swap_client.log.debug(
                     f"Found {len(active_network_offers)} active offers in the network"
                 )
 
@@ -568,11 +568,12 @@ def get_amm_active_count(swap_client, debug_override=False):
                             if enabled_offers is None or template_name in enabled_offers
                             else "disabled"
                         )
-                        swap_client.log.info(
-                            f"Template '{template_name}' ({enabled_status}): {active_offer_count} active out of {total_offers} total offers"
-                        )
+                        if debug_enabled:
+                            swap_client.log.debug(
+                                f"Template '{template_name}' ({enabled_status}): {active_offer_count} active out of {total_offers} total offers"
+                            )
                 elif debug_enabled:
-                    swap_client.log.info(
+                    swap_client.log.debug(
                         f"Template '{template_name}' is disabled, skipping {len(offers)} offers"
                     )
 
@@ -592,16 +593,18 @@ def get_amm_active_count(swap_client, debug_override=False):
                             if enabled_bids is None or template_name in enabled_bids
                             else "disabled"
                         )
-                        swap_client.log.info(
-                            f"Template '{template_name}' ({enabled_status}): {active_bid_count} active out of {total_bids} total bids"
-                        )
+
+                        if debug_enabled:
+                            swap_client.log.debug(
+                                f"Template '{template_name}' ({enabled_status}): {active_bid_count} active out of {total_bids} total bids"
+                            )
                 elif debug_enabled:
-                    swap_client.log.info(
+                    swap_client.log.debug(
                         f"Template '{template_name}' is disabled, skipping {len(bids)} bids"
                     )
 
         if debug_enabled:
-            swap_client.log.info(f"Total active AMM count: {amm_count}")
+            swap_client.log.debug(f"Total active AMM count: {amm_count}")
 
         if (
             amm_count == 0
@@ -678,7 +681,7 @@ def get_amm_active_count(swap_client, debug_override=False):
         return 0
 
     if debug_enabled:
-        swap_client.log.info(f"Final AMM active count: {amm_count}")
+        swap_client.log.debug(f"Final AMM active count: {amm_count}")
 
     return amm_count
 
@@ -1262,8 +1265,9 @@ def page_amm(self, _, post_string):
     logs = get_amm_logs()
 
     amm_count = get_amm_active_count(swap_client, amm_ui_debug)
-    if swap_client.debug and amm_ui_debug:
-        swap_client.log.info(f"AMM active count: {amm_count}")
+
+    if amm_ui_debug and post_string:
+        swap_client.log.debug(f"AMM active count: {amm_count}")
         logs.append(
             f"AMM active count: {amm_count} (only counting offers that are currently active in the network)"
         )

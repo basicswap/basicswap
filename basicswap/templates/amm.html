@@ -678,6 +678,69 @@
               </div>
             </div>
 
+            <div class="mb-4">
+              <button type="button" class="collapsible-header flex items-center justify-between w-full p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none" data-target="bidding-strategy-faq-content">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Bidding Strategy Settings FAQ</h4>
+                <svg class="w-5 h-5 transition-transform transform text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              <div id="bidding-strategy-faq-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden">
+                <p class="text-sm font-bold text-gray-600 dark:text-gray-400 mb-4">
+                  The <strong>Attempt Bids First</strong> allows your AMM to fill existing offers before creating new ones.
+                </p>
+
+                <div class="space-y-4">
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">How it works</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>1.</strong> AMM wants to create a 1 BTC → XMR offer at rate 150<br>
+                      <strong>2.</strong> Checks for existing XMR → BTC offers that would fill our intended offer<br>
+                      <strong>3.</strong> Places bids on compatible offers to fill what we can<br>
+                      <strong>4.</strong> Creates AMM offer only for the remaining amount<br>
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Bidding Strategies</h5>
+                    <div class="space-y-2 mt-2">
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Aggressive:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Bid on all compatible offers to fill as much as possible</span>
+                      </div>
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Balanced:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Mix of bidding and offer creation (default)</span>
+                      </div>
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Conservative:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on offers with auto-accept enabled</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Configuration Options</h5>
+                    <div class="space-y-2 mt-2">
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Max Bid Percentage:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Maximum % of your offer amount to use for bidding (0-100)</span>
+                      </div>
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Rate Tolerance %:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Bid on offers up to this % better than your intended rate</span>
+                      </div>
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Min Remaining Offer:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Don't create AMM offer if remainder is below this amount</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -1156,6 +1219,54 @@
                       </select>
                     </div>
                   </div>
+
+                  {% if debug_ui_mode %}
+                  <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <div class="flex items-center mb-3">
+                      <input type="checkbox" id="add-offer-attempt-bids-first" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                      <label for="add-offer-attempt-bids-first" class="ml-2 block text-sm font-medium text-gray-900 dark:text-gray-300">Attempt Bids First</label>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Before creating an AMM offer, attempt to fill existing offers by placing bids, then create offer for remainder.</p>
+
+                    <div id="add-offer-bidding-options" class="hidden space-y-4">
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label for="add-offer-bid-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bidding Strategy</label>
+                          <div class="relative">
+                            <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                            <select id="add-offer-bid-strategy" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                              <option value="aggressive">Aggressive - Fill as much as possible</option>
+                              <option value="balanced" selected>Balanced - Mix of bids and offers</option>
+                              <option value="conservative">Conservative - Only obvious wins</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label for="add-offer-max-bid-percentage" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Max Bid Percentage</label>
+                          <input type="text" id="add-offer-max-bid-percentage" pattern="[0-9]+" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="50" placeholder="50">
+                          <small class="text-xs text-gray-500 dark:text-gray-400">Maximum % of offer amount to use for bidding (0-100)</small>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label for="add-offer-bid-rate-tolerance" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate Tolerance %</label>
+                          <input type="text" id="add-offer-bid-rate-tolerance" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="2.0" placeholder="2.0">
+                          <small class="text-xs text-gray-500 dark:text-gray-400">Bid on offers up to this % better than our rate</small>
+                        </div>
+
+                        <div>
+                          <label for="add-offer-min-remaining-offer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Remaining Offer</label>
+                          <input type="text" id="add-offer-min-remaining-offer" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
+                          <small class="text-xs text-gray-500 dark:text-gray-400">Don't create offer if remainder is below this amount</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endif %}
                 </div>
 
                 <div id="add-bid-fields" class="hidden space-y-4">
@@ -1382,6 +1493,54 @@
                       </select>
                     </div>
                   </div>
+
+                  {% if debug_ui_mode %}
+                  <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
+                    <div class="flex items-center mb-3">
+                      <input type="checkbox" id="edit-offer-attempt-bids-first" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                      <label for="edit-offer-attempt-bids-first" class="ml-2 block text-sm font-medium text-gray-900 dark:text-gray-300">Attempt Bids First</label>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Before creating an AMM offer, attempt to fill existing offers by placing bids, then create offer for remainder.</p>
+
+                    <div id="edit-offer-bidding-options" class="hidden space-y-4">
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label for="edit-offer-bid-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Bidding Strategy</label>
+                          <div class="relative">
+                            <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                            <select id="edit-offer-bid-strategy" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                              <option value="aggressive">Aggressive - Fill as much as possible</option>
+                              <option value="balanced" selected>Balanced - Mix of bids and offers</option>
+                              <option value="conservative">Conservative - Only obvious wins</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label for="edit-offer-max-bid-percentage" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Max Bid Percentage</label>
+                          <input type="text" id="edit-offer-max-bid-percentage" pattern="[0-9]+" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="50" placeholder="50">
+                          <small class="text-xs text-gray-500 dark:text-gray-400">Maximum % of offer amount to use for bidding (0-100)</small>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label for="edit-offer-bid-rate-tolerance" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate Tolerance %</label>
+                          <input type="text" id="edit-offer-bid-rate-tolerance" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="2.0" placeholder="2.0">
+                          <small class="text-xs text-gray-500 dark:text-gray-400">Bid on offers up to this % better than our rate</small>
+                        </div>
+
+                        <div>
+                          <label for="edit-offer-min-remaining-offer" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Remaining Offer</label>
+                          <input type="text" id="edit-offer-min-remaining-offer" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
+                          <small class="text-xs text-gray-500 dark:text-gray-400">Don't create offer if remainder is below this amount</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% endif %}
                 </div>
 
                 <div id="edit-bid-fields" class="hidden space-y-4">

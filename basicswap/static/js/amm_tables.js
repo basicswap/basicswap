@@ -967,6 +967,10 @@ const AmmTablesManager = (function() {
             coinToSelect.addEventListener('change', handleCoinChange);
         }
 
+        if (type === 'offer') {
+            setupBiddingControls('add');
+        }
+
         const modal = document.getElementById('add-amm-modal');
         if (modal) {
             modal.classList.remove('hidden');
@@ -1129,6 +1133,31 @@ const AmmTablesManager = (function() {
                         alert('Invalid Offer Size Increment value. Please enter a valid decimal number.');
                     }
                     return;
+                }
+
+                const attemptBidsFirst = document.getElementById('add-offer-attempt-bids-first');
+                if (attemptBidsFirst && attemptBidsFirst.checked) {
+                    newItem.attempt_bids_first = true;
+
+                    const bidStrategy = document.getElementById('add-offer-bid-strategy').value;
+                    if (bidStrategy) {
+                        newItem.bid_strategy = bidStrategy;
+                    }
+
+                    const maxBidPercentage = document.getElementById('add-offer-max-bid-percentage').value;
+                    if (maxBidPercentage) {
+                        newItem.max_bid_percentage = parseInt(maxBidPercentage);
+                    }
+
+                    const bidRateTolerance = document.getElementById('add-offer-bid-rate-tolerance').value;
+                    if (bidRateTolerance) {
+                        newItem.bid_rate_tolerance = parseFloat(bidRateTolerance);
+                    }
+
+                    const minRemainingOffer = document.getElementById('add-offer-min-remaining-offer').value;
+                    if (minRemainingOffer) {
+                        newItem.min_remaining_offer = parseFloat(minRemainingOffer);
+                    }
                 }
             } else if (type === 'bid') {
                 newItem.max_rate = parseFloat(document.getElementById('add-amm-rate').value);
@@ -1362,6 +1391,11 @@ const AmmTablesManager = (function() {
                 editCoinToSelect.addEventListener('change', handleEditCoinChange);
             }
 
+            if (type === 'offer') {
+                setupBiddingControls('edit');
+                populateBiddingControls('edit', item);
+            }
+
             const modal = document.getElementById('edit-amm-modal');
             if (modal) {
                 modal.classList.remove('hidden');
@@ -1539,6 +1573,33 @@ const AmmTablesManager = (function() {
                         alert('Invalid Offer Size Increment value. Please enter a valid decimal number.');
                     }
                     return;
+                }
+
+                const attemptBidsFirst = document.getElementById('edit-offer-attempt-bids-first');
+                if (attemptBidsFirst && attemptBidsFirst.checked) {
+                    updatedItem.attempt_bids_first = true;
+
+                    const bidStrategy = document.getElementById('edit-offer-bid-strategy').value;
+                    if (bidStrategy) {
+                        updatedItem.bid_strategy = bidStrategy;
+                    }
+
+                    const maxBidPercentage = document.getElementById('edit-offer-max-bid-percentage').value;
+                    if (maxBidPercentage) {
+                        updatedItem.max_bid_percentage = parseInt(maxBidPercentage);
+                    }
+
+                    const bidRateTolerance = document.getElementById('edit-offer-bid-rate-tolerance').value;
+                    if (bidRateTolerance) {
+                        updatedItem.bid_rate_tolerance = parseFloat(bidRateTolerance);
+                    }
+
+                    const minRemainingOffer = document.getElementById('edit-offer-min-remaining-offer').value;
+                    if (minRemainingOffer) {
+                        updatedItem.min_remaining_offer = parseFloat(minRemainingOffer);
+                    }
+                } else {
+                    updatedItem.attempt_bids_first = false;
                 }
             } else if (type === 'bid') {
                 updatedItem.max_rate = parseFloat(document.getElementById('edit-amm-rate').value);
@@ -1983,6 +2044,61 @@ const AmmTablesManager = (function() {
         coinSelects.forEach(select => createCoinDropdown(select));
 
         swapTypeSelects.forEach(select => createSwapTypeDropdown(select));
+    }
+
+    function setupBiddingControls(modalType) {
+        const checkbox = document.getElementById(`${modalType}-offer-attempt-bids-first`);
+        const optionsDiv = document.getElementById(`${modalType}-offer-bidding-options`);
+
+        if (checkbox && optionsDiv) {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    optionsDiv.classList.remove('hidden');
+                } else {
+                    optionsDiv.classList.add('hidden');
+                }
+            });
+
+            if (checkbox.checked) {
+                optionsDiv.classList.remove('hidden');
+            } else {
+                optionsDiv.classList.add('hidden');
+            }
+        }
+    }
+
+    function populateBiddingControls(modalType, item) {
+        if (!item) return;
+
+        const attemptBidsFirst = document.getElementById(`${modalType}-offer-attempt-bids-first`);
+        const bidStrategy = document.getElementById(`${modalType}-offer-bid-strategy`);
+        const maxBidPercentage = document.getElementById(`${modalType}-offer-max-bid-percentage`);
+        const bidRateTolerance = document.getElementById(`${modalType}-offer-bid-rate-tolerance`);
+        const minRemainingOffer = document.getElementById(`${modalType}-offer-min-remaining-offer`);
+
+        if (attemptBidsFirst) {
+            attemptBidsFirst.checked = item.attempt_bids_first || false;
+        }
+
+        if (bidStrategy) {
+            bidStrategy.value = item.bid_strategy || 'balanced';
+        }
+
+        if (maxBidPercentage) {
+            maxBidPercentage.value = item.max_bid_percentage || '50';
+        }
+
+        if (bidRateTolerance) {
+            bidRateTolerance.value = item.bid_rate_tolerance || '2.0';
+        }
+
+        if (minRemainingOffer) {
+            minRemainingOffer.value = item.min_remaining_offer || '0.001';
+        }
+
+        if (attemptBidsFirst) {
+            attemptBidsFirst.dispatchEvent(new Event('change'));
+        }
     }
 
     function getRateFromCoinGecko(coinFromSelect, coinToSelect, rateInput) {

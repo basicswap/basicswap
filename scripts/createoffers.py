@@ -471,6 +471,192 @@ def write_state(statefile, script_state):
         json.dump(script_state, fp, indent=4)
 
 
+def attempt_pre_offer_bids(
+    offer_template, use_rate, amount_to_offer, coin_from_data, coin_to_data, debug=False
+):
+    if not offer_template.get("attempt_bids_first", False):
+        return amount_to_offer
+
+    if debug:
+        print(
+            f"Attempting to fill existing offers before creating {offer_template['name']}"
+        )
+
+    try:
+        # Find existing offers we could bid on (reverse direction)
+        existing_offers = read_json_api(
+            "offers",
+            {
+                "active": "active",
+                "include_sent": False,
+                "coin_from": coin_to_data["id"],  # We want to buy what we're offering
+                "coin_to": coin_from_data["id"],  # We want to sell what we're buying
+                "with_extra_info": True,
+            },
+        )
+
+        if not isinstance(existing_offers, list):
+            if debug:
+                print(f"Invalid offers response for bidding: {existing_offers}")
+            return amount_to_offer
+
+        if not existing_offers:
+            if debug:
+                print("No existing offers found to bid on")
+            return amount_to_offer
+
+        # Filter offers based on bidding strategy
+        biddable_offers = filter_biddable_offers(
+            existing_offers, offer_template, use_rate, debug
+        )
+
+        if not biddable_offers:
+            if debug:
+                print("No suitable offers found for bidding")
+            return amount_to_offer
+
+        # Calculate and execute bids
+        total_filled = execute_bid_plan(
+            biddable_offers, offer_template, amount_to_offer, use_rate, debug
+        )
+
+        remaining_amount = max(0, amount_to_offer - total_filled)
+
+        if debug:
+            print(
+                f"Filled {total_filled} via bids, remaining for AMM offer: {remaining_amount}"
+            )
+
+        return remaining_amount
+
+    except Exception as e:
+        if debug:
+            print(f"Error in pre-offer bidding: {e}")
+        return amount_to_offer
+
+
+def filter_biddable_offers(offers, offer_template, our_rate, debug=False):
+    """Filter offers based on bidding criteria"""
+    strategy = offer_template.get("bid_strategy", "balanced")
+    rate_tolerance = offer_template.get("bid_rate_tolerance", 2.0)
+
+    filtered = []
+    for offer in offers:
+        try:
+            offer_rate = float(offer["rate"])
+
+            # Check if offer rate is better than or close to our rate
+            max_acceptable_rate = our_rate * (1 + rate_tolerance / 100)
+
+            if offer_rate <= max_acceptable_rate:
+                # Apply strategy-specific filtering
+                if should_bid_on_offer(offer, strategy):
+                    filtered.append(offer)
+
+        except (ValueError, KeyError) as e:
+            if debug:
+                print(f"Error processing offer for bidding: {e}")
+            continue
+
+    # Sort by best rate first (lowest rate = best for us when buying)
+    filtered.sort(key=lambda x: float(x["rate"]))
+
+    if debug:
+        print(f"Found {len(filtered)} biddable offers using {strategy} strategy")
+
+    return filtered
+
+
+def execute_bid_plan(offers, offer_template, total_amount, our_rate, debug=False):
+    """Calculate and execute optimal bid amounts"""
+    max_bid_percentage = offer_template.get("max_bid_percentage", 50)
+    max_bid_amount = total_amount * (max_bid_percentage / 100)
+
+    total_filled = 0
+    remaining = min(max_bid_amount, total_amount)
+
+    for offer in offers:
+        if remaining <= 0:
+            break
+
+        try:
+            offer_amount = float(offer.get("amount_from", 0))
+            offer_rate = float(offer["rate"])
+            min_bid_amount = offer_template.get("min_bid_amount", 0.001)
+
+            # Calculate how much we can bid on this offer
+            # We're buying coin_to, so we need to calculate based on their offer_amount
+            max_we_can_buy = remaining
+            max_they_offer = offer_amount
+
+            bid_amount = min(max_we_can_buy, max_they_offer)
+
+            if bid_amount >= min_bid_amount:
+                # Attempt to place the bid
+                if place_bid_on_offer(offer, bid_amount, offer_template, debug):
+                    total_filled += bid_amount
+                    remaining -= bid_amount
+                    if debug:
+                        print(
+                            f"Successfully bid {bid_amount} on offer {offer.get('offer_id', 'unknown')} at rate {offer_rate}"
+                        )
+                else:
+                    if debug:
+                        print(
+                            f"Failed to place bid on offer {offer.get('offer_id', 'unknown')}"
+                        )
+
+        except (ValueError, KeyError) as e:
+            if debug:
+                print(f"Error calculating bid amount: {e}")
+            continue
+
+    return total_filled
+
+
+def place_bid_on_offer(offer, bid_amount, offer_template, debug=False):
+    """Place a bid on a specific offer"""
+    try:
+        bid_data = {
+            "offer_id": offer.get("offer_id"),
+            "amount_from": str(bid_amount),
+            "bid_rate": offer["rate"],  # Use the offer's rate
+        }
+
+        # Add optional bid settings
+        if "bid_valid_seconds" in offer_template:
+            bid_data["valid_for_seconds"] = str(offer_template["bid_valid_seconds"])
+
+        response = read_json_api("bids", bid_data)
+
+        if response and response.get("bid_id"):
+            return True
+        else:
+            if debug:
+                print(f"Bid placement failed: {response}")
+            return False
+
+    except Exception as e:
+        if debug:
+            print(f"Error placing bid: {e}")
+        return False
+
+
+def should_bid_on_offer(offer, strategy):
+    """Determine if we should bid on this offer based on strategy"""
+    if strategy == "aggressive":
+        # Bid on all compatible offers
+        return True
+    elif strategy == "conservative":
+        # Only bid on offers with auto-accept enabled
+        return offer.get("automation_strat_id") in [1, 2]
+    elif strategy == "balanced":
+        # Bid on auto-accept offers and some manual offers
+        return True  # For now same as aggressive (TODO)
+
+    return False
+
+
 def process_offers(args, config, script_state) -> None:
     if shutdown_in_progress:
         return
@@ -985,6 +1171,29 @@ def process_offers(args, config, script_state) -> None:
             print(
                 f"Offer data: {offer_amount} {coin_from_data['ticker']} -> {coin_to_data['ticker']} at {use_rate}"
             )
+
+        # Attempt to fill existing offers before creating AMM offer
+        final_offer_amount = attempt_pre_offer_bids(
+            offer_template,
+            use_rate,
+            offer_amount,
+            coin_from_data,
+            coin_to_data,
+            args.debug,
+        )
+
+        # Check if we still need to create an offer after bidding
+        min_remaining_offer = offer_template.get("min_remaining_offer", 0.001)
+        if final_offer_amount < min_remaining_offer:
+            print(
+                f"Fully filled via bids, skipping AMM offer creation for {offer_template['name']}"
+            )
+            continue
+
+        # Update offer amount if it changed due to bidding
+        if final_offer_amount != offer_amount:
+            offer_data["amt_from"] = final_offer_amount
+            print(f"Adjusted offer amount to {final_offer_amount} after bidding")
 
         try:
             new_offer = read_json_api("offers/new", offer_data)
