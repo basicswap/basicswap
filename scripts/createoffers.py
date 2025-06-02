@@ -650,6 +650,9 @@ def should_bid_on_offer(offer, strategy):
     elif strategy == "conservative":
         # Only bid on offers with auto-accept enabled
         return offer.get("automation_strat_id") in [1, 2]
+    elif strategy == "auto_accept_only":
+        # Only bid on auto-accept offers (best rates from auto-accept only)
+        return offer.get("automation_strat_id") in [1, 2]
     elif strategy == "balanced":
         # Bid on auto-accept offers and some manual offers
         return True  # For now same as aggressive (TODO)

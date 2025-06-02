@@ -687,7 +687,7 @@
               </button>
               <div id="bidding-strategy-faq-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden">
                 <p class="text-sm font-bold text-gray-600 dark:text-gray-400 mb-4">
-                  The <strong>Attempt Bids First</strong> allows your AMM to fill existing offers before creating new ones.
+                   <strong>Attempt Bids First</strong> allows your AMM to fill existing offers before creating new ones.
                 </p>
 
                 <div class="space-y-4">
@@ -715,8 +715,13 @@
                       <div>
                         <strong class="text-gray-900 dark:text-white">Conservative:</strong>
                         <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on offers with auto-accept enabled</span>
+                      <div>
+                        <strong class="text-gray-900 dark:text-white">Best rates from auto-accept offers only:</strong>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on auto-accept offers (best rates from auto-accept only)</span>
+                      </div>
                       </div>
                     </div>
+
                   </div>
 
                   <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
@@ -1240,6 +1245,7 @@
                               <option value="aggressive">Aggressive - Fill as much as possible</option>
                               <option value="balanced" selected>Balanced - Mix of bids and offers</option>
                               <option value="conservative">Conservative - Only obvious wins</option>
+                              <option value="auto_accept_only">Best rates from auto-accept offers only</option>
                             </select>
                           </div>
                         </div>
@@ -1514,6 +1520,7 @@
                               <option value="aggressive">Aggressive - Fill as much as possible</option>
                               <option value="balanced" selected>Balanced - Mix of bids and offers</option>
                               <option value="conservative">Conservative - Only obvious wins</option>
+                              <option value="auto_accept_only">Best rates from auto-accept offers only</option>
                             </select>
                           </div>
                         </div>
