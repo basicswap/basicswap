@@ -42,6 +42,7 @@ from .ui.util import (
 )
 from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
+from .db import Concepts
 
 
 def getFormData(post_string: str, is_json: bool):
@@ -284,6 +285,12 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             else:
                 offer_data["feerate_from"] = o.from_feerate
                 offer_data["feerate_to"] = o.to_feerate
+
+            try:
+                strategy = swap_client.getLinkedStrategy(Concepts.OFFER, o.offer_id)
+                offer_data["automation_strat_id"] = strategy[0]
+            except Exception:
+                offer_data["automation_strat_id"] = 0
 
         rv.append(offer_data)
     return bytes(json.dumps(rv), "UTF-8")

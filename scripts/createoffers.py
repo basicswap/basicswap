@@ -917,6 +917,11 @@ def process_offers(args, config, script_state) -> None:
         market_rate = None
         if adjust_rates_value in ["true", "only", "all", "minrate", "auto_accept_only"]:
             try:
+                if args.debug:
+                    print(
+                        f"Fetching offers with coin_from_id: {coin_from_data['id']}, coin_to_id: {coin_to_data['id']}"
+                    )
+
                 received_offers = read_json_api(
                     "offers",
                     {
@@ -924,7 +929,7 @@ def process_offers(args, config, script_state) -> None:
                         "include_sent": False,
                         "coin_from": coin_from_data["id"],
                         "coin_to": coin_to_data["id"],
-                        "with_extra_info": True,  # Need extra info to check automation strategy
+                        "with_extra_info": True,
                     },
                 )
 
@@ -941,20 +946,46 @@ def process_offers(args, config, script_state) -> None:
                 received_offers = []
 
             if args.debug:
+                coin_from_name = offer_template["coin_from"]
+                coin_to_name = offer_template["coin_to"]
                 print(
-                    f"Found {len(received_offers)} existing offers for {coin_from_data['ticker']} to {coin_to_data['ticker']}"
+                    f"Found {len(received_offers)} existing offers for {coin_from_name} to {coin_to_name}"
                 )
 
-            # Filter offers for auto_accept_only mode
             if adjust_rates_value == "auto_accept_only":
                 original_count = len(received_offers)
-                # Filter to only include offers that auto-accept bids (automation_strat_id 1 or 2)
-                received_offers = [
-                    offer
-                    for offer in received_offers
-                    if offer.get("automation_strat_id")
-                    in [1, 2]  # 1=accept_all, 2=accept_known
-                ]
+                auto_accept_offers = []
+
+                for offer in received_offers:
+                    try:
+                        offer_id = offer.get("offer_id", "unknown")
+                        if args.debug:
+                            print(
+                                f"Checking offer {offer_id} from {offer['addr_from']}"
+                            )
+
+                        automation_strat_id = offer.get("automation_strat_id", 0)
+
+                        if args.debug:
+                            print(f"Automation strategy ID: {automation_strat_id}")
+
+                        if automation_strat_id in [1, 2]:
+                            auto_accept_offers.append(offer)
+                            if args.debug:
+                                print(f"Added auto-accept offer: {offer_id}")
+                        elif args.debug:
+                            print(
+                                f"Skipping offer - not auto-accept (automation_strat_id: {automation_strat_id})"
+                            )
+
+                    except Exception as e:
+                        if args.debug:
+                            print(
+                                f"Error checking automation strategy for offer {offer.get('offer_id', 'unknown')}: {e}"
+                            )
+                        continue
+
+                received_offers = auto_accept_offers
                 if args.debug:
                     print(
                         f"Filtered to {len(received_offers)} auto-accept offers (from {original_count} total)"
