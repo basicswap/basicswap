@@ -292,23 +292,23 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
                 offer_data["feerate_from"] = o.from_feerate
                 offer_data["feerate_to"] = o.to_feerate
 
-            try:
-                strategy = swap_client.getLinkedStrategy(Concepts.OFFER, o.offer_id)
-                if strategy:
-                    offer_data["automation_strat_id"] = strategy[0]
+            offer_data["automation_strat_id"] = getattr(o, "auto_accept_type", 0)
+
+            if o.was_sent:
+                try:
+                    strategy = swap_client.getLinkedStrategy(Concepts.OFFER, o.offer_id)
+                    if strategy:
+                        offer_data["local_automation_strat_id"] = strategy[0]
+                        swap_client.log.debug(
+                            f"Found local automation strategy for own offer {o.offer_id.hex()}: {strategy[0]}"
+                        )
+                    else:
+                        offer_data["local_automation_strat_id"] = 0
+                except Exception as e:
                     swap_client.log.debug(
-                        f"Found automation strategy for offer {o.offer_id.hex()}: {strategy[0]}"
+                        f"Error getting local automation strategy for offer {o.offer_id.hex()}: {e}"
                     )
-                else:
-                    offer_data["automation_strat_id"] = 0
-                    swap_client.log.debug(
-                        f"No automation strategy found for offer {o.offer_id.hex()}"
-                    )
-            except Exception as e:
-                swap_client.log.warning(
-                    f"Error getting automation strategy for offer {o.offer_id.hex()}: {e}"
-                )
-                offer_data["automation_strat_id"] = 0
+                    offer_data["local_automation_strat_id"] = 0
 
         rv.append(offer_data)
     return bytes(json.dumps(rv), "UTF-8")
