@@ -727,9 +727,9 @@ def process_offers(args, config, script_state) -> None:
                         f"Error getting rates for {coin_from_data_name} to {coin_to_data['ticker']}: {e}"
                     )
 
-        # Fetch Orderbook data if needed (for "true","only", "all", and "minrate" modes)
+        # Fetch Orderbook data if needed (for "true","only", "all", "minrate", and "auto_accept_only" modes)
         market_rate = None
-        if adjust_rates_value in ["true", "only", "all", "minrate"]:
+        if adjust_rates_value in ["true", "only", "all", "minrate", "auto_accept_only"]:
             try:
                 received_offers = read_json_api(
                     "offers",
@@ -738,6 +738,7 @@ def process_offers(args, config, script_state) -> None:
                         "include_sent": False,
                         "coin_from": coin_from_data["id"],
                         "coin_to": coin_to_data["id"],
+                        "with_extra_info": True,  # Need extra info to check automation strategy
                     },
                 )
 
@@ -758,6 +759,21 @@ def process_offers(args, config, script_state) -> None:
                     f"Found {len(received_offers)} existing offers for {coin_from_data['ticker']} to {coin_to_data['ticker']}"
                 )
 
+            # Filter offers for auto_accept_only mode
+            if adjust_rates_value == "auto_accept_only":
+                original_count = len(received_offers)
+                # Filter to only include offers that auto-accept bids (automation_strat_id 1 or 2)
+                received_offers = [
+                    offer
+                    for offer in received_offers
+                    if offer.get("automation_strat_id")
+                    in [1, 2]  # 1=accept_all, 2=accept_known
+                ]
+                if args.debug:
+                    print(
+                        f"Filtered to {len(received_offers)} auto-accept offers (from {original_count} total)"
+                    )
+
             # Calculate market rate if offers are available
             if received_offers:
                 market_rates = [float(offer["rate"]) for offer in received_offers]
@@ -770,8 +786,13 @@ def process_offers(args, config, script_state) -> None:
                     market_rate = min_market_rate
 
                     # Log market statistics
+                    filter_type = (
+                        "auto-accept"
+                        if adjust_rates_value == "auto_accept_only"
+                        else "all"
+                    )
                     print(
-                        f"Market statistics - Count: {len(market_rates)}, Avg: {avg_market_rate:.8f}, Min: {min_market_rate:.8f}, Max: {max_market_rate:.8f}"
+                        f"Market statistics ({filter_type}) - Count: {len(market_rates)}, Avg: {avg_market_rate:.8f}, Min: {min_market_rate:.8f}, Max: {max_market_rate:.8f}"
                     )
                 else:
                     print("No valid market rates found in existing offers")
@@ -835,6 +856,20 @@ def process_offers(args, config, script_state) -> None:
                 )
                 print(
                     f"Skipping {offer_template['name']} - market-only mode requires existing offers"
+                )
+                continue
+
+        elif adjust_rates_value == "auto_accept_only":
+            # Use auto-accept offers only, fail if no auto-accept market rates
+            if market_rate:
+                use_rate = market_rate
+                print(f"Using auto-accept market rate only: {use_rate}")
+            else:
+                print(
+                    f"ERROR: No auto-accept market data available for 'auto_accept_only' mode for {offer_template['name']}"
+                )
+                print(
+                    f"Skipping {offer_template['name']} - auto-accept-only mode requires existing auto-accept offers"
                 )
                 continue
 

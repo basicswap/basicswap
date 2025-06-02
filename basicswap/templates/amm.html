@@ -37,21 +37,21 @@
      <div class="p-6 px-0 lg:px-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
       <div class="flex sm:pr-6 lg:pr-0 justify-end items-center">
         <div class="flex space-x-2">
-          <button id="add-new-offer-btn" class="flex items-center px-4 py-2.5 bg-green-800 hover:bg-green-700 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+          <button id="add-new-offer-btn" class="flex items-center px-4 py-2.5 bg-green-800 hover:bg-green-700 border-green-800 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Offer
           </button>
           {% if debug_ui_mode %}
-          <button id="add-new-bid-btn" class="flex items-center px-4 py-2.5 bg-green-800 hover:bg-green-700 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+          <button id="add-new-bid-btn" class="flex items-center px-4 py-2.5 bg-green-800 hover:bg-green-700 border-green-800 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Bid
           </button>
           {% endif %}
-          <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+          <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 border-blue-500 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
@@ -267,11 +267,11 @@
        {% endif %}
 
        <div class="flex flex-wrap gap-2">
-        <button type="submit" name="start" value="1" class="px-4 py-2.5 bg-green-800 hover:bg-green-700 font-medium text-sm text-white border border-green-700 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        <button type="submit" name="start" value="1" class="px-4 py-2.5 bg-green-800 hover:bg-green-700 font-medium text-sm text-white border border-green-800 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'running' %}disabled{% endif %}>
          Start
         </button>
-        <button type="submit" name="stop" value="1" class="px-4 py-2.5 bg-red-900 hover:bg-red-700 font-medium text-sm text-white border border-red-700 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        <button type="submit" name="stop" value="1" class="px-4 py-2.5 bg-red-900 hover:bg-red-700 font-medium text-sm text-white border border-red-800 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'stopped' %}disabled{% endif %}>
          Stop
         </button>
@@ -519,7 +519,9 @@
                       <li class="break-words"><span class="font-semibold">amount:</span> Amount to create the offer for</li>
                       <li class="break-words"><span class="font-semibold">minrate:</span> Rate below which the offer won't drop</li>
                       <li class="break-words"><span class="font-semibold">min_coin_from_amt:</span> Won't generate offers if wallet balance would drop below this (default: 0)</li>
-                      <li class="break-words"><span class="font-semibold">adjust_rates_based_on_market:</span> Per-offer setting with 3 modes:<br><strong>true</strong> (use higher of market/CoinGecko), <strong>false</strong> (use CoinGecko only), <strong>"only"</strong> (market rates only, no CoinGecko). Algorithm: Competitive rate = min_market_rate × (ratetweakpercent/100 + 1)</li>
+                      <li class="break-words">
+                        <span class="font-semibold">adjust_rates_based_on_market:</span> Controls how AMM determines competitive rates. See detailed explanation below.
+                      </li>
                     </ul>
                   </div>
                   <div class="break-words">
@@ -578,6 +580,103 @@
               </div>
             </div>
             {% endif %}
+
+            <div class="mb-4">
+              <button type="button" class="collapsible-header flex items-center justify-between w-full p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none" data-target="rate-adjustment-faq-content">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Rate Adjustment Settings FAQ</h4>
+                <svg class="w-5 h-5 transition-transform transform text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              <div id="rate-adjustment-faq-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden">
+                <p class="text-sm font-bold text-gray-600 dark:text-gray-400 mb-4">
+                  The <strong>adjust_rates_based_on_market</strong> setting controls how your AMM determines competitive rates for offers. Here are all available options:
+                </p>
+
+                <div class="space-y-4">
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Coingecko</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">false</code><br>
+                      <strong>Behavior:</strong> Uses only CoinGecko exchange rates. Fails if CoinGecko data is unavailable.<br>
+                      <strong>Best for:</strong> Stable, external market pricing without local market influence.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook (All)</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"only"</code><br>
+                      <strong>Behavior:</strong> Uses the best rate from ALL existing market offers. Fails if no offers exist.<br>
+                      <strong>Best for:</strong> Competing directly with all market participants.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook (Auto-Accept)</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"auto_accept_only"</code><br>
+                      <strong>Behavior:</strong> Uses only offers that automatically accept bids (automation_strat_id 1 or 2). Fails if no auto-accept offers exist.<br>
+                      <strong>Best for:</strong> Competing only with other automated market makers, ignoring manual-only offers.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Either</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">true</code><br>
+                      <strong>Behavior:</strong> Uses the higher rate between CoinGecko and market offers. Fails only if BOTH sources are unavailable.<br>
+                      <strong>Best for:</strong> Balanced approach with fallback protection.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Both</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"all"</code><br>
+                      <strong>Behavior:</strong> Uses the higher rate between CoinGecko and market offers. Fails if EITHER source is unavailable.<br>
+                      <strong>Best for:</strong> Strict validation requiring both external and market data.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook - Fallback</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"minrate"</code><br>
+                      <strong>Behavior:</strong> Uses market offers if available, otherwise falls back to your minimum rate + tweak.<br>
+                      <strong>Best for:</strong> Market-responsive pricing with guaranteed operation.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Static</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"static"</code><br>
+                      <strong>Behavior:</strong> Uses only your minimum rate + rate tweak percentage. Ignores all external data.<br>
+                      <strong>Best for:</strong> Fixed pricing strategies or testing.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h6 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Rate Calculation Formula</h6>
+                  <p class="text-sm text-gray-700 dark:text-gray-300">
+                    <strong>Final Rate = Base Rate × (1 + ratetweakpercent/100)</strong><br>
+                    Where Base Rate comes from your selected adjustment method above.
+                  </p>
+                </div>
+
+                <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h6 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Important Notes</h6>
+                  <ul class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    <li>• Final rate will never go below your <strong>minrate</strong> setting</li>
+                    <li>• <strong>Auto-Accept mode</strong> only considers offers with automation strategies "Accept All" or "Accept Known"</li>
+                    <li>• If your chosen method fails to get rates, the offer will be skipped for that cycle</li>
+                    <li>• Rate tweak percentage can be negative to offer below market rates</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -1048,7 +1147,8 @@
                       </svg>
                       <select id="add-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         <option value="false">Coingecko - Use CoinGecko, fail if rates not found</option>
-                        <option value="only">Orderbook - Use Orderbook, fail if rates not found</option>
+                        <option value="only">Orderbook (All) - Use all market offers, fail if rates not found</option>
+                        <option value="auto_accept_only">Orderbook (Auto-Accept) - Use auto-accept offers only, fail if rates not found</option>
                         <option value="true">Either - Use greater of CoinGecko + Orderbook, fail if BOTH unavailable</option>
                         <option value="all">Both - Use greater of CoinGecko + Orderbook, fail if EITHER unavailable</option>
                         <option value="minrate">Orderbook - Fallback to Minimum Rate + Tweak</option>
@@ -1273,7 +1373,8 @@
                       </svg>
                       <select id="edit-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         <option value="false">Coingecko - Use CoinGecko, fail if rates not found</option>
-                        <option value="only">Orderbook - Use Orderbook, fail if rates not found</option>
+                        <option value="only">Orderbook (All) - Use all market offers, fail if rates not found</option>
+                        <option value="auto_accept_only">Orderbook (Auto-Accept) - Use auto-accept offers only, fail if rates not found</option>
                         <option value="true">Either - Use greater of CoinGecko + Orderbook, fail if BOTH unavailable</option>
                         <option value="all">Both - Use greater of CoinGecko + Orderbook, fail if EITHER unavailable</option>
                         <option value="minrate">Orderbook - Fallback to Minimum Rate + Tweak</option>

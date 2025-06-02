@@ -838,7 +838,16 @@ def page_amm(self, _, post_string):
                 else:
                     err_messages.append(msg)
 
-            if "save_global_settings" not in form_data:
+            is_control_action = (
+                "save_global_settings" not in form_data
+                and "add_offer" not in form_data
+                and "add_bid" not in form_data
+                and "save_config" not in form_data
+                and "create_default" not in form_data
+                and "prune_state" not in form_data
+            )
+
+            if is_control_action:
                 if "autostart" in form_data:
                     swap_client.settings["amm_autostart"] = True
                     swap_client.log.info("AMM autostart enabled")
