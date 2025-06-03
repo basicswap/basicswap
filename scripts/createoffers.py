@@ -367,7 +367,7 @@ def readConfig(args, known_coins):
             print(
                 f"min_swap_amount cannot be larger than offer amount ({amount}) Setting min_swap_amount for",
                 offer_template["name"],
-                "to {amount}",
+                f"to {amount}",
             )
             offer_template["min_swap_amount"] = amount
             num_changes += 1
@@ -916,9 +916,9 @@ def process_offers(args, config, script_state) -> None:
                         f"Error getting rates for {coin_from_data_name} to {coin_to_data['ticker']}: {e}"
                     )
 
-        # Fetch Orderbook data if needed (for "true","only", "all", "minrate", and "auto_accept_only" modes)
+        # Fetch Orderbook data if needed (for "true", "only", "all", and "minrate" modes)
         market_rate = None
-        if adjust_rates_value in ["true", "only", "all", "minrate", "auto_accept_only"]:
+        if adjust_rates_value in ["true", "only", "all", "minrate"]:
             try:
                 if args.debug:
                     print(
@@ -955,31 +955,51 @@ def process_offers(args, config, script_state) -> None:
                     f"Found {len(received_offers)} existing offers for {coin_from_name} to {coin_to_name}"
                 )
 
-            if adjust_rates_value == "auto_accept_only":
+            if adjust_rates_value in ["true", "only", "all", "minrate"]:
                 original_count = len(received_offers)
                 auto_accept_offers = []
+
+                if "automation_strategy" not in offer_template:
+                    template_strategy = "accept_all"
+                else:
+                    template_strategy = offer_template["automation_strategy"]
 
                 for offer in received_offers:
                     try:
                         offer_id = offer.get("offer_id", "unknown")
+                        offer_strat_id = offer.get("automation_strat_id", 0)
                         if args.debug:
                             print(
                                 f"Checking offer {offer_id} from {offer['addr_from']}"
                             )
+                            print(f"Automation strategy ID: {offer_strat_id}")
 
-                        automation_strat_id = offer.get("automation_strat_id", 0)
-
-                        if args.debug:
-                            print(f"Automation strategy ID: {automation_strat_id}")
-
-                        if automation_strat_id in [1, 2]:
+                        if template_strategy == "accept_all" and offer_strat_id == 1:
                             auto_accept_offers.append(offer)
                             if args.debug:
-                                print(f"Added auto-accept offer: {offer_id}")
-                        elif args.debug:
-                            print(
-                                f"Skipping offer - not auto-accept (automation_strat_id: {automation_strat_id})"
-                            )
+                                print(
+                                    f"Using {template_strategy}. Offer strategy = {offer_strat_id}. Added offer: {offer_id}"
+                                )
+                        elif template_strategy == "accept_known" and offer_strat_id in [
+                            1,
+                            2,
+                        ]:
+                            auto_accept_offers.append(offer)
+                            if args.debug:
+                                print(
+                                    f"Using {template_strategy}. Offer strategy = {offer_strat_id}. Added offer: {offer_id}"
+                                )
+                        elif template_strategy == "none" or not template_strategy:
+                            auto_accept_offers.append(offer)
+                            if args.debug:
+                                print(
+                                    f"Automation_strategy is disabled. Adding all offers. offer: {offer_id}"
+                                )
+                        elif template_strategy in ["accept_all", "accept_known"]:
+                            if args.debug:
+                                print(
+                                    f"Offer not a match for {template_strategy}. Skipping offer: {offer_id}"
+                                )
 
                     except Exception as e:
                         if args.debug:
@@ -991,7 +1011,7 @@ def process_offers(args, config, script_state) -> None:
                 received_offers = auto_accept_offers
                 if args.debug:
                     print(
-                        f"Filtered to {len(received_offers)} auto-accept offers (from {original_count} total)"
+                        f"Filtered to {len(received_offers)} automation_strategy: '{template_strategy}' offers (from {original_count} total)"
                     )
 
             # Calculate market rate if offers are available
@@ -1006,13 +1026,8 @@ def process_offers(args, config, script_state) -> None:
                     market_rate = min_market_rate
 
                     # Log market statistics
-                    filter_type = (
-                        "auto-accept"
-                        if adjust_rates_value == "auto_accept_only"
-                        else "all"
-                    )
                     print(
-                        f"Market statistics ({filter_type}) - Count: {len(market_rates)}, Avg: {avg_market_rate:.8f}, Min: {min_market_rate:.8f}, Max: {max_market_rate:.8f}"
+                        f"Market statistics ({template_strategy}) - Count: {len(market_rates)}, Avg: {avg_market_rate:.8f}, Min: {min_market_rate:.8f}, Max: {max_market_rate:.8f}"
                     )
                 else:
                     print("No valid market rates found in existing offers")
@@ -1076,20 +1091,6 @@ def process_offers(args, config, script_state) -> None:
                 )
                 print(
                     f"Skipping {offer_template['name']} - market-only mode requires existing offers"
-                )
-                continue
-
-        elif adjust_rates_value == "auto_accept_only":
-            # Use auto-accept offers only, fail if no auto-accept market rates
-            if market_rate:
-                use_rate = market_rate
-                print(f"Using auto-accept market rate only: {use_rate}")
-            else:
-                print(
-                    f"ERROR: No auto-accept market data available for 'auto_accept_only' mode for {offer_template['name']}"
-                )
-                print(
-                    f"Skipping {offer_template['name']} - auto-accept-only mode requires existing auto-accept offers"
                 )
                 continue
 

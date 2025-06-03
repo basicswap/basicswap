@@ -604,20 +604,11 @@
                   </div>
 
                   <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
-                    <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook (All)</h5>
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook</h5>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"only"</code><br>
-                      <strong>Behavior:</strong> Uses the best rate from ALL existing market offers. Fails if no offers exist.<br>
-                      <strong>Best for:</strong> Competing directly with all market participants.
-                    </p>
-                  </div>
-
-                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
-                    <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook (Auto-Accept)</h5>
-                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"auto_accept_only"</code><br>
-                      <strong>Behavior:</strong> Uses only offers that automatically accept bids (automation_strat_id 1 or 2). Fails if no auto-accept offers exist.<br>
-                      <strong>Best for:</strong> Competing only with other automated market makers, ignoring manual-only offers.
+                      <strong>Behavior:</strong> Uses only Orderbook offers that are as or more permissive than your automation_strategy. Fails if no matches.<br>
+                      <strong>Best for:</strong> Competing only with other market makers.
                     </p>
                   </div>
 
@@ -643,7 +634,7 @@
                     <h5 class="font-semibold text-gray-900 dark:text-white">Orderbook - Fallback</h5>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"minrate"</code><br>
-                      <strong>Behavior:</strong> Uses market offers if available, otherwise falls back to your minimum rate + tweak.<br>
+                      <strong>Behavior:</strong> Uses market offers if available, otherwise falls back to your minimum rate.<br>
                       <strong>Best for:</strong> Market-responsive pricing with guaranteed operation.
                     </p>
                   </div>
@@ -661,7 +652,7 @@
                 <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                   <h6 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Rate Calculation Formula</h6>
                   <p class="text-sm text-gray-700 dark:text-gray-300">
-                    <strong>Final Rate = Base Rate × (1 + ratetweakpercent/100)</strong><br>
+                    <strong>Final Rate = Base Rate × (ratetweakpercent / 100 + 1)</strong><br>
                     Where Base Rate comes from your selected adjustment method above.
                   </p>
                 </div>
@@ -670,8 +661,8 @@
                   <h6 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Important Notes</h6>
                   <ul class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
                     <li>• Final rate will never go below your <strong>minrate</strong> setting</li>
-                    <li>• <strong>Auto-Accept mode</strong> only considers offers with automation strategies "Accept All" or "Accept Known"</li>
-                    <li>• If your chosen method fails to get rates, the offer will be skipped for that cycle</li>
+                    <li>• Strategies which use the orderbook will only consider offers with an automation strategy as permissive or better than your config</li>
+                    <li>• If your chosen method fails to get rates, the offer will be skipped for that cycle (Exception: "Static" and "Orderbook (Fallback)")</li>
                     <li>• Rate tweak percentage can be negative to offer below market rates</li>
                   </ul>
                 </div>
@@ -714,14 +705,23 @@
                       </div>
                       <div>
                         <strong class="text-gray-900 dark:text-white">Conservative:</strong>
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on offers with auto-accept enabled</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on offers that match your automation strategy</span>
+                      </div>
                       <div>
                         <strong class="text-gray-900 dark:text-white">Best rates from auto-accept offers only:</strong>
-                        <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on auto-accept offers (best rates from auto-accept only)</span>
-                      </div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Only bid on offers that match your automation strategy, prioritizing best rates</span>
                       </div>
                     </div>
+                  </div>
 
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Automation Strategy Compatibility</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Bidding strategies consider your AMM's automation strategy when selecting offers to bid on:<br>
+                      <strong>• Accept All:</strong> Only bids on offers with "Accept All" automation<br>
+                      <strong>• Accept Known:</strong> Bids on offers with "Accept All" or "Accept Known" automation<br>
+                      <strong>• None:</strong> Bids on all offers regardless of automation strategy<br>
+                    </p>
                   </div>
 
                   <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
@@ -1215,11 +1215,10 @@
                       </svg>
                       <select id="add-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         <option value="false">Coingecko - Use CoinGecko, fail if rates not found</option>
-                        <option value="only">Orderbook (All) - Use all market offers, fail if rates not found</option>
-                        <option value="auto_accept_only">Orderbook (Auto-Accept) - Use auto-accept offers only, fail if rates not found</option>
+                        <option value="only">Orderbook - Use Orderbook auto-accept offers only, fail if rates not found</option>
                         <option value="true">Either - Use greater of CoinGecko + Orderbook, fail if BOTH unavailable</option>
                         <option value="all">Both - Use greater of CoinGecko + Orderbook, fail if EITHER unavailable</option>
-                        <option value="minrate">Orderbook - Fallback to Minimum Rate + Tweak</option>
+                        <option value="minrate">Orderbook (Fallback) - Fallback to Minimum Rate</option>
                         <option value="static">Static - Exclusively use Minimum Rate + Tweak</option>
                       </select>
                     </div>
@@ -1490,11 +1489,10 @@
                       </svg>
                       <select id="edit-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         <option value="false">Coingecko - Use CoinGecko, fail if rates not found</option>
-                        <option value="only">Orderbook (All) - Use all market offers, fail if rates not found</option>
-                        <option value="auto_accept_only">Orderbook (Auto-Accept) - Use auto-accept offers only, fail if rates not found</option>
+                        <option value="only">Orderbook - Use Orderbook auto-accept offers only, fail if rates not found</option>
                         <option value="true">Either - Use greater of CoinGecko + Orderbook, fail if BOTH unavailable</option>
                         <option value="all">Both - Use greater of CoinGecko + Orderbook, fail if EITHER unavailable</option>
-                        <option value="minrate">Orderbook - Fallback to Minimum Rate + Tweak</option>
+                        <option value="minrate">Orderbook (Fallback) - Fallback to Minimum Rate</option>
                         <option value="static">Static - Exclusively use Minimum Rate + Tweak</option>
                       </select>
                     </div>

@@ -308,11 +308,17 @@ const AmmTablesManager = (function() {
                                     ${formatDuration(offerValidSeconds)}
                                 </span>
                             </div>
-                            <div class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${adjustRates ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                            <div class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${adjustRatesValue != 'static' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
                                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
                                 </svg>
-                                Auto Rates: ${adjustRatesValue === 'only' ? 'Market (All)' : adjustRatesValue === 'auto_accept_only' ? 'Market (Auto-Accept)' : adjustRates ? 'On' : 'Off'}
+                                Rates: ${adjustRatesValue === 'static'  ? 'Static'
+                                       : adjustRatesValue === 'only'    ? 'Market'
+                                       : adjustRatesValue === 'minrate' ? 'Market (fallback)'
+                                       : adjustRatesValue === 'false'   ? 'CoinGecko'
+                                       : adjustRatesValue === 'all'     ? 'Auto (all)'
+                                       : adjustRates                    ? 'Auto (any)'
+                                       : 'Off'}
                             </div>
                             <div class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
                                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
