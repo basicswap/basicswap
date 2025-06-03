@@ -48,6 +48,20 @@ def signal_handler(sig, frame):
         sys.stdout.fileno(), f"Signal {sig} detected, ending program.\n".encode("utf-8")
     )
     if swap_client is not None and not swap_client.chainstate_delay_event.is_set():
+        try:
+            from basicswap.ui.page_amm import stop_amm_process, get_amm_status
+
+            amm_status = get_amm_status()
+            if amm_status == "running":
+                logger.info("Signal handler stopping AMM process...")
+                success, msg = stop_amm_process(swap_client)
+                if success:
+                    logger.info(f"AMM signal shutdown: {msg}")
+                else:
+                    logger.warning(f"AMM signal shutdown warning: {msg}")
+        except Exception as e:
+            logger.error(f"Error stopping AMM in signal handler: {e}")
+
         swap_client.stopRunning()
 
 

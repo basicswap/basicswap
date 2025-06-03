@@ -833,6 +833,27 @@
              </div>
             </div>
            </section>
+<div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="confirmTitle">Confirm Action</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+        <div class="flex justify-center gap-4">
+          <button type="button" id="confirmYes"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Confirm
+          </button>
+          <button type="button" id="confirmNo"
+                  class="px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
            <input type="hidden" name="formid" value="{{ form_id }}">
           </div>
          </div>
@@ -840,9 +861,74 @@
        </div>
  </form>
  <script>
-  function confirmPopup(name) {
-   return confirm(name + " Bid - Are you sure?");
+document.addEventListener('DOMContentLoaded', function() {
+  let confirmCallback = null;
+  let triggerElement = null;
+
+  document.getElementById('confirmYes').addEventListener('click', function() {
+    if (typeof confirmCallback === 'function') {
+      confirmCallback();
+    }
+    hideConfirmDialog();
+  });
+
+  document.getElementById('confirmNo').addEventListener('click', hideConfirmDialog);
+
+  function showConfirmDialog(title, message, callback) {
+    confirmCallback = callback;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    const modal = document.getElementById('confirmModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+    }
+    return false;
   }
+
+  function hideConfirmDialog() {
+    const modal = document.getElementById('confirmModal');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    confirmCallback = null;
+    return false;
+  }
+
+  window.confirmPopup = function(action = 'Abandon') {
+    triggerElement = document.activeElement;
+    const title = `Confirm ${action} Bid`;
+    const message = `Are you sure you want to ${action.toLowerCase()} this bid?`;
+
+    return showConfirmDialog(title, message, function() {
+      if (triggerElement) {
+        const form = triggerElement.form;
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = triggerElement.name;
+        hiddenInput.value = triggerElement.value;
+        form.appendChild(hiddenInput);
+        form.submit();
+      }
+    });
+  };
+
+  const overrideButtonConfirm = function(button, action) {
+    if (button) {
+      button.removeAttribute('onclick');
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        triggerElement = this;
+        return confirmPopup(action);
+      });
+    }
+  };
+
+  const abandonBidBtn = document.querySelector('button[name="abandon_bid"]');
+  overrideButtonConfirm(abandonBidBtn, 'Abandon');
+
+  const acceptBidBtn = document.querySelector('button[name="accept_bid"]');
+  overrideButtonConfirm(acceptBidBtn, 'Accept');
+});
  </script>
 </div>
 {% include 'footer.html' %}

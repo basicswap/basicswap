@@ -30,7 +30,7 @@ const state = {
 
 document.addEventListener('tabactivated', function(event) {
     if (event.detail && event.detail.tabId) {
-        const tabType = event.detail.type || (event.detail.tabId === '#all' ? 'all' : 
+        const tabType = event.detail.type || (event.detail.tabId === '#all' ? 'all' :
                                              (event.detail.tabId === '#sent' ? 'sent' : 'received'));
         //console.log('Tab activation event received for:', tabType);
         state.currentTab = tabType;
@@ -555,7 +555,7 @@ function filterAndSortData(bids) {
             const coinName = selectedOption?.textContent.trim();
 
             if (coinName) {
-                const coinToMatch = state.currentTab === 'all' 
+                const coinToMatch = state.currentTab === 'all'
                     ? (bid.source === 'sent' ? bid.coin_to : bid.coin_from)
                     : (state.currentTab === 'sent' ? bid.coin_to : bid.coin_from);
                 if (!coinMatches(coinToMatch, coinName)) {
@@ -614,7 +614,7 @@ function filterAndSortData(bids) {
             let matchesDisplayedLabel = false;
             if (!matchesLabel && document) {
                 try {
-                    const tableId = state.currentTab === 'sent' ? 'sent' : 
+                    const tableId = state.currentTab === 'sent' ? 'sent' :
                                    (state.currentTab === 'received' ? 'received' : 'all');
                     const cells = document.querySelectorAll(`#${tableId} a[href^="/identity/"]`);
 
@@ -1056,6 +1056,24 @@ async function fetchAllBids() {
             receivedResponse.json()
         ]);
 
+        if (sentData.error || receivedData.error) {
+            const errorData = sentData.error ? sentData : receivedData;
+            if (errorData.locked) {
+                const tbody = elements.allBidsBody;
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-yellow-600 dark:text-yellow-400">
+                                ${errorData.error}
+                            </td>
+                        </tr>`;
+                }
+                return [];
+            } else {
+                throw new Error(errorData.error);
+            }
+        }
+
         const filteredSentData = filterAndSortData(sentData).map(bid => ({ ...bid, source: 'sent' }));
         const filteredReceivedData = filterAndSortData(receivedData).map(bid => ({ ...bid, source: 'received' }));
 
@@ -1090,7 +1108,7 @@ const createTableRow = async (bid) => {
     const timeColor = getTimeStrokeColor(bid.expire_at);
     const currentTabIsAll = state.currentTab === 'all';
     const isSent = currentTabIsAll ? (bid.source === 'sent') : (state.currentTab === 'sent');
-    const sourceIndicator = currentTabIsAll ? 
+    const sourceIndicator = currentTabIsAll ?
         `<span class="ml-1 px-1.5 py-0.5 text-xs font-medium ${isSent ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'} rounded">
             ${isSent ? 'Sent' : 'Received'}
         </span>` : '';
@@ -1321,6 +1339,24 @@ async function fetchBids(type = state.currentTab) {
         }
 
         const data = await response.json();
+
+        if (data.error) {
+            if (data.locked) {
+                const tbody = elements[`${type}BidsBody`];
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center py-4 text-yellow-600 dark:text-yellow-400">
+                                ${data.error}
+                            </td>
+                        </tr>`;
+                }
+                return [];
+            } else {
+                throw new Error(data.error);
+            }
+        }
+
         //console.log(`Received raw ${type} data:`, data.length, 'bids');
 
         state.filters.with_expired = includeExpired;
@@ -1509,14 +1545,13 @@ const updateBidsTable = async () => {
         updateLoadingState(true);
 
         let bids;
-        
+
         if (state.currentTab === 'all') {
             bids = await fetchAllBids();
         } else {
             bids = await fetchBids();
         }
 
-        // Add identity preloading if we're searching
         if (state.filters.searchQuery && state.filters.searchQuery.length > 0) {
             await preloadIdentitiesForSearch(bids);
         }
@@ -1774,7 +1809,7 @@ const setupRefreshButtons = () => {
 
                         state.data[lowerType] = data;
                     }
-                    
+
                     await updateTableContent(lowerType);
                     updatePaginationControls(lowerType);
 
@@ -1802,7 +1837,7 @@ const switchTab = (tabId) => {
 
     tooltipIdsToCleanup.clear();
 
-    state.currentTab = tabId === '#all' ? 'all' : 
+    state.currentTab = tabId === '#all' ? 'all' :
                       (tabId === '#sent' ? 'sent' : 'received');
 
     elements.allContent.classList.add('hidden');
@@ -1888,7 +1923,7 @@ const setupEventListeners = () => {
                 elements.sentContent.classList.toggle('hidden', targetId !== '#sent');
                 elements.receivedContent.classList.toggle('hidden', targetId !== '#received');
 
-                state.currentTab = targetId === '#all' ? 'all' : 
+                state.currentTab = targetId === '#all' ? 'all' :
                                   (targetId === '#sent' ? 'sent' : 'received');
                 state.currentPage[state.currentTab] = 1;
 
@@ -2101,7 +2136,7 @@ function initialize() {
     }, 100);
 
     setupMemoryMonitoring();
-    
+
     window.cleanupBidsTable = cleanup;
 }
 

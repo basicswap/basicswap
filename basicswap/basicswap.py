@@ -529,6 +529,20 @@ class BasicSwap(BaseApp):
     def finalise(self):
         self.log.info("Finalising")
 
+        try:
+            from basicswap.ui.page_amm import stop_amm_process, get_amm_status
+
+            amm_status = get_amm_status()
+            if amm_status == "running":
+                self.log.info("Stopping AMM process...")
+                success, msg = stop_amm_process(self)
+                if success:
+                    self.log.info(f"AMM shutdown: {msg}")
+                else:
+                    self.log.warning(f"AMM shutdown warning: {msg}")
+        except Exception as e:
+            self.log.error(f"Error stopping AMM during shutdown: {e}")
+
         self.delay_event.set()
         self.chainstate_delay_event.set()
 
@@ -1150,6 +1164,57 @@ class BasicSwap(BaseApp):
             self.processMsg(get_msg)
             nm += 1
         self.log.info(f"Scanned {nm} unread messages.")
+
+        autostart_setting = self.settings.get("amm_autostart", False)
+        self.log.info(f"Checking AMM autostart setting: {autostart_setting}")
+
+        if autostart_setting:
+            self.log.info("AMM autostart is enabled, starting AMM process...")
+            try:
+                from basicswap.ui.page_amm import (
+                    start_amm_process,
+                    start_amm_process_force,
+                    check_existing_amm_processes,
+                )
+
+                self.log.info("Waiting 2 seconds for BasicSwap to fully initialize...")
+                time.sleep(2)
+
+                amm_host = self.settings.get("htmlhost", "127.0.0.1")
+                amm_port = self.settings.get("htmlport", 12700)
+                amm_debug = False
+
+                self.log.info(
+                    f"Starting AMM with host={amm_host}, port={amm_port}, debug={amm_debug}"
+                )
+
+                existing_pids = check_existing_amm_processes()
+                if existing_pids:
+                    self.log.warning(
+                        f"Found existing AMM processes: {existing_pids}. Using force start to clean up..."
+                    )
+                    success, msg = start_amm_process_force(
+                        self, amm_host, amm_port, debug=amm_debug
+                    )
+                    if success:
+                        self.log.info(f"AMM autostart force successful: {msg}")
+                    else:
+                        self.log.warning(f"AMM autostart force failed: {msg}")
+                else:
+                    success, msg = start_amm_process(
+                        self, amm_host, amm_port, debug=amm_debug
+                    )
+                    if success:
+                        self.log.info(f"AMM autostart successful: {msg}")
+                    else:
+                        self.log.warning(f"AMM autostart failed: {msg}")
+            except Exception as e:
+                self.log.error(f"AMM autostart error: {str(e)}")
+                import traceback
+
+                self.log.error(traceback.format_exc())
+        else:
+            self.log.info("AMM autostart is disabled")
 
     def stopDaemon(self, coin) -> None:
         if coin in (Coins.XMR, Coins.DCR, Coins.WOW):
@@ -2343,6 +2408,10 @@ class BasicSwap(BaseApp):
         finally:
             self.closeDB(cursor)
         self.log.info(f"Sent OFFER {self.log.id(offer_id)}")
+
+        if self.ws_server:
+            self.ws_server.send_message_to_all('{"event": "offer_created"}')
+
         return offer_id
 
     def revokeOffer(self, offer_id, security_token=None) -> None:
@@ -11247,7 +11316,15 @@ class BasicSwap(BaseApp):
             return "bitcoin-cash"
         if coin_id == Coins.FIRO:
             return "zcoin"
-        return chainparams[coin_id]["name"]
+
+        # Handle coin variants that use base coin chainparams
+        use_coinid = coin_id
+        if coin_id == Coins.PART_ANON or coin_id == Coins.PART_BLIND:
+            use_coinid = Coins.PART
+        elif coin_id == Coins.LTC_MWEB:
+            use_coinid = Coins.LTC
+
+        return chainparams[use_coinid]["name"]
 
     def lookupFiatRates(
         self,
@@ -11432,16 +11509,17 @@ class BasicSwap(BaseApp):
                 js = self.lookupFiatRates([int(coin_from), int(coin_to)])
                 rate = float(js[int(coin_from)]) / float(js[int(coin_to)])
                 js["rate_inferred"] = ci_to.format_amount(rate, conv_int=True, r=1)
+
+                js[name_from] = {"usd": js[int(coin_from)]}
+                js.pop(int(coin_from))
+                js[name_to] = {"usd": js[int(coin_to)]}
+                js.pop(int(coin_to))
+
                 rv["coingecko"] = js
             except Exception as e:
                 rv["coingecko_error"] = str(e)
                 if self.debug:
                     self.log.error(traceback.format_exc())
-
-            js[name_from] = {"usd": js[int(coin_from)]}
-            js.pop(int(coin_from))
-            js[name_to] = {"usd": js[int(coin_to)]}
-            js.pop(int(coin_to))
 
         if output_array:
 
@@ -11451,7 +11529,7 @@ class BasicSwap(BaseApp):
             rv_array = []
             if "coingecko_error" in rv:
                 rv_array.append(("coingecko.com", "error", rv["coingecko_error"]))
-            if "coingecko" in rv:
+            elif "coingecko" in rv:
                 js = rv["coingecko"]
                 rv_array.append(
                     (

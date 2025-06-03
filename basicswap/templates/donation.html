@@ -1,0 +1,334 @@
+{% include 'header.html' %}
+{% from 'style.html' import breadcrumb_line_svg, love_svg %}
+
+<section class="py-3 px-4 mt-6">
+  <div class="lg:container mx-auto">
+    <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
+      <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
+      <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
+      <div class="relative z-20 flex flex-wrap items-center justify-center text-center">
+        <div class="w-full">
+          <h2 class="text-3xl font-bold text-white mb-4">
+            Support BasicSwap Development
+          </h2>
+          <p class="text-lg text-white max-w-3xl mx-auto">
+            Help keep BasicSwap free and open-source. Your donations directly fund development, security audits, and community growth.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="xl:container mx-auto">
+
+<section class="p-6">
+  <div class="lg:container mx-auto">
+    <div class="text-center mb-8">
+      <h3 class="font-semibold text-2xl text-black dark:text-white mb-4">Why Your Support Matters</h3>
+      <div class="flex justify-center mb-6">
+        {{ love_svg | safe }}
+      </div>
+      <div class="max-w-4xl mx-auto">
+        <p class="text-lg text-coolGray-500 dark:text-gray-300 mb-6">
+          BasicSwap is completely free and open-source software that charges no fees for its use. The project is entirely funded by generous community donations from users who believe in decentralized, censorship-resistant trading.
+        </p>
+        <p class="text-lg text-coolGray-500 dark:text-gray-300 mb-8">
+          Your donations are vital to keeping this project alive, accelerating development, and expanding our reach to more users who value financial freedom and privacy.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-lg p-6">
+            <div class="text-green-500 mb-3">
+              <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <h4 class="font-semibold text-coolGray-900 dark:text-white mb-2">Core Development</h4>
+            <p class="text-sm text-coolGray-500 dark:text-gray-300">New features and improvements</p>
+          </div>
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-lg p-6">
+            <div class="text-green-500 mb-3">
+              <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <h4 class="font-semibold text-coolGray-900 dark:text-white mb-2">Security Audits</h4>
+            <p class="text-sm text-coolGray-500 dark:text-gray-300">Testing and security infrastructure</p>
+          </div>
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-lg p-6">
+            <div class="text-green-500 mb-3">
+              <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <h4 class="font-semibold text-coolGray-900 dark:text-white mb-2">Documentation</h4>
+            <p class="text-sm text-coolGray-500 dark:text-gray-300">Educational resources and guides</p>
+          </div>
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-lg p-6">
+            <div class="text-green-500 mb-3">
+              <svg class="w-8 h-8 mx-auto" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <h4 class="font-semibold text-coolGray-900 dark:text-white mb-2">Community Growth</h4>
+            <p class="text-sm text-coolGray-500 dark:text-gray-300">Outreach and adoption initiatives</p>
+          </div>
+        </div>
+
+        <p class="text-lg text-coolGray-500 dark:text-gray-300">
+          Together, we're building financial tools that empower individuals and resist censorship. Thank you for being part of this movement toward true financial freedom.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="px-6 py-0 h-full overflow-hidden">
+    <div class="pb-6 border-coolGray-100">
+      <div class="flex flex-wrap items-center justify-between -m-2">
+        <div class="w-full pt-2">
+          <div class="lg:container mt-5 mx-auto">
+            <div class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+              <div class="px-6">
+                <h3 class="mb-6 text-2xl text-coolGray-900 dark:text-white font-bold text-center">
+                  Donation Addresses
+                </h3>
+                <div class="w-full pb-6 overflow-x-auto">
+                  <table class="w-full text-lg lg:text-sm">
+                    <thead class="uppercase">
+                      <tr class="text-left">
+                        <th class="p-0 w-1/6">
+                          <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
+                            <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Cryptocurrency</span>
+                          </div>
+                        </th>
+                        <th class="p-0 w-5/6">
+                          <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
+                            <span class="text-md lg:text-xs text-gray-600 dark:text-gray-300 font-semibold">Donation Address</span>
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <!-- Monero -->
+                    <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                      <td class="py-3 px-6 bold">
+                        <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                          <img class="h-7" src="/static/images/coins/Monero.png" alt="Monero">
+                        </span>
+                        Monero (XMR)
+                      </td>
+                      <td class="py-3 px-6">
+                        <input type="text" readonly
+                               class="donation-address cursor-pointer hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 font-mono"
+                               value="8BuQsYBNdfhfoWsvVR1unE7YuZEoTkC4hANaPm2fD6VR5VM2DzQoJhq2CHHXUN1UCWQfH3dctJgorSRxksVa5U4RNTJkcAc"
+                               data-address="8BuQsYBNdfhfoWsvVR1unE7YuZEoTkC4hANaPm2fD6VR5VM2DzQoJhq2CHHXUN1UCWQfH3dctJgorSRxksVa5U4RNTJkcAc">
+                      </td>
+                    </tr>
+
+                    <!-- Litecoin -->
+                    <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                      <td class="py-3 px-6 bold">
+                        <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                          <img class="h-7" src="/static/images/coins/Litecoin.png" alt="Litecoin">
+                        </span>
+                        Litecoin (LTC)
+                      </td>
+                      <td class="py-3 px-6">
+                        <input type="text" readonly
+                               class="donation-address cursor-pointer hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 font-mono"
+                               value="ltc1qevlumv48nz2afl0re9ml4tdewc56svxq3egkyt"
+                               data-address="ltc1qevlumv48nz2afl0re9ml4tdewc56svxq3egkyt">
+                      </td>
+                    </tr>
+
+                    <!-- Litecoin MWEB -->
+                    <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                      <td class="py-3 px-6 bold">
+                        <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                          <img class="h-7" src="/static/images/coins/Litecoin-MWEB.png" alt="Litecoin MWEB">
+                        </span>
+                        Litecoin MWEB
+                      </td>
+                      <td class="py-3 px-6">
+                        <input type="text" readonly
+                               class="donation-address cursor-pointer hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 font-mono"
+                               value="ltcmweb1qqt9rwznnxzkghv4s5wgtwxs0m0ry6n3atp95f47slppapxljde3xyqmdlnrc8ag7y2k354jzdc4pc4ks0kr43jehr77lngdecgh6689nn5mgv5yn"
+                               data-address="ltcmweb1qqt9rwznnxzkghv4s5wgtwxs0m0ry6n3atp95f47slppapxljde3xyqmdlnrc8ag7y2k354jzdc4pc4ks0kr43jehr77lngdecgh6689nn5mgv5yn">
+                      </td>
+                    </tr>
+
+                    <!-- Bitcoin -->
+                    <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                      <td class="py-3 px-6 bold">
+                        <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                          <img class="h-7" src="/static/images/coins/Bitcoin.png" alt="Bitcoin">
+                        </span>
+                        Bitcoin (BTC)
+                      </td>
+                      <td class="py-3 px-6">
+                        <input type="text" readonly
+                               class="donation-address cursor-pointer hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 font-mono"
+                               value="bc1q72j07vkn059xnmsrkk8x9up9lgvd9h9xjf8cq8"
+                               data-address="bc1q72j07vkn059xnmsrkk8x9up9lgvd9h9xjf8cq8">
+                      </td>
+                    </tr>
+
+                    <!-- Particl -->
+                    <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+                      <td class="py-3 px-6 bold">
+                        <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
+                          <img class="h-7" src="/static/images/coins/Particl.png" alt="Particl">
+                        </span>
+                        Particl (PART)
+                      </td>
+                      <td class="py-3 px-6">
+                        <input type="text" readonly
+                               class="donation-address cursor-pointer hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 font-mono"
+                               value="pw1qf59ef0zjdckldjs8smfhv4j04gsjv302w7pdpz"
+                               data-address="pw1qf59ef0zjdckldjs8smfhv4j04gsjv302w7pdpz">
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div class="text-center mt-6">
+                  <p class="text-lg text-coolGray-500 dark:text-gray-300">
+                    Every contribution helps make decentralized trading more accessible to everyone.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  setupDonationAddressCopy();
+});
+
+function setupDonationAddressCopy() {
+  const donationAddresses = document.querySelectorAll('.donation-address');
+
+  donationAddresses.forEach(element => {
+    element.addEventListener('click', function(e) {
+      const address = this.value;
+
+      copyToClipboard(address);
+
+      this.select();
+      this.setSelectionRange(0, 99999);
+
+      this.classList.add('bg-blue-50', 'dark:bg-blue-900');
+
+      showCopyFeedback(this);
+
+      setTimeout(() => {
+        this.classList.remove('bg-blue-50', 'dark:bg-blue-900');
+        this.blur(); // Remove focus
+      }, 1000);
+    });
+  });
+}
+
+let activeTooltip = null;
+
+function showCopyFeedback(element) {
+  if (activeTooltip && activeTooltip.parentNode) {
+    activeTooltip.parentNode.removeChild(activeTooltip);
+  }
+
+  const popup = document.createElement('div');
+  popup.className = 'copy-feedback-popup fixed z-50 bg-blue-600 text-white text-sm py-2 px-3 rounded-md shadow-lg';
+  popup.innerText = 'Address copied!';
+  document.body.appendChild(popup);
+
+  activeTooltip = popup;
+
+  updateTooltipPosition(popup, element);
+
+  const scrollHandler = () => {
+    if (popup.parentNode) {
+      updateTooltipPosition(popup, element);
+    }
+  };
+
+  window.addEventListener('scroll', scrollHandler, { passive: true });
+
+  popup.style.opacity = '0';
+  popup.style.transition = 'opacity 0.2s ease-in-out';
+
+  setTimeout(() => {
+    popup.style.opacity = '1';
+  }, 10);
+
+  setTimeout(() => {
+    window.removeEventListener('scroll', scrollHandler);
+    popup.style.opacity = '0';
+
+    setTimeout(() => {
+      if (popup.parentNode) {
+        popup.parentNode.removeChild(popup);
+      }
+      if (activeTooltip === popup) {
+        activeTooltip = null;
+      }
+    }, 200);
+  }, 1500);
+}
+
+function updateTooltipPosition(tooltip, element) {
+  const rect = element.getBoundingClientRect();
+
+  let top = rect.top - tooltip.offsetHeight - 8;
+  const left = rect.left + rect.width / 2;
+
+  if (top < 10) {
+    top = rect.bottom + 8;
+  }
+
+  tooltip.style.top = `${top}px`;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.transform = 'translateX(-50%)';
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(err => {
+      console.error('Failed to copy: ', err);
+      copyToClipboardFallback(text);
+    });
+  } else {
+    copyToClipboardFallback(text);
+  }
+}
+
+function copyToClipboardFallback(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-999999px';
+  textArea.style.top = '-999999px';
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    document.execCommand('copy');
+  } catch (err) {
+    console.error('Failed to copy text: ', err);
+  }
+
+  document.body.removeChild(textArea);
+}
+</script>
+
+{% include 'footer.html' %}
