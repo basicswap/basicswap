@@ -245,9 +245,9 @@ def start_amm_process(
 
     if not os.path.exists(config_path):
         default_config = {
-            "min_seconds_between_offers": 60,
-            "max_seconds_between_offers": 240,
-            "main_loop_delay": 300,
+            "min_seconds_between_offers": 15,
+            "max_seconds_between_offers": 60,
+            "main_loop_delay": 60,
             "offers": [],
             "bids": [],
         }
@@ -255,8 +255,8 @@ def start_amm_process(
         if swap_client.debug:
             default_config["prune_state_delay"] = 120
             default_config["prune_state_after_seconds"] = 604800
-            default_config["min_seconds_between_bids"] = 60
-            default_config["max_seconds_between_bids"] = 240
+            default_config["min_seconds_between_bids"] = 15
+            default_config["max_seconds_between_bids"] = 60
 
         with open(config_path, "w") as f:
             json.dump(default_config, f, indent=4)
