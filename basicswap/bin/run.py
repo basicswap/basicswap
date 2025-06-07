@@ -278,6 +278,26 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     return extra_args
 
 
+def mainLoop(daemons, update: bool = True):
+    while not swap_client.delay_event.wait(0.5):
+        if update:
+            swap_client.update()
+        else:
+            pass
+
+        for daemon in daemons:
+            if daemon.running is False:
+                continue
+            poll = daemon.handle.poll()
+            if poll is None:
+                pass  # Process is running
+            else:
+                daemon.running = False
+                swap_client.log.error(
+                    f"Process {daemon.handle.pid} for {daemon.name} terminated unexpectedly returning {poll}."
+                )
+
+
 def runClient(
     data_dir: str,
     chain: str,
@@ -522,8 +542,7 @@ def runClient(
             logger.info(
                 f"Only running {start_only_coins}. Manually exit with Ctrl + c when ready."
             )
-            while not swap_client.delay_event.wait(0.5):
-                pass
+            mainLoop(daemons, update=False)
         else:
             swap_client.start()
             if "htmlhost" in settings:
@@ -561,8 +580,7 @@ def runClient(
                 swap_client.ws_server.run_forever(threaded=True)
 
             logger.info("Exit with Ctrl + c.")
-            while not swap_client.delay_event.wait(0.5):
-                swap_client.update()
+            mainLoop(daemons)
 
     except Exception as e:  # noqa: F841
         traceback.print_exc()
