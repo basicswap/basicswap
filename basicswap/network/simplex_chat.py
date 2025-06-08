@@ -7,6 +7,7 @@
 
 import os
 import select
+import sqlite3
 import subprocess
 import time
 
@@ -77,17 +78,36 @@ def startSimplexClient(
     if not os.path.exists(data_path):
         os.makedirs(data_path)
 
-    db_path = os.path.join(data_path, "simplex_client_data")
-    args = [bin_path, "-d", db_path, "-s", server_address, "-p", str(websocket_port)]
+    simplex_data_prefix = os.path.join(data_path, "simplex_client_data")
+    simplex_db_path = simplex_data_prefix + "_chat.db"
+    args = [bin_path, "-d", simplex_data_prefix, "-p", str(websocket_port)]
 
     if socks_proxy:
         args += ["--socks-proxy", socks_proxy]
 
-    if not os.path.exists(db_path + "_chat.db"):
+    if not os.path.exists(simplex_db_path):
         # Need to set initial profile through CLI
         # TODO: Must be a better way?
         init_args = args + ["-e", "/help"]  # Run command to exit client
+        init_args += ["-s", server_address]
         initSimplexClient(init_args, logger, delay_event)
+    else:
+        # Workaround to avoid error:
+        # SQLite3 returned ErrorConstraint while attempting to perform step: UNIQUE constraint failed: protocol_servers.user_id, protocol_servers.host, protocol_servers.port
+        # TODO: Remove?
+        with sqlite3.connect(simplex_db_path) as con:
+            c = con.cursor()
+            if ":" in server_address:
+                host, port = server_address.split(":")
+            else:
+                host = server_address
+                port = ""
+            query: str = (
+                "SELECT COUNT(*) FROM protocol_servers WHERE host = :host and port = :port"
+            )
+            q = c.execute(query, {"host": host, "port": port}).fetchone()
+            if q[0] < 1:
+                args += ["-s", server_address]
 
     args += ["-l", log_level]
 
