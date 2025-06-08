@@ -4,7 +4,8 @@ const SummaryManager = (function() {
     summaryEndpoint: '/json',
     retryDelay: 5000,
     maxRetries: 3,
-    requestTimeout: 15000
+    requestTimeout: 15000,
+    debug: false
   };
 
   let refreshTimer = null;
@@ -60,11 +61,14 @@ const SummaryManager = (function() {
 
     updateElement('network-offers-counter', data.num_network_offers);
     updateElement('offers-counter', data.num_sent_active_offers);
+    updateElement('offers-counter-mobile', data.num_sent_active_offers);
     updateElement('sent-bids-counter', data.num_sent_active_bids);
     updateElement('recv-bids-counter', data.num_recv_active_bids);
     updateElement('bid-requests-counter', data.num_available_bids);
     updateElement('swaps-counter', data.num_swapping);
     updateElement('watched-outputs-counter', data.num_watched_outputs);
+
+    updateTooltips(data);
 
     const shutdownButtons = document.querySelectorAll('.shutdown-button');
     shutdownButtons.forEach(button => {
@@ -79,6 +83,100 @@ const SummaryManager = (function() {
         button.removeAttribute('title');
       }
     });
+  }
+
+  function updateTooltips(data) {
+    debugLog(`updateTooltips called with data:`, data);
+
+    const yourOffersTooltip = document.getElementById('tooltip-your-offers');
+    debugLog('Looking for tooltip-your-offers element:', yourOffersTooltip);
+
+    if (yourOffersTooltip) {
+      const newContent = `
+        <p><b>Total offers:</b> ${data.num_sent_offers || 0}</p>
+        <p><b>Active offers:</b> ${data.num_sent_active_offers || 0}</p>
+      `;
+
+      const totalParagraph = yourOffersTooltip.querySelector('p:first-child');
+      const activeParagraph = yourOffersTooltip.querySelector('p:last-child');
+
+      debugLog('Found paragraphs:', { totalParagraph, activeParagraph });
+
+      if (totalParagraph && activeParagraph) {
+        totalParagraph.innerHTML = `<b>Total offers:</b> ${data.num_sent_offers || 0}`;
+        activeParagraph.innerHTML = `<b>Active offers:</b> ${data.num_sent_active_offers || 0}`;
+        debugLog(`Updated Your Offers tooltip paragraphs: total=${data.num_sent_offers}, active=${data.num_sent_active_offers}`);
+      } else {
+        yourOffersTooltip.innerHTML = newContent;
+        debugLog(`Replaced Your Offers tooltip content: total=${data.num_sent_offers}, active=${data.num_sent_active_offers}`);
+      }
+
+      refreshTooltipInstances('tooltip-your-offers', newContent);
+    } else {
+      debugLog('Your Offers tooltip element not found - checking all tooltip elements');
+      const allTooltips = document.querySelectorAll('[id*="tooltip"]');
+      debugLog('All tooltip elements found:', Array.from(allTooltips).map(el => el.id));
+    }
+
+    const bidsTooltip = document.getElementById('tooltip-bids');
+    if (bidsTooltip) {
+      const newBidsContent = `
+        <p><b>Sent bids:</b> ${data.num_sent_bids || 0} (${data.num_sent_active_bids || 0} active)</p>
+        <p><b>Received bids:</b> ${data.num_recv_bids || 0} (${data.num_recv_active_bids || 0} active)</p>
+      `;
+
+      const sentParagraph = bidsTooltip.querySelector('p:first-child');
+      const recvParagraph = bidsTooltip.querySelector('p:last-child');
+
+      if (sentParagraph && recvParagraph) {
+        sentParagraph.innerHTML = `<b>Sent bids:</b> ${data.num_sent_bids || 0} (${data.num_sent_active_bids || 0} active)`;
+        recvParagraph.innerHTML = `<b>Received bids:</b> ${data.num_recv_bids || 0} (${data.num_recv_active_bids || 0} active)`;
+        debugLog(`Updated Bids tooltip: sent=${data.num_sent_bids}(${data.num_sent_active_bids}), recv=${data.num_recv_bids}(${data.num_recv_active_bids})`);
+      } else {
+        bidsTooltip.innerHTML = newBidsContent;
+        debugLog(`Replaced Bids tooltip content: sent=${data.num_sent_bids}(${data.num_sent_active_bids}), recv=${data.num_recv_bids}(${data.num_recv_active_bids})`);
+      }
+
+      refreshTooltipInstances('tooltip-bids', newBidsContent);
+    } else {
+      debugLog('Bids tooltip element not found');
+    }
+  }
+
+  function refreshTooltipInstances(tooltipId, newContent) {
+    const triggers = document.querySelectorAll(`[data-tooltip-target="${tooltipId}"]`);
+
+    triggers.forEach(trigger => {
+      if (trigger._tippy) {
+        trigger._tippy.setContent(newContent);
+        debugLog(`Updated Tippy instance content for ${tooltipId}`);
+      } else {
+        if (window.TooltipManager && typeof window.TooltipManager.create === 'function') {
+          window.TooltipManager.create(trigger, newContent, {
+            placement: trigger.getAttribute('data-tooltip-placement') || 'top'
+          });
+          debugLog(`Created new Tippy instance for ${tooltipId}`);
+        }
+      }
+    });
+
+    if (window.TooltipManager && typeof window.TooltipManager.refreshTooltip === 'function') {
+      window.TooltipManager.refreshTooltip(tooltipId, newContent);
+      debugLog(`Refreshed tooltip via TooltipManager for ${tooltipId}`);
+    }
+
+    if (window.TooltipManager && typeof window.TooltipManager.initializeTooltips === 'function') {
+      setTimeout(() => {
+        window.TooltipManager.initializeTooltips(`[data-tooltip-target="${tooltipId}"]`);
+        debugLog(`Re-initialized tooltips for ${tooltipId}`);
+      }, 50);
+    }
+  }
+
+  function debugLog(message) {
+    if (config.debug && console && console.log) {
+      console.log(`[SummaryManager] ${message}`);
+    }
   }
 
   function cacheSummaryData(data) {
@@ -301,6 +399,14 @@ const SummaryManager = (function() {
             throw error;
           }
         });
+    },
+
+    updateTooltips: function(data) {
+      updateTooltips(data || lastSuccessfulData);
+    },
+
+    updateUI: function(data) {
+      updateUIFromData(data || lastSuccessfulData);
     },
 
     startRefreshTimer: function() {

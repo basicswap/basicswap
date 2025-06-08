@@ -1,13 +1,12 @@
-<!DOCTYPE html>
-{% from 'style.html' import change_password_svg, notifications_network_offer_svg, 
-  notifications_bid_accepted_svg, notifications_unknow_event_svg, 
-  notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg, 
-  wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg, 
-  cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg, 
-  shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg, 
-  wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg, 
-  swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg, 
-  bids_sent_svg, header_arrow_down_svg, love_svg %}
+{% from 'style.html' import change_password_svg, notifications_network_offer_svg,
+  notifications_bid_accepted_svg, notifications_unknow_event_svg,
+  notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg,
+  wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg,
+  cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg,
+  shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg,
+  wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg,
+  swap_in_progress_green_svg, available_bids_svg, your_offers_svg, bids_received_svg,
+  bids_sent_svg, header_arrow_down_svg, love_svg, mobile_love_svg,  amm_active_svg, amm_inactive_svg %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -47,7 +46,7 @@
     })();
 
     (function() {
-      const isDarkMode = localStorage.getItem('color-theme') === 'dark' || 
+      const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
         (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
       if (!localStorage.getItem('color-theme')) {
@@ -78,6 +77,7 @@
   <script src="/static/js/modules/notification-manager.js"></script>
   <script src="/static/js/modules/identity-manager.js"></script>
   <script src="/static/js/modules/summary-manager.js"></script>
+  <script src="/static/js/amm_counter.js"></script>
   {% if current_page == 'wallets' or current_page == 'wallet' %}
   <script src="/static/js/modules/wallet-manager.js"></script>
   {% endif %}
@@ -93,9 +93,9 @@
     <div class="flex items-center justify-center min-h-screen p-4 relative z-10">
       <div class="bg-white dark:bg-gray-500 rounded-lg shadow-xl max-w-md w-full">
         <div class="p-6 text-center">
-          <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" 
+          <svg class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200"
             aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" 
+            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
               stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
           <h3 class="mb-5 text-lg font-normal text-gray-700 dark:text-gray-300">
@@ -107,14 +107,14 @@
           <p class="mb-5 text-sm text-gray-500 dark:text-gray-300">
             This action will shut down the application. Are you sure you want to proceed?
           </p>
-          <button id="confirmShutdown" type="button" class="text-white bg-red-600 hover:bg-red-800 
-            focus:ring-0 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium 
+          <button id="confirmShutdown" type="button" class="text-white bg-red-600 hover:bg-red-800
+            focus:ring-0 focus:outline-none focus:ring-red-300 dark:focus:ring-red-800 font-medium
             rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2">
             Yes, Shut Down
           </button>
-          <button id="closeShutdownModal" type="button" class="text-gray-500 bg-white hover:bg-gray-100 
-            focus:ring-0 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm 
-            font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 
+          <button id="closeShutdownModal" type="button" class="text-gray-500 bg-white hover:bg-gray-100
+            focus:ring-0 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm
+            font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300
             dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600">
             Cancel
           </button>
@@ -136,7 +136,7 @@
         <ul class="hidden xl:flex">
           <!-- Wallets -->
           <li>
-            <a class="flex mr-10 items-center py-3 text-gray-50 hover:text-gray-100 text-sm" 
+            <a class="flex mr-10 items-center py-3 text-gray-50 hover:text-gray-100 text-sm"
               href="/wallets">
               {{ wallet_svg | safe }}
               <span>Wallets</span>
@@ -145,11 +145,11 @@
 
           <!-- Network Order Book -->
           <li>
-            <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm" 
+            <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm"
               href="/offers">
               {{ order_book_svg | safe }}
               <span>Network Order Book</span>
-              <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs 
+              <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs
                 font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">
                 {{ summary.num_network_offers }}
               </span>
@@ -158,8 +158,8 @@
 
           <!-- Place New Offer -->
           <li>
-            <a class="flex rounded-full flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 
-              hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border 
+            <a class="flex rounded-full flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500
+              hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border
               border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/newoffer">
               {{ new_offer_svg | safe }}
               <span>Place new Offer</span>
@@ -167,10 +167,20 @@
           </li>
         </ul>
 
-        <!-- Settings Dropdown -->
+        <!-- Donation Link -->
         <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto">
-          <div id="dropdownNavbarLink" data-dropdown-toggle="dropdownNavbar" class="flex justify-between 
-            items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm md:border-0 md:p-0 md:w-auto 
+          <li>
+            <a href="/donation" class="flex items-center py-2 pr-4 pl-3 text-gray-50 text-sm hover:text-gray-100">
+              {{ love_svg | safe }}
+              <span class="ml-2">Donate</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- Settings Dropdown -->
+        <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6">
+          <div id="dropdownNavbarLink" data-dropdown-toggle="dropdownNavbar" class="flex justify-between
+            items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm md:border-0 md:p-0 md:w-auto
             text-gray-50 hover:text-gray-100">
             {{ settings_svg | safe }}
             Settings & Tools
@@ -179,12 +189,12 @@
         </ul>
 
         <!-- Settings Menu -->
-        <div id="dropdownNavbar" class="hidden z-50 w-50 font-normal bg-white shadow divide-y 
+        <div id="dropdownNavbar" class="hidden z-50 w-50 font-normal bg-white shadow divide-y
           divide-gray-100 dark:bg-gray-500 dark:divide-gray-400 dark:text-white">
           <ul class="py-0 text-sm text-gray-700" aria-labelledby="dropdownLargeButton">
             <!-- Settings Menu Items -->
             <li>
-              <a href="/settings" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/settings" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">Settings</span>
                 {{ cog_svg | safe }}
@@ -192,7 +202,7 @@
               </a>
             </li>
             <li>
-              <a href="/changepassword" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/changepassword" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">Change/Set Password</span>
                 {{ change_password_svg | safe }}
@@ -201,7 +211,7 @@
             </li>
             {% if debug_mode == true %}
             <li>
-              <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/rpc" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">RPC</span>
                 {{ rpc_svg | safe }}
@@ -209,7 +219,7 @@
               </a>
             </li>
             <li>
-              <a href="/debug" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/debug" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">Debug</span>
                 {{ debug_svg | safe }}
@@ -217,7 +227,7 @@
               </a>
             </li>
             <li>
-              <a href="/explorers" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/explorers" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">Explorers</span>
                 {{ explorer_svg | safe }}
@@ -227,7 +237,7 @@
             {% endif %}
             {% if use_tor_proxy == true %}
             <li>
-              <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/tor" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">Tor</span>
                 {{ tor_svg | safe }}
@@ -236,7 +246,7 @@
             </li>
             {% endif %}
             <li>
-              <a href="/smsgaddresses" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/smsgaddresses" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">SMSG Addresses</span>
                 {{ smsg_svg | safe }}
@@ -244,21 +254,22 @@
               </a>
             </li>
             <li>
-             <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 
+             <a href="/watched" class="flex items-center block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700
                 dark:text-white">
                 <span class="sr-only">Watch Outputs</span>
                 {{ outputs_svg | safe }}
                 <span>Watch Outputs</span>
-                <span id="watched-outputs-counter" class="inline-flex justify-center items-center text-xs font-semibold 
+                <span id="watched-outputs-counter" class="inline-flex justify-center items-center text-xs font-semibold
                 ml-3 mr-2 px-2.5 py-1 text-white {% if summary.num_watched_outputs > 0 %}bg-blue-500
                 {% else %}bg-gray-400{% endif %} rounded-full">
                 {{ summary.num_watched_outputs }}
                </span>
              </a>
             </li>
+
             {% if debug_mode == true %}
             <li>
-              <a href="/automation" class="flex items-center block py-4 px-4 hover:bg-gray-100 
+              <a href="/automation" class="flex items-center block py-4 px-4 hover:bg-gray-100
                 dark:hover:bg-gray-700 dark:text-white">
                 <span class="sr-only">Automation Strategies</span>
                 {{ automation_svg | safe }}
@@ -268,8 +279,8 @@
             {% endif %}
           </ul>
           <div class="text-sm text-gray-700">
-            <a href="/shutdown/{{ shutdown_token }}" class="shutdown-button flex items-center block py-4 
-              px-4 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 
+            <a href="/shutdown/{{ shutdown_token }}" class="shutdown-button flex items-center block py-4
+              px-4 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200
               dark:hover:text-white" data-active-swaps="{{ summary.num_swapping }}">
               {{ shutdown_svg | safe }}
               <span>Shutdown</span>
@@ -285,12 +296,12 @@
           {% if debug_mode == true %}
           <ul class="xl:flex">
             <li>
-              <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50 
+              <div data-tooltip-target="tooltip-DEV" class="ml-5 flex items-center text-gray-50
                 hover:text-gray-100 text-sm">
                 {{ debug_nerd_svg | safe }}
               </div>
-              <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 
-                text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 
+              <div id="tooltip-DEV" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3
+                text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
                 transition-opacity duration-300 tooltip">
                 <p><b>Debug mode:</b> Active</p>
                 {% if debug_ui_mode == true %}
@@ -301,28 +312,60 @@
           </ul>
           {% endif %}
 
+          <!-- AMM Status -->
+          <ul class="xl:flex">
+            <li>
+              {% if current_status == 'running' %}
+              <a href='/amm'>
+                <div data-tooltip-target="tooltip-amm-active" class="ml-5 flex items-center text-gray-50
+                  hover:text-gray-100 text-sm">
+                  {{ amm_active_svg | safe }}
+                </div>
+                <div id="tooltip-amm-active" role="tooltip" class="inline-block absolute invisible z-10
+                  py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
+                  transition-opacity duration-300 tooltip">
+                  <p><b>AMM:</b> Active</p>
+                  <p><b>Currently offers/bids:</b> {{ amm_active_count }}</p>
+                </div>
+              </a>
+              {% else %}
+              <a href='/amm'>
+                <div data-tooltip-target="tooltip-amm-inactive" class="ml-5 flex items-center
+                  text-gray-50 hover:text-gray-100 text-sm">
+                  {{ amm_inactive_svg | safe }}
+                </div>
+                <div id="tooltip-amm-inactive" role="tooltip" class="inline-block absolute invisible
+                  z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
+                  transition-opacity duration-300 tooltip">
+                  <p><b>AMM:</b> Inactive</p>
+                </div>
+              </a>
+              {% endif %}
+            </li>
+          </ul>
+
           <!-- Wallet Status -->
           {% if encrypted == true %}
           <ul class="xl:flex">
             <li>
               {% if locked == true %}
-              <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50 
+              <div data-tooltip-target="tooltip-locked-wallets" class="ml-5 flex items-center text-gray-50
                 hover:text-gray-100 text-sm">
                 {{ wallet_locked_svg | safe }}
               </div>
-              <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10 
-                py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 
+              <div id="tooltip-locked-wallets" role="tooltip" class="inline-block absolute invisible z-10
+                py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
                 transition-opacity duration-300 tooltip">
                 <p><b>Wallets:</b> Locked</p>
               </div>
               {% else %}
               <a href='/lock'>
-                <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center 
+                <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center
                   text-gray-50 hover:text-gray-100 text-sm">
                   {{ wallet_unlocked_svg | safe }}
                 </div>
-                <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible 
-                  z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 
+                <div id="tooltip-unlocked-wallets" role="tooltip" class="inline-block absolute invisible
+                  z-10 py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
                   transition-opacity duration-300 tooltip">
                   <p><b>Wallets:</b> Unlocked</p>
                 </div>
@@ -337,12 +380,12 @@
           <ul class="xl:flex ml-5">
             <li>
               <a href="/tor">
-                <div data-tooltip-target="tooltip-tor" class="flex items-center text-gray-50 
+                <div data-tooltip-target="tooltip-tor" class="flex items-center text-gray-50
                   hover:text-gray-100 text-sm">
                   {{ tor_purple_svg | safe }}
                 </div>
-                <div id="tooltip-tor" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3 
-                  text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 
+                <div id="tooltip-tor" role="tooltip" class="inline-block absolute invisible z-10 py-2 px-3
+                  text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
                   transition-opacity duration-300 tooltip">
                   <b>Tor mode:</b> Active
                   {% if tor_established == true %}
@@ -355,12 +398,12 @@
           {% endif %}
 
           <!-- Theme Toggle -->
-          <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button" 
+          <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button"
             class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5">
             {{ sun_svg | safe }}
             {{ moon_svg | safe }}
-            <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2 
-              px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 
+            <div id="tooltip-darkmode" role="tooltip" class="inline-block absolute invisible z-10 py-2
+              px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
               transition-opacity duration-300 tooltip">
               Dark mode
             </div>
@@ -376,24 +419,48 @@
       </div>
 
       <!-- Secondary Navigation Bar -->
-      <div class="hidden xl:block py-5 px-6 bg-coolGray-100 border-gray-100 dark:border-gray-500 
+      <div class="hidden xl:block py-5 px-6 bg-coolGray-100 border-gray-100 dark:border-gray-500
         dark:bg-body border-b dark:border-b-2">
         <div class="flex items-center justify-center container mx-auto">
           <ul class="flex items-center space-x-8">
+            <!-- AMM -->
+            <li>
+              <a data-tooltip-target="tooltip-amm-subheader" class="flex items-center text-sm text-gray-400
+                hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/amm">
+                {{ automation_svg | safe }}
+                <span>AMM</span>
+                <span id="amm-counter" class="inline-flex justify-center items-center text-xs
+                  font-semibold ml-3 px-2.5 py-1 text-white {% if current_status == 'running' and amm_active_count > 0 %}
+                  bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
+                  {{ amm_active_count }}
+                </span>
+              </a>
+              <div id="tooltip-amm-subheader" role="tooltip" class="inline-block absolute invisible z-10
+                py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
+                transition-opacity duration-300 tooltip">
+                <p><b>Status:</b> {% if current_status == 'running' %}Active{% else %}Inactive{% endif %}</p>
+                <p><b>Currently active offers/bids:</b> {{ amm_active_count }}</p>
+              </div>
+            </li>
+
+            <li>
+              <span class="text-gray-300">|</span>
+            </li>
+
             <!-- Your Offers -->
             <li>
-              <a data-tooltip-target="tooltip-your-offers" class="flex items-center text-sm text-gray-400 
+              <a data-tooltip-target="tooltip-your-offers" class="flex items-center text-sm text-gray-400
                 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
                 {{ your_offers_svg | safe }}
                 <span>Your Offers</span>
-                <span id="offers-counter" class="inline-flex justify-center items-center text-xs 
+                <span id="offers-counter" class="inline-flex justify-center items-center text-xs
                   font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_sent_active_offers > 0 %}
                   bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
                   {{ summary.num_sent_active_offers }}
                 </span>
               </a>
-              <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10 
-                py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0 
+              <div id="tooltip-your-offers" role="tooltip" class="inline-block absolute invisible z-10
+                py-2 px-3 text-sm font-medium text-white bg-blue-500 rounded-lg shadow-sm opacity-0
                 transition-opacity duration-300 tooltip">
                 <p><b>Total offers:</b> {{ summary.num_sent_offers }}</p>
                 <p><b>Active offers:</b> {{ summary.num_sent_active_offers }}</p>
@@ -406,11 +473,11 @@
 
             <!-- Bid Requests -->
             <li>
-              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 
+              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100
                 dark:hover:text-gray-100" href="/availablebids">
                 {{ available_bids_svg | safe }}
                 <span>Bid Requests</span>
-                <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs 
+                <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs
                   font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_available_bids > 0 %}
                   bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
                   {{ summary.num_available_bids }}
@@ -453,9 +520,9 @@
 
             <!-- Swaps in Progress -->
             <li>
-              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100 
+              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100
                 dark:hover:text-gray-100" href="/active">
-                <div id="swapContainer" class="inline-flex center-spin mr-2" 
+                <div id="swapContainer" class="inline-flex center-spin mr-2"
                   {% if summary.num_swapping != 0 %}style="animation: spin 2s linear infinite;"{% endif %}>
                   {% if summary.num_swapping != 0 %}
                     {{ swap_in_progress_green_svg | safe }}
@@ -464,7 +531,7 @@
                   {% endif %}
                 </div>
                 <span>Swaps in Progress</span>
-                <span id="swaps-counter" class="inline-flex justify-center items-center text-xs 
+                <span id="swaps-counter" class="inline-flex justify-center items-center text-xs
                   font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_swapping > 0 %}
                   bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
                   {{ summary.num_swapping }}
@@ -492,52 +559,72 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/offers">
             {{ order_book_svg | safe }}
             <span>Network Order Book</span>
-            <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs 
-              font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_network_offers and 
+            <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs
+              font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_network_offers and
               summary.num_network_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_network_offers }}
             </span>
           </a>
         </li>
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/newoffer">
             {{ new_offer_svg | safe }}
             <span>Place New Offer</span>
           </a>
         </li>
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/wallets">
             {{ wallet_svg | safe }}
             <span>Wallets</span>
           </a>
         </li>
+        <li>
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
+            href="/donation">
+            {{ mobile_love_svg | safe }}
+            <span>Donate</span>
+          </a>
+        </li>
+
       </ul>
 
       <!-- Trading Section -->
       <h3 class="mb-2 text-xs uppercase text-gray-300 font-medium">Trading</h3>
       <ul class="mb-8 text-sm font-medium">
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
+            href="/amm">
+            {{ automation_svg | safe }}
+            <span>AMM</span>
+            <span id="amm-counter-mobile" class="inline-flex justify-center items-center text-xs font-semibold
+              ml-auto px-2.5 py-1 text-white {% if current_status == 'running' and amm_active_count > 0 %}
+              bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
+              {{ amm_active_count }}
+            </span>
+          </a>
+        </li>
+        <li>
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/sentoffers">
             {{ your_offers_svg | safe }}
             <span>Your Offers</span>
-            <span id="offers-counter" class="inline-flex justify-center items-center text-xs font-semibold 
-              ml-auto px-2.5 py-1 text-white {% if summary.num_sent_active_offers and 
-              summary.num_sent_active_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} 
+            <span id="offers-counter-mobile" class="inline-flex justify-center items-center text-xs font-semibold
+              ml-auto px-2.5 py-1 text-white {% if summary.num_sent_active_offers and
+              summary.num_sent_active_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %}
               rounded-full">
               {{ summary.num_sent_active_offers }}
             </span>
           </a>
         </li>
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/availablebids">
             {{ available_bids_svg | safe }}
             <span>Bid Requests</span>
-            <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs 
-              font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_available_bids and 
+            <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs
+              font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_available_bids and
               summary.num_available_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_available_bids }}
             </span>
@@ -548,16 +635,16 @@
          {{ bids_received_svg | safe }}
        <span class="my-auto">Bids</span>
        <div class="flex items-center ml-auto my-auto">
-       <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 
+       <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5
         py-1 text-white {% if summary.num_sent_active_bids and summary.num_sent_active_bids > 0 %}
-        bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full mr-2 bids-tab-link cursor-pointer" 
+        bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full mr-2 bids-tab-link cursor-pointer"
         data-tab-target="#sent">
         <svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M5 19V5L19 12L5 19Z" fill="currentColor" transform="rotate(-90 12 12)"/>
         </svg>
         {{ summary.num_sent_active_bids }}
        </span>
-       <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5 
+       <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5
         py-1 text-white {% if summary.num_recv_active_bids and summary.num_recv_active_bids > 0 %}
         bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full bids-tab-link cursor-pointer"
         data-tab-target="#received">
@@ -568,9 +655,10 @@
        </span>
        </div>
         </a>
+        </li>
         <li>
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/active">
-            <div id="swapContainer" class="inline-flex center-spin mr-2" 
+            <div id="swapContainer" class="inline-flex center-spin mr-2"
               {% if summary.num_swapping and summary.num_swapping != 0 %}
               style="animation: spin 2s linear infinite;"{% endif %}>
               {% if summary.num_swapping and summary.num_swapping != 0 %}
@@ -580,7 +668,7 @@
               {% endif %}
             </div>
             <span>Swaps in Progress</span>
-            <span id="swaps-counter" class="inline-flex justify-center items-center text-xs font-semibold 
+            <span id="swaps-counter" class="inline-flex justify-center items-center text-xs font-semibold
               ml-auto px-2.5 py-1 text-white {% if summary.num_swapping and summary.num_swapping > 0 %}
               bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_swapping }}
@@ -591,8 +679,8 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/watched">
             {{ outputs_svg | safe }}
             <span>Watch Outputs</span>
-            <span id="watched-outputs-counter" class="inline-flex justify-center items-center text-xs 
-              font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_watched_outputs and 
+            <span id="watched-outputs-counter" class="inline-flex justify-center items-center text-xs
+              font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_watched_outputs and
               summary.num_watched_outputs > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_watched_outputs }}
             </span>
@@ -604,14 +692,14 @@
       <h3 class="mb-2 text-xs uppercase text-gray-300 font-medium">Settings & Tools</h3>
       <ul class="text-sm font-medium">
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/settings">
             {{ settings_svg | safe }}
             <span>Settings</span>
           </a>
         </li>
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/changepassword">
             {{ change_password_svg | safe }}
             <span>Change/Set Password</span>
@@ -631,7 +719,7 @@
           </a>
         </li>
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/explorers">
             {{ explorer_svg | safe }}
             <span>Explorers</span>
@@ -639,15 +727,16 @@
         </li>
         {% endif %}
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/smsgaddresses">
             {{ smsg_svg | safe }}
             <span>SMSG Addresses</span>
           </a>
         </li>
+
         {% if debug_mode == true %}
         <li>
-          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" 
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/automation">
             {{ automation_svg | safe }}
             <span>Automation Strategies</span>
@@ -666,7 +755,7 @@
 
       <!-- Shutdown Button -->
       <div class="pt-8">
-        <a href="/shutdown/{{ shutdown_token }}" class="shutdown-button flex items-center pl-3 py-3 pr-4 
+        <a href="/shutdown/{{ shutdown_token }}" class="shutdown-button flex items-center pl-3 py-3 pr-4
           text-gray-50 hover:bg-gray-900 rounded" data-active-swaps="{{ summary.num_swapping }}">
           {{ shutdown_svg | safe }}
           <span>Shutdown</span>
