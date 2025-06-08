@@ -348,8 +348,8 @@ def describeBid(
             if for_api
             else format_timestamp(bid.expire_at, with_seconds=True)
         ),
-        "was_sent": "True" if bid.was_sent else "False",
-        "was_received": "True" if bid.was_received else "False",
+        "was_sent": bid.was_sent,
+        "was_received": bid.was_received,
         "initiate_tx": getTxIdHex(bid, TxTypes.ITX, " " + ci_leader.ticker()),
         "initiate_conf": (
             "None"

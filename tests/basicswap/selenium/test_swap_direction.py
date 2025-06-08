@@ -239,10 +239,8 @@ def test_swap_dir(driver):
     assert num_found >= 2
 
     driver.get(f"{node1_url}/bid/{bid_1_id}")
-    td_sent = driver.find_element(
-        "xpath", "//td[contains(text(), 'Sent')]/following-sibling::td"
-    )
-    assert "False" in td_sent.get_attribute("innerHTML")
+    td_dir = driver.find_element(By.ID, "bidtype")
+    assert "Received" == td_dir.get_attribute("innerHTML")
     td_ys = driver.find_element(
         "xpath", "//td[contains(text(), 'You Send')]/following-sibling::td"
     )
@@ -253,10 +251,8 @@ def test_swap_dir(driver):
     assert "Monero" in td_yg.get_attribute("innerHTML")
 
     driver.get(f"{node2_url}/bid/{bid_1_id}")
-    td_sent = driver.find_element(
-        "xpath", "//td[contains(text(), 'Sent')]/following-sibling::td"
-    )
-    assert "True" in td_sent.get_attribute("innerHTML")
+    td_dir = driver.find_element(By.ID, "bidtype")
+    assert "Sent" == td_dir.get_attribute("innerHTML")
     td_ys = driver.find_element(
         "xpath", "//td[contains(text(), 'You Send')]/following-sibling::td"
     )
@@ -267,10 +263,8 @@ def test_swap_dir(driver):
     assert "Particl" in td_yg.get_attribute("innerHTML")
 
     driver.get(f"{node1_url}/bid/{bid_3_id}")
-    td_sent = driver.find_element(
-        "xpath", "//td[contains(text(), 'Sent')]/following-sibling::td"
-    )
-    assert "True" in td_sent.get_attribute("innerHTML")
+    td_dir = driver.find_element(By.ID, "bidtype")
+    assert "Sent (Transposed)" == td_dir.get_attribute("innerHTML")
     td_ys = driver.find_element(
         "xpath", "//td[contains(text(), 'You Send')]/following-sibling::td"
     )
@@ -281,10 +275,8 @@ def test_swap_dir(driver):
     assert "Monero" in td_yg.get_attribute("innerHTML")
 
     driver.get(f"{node2_url}/bid/{bid_3_id}")
-    td_sent = driver.find_element(
-        "xpath", "//td[contains(text(), 'Sent')]/following-sibling::td"
-    )
-    assert "False" in td_sent.get_attribute("innerHTML")
+    td_dir = driver.find_element(By.ID, "bidtype")
+    assert "Received (Transposed)" == td_dir.get_attribute("innerHTML")
     td_ys = driver.find_element(
         "xpath", "//td[contains(text(), 'You Send')]/following-sibling::td"
     )
