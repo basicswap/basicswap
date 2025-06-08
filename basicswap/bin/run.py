@@ -17,12 +17,13 @@ import traceback
 
 import basicswap.config as cfg
 from basicswap import __version__
-from basicswap.ui.util import getCoinName
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import chainparams, Coins, isKnownCoinName
-from basicswap.http_server import HttpThread
 from basicswap.contrib.websocket_server import WebsocketServer
-
+from basicswap.http_server import HttpThread
+from basicswap.network.simplex_chat import startSimplexClient
+from basicswap.ui.util import getCoinName
+from basicswap.util.daemon import Daemon
 
 initial_logger = logging.getLogger()
 initial_logger.level = logging.DEBUG
@@ -31,16 +32,6 @@ if not len(initial_logger.handlers):
 logger = initial_logger
 
 swap_client = None
-with_coins = set()
-without_coins = set()
-
-
-class Daemon:
-    __slots__ = ("handle", "files")
-
-    def __init__(self, handle, files):
-        self.handle = handle
-        self.files = files
 
 
 def signal_handler(sig, frame):
@@ -131,6 +122,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
             cwd=datadir_path,
         ),
         opened_files,
+        os.path.basename(daemon_bin),
     )
 
 
@@ -161,6 +153,7 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
             cwd=datadir_path,
         ),
         [file_stdout, file_stderr],
+        os.path.basename(daemon_bin),
     )
 
 
@@ -224,6 +217,7 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
             cwd=data_dir,
         ),
         [wallet_stdout, wallet_stderr],
+        os.path.basename(wallet_bin),
     )
 
 
@@ -284,8 +278,32 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     return extra_args
 
 
+def mainLoop(daemons, update: bool = True):
+    while not swap_client.delay_event.wait(0.5):
+        if update:
+            swap_client.update()
+        else:
+            pass
+
+        for daemon in daemons:
+            if daemon.running is False:
+                continue
+            poll = daemon.handle.poll()
+            if poll is None:
+                pass  # Process is running
+            else:
+                daemon.running = False
+                swap_client.log.error(
+                    f"Process {daemon.handle.pid} for {daemon.name} terminated unexpectedly returning {poll}."
+                )
+
+
 def runClient(
-    data_dir: str, chain: str, start_only_coins: bool, log_prefix: str = "BasicSwap"
+    data_dir: str,
+    chain: str,
+    start_only_coins: bool,
+    log_prefix: str = "BasicSwap",
+    extra_opts=dict(),
 ) -> int:
     global swap_client, logger
     daemons = []
@@ -311,13 +329,6 @@ def runClient(
     with open(settings_path) as fs:
         settings = json.load(fs)
 
-    extra_opts = dict()
-    if len(with_coins) > 0:
-        with_coins.add("particl")
-        extra_opts["with_coins"] = with_coins
-    if len(without_coins) > 0:
-        extra_opts["without_coins"] = without_coins
-
     swap_client = BasicSwap(
         data_dir, settings, chain, log_name=log_prefix, extra_opts=extra_opts
     )
@@ -334,12 +345,46 @@ def runClient(
 
     # Settings may have been modified
     settings = swap_client.settings
+
     try:
         # Try start daemons
+        for network in settings.get("networks", []):
+            network_type = network.get("type", "unknown")
+            if network_type == "simplex":
+                simplex_dir = os.path.join(data_dir, "simplex")
+
+                log_level = "debug" if swap_client.debug else "info"
+
+                socks_proxy = None
+                if "socks_proxy_override" in network:
+                    socks_proxy = network["socks_proxy_override"]
+                elif swap_client.use_tor_proxy:
+                    socks_proxy = (
+                        f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"
+                    )
+
+                daemons.append(
+                    startSimplexClient(
+                        network["client_path"],
+                        simplex_dir,
+                        network["server_address"],
+                        network["ws_port"],
+                        logger,
+                        swap_client.delay_event,
+                        socks_proxy=socks_proxy,
+                        log_level=log_level,
+                    )
+                )
+                pid = daemons[-1].handle.pid
+                swap_client.log.info(f"Started Simplex client {pid}")
+
         for c, v in settings["chainclients"].items():
             if len(start_only_coins) > 0 and c not in start_only_coins:
                 continue
-            if (len(with_coins) > 0 and c not in with_coins) or c in without_coins:
+            if (
+                len(swap_client.with_coins_override) > 0
+                and c not in swap_client.with_coins_override
+            ) or c in swap_client.without_coins_override:
                 if v.get("manage_daemon", False) or v.get(
                     "manage_wallet_daemon", False
                 ):
@@ -497,8 +542,7 @@ def runClient(
             logger.info(
                 f"Only running {start_only_coins}. Manually exit with Ctrl + c when ready."
             )
-            while not swap_client.delay_event.wait(0.5):
-                pass
+            mainLoop(daemons, update=False)
         else:
             swap_client.start()
             if "htmlhost" in settings:
@@ -536,8 +580,7 @@ def runClient(
                 swap_client.ws_server.run_forever(threaded=True)
 
             logger.info("Exit with Ctrl + c.")
-            while not swap_client.delay_event.wait(0.5):
-                swap_client.update()
+            mainLoop(daemons)
 
     except Exception as e:  # noqa: F841
         traceback.print_exc()
@@ -560,13 +603,13 @@ def runClient(
 
     closed_pids = []
     for d in daemons:
-        swap_client.log.info(f"Interrupting {d.handle.pid}")
+        swap_client.log.info(f"Interrupting {d.name} {d.handle.pid}")
         try:
             d.handle.send_signal(
                 signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
             )
         except Exception as e:
-            swap_client.log.info(f"Interrupting {d.handle.pid}, error {e}")
+            swap_client.log.info(f"Interrupting {d.name} {d.handle.pid}, error {e}")
     for d in daemons:
         try:
             d.handle.wait(timeout=120)
@@ -623,6 +666,9 @@ def printHelp():
         "--startonlycoin          Only start the provides coin daemon/s, use this if a chain requires extra processing."
     )
     print("--logprefix              Specify log prefix.")
+    print(
+        "--forcedbupgrade         Recheck database against schema regardless of version."
+    )
 
 
 def main():
@@ -630,6 +676,9 @@ def main():
     chain = "mainnet"
     start_only_coins = set()
     log_prefix: str = "BasicSwap"
+    options = dict()
+    with_coins = set()
+    without_coins = set()
 
     for v in sys.argv[1:]:
         if len(v) < 2 or v[0] != "-":
@@ -665,6 +714,9 @@ def main():
                 ensure_coin_valid(coin)
                 without_coins.add(coin)
             continue
+        if name == "forcedbupgrade":
+            options["force_db_upgrade"] = True
+            continue
         if len(s) == 2:
             if name == "datadir":
                 data_dir = os.path.expanduser(s[1])
@@ -693,8 +745,14 @@ def main():
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
+    if len(with_coins) > 0:
+        with_coins.add("particl")
+        options["with_coins"] = with_coins
+    if len(without_coins) > 0:
+        options["without_coins"] = without_coins
+
     logger.info(os.path.basename(sys.argv[0]) + ", version: " + __version__ + "\n\n")
-    fail_code = runClient(data_dir, chain, start_only_coins, log_prefix)
+    fail_code = runClient(data_dir, chain, start_only_coins, log_prefix, options)
 
     print("Done.")
     return fail_code

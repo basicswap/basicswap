@@ -71,6 +71,7 @@ class BaseApp(DBMethods):
         self.default_socket = socket.socket
         self.default_socket_timeout = socket.getdefaulttimeout()
         self.default_socket_getaddrinfo = socket.getaddrinfo
+        self._force_db_upgrade = False
 
     def __del__(self):
         if self.fp:

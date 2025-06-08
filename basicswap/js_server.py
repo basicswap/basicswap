@@ -858,7 +858,7 @@ def js_automationstrategies(self, url_split, post_string: str, is_json: bool) ->
             "label": strat_data.label,
             "type_ind": strat_data.type_ind,
             "only_known_identities": strat_data.only_known_identities,
-            "data": json.loads(strat_data.data.decode("utf-8")),
+            "data": json.loads(strat_data.data.decode("UTF-8")),
             "note": "" if strat_data.note is None else strat_data.note,
         }
         return bytes(json.dumps(rv), "UTF-8")
@@ -992,7 +992,7 @@ def js_unlock(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = getFormData(post_string, is_json)
 
-    password = get_data_entry(post_data, "password")
+    password: str = get_data_entry(post_data, "password")
 
     if have_data_entry(post_data, "coin"):
         coin = getCoinType(str(get_data_entry(post_data, "coin")))
@@ -1167,6 +1167,49 @@ def js_coinprices(self, url_split, post_string, is_json) -> bytes:
     )
 
 
+def js_messageroutes(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+
+    filters = {
+        "page_no": 1,
+        "limit": PAGE_LIMIT,
+        "sort_by": "created_at",
+        "sort_dir": "desc",
+    }
+
+    if have_data_entry(post_data, "sort_by"):
+        sort_by = get_data_entry(post_data, "sort_by")
+        ensure(
+            sort_by
+            in [
+                "created_at",
+            ],
+            "Invalid sort by",
+        )
+        filters["sort_by"] = sort_by
+    if have_data_entry(post_data, "sort_dir"):
+        sort_dir = get_data_entry(post_data, "sort_dir")
+        ensure(sort_dir in ["asc", "desc"], "Invalid sort dir")
+        filters["sort_dir"] = sort_dir
+
+    if have_data_entry(post_data, "offset"):
+        filters["offset"] = int(get_data_entry(post_data, "offset"))
+    if have_data_entry(post_data, "limit"):
+        filters["limit"] = int(get_data_entry(post_data, "limit"))
+        ensure(filters["limit"] > 0, "Invalid limit")
+
+    if have_data_entry(post_data, "address_from"):
+        filters["address_from"] = get_data_entry(post_data, "address_from")
+    if have_data_entry(post_data, "address_to"):
+        filters["address_to"] = get_data_entry(post_data, "address_to")
+
+    action = get_data_entry_or(post_data, "action", None)
+
+    message_routes = swap_client.listMessageRoutes(filters, action)
+    return bytes(json.dumps(message_routes), "UTF-8")
+
+
 endpoints = {
     "coins": js_coins,
     "wallets": js_wallets,
@@ -1194,6 +1237,7 @@ endpoints = {
     "readurl": js_readurl,
     "active": js_active,
     "coinprices": js_coinprices,
+    "messageroutes": js_messageroutes,
 }
 
 

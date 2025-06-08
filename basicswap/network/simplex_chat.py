@@ -7,10 +7,11 @@
 
 import os
 import select
+import sqlite3
 import subprocess
 import time
 
-from basicswap.bin.run import Daemon
+from basicswap.util.daemon import Daemon
 
 
 def initSimplexClient(args, logger, delay_event):
@@ -29,7 +30,7 @@ def initSimplexClient(args, logger, delay_event):
     def readOutput():
         buf = os.read(pipe_r, 1024).decode("utf-8")
         response = None
-        # logging.debug(f"simplex-chat output: {buf}")
+        # logger.debug(f"simplex-chat output: {buf}")
         if "display name:" in buf:
             logger.debug("Setting display name")
             response = b"user\n"
@@ -45,7 +46,7 @@ def initSimplexClient(args, logger, delay_event):
         max_wait_seconds: int = 60
         while p.poll() is None:
             if time.time() > start_time + max_wait_seconds:
-                raise ValueError("Timed out")
+                raise RuntimeError("Timed out")
             if os.name == "nt":
                 readOutput()
                 delay_event.wait(0.1)
@@ -70,22 +71,45 @@ def startSimplexClient(
     websocket_port: int,
     logger,
     delay_event,
+    socks_proxy=None,
+    log_level: str = "debug",
 ) -> Daemon:
     logger.info("Starting Simplex client")
     if not os.path.exists(data_path):
         os.makedirs(data_path)
 
-    db_path = os.path.join(data_path, "simplex_client_data")
+    simplex_data_prefix = os.path.join(data_path, "simplex_client_data")
+    simplex_db_path = simplex_data_prefix + "_chat.db"
+    args = [bin_path, "-d", simplex_data_prefix, "-p", str(websocket_port)]
 
-    args = [bin_path, "-d", db_path, "-s", server_address, "-p", str(websocket_port)]
+    if socks_proxy:
+        args += ["--socks-proxy", socks_proxy]
 
-    if not os.path.exists(db_path):
+    if not os.path.exists(simplex_db_path):
         # Need to set initial profile through CLI
         # TODO: Must be a better way?
-        init_args = args + ["-e", "/help"]  # Run command ro exit client
+        init_args = args + ["-e", "/help"]  # Run command to exit client
+        init_args += ["-s", server_address]
         initSimplexClient(init_args, logger, delay_event)
+    else:
+        # Workaround to avoid error:
+        # SQLite3 returned ErrorConstraint while attempting to perform step: UNIQUE constraint failed: protocol_servers.user_id, protocol_servers.host, protocol_servers.port
+        # TODO: Remove?
+        with sqlite3.connect(simplex_db_path) as con:
+            c = con.cursor()
+            if ":" in server_address:
+                host, port = server_address.split(":")
+            else:
+                host = server_address
+                port = ""
+            query: str = (
+                "SELECT COUNT(*) FROM protocol_servers WHERE host = :host and port = :port"
+            )
+            q = c.execute(query, {"host": host, "port": port}).fetchone()
+            if q[0] < 1:
+                args += ["-s", server_address]
 
-    args += ["-l", "debug"]
+    args += ["-l", log_level]
 
     opened_files = []
     stdout_dest = open(
@@ -104,4 +128,5 @@ def startSimplexClient(
             cwd=data_path,
         ),
         opened_files,
+        "simplex-chat",
     )
