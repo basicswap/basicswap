@@ -276,7 +276,7 @@ def sendSimplexMsg(
         to = "#bsx "
     sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
     response = waitForResponse(ws_thread, sent_id, self.delay_event)
-    if response["resp"]["type"] != "newChatItems":
+    if getResponseData(response, "type") != "newChatItems":
         json_str = json.dumps(response, indent=4)
         self.log.debug(f"Response {json_str}")
         raise ValueError("Send failed")
@@ -408,9 +408,9 @@ def readSimplexMsgs(self, network):
         data = json.loads(message)
         # self.log.debug(f"Message: {json.dumps(data, indent=4)}")
         try:
-            msg_type: str = data["resp"]["type"]
+            msg_type: str = getResponseData(data, "type")
             if msg_type in ("chatItemsStatusesUpdated", "newChatItems"):
-                for chat_item in data["resp"]["chatItems"]:
+                for chat_item in getResponseData(data, "chatItems"):
                     decrypted_msg = parseSimplexMsg(self, chat_item)
                     if decrypted_msg is None:
                         continue
@@ -431,6 +431,30 @@ def readSimplexMsgs(self, network):
         self.delay_event.wait(0.05)
 
 
+def getResponseData(data, tag=None):
+    if "Right" in data["resp"]:
+        if tag:
+            return data["resp"]["Right"][tag]
+        return data["resp"]["Right"]
+    if tag:
+        return data["resp"][tag]
+    return data["resp"]
+
+
+def getNewSimplexLink(data):
+    response_data = getResponseData(data)
+    if "connLinkContact" in response_data:
+        return response_data["connLinkContact"]["connFullLink"]
+    return response_data["connReqContact"]
+
+
+def getJoinedSimplexLink(data):
+    response_data = getResponseData(data)
+    if "connLinkInvitation" in response_data:
+        return response_data["connLinkInvitation"]["connFullLink"]
+    return response_data["connReqInvitation"]
+
+
 def initialiseSimplexNetwork(self, network_config) -> None:
     self.log.debug("initialiseSimplexNetwork")
 
@@ -445,10 +469,10 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     sent_id = ws_thread.send_command("/groups")
     response = waitForResponse(ws_thread, sent_id, self.delay_event)
 
-    if len(response["resp"]["groups"]) < 1:
+    if len(getResponseData(response, "groups")) < 1:
         sent_id = ws_thread.send_command("/c " + network_config["group_link"])
         response = waitForResponse(ws_thread, sent_id, self.delay_event)
-        assert "groupLinkId" in response["resp"]["connection"]
+        assert "groupLinkId" in getResponseData(response, "connection")
 
     network = {
         "type": "simplex",
@@ -463,7 +487,7 @@ def closeSimplexChat(self, net_i, connId) -> bool:
         cmd_id = net_i.send_command("/chats")
         response = net_i.wait_for_command_response(cmd_id, num_tries=500)
         remote_name = None
-        for chat in response["resp"]["chats"]:
+        for chat in getResponseData(response, "chats"):
             if (
                 "chatInfo" not in chat
                 or "type" not in chat["chatInfo"]
@@ -487,7 +511,7 @@ def closeSimplexChat(self, net_i, connId) -> bool:
         cmd_id = net_i.send_command(f"/delete @{remote_name}")
         cmd_response = net_i.wait_for_command_response(cmd_id)
 
-        if cmd_response["resp"]["type"] != "contactDeleted":
+        if getResponseData(cmd_response, "type") != "contactDeleted":
             self.log.warning(f"Failed to delete simplex chat, ID: {connId}")
             self.log.debug(
                 "cmd_response: {}".format(json.dumps(cmd_response, indent=4))

@@ -42,9 +42,12 @@ from basicswap.basicswap import (
 from basicswap.chainparams import Coins
 
 from basicswap.network.simplex import (
-    WebSocketThread,
+    getJoinedSimplexLink,
+    getNewSimplexLink,
+    getResponseData,
     waitForConnected,
     waitForResponse,
+    WebSocketThread,
 )
 from basicswap.network.simplex_chat import startSimplexClient
 from tests.basicswap.common import (
@@ -71,10 +74,13 @@ if not len(logger.handlers):
 
 
 def parse_message(msg_data):
-    if msg_data["resp"]["type"] not in ("chatItemsStatusesUpdated", "newChatItems"):
+    if getResponseData(msg_data, "type") not in (
+        "chatItemsStatusesUpdated",
+        "newChatItems",
+    ):
         return None
 
-    for chat_item in msg_data["resp"]["chatItems"]:
+    for chat_item in getResponseData(msg_data, "chatItems"):
         chat_type: str = chat_item["chatInfo"]["type"]
         if chat_type == "group":
             chat_name = chat_item["chatInfo"]["groupInfo"]["localDisplayName"]
@@ -155,7 +161,7 @@ class TestSimplex(unittest.TestCase):
             waitForConnected(ws_thread, test_delay_event)
             sent_id = ws_thread.send_command("/group bsx")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert response["resp"]["type"] == "groupCreated"
+            assert getResponseData(response, "type") == "groupCreated"
 
             ws_thread.send_command("/set voice #bsx off")
             ws_thread.send_command("/set files #bsx off")
@@ -165,36 +171,35 @@ class TestSimplex(unittest.TestCase):
             ws_thread.send_command("/set disappear #bsx on week")
 
             sent_id = ws_thread.send_command("/create link #bsx")
-            connReqContact = None
             connReqMsgData = waitForResponse(ws_thread, sent_id, test_delay_event)
-            connReqContact = connReqMsgData["resp"]["connReqContact"]
+            connReqContact = getNewSimplexLink(connReqMsgData)
 
             group_link = "https://simplex.chat" + connReqContact[8:]
             logger.info(f"group_link: {group_link}")
 
             sent_id = ws_thread2.send_command("/c " + group_link)
             response = waitForResponse(ws_thread2, sent_id, test_delay_event)
-            assert "groupLinkId" in response["resp"]["connection"]
+            assert "groupLinkId" in getResponseData(response, "connection")
 
             sent_id = ws_thread2.send_command("/groups")
             response = waitForResponse(ws_thread2, sent_id, test_delay_event)
-            assert len(response["resp"]["groups"]) == 1
+            assert len(getResponseData(response, "groups")) == 1
 
             sent_id = ws_thread2.send_command("/connect")
             response = waitForResponse(ws_thread2, sent_id, test_delay_event)
             with open(os.path.join(client2_dir, "chat_inv.txt"), "w") as fp:
                 fp.write(json.dumps(response, indent=4))
 
-            connReqInvitation = response["resp"]["connReqInvitation"]
+            connReqInvitation = getJoinedSimplexLink(response)
             logger.info(f"direct_link: {connReqInvitation}")
-            pccConnId_2_sent = response["resp"]["connection"]["pccConnId"]
+            pccConnId_2_sent = getResponseData(response, "connection")["pccConnId"]
             print(f"pccConnId_2_sent: {pccConnId_2_sent}")
 
             sent_id = ws_thread.send_command(f"/connect {connReqInvitation}")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
             with open(os.path.join(client1_dir, "chat_inv_accept.txt"), "w") as fp:
                 fp.write(json.dumps(response, indent=4))
-            pccConnId_1_accepted = response["resp"]["connection"]["pccConnId"]
+            pccConnId_1_accepted = getResponseData(response, "connection")["pccConnId"]
             print(f"pccConnId_1_accepted: {pccConnId_1_accepted}")
 
             sent_id = ws_thread.send_command("/chats")
@@ -203,7 +208,7 @@ class TestSimplex(unittest.TestCase):
                 fp.write(json.dumps(response, indent=4))
 
             direct_local_name_1 = None
-            for chat in response["resp"]["chats"]:
+            for chat in getResponseData(response, "chats"):
                 print(f"chat: {chat}")
                 if (
                     chat["chatInfo"]["contact"]["activeConn"]["connId"]
@@ -221,7 +226,7 @@ class TestSimplex(unittest.TestCase):
                 fp.write(json.dumps(response, indent=4))
 
             direct_local_name_2 = None
-            for chat in response["resp"]["chats"]:
+            for chat in getResponseData(response, "chats"):
                 print(f"chat: {chat}")
                 if (
                     chat["chatInfo"]["contact"]["activeConn"]["connId"]
@@ -238,10 +243,10 @@ class TestSimplex(unittest.TestCase):
 
             sent_id = ws_thread.send_command("#bsx test msg 1")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert response["resp"]["type"] == "newChatItems"
+            assert getResponseData(response, "type") == "newChatItems"
             sent_id = ws_thread.send_command("@user_1 test msg 2")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert response["resp"]["type"] == "newChatItems"
+            assert getResponseData(response, "type") == "newChatItems"
 
             msg_counter1: int = 0
             msg_counter2: int = 0
@@ -258,7 +263,7 @@ class TestSimplex(unittest.TestCase):
                     msg_counter1 += 1
                     data = json.loads(message)
                     try:
-                        msg_type = data["resp"]["type"]
+                        msg_type = getResponseData(data, "type")
                     except Exception as e:
                         print(f"msg_type error: {e}")
                         msg_type = "None"
@@ -287,7 +292,7 @@ class TestSimplex(unittest.TestCase):
                     msg_counter2 += 1
                     data = json.loads(message)
                     try:
-                        msg_type = data["resp"]["type"]
+                        msg_type = getResponseData(data, "type")
                     except Exception as e:
                         print(f"msg_type error: {e}")
                         msg_type = "None"
@@ -320,18 +325,24 @@ class TestSimplex(unittest.TestCase):
             assert len(found_connected[0]) == 1
             node1_connect = list(found_connected[0].values())[0]
             assert (
-                node1_connect["resp"]["contact"]["activeConn"]["connId"]
+                getResponseData(node1_connect, "contact")["activeConn"]["connId"]
                 == pccConnId_1_accepted
             )
-            assert node1_connect["resp"]["contact"]["localDisplayName"] == "user_2"
+            assert (
+                getResponseData(node1_connect, "contact")["localDisplayName"]
+                == "user_2"
+            )
 
             assert len(found_connected[1]) == 1
             node2_connect = list(found_connected[1].values())[0]
             assert (
-                node2_connect["resp"]["contact"]["activeConn"]["connId"]
+                getResponseData(node2_connect, "contact")["activeConn"]["connId"]
                 == pccConnId_2_sent
             )
-            assert node2_connect["resp"]["contact"]["localDisplayName"] == "user_2"
+            assert (
+                getResponseData(node2_connect, "contact")["localDisplayName"]
+                == "user_2"
+            )
 
             node1_msg1 = [m for m in found[0].values() if m["text"] == "test msg 1"]
             assert len(node1_msg1) == 1
@@ -361,18 +372,18 @@ class TestSimplex(unittest.TestCase):
 
             sent_id = ws_thread.send_command("/delete @user_1")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert response["resp"]["type"] == "contactDeleted"
+            assert getResponseData(response, "type") == "contactDeleted"
 
             sent_id = ws_thread2.send_command("/delete @user_1")
             response = waitForResponse(ws_thread2, sent_id, test_delay_event)
-            assert response["resp"]["type"] == "contactDeleted"
+            assert getResponseData(response, "type") == "contactDeleted"
 
             sent_id = ws_thread2.send_command("/chats")
             response = waitForResponse(ws_thread2, sent_id, test_delay_event)
             with open(os.path.join(client2_dir, "chats_after_delete.txt"), "w") as fp:
                 fp.write(json.dumps(response, indent=4))
 
-            assert len(response["resp"]["chats"]) == 4
+            assert len(getResponseData(response, "chats")) == 4
 
         finally:
             for t in threads:
@@ -417,7 +428,7 @@ class Test(BaseTest):
             waitForConnected(ws_thread, test_delay_event)
             sent_id = ws_thread.send_command("/group bsx")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert response["resp"]["type"] == "groupCreated"
+            assert getResponseData(response, "type") == "groupCreated"
 
             ws_thread.send_command("/set voice #bsx off")
             ws_thread.send_command("/set files #bsx off")
@@ -429,7 +440,7 @@ class Test(BaseTest):
 
             connReqContact = None
             connReqMsgData = waitForResponse(ws_thread, sent_id, test_delay_event)
-            connReqContact = connReqMsgData["resp"]["connReqContact"]
+            connReqContact = getNewSimplexLink(connReqMsgData)
             cls.group_link = "https://simplex.chat" + connReqContact[8:]
             logger.info(f"BSX group_link: {cls.group_link}")
 

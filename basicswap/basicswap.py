@@ -151,11 +151,13 @@ from .explorers import (
     ExplorerChainz,
 )
 from .network.simplex import (
+    closeSimplexChat,
     encryptMsg,
+    getJoinedSimplexLink,
+    getResponseData,
     initialiseSimplexNetwork,
     readSimplexMsgs,
     sendSimplexMsg,
-    closeSimplexChat,
 )
 from .network.util import (
     getMsgPubkey,
@@ -1838,7 +1840,7 @@ class BasicSwap(BaseApp, UIApp):
                 self.log.debug(f"Finding name for Simplex chat, ID: {pccConnId}")
                 cmd_id = net_i.send_command("/chats")
                 response = net_i.wait_for_command_response(cmd_id)
-                for chat in response["resp"]["chats"]:
+                for chat in getResponseData(response, "chats"):
                     if (
                         "chatInfo" not in chat
                         or "type" not in chat["chatInfo"]
@@ -4000,8 +4002,8 @@ class BasicSwap(BaseApp, UIApp):
 
         cmd_id = net_i.send_command("/connect")
         response = net_i.wait_for_command_response(cmd_id)
-        connReqInvitation = response["resp"]["connReqInvitation"]
-        pccConnId = response["resp"]["connection"]["pccConnId"]
+        connReqInvitation = getJoinedSimplexLink(response)
+        pccConnId = getResponseData(response, "connection")["pccConnId"]
         req_data["bsx_address"] = addr_from
         req_data["connection_req"] = connReqInvitation
 
@@ -10153,7 +10155,7 @@ class BasicSwap(BaseApp, UIApp):
             connReqInvitation = req_data["connection_req"]
             cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
             response = net_i.wait_for_command_response(cmd_id)
-            pccConnId = response["resp"]["connection"]["pccConnId"]
+            pccConnId = getResponseData(response, "connection")["pccConnId"]
 
             now: int = self.getTime()
             message_route = DirectMessageRoute(
@@ -10211,8 +10213,9 @@ class BasicSwap(BaseApp, UIApp):
             self.saveBidInSession(bid_id, bid, cursor)
 
     def processContactConnected(self, event_data) -> None:
-        connId = event_data["resp"]["contact"]["activeConn"]["connId"]
-        localDisplayName = event_data["resp"]["contact"]["localDisplayName"]
+        contact_data = getResponseData(event_data, "contact")
+        connId = contact_data["activeConn"]["connId"]
+        localDisplayName = contact_data["localDisplayName"]
         self.log.debug(
             f"Processing Contact Connected event, ID: {connId}, contact name: {localDisplayName}."
         )
@@ -10274,7 +10277,7 @@ class BasicSwap(BaseApp, UIApp):
 
     def processContactDisconnected(self, event_data) -> None:
         net_i = self.getActiveNetworkInterface(2)
-        connId = event_data["resp"]["contact"]["activeConn"]["connId"]
+        connId = getResponseData(event_data, "contact")["activeConn"]["connId"]
         self.log.info(f"Direct message route disconnected, connId: {connId}")
         closeSimplexChat(self, net_i, connId)
 
