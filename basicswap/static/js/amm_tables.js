@@ -523,10 +523,16 @@ const AmmTablesManager = (function() {
             'bitcoin cash': 'BCH',
             'bitcoincash': 'BCH',
             'bch': 'BCH',
+            'decred': 'DCR',
+            'dcr': 'DCR',
+            'dogecoin': 'DOGE',
+            'doge': 'DOGE',
             'monero': 'XMR',
             'xmr': 'XMR',
             'litecoin': 'LTC',
             'ltc': 'LTC',
+            'namecoin': 'NMC',
+            'nmc': 'NMC',
             'wownero': 'WOW',
             'wow': 'WOW',
             'dash': 'DASH',
@@ -536,7 +542,10 @@ const AmmTablesManager = (function() {
             'zcoin': 'FIRO',
             'BTC': 'BTC',
             'BCH': 'BCH',
+            'DCR': 'DCR',
+            'DOGE': 'DOGE',
             'LTC': 'LTC',
+            'NMC': 'NMC',
             'XMR': 'XMR',
             'PART': 'PART',
             'WOW': 'WOW',
@@ -601,7 +610,7 @@ const AmmTablesManager = (function() {
 
     async function fetchLatestPrices() {
         try {
-            const coins = 'BTC,BCH,LTC,XMR,PART,WOW,FIRO,DASH,PIVX';
+            const coins = 'BTC,BCH,DCR,DOGE,LTC,NMC,XMR,PART,WOW,FIRO,DASH,PIVX';
 
             const response = await fetch('/json/coinprices', {
                 method: 'POST',
