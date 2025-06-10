@@ -61,6 +61,7 @@ Create offers
             "amount_variable": Can send bids below the set "amount" where possible if true.
             "max_coin_from_balance": Won't send bids if wallet amount of "coin_from" would be above.
             "address": Address offer is sent from, default will generate a new address per bid.
+            "use_balance_bidding": If true, calculates bid amount as (wallet_balance - offer_min_amount) instead of using template amount.
         },
         ...
     ]
@@ -1426,7 +1427,55 @@ def process_bids(args, config, script_state) -> None:
                 offer_id = offer["offer_id"]
                 offer_amount = float(offer["amount_from"])
                 offer_rate = float(offer["rate"])
-                bid_amount = bid_template["amount"]
+
+                # Check if we should use balance-based bidding
+                use_balance_bidding = bid_template.get("use_balance_bidding", False)
+
+                if use_balance_bidding:
+                    # Calculate bid amount based on available balance minus minimum amount
+                    # This follows the same pattern as offers: balance - min_amount
+                    try:
+                        # Get wallet balance for the coin we're bidding with (coin_from in the offer)
+                        wallet_from = read_json_api_wallet(
+                            "wallets/{}".format(coin_from_data["ticker"])
+                        )
+
+                        wallet_balance = float(wallet_from.get("balance", 0)) + float(
+                            wallet_from.get("unconfirmed", 0)
+                        )
+
+                        # Get minimum amount from the offer
+                        offer_min_amount = float(offer.get("amount_bid_min", 0.001))
+
+                        # Calculate available amount: balance - min_amount
+                        available_amount = wallet_balance - offer_min_amount
+
+                        if available_amount > 0:
+                            bid_amount = available_amount
+                            if args.debug:
+                                print(
+                                    f"Using balance-based bidding: {bid_amount} (balance: {wallet_balance} - min: {offer_min_amount})"
+                                )
+                        else:
+                            # Fallback to template amount if calculation fails
+                            bid_amount = bid_template["amount"]
+                            if args.debug:
+                                print(
+                                    f"Insufficient balance for balance-based bid, using template amount: {bid_amount}"
+                                )
+
+                    except Exception as balance_error:
+                        # Fallback to template amount if balance calculation fails
+                        bid_amount = bid_template["amount"]
+                        if args.debug:
+                            print(
+                                f"Error calculating balance-based bid amount: {balance_error}, using template amount: {bid_amount}"
+                            )
+                else:
+                    # Use traditional template amount
+                    bid_amount = bid_template["amount"]
+                    if args.debug:
+                        print(f"Using template bid amount: {bid_amount}")
             except (KeyError, TypeError, ValueError) as e:
                 if args.debug:
                     print(f"Error processing offer data: {e}, offer: {offer}")
