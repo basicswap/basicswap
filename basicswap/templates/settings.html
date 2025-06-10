@@ -35,542 +35,614 @@
   </div>
  </section>
  {% include 'inc_messages.html' %}
- <section>
-  <div class="pl-6 pr-6 pt-0 pb-6 mt-5 h-full overflow-hidden">
-   <div class="pb-6">
-    <div class="flex flex-wrap items-center justify-between -m-2">
-     <div class="w-full pt-2">
-      <div class="mb-4 border-b pb-5 border-gray-200 dark:border-gray-500">
-       <ul class="flex flex-wrap text-sm font-medium text-center text-gray-500 dark:text-gray-400" id="myTab" data-tabs-toggle="#settingstab" role="tablist">
-        <li class="mr-2">
-         <a class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" id="coins-tab" data-tabs-target="#coins" role="tab" aria-controls="coins" aria-selected={% if active_tab == 'default' %}"true"{% else %}"false"{% endif %}>Coins</a>
-        </li>
-        <li class="mr-2">
-         <a class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" id="general-tab" data-tabs-target="#general" role="tab" aria-controls="general" aria-selected={% if active_tab == 'general' %}"true"{% else %}"false"{% endif %}>General</a>
-        </li>
-        <li class="mr-2">
-         <a class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" id="tor-tab" data-tabs-target="#tor" role="tab" aria-controls="tor" aria-selected={% if active_tab == 'tor' %}"true"{% else %}"false"{% endif %}>Tor</a>
-        </li>
-       </ul>
-      </div>
-     </div>
+
+
+
+ <section class="py-4">
+  <div class="container px-4 mx-auto">
+   <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl  ">
+    <div class="">
+     <nav class="flex space-x-8 px-6" aria-label="Tabs">
+      <button class="tab-button border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="coins" id="coins-tab">
+       Coins
+      </button>
+      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="general" id="general-tab">
+       General
+      </button>
+      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="tor" id="tor-tab">
+       Tor
+      </button>
+     </nav>
     </div>
    </div>
   </div>
  </section>
- <div id="settingstab">
-  <div class="hidden rounded-lg" id="coins" role="tabpanel" aria-labelledby="coins-tab">
-   <form method="post">
-    {% for c in chains %}
-    <section class="pl-6">
-     <div class="flex flex-wrap items-center">
-      <div class="w-full">
-       <h4 class="font-semibold text-black dark:text-white text-2xl align-middle">
-        <span class="mr-2 inline-block align-middle items-center justify-center w-9 h-10 bg-white-50 rounded">
-         <img class="h-9" src="/static/images/coins/{{ c.name }}.png" alt="">
-        </span>
-    {{ c.display_name }}
-       </h4>
-      </div>
-     </div>
-    </section>
-    <section>
-     <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-      <div class="border-coolGray-100">
-       <div class="flex flex-wrap items-center justify-between -m-2">
-        <div class="w-full pt-2">
-         <div class="container mt-5 mx-auto">
-          <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-           <div class="px-6">
-            <div class="w-full mt-6 pb-6 overflow-x-auto">
-             <table class="w-full min-w-max text-sm">
-              <thead class="uppercase">
-               <tr class="text-left">
-                <th class="p-0">
-                 <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                  <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span>
-                 </div>
-                </th>
-                <th class="p-0">
-                 <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                  <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
-                 </div>
-                </th>
-               </tr>
-              </thead>
-              {% if c.connection_type %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-               <td class="py-3 px-6 bold">Connection Type</td>
-               <td class="py-3 px-6">{{ c.connection_type }}</td>
-              </tr>
-              {% endif %}
-              {% if c.manage_daemon is defined %}
-              {% if c.name in ('wownero', 'monero') %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Manage Daemon</td>
-               <td class="py-3 px-6">
-                <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                 <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="managedaemon_{{ c.name }}">
-                  <option value="true" {% if c.manage_daemon==true %} selected{% endif %}>True</option>
-                  <option value="false" {% if c.manage_daemon==false %} selected{% endif %}>False</option>
-                 </select>
-                </div>
-               </td>
-              </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Daemon RPC Host</td>
-               <td class="py-3 px-6">
-                <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="rpchost_{{ c.name }}" value="{{ c.rpchost }}">
-               </td>
-              </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Daemon RPC Port</td>
-               <td class="py-3 px-6">
-                <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="rpcport_{{ c.name }}" value="{{ c.rpcport }}">
-               </td>
-              </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">List trusted public nodes to use if “Automatically Select Daemon” is set as “True”.</td>
-               <td class="py-3 px-6">
-                <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" placeholder="(Add one entry per line) eg: node.xmr.to:18081" name="remotedaemonurls_{{ c.name }}" rows="4" cols="45">{{ c.remotedaemonurls }}</textarea>
-               </td>
-              </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Automatically Select Daemon</td>
-               <td class="py-3 px-6">
-                <div class="w-52 md:flex-1">
-                 <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                  <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="autosetdaemon_{{ c.name }}">
-                   <option value="true" {% if c.autosetdaemon==true %} selected{% endif %}>True</option>
-                   <option value="false" {% if c.autosetdaemon==false %} selected{% endif %}>False</option>
-                  </select>
-                 </div>
-                </div>
-               </td>
-              </tr>
-              {% else %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-               <td class="py-3 px-6 bold">Manage Daemon</td>
-               <td class="py-3 px-6">{{ c.manage_daemon }}</td>
-              </tr>
-              {% endif %}
-              {% endif %}
-              {% if c.manage_wallet_daemon is defined %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
-               <td class="py-3 px-6 bold">Manage Wallet Daemon</td>
-               <td class="py-3 px-6">{{ c.manage_wallet_daemon }}</td>
-              </tr>
-              {% endif %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Chain Lookups</td>
-               <td class="py-3 px-6">
-                <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                 <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="lookups_{{ c.name }}">
-                  <option value="local" {% if c.lookups=='local' %} selected{% endif %}>Local Node</option>
-                  <option value="explorer" {% if c.lookups=='explorer' %} selected{% endif %}>Explorer</option>
-                 </select>
-                </div>
-               </td>
-              </tr>
-              {% if c.name in ('wownero', 'monero') %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Transaction Fee Priority</td>
-               <td class="py-3 px-6">
-                <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                 <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_priority_{{ c.name }}">
-                  <option value="0" {% if c.fee_priority==0 %} selected{% endif %}>Auto</option>
-                  <option value="1" {% if c.fee_priority==1 %} selected{% endif %}>Slow</option>
-                  <option value="2" {% if c.fee_priority==2 %} selected{% endif %}>Normal</option>
-                  <option value="3" {% if c.fee_priority==3 %} selected{% endif %}>Fast</option>
-                 </select>
-                </div>
-               </td>
-              </tr>
-              {% else %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Blocks Confirmed Target</td>
-               <td class="py-3 px-6">
-                <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}">
-               </td>
-              </tr>
-              {% endif %}
-              {% if c.name == 'particl' %}
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-               <td class="py-3 px-6 bold">Anon Tx Ring Size</td>
-               <td class="py-3 px-6">
-                <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="rct_ring_size_{{ c.name }}" min="3" max="32" value="{{ c.anon_tx_ring_size }}">
-               </td>
-              </tr>
-              {% endif %}
-             </table>
-            </div>
-           </div>
-          </div>
+
+ <div class="container px-4 mx-auto">
+  
+  <div class="tab-content" id="coins" role="tabpanel" aria-labelledby="coins-tab">
+   <form method="post" id="coins-form">
+    <div class="space-y-6">
+     {% for c in chains %}
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl  overflow-hidden coin-card" data-coin="{{ c.name }}">
+
+      <div class="px-6 py-4 cursor-pointer coin-header" data-coin="{{ c.name }}">
+       <div class="flex items-center justify-between">
+        <div class="flex items-center">
+         <div class="flex-shrink-0">
+          <img class="h-10 w-10" src="/static/images/coins/{{ c.name }}.png" alt="{{ c.display_name }}">
          </div>
-    </section>
-    <section>
-     <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
-      <div class="pb-6 ">
-       <div class="flex flex-wrap items-center justify-between -m-2">
-        <div class="w-full pt-2">
-         <div class="container mx-auto">
-          <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
-           <div class="px-6">
-            <div class="flex flex-wrap justify-end">
-             <div class="w-full md:w-auto p-1.5 ml-2">
-              <button name="apply_{{ c.name }}" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Apply</button>
-             </div>
-             {% if c.can_disable == true %}
-             <div class="w-full md:w-auto p-1.5 ml-2">
-              <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white border border-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Disable Coin</button>
-             </div>
-             {% endif %}
-             {% if c.can_reenable == true %}
-             <div class="w-full md:w-auto p-1.5 ml-2">
-              <button name="enable_{{ c.name }}" value="Enable" onclick="return confirmPopup('Enable', '{{ c.display_name }}');" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Enable</button>
-             </div>
-             {% endif %}
-            </div>
-           </div>
-          </div>
+         <div class="ml-4">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ c.display_name }} ({{ c.ticker }})</h3>
          </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+         {% if c.can_disable == true %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8">
+           <circle cx="4" cy="4" r="3"/>
+          </svg>
+          Enabled
+         </span>
+         {% else %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8">
+           <circle cx="4" cy="4" r="3"/>
+          </svg>
+          Disabled
+         </span>
+         {% endif %}
+
+         <svg class="w-5 h-5 transform transition-transform toggle-arrow text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+         </svg>
         </div>
        </div>
       </div>
+
+      <div class="coin-details hidden" id="details-{{ c.name }}">
+       <div class="px-6 py-6">
+        
+        {% if c.connection_type %}
+        <div class="mb-6">
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          Connection
+         </h4>
+         
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+           
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Connection Type</label>
+            <div class="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg text-sm text-gray-900 dark:text-gray-100">
+             {{ c.connection_type }}
+            </div>
+           </div>
+           
+           {% if c.manage_daemon is defined %}
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Manage Daemon</label>
+            {% if c.name in ('wownero', 'monero') %}
+            <div class="relative">
+             <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="managedaemon_{{ c.name }}">
+              <option value="true" {% if c.manage_daemon==true %} selected{% endif %}>True</option>
+              <option value="false" {% if c.manage_daemon==false %} selected{% endif %}>False</option>
+             </select>
+             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+             </div>
+            </div>
+            {% else %}
+            <div class="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg text-sm text-gray-900 dark:text-gray-100">
+             {{ c.manage_daemon }}
+            </div>
+            {% endif %}
+           </div>
+           {% endif %}
+           
+          </div>
+         </div>
+        </div>
+        {% endif %}
+
+        {% if c.name in ('wownero', 'monero') %}
+        <div class="mb-6">
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          RPC Configuration
+         </h4>
+
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Daemon RPC Host</label>
+            <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="rpchost_{{ c.name }}" value="{{ c.rpchost }}" placeholder="127.0.0.1">
+           </div>
+
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Daemon RPC Port</label>
+            <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="rpcport_{{ c.name }}" value="{{ c.rpcport }}" placeholder="18081">
+           </div>
+
+          </div>
+
+          <div class="mb-4">
+           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Automatically Select Daemon</label>
+           <div class="relative">
+            <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="autosetdaemon_{{ c.name }}">
+             <option value="true" {% if c.autosetdaemon==true %} selected{% endif %}>True</option>
+             <option value="false" {% if c.autosetdaemon==false %} selected{% endif %}>False</option>
+            </select>
+            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+             </svg>
+            </div>
+           </div>
+          </div>
+
+          <div>
+           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Trusted Public Nodes</label>
+           <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">List trusted public nodes to use if "Automatically Select Daemon" is enabled (one per line)</p>
+           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" placeholder="node.xmr.to:18081&#10;node2.xmr.to:18081" name="remotedaemonurls_{{ c.name }}" rows="4">{{ c.remotedaemonurls }}</textarea>
+          </div>
+         </div>
+        </div>
+        {% endif %}
+
+        <div class="mb-6">
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          Advanced Settings
+         </h4>
+
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chain Lookups</label>
+            <div class="relative">
+             <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="lookups_{{ c.name }}">
+              <option value="local" {% if c.lookups=='local' %} selected{% endif %}>Local Node</option>
+              <option value="explorer" {% if c.lookups=='explorer' %} selected{% endif %}>Explorer</option>
+             </select>
+             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+             </div>
+            </div>
+           </div>
+
+           {% if c.manage_wallet_daemon is defined %}
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Manage Wallet Daemon</label>
+            <div class="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg text-sm text-gray-900 dark:text-gray-100">
+             {{ c.manage_wallet_daemon }}
+            </div>
+           </div>
+           {% endif %}
+
+           {% if c.name in ('wownero', 'monero') %}
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Transaction Fee Priority</label>
+            <div class="relative">
+             <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="fee_priority_{{ c.name }}">
+              <option value="0" {% if c.fee_priority==0 %} selected{% endif %}>Auto</option>
+              <option value="1" {% if c.fee_priority==1 %} selected{% endif %}>Slow</option>
+              <option value="2" {% if c.fee_priority==2 %} selected{% endif %}>Normal</option>
+              <option value="3" {% if c.fee_priority==3 %} selected{% endif %}>Fast</option>
+             </select>
+             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+             </div>
+            </div>
+           </div>
+           {% else %}
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Blocks Confirmed Target</label>
+            <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}" placeholder="6">
+           </div>
+           {% endif %}
+
+           {% if c.name == 'particl' %}
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Anon Tx Ring Size</label>
+            <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="rct_ring_size_{{ c.name }}" min="3" max="32" value="{{ c.anon_tx_ring_size }}" placeholder="12">
+           </div>
+           {% endif %}
+
+          </div>
+         </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-4 ">
+         <button name="apply_{{ c.name }}" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+          Apply Changes
+         </button>
+         {% if c.can_disable == true %}
+         <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+          Disable Coin
+         </button>
+         {% endif %}
+         {% if c.can_reenable == true %}
+         <button name="enable_{{ c.name }}" value="Enable" onclick="return confirmPopup('Enable', '{{ c.display_name }}');" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+          Enable Coin
+         </button>
+         {% endif %}
+        </div>
+
+       </div>
+      </div>
+
      </div>
-    </section>
-    {% endfor %}
+     {% endfor %}
+    </div>
     <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
   </div>
-  <div class="hidden rounded-lg" id="general" role="tabpanel" aria-labelledby="general-tab">
-   <section class="pl-6">
-    <div class="flex flex-wrap items-center">
-     <div class="w-full">
-      <h4 class="font-semibold text-black dark:text-white text-2xl align-middle">
-       <span class="mr-2 inline-block align-middle items-center justify-center w-0 h-10 bg-white-50 rounded">
-       </span>General
-      </h4>
-     </div>
-    </div>
-   </section>
-   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-     <div class="border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-       <div class="w-full pt-2">
-        <div class="container mt-5 mx-auto">
-         <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-          <div class="px-6">
-           <div class="w-full mt-6 pb-6 overflow-x-auto">
-            <table class="w-full min-w-max text-sm">
-             <thead class="uppercase">
-              <tr class="text-left">
-               <th class="p-0">
-                <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span>
-                </div>
-               </th>
-               <th class="p-0">
-                <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
-                </div>
-               </th>
-              </tr>
-             </thead>
-             <tr>
-            <td colspan="2" class="py-3 px-6">
-              <div class="flex items-center">
-                <span class="text-red-500 dark:text-red-500 text-sm font-medium">WARNING: Advanced features - Only enable if you know what you're doing!</span>
-             </div>
-             </td>
-             </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold w-96 bold">Debug Mode</td>
-              <td class="py-3 px-6">
-               <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                <select name="debugmode" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                 <option {% if general_settings.debug %}selected{% endif %} value="true">True</option>
-                 <option {% if not general_settings.debug %}selected{% endif %} value="false">False</option>
-                </select>
-               </div>
-              </td>
-             </tr>
-             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold">Debug Mode UI</td>
-              <td class="py-3 px-6">
-               <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                <select name="debugui" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                 <option {% if general_settings.debug_ui %}selected{% endif %} value="true">True</option>
-                 <option {% if not general_settings.debug_ui %}selected{% endif %} value="false">False</option>
-                </select>
-               </div>
-              </td>
-             </tr>
-             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold">Remove DB records for expired offers</td>
-              <td class="py-3 px-6">
-               <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                <select name="expire_db_records" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                 <option {% if general_settings.expire_db_records %}selected{% endif %} value="true">True</option>
-                 <option {% if not general_settings.expire_db_records %}selected{% endif %} value="false">False</option>
-                </select>
-               </div>
-              </td>
-             </tr>
-            </table>
-           </div>
-          </div>
+
+  <div class="tab-content hidden" id="general" role="tabpanel" aria-labelledby="general-tab">
+   <form method="post" id="general-form">
+    <div class="space-y-6">
+
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl  ">
+      <div class="px-6 py-4 ">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        Debug Settings
+       </h3>
+       <div class="mt-2 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert">
+        <div class="flex items-start">
+         <div class="flex-shrink-0">
+          <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+          </svg>
+         </div>
+         <div class="ml-3">
+          <p class="text-sm font-medium text-red-800 dark:text-red-400">
+           WARNING: Advanced features - Only enable if you know what you're doing!
+          </p>
          </div>
         </div>
        </div>
       </div>
-     </div>
-    </div>
-   </section>
-   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
-     <div class="pb-6 ">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-       <div class="w-full pt-2">
-        <div class="container mx-auto">
-         <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
-          <div class="px-6">
-           <div class="flex flex-wrap justify-end">
-            <div class="w-full md:w-auto p-1.5 ml-2">
-             <button name="apply_general" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Apply</button>
-            </div>
-           </div>
+
+      <div class="px-6 py-6">
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Debug Mode</label>
+         <div class="relative">
+          <select name="debugmode" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if general_settings.debug %}selected{% endif %} value="true">Enabled</option>
+           <option {% if not general_settings.debug %}selected{% endif %} value="false">Disabled</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
           </div>
          </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enable detailed logging and debug information</p>
         </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Debug UI</label>
+         <div class="relative">
+          <select name="debugui" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if general_settings.debug_ui %}selected{% endif %} value="true">Enabled</option>
+           <option {% if not general_settings.debug_ui %}selected{% endif %} value="false">Disabled</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+          </div>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Show advanced UI elements and debug controls</p>
+        </div>
+
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Remove DB Records for Expired Offers</label>
+         <div class="relative max-w-xs">
+          <select name="expire_db_records" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if general_settings.expire_db_records %}selected{% endif %} value="true">Enabled</option>
+           <option {% if not general_settings.expire_db_records %}selected{% endif %} value="false">Disabled</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+          </div>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Automatically clean up database records for expired offers</p>
+        </div>
+
+       </div>
+
+       <div class="flex justify-end pt-6  mt-6">
+        <button name="apply_general" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Apply Changes
+        </button>
+       </div>
+      </div>
+     </div>
+
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl  ">
+      <div class="px-6 py-4 ">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        Charts Configuration
+       </h3>
+      </div>
+
+      <div class="px-6 py-6">
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Show Charts</label>
+         <div class="relative">
+          <select name="showchart" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if chart_settings.show_chart %}selected{% endif %} value="true">Enabled</option>
+           <option {% if not chart_settings.show_chart %}selected{% endif %} value="false">Disabled</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+          </div>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enable price charts in the interface</p>
+        </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">CryptoCompare API Key</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="chartapikey" value="{{ chart_settings.chart_api_key }}" placeholder="Enter API key">
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">API key for CryptoCompare price data</p>
+        </div>
+
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">CoinGecko API Key</label>
+         <div class="max-w-md">
+          <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="coingeckoapikey" value="{{ chart_settings.coingecko_api_key }}" placeholder="Enter API key">
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">API key for CoinGecko price data (optional for basic usage)</p>
+        </div>
+
+       </div>
+
+       <div class="flex justify-end pt-6  mt-6">
+        <button name="apply_chart" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Apply Changes
+        </button>
        </div>
       </div>
      </div>
     </div>
-   </section>
-   <section class="pl-6">
-    <div class="flex flex-wrap items-center">
-     <div class="w-full">
-      <h4 class="font-semibold text-black dark:text-white text-2xl align-middle">
-       <span class="mr-2 inline-block align-middle items-center justify-center w-0 h-10 bg-white-50 rounded">
-       </span>Price Chart
-      </h4>
-     </div>
-    </div>
-   </section>
-   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-     <div class="border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-       <div class="w-full pt-2">
-        <div class="container mt-5 mx-auto">
-         <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-          <div class="px-6">
-           <div class="w-full mt-6 pb-6 overflow-x-auto">
-            <table class="w-full min-w-max text-sm">
-             <thead class="uppercase">
-              <tr class="text-left">
-               <th class="p-0">
-                <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span>
-                </div>
-               </th>
-               <th class="p-0">
-                <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
-                </div>
-               </th>
-              </tr>
-             </thead>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold w-96 bold">Show Price Chart</td>
-              <td class="py-3 px-6">
-               <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                <select name="showchart" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                 <option {% if chart_settings.show_chart %}selected{% endif %} value="true">True</option>
-                 <option {% if not chart_settings.show_chart %}selected{% endif %} value="false">False</option>
-                </select>
-               </div>
-              </td>
-             </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold">Chart API Key (CryptoCompare)</td>
-              <td class="py-3 px-6">
-               <label for="chartapikey" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Chart API (free) Key at <a class="inline-block text-blue-500 hover:text-blue-600 hover:underline" href="https://min-api.cryptocompare.com/" target="_blank">CryptoCompare.com</a>
-                <br />
-               </label>
-               <input name="chartapikey" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" min="3" max="32" value="{{chart_settings.chart_api_key}}">
-              </td>
-             </tr>
-             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-             <td class="py-3 px-6 bold">Chart API Key (CoinGecko)</td>
-             <td class="py-3 px-6">
-              <label for="coingeckoapikey" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Chart API (free) Key at <a class="inline-block text-blue-500 hover:text-blue-600 hover:underline" href="https://coingecko.com/" target="_blank">CoinGecko.com</a>
-               <br />
-              </label>
-              <input name="coingeckoapikey" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" min="3" max="32" value="{{chart_settings.coingecko_api_key}}">
-             </td>
-            </tr>
-            <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-             <td class="py-3 px-6 bold">Enabled Coins</td>
-             <td class="py-3 px-6">
-              <label for="enabledchartcoins" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Coins to show data for: Blank for active coins, "all" for all known coins or comma separated<br/> list of coin tickers to show
-               <br />
-              </label>
-              <input name="enabledchartcoins" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" value="{{chart_settings.enabled_chart_coins}}">
-             </td>
-            </tr>
-            </table>
-           </div>
-          </div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-    </div>
-   </section>
-   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
-     <div class="pb-6 ">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-       <div class="w-full pt-2">
-        <div class="container mx-auto">
-         <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
-          <div class="px-6">
-           <div class="flex flex-wrap justify-end">
-            <div class="w-full md:w-auto p-1.5 ml-2">
-             <button name="apply_chart" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Apply</button>
-            </div>
-           </div>
-          </div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-    </div>
-   </section>
+    <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
   </div>
-  <div class="hidden rounded-lg" id="tor" role="tabpanel" aria-labelledby="tor-tab">
-   <section class="pl-6">
-    <div class="flex flex-wrap items-center">
-     <div class="w-full">
-      <h4 class="font-semibold text-black dark:text-white text-2xl align-middle">
-       <span class="mr-2 inline-block align-middle items-center justify-center w-0 h-10 bg-white-50 rounded">
-       </span>Tor
-      </h4>
-     </div>
-    </div>
-   </section>
-   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-     <div class="border-coolGray-100">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-       <div class="w-full pt-2">
-        <div class="container mt-5 mx-auto">
-         <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-          <div class="px-6">
-           <div class="w-full mt-6 pb-6 overflow-x-auto">
-            <table class="w-full min-w-max text-sm">
-             <thead class="uppercase">
-              <tr class="text-left">
-               <th class="p-0">
-                <div class="py-3 px-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600">
-                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Options</span>
-                </div>
-               </th>
-               <th class="p-0">
-                <div class="py-3 px-6 rounded-tr-xl bg-coolGray-200 dark:bg-gray-600">
-                 <span class="text-xs text-gray-600 dark:text-gray-300 font-semibold">Settings</span>
-                </div>
-               </th>
-              </tr>
-             </thead>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold">Use Tor Proxy</td>
-              <td class="py-3 px-6">
-               <div class="w-1/5 md:flex-1">
-                <div class="relative">
-                {{ input_arrow_down_svg| safe }}
-                 <select name="usetorproxy" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
-                  <option {% if tor_settings.use_tor %}selected{% endif %} value="true">True</option>
-                  <option {% if not tor_settings.use_tor %}selected{% endif %} value="false">False</option>
-                 </select>
-                </div>
-               </div>
-              </td>
-             </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold w-96">Tor Proxy Host</td>
-              <td class="py-3 px-6">
-               <input name="proxyhost" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="" min="3" max="32" value="{{tor_settings.proxy_host}}">
-              </td>
-             </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold w-96">Tor Proxy Port</td>
-              <td class="py-3 px-6">
-               <input name="proxyport" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="" min="3" max="32" value="{{tor_settings.proxy_port}}">
-              </td>
-             </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold w-96">Tor Control Port</td>
-              <td class="py-3 px-6">
-               <input name="controlport" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="" min="3" max="32" value="{{tor_settings.control_port}}">
-              </td>
-             </tr>
-              <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-              <td class="py-3 px-6 bold w-96">Tor Control Password</td>
-              <td class="py-3 px-6">
-               <input name="controlpwd" type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="" min="3" max="32" value="{{tor_settings.control_password}}">
-              </td>
-             </tr>
-            </table>
-           </div>
+
+  <div class="tab-content hidden" id="tor" role="tabpanel" aria-labelledby="tor-tab">
+   <form method="post" id="tor-form">
+    <div class="space-y-6">
+
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl  ">
+      <div class="px-6 py-4 ">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        Tor Configuration
+       </h3>
+      </div>
+
+      <div class="px-6 py-6">
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Use Tor Proxy</label>
+         <div class="relative">
+          <select name="usetorproxy" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if tor_settings.use_tor %}selected{% endif %} value="true">Enabled</option>
+           <option {% if not tor_settings.use_tor %}selected{% endif %} value="false">Disabled</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
           </div>
          </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enable Tor proxy for enhanced privacy</p>
         </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tor Proxy Host</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="proxyhost" value="{{ tor_settings.proxy_host }}" placeholder="127.0.0.1">
+        </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tor Proxy Port</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="proxyport" value="{{ tor_settings.proxy_port }}" placeholder="9050">
+        </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tor Control Port</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="controlport" value="{{ tor_settings.control_port }}" placeholder="9051">
+        </div>
+
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tor Control Password</label>
+         <div class="max-w-md">
+          <input type="password" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="controlpwd" value="{{ tor_settings.control_password }}" placeholder="Enter password">
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Password for Tor control interface (optional)</p>
+        </div>
+
+       </div>
+
+       <div class="flex justify-end pt-6  mt-6">
+        <button name="apply_tor" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Apply Changes
+        </button>
        </div>
       </div>
      </div>
     </div>
-   </section>
-   <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden ">
-     <div class="pb-6 ">
-      <div class="flex flex-wrap items-center justify-between -m-2">
-       <div class="w-full pt-2">
-        <div class="container mx-auto">
-         <div class="pt-6 pb-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
-          <div class="px-6">
-           <div class="flex flex-wrap justify-end">
-            <div class="w-full md:w-auto p-1.5 ml-2">
-             <button name="apply_tor" value="Apply" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Apply</button>
-            </div>
-           </div>
-          </div>
-         </div>
-        </div>
-       </div>
-      </div>
-     </div>
-   </section>
+    <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
   </div>
+
  </div>
+</div>
+
+<div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="confirmTitle">Confirm Action</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+        <div class="flex justify-center gap-4">
+          <button type="button" id="confirmYes"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Confirm
+          </button>
+          <button type="button" id="confirmNo"
+                  class="px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
+</div>
+
 <script>
-  function confirmPopup(action, coin_name) {
-   return confirm(action + " " + coin_name + "?\nWill shutdown basicswap.");
+document.addEventListener('DOMContentLoaded', function() {
+ const tabButtons = document.querySelectorAll('.tab-button');
+ const tabContents = document.querySelectorAll('.tab-content');
+
+ function switchTab(targetTab) {
+  tabButtons.forEach(btn => {
+   if (btn.dataset.tab === targetTab) {
+    btn.className = 'tab-button border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0';
+   } else {
+    btn.className = 'tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0';
+   }
+  });
+
+  tabContents.forEach(content => {
+   if (content.id === targetTab) {
+    content.classList.remove('hidden');
+   } else {
+    content.classList.add('hidden');
+   }
+  });
+ }
+
+ tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+   switchTab(btn.dataset.tab);
+  });
+ });
+
+ const coinHeaders = document.querySelectorAll('.coin-header');
+ coinHeaders.forEach(header => {
+  header.addEventListener('click', function() {
+   const coinName = this.dataset.coin;
+   const details = document.getElementById(`details-${coinName}`);
+   const arrow = this.querySelector('.toggle-arrow');
+
+   if (details.classList.contains('hidden')) {
+    details.classList.remove('hidden');
+    arrow.style.transform = 'rotate(180deg)';
+   } else {
+    details.classList.add('hidden');
+    arrow.style.transform = 'rotate(0deg)';
+   }
+  });
+ });
+
+ let confirmCallback = null;
+ let triggerElement = null;
+
+ document.getElementById('confirmYes').addEventListener('click', function() {
+  if (typeof confirmCallback === 'function') {
+   confirmCallback();
   }
+  hideConfirmDialog();
+ });
+
+ document.getElementById('confirmNo').addEventListener('click', hideConfirmDialog);
+
+ function showConfirmDialog(title, message, callback) {
+  confirmCallback = callback;
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMessage').textContent = message;
+  const modal = document.getElementById('confirmModal');
+  if (modal) {
+   modal.classList.remove('hidden');
+  }
+  return false;
+ }
+
+ function hideConfirmDialog() {
+  const modal = document.getElementById('confirmModal');
+  if (modal) {
+   modal.classList.add('hidden');
+  }
+  confirmCallback = null;
+  return false;
+ }
+
+ window.confirmPopup = function(action, coin_name) {
+  triggerElement = document.activeElement;
+  const title = `Confirm ${action} ${coin_name}`;
+  const message = `Are you sure you want to ${action.toLowerCase()} ${coin_name}?\n\nThis will shutdown BasicSwap.`;
+
+  return showConfirmDialog(title, message, function() {
+   if (triggerElement) {
+    const form = triggerElement.form;
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.name = triggerElement.name;
+    hiddenInput.value = triggerElement.value;
+    form.appendChild(hiddenInput);
+    form.submit();
+   }
+  });
+ };
+
+ const overrideButtonConfirm = function(button, action, coinName) {
+  if (button) {
+   button.removeAttribute('onclick');
+   button.addEventListener('click', function(e) {
+    e.preventDefault();
+    triggerElement = this;
+    return confirmPopup(action, coinName);
+   });
+  }
+ };
+
+ const disableButtons = document.querySelectorAll('button[name^="disable_"]');
+ disableButtons.forEach(btn => {
+  const coinName = btn.name.replace('disable_', '');
+  const displayName = btn.closest('.coin-card').querySelector('h3').textContent.split(' (')[0];
+  overrideButtonConfirm(btn, 'Disable', displayName);
+ });
+
+ const enableButtons = document.querySelectorAll('button[name^="enable_"]');
+ enableButtons.forEach(btn => {
+  const coinName = btn.name.replace('enable_', '');
+  const displayName = btn.closest('.coin-card').querySelector('h3').textContent.split(' (')[0];
+  overrideButtonConfirm(btn, 'Enable', displayName);
+ });
+
+ switchTab('coins');
+});
+
+
 </script>
+
 {% include 'footer.html' %}
-</body>
-</html>
