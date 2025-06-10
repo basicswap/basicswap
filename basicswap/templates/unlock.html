@@ -3,39 +3,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   {% if refresh %}
   <meta http-equiv="refresh" content="{{ refresh }}">
   {% endif %}
   <title>(BSX) BasicSwap - v{{ version }}</title>
   <link rel="icon" sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-  <!-- CSS Stylesheets -->
   <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
-  <!-- Custom styles -->
   <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
   <script>
-    function getAPIKeys() {
-      return {
-        cryptoCompare: "{{ chart_api_key|safe }}",
-        coinGecko: "{{ coingecko_api_key|safe }}"
-      };
-    }
-
-    (function() {
-      Object.defineProperty(window, 'ws_port', {
-        value: "{{ ws_port|safe }}",
-        writable: false,
-        configurable: false,
-        enumerable: true
-      });
-      window.getWebSocketConfig = window.getWebSocketConfig || function() {
-        return {
-          port: window.ws_port || '11700',
-          fallbackPort: '11700'
-        };
-      };
-    })();
-
     (function() {
       const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
         (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -46,146 +23,205 @@
       document.documentElement.classList.toggle('dark', isDarkMode);
     })();
   </script>
-  <!-- Third-party Libraries -->
-  <script src="/static/js/libs/chart.js"></script>
-  <script src="/static/js/libs/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script src="/static/js/libs/popper.js"></script>
-  <script src="/static/js/libs/tippy.js"></script>
-  <!-- UI Components -->
-  <script src="/static/js/ui/tabs.js"></script>
-  <script src="/static/js/ui/dropdown.js"></script>
-  <!-- Core functionality -->
-  <script src="/static/js/modules/coin-manager.js"></script>
-  <script src="/static/js/modules/config-manager.js"></script>
-  <script src="/static/js/modules/cache-manager.js"></script>
-  <script src="/static/js/modules/cleanup-manager.js"></script>
-  <script src="/static/js/modules/websocket-manager.js"></script>
-  <script src="/static/js/modules/network-manager.js"></script>
-  <script src="/static/js/modules/api-manager.js"></script>
-  <script src="/static/js/modules/price-manager.js"></script>
-  <script src="/static/js/modules/tooltips-manager.js"></script>
-  <script src="/static/js/modules/notification-manager.js"></script>
-  <script src="/static/js/modules/identity-manager.js"></script>
-  <script src="/static/js/modules/summary-manager.js"></script>
-  {% if current_page == 'wallets' or current_page == 'wallet' %}
-  <script src="/static/js/modules/wallet-manager.js"></script>
-  {% endif %}
-  <!-- Memory management -->
-  <script src="/static/js/modules/memory-manager.js"></script>
-  <!-- Main application script -->
-  <script src="/static/js/global.js"></script>
 </head>
-    <script>
-    (function() {
-      const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
-        (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-      if (!localStorage.getItem('color-theme')) {
-        localStorage.setItem('color-theme', 'dark');
-      }
-      document.documentElement.classList.toggle('dark', isDarkMode);
-    })();
-    </script>
-
-    <link rel=icon sizes="32x32" type="image/png" href="/static/images/favicon/favicon-32.png">
-    <title>(BSX) BasicSwap - v{{ version }}</title>
-  </head>
-  <body class="dark:bg-gray-700">
-    <section class="py-24 md:py-32">
-      <div class="container px-4 mx-auto">
-        <div class="max-w-sm mx-auto">
-          <div class="mb-3 text-center">
-            <a class="inline-block mb-6" href="#">
-              <img src="/static/images/logos/basicswap-logo.svg" class="h-20 imageshow dark-image">
-              <img src="/static/images/logos/basicswap-logo-dark.svg" class="h-20 imageshow light-image">
-            </a>
-            <p class="text-lg text-coolGray-500 font-medium mb-6 dark:text-white">Unlock your wallets</p>
-            {% for m in messages %}
-            <section class="py-4" id="messages_{{ m[0] }}" role="alert">
-              <div class="container px-4 mx-auto">
-                <div class="p-6 text-green-800 rounded-lg bg-green-50 border border-green-500 dark:bg-gray-500 dark:text-green-400 rounded-md">
-                  <div class="flex flex-wrap justify-between items-center -m-2">
-                    <div class="flex-1 p-2">
-                      <div class="flex flex-wrap -m-1">
-                        <div class="w-auto p-1"> {{ circular_info_messages_svg | safe }} </div>
-                        <ul class="ml-4 mt-1">
-                          <li class="font-semibold text-sm text-green-500 error_msg text-left"><span class="bold">ALERT:</span></li>
-                          <li class="font-medium text-sm text-green-500 infomsg">This will unlock the system for all users!</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-            {% endfor %}
-            {% for m in err_messages %}
-            <section class="py-4" id="err_messages_{{ m[0] }}" role="alert">
-              <div class="container px-4 mx-auto">
-                <div class="p-6 text-green-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
-                  <div class="flex flex-wrap justify-between items-center -m-2">
-                    <div class="flex-1 p-2">
-                      <div class="flex flex-wrap -m-1">
-                        <div class="w-auto p-1"> {{ circular_error_messages_svg | safe }} </div>
-                        <ul class="ml-4 mt-1">
-                          <li class="font-semibold text-sm text-red-500 error_msg text-left"><span class="bold">ERROR:</span></li>
-                          <li class="font-medium text-sm text-red-500 error_msg">{{ m[1] }}</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </section>
-            {% endfor %}
+  <body class="bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center">
+    <div class="w-full max-w-md px-6">
+      <div class="bg-white dark:bg-gray-800 rounded-xl dark:shadow-lg p-8">
+        <div class="text-center mb-8">
+          <div class="mb-6">
+            <img src="/static/images/logos/basicswap-logo.svg" class="h-16 mx-auto imageshow dark-image">
+            <img src="/static/images/logos/basicswap-logo-dark.svg" class="h-16 mx-auto imageshow light-image">
           </div>
-          <form method="post" autocomplete="off">
-            <div class="mb-4">
-              <label class="block mb-2 text-coolGray-800 font-medium dark:text-white" for="">Your Password</label>
-              <div class="relative w-full">
-                <div class="absolute inset-y-0 right-0 flex items-center px-2">
-                  <input class="hidden js-password-toggle" id="toggle" type="checkbox" />
-                  <label class="px-2 py-1 text-sm text-gray-600 font-mono cursor-pointer js-password-label" for="toggle">
-                    <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24">
-                      <g fill="#8896ab">
-                        <path d="M23.444,10.239C21.905,8.062,17.708,3,12,3S2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0C2.1,15.938,6.292,21,12,21s9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239ZM12,17a5,5,0,1,1,5-5A5,5,0,0,1,12,17Z" fill="#8896ab"></path>
-                      </g>
-                    </svg>
-                  </label>
-                </div>
-                <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0 js-password" name="password" id="password" type="password" autocomplete="off" />
-              </div>
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Unlock BasicSwap</h1>
+          <p class="text-gray-600 dark:text-gray-400">Enter your password to access your wallets</p>
+        </div>
+
+        {% for m in messages %}
+        <div class="mb-4 p-4 bg-green-50 border border-green-500 rounded-lg dark:bg-gray-500 dark:text-green-400" role="alert">
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+              </svg>
             </div>
-            <button type="submit" name="unlock" value="Unlock" class="appearance-none focus:outline-none inline-block py-3 px-7 mb-6 w-full text-base text-blue-50 font-medium text-center leading-6 bg-blue-500 hover:bg-blue-600 focus:ring-0 rounded-md shadow-sm">Unlock</button>
-            <p class="text-center">
-              <span class="text-xs font-medium dark:text-white">Need help?</span>
-              <a class="inline-block text-xs font-medium text-blue-500 hover:text-blue-600 hover:underline" href="https://academy.particl.io/en/latest/faq/get_support.html" target="_blank">Help / Tutorials</a>
-            </p>
-            <p class="text-center">
-              <span class="text-xs font-medium text-coolGray-500 dark:text-gray-500">{{ title }}</span>
-            </p>
-            <input type="hidden" name="formid" value="{{ form_id }}">
-          </form>
+            <div class="ml-3">
+              <p class="text-sm font-medium text-green-800 dark:text-green-400">
+                This will unlock the system for all users!
+              </p>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+
+        {% for m in err_messages %}
+        <div class="mb-4 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert">
+          <div class="flex items-start">
+            <div class="flex-shrink-0">
+              <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm font-medium text-red-800 dark:text-red-400">
+                {{ m[1] }}
+              </p>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+
+        <form method="post" autocomplete="off" id="unlock-form">
+          <div class="mb-6">
+            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Password
+            </label>
+            <div class="relative">
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="w-full px-4 py-3 pr-12 border border-blue-500 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-blue-500 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 transition-colors"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+                autofocus
+              />
+              <button
+                type="button"
+                id="toggle-password"
+                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                aria-label="Toggle password visibility"
+              >
+                <svg id="eye-open" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <svg id="eye-closed" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                </svg>
+              </button>
+            </div>
+            <div id="caps-warning" class="hidden mt-2 text-sm text-amber-700 dark:text-amber-300 flex items-center">
+              <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+              </svg>
+              Caps Lock is on
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            name="unlock"
+            value="Unlock"
+            id="unlock-btn"
+            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors focus:outline-none disabled:cursor-not-allowed"
+          >
+            <span id="unlock-text">Unlock</span>
+            <svg id="unlock-spinner" class="hidden animate-spin ml-2 h-5 w-5 text-white inline" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </button>
+
+          <input type="hidden" name="formid" value="{{ form_id }}">
+        </form>
+
+        <div class="mt-8 text-center space-y-2">
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Need help?
+            <a href="https://academy.particl.io/en/latest/faq/get_support.html"
+               target="_blank"
+               class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
+              View tutorials
+            </a>
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-500">
+            {{ title }}
+          </p>
         </div>
       </div>
-    </section>
+    </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const passwordToggle = document.querySelector('.js-password-toggle');
-      if (passwordToggle) {
-        passwordToggle.addEventListener('change', function() {
-          const password = document.querySelector('.js-password');
-          const passwordLabel = document.querySelector('.js-password-label');
-          if (password && passwordLabel) {
-            if (password.type === 'password') {
-              password.type = 'text';
-              passwordLabel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#8896ab"><path d="M23.444,10.239a22.936,22.936,0,0,0-2.492-2.948l-4.021,4.021A5.026,5.026,0,0,1,17,12a5,5,0,0,1-5,5,5.026,5.026,0,0,1-.688-.069L8.055,20.188A10.286,10.286,0,0,0,12,21c5.708,0,9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239Z" fill="#8896ab"></path><path d="M12,3C6.292,3,2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0a21.272,21.272,0,0,0,4.784,4.9l3.124-3.124a5,5,0,0,1,7.071-7.072L8.464,15.536l10.2-10.2A11.484,11.484,0,0,0,12,3Z" fill="#8896ab"></path><path data-color="color-2" d="M1,24a1,1,0,0,1-.707-1.707l22-22a1,1,0,0,1,1.414,1.414l-22,22A1,1,0,0,1,1,24Z"></path></g></svg>';
-            } else {
-              password.type = 'password';
-              passwordLabel.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 24 24"><g fill="#8896ab" ><path d="M23.444,10.239C21.905,8.062,17.708,3,12,3S2.1,8.062.555,10.24a3.058,3.058,0,0,0,0,3.52h0C2.1,15.938,6.292,21,12,21s9.905-5.062,11.445-7.24A3.058,3.058,0,0,0,23.444,10.239ZM12,17a5,5,0,1,1,5-5A5,5,0,0,1,12,17Z" fill="#8896ab"></path></g></svg>';
-            }
-            password.focus();
+    document.addEventListener('DOMContentLoaded', function() {
+      const passwordInput = document.getElementById('password');
+      const toggleButton = document.getElementById('toggle-password');
+      const eyeOpen = document.getElementById('eye-open');
+      const eyeClosed = document.getElementById('eye-closed');
+      const capsWarning = document.getElementById('caps-warning');
+      const unlockForm = document.getElementById('unlock-form');
+      const unlockBtn = document.getElementById('unlock-btn');
+      const unlockText = document.getElementById('unlock-text');
+      const unlockSpinner = document.getElementById('unlock-spinner');
+
+      if (toggleButton && passwordInput) {
+        toggleButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const isPassword = passwordInput.type === 'password';
+          const cursorPosition = passwordInput.selectionStart;
+          const inputValue = passwordInput.value;
+
+          passwordInput.type = isPassword ? 'text' : 'password';
+          passwordInput.value = inputValue;
+
+          setTimeout(() => {
+            passwordInput.setSelectionRange(cursorPosition, cursorPosition);
+          }, 0);
+
+          if (isPassword) {
+            eyeOpen.classList.add('hidden');
+            eyeClosed.classList.remove('hidden');
+          } else {
+            eyeOpen.classList.remove('hidden');
+            eyeClosed.classList.add('hidden');
+          }
+        });
+
+        toggleButton.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+        });
+      }
+
+      if (passwordInput && capsWarning) {
+        passwordInput.addEventListener('keydown', function(e) {
+          const capsLockOn = e.getModifierState && e.getModifierState('CapsLock');
+          if (capsLockOn) {
+            capsWarning.classList.remove('hidden');
+          } else {
+            capsWarning.classList.add('hidden');
+          }
+        });
+
+        passwordInput.addEventListener('keyup', function(e) {
+          const capsLockOn = e.getModifierState && e.getModifierState('CapsLock');
+          if (!capsLockOn) {
+            capsWarning.classList.add('hidden');
+          }
+        });
+      }
+
+      if (unlockForm) {
+        unlockForm.addEventListener('submit', function(e) {
+          if (unlockBtn && unlockText && unlockSpinner) {
+            unlockBtn.disabled = true;
+            unlockText.textContent = 'Unlocking...';
+            unlockSpinner.classList.remove('hidden');
+          }
+        });
+      }
+
+      const errorMessages = document.querySelectorAll('[role="alert"]');
+      if (errorMessages.length > 0 && passwordInput) {
+        passwordInput.value = '';
+        passwordInput.focus();
+      }
+
+      if (passwordInput) {
+        passwordInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && unlockForm) {
+            unlockForm.submit();
           }
         });
       }
