@@ -54,7 +54,7 @@ const ConfigManager = (function() {
         retryDelays: [5000, 15000, 30000],
         get coins() {
             return window.CoinManager ? window.CoinManager.getAllCoins() : [
-                { symbol: 'BTC', name: 'bitcoin', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 },
+                { symbol: 'BTC', name: 'bitcoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
                 { symbol: 'XMR', name: 'monero', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
                 { symbol: 'PART', name: 'particl', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
                 { symbol: 'BCH', name: 'bitcoincash', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },

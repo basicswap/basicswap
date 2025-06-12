@@ -367,20 +367,18 @@ const ApiManager = (function() {
 
             const results = {};
             const fetchPromises = coinSymbols.map(async coin => {
-                if (coin === 'WOW') {
-                    return this.rateLimiter.queueRequest('coingecko', async () => {
-                        const url = `https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=1`;
-                        try {
-                            const response = await this.makePostRequest(url);
-                            if (response && response.prices) {
-                                results[coin] = response.prices;
-                            }
-                        } catch (error) {
-                            console.error(`Error fetching CoinGecko data for WOW:`, error);
-                            throw error;
-                        }
-                    });
+                let usesCryptoCompare = false;
+                if (window.CoinManager) {
+                    const coinInfo = window.CoinManager.getCoinByAnyIdentifier(coin);
+                    usesCryptoCompare = coinInfo?.usesCryptoCompare || false;
+                } else if (window.config?.coins) {
+                    const coinInfo = window.config.coins.find(c => c.symbol === coin);
+                    usesCryptoCompare = coinInfo?.usesCryptoCompare || false;
                 } else {
+                    usesCryptoCompare = coin === 'BTC' || coin === 'XMR';
+                }
+
+                if (usesCryptoCompare) {
                     return this.rateLimiter.queueRequest('cryptocompare', async () => {
                         try {
                             const apiKey = window.config?.apiKeys?.cryptoCompare || '';
@@ -396,21 +394,53 @@ const ApiManager = (function() {
 
                             const response = await this.makePostRequest(url);
                             if (response.Response === "Error") {
-                                console.error(`API Error for ${coin}:`, response.Message);
-                                throw new Error(response.Message);
+                                console.warn(`CryptoCompare API Error for ${coin}: ${response.Message}, falling back to CoinGecko`);
+                                return this.fetchCoinGeckoHistoricalData(coin, resolution, results);
                             } else if (response.Data && response.Data.Data) {
                                 results[coin] = response.Data;
                             }
                         } catch (error) {
-                            console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
-                            throw error;
+                            console.warn(`CryptoCompare request failed for ${coin}: ${error.message}, falling back to CoinGecko`);
+                            return this.fetchCoinGeckoHistoricalData(coin, resolution, results);
                         }
+                    });
+                } else {
+                    return this.rateLimiter.queueRequest('coingecko', async () => {
+                        return this.fetchCoinGeckoHistoricalData(coin, resolution, results);
                     });
                 }
             });
 
             await Promise.all(fetchPromises);
             return results;
+        },
+
+        fetchCoinGeckoHistoricalData: async function(coin, resolution, results) {
+            try {
+                let coingeckoId = coin.toLowerCase();
+                if (window.CoinManager) {
+                    coingeckoId = window.CoinManager.getCoingeckoId(coin) || coin.toLowerCase();
+                } else if (window.config?.getCoinBackendId) {
+                    coingeckoId = window.config.getCoinBackendId(coin) || coin.toLowerCase();
+                }
+
+                let days = 1;
+                if (resolution === 'year') {
+                    days = 365;
+                } else if (resolution === 'month') {
+                    days = 30;
+                }
+
+                const url = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=${days}`;
+                const response = await this.makePostRequest(url);
+
+                if (response && response.prices) {
+                    results[coin] = response.prices;
+                }
+            } catch (error) {
+                console.error(`CoinGecko fallback also failed for ${coin}:`, error);
+                throw error;
+            }
         },
 
         dispose: function() {

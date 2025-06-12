@@ -1086,7 +1086,7 @@ const app = {
   nextRefreshTime: null,
   lastRefreshedTime: null,
   isRefreshing: false,
-  isAutoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') !== 'true',
+  isAutoRefreshEnabled: localStorage.getItem('autoRefreshEnabled') === 'true',
   updateNextRefreshTimeRAF: null,
 
   refreshTexts: {

@@ -7,7 +7,7 @@ const CoinManager = (function() {
             aliases: ['btc', 'bitcoin'],
             coingeckoId: 'bitcoin',
             cryptocompareId: 'BTC',
-            usesCryptoCompare: false,
+            usesCryptoCompare: true,
             usesCoinGecko: true,
             historicalDays: 30,
             icon: 'Bitcoin.png'
