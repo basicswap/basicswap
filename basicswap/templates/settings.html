@@ -412,6 +412,12 @@
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">API key for CoinGecko price data (optional for basic usage)</p>
         </div>
 
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Enabled Coins</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="enabledchartcoins" value="{{ chart_settings.enabled_chart_coins }}" placeholder="Leave blank for active coins, 'all' for all coins, or comma-separated list">
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Coins to show data for: Blank for active coins, "all" for all known coins or comma separated list of coin tickers to show</p>
+        </div>
+
        </div>
 
        <div class="flex justify-end pt-6  mt-6">
