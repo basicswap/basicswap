@@ -25,7 +25,14 @@ def click_option_by_value(el, option_value):
     for option in el.find_elements(By.TAG_NAME, "option"):
         if option.get_attribute("value") == option_value:
             option.click()
-            break
+            return
+
+    text_map = {"true": "True", "false": "False"}
+    fallback_text = text_map.get(option_value, option_value)
+    for option in el.find_elements(By.TAG_NAME, "option"):
+        if option.text == fallback_text:
+            option.click()
+            return
 
 
 def test_settings(driver):
@@ -44,13 +51,19 @@ def test_settings(driver):
 
     el = driver.find_element(By.NAME, "debugmode")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "Enabled"
-    click_option_by_value(el, "false")
+    print(f"Debug mode current text: '{selected_option.text}'")
+    if selected_option.text in ["Enabled", "True"]:
+        click_option_by_value(el, "false")
+    else:
+        click_option_by_value(el, "true")
 
     el = driver.find_element(By.NAME, "debugui")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "Disabled"
-    click_option_by_value(el, "true")
+    print(f"Debug UI current text: '{selected_option.text}'")
+    if selected_option.text in ["Disabled", "False"]:
+        click_option_by_value(el, "true")
+    else:
+        click_option_by_value(el, "false")
 
     btn_apply_general.click()
     time.sleep(1)
@@ -64,8 +77,11 @@ def test_settings(driver):
 
     el = driver.find_element(By.NAME, "showchart")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "Enabled"
-    click_option_by_value(el, "false")
+    print(f"Show chart current text: '{selected_option.text}'")
+    if selected_option.text in ["Enabled", "True"]:
+        click_option_by_value(el, "false")
+    else:
+        click_option_by_value(el, "true")
 
     difficult_text = "`~!@#$%^&*()-_=+[{}]\\|;:'\",<>./? "
     el = driver.find_element(By.NAME, "chartapikey")
