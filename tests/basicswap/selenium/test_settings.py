@@ -21,18 +21,11 @@ from util import (
 from basicswap.ui.page_offers import default_chart_api_key
 
 
-def click_option_by_value(el, option_value):
+def click_option(el, option_text):
     for option in el.find_elements(By.TAG_NAME, "option"):
-        if option.get_attribute("value") == option_value:
+        if option.text == option_text:
             option.click()
-            return
-
-    text_map = {"true": "True", "false": "False"}
-    fallback_text = text_map.get(option_value, option_value)
-    for option in el.find_elements(By.TAG_NAME, "option"):
-        if option.text == fallback_text:
-            option.click()
-            return
+            break
 
 
 def test_settings(driver):
@@ -51,19 +44,13 @@ def test_settings(driver):
 
     el = driver.find_element(By.NAME, "debugmode")
     selected_option = Select(el).first_selected_option
-    print(f"Debug mode current text: '{selected_option.text}'")
-    if selected_option.text in ["Enabled", "True"]:
-        click_option_by_value(el, "false")
-    else:
-        click_option_by_value(el, "true")
+    assert selected_option.text == "True"
+    click_option(el, "False")
 
     el = driver.find_element(By.NAME, "debugui")
     selected_option = Select(el).first_selected_option
-    print(f"Debug UI current text: '{selected_option.text}'")
-    if selected_option.text in ["Disabled", "False"]:
-        click_option_by_value(el, "true")
-    else:
-        click_option_by_value(el, "false")
+    assert selected_option.text == "False"
+    click_option(el, "True")
 
     btn_apply_general.click()
     time.sleep(1)
@@ -77,11 +64,8 @@ def test_settings(driver):
 
     el = driver.find_element(By.NAME, "showchart")
     selected_option = Select(el).first_selected_option
-    print(f"Show chart current text: '{selected_option.text}'")
-    if selected_option.text in ["Enabled", "True"]:
-        click_option_by_value(el, "false")
-    else:
-        click_option_by_value(el, "true")
+    assert selected_option.text == "True"
+    click_option(el, "False")
 
     difficult_text = "`~!@#$%^&*()-_=+[{}]\\|;:'\",<>./? "
     el = driver.find_element(By.NAME, "chartapikey")
@@ -118,11 +102,11 @@ def test_settings(driver):
     btn_apply_general = wait.until(
         EC.element_to_be_clickable((By.NAME, "apply_general"))
     )
-    click_option_by_value(driver.find_element(By.NAME, "debugmode"), "true")
-    click_option_by_value(driver.find_element(By.NAME, "debugui"), "false")
+    click_option(driver.find_element(By.NAME, "debugmode"), "True")
+    click_option(driver.find_element(By.NAME, "debugui"), "False")
     btn_apply_general.click()
     btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, "apply_chart")))
-    click_option_by_value(driver.find_element(By.NAME, "showchart"), "true")
+    click_option(driver.find_element(By.NAME, "showchart"), "True")
     btn_apply_chart.click()
     time.sleep(1)
 

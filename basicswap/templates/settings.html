@@ -318,8 +318,8 @@
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Debug Mode</label>
          <div class="relative">
           <select name="debugmode" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
-           <option {% if general_settings.debug %}selected{% endif %} value="true">Enabled</option>
-           <option {% if not general_settings.debug %}selected{% endif %} value="false">Disabled</option>
+           <option {% if general_settings.debug %}selected{% endif %} value="True">True</option>
+           <option {% if not general_settings.debug %}selected{% endif %} value="False">False</option>
           </select>
           <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -334,8 +334,8 @@
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Debug UI</label>
          <div class="relative">
           <select name="debugui" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
-           <option {% if general_settings.debug_ui %}selected{% endif %} value="true">Enabled</option>
-           <option {% if not general_settings.debug_ui %}selected{% endif %} value="false">Disabled</option>
+           <option {% if general_settings.debug_ui %}selected{% endif %} value="True">True</option>
+           <option {% if not general_settings.debug_ui %}selected{% endif %} value="False">False</option>
           </select>
           <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -350,8 +350,8 @@
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Remove DB Records for Expired Offers</label>
          <div class="relative max-w-xs">
           <select name="expire_db_records" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
-           <option {% if general_settings.expire_db_records %}selected{% endif %} value="true">Enabled</option>
-           <option {% if not general_settings.expire_db_records %}selected{% endif %} value="false">Disabled</option>
+           <option {% if general_settings.expire_db_records %}selected{% endif %} value="True">True</option>
+           <option {% if not general_settings.expire_db_records %}selected{% endif %} value="False">False</option>
           </select>
           <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,8 +386,8 @@
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Show Charts</label>
          <div class="relative">
           <select name="showchart" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
-           <option {% if chart_settings.show_chart %}selected{% endif %} value="true">Enabled</option>
-           <option {% if not chart_settings.show_chart %}selected{% endif %} value="false">Disabled</option>
+           <option {% if chart_settings.show_chart %}selected{% endif %} value="True">True</option>
+           <option {% if not chart_settings.show_chart %}selected{% endif %} value="False">False</option>
           </select>
           <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
