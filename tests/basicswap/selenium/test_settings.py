@@ -22,27 +22,36 @@ from util import (
 from basicswap.ui.page_offers import default_chart_api_key
 
 
+def click_option_by_value(el, option_value):
+    for option in el.find_elements(By.TAG_NAME, "option"):
+        if option.get_attribute("value") == option_value:
+            option.click()
+            break
+
+
 def test_settings(driver):
     base_url = f"http://localhost:{BSX_0_PORT}"
 
     url = base_url + "/settings"
     driver.get(url)
-    driver.find_element(By.ID, "general-tab").click()
-
+    
     wait = WebDriverWait(driver, 10)
+    general_tab = wait.until(EC.element_to_be_clickable((By.ID, "general-tab")))
+    general_tab.click()
+    
     btn_apply_general = wait.until(
         EC.element_to_be_clickable((By.NAME, "apply_general"))
     )
 
     el = driver.find_element(By.NAME, "debugmode")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "True"
-    click_option(el, "False")
+    assert selected_option.text == "Enabled"
+    click_option_by_value(el, "false")
 
     el = driver.find_element(By.NAME, "debugui")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "False"
-    click_option(el, "True")
+    assert selected_option.text == "Disabled"
+    click_option_by_value(el, "true")
 
     btn_apply_general.click()
     time.sleep(1)
@@ -56,8 +65,8 @@ def test_settings(driver):
 
     el = driver.find_element(By.NAME, "showchart")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "True"
-    click_option(el, "False")
+    assert selected_option.text == "Enabled"
+    click_option_by_value(el, "false")
 
     difficult_text = "`~!@#$%^&*()-_=+[{}]\\|;:'\",<>./? "
     el = driver.find_element(By.NAME, "chartapikey")
@@ -91,19 +100,17 @@ def test_settings(driver):
 
     assert settings.get("chart_api_key") == hex_text
 
-    # Reset
     btn_apply_general = wait.until(
         EC.element_to_be_clickable((By.NAME, "apply_general"))
     )
-    click_option(driver.find_element(By.NAME, "debugmode"), "True")
-    click_option(driver.find_element(By.NAME, "debugui"), "False")
+    click_option_by_value(driver.find_element(By.NAME, "debugmode"), "true")
+    click_option_by_value(driver.find_element(By.NAME, "debugui"), "false")
     btn_apply_general.click()
     btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, "apply_chart")))
-    click_option(driver.find_element(By.NAME, "showchart"), "True")
+    click_option_by_value(driver.find_element(By.NAME, "showchart"), "true")
     btn_apply_chart.click()
     time.sleep(1)
 
-    # Apply XMR settings with blank nodes list
     driver.find_element(By.ID, "coins-tab").click()
     btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, "apply_monero")))
     el = driver.find_element(By.NAME, "remotedaemonurls_monero")
