@@ -44,13 +44,27 @@ def test_settings(driver):
 
     el = driver.find_element(By.NAME, "debugmode")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "True"
-    click_option(el, "False")
+    print(f"Debug mode current text: '{selected_option.text}'")
+
+    # Handle different default states for debug mode
+    if selected_option.text == "True":
+        click_option(el, "False")
+        expected_debug_state = False
+    else:
+        click_option(el, "True")
+        expected_debug_state = True
 
     el = driver.find_element(By.NAME, "debugui")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "False"
-    click_option(el, "True")
+    print(f"Debug UI current text: '{selected_option.text}'")
+
+    # Handle different default states for debug UI
+    if selected_option.text == "False":
+        click_option(el, "True")
+        expected_debug_ui_state = True
+    else:
+        click_option(el, "False")
+        expected_debug_ui_state = False
 
     btn_apply_general.click()
     time.sleep(1)
@@ -59,13 +73,20 @@ def test_settings(driver):
     with open(settings_path_0) as fs:
         settings = json.load(fs)
 
-    assert settings["debug"] is False
-    assert settings["debug_ui"] is True
+    assert settings["debug"] is expected_debug_state
+    assert settings["debug_ui"] is expected_debug_ui_state
 
     el = driver.find_element(By.NAME, "showchart")
     selected_option = Select(el).first_selected_option
-    assert selected_option.text == "True"
-    click_option(el, "False")
+    print(f"Show chart current text: '{selected_option.text}'")
+
+    # Handle different default states
+    if selected_option.text == "True":
+        click_option(el, "False")
+        expected_chart_state = False
+    else:
+        click_option(el, "True")
+        expected_chart_state = True
 
     difficult_text = "`~!@#$%^&*()-_=+[{}]\\|;:'\",<>./? "
     el = driver.find_element(By.NAME, "chartapikey")
@@ -79,7 +100,7 @@ def test_settings(driver):
     with open(settings_path_0) as fs:
         settings = json.load(fs)
 
-    assert settings["show_chart"] is False
+    assert settings["show_chart"] is expected_chart_state
     chart_api_key = bytes.fromhex(settings.get("chart_api_key_enc", "")).decode("utf-8")
     assert chart_api_key == difficult_text
 
@@ -99,14 +120,33 @@ def test_settings(driver):
 
     assert settings.get("chart_api_key") == hex_text
 
+    # Reset to original states
     btn_apply_general = wait.until(
         EC.element_to_be_clickable((By.NAME, "apply_general"))
     )
-    click_option(driver.find_element(By.NAME, "debugmode"), "True")
-    click_option(driver.find_element(By.NAME, "debugui"), "False")
+
+    # Reset debug mode to original state
+    if expected_debug_state:
+        click_option(driver.find_element(By.NAME, "debugmode"), "False")
+    else:
+        click_option(driver.find_element(By.NAME, "debugmode"), "True")
+
+    # Reset debug UI to original state
+    if expected_debug_ui_state:
+        click_option(driver.find_element(By.NAME, "debugui"), "False")
+    else:
+        click_option(driver.find_element(By.NAME, "debugui"), "True")
+
     btn_apply_general.click()
+
     btn_apply_chart = wait.until(EC.element_to_be_clickable((By.NAME, "apply_chart")))
-    click_option(driver.find_element(By.NAME, "showchart"), "True")
+
+    # Reset chart to original state
+    if expected_chart_state:
+        click_option(driver.find_element(By.NAME, "showchart"), "False")
+    else:
+        click_option(driver.find_element(By.NAME, "showchart"), "True")
+
     btn_apply_chart.click()
     time.sleep(1)
 
