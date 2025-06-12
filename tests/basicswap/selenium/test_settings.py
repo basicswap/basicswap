@@ -16,7 +16,6 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from util import (
     BSX_0_PORT,
-    click_option,
     get_driver,
 )
 from basicswap.ui.page_offers import default_chart_api_key
@@ -34,11 +33,11 @@ def test_settings(driver):
 
     url = base_url + "/settings"
     driver.get(url)
-    
+
     wait = WebDriverWait(driver, 10)
     general_tab = wait.until(EC.element_to_be_clickable((By.ID, "general-tab")))
     general_tab.click()
-    
+
     btn_apply_general = wait.until(
         EC.element_to_be_clickable((By.NAME, "apply_general"))
     )
@@ -111,6 +110,7 @@ def test_settings(driver):
     btn_apply_chart.click()
     time.sleep(1)
 
+    # Apply XMR settings with blank nodes list
     driver.find_element(By.ID, "coins-tab").click()
     btn_apply_monero = wait.until(EC.element_to_be_clickable((By.NAME, "apply_monero")))
     el = driver.find_element(By.NAME, "remotedaemonurls_monero")
