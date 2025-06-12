@@ -131,6 +131,9 @@ def test_settings(driver):
         print(f"Chart settings not accessible: {e}, skipping chart tests")
         expected_chart_state = None
 
+    general_tab = wait.until(EC.element_to_be_clickable((By.ID, "general-tab")))
+    general_tab.click()
+
     btn_apply_general = wait.until(
         EC.element_to_be_clickable((By.NAME, "apply_general"))
     )
