@@ -47,7 +47,7 @@ from basicswap.bin.run import (
     getWalletBinName,
 )
 
-
+# Coin clients
 PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
@@ -94,12 +94,6 @@ BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
-GUIX_SSL_CERT_DIR = None
-OVERRIDE_DISABLED_COINS = toBool(os.getenv("OVERRIDE_DISABLED_COINS", "false"))
-
-# If SKIP_GPG_VALIDATION is set to true the script will check hashes but not signatures
-SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", "false"))
-
 
 known_coins = {
     "particl": (PARTICL_VERSION, PARTICL_VERSION_TAG, ("tecnovert",)),
@@ -120,6 +114,21 @@ known_coins = {
 disabled_coins = [
     "navcoin",
 ]
+
+# Network clients
+SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "6.3.5")
+SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", 5225))
+SIMPLEX_SERVER_ADDRESS = os.getenv(
+    "SIMPLEX_CHAT_VERSION",
+    "smp://u2dS9sG8nMNURyZwqASV4yROM28Er0luVTx5X1CsMrU=@smp4.simplex.im",
+)
+SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "127.0.0.1:9150")
+SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", None)
+
+
+known_networks = ["smsg", "simplex"]
+disabled_networks = []
+
 
 expected_key_ids = {
     "tecnovert": ("8E517DC12EC1CC37F6423A8A13F13651C9CF0D6B",),
@@ -145,7 +154,14 @@ expected_key_ids = {
     ),
     "decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",),
     "Calin_Culianu": ("D465135F97D0047E18E99DC321810A542031C02C",),
+    "SimpleX_Chat": ("FB44AF81A45BDE327319797C85107E357D4A17FC",),
 }
+
+GUIX_SSL_CERT_DIR = None
+OVERRIDE_DISABLED_COINS = toBool(os.getenv("OVERRIDE_DISABLED_COINS", "false"))
+
+# If SKIP_GPG_VALIDATION is set to true the script will check hashes but not signatures
+SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", "false"))
 
 USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
 if USE_PLATFORM == "Darwin":
@@ -597,7 +613,7 @@ def downloadPIVXParams(output_dir):
             downloadFile(url, path)
 
         file_hash = getFileHash(path)
-        logger.info("%s hash: %s", k, file_hash)
+        logger.info(f"{k} hash: {file_hash}")
         assert file_hash == v
     finally:
         popConnectionParameters()
@@ -624,9 +640,21 @@ def ensureValidSignatureBy(result, signing_key_name):
     logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
 
 
+def ensureFileHashInFile(release_hash, assert_path):
+    with (
+        open(assert_path, "rb", 0) as fp,
+        mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s,
+    ):
+        if s.find(bytes(release_hash, "utf-8")) == -1:
+            raise ValueError(
+                f"Error: Release hash {release_hash} not found in assert file."
+            )
+        logger.info("Found release hash in assert file.")
+
+
 def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts={}):
     version, version_tag, signers = version_data
-    logger.info("extractCore %s v%s%s", coin, version, version_tag)
+    logger.info(f"Extracting core {coin} v{version}{version_tag}")
     extract_core_overwrite = extra_opts.get("extract_core_overwrite", True)
 
     if coin in ("monero", "firo", "wownero"):
@@ -655,9 +683,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                                     )
                                 except Exception as e:
                                     logging.warning(
-                                        "Unable to set file permissions: %s, for %s",
-                                        str(e),
-                                        out_path,
+                                        f"Unable to set file permissions: {e}, for {out_path}"
                                     )
                                 break
             return
@@ -686,9 +712,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
                     except Exception as e:
                         logging.warning(
-                            "Unable to set file permissions: %s, for %s",
-                            str(e),
-                            out_path,
+                            f"Unable to set file permissions: {e}, for {out_path}"
                         )
         return
 
@@ -731,9 +755,7 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
                     except Exception as e:
                         logging.warning(
-                            "Unable to set file permissions: %s, for %s",
-                            str(e),
-                            out_path,
+                            f"Unable to set file permissions: {e}, for {out_path}"
                         )
     else:
         with tarfile.open(release_path) as ft:
@@ -749,15 +771,13 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
                         os.chmod(out_path, stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH)
                     except Exception as e:
                         logging.warning(
-                            "Unable to set file permissions: %s, for %s",
-                            str(e),
-                            out_path,
+                            f"Unable to set file permissions: {e}, for {out_path}"
                         )
 
 
 def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     version, version_tag, signers = version_data
-    logger.info("prepareCore %s v%s%s", coin, version, version_tag)
+    logger.info(f"Prepare core {coin} v{version}{version_tag}")
 
     bin_dir = os.path.expanduser(settings["chainclients"][coin]["bindir"])
     if not os.path.exists(bin_dir):
@@ -795,11 +815,9 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         release_path = os.path.join(bin_dir, release_filename)
         downloadRelease(release_url, release_path, extra_opts)
 
-        assert_filename = "monero-{}-hashes.txt".format(version)
-        # assert_url = 'https://www.getmonero.org/downloads/hashes.txt'
-        assert_url = "https://raw.githubusercontent.com/monero-project/monero-site/{}/downloads/hashes.txt".format(
-            XMR_SITE_COMMIT
-        )
+        assert_filename = f"monero-{version}-hashes.txt"
+        # Get the hashes file as of XMR_SITE_COMMIT
+        assert_url = f"https://raw.githubusercontent.com/monero-project/monero-site/{XMR_SITE_COMMIT}/downloads/hashes.txt"
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
@@ -920,9 +938,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = "{}-core-{}-{}-build.assert".format(
                 coin, os_name, ".".join(version.split(".")[:2])
             )
-            assert_url = (
-                "https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/%s-%s/%s/%s"
-                % (version, os_dir_name, signing_key_name, assert_filename)
+            assert_url = "https://raw.githubusercontent.com/litecoin-project/gitian.sigs.ltc/master/{}-{}/{}/{}".format(
+                version, os_dir_name, signing_key_name, assert_filename
             )
         elif coin == "dogecoin":
             release_url = (
@@ -955,10 +972,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                 version, release_filename
             )
             assert_filename = "SHA256SUMS.{}.asc.Calin_Culianu".format(version)
-            assert_url = (
-                "https://gitlab.com/bitcoin-cash-node/announcements/-/raw/master/release-sigs/%s/%s"
-                % (version, assert_filename)
-            )
+            assert_url = f"https://gitlab.com/bitcoin-cash-node/announcements/-/raw/master/release-sigs/{version}/{assert_filename}"
         elif coin == "namecoin":
             release_url = f"https://www.namecoin.org/files/namecoin-core/namecoin-core-{version}/{release_filename}"
             signing_key = "Rose%20Turing"
@@ -974,14 +988,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_filename = "{}-{}-{}-build.assert".format(
                 coin, os_name, version.rsplit(".", 1)[0]
             )
-            assert_url = (
-                "https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/%s-%s/%s/%s"
-                % (
-                    version + version_tag,
-                    os_dir_name,
-                    signing_key_name.capitalize(),
-                    assert_filename,
-                )
+            assert_url = "https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/{}-{}/{}/{}".format(
+                version + version_tag,
+                os_dir_name,
+                signing_key_name.capitalize(),
+                assert_filename,
             )
         elif coin == "dash":
             release_filename = "{}-{}-{}.{}".format(
@@ -1011,9 +1022,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     version + version_tag, release_filename
                 )
             )
-            assert_url = (
-                "https://github.com/firoorg/firo/releases/download/v%s/SHA256SUMS"
-                % (version + version_tag)
+            assert_url = "https://github.com/firoorg/firo/releases/download/v{}/SHA256SUMS".format(
+                version + version_tag
             )
         elif coin == "navcoin":
             release_filename = "{}-{}-{}.{}".format(coin, version, BIN_ARCH, FILE_EXT)
@@ -1054,15 +1064,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
     release_hash: str = getFileHash(release_path)
     logger.info(f"{release_filename} hash: {release_hash}")
-    with (
-        open(assert_path, "rb", 0) as fp,
-        mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s,
-    ):
-        if s.find(bytes(release_hash, "utf-8")) == -1:
-            raise ValueError(
-                f"Error: Release hash {release_hash} not found in assert file."
-            )
-        logger.info("Found release hash in assert file.")
+    ensureFileHashInFile(release_hash, assert_path)
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
@@ -1354,7 +1356,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 elif chain == "regtest":
                     fp.write("[regtest]\n\n")
                 else:
-                    logger.warning("Unknown chain %s", chain)
+                    logger.warning(f"Unknown chain {chain}")
 
         if COINS_RPCBIND_IP != "127.0.0.1":
             fp.write("rpcallowip=127.0.0.1\n")
@@ -1478,10 +1480,10 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     )
                 )
         else:
-            logger.warning("Unknown coin %s", coin)
+            logger.warning(f"Unknown coin {coin}")
 
     if coin == "bitcoin" and extra_opts.get("use_btc_fastsync", False) is True:
-        logger.info("Initialising BTC chain with fastsync %s", BITCOIN_FASTSYNC_FILE)
+        logger.info(f"Initialising BTC chain with fastsync {BITCOIN_FASTSYNC_FILE}")
         base_dir = extra_opts["data_dir"]
 
         for dirname in ("blocks", "chainstate"):
@@ -1690,6 +1692,8 @@ def printHelp():
     )
     print("--preparebinonly         Don't prepare settings or datadirs.")
     print("--nocores                Don't download and extract any coin clients.")
+    print("--addnetwork             Add network.")
+    print("--disablenetwork         Remove network.")
     print("--usecontainers          Expect each core to run in a unique container.")
     print("--portoffset=n           Raise all ports by n.")
     print(
@@ -2152,7 +2156,6 @@ def load_config(config_path):
 
 
 def save_config(config_path, settings, add_options: bool = True) -> None:
-
     if add_options is True:
         # Add to config file only if manually set
         if os.getenv("BSX_DOCKER_MODE"):
@@ -2237,6 +2240,13 @@ def ensure_coin_valid(coin_name: str, test_disabled: bool = True) -> None:
         exitWithError(f"Unknown coin {coin_name.capitalize()}")
     if test_disabled and not OVERRIDE_DISABLED_COINS and coin_name in disabled_coins:
         exitWithError(f"{coin_name.capitalize()} is disabled")
+
+
+def ensure_network_valid(network_name: str, test_disabled: bool = True) -> None:
+    if network_name not in known_networks:
+        exitWithError(f"Unknown network {network_name.capitalize()}")
+    if test_disabled and network_name in disabled_networks:
+        exitWithError(f"{network_name.capitalize()} is disabled")
 
 
 def main():
@@ -2378,6 +2388,16 @@ def main():
             if name == "disablecoin":
                 disable_coin = s[1].strip().lower()
                 ensure_coin_valid(disable_coin, test_disabled=False)
+                continue
+            if name == "addnetwork":
+                network_name = s[1].strip().lower()
+                ensure_network_valid(network_name)
+                extra_opts["addnetwork"] = network_name
+                continue
+            if name == "disablenetwork":
+                network_name = s[1].strip().lower()
+                ensure_network_valid(network_name, test_disabled=False)
+                extra_opts["disablenetwork"] = network_name
                 continue
             if name == "htmlhost":
                 htmlhost = s[1].strip('"')
@@ -2843,10 +2863,10 @@ def main():
         settings = load_config(config_path)
 
         init_coins = settings["chainclients"].keys()
-        logger.info("Active coins: %s", ", ".join(init_coins))
+        logger.info("Active coins: {}".format(", ".join(init_coins)))
         if with_coins_changed:
             init_coins = with_coins
-            logger.info("Initialising coins: %s", ", ".join(init_coins))
+            logger.info("Initialising coins: {}".format(", ".join(init_coins)))
         initialise_wallets(
             particl_wallet_mnemonic,
             init_coins,
@@ -2903,7 +2923,7 @@ def main():
         if "particl" in disable_coin:
             exitWithError("Cannot disable Particl (required for operation)")
 
-        logger.info("Disabling coin: %s", disable_coin)
+        logger.info(f"Disabling coin: {disable_coin}")
         settings = load_config(config_path)
 
         if disable_coin not in settings["chainclients"]:
@@ -2928,7 +2948,7 @@ def main():
     extra_opts["tor_control_password"] = tor_control_password
 
     if add_coin != "":
-        logger.info("Adding coin: %s", add_coin)
+        logger.info(f"Adding coin: {add_coin}")
         settings = load_config(config_path)
 
         if add_coin in settings["chainclients"]:
@@ -2937,7 +2957,7 @@ def main():
                 coin_settings["connection_type"] == "none"
                 and coin_settings["manage_daemon"] is False
             ):
-                logger.info("Enabling coin: %s", add_coin)
+                logger.info(f"Enabling coin: {add_coin}")
                 coin_settings["connection_type"] = "rpc"
                 coin_settings["manage_daemon"] = True
                 if "manage_wallet_daemon" in coin_settings:
@@ -2982,6 +3002,136 @@ def main():
             save_config(config_path, settings)
 
         logger.info(f"Done. Coin {add_coin} successfully added.")
+        return 0
+
+    if "addnetwork" in extra_opts:
+        network_name = extra_opts["addnetwork"]
+        logger.info(f"Adding network: {network_name}")
+        settings = load_config(config_path)
+        network_config_list = settings.get("networks", [])
+        if len(network_config_list) < 1:
+            network_config_list = [{"type": "smsg", "enabled": True}]
+
+        network_enabled: bool = False
+        if network_name == "simplex":
+            if SIMPLEX_GROUP_LINK is None:
+                raise ValueError("SIMPLEX_GROUP_LINK must be set.")
+
+            simplex_chat_bin_dir = os.path.join(bin_dir, "simplex")
+            simplex_chat_client_path = os.path.join(
+                simplex_chat_bin_dir, "simplex-chat"
+            )
+            simplex_chat_release_dir = os.path.join(
+                simplex_chat_bin_dir, SIMPLEX_CHAT_VERSION
+            )
+            if not os.path.exists(simplex_chat_release_dir):
+                os.makedirs(simplex_chat_release_dir)
+
+            if USE_PLATFORM == "Linux":
+                simplex_chat_release_file = "simplex-chat-ubuntu-24_04-x86-64"
+            elif USE_PLATFORM == "Darwin":
+                simplex_chat_release_file = "simplex-chat-macos-x86-64"
+            elif USE_PLATFORM == "Windows":
+                simplex_chat_release_file = "simplex-chat-windows-x86-64"
+            else:
+                raise ValueError(f"Unknown platform {USE_PLATFORM}")
+
+            simplex_chat_release_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{simplex_chat_release_file}"
+            simplex_chat_release_path = os.path.join(
+                simplex_chat_release_dir, simplex_chat_release_file
+            )
+            downloadRelease(
+                simplex_chat_release_url, simplex_chat_release_path, extra_opts
+            )
+
+            assert_filename = "_sha256sums"
+            assert_path = os.path.join(simplex_chat_release_dir, assert_filename)
+            assert_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/_sha256sums"
+            if not os.path.exists(assert_path):
+                downloadFile(assert_url, assert_path)
+
+            release_hash: str = getFileHash(simplex_chat_release_path)
+            logger.info(f"{simplex_chat_release_file} hash: {release_hash}")
+            ensureFileHashInFile(release_hash, assert_path)
+
+            assert_sig_filename = assert_filename + ".asc"
+            assert_sig_url = assert_url + ".asc"
+            assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
+            if not os.path.exists(assert_sig_path):
+                downloadFile(assert_sig_url, assert_sig_path)
+
+            gpg = gnupg.GPG()
+            pubkey_filename = "SimpleX_Chat.pgp"
+            pubkeyurls = []
+            if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
+                importPubkey(gpg, pubkey_filename, pubkeyurls)
+            with open(assert_sig_path, "rb") as fp:
+                verified = gpg.verify_file(fp, assert_path)
+            ensureValidSignatureBy(verified, "SimpleX_Chat")
+
+            shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
+
+            simplex_settings = {
+                "type": "simplex",
+                "server_address": SIMPLEX_SERVER_ADDRESS,
+                "client_path": simplex_chat_client_path,
+                "ws_port": SIMPLEX_WS_PORT,
+                "group_link": SIMPLEX_GROUP_LINK,
+                "enabled": True,
+            }
+            if SIMPLEX_SERVER_SOCKS_PROXY is not None:
+                simplex_settings["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
+
+            found_network: bool = False
+            for network in network_config_list:
+                network_type: str = network.get("type", "unknown")
+                if network_type == "simplex":
+                    found_network = True
+                    if network.get("enabled", False) is True:
+                        logger.warning(f"Network {network_type} is already active.")
+                    network = simplex_settings
+                else:
+                    # TODO: Allow multiple active networks
+                    network["enabled"] = False
+                    logger.info(f"Disabling network {network_type}.")
+            if found_network is False:
+                network_config_list.append(simplex_settings)
+        elif network_name == "smsg":
+            found_network: bool = False
+            for network in network_config_list:
+                network_type: str = network.get("type", "unknown")
+                if network_type == "smsg":
+                    found_network = True
+                    if network.get("enabled", False) is True:
+                        logger.warning(f"Network {network_type} is already active.")
+                    else:
+                        network["enabled"] = True
+                else:
+                    # TODO: Allow multiple active networks
+                    network["enabled"] = False
+                    logger.info(f"Disabling network {network_type}.")
+            if found_network is False:
+                network_config_list.append({"type": "smsg", "enabled": True})
+        else:
+            raise ValueError(f"Unknown network {network_name}")
+
+        settings["networks"] = network_config_list
+        save_config(config_path, settings)
+        if network_enabled:
+            logger.info(f"Done. Network {network_name} successfully added.")
+        else:
+            logger.info("Done.")
+        return 0
+
+    if "disablenetwork" in extra_opts:
+        network_name = extra_opts["disablenetwork"]
+        logger.info(f"Disable network: {network_name}")
+        settings = load_config(config_path)
+        network_config_list = settings.get("networks", [])
+        if len(network_config_list) < 1:
+            network_config_list = [{"type": "smsg", "enabled": True}]
+
+        logger.info(f"Done. Network {network_name} successfully disabled.")
         return 0
 
     logger.info(

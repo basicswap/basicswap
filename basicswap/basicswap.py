@@ -1144,6 +1144,8 @@ class BasicSwap(BaseApp, UIApp):
             network_config_list = [{"type": "smsg", "enabled": True}]
 
         for network in network_config_list:
+            if network.get("enabled", True) is False:
+                continue
             if network["type"] == "smsg":
                 self.active_networks.append({"type": "smsg"})
             elif network["type"] == "simplex":

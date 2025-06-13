@@ -504,6 +504,7 @@ def modifyConfig(test_path, i):
             "client_path": SIMPLEX_CLIENT_PATH,
             "ws_port": SIMPLEX_WS_PORT + i,
             "group_link": SIMPLEX_GROUP_LINK,
+            "enabled": True,
         }
         if SIMPLEX_SERVER_SOCKS_PROXY != "":
             simplex_options["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
