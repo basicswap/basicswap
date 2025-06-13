@@ -464,6 +464,7 @@ class Test(BaseTest):
                 "client_path": SIMPLEX_CLIENT_PATH,
                 "ws_port": 5225 + node_id,
                 "group_link": cls.group_link,
+                "enabled": True,
             },
         ]
 
