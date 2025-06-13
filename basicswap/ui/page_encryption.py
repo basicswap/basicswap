@@ -6,6 +6,7 @@
 
 from .util import (
     get_data_entry_or,
+    getCoinName,
 )
 
 
@@ -33,6 +34,22 @@ def page_changepassword(self, url_split, post_string):
         except Exception as e:
             err_messages.append(str(e))
 
+    chains_formatted = []
+    sorted_names = sorted(swap_client.settings["chainclients"].keys())
+    for name in sorted_names:
+        c = swap_client.settings["chainclients"][name]
+        try:
+            display_name = getCoinName(swap_client.getCoinIdFromName(name))
+        except Exception:
+            display_name = name
+        chains_formatted.append(
+            {
+                "name": name,
+                "display_name": display_name,
+                "connection_type": c.get("connection_type", "Unknown"),
+            }
+        )
+
     template = server.env.get_template("changepassword.html")
     return self.render_template(
         template,
@@ -40,6 +57,7 @@ def page_changepassword(self, url_split, post_string):
             "messages": messages,
             "err_messages": err_messages,
             "summary": swap_client.getSummary(),
+            "chains_formatted": chains_formatted,
         },
     )
 
