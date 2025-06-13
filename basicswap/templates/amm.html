@@ -37,21 +37,21 @@
      <div class="p-6 px-0 lg:px-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
       <div class="flex sm:pr-6 lg:pr-0 justify-end items-center">
         <div class="flex space-x-2">
-          <button id="add-new-offer-btn" class="flex items-center px-4 py-2.5 bg-green-800 hover:bg-green-700 border-green-800 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
+          <button id="add-new-offer-btn" class="flex items-center px-4 py-2.5 bg-green-600 hover:bg-green-700 border-green-600 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Offer
           </button>
           {% if debug_ui_mode %}
-          <button id="add-new-bid-btn" class="flex items-center px-4 py-2.5 bg-green-800 hover:bg-green-700 border-green-800 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
+          <button id="add-new-bid-btn" class="flex items-center px-4 py-2.5 bg-green-600 hover:bg-green-700 border-green-600 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             Add Bid
           </button>
           {% endif %}
-          <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-500 hover:bg-blue-600 border-blue-500 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
+          <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-600 border-blue-500 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
             </svg>
@@ -267,9 +267,9 @@
        {% endif %}
 
        <div class="flex flex-wrap gap-2">
-        <button type="submit" name="start" value="1" class="px-4 py-2.5 bg-green-800 hover:bg-green-700 font-medium text-sm text-white border border-green-800 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+        <button type="submit" name="start" value="1" class="px-4 py-2.5 bg-green-600 hover:bg-green-700 font-medium text-sm text-white border border-green-600 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'running' %}disabled{% endif %}>
-         Start
+         Start AMM
         </button>
         <button type="submit" name="stop" value="1" class="px-4 py-2.5 bg-red-900 hover:bg-red-700 font-medium text-sm text-white border border-red-800 rounded-md shadow-button focus:ring-0 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
          {% if current_status == 'stopped' %}disabled{% endif %}>
@@ -369,7 +369,7 @@
                 <div class="flex justify-between">
                   <button type="submit" name="create_default" value="true" id="create_default_btn" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Create Default Config</button>
                   {% if debug_ui_mode %}
-                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-500 hover:bg-green-600 font-medium text-sm text-white border border-green-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Config</button>
+                  <button type="submit" name="save_config" value="true" id="save_config_btn" class="px-4 py-2.5 bg-green-600 hover:bg-green-700 font-medium text-sm text-white border border-green-600 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Config</button>
                   {% endif %}
                 </div>
               </div>
@@ -572,6 +572,7 @@
                       <li><span class="font-semibold">max_coin_from_balance:</span> If needed, uncomment and set to limit bids when wallet amount is above this</li>
                       <li><span class="font-semibold">address:</span> Address bid is sent from (auto = generate new address per bid)</li>
                       <li><span class="font-semibold">min_swap_amount:</span> Minimum swap amount for variable amount bids</li>
+                      <li><span class="font-semibold">use_balance_bidding:</span> If true, calculates bid amount as (wallet_balance - offer_min_amount) instead of using template amount</li>
                       <li><span class="font-semibold">offers_to_bid_on:</span> Filter offers to bid on: <strong>"auto_accept_only"</strong> (only auto-accept offers, default), <strong>"all"</strong> (any offer), <strong>"known_only"</strong> (known identities only)</li>
                     </ul>
                   </div>
@@ -1312,6 +1313,15 @@
                       <label for="add-bid-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
                       <input type="text" id="add-bid-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
                     </div>
+
+                    <div class="flex items-center">
+                      <input type="checkbox" id="add-bid-use-balance-bidding" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                      <label for="add-bid-use-balance-bidding" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Use Balance Bidding</label>
+                    </div>
+                  </div>
+
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    <strong>Use Balance Bidding:</strong> Calculate bid amount as (wallet_balance - offer_min_amount) instead of using template amount.
                   </div>
                 </div>
 
@@ -1586,6 +1596,15 @@
                       <label for="edit-bid-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
                       <input type="text" id="edit-bid-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.001">
                     </div>
+
+                    <div class="flex items-center">
+                      <input type="checkbox" id="edit-bid-use-balance-bidding" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600">
+                      <label for="edit-bid-use-balance-bidding" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">Use Balance Bidding</label>
+                    </div>
+                  </div>
+
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    <strong>Use Balance Bidding:</strong> Calculate bid amount as (wallet_balance - offer_min_amount) instead of using template amount.
                   </div>
                 </div>
 

@@ -418,6 +418,7 @@ const AmmTablesManager = (function() {
             const amountToSend = amount * maxRate;
             const activeBidsCount = activeBids[name] && Array.isArray(activeBids[name]) ?
                 activeBids[name].length : 0;
+            const useBalanceBidding = bid.use_balance_bidding !== undefined ? bid.use_balance_bidding : false;
 
             tableHtml += `
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
@@ -451,6 +452,11 @@ const AmmTablesManager = (function() {
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
                                     Max: ${maxConcurrent}
                                 </span>
+                                ${useBalanceBidding ? `
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                                    Balance Bidding
+                                </span>
+                                ` : ''}
                             </div>
                         </div>
                     </td>
@@ -514,10 +520,19 @@ const AmmTablesManager = (function() {
             'part blind': 'PART',
             'bitcoin': 'BTC',
             'btc': 'BTC',
+            'bitcoin cash': 'BCH',
+            'bitcoincash': 'BCH',
+            'bch': 'BCH',
+            'decred': 'DCR',
+            'dcr': 'DCR',
+            'dogecoin': 'DOGE',
+            'doge': 'DOGE',
             'monero': 'XMR',
             'xmr': 'XMR',
             'litecoin': 'LTC',
             'ltc': 'LTC',
+            'namecoin': 'NMC',
+            'nmc': 'NMC',
             'wownero': 'WOW',
             'wow': 'WOW',
             'dash': 'DASH',
@@ -526,7 +541,11 @@ const AmmTablesManager = (function() {
             'xzc': 'FIRO',
             'zcoin': 'FIRO',
             'BTC': 'BTC',
+            'BCH': 'BCH',
+            'DCR': 'DCR',
+            'DOGE': 'DOGE',
             'LTC': 'LTC',
+            'NMC': 'NMC',
             'XMR': 'XMR',
             'PART': 'PART',
             'WOW': 'WOW',
@@ -591,7 +610,7 @@ const AmmTablesManager = (function() {
 
     async function fetchLatestPrices() {
         try {
-            const coins = 'BTC,LTC,XMR,PART,WOW,FIRO,DASH,PIVX';
+            const coins = 'BTC,BCH,DCR,DOGE,LTC,NMC,XMR,PART,WOW,FIRO,DASH,PIVX';
 
             const response = await fetch('/json/coinprices', {
                 method: 'POST',
@@ -1188,6 +1207,11 @@ const AmmTablesManager = (function() {
                 if (minSwapAmount) {
                     newItem.min_swap_amount = parseFloat(minSwapAmount);
                 }
+
+                const useBalanceBidding = document.getElementById('add-bid-use-balance-bidding').checked;
+                if (useBalanceBidding) {
+                    newItem.use_balance_bidding = true;
+                }
             }
 
             if (type === 'offer') {
@@ -1369,6 +1393,7 @@ const AmmTablesManager = (function() {
                     document.getElementById('edit-bid-address').value = item.address || 'auto';
                     document.getElementById('edit-bid-min-swap-amount').value = item.min_swap_amount || '';
                     document.getElementById('edit-bid-offers-to-bid-on').value = item.offers_to_bid_on || 'all';
+                    document.getElementById('edit-bid-use-balance-bidding').checked = item.use_balance_bidding || false;
                 }
             }
 
@@ -1629,6 +1654,13 @@ const AmmTablesManager = (function() {
                 const minSwapAmount = document.getElementById('edit-bid-min-swap-amount').value;
                 if (minSwapAmount) {
                     updatedItem.min_swap_amount = parseFloat(minSwapAmount);
+                }
+
+                const useBalanceBidding = document.getElementById('edit-bid-use-balance-bidding').checked;
+                if (useBalanceBidding) {
+                    updatedItem.use_balance_bidding = true;
+                } else {
+                    delete updatedItem.use_balance_bidding;
                 }
             }
 

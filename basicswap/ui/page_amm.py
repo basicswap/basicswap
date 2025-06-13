@@ -1138,6 +1138,9 @@ def page_amm(self, _, post_string):
                         except ValueError:
                             pass
 
+                    if form_data.get("bid_use_balance_bidding", [""])[0]:
+                        new_bid["use_balance_bidding"] = True
+
                     if "bids" not in current_config:
                         current_config["bids"] = []
 
@@ -1243,6 +1246,7 @@ def page_amm(self, _, post_string):
                             # "max_coin_from_balance": 100.0,  # Won't send bids if wallet amount would be above this
                             "address": "auto",  # Address bid is sent from (auto = generate new address per bid)
                             "min_swap_amount": 0.001,  # Minimum swap amount
+                            # "use_balance_bidding": False,  # Calculate bid amount as (wallet_balance - offer_min_amount) instead of using template amount
                         }
                     ]
 
