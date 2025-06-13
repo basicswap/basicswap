@@ -78,7 +78,7 @@
         </div>
 
         <div class="flex items-center space-x-4">
-         {% if c.can_disable == true %}
+         {% if c.connection_type != "none" %}
          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
           <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8">
            <circle cx="4" cy="4" r="3"/>
