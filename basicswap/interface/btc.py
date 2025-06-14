@@ -315,6 +315,21 @@ class BTCInterface(Secp256k1Interface):
     def checkWallets(self) -> int:
         wallets = self.rpc("listwallets")
 
+        if self._rpc_wallet not in wallets:
+            self._log.debug(
+                f"Wallet: {self._rpc_wallet} not active, attempting to load."
+            )
+            try:
+                self.rpc_wallet(
+                    "loadwallet",
+                    [
+                        self._rpc_wallet,
+                    ],
+                )
+                wallets = self.rpc("listwallets")
+            except Exception as e:
+                self._log.debug(f'Error loading wallet "self._rpc_wallet": {e}.')
+
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
             self._log.warning(f"Changing {self.ticker()} wallet name.")
