@@ -20,48 +20,53 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
-import basicswap.config as cfg
-from basicswap.basicswap import BasicSwap
-from basicswap.basicswap_util import OffererPingStatus
-from basicswap.chainparams import chainparams, Coins
-from basicswap.contrib.key import ECKey
-from basicswap.http_server import HttpThread
-from basicswap.messages_npb import OffererPingMessage
-from basicswap.util.address import (
-    toWIF,
-    pubkeyToAddress,
-)
-from basicswap.bin.run import (
-    startDaemon,
-    startXmrDaemon,
-    startXmrWalletDaemon,
-)
-from basicswap.rpc_xmr import callrpc_xmr
-from tests.basicswap.test_xmr import (
-    NUM_NODES,
-    NUM_XMR_NODES,
-    TEST_DIR,
-    XMR_BASE_RPC_PORT,
-    XMR_BASE_WALLET_RPC_PORT,
-    test_delay_event,
-    signal_event,
-    prepareXmrDataDir,
-    prepare_swapclient_dir,
-    waitForXMRNode,
-    waitForXMRWallet,
-    run_loop,
-    PREFIX_SECRET_KEY_REGTEST,
-    TEST_HTTP_HOST,
-    TEST_HTTP_PORT,
-    BASE_RPC_PORT,
-    RESET_TEST,
-)
-from tests.basicswap.common import (
-    prepareDataDir,
-    make_rpc_func,
-    waitForRPC,
-    callrpc_cli,
-)
+try:
+    import basicswap.config as cfg
+    from basicswap.basicswap import BasicSwap
+    from basicswap.basicswap_util import OffererPingStatus
+    from basicswap.chainparams import chainparams, Coins
+    from basicswap.contrib.key import ECKey
+    from basicswap.http_server import HttpThread
+    from basicswap.messages_npb import OffererPingMessage
+    from basicswap.util.address import (
+        toWIF,
+        pubkeyToAddress,
+    )
+    from basicswap.bin.run import (
+        startDaemon,
+        startXmrDaemon,
+        startXmrWalletDaemon,
+    )
+    from basicswap.rpc_xmr import callrpc_xmr
+    from tests.basicswap.test_xmr import (
+        NUM_NODES,
+        NUM_XMR_NODES,
+        TEST_DIR,
+        XMR_BASE_RPC_PORT,
+        XMR_BASE_WALLET_RPC_PORT,
+        test_delay_event,
+        signal_event,
+        prepareXmrDataDir,
+        prepare_swapclient_dir,
+        waitForXMRNode,
+        waitForXMRWallet,
+        run_loop,
+        PREFIX_SECRET_KEY_REGTEST,
+        TEST_HTTP_HOST,
+        TEST_HTTP_PORT,
+        BASE_RPC_PORT,
+        RESET_TEST,
+    )
+    from tests.basicswap.common import (
+        prepareDataDir,
+        make_rpc_func,
+        waitForRPC,
+        callrpc_cli,
+    )
+except ImportError as e:
+    print(f"Import error: {e}")
+    print("Make sure to run tests from the project root directory")
+    sys.exit(1)
 
 
 class TestPingSystem(unittest.TestCase):
