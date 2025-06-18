@@ -8,31 +8,35 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-test_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, test_dir)
+import json
+import logging
+import shutil
+import signal
+import socket
+import subprocess
+import threading
+import time
+import traceback
+import unittest
 
-import time  # noqa: E402
-import unittest  # noqa: E402
-import logging  # noqa: E402
-import json  # noqa: E402
-import threading  # noqa: E402
-import signal  # noqa: E402
-
-from basicswap.basicswap_util import OffererPingStatus  # noqa: E402
-from basicswap.messages_npb import OffererPingMessage  # noqa: E402
-from basicswap.basicswap import BasicSwap  # noqa: E402
-from basicswap.util.address import toWIF  # noqa: E402
-from basicswap.contrib.key import ECKey  # noqa: E402
-from basicswap.http_server import HttpThread  # noqa: E402
-from basicswap.bin.run import (  # noqa: E402
+import basicswap.config as cfg
+from basicswap.basicswap import BasicSwap
+from basicswap.basicswap_util import OffererPingStatus
+from basicswap.chainparams import chainparams, Coins
+from basicswap.contrib.key import ECKey
+from basicswap.http_server import HttpThread
+from basicswap.messages_npb import OffererPingMessage
+from basicswap.util.address import (
+    toWIF,
+    pubkeyToAddress,
+)
+from basicswap.bin.run import (
     startDaemon,
     startXmrDaemon,
     startXmrWalletDaemon,
 )
-from basicswap.rpc_xmr import callrpc_xmr  # noqa: E402
-import basicswap.config as cfg  # noqa: E402
-from test_xmr import (  # noqa: E402
+from basicswap.rpc_xmr import callrpc_xmr
+from test_xmr import (
     NUM_NODES,
     NUM_XMR_NODES,
     TEST_DIR,
@@ -51,12 +55,16 @@ from test_xmr import (  # noqa: E402
     BASE_RPC_PORT,
     RESET_TEST,
 )
-from tests.basicswap.common import (  # noqa: E402
+from tests.basicswap.common import (
     prepareDataDir,
     make_rpc_func,
     waitForRPC,
     callrpc_cli,
 )
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+test_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, test_dir)
 
 
 class TestPingSystem(unittest.TestCase):
@@ -92,8 +100,6 @@ class TestPingSystem(unittest.TestCase):
         if os.path.isdir(TEST_DIR):
             if RESET_TEST:
                 logging.info("Removing test dir " + TEST_DIR)
-                import shutil
-
                 for name in os.listdir(TEST_DIR):
                     if name == "pivx-params":
                         continue
@@ -119,17 +125,12 @@ class TestPingSystem(unittest.TestCase):
         try:
             cls._setupNodes()
         except Exception:
-            import traceback
-
             traceback.print_exc()
             cls.tearDownClass()
             raise ValueError("setUpClass() failed.")
 
     @classmethod
     def _cleanupExistingProcesses(cls):
-        import socket
-        import subprocess
-
         ports_to_check = [
             TEST_HTTP_PORT,
             TEST_HTTP_PORT + 1,
@@ -173,8 +174,6 @@ class TestPingSystem(unittest.TestCase):
                         logging.warning(f"Could not free port {port}: {e}")
             except Exception:
                 pass
-
-        import time
 
         time.sleep(2)
 
@@ -221,8 +220,6 @@ class TestPingSystem(unittest.TestCase):
             logging.info("Started %s %d", cfg.PARTICLD, cls.part_daemons[-1].handle.pid)
 
         if not cls.restore_instance:
-            import time
-
             for i in range(NUM_NODES):
                 rpc = make_rpc_func(i)
 
@@ -326,9 +323,6 @@ class TestPingSystem(unittest.TestCase):
 
                 cls.network_keys.append(network_key)
                 cls.network_pubkeys.append(network_pubkey)
-
-                from basicswap.util.address import pubkeyToAddress
-                from basicswap.chainparams import chainparams, Coins
 
                 pubkey_address_prefix = chainparams[Coins.PART]["regtest"][
                     "pubkey_address"
@@ -978,8 +972,6 @@ class TestPingSystem(unittest.TestCase):
                             thread.join()
                         except Exception as e:
                             logging.warning(f"Error stopping HTTP thread {i}: {e}")
-
-            import time
 
             time.sleep(2)
             logging.info("Auto shutdown completed")
