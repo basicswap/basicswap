@@ -556,10 +556,39 @@
 <div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
   <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
   <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
-    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-2xl w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
       <div class="text-center">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="confirmTitle">Confirm Action</h2>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-6" id="confirmTitle">Confirm Action</h2>
+
+        <div id="bidDetailsSection" class="hidden space-y-4 text-left mb-8">
+          <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-4">
+            <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">You will send:</div>
+            <div class="font-medium text-gray-900 dark:text-white text-lg" id="confirmSendAmount">
+              {% if data.was_sent %}
+                {{ data.amt_to }} {{ data.ticker_to }}
+              {% else %}
+                {{ data.amt_from }} {{ data.ticker_from }}
+              {% endif %}
+            </div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-4">
+            <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">You will receive:</div>
+            <div class="font-medium text-gray-900 dark:text-white text-lg" id="confirmReceiveAmount">
+              {% if data.was_sent %}
+                {{ data.amt_from }} {{ data.ticker_from }}
+              {% else %}
+                {{ data.amt_to }} {{ data.ticker_to }}
+              {% endif %}
+            </div>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-4">
+            <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Exchange rate:</div>
+            <div class="font-medium text-gray-900 dark:text-white text-lg">{{ data.bid_rate }}</div>
+          </div>
+        </div>
+
         <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+
         <div class="flex justify-center gap-4">
           <button type="button" id="confirmYes"
                   class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
@@ -594,10 +623,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('confirmNo').addEventListener('click', hideConfirmDialog);
 
-  function showConfirmDialog(title, message, callback) {
+  function showConfirmDialog(title, message, callback, showBidDetails = false) {
     confirmCallback = callback;
     document.getElementById('confirmTitle').textContent = title;
     document.getElementById('confirmMessage').textContent = message;
+
+    const bidDetailsSection = document.getElementById('bidDetailsSection');
+    const confirmMessage = document.getElementById('confirmMessage');
+
+    if (showBidDetails && bidDetailsSection) {
+      bidDetailsSection.classList.remove('hidden');
+      confirmMessage.classList.add('hidden');
+    } else {
+      if (bidDetailsSection) bidDetailsSection.classList.add('hidden');
+      confirmMessage.classList.remove('hidden');
+    }
+
     const modal = document.getElementById('confirmModal');
     if (modal) {
       modal.classList.remove('hidden');
@@ -617,7 +658,14 @@ document.addEventListener('DOMContentLoaded', function() {
   window.confirmPopup = function(action = 'Abandon') {
     triggerElement = document.activeElement;
     const title = `Confirm ${action} Bid`;
-    const message = `Are you sure you want to ${action.toLowerCase()} this bid?`;
+    const showBidDetails = action.toLowerCase() === 'accept';
+
+    let message;
+    if (showBidDetails) {
+      message = 'Please review the bid details below and confirm if you want to proceed with this exchange.';
+    } else {
+      message = `Are you sure you want to ${action.toLowerCase()} this bid?`;
+    }
 
     return showConfirmDialog(title, message, function() {
       if (triggerElement) {
@@ -629,7 +677,7 @@ document.addEventListener('DOMContentLoaded', function() {
         form.appendChild(hiddenInput);
         form.submit();
       }
-    });
+    }, showBidDetails);
   };
 
   const overrideButtonConfirm = function(button, action) {
