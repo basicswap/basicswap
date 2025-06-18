@@ -8,35 +8,39 @@
 import os
 import sys
 
-import json
-import logging
-import shutil
-import signal
-import socket
-import subprocess
-import threading
-import time
-import traceback
-import unittest
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+test_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, test_dir)
 
-import basicswap.config as cfg
-from basicswap.basicswap import BasicSwap
-from basicswap.basicswap_util import OffererPingStatus
-from basicswap.chainparams import chainparams, Coins
-from basicswap.contrib.key import ECKey
-from basicswap.http_server import HttpThread
-from basicswap.messages_npb import OffererPingMessage
-from basicswap.util.address import (
+import json  # noqa: E402
+import logging  # noqa: E402
+import shutil  # noqa: E402
+import signal  # noqa: E402
+import socket  # noqa: E402
+import subprocess  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+import traceback  # noqa: E402
+import unittest  # noqa: E402
+
+import basicswap.config as cfg  # noqa: E402
+from basicswap.basicswap import BasicSwap  # noqa: E402
+from basicswap.basicswap_util import OffererPingStatus  # noqa: E402
+from basicswap.chainparams import chainparams, Coins  # noqa: E402
+from basicswap.contrib.key import ECKey  # noqa: E402
+from basicswap.http_server import HttpThread  # noqa: E402
+from basicswap.messages_npb import OffererPingMessage  # noqa: E402
+from basicswap.util.address import (  # noqa: E402
     toWIF,
     pubkeyToAddress,
 )
-from basicswap.bin.run import (
+from basicswap.bin.run import (  # noqa: E402
     startDaemon,
     startXmrDaemon,
     startXmrWalletDaemon,
 )
-from basicswap.rpc_xmr import callrpc_xmr
-from test_xmr import (
+from basicswap.rpc_xmr import callrpc_xmr  # noqa: E402
+from test_xmr import (  # noqa: E402
     NUM_NODES,
     NUM_XMR_NODES,
     TEST_DIR,
@@ -55,16 +59,12 @@ from test_xmr import (
     BASE_RPC_PORT,
     RESET_TEST,
 )
-from tests.basicswap.common import (
+from tests.basicswap.common import (  # noqa: E402
     prepareDataDir,
     make_rpc_func,
     waitForRPC,
     callrpc_cli,
 )
-
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-test_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, test_dir)
 
 
 class TestPingSystem(unittest.TestCase):
