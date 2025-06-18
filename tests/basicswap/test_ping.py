@@ -7,26 +7,32 @@
 
 import os
 import sys
-import time
-import unittest
-import logging
-import json
-import threading
-import signal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-
-from basicswap.basicswap_util import OffererPingStatus, MessageTypes
-from basicswap.messages_npb import OffererPingMessage
-from basicswap.basicswap import Coins, BasicSwap
-from basicswap.util.address import toWIF
-from basicswap.contrib.key import ECKey
-from basicswap.http_server import HttpThread
-import basicswap.config as cfg
-
 test_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, test_dir)
-from test_xmr import (
+
+import time  # noqa: E402
+import unittest  # noqa: E402
+import logging  # noqa: E402
+import json  # noqa: E402
+import threading  # noqa: E402
+import signal  # noqa: E402
+
+from basicswap.basicswap_util import OffererPingStatus  # noqa: E402
+from basicswap.messages_npb import OffererPingMessage  # noqa: E402
+from basicswap.basicswap import BasicSwap  # noqa: E402
+from basicswap.util.address import toWIF  # noqa: E402
+from basicswap.contrib.key import ECKey  # noqa: E402
+from basicswap.http_server import HttpThread  # noqa: E402
+from basicswap.bin.run import (  # noqa: E402
+    startDaemon,
+    startXmrDaemon,
+    startXmrWalletDaemon,
+)
+from basicswap.rpc_xmr import callrpc_xmr  # noqa: E402
+import basicswap.config as cfg  # noqa: E402
+from test_xmr import (  # noqa: E402
     NUM_NODES,
     NUM_XMR_NODES,
     TEST_DIR,
@@ -42,20 +48,15 @@ from test_xmr import (
     PREFIX_SECRET_KEY_REGTEST,
     TEST_HTTP_HOST,
     TEST_HTTP_PORT,
-    BASE_ZMQ_PORT,
     BASE_RPC_PORT,
     RESET_TEST,
 )
-from tests.basicswap.common import (
+from tests.basicswap.common import (  # noqa: E402
     prepareDataDir,
     make_rpc_func,
     waitForRPC,
-    stopDaemons,
     callrpc_cli,
 )
-from tests.basicswap.util import make_boolean
-from basicswap.bin.run import startDaemon, startXmrDaemon, startXmrWalletDaemon
-from basicswap.rpc_xmr import callrpc_xmr
 
 
 class TestPingSystem(unittest.TestCase):
@@ -459,35 +460,6 @@ class TestPingSystem(unittest.TestCase):
             }
         )
 
-    @classmethod
-    def tearDownClass(cls):
-        logging.info("Finalising")
-        test_delay_event.set()
-        if cls.update_thread is not None:
-            try:
-                cls.update_thread.join()
-            except Exception:
-                logging.info("Failed to join update_thread")
-
-        for t in cls.http_threads:
-            t.stop()
-            t.join()
-
-        logging.info("Stopping swap clients")
-        for c in cls.swap_clients:
-            c.finalise()
-
-        logging.info("Stopping coin nodes")
-        stopDaemons(cls.xmr_daemons)
-        stopDaemons(cls.part_daemons)
-
-        cls.http_threads.clear()
-        cls.swap_clients.clear()
-        cls.part_daemons.clear()
-        cls.xmr_daemons.clear()
-
-        super(TestPingSystem, cls).tearDownClass()
-
     def test_01_ping_message_processing(self):
         logging.info("Testing ping message processing")
 
@@ -602,7 +574,7 @@ class TestPingSystem(unittest.TestCase):
             )
             logging.info(f"Initial ping status: {initial_ping_status.status}")
 
-            logging.info(f"Mock ping details:")
+            logging.info("Mock ping details:")
             logging.info(f"  from: {mock_ping['from']}")
             logging.info(f"  hex length: {len(mock_ping['hex'])}")
             logging.info(f"  received: {mock_ping['received']}")
@@ -614,7 +586,7 @@ class TestPingSystem(unittest.TestCase):
                 ping_data = OffererPingMessage()
                 ping_data.from_bytes(ping_bytes)
 
-                logging.info(f"Successfully parsed ping message:")
+                logging.info("Successfully parsed ping message:")
                 logging.info(f"  timestamp: {ping_data.timestamp}")
                 logging.info(f"  protocol_version: {ping_data.protocol_version}")
                 logging.info(f"  active_offers_count: {ping_data.active_offers_count}")
@@ -682,7 +654,7 @@ class TestPingSystem(unittest.TestCase):
         try:
 
             test_addr = "offline_test_addr"
-            ping_status = client.getOrCreateOffererPingStatus(test_addr, cursor)
+            client.getOrCreateOffererPingStatus(test_addr, cursor)
 
             old_time = int(time.time()) - 400
 
@@ -721,7 +693,7 @@ class TestPingSystem(unittest.TestCase):
         try:
 
             test_addr = "unresponsive_test_addr"
-            ping_status = client.getOrCreateOffererPingStatus(test_addr, cursor)
+            client.getOrCreateOffererPingStatus(test_addr, cursor)
 
             very_old_time = int(time.time()) - 400
 
@@ -764,19 +736,18 @@ class TestPingSystem(unittest.TestCase):
         client1 = swap_clients[0]
         client2 = swap_clients[1]
 
-        from basicswap.chainparams import Coins
-
         cursor1 = client1.openDB()
         cursor2 = client2.openDB()
         try:
 
-            offer_data = {
-                "coin_from": Coins.PART,
-                "coin_to": Coins.XMR,
-                "amount_from": 1000000,
-                "amount_to": 100000000000,
-                "addr_from": client1.network_addr,
-            }
+            # Test data for ping with offers
+            # offer_data = {
+            #     "coin_from": Coins.PART,
+            #     "coin_to": Coins.XMR,
+            #     "amount_from": 1000000,
+            #     "amount_to": 100000000000,
+            #     "addr_from": client1.network_addr,
+            # }
 
             ping_msg = OffererPingMessage()
             ping_msg.timestamp = int(time.time())
