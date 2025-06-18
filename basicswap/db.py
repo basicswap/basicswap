@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 29
+CURRENT_DB_VERSION = 30
 CURRENT_DB_DATA_VERSION = 6
 
 
@@ -627,6 +627,18 @@ class Notification(Table):
     created_at = Column("integer")
     event_type = Column("integer")
     event_data = Column("blob")
+
+
+class OffererPingStatus(Table):
+    __tablename__ = "offerer_ping_status"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    addr_from = Column("string", unique=True)
+    last_ping_received = Column("integer")
+    ping_failures = Column("integer")
+    status = Column("integer")
+    created_at = Column("integer")
+    updated_at = Column("integer")
 
 
 class MessageLink(Table):

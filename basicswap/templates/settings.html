@@ -346,9 +346,9 @@
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Show advanced UI elements and debug controls</p>
         </div>
 
-        <div class="md:col-span-2">
+        <div>
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Remove DB Records for Expired Offers</label>
-         <div class="relative max-w-xs">
+         <div class="relative">
           <select name="expire_db_records" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
            <option {% if general_settings.expire_db_records %}selected{% endif %} value="True">True</option>
            <option {% if not general_settings.expire_db_records %}selected{% endif %} value="False">False</option>
@@ -360,6 +360,22 @@
           </div>
          </div>
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Automatically clean up database records for expired offers</p>
+        </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Remove Offers from Offline Users</label>
+         <div class="relative">
+          <select name="prune_inactive_offers" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if general_settings.prune_inactive_offers %}selected{% endif %} value="True">True</option>
+           <option {% if not general_settings.prune_inactive_offers %}selected{% endif %} value="False">False</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+          </div>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Automatically remove offers from users who haven't been seen online recently</p>
         </div>
 
        </div>

@@ -43,6 +43,9 @@ def page_settings(self, url_split, post_string):
                     "expire_db_records": toBool(
                         get_data_entry(form_data, "expire_db_records")
                     ),
+                    "prune_inactive_offers": toBool(
+                        get_data_entry(form_data, "prune_inactive_offers")
+                    ),
                 }
                 swap_client.editGeneralSettings(data)
             elif have_data_entry(form_data, "apply_chart"):
@@ -170,6 +173,7 @@ def page_settings(self, url_split, post_string):
         "debug": swap_client.debug,
         "debug_ui": swap_client.debug_ui,
         "expire_db_records": swap_client._expire_db_records,
+        "prune_inactive_offers": swap_client.prune_inactive_offers,
     }
 
     chart_api_key = get_api_key_setting(

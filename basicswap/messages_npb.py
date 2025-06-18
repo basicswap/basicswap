@@ -282,3 +282,11 @@ class ConnectReqMessage(NonProtobufClass):
         3: ("request_type", NPBW_INT, 0),
         4: ("request_data", NPBW_BYTES, 0),
     }
+
+
+class OffererPingMessage(NonProtobufClass):
+    _map = {
+        1: ("timestamp", NPBW_INT, 0),
+        2: ("protocol_version", NPBW_INT, 0),
+        3: ("active_offers_count", NPBW_INT, 0),
+    }

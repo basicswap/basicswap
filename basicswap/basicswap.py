@@ -51,6 +51,7 @@ from .basicswap_util import (
     MessageTypes,
     NotificationTypes as NT,
     OfferStates,
+    OffererPingStatus,
     strBidState,
     SwapTypes,
     TxLockTypes,
@@ -111,6 +112,7 @@ from .messages_npb import (
     ConnectReqMessage,
     OfferMessage,
     OfferRevokeMessage,
+    OffererPingMessage,
     XmrBidAcceptMessage,
     XmrBidLockReleaseMessage,
     XmrBidLockSpendTxMessage,
@@ -134,6 +136,7 @@ from .db import (
     MessageLink,
     Notification,
     Offer,
+    OffererPingStatus as OffererPingStatusDB,
     pack_state,
     PooledAddress,
     PrefundedTx,
@@ -330,6 +333,16 @@ class BasicSwap(BaseApp, UIApp):
         self.check_delayed_auto_accept_seconds = self.get_int_setting(
             "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
+        self.offerer_ping_seconds = self.get_int_setting(
+            "offerer_ping_seconds", 6 * 60, 60, 30 * 60
+        )
+        self.offerer_ping_timeout_seconds = self.get_int_setting(
+            "offerer_ping_timeout_seconds", 12 * 60, 5 * 60, 60 * 60
+        )
+        self.offerer_ping_prune_after_seconds = self.get_int_setting(
+            "offerer_ping_prune_after_seconds", 12 * 60, 5 * 60, 24 * 60 * 60
+        )
+        self.prune_inactive_offers = self.settings.get("prune_inactive_offers", False)
         self.startup_tries = self.get_int_setting(
             "startup_tries", 21, 1, 100
         )  # Seconds waited for will be (x(1 + x+1) / 2
@@ -343,6 +356,8 @@ class BasicSwap(BaseApp, UIApp):
         self._last_checked_watched = 0
         self._last_checked_split_messages = 0
         self._last_checked_delayed_auto_accept = 0
+        self._last_sent_ping = 0
+        self._last_checked_pings = 0
         self._possibly_revoked_offers = collections.deque(
             [], maxlen=48
         )  # TODO: improve
@@ -576,6 +591,7 @@ class BasicSwap(BaseApp, UIApp):
             self.thread_pool.shutdown()
 
         if self._zmq_queue_enabled:
+            self._read_zmq_queue = False
             self.zmqContext.destroy()
 
         self.swaps_in_progress.clear()
@@ -7271,6 +7287,218 @@ class BasicSwap(BaseApp, UIApp):
             return
         remove_expired_data(self, self._expire_db_records_after)
 
+    def getOrCreateOffererPingStatus(
+        self, addr_from: str, cursor
+    ) -> OffererPingStatusDB:
+        ping_status = self.queryOne(
+            OffererPingStatusDB, cursor, {"addr_from": addr_from}
+        )
+        if ping_status is None:
+            now = self.getTime()
+            ping_status = OffererPingStatusDB(
+                addr_from=addr_from,
+                last_ping_received=0,
+                ping_failures=0,
+                status=OffererPingStatus.UNKNOWN,
+                created_at=now,
+                updated_at=now,
+            )
+            self.add(ping_status, cursor)
+        return ping_status
+
+    def sendPing(self, cursor) -> bytes:
+        now = self.getTime()
+
+        active_offers_count = cursor.execute(
+            "SELECT COUNT(*) FROM offers WHERE addr_from = ? AND active_ind = 1 AND expire_at > ?",
+            (self.network_addr, now),
+        ).fetchone()[0]
+
+        if active_offers_count == 0:
+            return None
+
+        msg_buf = OffererPingMessage()
+        msg_buf.timestamp = now
+        msg_buf.protocol_version = PROTOCOL_VERSION_SECRET_HASH
+        msg_buf.active_offers_count = active_offers_count
+
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.OFFERER_PING) + msg_buf.to_bytes().hex()
+        )
+        msg_valid = self.SMSG_SECONDS_IN_HOUR
+
+        try:
+            ro = self.callrpc(
+                "smsgsend",
+                [self.network_addr, "", payload_hex, False, msg_valid, False],
+            )
+            msg_id = ro["msgid"] if "msgid" in ro else None
+
+            self.log.debug(f"Sent ping with {active_offers_count} active offers")
+            return msg_id
+
+        except Exception as e:
+            self.log.warning(f"Failed to send ping: {e}")
+            return None
+
+    def processOffererPing(self, msg) -> None:
+        try:
+            ping_bytes = bytes.fromhex(msg["hex"][2:-2])
+            ping_data = OffererPingMessage()
+            ping_data.from_bytes(ping_bytes)
+
+            addr_from = msg["from"]
+            now = self.getTime()
+
+            if addr_from == self.network_addr:
+                return
+
+            cursor = self.openDB()
+            try:
+                ping_status = self.getOrCreateOffererPingStatus(addr_from, cursor)
+
+                # If user was offline/unresponsive, restore valid offers automatically
+                if ping_status.status in (
+                    OffererPingStatus.OFFLINE,
+                    OffererPingStatus.UNRESPONSIVE,
+                ):
+                    restored_count = self.restoreValidOffers(addr_from, cursor, now)
+                    if restored_count > 0:
+                        self.log.info(
+                            f"User {addr_from} back online - automatically restored {restored_count} valid offers"
+                        )
+
+                ping_status.last_ping_received = now
+                ping_status.ping_failures = 0
+                ping_status.status = OffererPingStatus.ONLINE
+                ping_status.updated_at = now
+                self.add(ping_status, cursor, upsert=True)
+
+                self.log.debug(
+                    f"Received ping from {addr_from}, active offers: {ping_data.active_offers_count}"
+                )
+
+            finally:
+                self.closeDB(cursor)
+
+        except Exception as e:
+            self.log.warning(f"Failed to process offerer ping: {e}")
+
+    def restoreValidOffers(self, addr_from: str, cursor, now: int) -> int:
+        """Automatically restore non-expired offers when user comes back online"""
+        result = cursor.execute(
+            """
+            UPDATE offers SET active_ind = 1
+            WHERE addr_from = ?
+            AND active_ind = 0
+            AND expire_at > ?
+            AND was_sent = 0
+        """,
+            (addr_from, now),
+        )
+
+        restored_count = result.rowcount
+        return restored_count
+
+    def checkPings(self) -> None:
+        if self._is_locked is True:
+            return
+
+        now = self.getTime()
+        cursor = self.openDB()
+        try:
+            if now - self._last_sent_ping >= self.offerer_ping_seconds:
+                self.sendPing(cursor)
+                self._last_sent_ping = now
+
+            timeout_cutoff = now - self.offerer_ping_timeout_seconds
+            stale_rows = cursor.execute(
+                """
+                SELECT addr_from FROM offerer_ping_status
+                WHERE last_ping_received < ? AND status != ?
+            """,
+                (timeout_cutoff, OffererPingStatus.UNRESPONSIVE),
+            ).fetchall()
+
+            for (addr_from,) in stale_rows:
+                ping_status = self.getOrCreateOffererPingStatus(addr_from, cursor)
+                ping_status.ping_failures += 1
+                ping_status.status = OffererPingStatus.OFFLINE
+                ping_status.updated_at = now
+
+                if (
+                    now - ping_status.last_ping_received
+                    > self.offerer_ping_prune_after_seconds
+                ):
+                    ping_status.status = OffererPingStatus.UNRESPONSIVE
+                    self.log.info(f"Offerer {addr_from} marked as unresponsive")
+
+                self.add(ping_status, cursor, upsert=True)
+
+            self.pruneUnresponsiveOffers(cursor, now)
+
+        finally:
+            self.closeDB(cursor)
+
+    def pruneUnresponsiveOffers(self, cursor, now: int) -> None:
+        if not self.prune_inactive_offers:
+            return
+
+        unresponsive_rows = cursor.execute(
+            """
+            SELECT addr_from FROM offerer_ping_status
+            WHERE status = ?
+        """,
+            (OffererPingStatus.UNRESPONSIVE,),
+        ).fetchall()
+
+        pruned_count = 0
+        for (addr_from,) in unresponsive_rows:
+            result = cursor.execute(
+                """
+                UPDATE offers SET active_ind = 0
+                WHERE addr_from = ? AND active_ind = 1 AND was_sent = 0
+            """,
+                (addr_from,),
+            )
+
+            offers_pruned = result.rowcount
+            if offers_pruned > 0:
+                pruned_count += offers_pruned
+                self.log.info(
+                    f"Pruned {offers_pruned} offers from unresponsive offerer {addr_from}"
+                )
+
+        if pruned_count > 0:
+            self.log.info(
+                f"Total offers pruned from unresponsive offerers: {pruned_count}"
+            )
+
+    def getOffererPingStats(self) -> dict:
+        cursor = self.openDB()
+        try:
+            stats = {}
+
+            for status in OffererPingStatus:
+                count = cursor.execute(
+                    "SELECT COUNT(*) FROM offerer_ping_status WHERE status = ?",
+                    (status,),
+                ).fetchone()[0]
+                stats[status.name.lower()] = count
+
+            now = self.getTime()
+            recent_cutoff = now - (24 * 60 * 60)
+
+            stats["recent_pings_received"] = cursor.execute(
+                "SELECT COUNT(*) FROM offerer_ping_status WHERE last_ping_received > ?",
+                (recent_cutoff,),
+            ).fetchone()[0]
+
+            return stats
+
+        finally:
+            self.closeDB(cursor)
+
     def checkAcceptedBids(self) -> None:
         # Check for bids stuck as accepted (not yet in-progress)
         if self._is_locked is True:
@@ -10357,6 +10585,8 @@ class BasicSwap(BaseApp, UIApp):
                 self.processADSBidReversedAccept(msg)
             elif msg_type == MessageTypes.CONNECT_REQ:
                 self.processConnectRequest(msg)
+            elif msg_type == MessageTypes.OFFERER_PING:
+                self.processOffererPing(msg)
 
         except InactiveCoin as ex:
             self.log.debug(
@@ -10374,10 +10604,11 @@ class BasicSwap(BaseApp, UIApp):
                     None,
                 )
 
-    def processZmqSmsg(self) -> None:
-        message = self.zmqSubscriber.recv()
-        # Clear
-        _ = self.zmqSubscriber.recv()
+    def processZmqSmsg(self, message=None) -> None:
+        if message is None:
+            message = self.zmqSubscriber.recv()
+            # Clear
+            _ = self.zmqSubscriber.recv()
 
         if message[0] == 3:  # Paid smsg
             return  # TODO: Switch to paid?
@@ -10522,14 +10753,20 @@ class BasicSwap(BaseApp, UIApp):
             )
 
     def update(self) -> None:
-        if self._zmq_queue_enabled:
+        if self._zmq_queue_enabled and self._read_zmq_queue:
             try:
-                if self._read_zmq_queue:
-                    message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
-                    if message == b"smsg":
-                        self.processZmqSmsg()
+                message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
+                if message == b"smsg":
+
+                    msg_data = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
+                    self.processZmqSmsg(msg_data)
             except zmq.Again as e:  # noqa: F841
                 pass
+            except zmq.ZMQError as e:
+                if e.errno == zmq.ENOTSOCK:
+                    pass
+                else:
+                    self.logException(f"smsg zmq {e}")
             except Exception as e:
                 self.logException(f"smsg zmq {e}")
 
@@ -10661,6 +10898,10 @@ class BasicSwap(BaseApp, UIApp):
                 self.checkDelayedAutoAccept()
                 self._last_checked_delayed_auto_accept = now
 
+            if now - self._last_checked_pings >= self.offerer_ping_seconds:
+                self.checkPings()
+                self._last_checked_pings = now
+
         except Exception as ex:
             self.logException(f"update {ex}")
 
@@ -10755,6 +10996,17 @@ class BasicSwap(BaseApp, UIApp):
                 if settings_copy.get("expire_db_records", False) != new_value:
                     self._expire_db_records = new_value
                     settings_copy["expire_db_records"] = new_value
+                    settings_changed = True
+
+            if "prune_inactive_offers" in data:
+                new_value = data["prune_inactive_offers"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New prune_inactive_offers value not boolean",
+                )
+                if settings_copy.get("prune_inactive_offers", False) != new_value:
+                    self.prune_inactive_offers = new_value
+                    settings_copy["prune_inactive_offers"] = new_value
                     settings_changed = True
 
             if "show_chart" in data:

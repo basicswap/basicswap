@@ -59,6 +59,7 @@ class MessageTypes(IntEnum):
     ADS_BID_ACCEPT_FL = auto()
 
     CONNECT_REQ = auto()
+    OFFERER_PING = auto()
 
 
 class AddressTypes(IntEnum):
@@ -206,6 +207,13 @@ class EventLogTypes(IntEnum):
 class XmrSplitMsgTypes(IntEnum):
     BID = auto()
     BID_ACCEPT = auto()
+
+
+class OffererPingStatus(IntEnum):
+    UNKNOWN = 0
+    ONLINE = 1
+    OFFLINE = 2
+    UNRESPONSIVE = 3
 
 
 class DebugTypes(IntEnum):
