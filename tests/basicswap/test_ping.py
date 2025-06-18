@@ -5,42 +5,39 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import json
+import logging
 import os
+import shutil
+import signal
+import socket
+import subprocess
 import sys
+import threading
+import time
+import traceback
+import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-test_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, test_dir)
 
-import json  # noqa: E402
-import logging  # noqa: E402
-import shutil  # noqa: E402
-import signal  # noqa: E402
-import socket  # noqa: E402
-import subprocess  # noqa: E402
-import threading  # noqa: E402
-import time  # noqa: E402
-import traceback  # noqa: E402
-import unittest  # noqa: E402
-
-import basicswap.config as cfg  # noqa: E402
-from basicswap.basicswap import BasicSwap  # noqa: E402
-from basicswap.basicswap_util import OffererPingStatus  # noqa: E402
-from basicswap.chainparams import chainparams, Coins  # noqa: E402
-from basicswap.contrib.key import ECKey  # noqa: E402
-from basicswap.http_server import HttpThread  # noqa: E402
-from basicswap.messages_npb import OffererPingMessage  # noqa: E402
-from basicswap.util.address import (  # noqa: E402
+import basicswap.config as cfg
+from basicswap.basicswap import BasicSwap
+from basicswap.basicswap_util import OffererPingStatus
+from basicswap.chainparams import chainparams, Coins
+from basicswap.contrib.key import ECKey
+from basicswap.http_server import HttpThread
+from basicswap.messages_npb import OffererPingMessage
+from basicswap.util.address import (
     toWIF,
     pubkeyToAddress,
 )
-from basicswap.bin.run import (  # noqa: E402
+from basicswap.bin.run import (
     startDaemon,
     startXmrDaemon,
     startXmrWalletDaemon,
 )
-from basicswap.rpc_xmr import callrpc_xmr  # noqa: E402
-from test_xmr import (  # noqa: E402
+from basicswap.rpc_xmr import callrpc_xmr
+from tests.basicswap.test_xmr import (
     NUM_NODES,
     NUM_XMR_NODES,
     TEST_DIR,
@@ -59,7 +56,7 @@ from test_xmr import (  # noqa: E402
     BASE_RPC_PORT,
     RESET_TEST,
 )
-from tests.basicswap.common import (  # noqa: E402
+from tests.basicswap.common import (
     prepareDataDir,
     make_rpc_func,
     waitForRPC,
@@ -68,6 +65,7 @@ from tests.basicswap.common import (  # noqa: E402
 
 
 class TestPingSystem(unittest.TestCase):
+
     __test__ = True
 
     update_thread = None
@@ -531,7 +529,6 @@ class TestPingSystem(unittest.TestCase):
             logging.info(f"Client {i} ping statistics work")
 
     def test_05_ping_processing_with_real_network(self):
-        """Test ping processing between real BasicSwap instances with unique network addresses."""
         logging.info("Testing ping processing with real network")
 
         swap_clients = self.swap_clients
@@ -638,7 +635,6 @@ class TestPingSystem(unittest.TestCase):
             client2.closeDB(cursor)
 
     def test_06_ping_offline_status(self):
-        """Test OFFLINE status detection."""
         logging.info("Testing OFFLINE status detection")
 
         swap_clients = self.swap_clients
@@ -677,7 +673,6 @@ class TestPingSystem(unittest.TestCase):
             client.closeDB(cursor)
 
     def test_07_ping_unresponsive_status(self):
-        """Test UNRESPONSIVE status detection."""
         logging.info("Testing UNRESPONSIVE status detection")
 
         swap_clients = self.swap_clients
@@ -723,7 +718,6 @@ class TestPingSystem(unittest.TestCase):
             client.closeDB(cursor)
 
     def test_08_ping_with_offers(self):
-        """Test ping system with actual offers."""
         logging.info("Testing ping system with real offers")
 
         swap_clients = self.swap_clients
@@ -734,19 +728,53 @@ class TestPingSystem(unittest.TestCase):
         cursor2 = client2.openDB()
         try:
 
-            # Test data for ping with offers
-            # offer_data = {
-            #     "coin_from": Coins.PART,
-            #     "coin_to": Coins.XMR,
-            #     "amount_from": 1000000,
-            #     "amount_to": 100000000000,
-            #     "addr_from": client1.network_addr,
-            # }
+            offer_data = {
+                "coin_from": Coins.PART,
+                "coin_to": Coins.XMR,
+                "amount_from": 1000000,
+                "amount_to": 100000000000,
+                "addr_from": client1.network_addr,
+            }
+            logging.info(
+                f"Testing with offer data: {offer_data['coin_from']} -> {offer_data['coin_to']}"
+            )
+
+            current_time = int(time.time())
+            future_time = current_time + 3600
+            test_offer_id = bytes(32)
+
+            cursor1.execute(
+                """
+                INSERT OR REPLACE INTO offers
+                (offer_id, addr_from, active_ind, expire_at, created_at, was_sent, coin_from, coin_to, amount_from, amount_to, rate, min_bid_amount, time_valid, lock_type, lock_value, swap_type)
+                VALUES (?, ?, 1, ?, ?, 0, ?, ?, ?, ?, 100000000000, 10000000, 3600, 1, 3600, 1)
+            """,
+                (
+                    test_offer_id,
+                    offer_data["addr_from"],
+                    future_time,
+                    current_time,
+                    int(offer_data["coin_from"]),
+                    int(offer_data["coin_to"]),
+                    offer_data["amount_from"],
+                    offer_data["amount_to"],
+                ),
+            )
+            client1.commitDB()
+
+            active_offers_count = cursor1.execute(
+                "SELECT COUNT(*) FROM offers WHERE addr_from = ? AND active_ind = 1",
+                (offer_data["addr_from"],),
+            ).fetchone()[0]
+
+            logging.info(
+                f"Created test offer, active offers count: {active_offers_count}"
+            )
 
             ping_msg = OffererPingMessage()
-            ping_msg.timestamp = int(time.time())
+            ping_msg.timestamp = current_time
             ping_msg.protocol_version = 5
-            ping_msg.active_offers_count = 1
+            ping_msg.active_offers_count = active_offers_count
 
             message_bytes_hex = ping_msg.to_bytes().hex()
             formatted_hex = "0a" + message_bytes_hex + "00"
@@ -763,8 +791,8 @@ class TestPingSystem(unittest.TestCase):
             ping_data.from_bytes(ping_bytes)
 
             assert (
-                ping_data.active_offers_count == 1
-            ), f"Expected 1 offer, got {ping_data.active_offers_count}"
+                ping_data.active_offers_count == active_offers_count
+            ), f"Expected {active_offers_count} offers, got {ping_data.active_offers_count}"
 
             ping_status = client2.getOrCreateOffererPingStatus(
                 client1.network_addr, cursor2
@@ -791,17 +819,28 @@ class TestPingSystem(unittest.TestCase):
             )
             assert final_status.status == OffererPingStatus.ONLINE
 
+            final_offers_count = cursor1.execute(
+                "SELECT COUNT(*) FROM offers WHERE addr_from = ? AND active_ind = 1",
+                (offer_data["addr_from"],),
+            ).fetchone()[0]
+
+            assert (
+                final_offers_count == active_offers_count
+            ), f"Offer count changed unexpectedly: {final_offers_count}"
+
             logging.info(
-                f"Ping with {ping_data.active_offers_count} offers processed successfully!"
+                f"Ping with {ping_data.active_offers_count} real offers processed successfully"
             )
-            logging.info("Ping system works correctly with offer information")
+            logging.info("Ping system works correctly with actual offer data")
+            logging.info(
+                f"Verified offer remains active: {offer_data['coin_from']} -> {offer_data['coin_to']}"
+            )
 
         finally:
             client1.closeDB(cursor1)
             client2.closeDB(cursor2)
 
     def test_09_ping_state_transitions(self):
-        """Test complete ping state transitions: UNKNOWN -> ONLINE -> OFFLINE -> UNRESPONSIVE."""
         logging.info("Testing complete ping state transitions")
 
         swap_clients = self.swap_clients
@@ -870,7 +909,6 @@ class TestPingSystem(unittest.TestCase):
             client.closeDB(cursor)
 
     def test_10_automatic_offer_restoration(self):
-        """Test that valid offers are automatically restored when user comes back online"""
         logging.info("Testing automatic offer restoration")
         client = self.swap_clients[0]
 
@@ -927,13 +965,12 @@ class TestPingSystem(unittest.TestCase):
             ).fetchone()[0]
             assert active_offers == 1, "Offer should be restored to active"
 
-            logging.info("Automatic offer restoration works correctly!")
+            logging.info("Automatic offer restoration works correctly")
 
         finally:
             client.closeDB(cursor)
 
     def test_11_ping_system_summary(self):
-        """Ping system test summary."""
         logging.info("Ping system tests completed successfully")
         logging.info("All ping states working: UNKNOWN, ONLINE, OFFLINE, UNRESPONSIVE")
         logging.info("Ping system is functional")
@@ -943,7 +980,6 @@ class TestPingSystem(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        """Clean shutdown after all tests complete successfully."""
         logging.info("Ping tests completed")
 
         if hasattr(cls, "_all_tests_passed") and cls._all_tests_passed:
