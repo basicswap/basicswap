@@ -203,6 +203,19 @@ const CoinManager = (function() {
             return coin ? coin.symbol : null;
         },
         getDisplayName: function(identifier) {
+            if (!identifier) return null;
+
+            const normalizedId = identifier.toString().toLowerCase().trim();
+            if (normalizedId === 'particl anon' || normalizedId === 'part_anon' || normalizedId === 'particl_anon') {
+                return 'Particl Anon';
+            }
+            if (normalizedId === 'particl blind' || normalizedId === 'part_blind' || normalizedId === 'particl_blind') {
+                return 'Particl Blind';
+            }
+            if (normalizedId === 'litecoin mweb' || normalizedId === 'ltc_mweb' || normalizedId === 'litecoin_mweb') {
+                return 'Litecoin MWEB';
+            }
+
             const coin = getCoinByAnyIdentifier(identifier);
             return coin ? coin.displayName : null;
         },
