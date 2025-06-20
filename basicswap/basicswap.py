@@ -1144,8 +1144,6 @@ class BasicSwap(BaseApp, UIApp):
             network_config_list = [{"type": "smsg", "enabled": True}]
 
         for network in network_config_list:
-            if network.get("enabled", True) is False:
-                continue
             if network["type"] == "smsg":
                 self.active_networks.append({"type": "smsg"})
             elif network["type"] == "simplex":
@@ -11348,6 +11346,11 @@ class BasicSwap(BaseApp, UIApp):
             filter_include_sent = filters.get("include_sent", None)
             if filter_include_sent is not None and filter_include_sent is not True:
                 query_suffix += " AND was_sent = 0"
+
+            filter_auto_accept_type = filters.get("auto_accept_type", None)
+            if filter_auto_accept_type and filter_auto_accept_type != "any":
+                query_suffix += " AND auto_accept_type = :filter_auto_accept_type"
+                query_data["filter_auto_accept_type"] = int(filter_auto_accept_type)
 
             query_suffix += getOrderByStr(filters)
 
