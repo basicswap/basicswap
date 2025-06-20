@@ -1808,6 +1808,41 @@ class BasicSwapTest(TestFunctions):
             ci.setActiveWallet("wallet.dat")
             chain_client_settings["manage_daemon"] = False
 
+    def test_015_changetype(self):
+        logging.info(f"---------- Test {self.test_coin_from.name} changetype")
+        ci = self.swap_clients[0].ci(self.test_coin_from)
+
+        addr_p2sh = ci.rpc_wallet(
+            "getnewaddress", ["test_015_changetype", "p2sh-segwit"]
+        )
+        txid = ci.rpc_wallet("sendtoaddress", [addr_p2sh, 1])
+
+        tx_hex = ci.rpc_wallet("gettransaction", [txid])["hex"]
+        tx = ci.rpc_wallet("decoderawtransaction", [tx_hex])
+        change_vout: int = -1
+        for vout in tx["vout"]:
+            if "address" in vout["scriptPubKey"]:
+                if vout["scriptPubKey"]["address"] == addr_p2sh:
+                    continue
+            else:
+                if addr_p2sh in vout["scriptPubKey"]["addresses"]:
+                    continue
+            change_vout = vout["n"]
+            assert vout["scriptPubKey"]["type"] == "witness_v0_keyhash"
+        assert change_vout > -1
+        ci.rpc_wallet("sendtoaddress", [addr_p2sh, 2])
+        ci.rpc_wallet("sendtoaddress", [addr_p2sh, 3])
+
+        txid = ci.combine_non_segwit_prevouts()
+        tx_hex = ci.rpc_wallet("gettransaction", [txid])["hex"]
+        tx = ci.rpc_wallet("decoderawtransaction", [tx_hex])
+
+        assert len(tx["vin"]) == 3
+        for vin in tx["vin"]:
+            assert len(vin["scriptSig"]["hex"]) > 0
+        for vout in tx["vout"]:
+            assert vout["scriptPubKey"]["type"] == "witness_v0_keyhash"
+
     def test_01_0_lock_bad_prevouts(self):
         logging.info(
             "---------- Test {} lock_bad_prevouts".format(self.test_coin_from.name)

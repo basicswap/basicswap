@@ -1315,7 +1315,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         )
         wallet_conf_path = os.path.join(data_dir, wallet_conf_filename)
         if os.path.exists(wallet_conf_path):
-            exitWithError("{} exists".format(wallet_conf_path))
+            exitWithError(f"{wallet_conf_path} exists")
         with open(wallet_conf_path, "w") as fp:
             if chain != "mainnet":
                 fp.write(chainname + "=1\n")
@@ -1342,7 +1342,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     core_conf_name: str = core_settings.get("config_filename", coin + ".conf")
     core_conf_path = os.path.join(data_dir, core_conf_name)
     if os.path.exists(core_conf_path):
-        exitWithError("{} exists".format(core_conf_path))
+        exitWithError(f"{core_conf_path} exists")
     with open(core_conf_path, "w") as fp:
         if chain != "mainnet":
             if coin in ("navcoin",):
@@ -1393,6 +1393,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 )
         elif coin == "litecoin":
             fp.write("prune=4000\n")
+            fp.write("changetype=bech32\n")
             if LTC_RPC_USER != "":
                 fp.write(
                     "rpcauth={}:{}${}\n".format(
@@ -1410,6 +1411,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         elif coin == "bitcoin":
             fp.write("deprecatedrpc=create_bdb\n")
             fp.write("prune=2000\n")
+            fp.write("changetype=bech32\n")
             fp.write("fallbackfee=0.0002\n")
             if BTC_RPC_USER != "":
                 fp.write(
@@ -1784,7 +1786,7 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
         coin_name = "particl"
         coin_settings = settings["chainclients"][coin_name]
         daemon_args += getCoreBinArgs(c, coin_settings, prepare=True)
-        extra_config = {"stdout_to_file": True}
+        extra_config = {"stdout_to_file": True, "coin_name": coin_name}
         if coin_settings["manage_daemon"]:
             filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
             daemons.append(
@@ -1906,7 +1908,7 @@ def initialise_wallets(
                             )
                         ]
 
-                    extra_config = {"stdout_to_file": True}
+                    extra_config = {"stdout_to_file": True, "coin_name": coin_name}
                     daemons.append(
                         startDaemon(
                             coin_settings["datadir"],

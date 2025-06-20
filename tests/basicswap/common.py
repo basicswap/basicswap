@@ -102,6 +102,9 @@ def prepareDataDir(
 
         if base_p2p_port == BTC_BASE_PORT:
             fp.write("deprecatedrpc=create_bdb\n")
+            fp.write("changetype=bech32\n")
+        elif base_p2p_port == LTC_BASE_PORT:
+            fp.write("changetype=bech32\n")
         elif base_p2p_port == BASE_PORT:  # Particl
             fp.write("zmqpubsmsg=tcp://127.0.0.1:{}\n".format(BASE_ZMQ_PORT + node_id))
             # minstakeinterval=5  # Using walletsettings stakelimit instead

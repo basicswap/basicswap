@@ -59,15 +59,20 @@ def signal_handler(sig, frame):
 def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
     datadir_path = os.path.expanduser(node_dir)
+    coin_name = extra_config.get("coin_name", "")
 
     # Rewrite litecoin.conf
     # TODO: Remove
-    needs_rewrite: bool = False
     ltc_conf_path = os.path.join(datadir_path, "litecoin.conf")
     if os.path.exists(ltc_conf_path):
+        needs_rewrite: bool = False
+        add_changetype: bool = True
         with open(ltc_conf_path) as fp:
             for line in fp:
                 line = line.strip()
+                if line.startswith("changetype="):
+                    add_changetype = False
+                    break
                 if line.endswith("=onion"):
                     needs_rewrite = True
                     break
@@ -83,6 +88,29 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
                         fp_to.write(line.strip()[:-6] + "\n")
                     else:
                         fp_to.write(line)
+                if add_changetype:
+                    fp_to.write("changetype=bech32\n")
+                    add_changetype = False
+        if add_changetype:
+            logger.info("Adding changetype to litecoin.conf")
+            with open(ltc_conf_path, "a") as fp:
+                fp.write("changetype=bech32\n")
+
+    # Rewrite bitcoin.conf
+    # TODO: Remove
+    btc_conf_path = os.path.join(datadir_path, "bitcoin.conf")
+    if coin_name == "bitcoin" and os.path.exists(btc_conf_path):
+        add_changetype: bool = True
+        with open(btc_conf_path) as fp:
+            for line in fp:
+                line = line.strip()
+                if line.startswith("changetype="):
+                    add_changetype = False
+                    break
+        if add_changetype:
+            logger.info("Adding changetype to bitcoin.conf")
+            with open(btc_conf_path, "a") as fp:
+                fp.write("changetype=bech32\n")
 
     args = [
         daemon_bin,
@@ -474,6 +502,7 @@ def runClient(
                         "stdout_to_file": True,
                         "stdout_filename": "dcrd_stdout.log",
                         "use_shell": use_shell,
+                        "coin_name": "decred",
                     }
                     daemons.append(
                         startDaemon(
@@ -502,6 +531,7 @@ def runClient(
                         "stdout_to_file": True,
                         "stdout_filename": "dcrwallet_stdout.log",
                         "use_shell": use_shell,
+                        "coin_name": "decred",
                     }
                     daemons.append(
                         startDaemon(
@@ -524,8 +554,15 @@ def runClient(
                 extra_opts = getCoreBinArgs(
                     coin_id, v, use_tor_proxy=swap_client.use_tor_proxy
                 )
+                extra_config = {"coin_name": c}
                 daemons.append(
-                    startDaemon(v["datadir"], v["bindir"], filename, opts=extra_opts)
+                    startDaemon(
+                        v["datadir"],
+                        v["bindir"],
+                        filename,
+                        opts=extra_opts,
+                        extra_config=extra_config,
+                    )
                 )
                 pid = daemons[-1].handle.pid
                 pids.append((c, pid))
