@@ -372,7 +372,14 @@ function coinMatches(offerCoin, filterCoins) {
         if (normalizedFilterCoin.includes(' ') || normalizedOfferCoin.includes(' ')) {
             const filterFirstWord = normalizedFilterCoin.split(' ')[0];
             const offerFirstWord = normalizedOfferCoin.split(' ')[0];
-            if (filterFirstWord === offerFirstWord && filterFirstWord.length > 3) {
+
+            if (filterFirstWord === 'bitcoin' && offerFirstWord === 'bitcoin') {
+                const filterHasCash = normalizedFilterCoin.includes('cash');
+                const offerHasCash = normalizedOfferCoin.includes('cash');
+                return filterHasCash === offerHasCash;
+            }
+
+            if (filterFirstWord === offerFirstWord && filterFirstWord.length > 4) {
                 return true;
             }
         }

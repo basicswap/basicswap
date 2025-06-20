@@ -152,6 +152,21 @@ const ConfigManager = (function() {
             if (filterCoin === 'particl' && particlVariants.includes(offerCoin)) {
                 return true;
             }
+
+            if (filterCoin.includes(' ') || offerCoin.includes(' ')) {
+                const filterFirstWord = filterCoin.split(' ')[0];
+                const offerFirstWord = offerCoin.split(' ')[0];
+
+                if (filterFirstWord === 'bitcoin' && offerFirstWord === 'bitcoin') {
+                    const filterHasCash = filterCoin.includes('cash');
+                    const offerHasCash = offerCoin.includes('cash');
+                    return filterHasCash === offerHasCash;
+                }
+
+                if (filterFirstWord === offerFirstWord && filterFirstWord.length > 4) {
+                    return true;
+                }
+            }
             if (particlVariants.includes(filterCoin)) {
                 return offerCoin === filterCoin;
             }
