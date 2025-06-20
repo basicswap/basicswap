@@ -293,8 +293,8 @@ const createSwapTableRow = async (swap) => {
 
     const identity = await IdentityManager.getIdentityData(swap.addr_from);
     const uniqueId = `${swap.bid_id}_${swap.created_at}`;
-    const fromSymbol = window.CoinManager.getSymbol(swap.coin_from) || swap.coin_from;
-    const toSymbol = window.CoinManager.getSymbol(swap.coin_to) || swap.coin_to;
+    const fromSymbol = window.CoinManager.getDisplayName(swap.coin_from) || swap.coin_from;
+    const toSymbol = window.CoinManager.getDisplayName(swap.coin_to) || swap.coin_to;
     const timeColor = getTimeStrokeColor(swap.expire_at);
     const fromAmount = parseFloat(swap.amount_from) || 0;
     const toAmount = parseFloat(swap.amount_to) || 0;

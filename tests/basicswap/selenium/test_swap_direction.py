@@ -319,14 +319,14 @@ def test_swap_dir(driver):
         except Exception as e:
             print(e)
         time.sleep(2)
-    assert "PART" in bid_rows[bid_1_id][0]
+    assert "Particl" in bid_rows[bid_1_id][0]
     assert float(bid_rows[bid_1_id][1]) == 1.0
-    assert "XMR" in bid_rows[bid_1_id][2]
+    assert "Monero" in bid_rows[bid_1_id][2]
     assert float(bid_rows[bid_1_id][3]) == 2.0
 
-    assert "PART" in bid_rows[bid_3_id][0]
+    assert "Particl" in bid_rows[bid_3_id][0]
     assert float(bid_rows[bid_3_id][1]) == 6.0
-    assert "XMR" in bid_rows[bid_3_id][2]
+    assert "Monero" in bid_rows[bid_3_id][2]
     assert float(bid_rows[bid_3_id][3]) == 5.0
 
     logger.info(f"Waiting for {node2_url}/active")
@@ -362,14 +362,14 @@ def test_swap_dir(driver):
         except Exception as e:
             print(e)
         time.sleep(2)
-    assert "XMR" in bid_rows[bid_1_id][0]
+    assert "Monero" in bid_rows[bid_1_id][0]
     assert float(bid_rows[bid_1_id][1]) == 2.0
-    assert "PART" in bid_rows[bid_1_id][2]
+    assert "Particl" in bid_rows[bid_1_id][2]
     assert float(bid_rows[bid_1_id][3]) == 1.0
 
-    assert "XMR" in bid_rows[bid_3_id][0]
+    assert "Monero" in bid_rows[bid_3_id][0]
     assert float(bid_rows[bid_3_id][1]) == 5.0
-    assert "PART" in bid_rows[bid_3_id][2]
+    assert "Particl" in bid_rows[bid_3_id][2]
     assert float(bid_rows[bid_3_id][3]) == 6.0
 
     print("Test Passed!")
