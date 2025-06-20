@@ -11349,6 +11349,11 @@ class BasicSwap(BaseApp, UIApp):
             if filter_include_sent is not None and filter_include_sent is not True:
                 query_suffix += " AND was_sent = 0"
 
+            filter_auto_accept_type = filters.get("auto_accept_type", None)
+            if filter_auto_accept_type and filter_auto_accept_type != "any":
+                query_suffix += " AND auto_accept_type = :filter_auto_accept_type"
+                query_data["filter_auto_accept_type"] = int(filter_auto_accept_type)
+
             query_suffix += getOrderByStr(filters)
 
             limit = filters.get("limit", None)
