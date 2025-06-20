@@ -389,7 +389,7 @@ const createSwapTableRow = async (swap) => {
                     <div class="flex items-center justify-center">
                         <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12"
-                                 src="/static/images/coins/${swap.coin_from.replace(' ', '-')}.png"
+                                 src="/static/images/coins/${window.CoinManager.getCoinIcon(swap.coin_from)}"
                                  alt="${swap.coin_from}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
@@ -398,7 +398,7 @@ const createSwapTableRow = async (swap) => {
                         </svg>
                         <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12"
-                                 src="/static/images/coins/${swap.coin_to.replace(' ', '-')}.png"
+                                 src="/static/images/coins/${window.CoinManager.getCoinIcon(swap.coin_to)}"
                                  alt="${swap.coin_to}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>

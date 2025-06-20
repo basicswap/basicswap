@@ -61,64 +61,9 @@ const AmmTablesManager = (function() {
     function getImageFilename(coinSymbol) {
         if (!coinSymbol) return 'Unknown.png';
 
-        const coinNameToSymbol = {
-            'bitcoin': 'BTC',
-            'monero': 'XMR',
-            'particl': 'PART',
-            'particl anon': 'PART_ANON',
-            'particl blind': 'PART_BLIND',
-            'litecoin': 'LTC',
-            'bitcoincash': 'BCH',
-            'bitcoin cash': 'BCH',
-            'firo': 'FIRO',
-            'zcoin': 'FIRO',
-            'pivx': 'PIVX',
-            'dash': 'DASH',
-            'ethereum': 'ETH',
-            'dogecoin': 'DOGE',
-            'decred': 'DCR',
-            'namecoin': 'NMC',
-            'zano': 'ZANO',
-            'wownero': 'WOW'
-        };
-
-        let normalizedInput = coinSymbol.toLowerCase();
-
-        if (coinNameToSymbol[normalizedInput]) {
-            normalizedInput = coinNameToSymbol[normalizedInput];
-        }
-
-        const normalizedSymbol = normalizedInput.toUpperCase();
-
-        if (normalizedSymbol === 'FIRO' || normalizedSymbol === 'ZCOIN') return 'Firo.png';
-        if (normalizedSymbol === 'BCH' || normalizedSymbol === 'BITCOINCASH') return 'Bitcoin-Cash.png';
-        if (normalizedSymbol === 'PART_ANON' || normalizedSymbol === 'PARTICL_ANON') return 'Particl.png';
-        if (normalizedSymbol === 'PART_BLIND' || normalizedSymbol === 'PARTICL_BLIND') return 'Particl.png';
-
-        if (window.CoinManager && window.CoinManager.getCoinBySymbol) {
-            const coin = window.CoinManager.getCoinBySymbol(normalizedSymbol);
-            if (coin && coin.image) return coin.image;
-        }
-
-        const coinImages = {
-            'BTC': 'Bitcoin.png',
-            'XMR': 'Monero.png',
-            'PART': 'Particl.png',
-            'LTC': 'Litecoin.png',
-            'FIRO': 'Firo.png',
-            'PIVX': 'PIVX.png',
-            'DASH': 'Dash.png',
-            'ETH': 'Ethereum.png',
-            'DOGE': 'Dogecoin.png',
-            'DCR': 'Decred.png',
-            'NMC': 'Namecoin.png',
-            'ZANO': 'Zano.png',
-            'WOW': 'Wownero.png'
-        };
-
-        const result = coinImages[normalizedSymbol] || 'Unknown.png';
-        debugLog(`Coin symbol: ${coinSymbol}, normalized: ${normalizedSymbol}, image: ${result}`);
-        return result;
+        const icon = window.CoinManager.getCoinIcon(coinSymbol);
+        debugLog(`CoinManager returned icon: ${icon} for ${coinSymbol}`);
+        return icon || 'Unknown.png';
     }
 
     function getCoinDisplayName(coinId) {

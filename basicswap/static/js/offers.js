@@ -229,34 +229,7 @@ function getCoinNameFromValue(value, filterType) {
 }
 
 function getCoinImage(coinName) {
-    const coinImageMap = {
-        'Bitcoin': 'Bitcoin.png',
-        'Monero': 'Monero.png',
-        'Particl': 'Particl.png',
-        'Particl Anon': 'Particl.png',
-        'Particl Blind': 'Particl.png',
-        'Litecoin': 'Litecoin.png',
-        'Bitcoin Cash': 'Bitcoin%20Cash.png',
-        'Firo': 'Firo.png',
-        'PIVX': 'PIVX.png',
-        'Dash': 'Dash.png',
-        'Ethereum': 'Ethereum.png',
-        'Dogecoin': 'Dogecoin.png',
-        'Decred': 'Decred.png',
-        'Namecoin': 'Namecoin.png',
-        'Zano': 'Zano.png',
-        'Wownero': 'Wownero.png'
-    };
-
-    if (coinImageMap[coinName]) {
-        return coinImageMap[coinName];
-    }
-
-    const capitalizedName = coinName.split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join('%20');
-
-    return `${capitalizedName}.png`;
+    return window.CoinManager.getCoinIcon(coinName);
 }
 
 function updateFilterButtonText(filterType) {
