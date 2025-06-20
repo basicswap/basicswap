@@ -55,7 +55,7 @@ def validateAmountString(amount, ci):
 
 def inputAmount(amount_str, ci):
     validateAmountString(amount_str, ci)
-    return make_int(amount_str, ci.exp())
+    return make_int(amount_str, ci.exp(), r=1)
 
 
 def get_data_entry_or(post_data, name, default):
