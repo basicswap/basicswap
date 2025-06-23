@@ -187,6 +187,9 @@ class PARTInterface(BTCInterface):
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
 
+    def combine_non_segwit_prevouts(self):
+        raise RuntimeError("No non-segwit outputs found.")
+
 
 class PARTInterfaceBlind(PARTInterface):
 

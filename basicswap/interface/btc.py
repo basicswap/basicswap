@@ -561,7 +561,7 @@ class BTCInterface(Secp256k1Interface):
         override_feerate = chain_client_settings.get("override_feerate", None)
         if override_feerate:
             self._log.debug(
-                "Fee rate override used for %s: %f", self.coin_name(), override_feerate
+                f"Fee rate override used for {self.coin_name()}: {override_feerate}"
             )
             return override_feerate, "override_feerate"
 
@@ -1318,22 +1318,37 @@ class BTCInterface(Secp256k1Interface):
         rv = self.rpc_wallet("fundrawtransaction", [tx.hex(), options])
         return bytes.fromhex(rv["hex"])
 
-    def lockNonSegwitPrevouts(self) -> None:
-        # For tests
-        unspent = self.rpc_wallet("listunspent")
-
-        to_lock = []
-        for u in unspent:
+    def getNonSegwitOutputs(self):
+        unspents = self.rpc_wallet("listunspent", [0, 99999999])
+        nonsegwit_unspents = []
+        for u in unspents:
             if u.get("spendable", False) is False:
                 continue
             if "desc" in u:
                 desc = u["desc"]
                 if self.use_p2shp2wsh():
                     if not desc.startswith("sh(wpkh"):
-                        to_lock.append({"txid": u["txid"], "vout": u["vout"]})
+                        nonsegwit_unspents.append(
+                            {
+                                "txid": u["txid"],
+                                "vout": u["vout"],
+                                "amount": u["amount"],
+                            }
+                        )
                 else:
                     if not desc.startswith("wpkh"):
-                        to_lock.append({"txid": u["txid"], "vout": u["vout"]})
+                        nonsegwit_unspents.append(
+                            {
+                                "txid": u["txid"],
+                                "vout": u["vout"],
+                                "amount": u["amount"],
+                            }
+                        )
+        return nonsegwit_unspents
+
+    def lockNonSegwitPrevouts(self) -> None:
+        # For tests
+        to_lock = self.getNonSegwitOutputs()
 
         if len(to_lock) > 0:
             self._log.debug(f"Locking {len(to_lock)} non segwit prevouts")
@@ -1661,7 +1676,7 @@ class BTCInterface(Secp256k1Interface):
                 "listunspent",
                 [
                     0,
-                    9999999,
+                    99999999,
                     [
                         dest_address,
                     ],
@@ -2391,6 +2406,59 @@ class BTCInterface(Secp256k1Interface):
 
     def isTxNonFinalError(self, err_str: str) -> bool:
         return "non-BIP68-final" in err_str or "non-final" in err_str
+
+    def combine_non_segwit_prevouts(self):
+        self._log.info("Combining non-segwit prevouts")
+        if self._use_segwit is False:
+            raise RuntimeError("Not configured to use segwit outputs.")
+        prevouts_to_spend = self.getNonSegwitOutputs()
+        if len(prevouts_to_spend) < 1:
+            raise RuntimeError("No non-segwit outputs found.")
+
+        total_amount: int = 0
+        for n, prevout in enumerate(prevouts_to_spend):
+            total_amount += self.make_int(prevout["amount"])
+        addr_to: str = self.getNewAddress(
+            self._use_segwit, "combine_non_segwit_prevouts"
+        )
+
+        txn = self.rpc(
+            "createrawtransaction",
+            [prevouts_to_spend, {addr_to: self.format_amount(total_amount)}],
+        )
+        fee_rate, rate_src = self.get_fee_rate(self._conf_target)
+        fee_rate_str: str = self.format_amount(fee_rate, True, 1)
+        self._log.debug(
+            f"Using fee rate: {fee_rate_str}, src: {rate_src}, confirms target: {self._conf_target}"
+        )
+        options = {
+            "add_inputs": False,
+            "subtractFeeFromOutputs": [
+                0,
+            ],
+            "feeRate": fee_rate_str,
+        }
+        tx_fee_set = self.rpc_wallet("fundrawtransaction", [txn, options])["hex"]
+        tx_signed = self.rpc_wallet("signrawtransactionwithwallet", [tx_fee_set])["hex"]
+        tx = self.rpc(
+            "decoderawtransaction",
+            [
+                tx_signed,
+            ],
+        )
+        self._log.info(
+            "Submitting tx to combine non-segwit prevouts: {}".format(
+                self._log.id(bytes.fromhex(tx["txid"]))
+            )
+        )
+        self.rpc(
+            "sendrawtransaction",
+            [
+                tx_signed,
+            ],
+        )
+
+        return tx["txid"]
 
 
 def testBTCInterface():
