@@ -81,9 +81,9 @@
             <td class="py-3 px-6 bold">Swap</td>
             <td class="py-3 px-6">
              <div class="content flex py-2">
-              <span class="bold">{% if data.amt_to %}{{ data.amt_to }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000</span>{% endif %} {{ data.ticker_to }}</span>
+              <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
                 {{ small_arrow_white_right_svg | safe }}
-              <span class="bold">{% if data.amt_from %}{{ data.amt_from }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000</span>{% endif %} {{ data.ticker_from }}</span>
+              <span class="text-xs bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
              </div>
             </td>
            </tr>
@@ -92,16 +92,16 @@
             <td class="py-3 px-6 bold">Swap</td>
             <td class="py-3 px-6">
              <div class="content flex py-2">
-              <span class="bold">{% if data.amt_from %}{{ data.amt_from }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000</span>{% endif %} {{ data.ticker_from }}</span>
+              <span class="bold">{{ data.amt_from }} {{ data.ticker_from }}</span>
                 {{ small_arrow_white_right_svg | safe }}
-              <span class="bold">{% if data.amt_to %}{{ data.amt_to }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000</span>{% endif %} {{ data.ticker_to }}</span>
+              <span class="bold">{{ data.amt_to }} {{ data.ticker_to }}</span>
              </div>
             </td>
            </tr>
            {% endif %}
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <td class="py-3 px-6 bold">Bid Rate</td>
-            <td class="py-3 px-6">{% if data.bid_rate %}{{ data.bid_rate }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000</span>{% endif %}</td>
+            <td class="py-3 px-6">{{ data.bid_rate }}</td>
            </tr>
            {% if data.was_sent %}
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
@@ -437,23 +437,6 @@
               </th>
              </tr>
             </thead>
-            <tr id="validation-error-row" class="hidden">
-             <td colspan="2" class="px-6 py-3">
-              <div class="p-4 text-red-800 rounded-lg bg-red-50 border border-red-400 dark:bg-gray-500 dark:text-red-400 rounded-md">
-               <div class="flex flex-wrap items-center -m-1">
-                <div class="w-auto p-1">
-                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
-                 </svg>
-                </div>
-                <div class="ml-2 p-1">
-                 <span class="font-semibold text-sm text-red-500 dark:text-red-400">ERROR:</span>
-                 <span class="font-medium text-sm text-red-500 dark:text-red-400" id="validation-error-message"></span>
-                </div>
-               </div>
-              </div>
-             </td>
-            </tr>
             <tr class="opacity-100 text-gray-500 dark:text-gray-100">
              <td class="py-3 px-6 bold">Change Bid State:</td>
              <td class="py-3 px-6">
@@ -549,12 +532,12 @@
                     <div class="w-full md:w-auto p-1.5">
                      <button name="edit_bid" type="submit" value="Edit Bid" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">Edit Bid</button>
                     </div>
-                    {% endif %}
-                    {% endif %}
                     {% if data.can_abandon == true and not edit_bid %}
                     <div class="w-full md:w-auto p-1.5">
                      <button name="abandon_bid" type="submit" value="Abandon Bid" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Abandon Bid</button>
                     </div>
+                    {% endif %}
+                    {% endif %}
                     {% endif %}
                      {% if data.was_received and not edit_bid and data.can_accept_bid %}
                     <div class="w-full md:w-auto p-1.5">
@@ -582,9 +565,9 @@
             <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">You will send:</div>
             <div class="font-medium text-gray-900 dark:text-white text-lg" id="confirmSendAmount">
               {% if data.was_sent %}
-                {% if data.amt_to %}{{ data.amt_to }} {{ data.ticker_to }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000 {{ data.ticker_to }}</span>{% endif %}
+                {{ data.amt_to }} {{ data.ticker_to }}
               {% else %}
-                {% if data.amt_from %}{{ data.amt_from }} {{ data.ticker_from }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000 {{ data.ticker_from }}</span>{% endif %}
+                {{ data.amt_from }} {{ data.ticker_from }}
               {% endif %}
             </div>
           </div>
@@ -592,15 +575,15 @@
             <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">You will receive:</div>
             <div class="font-medium text-gray-900 dark:text-white text-lg" id="confirmReceiveAmount">
               {% if data.was_sent %}
-                {% if data.amt_from %}{{ data.amt_from }} {{ data.ticker_from }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000 {{ data.ticker_from }}</span>{% endif %}
+                {{ data.amt_from }} {{ data.ticker_from }}
               {% else %}
-                {% if data.amt_to %}{{ data.amt_to }} {{ data.ticker_to }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000 {{ data.ticker_to }}</span>{% endif %}
+                {{ data.amt_to }} {{ data.ticker_to }}
               {% endif %}
             </div>
           </div>
           <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-4">
             <div class="text-sm text-gray-600 dark:text-gray-400 mb-1">Exchange rate:</div>
-            <div class="font-medium text-gray-900 dark:text-white text-lg">{% if data.bid_rate %}{{ data.bid_rate }}{% else %}<span class="text-gray-400 dark:text-gray-500">0.00000000</span>{% endif %}</div>
+            <div class="font-medium text-gray-900 dark:text-white text-lg">{{ data.bid_rate }}</div>
           </div>
         </div>
 
@@ -674,20 +657,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.confirmPopup = function(action = 'Abandon') {
     triggerElement = document.activeElement;
-
-    if (action.toLowerCase() === 'accept') {
-      const sendAmountText = document.getElementById('confirmSendAmount')?.textContent || '';
-      const receiveAmountText = document.getElementById('confirmReceiveAmount')?.textContent || '';
-
-      const sendAmount = parseFloat(sendAmountText.match(/[\d.]+/)?.[0] || '0');
-      const receiveAmount = parseFloat(receiveAmountText.match(/[\d.]+/)?.[0] || '0');
-
-      if (sendAmount <= 0 || receiveAmount <= 0) {
-        showValidationError('Cannot accept bid with zero amounts. Please check the bid details.');
-        return false;
-      }
-    }
-
     const title = `Confirm ${action} Bid`;
     const showBidDetails = action.toLowerCase() === 'accept';
 
@@ -727,18 +696,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const acceptBidBtn = document.querySelector('button[name="accept_bid"]');
   overrideButtonConfirm(acceptBidBtn, 'Accept');
-
-  function showValidationError(message) {
-    const errorRow = document.getElementById('validation-error-row');
-    const messageSpan = document.getElementById('validation-error-message');
-    if (errorRow && messageSpan) {
-      messageSpan.textContent = message;
-      errorRow.classList.remove('hidden');
-      setTimeout(() => {
-        errorRow.classList.add('hidden');
-      }, 5000);
-    }
-  }
 });
  </script>
 </div>
