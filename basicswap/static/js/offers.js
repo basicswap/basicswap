@@ -793,7 +793,7 @@ async function fetchOffers() {
 
         CacheManager.set('offers_cached', jsonData, 'offers');
 
-        await updateOffersTable();
+        applyFilters();
         updatePaginationInfo();
 
     } catch (error) {
@@ -804,7 +804,7 @@ async function fetchOffers() {
         if (cachedOffers?.value) {
             jsonData = cachedOffers.value;
             originalJsonData = [...jsonData];
-            await updateOffersTable();
+            applyFilters();
         }
         ui.displayErrorMessage('Failed to fetch offers. Please try again later.');
     } finally {
@@ -2270,10 +2270,10 @@ function initializeTableEvents() {
                 if (!priceData && previousPrices) {
                     console.log('Using previous price data after failed refresh');
                     latestPrices = previousPrices;
-                    await updateOffersTable();
+                    applyFilters();
                 } else if (priceData) {
                     latestPrices = priceData;
-                    await updateOffersTable();
+                    applyFilters();
                 } else {
                     throw new Error('Unable to fetch price data');
                 }
@@ -2291,7 +2291,7 @@ function initializeTableEvents() {
                 const cachedData = CacheManager.get('prices_coingecko');
                 if (cachedData?.value) {
                     latestPrices = cachedData.value;
-                    await updateOffersTable();
+                    applyFilters();
                 }
             } finally {
                 window.isManualRefresh = false;
@@ -2560,7 +2560,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                             latestPrices = previousPrices;
                         }
 
-                        await updateOffersTable();
+                        applyFilters();
 
                         updateProfitLossDisplays();
 
