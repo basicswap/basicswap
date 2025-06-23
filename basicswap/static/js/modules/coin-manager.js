@@ -47,7 +47,7 @@ const CoinManager = (function() {
             usesCryptoCompare: true,
             usesCoinGecko: true,
             historicalDays: 30,
-            icon: 'Bitcoin-Cash.png'
+            icon: 'Bitcoin%20Cash.png'
         },
         {
             symbol: 'PIVX',
@@ -235,6 +235,31 @@ const CoinManager = (function() {
             const coin = getCoinByAnyIdentifier(coinIdentifier);
             if (!coin) return coinIdentifier.toLowerCase();
             return coin.coingeckoId;
+        },
+        getCoinIcon: function(identifier) {
+            if (!identifier) return null;
+
+            const normalizedId = identifier.toString().toLowerCase().trim();
+            if (normalizedId === 'particl anon' || normalizedId === 'part_anon' || normalizedId === 'particl_anon') {
+                return 'Particl.png';
+            }
+            if (normalizedId === 'particl blind' || normalizedId === 'part_blind' || normalizedId === 'particl_blind') {
+                return 'Particl.png';
+            }
+            if (normalizedId === 'litecoin mweb' || normalizedId === 'ltc_mweb' || normalizedId === 'litecoin_mweb') {
+                return 'Litecoin.png';
+            }
+
+            const coin = getCoinByAnyIdentifier(identifier);
+            if (coin && coin.icon) {
+                return coin.icon;
+            }
+
+            const capitalizedName = identifier.toString().split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join('%20');
+
+            return `${capitalizedName}.png`;
         }
     };
 })();

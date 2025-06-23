@@ -132,7 +132,6 @@ function initializeTableRateModule() {
 }
 
 function continueInitialization() {
-    updateCoinFilterImages();
     fetchOffers().then(() => {
         applyFilters();
         if (!isSentOffers) {
@@ -157,65 +156,340 @@ function getValidOffers() {
         return [];
     }
 
-    const filteredData = filterAndSortData();
-    return filteredData;
+    return jsonData;
 }
 
 function saveFilterSettings() {
-    const formData = new FormData(filterForm);
-    const filters = Object.fromEntries(formData);
-
     const storageKey = isSentOffers ? 'sentOffersTableSettings' : 'networkOffersTableSettings';
 
+    const selectedCoinTo = getSelectedCoins('coin_to');
+    const selectedCoinFrom = getSelectedCoins('coin_from');
+
+    const statusSelect = document.getElementById('status');
+    const sentFromSelect = document.getElementById('sent_from');
+    const autoAcceptTypeSelect = document.getElementById('auto_accept_type');
+
     localStorage.setItem(storageKey, JSON.stringify({
-        coin_to: filters.coin_to,
-        coin_from: filters.coin_from,
-        status: filters.status,
-        sent_from: filters.sent_from,
+        coin_to: selectedCoinTo,
+        coin_from: selectedCoinFrom,
+        status: statusSelect ? statusSelect.value : 'any',
+        sent_from: sentFromSelect ? sentFromSelect.value : 'any',
+        auto_accept_type: autoAcceptTypeSelect ? autoAcceptTypeSelect.value : 'any',
         sortColumn: currentSortColumn,
         sortDirection: currentSortDirection
     }));
 }
 
-function coinMatches(offerCoin, filterCoin) {
-    if (!offerCoin || !filterCoin || filterCoin === 'any') return true;
 
-    offerCoin = offerCoin.toLowerCase();
-    filterCoin = filterCoin.toLowerCase();
+function getSelectedCoins(filterType) {
 
-    if (offerCoin === filterCoin) return true;
-
-    if ((offerCoin === 'firo' || offerCoin === 'zcoin') &&
-        (filterCoin === 'firo' || filterCoin === 'zcoin')) {
-        return true;
+    const dropdown = document.getElementById(`${filterType}_dropdown`);
+    if (!dropdown) {
+        return ['any'];
     }
 
-    if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
-        (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
-        return true;
-    }
 
-    const particlVariants = ['particl', 'particl anon', 'particl blind'];
-    if (filterCoin === 'particl' && particlVariants.includes(offerCoin)) {
-        return true;
-    }
+    const allCheckboxes = dropdown.querySelectorAll('input[type="checkbox"]');
 
-    if (particlVariants.includes(filterCoin)) {
-        return offerCoin === filterCoin;
-    }
+    const selected = [];
+    allCheckboxes.forEach((cb) => {
+        if (cb.checked && cb.value !== 'any') {
+            selected.push(cb.value);
+        }
+    });
 
-    return false;
+    return selected.length > 0 ? selected : ['any'];
 }
 
-function filterAndSortData() {
-    const formData = new FormData(filterForm);
-    const filters = Object.fromEntries(formData);
+function getCoinNameFromValue(value, filterType) {
+    if (value === 'any') {
+        return 'any';
+    }
 
+    const dropdown = document.getElementById(`${filterType}_dropdown`);
+    if (!dropdown) {
+        return value;
+    }
+
+    const checkbox = dropdown.querySelector(`input[value="${value}"]`);
+    if (checkbox) {
+        const label = checkbox.closest('label');
+        const spans = label.querySelectorAll('span');
+
+        const coinSpan = spans[spans.length - 1];
+        if (coinSpan) {
+            const text = coinSpan.textContent.trim();
+
+            const cleanText = text.replace(/\s*\(clear all\)\s*/, '');
+            return cleanText;
+        }
+    }
+
+    return value;
+}
+
+function getCoinImage(coinName) {
+    return window.CoinManager.getCoinIcon(coinName);
+}
+
+function updateFilterButtonText(filterType) {
+    const selected = getSelectedCoins(filterType);
+    const button = document.getElementById(`${filterType}_button`);
+    const textSpan = document.getElementById(`${filterType}_text`);
+
+    if (!button || !textSpan) return;
+
+    if (selected.length === 0 || (selected.length === 1 && selected[0] === 'any')) {
+
+        const defaultText = filterType === 'coin_to' ?
+            (isSentOffers ? 'Filter Receiving' : 'Filter Bids') :
+            (isSentOffers ? 'Filter Sending' : 'Filter Offers');
+        textSpan.textContent = defaultText;
+    } else {
+        const filterLabel = filterType === 'coin_to' ?
+            (isSentOffers ? 'Receiving' : 'Bids') :
+            (isSentOffers ? 'Sending' : 'Offers');
+        textSpan.textContent = `Filter ${filterLabel} (${selected.length} selected)`;
+    }
+
+
+    button.style.width = '210px';
+}
+
+function updateCoinBadges(filterType) {
+    const selected = getSelectedCoins(filterType);
+    const badgesContainer = document.getElementById(`${filterType}_badges`);
+    const mainContainer = document.getElementById('selected_coins_container');
+
+    if (!badgesContainer) return;
+
+    badgesContainer.innerHTML = '';
+
+    if (selected.length > 0 && !(selected.length === 1 && selected[0] === 'any')) {
+        selected.forEach(coinValue => {
+            const coinName = getCoinNameFromValue(coinValue, filterType);
+            const badge = document.createElement('span');
+
+
+            const isBidsFilter = filterType === 'coin_to' && !isSentOffers;
+            const isOffersFilter = filterType === 'coin_from' && !isSentOffers;
+            const isReceivingFilter = filterType === 'coin_to' && isSentOffers;
+            const isSendingFilter = filterType === 'coin_from' && isSentOffers;
+
+            let badgeClass = 'inline-flex items-center px-3 py-2 rounded-full text-sm font-medium mr-2 mb-1';
+            if (isBidsFilter || isReceivingFilter) {
+                badgeClass += ' bg-blue-500 text-white dark:bg-blue-600 dark:text-white';
+            } else {
+                badgeClass += ' bg-green-400 text-white dark:bg-green-500 dark:text-white';
+            }
+
+            badge.className = badgeClass + ' cursor-pointer hover:opacity-80';
+
+
+            const coinImage = getCoinImage(coinName);
+
+            badge.innerHTML = `
+                <img src="/static/images/coins/${coinImage}" class="w-4 h-4 mr-1" alt="${coinName}" onerror="this.style.display='none'">
+                <span>${coinName}</span>
+                <button type="button" class="ml-1 text-current hover:text-red-500 focus:outline-none remove-coin-btn">
+                    <span class="sr-only">Remove ${coinName}</span>
+                    ×
+                </button>
+            `;
+
+            CleanupManager.addListener(badge, 'click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                removeCoinFilter(filterType, coinValue);
+            });
+
+            const closeBtn = badge.querySelector('.remove-coin-btn');
+            if (closeBtn) {
+                CleanupManager.addListener(closeBtn, 'click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeCoinFilter(filterType, coinValue);
+                });
+            }
+
+            badgesContainer.appendChild(badge);
+        });
+
+        if (mainContainer) {
+            mainContainer.style.display = 'block';
+        }
+    } else {
+
+        const otherType = filterType === 'coin_to' ? 'coin_from' : 'coin_to';
+        const otherSelected = getSelectedCoins(otherType);
+        if (otherSelected.length === 0 || (otherSelected.length === 1 && otherSelected[0] === 'any')) {
+            if (mainContainer) {
+                mainContainer.style.display = 'none';
+            }
+        }
+    }
+}
+
+function coinMatches(offerCoin, filterCoins) {
+    if (!offerCoin || !filterCoins) return true;
+
+    if (typeof filterCoins === 'string') {
+        filterCoins = [filterCoins];
+    }
+
+    if (filterCoins.includes('any') || filterCoins.length === 0) return true;
+
+    const normalizedOfferCoin = offerCoin.toLowerCase().trim();
+
+    return filterCoins.some(filterCoin => {
+        if (!filterCoin) return false;
+
+        const normalizedFilterCoin = filterCoin.toLowerCase().trim();
+
+        if (normalizedOfferCoin === normalizedFilterCoin) {
+            return true;
+        }
+
+        if ((normalizedOfferCoin === 'firo' || normalizedOfferCoin === 'zcoin') &&
+            (normalizedFilterCoin === 'firo' || normalizedFilterCoin === 'zcoin')) {
+            return true;
+        }
+
+        if ((normalizedOfferCoin === 'bitcoincash' && normalizedFilterCoin === 'bitcoin cash') ||
+            (normalizedOfferCoin === 'bitcoin cash' && normalizedFilterCoin === 'bitcoincash')) {
+            return true;
+        }
+
+        const particlVariants = ['particl', 'particl anon', 'particl blind'];
+        if (normalizedFilterCoin === 'particl' && particlVariants.includes(normalizedOfferCoin)) {
+            return true;
+        }
+
+        if (particlVariants.includes(normalizedFilterCoin)) {
+            return normalizedOfferCoin === normalizedFilterCoin;
+        }
+
+        if (normalizedFilterCoin.includes(' ') || normalizedOfferCoin.includes(' ')) {
+            const filterFirstWord = normalizedFilterCoin.split(' ')[0];
+            const offerFirstWord = normalizedOfferCoin.split(' ')[0];
+
+            if (filterFirstWord === 'bitcoin' && offerFirstWord === 'bitcoin') {
+                const filterHasCash = normalizedFilterCoin.includes('cash');
+                const offerHasCash = normalizedOfferCoin.includes('cash');
+                return filterHasCash === offerHasCash;
+            }
+
+            if (filterFirstWord === offerFirstWord && filterFirstWord.length > 4) {
+                return true;
+            }
+        }
+
+        return false;
+    });
+}
+
+function toggleDropdown(filterType) {
+    const dropdown = document.getElementById(`${filterType}_dropdown`);
+    const button = document.getElementById(`${filterType}_button`);
+    const container = dropdown?.closest('.dropdown-container');
+
+    if (dropdown && button) {
+        const isVisible = dropdown.style.display !== 'none';
+        hideAllDropdowns();
+
+        if (!isVisible) {
+            const buttonRect = button.getBoundingClientRect();
+            dropdown.style.position = 'fixed';
+            dropdown.style.top = (buttonRect.bottom + 4) + 'px';
+            dropdown.style.left = buttonRect.left + 'px';
+            dropdown.style.width = buttonRect.width + 'px';
+            dropdown.style.display = 'block';
+
+            if (container) {
+                container.classList.add('open');
+            }
+        }
+    }
+}
+
+function hideDropdown(filterType) {
+    const dropdown = document.getElementById(`${filterType}_dropdown`);
+    const container = dropdown?.closest('.dropdown-container');
+
+    if (dropdown) {
+        dropdown.style.display = 'none';
+        if (container) {
+            container.classList.remove('open');
+        }
+    }
+}
+
+function hideAllDropdowns() {
+    hideDropdown('coin_to');
+    hideDropdown('coin_from');
+}
+
+function handleCoinCheckboxChange(filterType, checkbox) {
+    if (checkbox.value === 'any') {
+
+        if (checkbox.checked) {
+            const dropdown = document.getElementById(`${filterType}_dropdown`);
+            if (dropdown) {
+                const otherCheckboxes = dropdown.querySelectorAll('input[type="checkbox"]:not([value="any"])');
+                otherCheckboxes.forEach(cb => cb.checked = false);
+            }
+        }
+    } else {
+
+        if (checkbox.checked) {
+            const dropdown = document.getElementById(`${filterType}_dropdown`);
+            if (dropdown) {
+                const anyCheckbox = dropdown.querySelector('input[value="any"]');
+                if (anyCheckbox) anyCheckbox.checked = false;
+            }
+        }
+    }
+
+    updateFilterButtonText(filterType);
+    updateCoinBadges(filterType);
+    applyFilters();
+    updateClearFiltersButton();
+}
+
+function removeCoinFilter(filterType, coinValue) {
+
+    const dropdown = document.getElementById(`${filterType}_dropdown`);
+    if (!dropdown) {
+        return;
+    }
+
+    const checkbox = dropdown.querySelector(`input[value="${coinValue}"]`);
+    if (checkbox) {
+        checkbox.checked = false;
+
+
+        updateFilterButtonText(filterType);
+        updateCoinBadges(filterType);
+        applyFilters();
+        updateClearFiltersButton();
+    }
+}
+
+
+window.removeCoinFilter = removeCoinFilter;
+
+function filterAndSortData() {
     saveFilterSettings();
 
     let filteredData = [...originalJsonData];
 
-    const sentFromFilter = filters.sent_from || 'any';
+    const statusSelect = document.getElementById('status');
+    const sentFromSelect = document.getElementById('sent_from');
+    const autoAcceptTypeSelect = document.getElementById('auto_accept_type');
+    const selectedCoinTo = getSelectedCoins('coin_to');
+    const selectedCoinFrom = getSelectedCoins('coin_from');
+
+    const sentFromFilter = sentFromSelect ? sentFromSelect.value : 'any';
     filteredData = filteredData.filter(offer => {
         const isMatch = sentFromFilter === 'public' ? offer.is_public :
                         sentFromFilter === 'private' ? !offer.is_public :
@@ -223,37 +497,43 @@ function filterAndSortData() {
         return isMatch;
     });
 
+    const autoAcceptTypeFilter = autoAcceptTypeSelect ? autoAcceptTypeSelect.value : 'any';
+    if (autoAcceptTypeFilter !== 'any') {
+        filteredData = filteredData.filter(offer => {
+            const offerAutoAcceptType = offer.auto_accept_type !== undefined ? offer.auto_accept_type : 0;
+            return offerAutoAcceptType === parseInt(autoAcceptTypeFilter);
+        });
+    }
+
     filteredData = filteredData.filter(offer => {
         if (!isSentOffers && isOfferExpired(offer)) {
             return false;
         }
 
-        if (filters.coin_to && filters.coin_to !== 'any') {
-            const coinToSelect = document.getElementById('coin_to');
-            const selectedOption = coinToSelect?.querySelector(`option[value="${filters.coin_to}"]`);
-            const coinName = selectedOption?.textContent.trim();
 
-            if (coinName && !coinMatches(offer.coin_to, coinName)) {
+        if (selectedCoinTo.length > 0 && !(selectedCoinTo.length === 1 && selectedCoinTo[0] === 'any')) {
+            const coinNames = selectedCoinTo.map(value => getCoinNameFromValue(value, 'coin_to'));
+            const matches = coinMatches(offer.coin_to, coinNames);
+            if (!matches) {
                 return false;
             }
         }
 
-        if (filters.coin_from && filters.coin_from !== 'any') {
-            const coinFromSelect = document.getElementById('coin_from');
-            const selectedOption = coinFromSelect?.querySelector(`option[value="${filters.coin_from}"]`);
-            const coinName = selectedOption?.textContent.trim();
 
-            if (coinName && !coinMatches(offer.coin_from, coinName)) {
+        if (selectedCoinFrom.length > 0 && !(selectedCoinFrom.length === 1 && selectedCoinFrom[0] === 'any')) {
+            const coinNames = selectedCoinFrom.map(value => getCoinNameFromValue(value, 'coin_from'));
+            const matches = coinMatches(offer.coin_from, coinNames);
+            if (!matches) {
                 return false;
             }
         }
 
-        if (isSentOffers && filters.status && filters.status !== 'any') {
+        if (isSentOffers && statusSelect && statusSelect.value !== 'any') {
             const isExpired = offer.expire_at <= Math.floor(Date.now() / 1000);
             const isRevoked = Boolean(offer.is_revoked);
 
             let statusMatch = false;
-            switch (filters.status) {
+            switch (statusSelect.value) {
                 case 'active':
                     statusMatch = !isExpired && !isRevoked;
                     break;
@@ -554,6 +834,7 @@ function formatInitialData(data) {
         amount_negotiable: Boolean(offer.amount_negotiable),
         is_revoked: Boolean(offer.is_revoked),
         is_public: offer.is_public !== undefined ? Boolean(offer.is_public) : false,
+        auto_accept_type: offer.auto_accept_type !== undefined ? Number(offer.auto_accept_type) : 0,
         unique_id: `${offer.offer_id}_${offer.created_at}_${offer.coin_from}_${offer.coin_to}`
     }));
 }
@@ -721,28 +1002,7 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
 }
 
 function updateCoinFilterImages() {
-    const coinToSelect = document.getElementById('coin_to');
-    const coinFromSelect = document.getElementById('coin_from');
-    const coinToButton = document.getElementById('coin_to_button');
-    const coinFromButton = document.getElementById('coin_from_button');
-
-    function updateButtonImage(select, button) {
-        const selectedOption = select.options[select.selectedIndex];
-        const imagePath = selectedOption.getAttribute('data-image');
-        if (imagePath && select.value !== 'any') {
-            button.style.backgroundImage = `url(${imagePath})`;
-            button.style.backgroundSize = '25px 25px';
-            button.style.backgroundPosition = 'center';
-            button.style.backgroundRepeat = 'no-repeat';
-        } else {
-            button.style.backgroundImage = 'none';
-        }
-        button.style.minWidth = '25px';
-        button.style.minHeight = '25px';
-    }
-
-    updateButtonImage(coinToSelect, coinToButton);
-    updateButtonImage(coinFromSelect, coinFromButton);
+    return;
 }
 
 function updateClearFiltersButton() {
@@ -799,11 +1059,7 @@ function cleanupTable() {
 }
 
 function handleNoOffersScenario() {
-    const formData = new FormData(filterForm);
-    const filters = Object.fromEntries(formData);
-    const hasActiveFilters = filters.coin_to !== 'any' ||
-                            filters.coin_from !== 'any' ||
-                            (filters.status && filters.status !== 'any');
+    const hasFilters = hasActiveFilters();
 
     stopRefreshAnimation();
 
@@ -812,7 +1068,7 @@ function handleNoOffersScenario() {
         cleanupRow(row);
     });
 
-    if (hasActiveFilters) {
+    if (hasFilters) {
         offersBody.innerHTML = `
             <tr>
                 <td colspan="9" class="text-center py-8">
@@ -1726,19 +1982,30 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    filterForm.reset();
-
-    const selectElements = filterForm.querySelectorAll('select');
-    selectElements.forEach(select => {
-        select.value = 'any';
-        const event = new Event('change', { bubbles: true });
-        select.dispatchEvent(event);
+    document.querySelectorAll('.coin-to-checkbox, .coin-from-checkbox').forEach(checkbox => {
+        checkbox.checked = checkbox.value === 'any';
     });
 
     const statusSelect = document.getElementById('status');
     if (statusSelect) {
         statusSelect.value = 'any';
     }
+
+    const sentFromSelect = document.getElementById('sent_from');
+    if (sentFromSelect) {
+        sentFromSelect.value = 'any';
+    }
+
+    const autoAcceptTypeSelect = document.getElementById('auto_accept_type');
+    if (autoAcceptTypeSelect) {
+        autoAcceptTypeSelect.value = 'any';
+    }
+
+    updateFilterButtonText('coin_to');
+    updateFilterButtonText('coin_from');
+    updateCoinBadges('coin_to');
+    updateCoinBadges('coin_from');
+    hideAllDropdowns();
 
     jsonData = [...originalJsonData];
     currentPage = 1;
@@ -1747,21 +2014,25 @@ function clearFilters() {
     localStorage.removeItem(storageKey);
 
     updateOffersTable();
-    updateCoinFilterImages();
     updateClearFiltersButton();
 }
 
 function hasActiveFilters() {
-    const selectElements = filterForm.querySelectorAll('select');
-    let hasChangedFilters = false;
+    const selectedCoinTo = getSelectedCoins('coin_to');
+    const selectedCoinFrom = getSelectedCoins('coin_from');
 
-    selectElements.forEach(select => {
-        if (select.value !== 'any') {
-            hasChangedFilters = true;
-        }
-    });
+    const hasCoinToFilter = selectedCoinTo.length > 0 && !(selectedCoinTo.length === 1 && selectedCoinTo[0] === 'any');
+    const hasCoinFromFilter = selectedCoinFrom.length > 0 && !(selectedCoinFrom.length === 1 && selectedCoinFrom[0] === 'any');
 
-    return hasChangedFilters;
+    const statusSelect = document.getElementById('status');
+    const sentFromSelect = document.getElementById('sent_from');
+    const autoAcceptTypeSelect = document.getElementById('auto_accept_type');
+
+    const hasStatusFilter = statusSelect && statusSelect.value !== 'any';
+    const hasSentFromFilter = sentFromSelect && sentFromSelect.value !== 'any';
+    const hasAutoAcceptTypeFilter = autoAcceptTypeSelect && autoAcceptTypeSelect.value !== 'any';
+
+    return hasCoinToFilter || hasCoinFromFilter || hasStatusFilter || hasSentFromFilter || hasAutoAcceptTypeFilter;
 }
 
 function formatTimeLeft(timestamp) {
@@ -1789,13 +2060,6 @@ function getCoinSymbolLowercase(coin) {
     } else {
         return 'unknown';
     }
-}
-
-function coinMatches(offerCoin, filterCoin) {
-    if (window.CoinManager) {
-        return window.CoinManager.coinMatches(offerCoin, filterCoin);
-    }
-    return window.config.coinMatches(offerCoin, filterCoin);
 }
 
 function getProfitColorClass(percentage) {
@@ -1872,24 +2136,50 @@ function initializeTableEvents() {
         });
     }
 
-    const coinToSelect = document.getElementById('coin_to');
-    const coinFromSelect = document.getElementById('coin_from');
+    const coinToButton = document.getElementById('coin_to_button');
+    const coinFromButton = document.getElementById('coin_from_button');
+    const coinToDropdown = document.getElementById('coin_to_dropdown');
+    const coinFromDropdown = document.getElementById('coin_from_dropdown');
     const statusSelect = document.getElementById('status');
     const sentFromSelect = document.getElementById('sent_from');
 
-    if (coinToSelect) {
-        CleanupManager.addListener(coinToSelect, 'change', () => {
-            applyFilters();
-            updateCoinFilterImages();
+
+    if (coinToButton && coinToDropdown) {
+        CleanupManager.addListener(coinToButton, 'click', (e) => {
+            e.stopPropagation();
+            toggleDropdown('coin_to');
+        });
+
+        const coinToCheckboxes = coinToDropdown.querySelectorAll('.coin-to-checkbox');
+        coinToCheckboxes.forEach(checkbox => {
+            CleanupManager.addListener(checkbox, 'change', (e) => {
+                handleCoinCheckboxChange('coin_to', e.target);
+            });
         });
     }
 
-    if (coinFromSelect) {
-        CleanupManager.addListener(coinFromSelect, 'change', () => {
-            applyFilters();
-            updateCoinFilterImages();
+
+    if (coinFromButton && coinFromDropdown) {
+        CleanupManager.addListener(coinFromButton, 'click', (e) => {
+            e.stopPropagation();
+            toggleDropdown('coin_from');
+        });
+
+        const coinFromCheckboxes = coinFromDropdown.querySelectorAll('.coin-from-checkbox');
+        coinFromCheckboxes.forEach(checkbox => {
+            CleanupManager.addListener(checkbox, 'change', (e) => {
+                handleCoinCheckboxChange('coin_from', e.target);
+            });
         });
     }
+
+    CleanupManager.addListener(window, 'resize', () => {
+        hideAllDropdowns();
+    });
+
+    CleanupManager.addListener(window, 'scroll', () => {
+        hideAllDropdowns();
+    });
 
     if (statusSelect) {
         CleanupManager.addListener(statusSelect, 'change', () => {
@@ -1903,11 +2193,17 @@ function initializeTableEvents() {
         });
     }
 
+    const autoAcceptTypeSelect = document.getElementById('auto_accept_type');
+    if (autoAcceptTypeSelect) {
+        CleanupManager.addListener(autoAcceptTypeSelect, 'change', () => {
+            applyFilters();
+        });
+    }
+
     const clearFiltersBtn = document.getElementById('clearFilters');
     if (clearFiltersBtn) {
         CleanupManager.addListener(clearFiltersBtn, 'click', () => {
             clearFilters();
-            updateCoinFilterImages();
         });
     }
 
@@ -2133,7 +2429,12 @@ async function initializeTableAndData() {
     updateClearFiltersButton();
     initializeTableEvents();
     initializeTooltips();
-    updateCoinFilterImages();
+
+
+    updateFilterButtonText('coin_to');
+    updateFilterButtonText('coin_from');
+    updateCoinBadges('coin_to');
+    updateCoinBadges('coin_from');
 
     try {
         await fetchOffers();
@@ -2152,7 +2453,23 @@ function loadSavedSettings() {
     if (saved) {
         const settings = JSON.parse(saved);
 
-        ['coin_to', 'coin_from', 'status', 'sent_from'].forEach(id => {
+        ['coin_to', 'coin_from'].forEach(filterType => {
+            const savedCoins = settings[filterType];
+            if (savedCoins && Array.isArray(savedCoins)) {
+
+                document.querySelectorAll(`.${filterType}-checkbox`).forEach(cb => cb.checked = false);
+
+                savedCoins.forEach(coinValue => {
+                    const checkbox = document.querySelector(`.${filterType}-checkbox[value="${coinValue}"]`);
+                    if (checkbox) checkbox.checked = true;
+                });
+
+                updateFilterButtonText(filterType);
+                updateCoinBadges(filterType);
+            }
+        });
+
+        ['status', 'sent_from', 'auto_accept_type'].forEach(id => {
             const element = document.getElementById(id);
             if (element && settings[id]) element.value = settings[id];
         });
@@ -2308,7 +2625,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             filterForm.querySelectorAll('select').forEach(select => {
                 CleanupManager.addListener(select, 'change', () => {
                     applyFilters();
-                    updateCoinFilterImages();
                     updateClearFiltersButton();
                 });
             });
@@ -2318,6 +2634,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (clearFiltersBtn) {
             CleanupManager.addListener(clearFiltersBtn, 'click', clearFilters);
         }
+
+        CleanupManager.addListener(document, 'click', (e) => {
+            const coinToDropdown = document.getElementById('coin_to_dropdown');
+            const coinFromDropdown = document.getElementById('coin_from_dropdown');
+
+            if (coinToDropdown && coinToDropdown.style.display !== 'none') {
+                if (!e.target.closest('#coin_to_button') && !e.target.closest('#coin_to_dropdown')) {
+                    hideDropdown('coin_to');
+                }
+            }
+
+            if (coinFromDropdown && coinFromDropdown.style.display !== 'none') {
+                if (!e.target.closest('#coin_from_button') && !e.target.closest('#coin_from_dropdown')) {
+                    hideDropdown('coin_from');
+                }
+            }
+        });
 
         const rowTimeInterval = setInterval(updateRowTimes, 30000);
         if (CleanupManager.registerResource) {

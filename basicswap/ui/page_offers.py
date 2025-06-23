@@ -884,6 +884,7 @@ def page_offers(self, url_split, post_string, sent=False):
         "sort_dir": "desc",
         "sent_from": "any" if sent is False else "only",
         "active": "any",
+        "auto_accept_type": "any",
     }
 
     filter_prefix = "page_offers_sent" if sent else "page_offers"
@@ -908,6 +909,16 @@ def page_offers(self, url_split, post_string, sent=False):
                 sent_from = get_data_entry(form_data, "sent_from")
                 ensure(sent_from in ["any", "only"], "Invalid sent filter")
                 filters["sent_from"] = sent_from
+            if have_data_entry(form_data, "auto_accept_type"):
+                auto_accept_type = get_data_entry(form_data, "auto_accept_type")
+                ensure(
+                    auto_accept_type in ["any", "0", "1", "2"],
+                    "Invalid auto accept type filter",
+                )
+                if auto_accept_type == "any":
+                    filters["auto_accept_type"] = "any"
+                else:
+                    filters["auto_accept_type"] = int(auto_accept_type)
             if have_data_entry(form_data, "active"):
                 active_filter = get_data_entry(form_data, "active")
                 ensure(

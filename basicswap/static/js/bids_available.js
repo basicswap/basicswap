@@ -352,7 +352,7 @@ const createBidTableRow = async (bid) => {
                     <div class="flex items-center justify-center">
                         <span class="inline-flex mr-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12"
-                                 src="/static/images/coins/${bid.coin_from.replace(' ', '-')}.png"
+                                 src="/static/images/coins/${window.CoinManager.getCoinIcon(bid.coin_from)}"
                                  alt="${bid.coin_from}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
@@ -361,7 +361,7 @@ const createBidTableRow = async (bid) => {
                         </svg>
                         <span class="inline-flex ml-3 align-middle items-center justify-center w-18 h-20 rounded">
                             <img class="h-12"
-                                 src="/static/images/coins/${bid.coin_to.replace(' ', '-')}.png"
+                                 src="/static/images/coins/${window.CoinManager.getCoinIcon(bid.coin_to)}"
                                  alt="${bid.coin_to}"
                                  onerror="this.src='/static/images/coins/default.png'">
                         </span>
