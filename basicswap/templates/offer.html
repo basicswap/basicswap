@@ -846,6 +846,27 @@ function validateMaxAmount(input, maxAmount) {
 }
 
 function showConfirmModal() {
+    const bidAmountSendInput = document.getElementById('bid_amount_send');
+    const bidAmountInput = document.getElementById('bid_amount');
+
+    let sendAmount = 0;
+    let receiveAmount = 0;
+
+    if (bidAmountSendInput && bidAmountSendInput.value) {
+        sendAmount = parseFloat(bidAmountSendInput.value) || 0;
+    }
+    if (bidAmountInput && bidAmountInput.value) {
+        receiveAmount = parseFloat(bidAmountInput.value) || 0;
+    }
+
+    if (sendAmount <= 0 && bidAmountSendInput && !bidAmountSendInput.disabled) {
+        return false;
+    }
+
+    if (receiveAmount <= 0 && bidAmountInput && !bidAmountInput.disabled) {
+        return false;
+    }
+
     updateModalValues();
     const modal = document.getElementById('confirmModal');
     if (modal) {
