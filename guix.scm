@@ -7,6 +7,7 @@
 #:use-module (guix git-download)
 #:use-module (guix download)
 #:use-module (guix search-paths)
+#:use-module (guix utils)
 #:use-module (gnu packages)
 #:use-module (gnu packages pkg-config)
 #:use-module (gnu packages autotools)
@@ -67,6 +68,24 @@
     (license license:unlicense)))
 
 
+(define-public cmake-3.31
+  (package
+    (inherit cmake)
+    (version "3.31.8")
+    (source (origin
+              (method url-fetch)
+              (uri (string-append "https://cmake.org/files/v";
+                                  (version-major+minor version)
+                                  "/cmake-" version ".tar.gz"))
+              (sha256
+               (base32
+                "1akcmx9w5wbygq088hrr13l6n4b5npqvh9jk20934bfwhg5f7kg3"))))
+    (native-inputs
+     (modify-inputs (package-native-inputs cmake)
+       ;; Avoid circular dependency with (gnu packages debug).
+       (prepend (module-ref (resolve-interface '(gnu packages debug))
+                            'cppdap))))))
+
 (define python-coincurve-basicswap
   (package
     (name "python-coincurve-basicswap")
@@ -99,7 +118,7 @@
       python-cffi))
     (native-inputs
      (list
-      cmake-3.30
+      cmake-3.31
       python-hatchling
       python-scikit-build
       python-scikit-build-core
@@ -115,15 +134,15 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.14.4")
+  (version "0.14.6")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "3c18a3ed26222bac22a9c15795bd8c6fae0b01ba")))
+      (commit "8c06508e7c50ae64ca81626b346252f45f8e40f0")))
     (sha256
       (base32
-        "02mwyklcw9320crcm8laiw4ba24xrazbg48whvdxnbmarcbipkd3"))
+        "0kqlk8gvs9l47win2x9l415vcmv8alf874rvma0641ihkzid47g5"))
     (file-name (git-file-name name version))))
   (build-system pyproject-build-system)
 
