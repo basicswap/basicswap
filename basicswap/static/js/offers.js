@@ -578,7 +578,7 @@ function filterAndSortData() {
                     if (offer.is_own_offer || isSentOffers) {
                         percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
                     } else {
-                        percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
+                        percentDiff = (-((toValueUSD / fromValueUSD) - 1)) * 100;
                     }
                 }
             }
@@ -706,7 +706,7 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
         if (isOwnOffer) {
             percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
         } else {
-            percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
+            percentDiff = (-((toValueUSD / fromValueUSD) - 1)) * 100;
         }
 
         if (isNaN(percentDiff)) {
@@ -975,12 +975,11 @@ function updateProfitLoss(row, fromCoin, toCoin, fromAmount, toAmount, isOwnOffe
                 return;
             }
 
-            const formattedPercentDiff = percentDiff.toFixed(2);
-            const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
-                                     (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+            const percentDiffDisplay = percentDiff === "0.00" ? "0.00" :
+                                     (percentDiff > 0 ? percentDiff : -percentDiff);
 
             const colorClass = getProfitColorClass(percentDiff);
-            profitLossElement.textContent = `${percentDiffDisplay}%`;
+            profitLossElement.textContent = `${percentDiffDisplay.toFixed(2)}%`;
             profitLossElement.className = `profit-loss text-lg font-bold ${colorClass}`;
 
             const tooltipId = `percentage-tooltip-${row.getAttribute('data-offer-id')}`;
@@ -1808,38 +1807,37 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
     if (isSentOffers || isOwnOffer) {
         percentDiff = ((toValueUSD / fromValueUSD) - 1) * 100;
     } else {
-        percentDiff = ((fromValueUSD / toValueUSD) - 1) * 100;
+        percentDiff = (-((toValueUSD / fromValueUSD) - 1)) * 100;
     }
 
-    const formattedPercentDiff = percentDiff.toFixed(2);
-    const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
-                             (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+    const percentDiffDisplay = percentDiff === "0.00" ? "0.00" :
+                             (percentDiff > 0 ? percentDiff : -percentDiff);
 
-    const profitLabel = (isSentOffers || isOwnOffer) ? "Max Profit" : "Max Loss";
+    const profitLabel = percentDiff > 0 ? "Max Profit" : "Max Loss";
     const actionLabel = (isSentOffers || isOwnOffer) ? "selling" : "buying";
     const directionLabel = (isSentOffers || isOwnOffer) ? "receiving" : "paying";
 
     return `
         <p class="font-bold mb-1">Profit/Loss Calculation:</p>
         <p>You are ${actionLabel} ${fromAmount.toFixed(8)} ${coinFrom} ($${fromValueUSD.toFixed(2)} USD) <br/> and ${directionLabel} ${toAmount.toFixed(8)} ${coinTo} ($${toValueUSD.toFixed(2)} USD).</p>
-        <p class="mt-1">Percentage difference: ${percentDiffDisplay}%</p>
-        <p>${profitLabel}: ${profitUSD > 0 ? '' : '-'}$${Math.abs(profitUSD).toFixed(2)} USD</p>
+        <p class="mt-1">Percentage difference: ${percentDiffDisplay.toFixed(2)}%</p>
+        <p>${profitLabel}: ${Math.abs(profitUSD).toFixed(2)} USD</p>
         <p class="font-bold mt-2">Calculation:</p>
         <p>Percentage = ${(isSentOffers || isOwnOffer) ?
             "((To Amount in USD / From Amount in USD) - 1) * 100" :
-            "((From Amount in USD / To Amount in USD) - 1) * 100"}</p>
+            "(-((To Amount in USD / From Amount in USD) - 1)) * 100"}</p>
         <p>USD ${profitLabel} = To Amount in USD - From Amount in USD</p>
         <p class="font-bold mt-1">Interpretation:</p>
         ${(isSentOffers || isOwnOffer) ? `
-            <p><span class="text-green-500">Positive percentage:</span> You're selling above market rate (profitable)</p>
-            <p><span class="text-red-500">Negative percentage:</span> You're selling below market rate (loss)</p>
+            <p><span class="text-green-500">Green:</span> You're selling above market rate (profitable)</p>
+            <p><span class="text-red-500">Red:</span> You're selling below market rate (loss)</p>
         ` : `
-            <p><span class="text-green-500">Positive percentage:</span> You're buying below market rate (savings)</p>
-            <p><span class="text-red-500">Negative percentage:</span> You're buying above market rate (premium)</p>
+            <p><span class="text-green-500">Green:</span> You're buying below market rate (savings)</p>
+            <p><span class="text-red-500">Red:</span> You're buying above market rate (premium)</p>
         `}
         <p class="mt-1"><strong>Note:</strong> ${(isSentOffers || isOwnOffer) ?
-            "As a seller, a positive percentage means <br/> you're selling for more than the current market value." :
-            "As a buyer, a positive percentage indicates </br> potential savings compared to current market rates."}</p>
+            "As a seller, a green percentage means <br/> you're selling for more than the current market rate." :
+            "As a buyer, a green percentage indicates </br> potential savings compared to current market rate."}</p>
         <p class="mt-1"><strong>Market Rate:</strong> 1 ${coinFrom} = ${marketRate.toFixed(8)} ${coinTo}</p>
         <p><strong>Offer Rate:</strong> 1 ${coinFrom} = ${offerRate.toFixed(8)} ${coinTo}</p>
     `;
@@ -1921,15 +1919,14 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
     const rateInUSD = rate * toPriceUSD;
     const marketRate = fromPriceUSD / toPriceUSD;
     const percentDiff = marketRate ? ((rate - marketRate) / marketRate) * 100 : 0;
-    const formattedPercentDiff = percentDiff.toFixed(2);
-    const percentDiffDisplay = formattedPercentDiff === "0.00" ? "0.00" :
-    (percentDiff > 0 ? `+${formattedPercentDiff}` : formattedPercentDiff);
+    const percentDiffDisplay = percentDiff === "0.00" ? "0.00" :
+    (percentDiff > 0 ? percentDiff : -percentDiff);
     const aboveOrBelow = percentDiff > 0 ? "above" : percentDiff < 0 ? "below" : "at";
     const action = treatAsSentOffer ? "selling" : "buying";
 
     return `
         <p class="font-bold mb-1">Exchange Rate Explanation:</p>
-        <p>This offer is ${action} ${coinFrom} for ${coinTo} <br/>at a rate that is ${percentDiffDisplay}% ${aboveOrBelow} market price.</p>
+        <p>This offer is ${action} ${coinFrom} for ${coinTo} <br/>at a rate that is ${percentDiffDisplay.toFixed(2)}% ${aboveOrBelow} market price.</p>
         <p class="font-bold mt-1">Exchange Rates:</p>
         <p>1 ${coinFrom} = ${rate.toFixed(8)} ${coinTo}</p>
         <p>1 ${coinTo} = ${inverseRate.toFixed(8)} ${coinFrom}</p>
