@@ -329,8 +329,10 @@ def readConfig(args, known_coins):
         elif offer_template["enabled"] is not True:
             continue
         if "amount" not in offer_template:
-            offer_template["amount"] = None
-            print(f"{offer_template['name']} amount missing. Skipping offer")
+            offer_template["amount"] = 0
+            print(f"{offer_template['name']} Offer amount missing. Skipping offer")
+            num_changes += 1
+            continue
         elif (
             offer_template["amount"] is None
             or float(offer_template["amount"]) < min_swap_size
@@ -338,6 +340,10 @@ def readConfig(args, known_coins):
             print(f"{offer_template['name']} Offer amount invalid. Skipping offer")
             continue
         amount = float(offer_template["amount"])
+        if "minrate" not in offer_template or offer_template["minrate"] is None:
+            offer_template["minrate"] = 0
+            print(f"{offer_template['name']} Offer minrate missing. Setting to 0")
+            num_changes += 1
         if "amount_step" not in offer_template:
             print(
                 f"Adding mandatory amount_step for {offer_template['name']} (privacy feature)"
