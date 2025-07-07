@@ -1056,10 +1056,10 @@ const AmmTablesManager = (function() {
                     newItem.min_swap_amount = parseFloat(minSwapAmount);
                 }
 
-                const amountStep = document.getElementById('add-offer-amount-step').value;
+                const amountStep = parseFloat(document.getElementById('add-offer-amount-step').value);
                 const offerAmount = parseFloat(document.getElementById('add-amm-amount').value);
 
-                if (!amountStep || amountStep.trim() === '') {
+                if (!amountStep) {
                     if (window.showErrorModal) {
                         window.showErrorModal('Validation Error', 'Offer Size Increment is required. This privacy feature prevents revealing your exact wallet balance.');
                     } else {
@@ -1069,8 +1069,7 @@ const AmmTablesManager = (function() {
                 }
 
                 if (/^[0-9]*\.?[0-9]*$/.test(amountStep)) {
-                    const parsedValue = parseFloat(amountStep);
-                    if (parsedValue <= 0) {
+                    if (amountStep <= 0) {
                         if (window.showErrorModal) {
                             window.showErrorModal('Validation Error', 'Offer Size Increment must be greater than zero.');
                         } else {
@@ -1078,7 +1077,7 @@ const AmmTablesManager = (function() {
                         }
                         return;
                     }
-                    if (parsedValue < 0.001) {
+                    if (amountStep < 0.001) {
                         if (window.showErrorModal) {
                             window.showErrorModal('Validation Error', 'Offer Size Increment must be at least 0.001.');
                         } else {
@@ -1086,15 +1085,15 @@ const AmmTablesManager = (function() {
                         }
                         return;
                     }
-                    if (parsedValue > offerAmount) {
+                    if (amountStep > offerAmount) {
                         if (window.showErrorModal) {
-                            window.showErrorModal('Validation Error', `Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                            window.showErrorModal('Validation Error', `Offer Size Increment (${amountStep}) cannot be greater than the offer amount (${offerAmount}).`);
                         } else {
-                            alert(`Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                            alert(`Offer Size Increment (${amountStep}) cannot be greater than the offer amount (${offerAmount}).`);
                         }
                         return;
                     }
-                    newItem.amount_step = parsedValue.toString();
+                    newItem.amount_step = amountStep;
                     console.log(`Offer Size Increment set to: ${newItem.amount_step}`);
                 } else {
                     if (window.showErrorModal) {
@@ -1502,10 +1501,10 @@ const AmmTablesManager = (function() {
                     updatedItem.min_swap_amount = parseFloat(minSwapAmount);
                 }
 
-                const amountStep = document.getElementById('edit-offer-amount-step').value;
+                const amountStep = parseFloat(document.getElementById('edit-offer-amount-step').value);
                 const offerAmount = parseFloat(document.getElementById('edit-amm-amount').value);
 
-                if (!amountStep || amountStep.trim() === '') {
+                if (!amountStep) {
                     if (window.showErrorModal) {
                         window.showErrorModal('Validation Error', 'Offer Size Increment is required. This privacy feature prevents revealing your exact wallet balance.');
                     } else {
@@ -1515,8 +1514,7 @@ const AmmTablesManager = (function() {
                 }
 
                 if (/^[0-9]*\.?[0-9]*$/.test(amountStep)) {
-                    const parsedValue = parseFloat(amountStep);
-                    if (parsedValue <= 0) {
+                    if (amountStep <= 0) {
                         if (window.showErrorModal) {
                             window.showErrorModal('Validation Error', 'Offer Size Increment must be greater than zero.');
                         } else {
@@ -1524,7 +1522,7 @@ const AmmTablesManager = (function() {
                         }
                         return;
                     }
-                    if (parsedValue < 0.001) {
+                    if (amountStep < 0.001) {
                         if (window.showErrorModal) {
                             window.showErrorModal('Validation Error', 'Offer Size Increment must be at least 0.001.');
                         } else {
@@ -1532,15 +1530,15 @@ const AmmTablesManager = (function() {
                         }
                         return;
                     }
-                    if (parsedValue > offerAmount) {
+                    if (amountStep > offerAmount) {
                         if (window.showErrorModal) {
-                            window.showErrorModal('Validation Error', `Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                            window.showErrorModal('Validation Error', `Offer Size Increment (${amountStep}) cannot be greater than the offer amount (${offerAmount}).`);
                         } else {
-                            alert(`Offer Size Increment (${parsedValue}) cannot be greater than the offer amount (${offerAmount}).`);
+                            alert(`Offer Size Increment (${amountStep}) cannot be greater than the offer amount (${offerAmount}).`);
                         }
                         return;
                     }
-                    updatedItem.amount_step = parsedValue.toString();
+                    updatedItem.amount_step = amountStep;
                     console.log(`Offer Size Increment set to: ${updatedItem.amount_step}`);
                 } else {
                     if (window.showErrorModal) {
