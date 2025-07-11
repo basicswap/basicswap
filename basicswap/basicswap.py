@@ -202,10 +202,18 @@ def threadPollXMRChainState(swap_client, coin_type):
                 if swap_client.ws_server:
                     try:
                         current_balance = ci.getSpendableBalance()
+                        current_total_balance = swap_client.getTotalBalance(coin_type)
                         cached_balance = cc.get("cached_balance", None)
+                        cached_total_balance = cc.get("cached_total_balance", None)
 
-                        if cached_balance is None or current_balance != cached_balance:
+                        if (
+                            cached_balance is None
+                            or current_balance != cached_balance
+                            or cached_total_balance is None
+                            or current_total_balance != cached_total_balance
+                        ):
                             cc["cached_balance"] = current_balance
+                            cc["cached_total_balance"] = current_total_balance
                             balance_event = {
                                 "event": "coin_balance_updated",
                                 "coin": ci.ticker(),
@@ -216,6 +224,7 @@ def threadPollXMRChainState(swap_client, coin_type):
                             )
                     except Exception:
                         cc["cached_balance"] = None
+                        cc["cached_total_balance"] = None
 
         except Exception as e:
             swap_client.log.warning(
@@ -242,10 +251,18 @@ def threadPollWOWChainState(swap_client, coin_type):
                 if swap_client.ws_server:
                     try:
                         current_balance = ci.getSpendableBalance()
+                        current_total_balance = swap_client.getTotalBalance(coin_type)
                         cached_balance = cc.get("cached_balance", None)
+                        cached_total_balance = cc.get("cached_total_balance", None)
 
-                        if cached_balance is None or current_balance != cached_balance:
+                        if (
+                            cached_balance is None
+                            or current_balance != cached_balance
+                            or cached_total_balance is None
+                            or current_total_balance != cached_total_balance
+                        ):
                             cc["cached_balance"] = current_balance
+                            cc["cached_total_balance"] = current_total_balance
                             balance_event = {
                                 "event": "coin_balance_updated",
                                 "coin": ci.ticker(),
@@ -256,6 +273,7 @@ def threadPollWOWChainState(swap_client, coin_type):
                             )
                     except Exception:
                         cc["cached_balance"] = None
+                        cc["cached_total_balance"] = None
 
         except Exception as e:
             swap_client.log.warning(
@@ -286,10 +304,18 @@ def threadPollChainState(swap_client, coin_type):
                 if swap_client.ws_server:
                     try:
                         current_balance = ci.getSpendableBalance()
+                        current_total_balance = swap_client.getTotalBalance(coin_type)
                         cached_balance = cc.get("cached_balance", None)
+                        cached_total_balance = cc.get("cached_total_balance", None)
 
-                        if cached_balance is None or current_balance != cached_balance:
+                        if (
+                            cached_balance is None
+                            or current_balance != cached_balance
+                            or cached_total_balance is None
+                            or current_total_balance != cached_total_balance
+                        ):
                             cc["cached_balance"] = current_balance
+                            cc["cached_total_balance"] = current_total_balance
                             balance_event = {
                                 "event": "coin_balance_updated",
                                 "coin": ci.ticker(),
@@ -300,6 +326,7 @@ def threadPollChainState(swap_client, coin_type):
                             )
                     except Exception:
                         cc["cached_balance"] = None
+                        cc["cached_total_balance"] = None
 
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")
@@ -5466,6 +5493,39 @@ class BasicSwap(BaseApp, UIApp):
             # TODO: Wait for depth?
 
         # bid saved in checkBidState
+
+    def getTotalBalance(self, coin_type) -> int:
+        try:
+            ci = self.ci(coin_type)
+            if hasattr(ci, "rpc_wallet"):
+                if coin_type in (Coins.XMR, Coins.WOW):
+                    balance_info = ci.rpc_wallet("get_balance")
+                    return balance_info["balance"]
+                elif coin_type == Coins.PART:
+                    balances = ci.rpc_wallet("getbalances")
+                    return ci.make_int(
+                        balances["mine"]["trusted"]
+                        + balances["mine"]["untrusted_pending"]
+                    )
+                else:
+                    try:
+                        balances = ci.rpc_wallet("getbalances")
+                        return ci.make_int(
+                            balances["mine"]["trusted"]
+                            + balances["mine"]["untrusted_pending"]
+                        )
+                    except Exception:
+                        wallet_info = ci.rpc_wallet("getwalletinfo")
+                        total = wallet_info.get("balance", 0)
+                        if "unconfirmed_balance" in wallet_info:
+                            total += wallet_info["unconfirmed_balance"]
+                        if "immature_balance" in wallet_info:
+                            total += wallet_info["immature_balance"]
+                        return ci.make_int(total)
+            else:
+                return ci.getSpendableBalance()
+        except Exception:
+            return ci.getSpendableBalance()
 
     def getAddressBalance(self, coin_type, address: str) -> int:
         if self.coin_clients[coin_type]["chain_lookups"] == "explorer":

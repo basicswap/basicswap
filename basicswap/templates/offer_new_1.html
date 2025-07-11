@@ -546,7 +546,7 @@ function setupWebSocketBalanceUpdates() {
         .catch(error => {
           console.error('Error in periodic New Offer balance refresh:', error);
         });
-    }, 300000);
+    }, 120000);
   }
 }
 

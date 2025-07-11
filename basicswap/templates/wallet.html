@@ -1410,7 +1410,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   window.walletPeriodicRefresh = setInterval(() => {
     updateWalletBalances();
-  }, 300000);
+  }, 120000);
 
   window.addEventListener('beforeunload', cleanupWalletBalanceUpdates);
 
