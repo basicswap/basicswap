@@ -21,8 +21,7 @@
         <div id="total-btc-value" class="text-sm text-white mt-2"></div>
      </div>
       <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto">
-        <a class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/changepassword">{{ lock_svg | safe }}<span>Change/Set Password</span></a>
-        <a class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallets">{{ circular_arrows_svg | safe }}<span>Refresh</span></a>
+        <a class="rounded-full flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/changepassword">{{ lock_svg | safe }}<span>Change/Set Password</span></a>
      </div>
     </div>
    </div>
@@ -190,5 +189,474 @@
  </section>
 
 {% include 'footer.html' %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  if (window.WebSocketManager && typeof window.WebSocketManager.initialize === 'function') {
+    window.WebSocketManager.initialize();
+  }
+
+  function setupWalletsWebSocketUpdates() {
+    if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
+
+
+      const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
+        if (data && data.event) {
+
+          if (data.event === 'coin_balance_updated') {
+            clearTimeout(window.walletsBalanceUpdateTimeout);
+            window.walletsBalanceUpdateTimeout = setTimeout(() => {
+              updateWalletBalances();
+            }, 2000);
+          }
+
+          if (data.event === 'price_updated' || data.event === 'prices_updated') {
+
+            clearTimeout(window.walletsPriceUpdateTimeout);
+            window.walletsPriceUpdateTimeout = setTimeout(() => {
+              if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
+                window.WalletManager.updatePrices(true);
+              }
+            }, 500);
+          }
+
+
+          const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
+          if (swapEvents.includes(data.event)) {
+
+            clearTimeout(window.walletsSwapEventTimeout);
+            window.walletsSwapEventTimeout = setTimeout(() => {
+
+              updateWalletBalances();
+            }, 5000);
+          }
+
+
+        }
+      });
+
+      window.walletsBalanceHandlerId = balanceHandlerId;
+
+    } else {
+
+    }
+  }
+
+  function updateWalletBalances() {
+    fetch('/json/walletbalances', {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(balanceData => {
+      if (balanceData.error) {
+        throw new Error(balanceData.error);
+      }
+
+      if (!Array.isArray(balanceData)) {
+        throw new Error('Invalid response format');
+      }
+
+      balanceData.forEach(coin => {
+        updateWalletDisplay(coin);
+      });
+
+      setTimeout(() => {
+        if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
+          window.WalletManager.updatePrices(true);
+        }
+      }, 250);
+    })
+    .catch(error => {
+      console.error('Error updating wallet balances:', error);
+    });
+  }
+
+  function updateWalletDisplay(coinData) {
+    if (coinData.name === 'Particl') {
+      updateSpecificBalance('Particl', 'Balance:', coinData.balance, coinData.ticker || 'PART');
+    } else if (coinData.name === 'Particl Anon') {
+      updateSpecificBalance('Particl', 'Anon Balance:', coinData.balance, coinData.ticker || 'PART');
+      removePendingBalance('Particl', 'Anon Balance:');
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingBalance('Particl', 'Anon Balance:', coinData.pending, coinData.ticker || 'PART', 'Anon Pending:', coinData);
+      }
+    } else if (coinData.name === 'Particl Blind') {
+      updateSpecificBalance('Particl', 'Blind Balance:', coinData.balance, coinData.ticker || 'PART');
+      removePendingBalance('Particl', 'Blind Balance:');
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingBalance('Particl', 'Blind Balance:', coinData.pending, coinData.ticker || 'PART', 'Blind Unconfirmed:', coinData);
+      }
+    } else {
+      updateSpecificBalance(coinData.name, 'Balance:', coinData.balance, coinData.ticker || coinData.name);
+
+      if (coinData.name !== 'Particl Anon' && coinData.name !== 'Particl Blind' && coinData.name !== 'Litecoin MWEB') {
+        if (coinData.pending && parseFloat(coinData.pending) > 0) {
+          updatePendingDisplay(coinData);
+        } else {
+          removePendingDisplay(coinData.name);
+        }
+      }
+    }
+  }
+
+  function updateSpecificBalance(coinName, labelText, balance, ticker, isPending = false) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+    let found = false;
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinName) {
+        const parentDiv = element.closest('.flex.mb-2.justify-between.items-center');
+        const labelElement = parentDiv ? parentDiv.querySelector('h4') : null;
+
+        if (labelElement) {
+          const currentLabel = labelElement.textContent.trim();
+
+          if (currentLabel === labelText) {
+            if (isPending) {
+              const cleanBalance = balance.toString().replace(/^\+/, '');
+              element.textContent = `+${cleanBalance} ${ticker}`;
+            } else {
+              element.textContent = `${balance} ${ticker}`;
+            }
+            found = true;
+          }
+        }
+      }
+    });
+
+  }
+
+  function updatePendingDisplay(coinData) {
+    const walletContainer = findWalletContainer(coinData.name);
+    if (!walletContainer) return;
+
+    const existingPendingElements = walletContainer.querySelectorAll('.flex.mb-2.justify-between.items-center');
+    let staticPendingElement = null;
+    let staticUsdElement = null;
+
+    existingPendingElements.forEach(element => {
+      const labelElement = element.querySelector('h4');
+      if (labelElement) {
+        const labelText = labelElement.textContent;
+        if (labelText.includes('Pending:') && !labelText.includes('USD')) {
+          staticPendingElement = element;
+        } else if (labelText.includes('Pending USD value:')) {
+          staticUsdElement = element;
+        }
+      }
+    });
+
+    if (staticPendingElement && staticUsdElement) {
+      const pendingSpan = staticPendingElement.querySelector('.coinname-value');
+      if (pendingSpan) {
+        const cleanPending = coinData.pending.toString().replace(/^\+/, '');
+        pendingSpan.textContent = `+${cleanPending} ${coinData.ticker || coinData.name}`;
+      }
+
+      let initialUSD = '$0.00';
+      if (window.WalletManager && window.WalletManager.coinPrices) {
+        const coinId = coinData.name.toLowerCase().replace(' ', '-');
+        const price = window.WalletManager.coinPrices[coinId];
+        if (price && price.usd) {
+          const cleanPending = coinData.pending.toString().replace(/^\+/, '');
+          const usdValue = (parseFloat(cleanPending) * price.usd).toFixed(2);
+          initialUSD = `$${usdValue}`;
+        }
+      }
+
+      const usdDiv = staticUsdElement.querySelector('.usd-value');
+      if (usdDiv) {
+        usdDiv.textContent = initialUSD;
+      }
+      return;
+    }
+
+    let pendingContainer = walletContainer.querySelector('.pending-container');
+
+    if (!pendingContainer) {
+      pendingContainer = document.createElement('div');
+      pendingContainer.className = 'pending-container';
+
+      const pendingRow = document.createElement('div');
+      pendingRow.className = 'flex mb-2 justify-between items-center';
+      const cleanPending = coinData.pending.toString().replace(/^\+/, '');
+      pendingRow.innerHTML = `
+        <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Pending:</h4>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="${coinData.name}">+${cleanPending} ${coinData.ticker || coinData.name}</span>
+      `;
+
+      pendingContainer.appendChild(pendingRow);
+
+      let initialUSD = '$0.00';
+      if (window.WalletManager && window.WalletManager.coinPrices) {
+        const coinId = coinData.name.toLowerCase().replace(' ', '-');
+        const price = window.WalletManager.coinPrices[coinId];
+        if (price && price.usd) {
+          const usdValue = (parseFloat(cleanPending) * price.usd).toFixed(2);
+          initialUSD = `$${usdValue}`;
+        }
+      }
+
+      const usdRow = document.createElement('div');
+      usdRow.className = 'flex mb-2 justify-between items-center';
+      usdRow.innerHTML = `
+        <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Pending USD value:</h4>
+        <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value">${initialUSD}</div>
+      `;
+      pendingContainer.appendChild(usdRow);
+
+      const balanceRow = walletContainer.querySelector('.flex.mb-2.justify-between.items-center');
+      let insertAfterElement = balanceRow;
+
+      if (balanceRow) {
+        let nextElement = balanceRow.nextElementSibling;
+        while (nextElement) {
+          const labelElement = nextElement.querySelector('h4');
+          if (labelElement && labelElement.textContent.includes('USD value:') &&
+              !labelElement.textContent.includes('Pending') && !labelElement.textContent.includes('Unconfirmed')) {
+            insertAfterElement = nextElement;
+            break;
+          }
+          nextElement = nextElement.nextElementSibling;
+        }
+      }
+
+      if (insertAfterElement && insertAfterElement.nextSibling) {
+        walletContainer.insertBefore(pendingContainer, insertAfterElement.nextSibling);
+      } else {
+        walletContainer.appendChild(pendingContainer);
+      }
+    } else {
+      const pendingElement = pendingContainer.querySelector('.coinname-value');
+      if (pendingElement) {
+        const cleanPending = coinData.pending.toString().replace(/^\+/, ''); // Remove existing + if any
+        pendingElement.textContent = `+${cleanPending} ${coinData.ticker || coinData.name}`;
+      }
+    }
+  }
+
+  function removePendingDisplay(coinName) {
+    const walletContainer = findWalletContainer(coinName);
+    if (!walletContainer) return;
+
+    const pendingContainer = walletContainer.querySelector('.pending-container');
+    if (pendingContainer) {
+      pendingContainer.remove();
+    }
+
+    const existingPendingElements = walletContainer.querySelectorAll('.flex.mb-2.justify-between.items-center');
+    existingPendingElements.forEach(element => {
+      const labelElement = element.querySelector('h4');
+      if (labelElement) {
+        const labelText = labelElement.textContent;
+        if (labelText.includes('Pending:') || labelText.includes('Pending USD value:')) {
+          element.style.display = 'none';
+        }
+      }
+    });
+  }
+
+  function removeSpecificPending(coinName, labelText) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinName) {
+        const parentDiv = element.closest('.flex.mb-2.justify-between.items-center');
+        const labelElement = parentDiv ? parentDiv.querySelector('h4') : null;
+
+        if (labelElement) {
+          const currentLabel = labelElement.textContent.trim();
+
+          if (currentLabel === labelText) {
+            parentDiv.remove();
+          }
+        }
+      }
+    });
+  }
+
+  function updatePendingBalance(coinName, balanceType, pendingAmount, ticker, pendingLabel, coinData) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+    let targetElement = null;
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+      if (elementCoinName === coinName) {
+        const parentElement = element.closest('.flex.mb-2.justify-between.items-center');
+        if (parentElement) {
+          const labelElement = parentElement.querySelector('h4');
+          if (labelElement && labelElement.textContent.includes(balanceType)) {
+            targetElement = parentElement;
+          }
+        }
+      }
+    });
+
+    if (!targetElement) return;
+
+    let insertAfterElement = targetElement;
+    let nextElement = targetElement.nextElementSibling;
+    while (nextElement) {
+      const labelElement = nextElement.querySelector('h4');
+      if (labelElement) {
+        const labelText = labelElement.textContent;
+        if (labelText.includes('USD value:') && !labelText.includes('Pending') && !labelText.includes('Unconfirmed')) {
+          insertAfterElement = nextElement;
+          break;
+        }
+        if (labelText.includes('Balance:') || labelText.includes('Pending:') || labelText.includes('Unconfirmed:')) {
+          break;
+        }
+      }
+      nextElement = nextElement.nextElementSibling;
+    }
+
+    let pendingElement = insertAfterElement.nextElementSibling;
+    while (pendingElement && !pendingElement.querySelector('h4')?.textContent.includes(pendingLabel)) {
+      pendingElement = pendingElement.nextElementSibling;
+      if (pendingElement && pendingElement.querySelector('h4')?.textContent.includes('Balance:')) {
+        pendingElement = null;
+        break;
+      }
+    }
+
+    if (!pendingElement) {
+      const newPendingElement = document.createElement('div');
+      newPendingElement.className = 'flex mb-2 justify-between items-center';
+      newPendingElement.innerHTML = `
+        <h4 class="text-xs font-bold text-green-500 dark:text-green-500">${pendingLabel}</h4>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="${coinName}">+${pendingAmount} ${ticker}</span>
+      `;
+
+      insertAfterElement.parentNode.insertBefore(newPendingElement, insertAfterElement.nextSibling);
+
+      let initialUSD = '$0.00';
+      if (window.WalletManager && window.WalletManager.coinPrices) {
+        const coinId = coinName.toLowerCase().replace(' ', '-');
+        const price = window.WalletManager.coinPrices[coinId];
+        if (price && price.usd) {
+          const usdValue = (parseFloat(pendingAmount) * price.usd).toFixed(2);
+          initialUSD = `$${usdValue}`;
+        }
+      }
+
+      const usdElement = document.createElement('div');
+      usdElement.className = 'flex mb-2 justify-between items-center';
+      usdElement.innerHTML = `
+        <h4 class="text-xs font-bold text-green-500 dark:text-green-500">${pendingLabel.replace(':', '')} USD value:</h4>
+        <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value">${initialUSD}</div>
+      `;
+
+      newPendingElement.parentNode.insertBefore(usdElement, newPendingElement.nextSibling);
+    } else {
+      const pendingSpan = pendingElement.querySelector('.coinname-value');
+      if (pendingSpan) {
+        pendingSpan.textContent = `+${pendingAmount} ${ticker}`;
+      }
+    }
+  }
+
+  function removePendingBalance(coinName, balanceType) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+    let targetElement = null;
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+      if (elementCoinName === coinName) {
+        const parentElement = element.closest('.flex.mb-2.justify-between.items-center');
+        if (parentElement) {
+          const labelElement = parentElement.querySelector('h4');
+          if (labelElement && labelElement.textContent.includes(balanceType)) {
+            targetElement = parentElement;
+          }
+        }
+      }
+    });
+
+    if (!targetElement) return;
+
+    let nextElement = targetElement.nextElementSibling;
+    while (nextElement) {
+      const labelElement = nextElement.querySelector('h4');
+      if (labelElement) {
+        const labelText = labelElement.textContent;
+        if (labelText.includes('Pending:') || labelText.includes('Unconfirmed:') ||
+            labelText.includes('Anon Pending:') || labelText.includes('Blind Unconfirmed:') ||
+            labelText.includes('Pending USD value:') || labelText.includes('Unconfirmed USD value:') ||
+            labelText.includes('Anon Pending USD value:') || labelText.includes('Blind Unconfirmed USD value:')) {
+          const elementToRemove = nextElement;
+          nextElement = nextElement.nextElementSibling;
+          elementToRemove.remove();
+        } else if (labelText.includes('Balance:')) {
+          break; // Stop if we hit another balance
+        } else {
+          nextElement = nextElement.nextElementSibling;
+        }
+      } else {
+        nextElement = nextElement.nextElementSibling;
+      }
+    }
+  }
+
+  function findWalletContainer(coinName) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+    for (const element of balanceElements) {
+      if (element.getAttribute('data-coinname') === coinName) {
+        return element.closest('.bg-coolGray-100, .dark\\:bg-gray-600');
+      }
+    }
+    return null;
+  }
+
+  function cleanupWalletsBalanceUpdates() {
+    if (window.walletsBalanceHandlerId && window.WebSocketManager) {
+      window.WebSocketManager.removeMessageHandler('message', window.walletsBalanceHandlerId);
+
+    }
+
+    clearTimeout(window.walletsBalanceUpdateTimeout);
+    clearTimeout(window.walletsSwapEventTimeout);
+    clearTimeout(window.walletsPriceUpdateTimeout);
+
+    if (window.walletsPeriodicRefresh) {
+      clearInterval(window.walletsPeriodicRefresh);
+      window.walletsPeriodicRefresh = null;
+    }
+
+  }
+
+  setupWalletsWebSocketUpdates();
+
+  setTimeout(() => {
+    updateWalletBalances();
+  }, 1000);
+
+  window.walletsPeriodicRefresh = setInterval(() => {
+    updateWalletBalances();
+  }, 60000);
+
+
+
+  if (window.CleanupManager) {
+    window.CleanupManager.registerResource('walletsBalanceUpdates', null, cleanupWalletsBalanceUpdates);
+  }
+
+  window.addEventListener('beforeunload', cleanupWalletsBalanceUpdates);
+});
+</script>
+
 </body>
 </html>

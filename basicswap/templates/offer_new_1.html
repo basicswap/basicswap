@@ -155,7 +155,7 @@
                           <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 bold focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
                             <option value="-1">Select coin you send</option>
                             {% for c in coins_from %}
-                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png" data-balance="{{ c[2] }}">{{ c[1] }} - Balance: {{ c[2] }}</option>
                             {% endfor %}
                           </select>
                           <div class="select-dropdown"> <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
@@ -166,6 +166,11 @@
                       <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>
                       <div class="relative">
                         <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0 bold" placeholder="0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');">
+                      </div>
+                      <div class="mt-2 flex space-x-2">
+                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setOfferAmount(0.25, 'amt_from')">25%</button>
+                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setOfferAmount(0.5, 'amt_from')">50%</button>
+                        <button type="button" class="py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setOfferAmount(1, 'amt_from')">100%</button>
                       </div>
                     </div>
                   </div>
@@ -332,6 +337,251 @@
     </div>
   </section>
 </div>
+
+<script>
+function setOfferAmount(percent, fieldId) {
+  const amountInput = document.getElementById(fieldId);
+  const coinFromSelect = document.getElementById('coin_from');
+
+  if (!amountInput || !coinFromSelect) {
+    console.error('Required elements not found');
+    return;
+  }
+
+  const selectedOption = coinFromSelect.options[coinFromSelect.selectedIndex];
+  if (!selectedOption || selectedOption.value === '-1') {
+    alert('Please select a coin first');
+    return;
+  }
+
+  const balance = selectedOption.getAttribute('data-balance');
+  if (!balance) {
+    console.error('Balance not found for selected coin');
+    return;
+  }
+
+  const floatBalance = parseFloat(balance);
+  if (isNaN(floatBalance) || floatBalance <= 0) {
+    alert('Invalid balance for selected coin');
+    return;
+  }
+
+  const calculatedAmount = floatBalance * percent;
+  amountInput.value = calculatedAmount.toFixed(8);
+
+
+  if (amountInput.onchange) {
+    amountInput.onchange();
+  }
+
+
+  if (typeof set_rate === 'function') {
+    set_rate(fieldId);
+  }
+}
+
+function updateCustomDropdownDisplay(select, coinName, balance, pending) {
+  const selectNameElement = select.nextElementSibling?.querySelector('.select-name');
+  if (!selectNameElement) return;
+
+
+  selectNameElement.innerHTML = '';
+  selectNameElement.style.display = 'flex';
+  selectNameElement.style.flexDirection = 'column';
+  selectNameElement.style.alignItems = 'flex-start';
+  selectNameElement.style.lineHeight = '1.2';
+
+
+  const coinNameDiv = document.createElement('div');
+  coinNameDiv.textContent = coinName;
+  coinNameDiv.style.fontWeight = 'normal';
+  coinNameDiv.style.color = 'inherit';
+
+
+  const balanceDiv = document.createElement('div');
+  balanceDiv.textContent = `Balance: ${balance}`;
+  balanceDiv.style.fontSize = '0.75rem';
+  balanceDiv.style.color = '#6b7280';
+  balanceDiv.style.marginTop = '1px';
+
+  selectNameElement.appendChild(coinNameDiv);
+  selectNameElement.appendChild(balanceDiv);
+
+
+  if (pending !== '0.0' && parseFloat(pending) > 0) {
+    const pendingDiv = document.createElement('div');
+    pendingDiv.textContent = `+${pending} pending`;
+    pendingDiv.style.fontSize = '0.75rem';
+    pendingDiv.style.color = '#10b981';
+    pendingDiv.style.marginTop = '1px';
+    selectNameElement.appendChild(pendingDiv);
+  }
+}
+
+function updateCoinDropdownBalances(balanceData) {
+
+  const coinFromSelect = document.getElementById('coin_from');
+  if (!coinFromSelect) return;
+
+
+  const balanceMap = {};
+  const pendingMap = {};
+  balanceData.forEach(coin => {
+    balanceMap[coin.id] = coin.balance;
+    pendingMap[coin.id] = coin.pending || '0.0';
+  });
+
+
+  Array.from(coinFromSelect.options).forEach(option => {
+    if (option.value === '-1') return;
+
+    const coinId = parseInt(option.value);
+    const balance = balanceMap[coinId] || '0.0';
+    const pending = pendingMap[coinId] || '0.0';
+
+
+    option.setAttribute('data-balance', balance);
+
+
+    const coinName = option.textContent.split(' - Balance:')[0];
+    if (pending !== '0.0' && parseFloat(pending) > 0) {
+      option.textContent = `${coinName} - Balance: ${balance} (+${pending} pending)`;
+    } else {
+      option.textContent = `${coinName} - Balance: ${balance}`;
+    }
+
+
+    const select = option.closest('select');
+    if (select && select.value === option.value) {
+      updateCustomDropdownDisplay(select, coinName, balance, pending);
+    }
+  });
+}
+
+
+function fetchBalanceData() {
+  return fetch('/json/walletbalances', {
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(balanceData => {
+      if (balanceData.error) {
+        throw new Error(balanceData.error);
+      }
+
+
+      if (!Array.isArray(balanceData)) {
+        throw new Error('Invalid response format');
+      }
+
+      return balanceData;
+    });
+}
+
+
+function setupWebSocketBalanceUpdates() {
+  if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
+
+
+
+    const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
+      if (data && data.event) {
+
+        if (data.event === 'coin_balance_updated') {
+          clearTimeout(window.offerBalanceUpdateTimeout);
+          window.offerBalanceUpdateTimeout = setTimeout(() => {
+            fetchBalanceData()
+              .then(balanceData => {
+                updateCoinDropdownBalances(balanceData);
+              })
+              .catch(error => {
+                console.error('Error updating New Offer balances via WebSocket:', error);
+              });
+          }, 2000);
+        }
+
+
+        const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
+        if (swapEvents.includes(data.event)) {
+
+
+
+          clearTimeout(window.offerSwapEventTimeout);
+          window.offerSwapEventTimeout = setTimeout(() => {
+            fetchBalanceData()
+              .then(balanceData => {
+                updateCoinDropdownBalances(balanceData);
+
+              })
+              .catch(error => {
+                console.error('Error updating New Offer balances via swap event:', error);
+              });
+          }, 5000);
+        }
+      }
+    });
+
+
+    window.offerBalanceHandlerId = balanceHandlerId;
+
+  } else {
+
+  }
+
+
+  if (!window.offerPeriodicRefresh) {
+    window.offerPeriodicRefresh = setInterval(() => {
+      fetchBalanceData()
+        .then(balanceData => {
+          updateCoinDropdownBalances(balanceData);
+        })
+        .catch(error => {
+          console.error('Error in periodic New Offer balance refresh:', error);
+        });
+    }, 300000);
+  }
+}
+
+
+function cleanupOfferBalanceUpdates() {
+  if (window.offerBalanceHandlerId && window.WebSocketManager) {
+    window.WebSocketManager.removeMessageHandler('message', window.offerBalanceHandlerId);
+
+  }
+
+  if (window.offerPeriodicRefresh) {
+    clearInterval(window.offerPeriodicRefresh);
+    window.offerPeriodicRefresh = null;
+
+  }
+
+  clearTimeout(window.offerBalanceUpdateTimeout);
+  clearTimeout(window.offerSwapEventTimeout);
+}
+
+
+document.addEventListener('DOMContentLoaded', function() {
+  setupWebSocketBalanceUpdates();
+
+
+  if (window.CleanupManager) {
+    window.CleanupManager.registerResource('offerBalanceUpdates', null, cleanupOfferBalanceUpdates);
+  }
+
+  window.addEventListener('beforeunload', cleanupOfferBalanceUpdates);
+
+});
+
+</script>
+
 <script src="static/js/new_offer.js"></script>
 {% include 'footer.html' %}
 </div>

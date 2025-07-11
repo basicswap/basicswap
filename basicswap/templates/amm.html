@@ -51,12 +51,7 @@
             Add Bid
           </button>
           {% endif %}
-          <button id="refreshAmmTables" class="flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-600 border-blue-500 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            Refresh
-          </button>
+
         </div>
       </div>
 
@@ -290,6 +285,7 @@
            <button type="submit" name="kill_orphans" value="1" class="inline-flex items-center px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-md shadow-sm focus:ring-0 focus:outline-none" title="Kill orphaned AMM processes">
              Kill Orphans
            </button>
+
          </div>
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
            Use "Check Processes" to see running AMM processes. Use "Kill Orphans" to clean up duplicate processes. Use "Force Start" to automatically clean up and start fresh.
@@ -974,7 +970,7 @@
 
            if (localStorage.getItem('amm_create_default_refresh') === 'true') {
              localStorage.removeItem('amm_create_default_refresh');
-             console.log('[AMM] Page loaded after create default config - redirecting to fresh page');
+
 
              setTimeout(function() {
                window.location.href = window.location.pathname + window.location.search;
@@ -1066,7 +1062,7 @@
       <div class="absolute inset-0 bg-gray-500 opacity-75 dark:bg-gray-900 dark:opacity-90"></div>
     </div>
 
-    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle md:max-w-2xl md:w-full">
+    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-visible shadow-xl transform transition-all sm:my-8 sm:align-middle md:max-w-2xl md:w-full">
       <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
         <div class="sm:flex sm:items-start">
           <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
@@ -1086,7 +1082,7 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                  <div>
+                  <div class="min-h-[80px]">
                     <label for="add-amm-coin-from" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Maker</label>
                     <div class="relative">
                       <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1094,15 +1090,14 @@
                       </svg>
                       <select id="add-amm-coin-from" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         {% for c in coins %}
-                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                          {{ c[1] }}
-                        </option>
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}" data-balance="{{ c[2] }}">{{ c[1] }}</option>
                         {% endfor %}
                       </select>
                     </div>
+
                   </div>
 
-                  <div>
+                  <div class="min-h-[80px]">
                     <label for="add-amm-coin-to" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Taker</label>
                     <div class="relative">
                       <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1110,12 +1105,11 @@
                       </svg>
                       <select id="add-amm-coin-to" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         {% for c in coins %}
-                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                          {{ c[1] }}
-                        </option>
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}" data-balance="{{ c[2] }}">{{ c[1] }}</option>
                         {% endfor %}
                       </select>
                     </div>
+
                   </div>
                 </div>
 
@@ -1123,13 +1117,18 @@
                   <div>
                     <label for="add-amm-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Amount <span class="text-red-500">*</span></label>
                     <input type="text" id="add-amm-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                    <div class="mt-2 flex space-x-2">
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.25, 'add-amm-amount')">25%</button>
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.5, 'add-amm-amount')">50%</button>
+                      <button type="button" class="py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(1, 'add-amm-amount')">100%</button>
+                    </div>
                   </div>
 
                   <div>
                     <label id="add-amm-rate-label" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Minimum Rate <span class="text-red-500">*</span></label>
-                    <div class="flex items-center gap-2">
-                      <input type="text" id="add-amm-rate" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
-                      <button type="button" id="add-get-rate-button" class="px-2 py-1.5 bg-blue-500 hover:bg-blue-600 font-medium text-xs text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Get Rate</button>
+                    <input type="text" id="add-amm-rate" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                    <div class="mt-2">
+                      <button type="button" id="add-get-rate-button" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md focus:outline-none">Get Rate</button>
                     </div>
                   </div>
                 </div>
@@ -1348,7 +1347,7 @@
       <div class="absolute inset-0 bg-gray-500 opacity-75 dark:bg-gray-900 dark:opacity-90"></div>
     </div>
 
-    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle lg:max-w-xl md:max-w-2xl md:w-full">
+    <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-visible shadow-xl transform transition-all sm:my-8 sm:align-middle lg:max-w-xl md:max-w-2xl md:w-full">
       <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
         <div class="sm:flex sm:items-start">
           <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
@@ -1370,7 +1369,7 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                  <div>
+                  <div class="min-h-[80px]">
                     <label for="edit-amm-coin-from" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Maker</label>
                     <div class="relative">
                       <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1378,15 +1377,14 @@
                       </svg>
                       <select id="edit-amm-coin-from" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         {% for c in coins %}
-                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                          {{ c[1] }}
-                        </option>
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}" data-balance="{{ c[2] }}">{{ c[1] }}</option>
                         {% endfor %}
                       </select>
                     </div>
+
                   </div>
 
-                  <div>
+                  <div class="min-h-[80px]">
                     <label for="edit-amm-coin-to" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Taker</label>
                     <div class="relative">
                       <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1394,12 +1392,11 @@
                       </svg>
                       <select id="edit-amm-coin-to" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
                         {% for c in coins %}
-                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}">
-                          {{ c[1] }}
-                        </option>
+                        <option value="{{ c[1] }}" data-symbol="{{ c[0] }}" data-balance="{{ c[2] }}">{{ c[1] }}</option>
                         {% endfor %}
                       </select>
                     </div>
+
                   </div>
                 </div>
 
@@ -1407,13 +1404,18 @@
                   <div>
                     <label for="edit-amm-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Amount <span class="text-red-500">*</span></label>
                     <input type="text" id="edit-amm-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                    <div class="mt-2 flex space-x-2">
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.25, 'edit-amm-amount')">25%</button>
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.5, 'edit-amm-amount')">50%</button>
+                      <button type="button" class="py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(1, 'edit-amm-amount')">100%</button>
+                    </div>
                   </div>
 
                   <div>
                     <label id="edit-amm-rate-label" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Minimum Rate <span class="text-red-500">*</span></label>
-                    <div class="flex items-center gap-2">
-                      <input type="text" id="edit-amm-rate" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
-                      <button type="button" id="edit-get-rate-button" class="px-2 py-1.5 bg-blue-500 hover:bg-blue-600 font-medium text-xs text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Get Rate</button>
+                    <input type="text" id="edit-amm-rate" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                    <div class="mt-2">
+                      <button type="button" id="edit-get-rate-button" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md focus:outline-none">Get Rate</button>
                     </div>
                   </div>
                 </div>
@@ -2033,6 +2035,304 @@
         });
       }
     });
+
+    function setAmmAmount(percent, fieldId) {
+      const amountInput = document.getElementById(fieldId);
+      let coinSelect;
+
+
+      let modalType = null;
+      if (fieldId.includes('add-amm')) {
+        const addModal = document.getElementById('add-amm-modal');
+        modalType = addModal ? addModal.getAttribute('data-amm-type') : null;
+      } else if (fieldId.includes('edit-amm')) {
+        const editModal = document.getElementById('edit-amm-modal');
+        modalType = editModal ? editModal.getAttribute('data-amm-type') : null;
+      }
+
+
+      if (fieldId.includes('add-amm')) {
+        const isBidModal = modalType === 'bid';
+        coinSelect = document.getElementById(isBidModal ? 'add-amm-coin-to' : 'add-amm-coin-from');
+      } else if (fieldId.includes('edit-amm')) {
+        const isBidModal = modalType === 'bid';
+        coinSelect = document.getElementById(isBidModal ? 'edit-amm-coin-to' : 'edit-amm-coin-from');
+      }
+
+      if (!amountInput || !coinSelect) {
+        console.error('Required elements not found');
+        return;
+      }
+
+      const selectedOption = coinSelect.options[coinSelect.selectedIndex];
+      if (!selectedOption) {
+        alert('Please select a coin first');
+        return;
+      }
+
+      const balance = selectedOption.getAttribute('data-balance');
+      if (!balance) {
+        console.error('Balance not found for selected coin');
+        return;
+      }
+
+      const floatBalance = parseFloat(balance);
+      if (isNaN(floatBalance) || floatBalance <= 0) {
+        alert('Invalid balance for selected coin');
+        return;
+      }
+
+      const calculatedAmount = floatBalance * percent;
+      amountInput.value = calculatedAmount.toFixed(8);
+
+
+      const event = new Event('input', { bubbles: true });
+      amountInput.dispatchEvent(event);
+    }
+
+    function fetchBalanceData() {
+      return fetch('/json/walletbalances', {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(balanceData => {
+          if (balanceData.error) {
+            throw new Error(balanceData.error);
+          }
+
+
+          if (!Array.isArray(balanceData)) {
+            throw new Error('Invalid response format');
+          }
+
+          return balanceData;
+        });
+    }
+
+    function setupWebSocketBalanceUpdates() {
+      if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
+
+
+
+        const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
+          if (data && data.event) {
+
+            if (data.event === 'coin_balance_updated') {
+              clearTimeout(window.ammBalanceUpdateTimeout);
+              window.ammBalanceUpdateTimeout = setTimeout(() => {
+                fetchBalanceData()
+                  .then(balanceData => {
+
+                    const addModal = document.getElementById('add-amm-modal');
+                    const editModal = document.getElementById('edit-amm-modal');
+                    const addModalVisible = addModal && !addModal.classList.contains('hidden');
+                    const editModalVisible = editModal && !editModal.classList.contains('hidden');
+
+                    let modalType = null;
+                    if (addModalVisible) {
+                      modalType = addModal.getAttribute('data-amm-type');
+                    } else if (editModalVisible) {
+                      modalType = editModal.getAttribute('data-amm-type');
+                    }
+
+                    if (modalType === 'offer') {
+                      updateOfferDropdownBalances(balanceData);
+                    } else if (modalType === 'bid') {
+                      updateBidDropdownBalances(balanceData);
+                    }
+                  })
+                  .catch(error => {
+                    console.error('Error updating AMM balances via WebSocket:', error);
+                  });
+              }, 2000);
+            }
+
+            const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
+            if (swapEvents.includes(data.event)) {
+
+              clearTimeout(window.ammSwapEventTimeout);
+              window.ammSwapEventTimeout = setTimeout(() => {
+                fetchBalanceData()
+                  .then(balanceData => {
+
+                    const addModal = document.getElementById('add-amm-modal');
+                    const editModal = document.getElementById('edit-amm-modal');
+                    const addModalVisible = addModal && !addModal.classList.contains('hidden');
+                    const editModalVisible = editModal && !editModal.classList.contains('hidden');
+
+                    let modalType = null;
+                    if (addModalVisible) {
+                      modalType = addModal.getAttribute('data-amm-type');
+                    } else if (editModalVisible) {
+                      modalType = editModal.getAttribute('data-amm-type');
+                    }
+
+                    if (modalType === 'offer') {
+                      updateOfferDropdownBalances(balanceData);
+                    } else if (modalType === 'bid') {
+                      updateBidDropdownBalances(balanceData);
+                    }
+                  })
+                  .catch(error => {
+                    console.error('Error updating AMM balances via swap event:', error);
+                  });
+              }, 5000);
+            }
+          }
+        });
+
+        window.ammBalanceHandlerId = balanceHandlerId;
+
+      } else {
+
+      }
+
+      if (!window.ammPeriodicRefresh) {
+        window.ammPeriodicRefresh = setInterval(() => {
+          fetchBalanceData()
+            .then(balanceData => {
+
+              const addModal = document.getElementById('add-amm-modal');
+              const editModal = document.getElementById('edit-amm-modal');
+              const addModalVisible = addModal && !addModal.classList.contains('hidden');
+              const editModalVisible = editModal && !editModal.classList.contains('hidden');
+
+              let modalType = null;
+              if (addModalVisible) {
+                modalType = addModal.getAttribute('data-amm-type');
+              } else if (editModalVisible) {
+                modalType = editModal.getAttribute('data-amm-type');
+              }
+
+              if (modalType === 'offer') {
+                updateOfferDropdownBalances(balanceData);
+              } else if (modalType === 'bid') {
+                updateBidDropdownBalances(balanceData);
+              }
+            })
+            .catch(error => {
+              console.error('Error in periodic AMM balance refresh:', error);
+            });
+        }, 300000);
+
+      }
+    }
+
+    function updateAmmDropdownBalances(balanceData) {
+
+      const balanceMap = {};
+      const pendingMap = {};
+      balanceData.forEach(coin => {
+        balanceMap[coin.name] = coin.balance;
+        pendingMap[coin.name] = coin.pending || '0.0';
+      });
+
+      const dropdownIds = ['add-amm-coin-from', 'edit-amm-coin-from', 'add-amm-coin-to', 'edit-amm-coin-to'];
+
+      dropdownIds.forEach(dropdownId => {
+        const select = document.getElementById(dropdownId);
+        if (!select) {
+          return;
+        }
+
+
+        Array.from(select.options).forEach(option => {
+          const coinName = option.value;
+          const balance = balanceMap[coinName] || '0.0';
+          const pending = pendingMap[coinName] || '0.0';
+
+          option.setAttribute('data-balance', balance);
+          option.setAttribute('data-pending-balance', pending);
+        });
+      });
+
+
+      const addModal = document.getElementById('add-amm-modal');
+      const editModal = document.getElementById('edit-amm-modal');
+      const addModalVisible = addModal && !addModal.classList.contains('hidden');
+      const editModalVisible = editModal && !editModal.classList.contains('hidden');
+
+      let currentModalType = null;
+      if (addModalVisible) {
+        currentModalType = addModal.getAttribute('data-amm-type');
+      } else if (editModalVisible) {
+        currentModalType = editModal.getAttribute('data-amm-type');
+      }
+
+      if (currentModalType && window.ammTablesManager) {
+        if (currentModalType === 'offer' && typeof window.ammTablesManager.refreshOfferDropdownBalanceDisplay === 'function') {
+          window.ammTablesManager.refreshOfferDropdownBalanceDisplay();
+        } else if (currentModalType === 'bid' && typeof window.ammTablesManager.refreshBidDropdownBalanceDisplay === 'function') {
+          window.ammTablesManager.refreshBidDropdownBalanceDisplay();
+        }
+      }
+    }
+
+    function updateOfferDropdownBalances(balanceData) {
+      updateAmmDropdownBalances(balanceData);
+    }
+
+    function updateBidDropdownBalances(balanceData) {
+      updateAmmDropdownBalances(balanceData);
+    }
+
+    function updateOfferCustomDropdownDisplay(select, balanceMap, pendingMap) {
+      console.log(`[DEBUG] updateOfferCustomDropdownDisplay called for ${select.id} - doing nothing`);
+
+    }
+
+    function updateBidCustomDropdownDisplay(select, balanceMap, pendingMap) {
+      console.log(`[DEBUG] updateBidCustomDropdownDisplay called for ${select.id} - doing nothing`);
+
+    }
+
+    function updateCustomDropdownDisplay(select, balanceMap, pendingMap) {
+      console.log(`[DEBUG] updateCustomDropdownDisplay called for ${select.id} - doing nothing`);
+
+    }
+
+    setupWebSocketBalanceUpdates();
+
+    function cleanupAmmBalanceUpdates() {
+      if (window.ammBalanceHandlerId && window.WebSocketManager) {
+        window.WebSocketManager.removeMessageHandler('message', window.ammBalanceHandlerId);
+
+      }
+
+      if (window.ammPeriodicRefresh) {
+        clearInterval(window.ammPeriodicRefresh);
+        window.ammPeriodicRefresh = null;
+
+      }
+
+
+      if (window.ammDropdowns) {
+        window.ammDropdowns.forEach(dropdown => {
+          if (dropdown.parentNode) {
+            dropdown.parentNode.removeChild(dropdown);
+          }
+        });
+        window.ammDropdowns = [];
+      }
+
+      clearTimeout(window.ammBalanceUpdateTimeout);
+      clearTimeout(window.ammSwapEventTimeout);
+    }
+
+    if (window.CleanupManager) {
+      window.CleanupManager.registerResource('ammBalanceUpdates', null, cleanupAmmBalanceUpdates);
+    }
+
+    window.addEventListener('beforeunload', cleanupAmmBalanceUpdates);
+    window.setAmmAmount = setAmmAmount;
   </script>
 
 {% include 'footer.html' %}

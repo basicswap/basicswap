@@ -13,7 +13,7 @@
               <span class="inline-block align-middle">
               <img class="mr-2 h-16" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"></span>({{ w.ticker }}) {{ w.name }} Wallet </h2>
           </div>
-          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"> <a class="rounded-full mr-5 flex flex-wrap justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border dark:bg-gray-500 dark:hover:bg-gray-700 border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="refresh" href="/wallet/{{ w.ticker }}"> {{ circular_arrows_svg | safe }}<span>Refresh</span> </a> </div>
+          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"></div>
         </div>
       </div>
     </div>
@@ -667,16 +667,7 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
  var floatBalance;
  var calculatedAmount;
 
- console.log('SetAmount Called with:', {
-  percent: percent,
-  balance: balance,
-  cid: cid,
-  blindBalance: blindBalance,
-  anonBalance: anonBalance,
-  selectedType: selectedType,
-  blindBalanceType: typeof blindBalance,
-  blindBalanceNumeric: Number(blindBalance)
- });
+
 
  const safeParseFloat = (value) => {
   const numValue = Number(value);
@@ -706,11 +697,7 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
 
  calculatedAmount = Math.max(0, Math.floor(floatBalance * percent * 100000000) / 100000000);
  
- console.log('Calculated Amount:', {
-  floatBalance: floatBalance,
-  calculatedAmount: calculatedAmount,
-  percent: percent
- });
+
 
  if (percent === 1) {
   calculatedAmount = floatBalance;
@@ -727,43 +714,6 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
  if (subfeeCheckbox) {
   subfeeCheckbox.checked = (percent === 1);
  }
-
- console.log('Final Amount Set:', amountInput.value);
-}function setAmount(percent, balance, cid, blindBalance, anonBalance) {
- var amountInput = document.getElementById('amount');
- var typeSelect = document.getElementById('withdraw_type');
- var selectedType = typeSelect.value;
- var floatBalance;
- var calculatedAmount;
-
- switch(selectedType) {
-  case 'plain':
-   floatBalance = parseFloat(balance);
-   break;
-  case 'blind':
-   floatBalance = parseFloat(blindBalance);
-   break;
-  case 'anon':
-   floatBalance = parseFloat(anonBalance);
-   break;
-  default:
-   floatBalance = parseFloat(balance);
-   break;
- }
-
- calculatedAmount = Math.floor(floatBalance * percent * 100000000) / 100000000;
-
- if (percent === 1) {
-  calculatedAmount = floatBalance;
- }
-
- amountInput.value = calculatedAmount.toFixed(8);
-
- var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
- if (subfeeCheckbox) {
-  subfeeCheckbox.checked = (percent === 1);
- }
-
 }
 </script>
 
@@ -818,17 +768,14 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
 
   const specialCids = [6, 9];
 
-  console.log("CID:", cid);
-  console.log("Percent:", percent);
-  console.log("Balance:", balance);
-  console.log("Calculated Amount:", calculatedAmount);
+
 
   if (specialCids.includes(parseInt(cid)) && percent === 1) {
    amountInput.setAttribute('data-hidden', 'true');
    amountInput.placeholder = 'Sweep All';
    amountInput.value = '';
    amountInput.disabled = true;
-   console.log("Sweep All activated for special CID:", cid);
+
   } else {
    amountInput.value = calculatedAmount.toFixed(8);
    amountInput.setAttribute('data-hidden', 'false');
@@ -840,17 +787,15 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
   if (sweepAllCheckbox) {
    if (specialCids.includes(parseInt(cid)) && percent === 1) {
     sweepAllCheckbox.checked = true;
-    console.log("Sweep All checkbox checked");
    } else {
     sweepAllCheckbox.checked = false;
-    console.log("Sweep All checkbox unchecked");
    }
   }
 
   let subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
   if (subfeeCheckbox) {
    subfeeCheckbox.checked = (percent === 1);
-   console.log("Subfee checkbox status for CID", cid, ":", subfeeCheckbox.checked);
+
   }
  }
 </script>
@@ -1148,6 +1093,336 @@ function confirmUTXOResize() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+
+  if (window.WebSocketManager && typeof window.WebSocketManager.initialize === 'function') {
+    window.WebSocketManager.initialize();
+  }
+
+  function updateWalletBalances() {
+    fetch('/json/walletbalances', {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then(balanceData => {
+        if (balanceData.error) {
+          throw new Error(balanceData.error);
+        }
+
+        if (!Array.isArray(balanceData)) {
+          throw new Error('Invalid response format');
+        }
+
+
+        balanceData.forEach(coin => {
+          updateWalletDisplay(coin);
+        });
+
+
+        setTimeout(() => {
+          if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
+            window.WalletManager.updatePrices(true);
+          }
+
+        }, 100);
+      })
+      .catch(error => {
+        console.error('[Wallet] Error updating wallet balances:', error);
+      });
+  }
+
+  function updateWalletDisplay(coinData) {
+
+    if (coinData.name === 'Particl') {
+
+      updateSpecificBalance('Particl', 'Balance:', coinData.balance, coinData.ticker || 'PART');
+    } else if (coinData.name === 'Particl Anon') {
+
+      updateSpecificBalance('Particl', 'Anon Balance:', coinData.balance, coinData.ticker || 'PART');
+
+      removePendingBalance('Particl', 'Anon Balance:');
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingBalance('Particl', 'Anon Balance:', coinData.pending, coinData.ticker || 'PART', 'Pending:', coinData);
+      }
+    } else if (coinData.name === 'Particl Blind') {
+
+      updateSpecificBalance('Particl', 'Blind Balance:', coinData.balance, coinData.ticker || 'PART');
+
+      removePendingBalance('Particl', 'Blind Balance:');
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingBalance('Particl', 'Blind Balance:', coinData.pending, coinData.ticker || 'PART', 'Unconfirmed:', coinData);
+      }
+    } else if (coinData.name === 'Litecoin') {
+
+      updateSpecificBalance('Litecoin', 'Balance:', coinData.balance, coinData.ticker || 'LTC');
+
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingDisplay(coinData);
+      } else {
+        removePendingDisplay(coinData.name);
+      }
+    } else if (coinData.name === 'Litecoin MWEB') {
+
+      updateSpecificBalance('Litecoin', 'MWEB Balance:', coinData.balance, coinData.ticker || 'LTC');
+
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingBalance('Litecoin', 'MWEB Balance:', coinData.pending, coinData.ticker || 'LTC', 'Pending:', coinData);
+      }
+    } else {
+
+      updateSpecificBalance(coinData.name, 'Balance:', coinData.balance, coinData.ticker || coinData.name);
+
+
+      if (coinData.pending && parseFloat(coinData.pending) > 0) {
+        updatePendingDisplay(coinData);
+      } else {
+        removePendingDisplay(coinData.name);
+      }
+    }
+  }
+
+  function updateSpecificBalance(coinName, labelText, balance, ticker, isPending = false) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+    let found = false;
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinName) {
+        const parentRow = element.closest('tr');
+        if (parentRow) {
+          const labelCell = parentRow.querySelector('td:first-child');
+          if (labelCell) {
+            const currentLabel = labelCell.textContent.trim();
+
+            if (currentLabel.includes(labelText)) {
+              if (isPending) {
+                element.textContent = `+${balance} ${ticker}`;
+              } else {
+                element.textContent = `${balance} ${ticker}`;
+              }
+
+
+              setTimeout(() => {
+                if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
+                  window.WalletManager.updatePrices(false);
+                }
+              }, 50);
+
+              found = true;
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function updatePendingDisplay(coinData) {
+
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinData.name) {
+        const parentRow = element.closest('tr');
+        if (parentRow) {
+          const labelCell = parentRow.querySelector('td:first-child');
+          if (labelCell && labelCell.textContent.includes('Balance:')) {
+
+            const balanceCell = parentRow.querySelector('td:nth-child(2)');
+            if (balanceCell) {
+              let pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
+
+              if (coinData.pending && parseFloat(coinData.pending) > 0) {
+                if (!pendingSpan) {
+
+                  pendingSpan = document.createElement('span');
+                  pendingSpan.className = 'inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500';
+                  balanceCell.appendChild(document.createTextNode(' '));
+                  balanceCell.appendChild(pendingSpan);
+                }
+
+                const ticker = coinData.ticker || coinData.name;
+
+                pendingSpan.textContent = `Pending: +${coinData.pending} ${ticker}`;
+              } else {
+
+                if (pendingSpan) {
+                  pendingSpan.remove();
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function removePendingDisplay(coinName) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinName) {
+        const parentRow = element.closest('tr');
+        if (parentRow) {
+          const balanceCell = parentRow.querySelector('td:nth-child(2)');
+          if (balanceCell) {
+            const pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
+            if (pendingSpan) {
+              pendingSpan.remove();
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function updatePendingBalance(coinName, balanceType, pendingAmount, ticker, pendingLabel, coinData) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinName) {
+        const parentRow = element.closest('tr');
+        if (parentRow) {
+          const labelCell = parentRow.querySelector('td:first-child');
+          if (labelCell && labelCell.textContent.includes(balanceType)) {
+
+            const balanceCell = parentRow.querySelector('td:nth-child(2)');
+            if (balanceCell) {
+              let pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
+
+              if (pendingAmount && parseFloat(pendingAmount) > 0) {
+                if (!pendingSpan) {
+
+                  pendingSpan = document.createElement('span');
+                  pendingSpan.className = 'inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500';
+                  balanceCell.appendChild(document.createTextNode(' '));
+                  balanceCell.appendChild(pendingSpan);
+                }
+
+
+                pendingSpan.textContent = `${pendingLabel} +${pendingAmount} ${ticker}`;
+              } else if (pendingSpan) {
+
+                pendingSpan.remove();
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function removePendingBalance(coinName, balanceType) {
+    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+
+    balanceElements.forEach(element => {
+      const elementCoinName = element.getAttribute('data-coinname');
+
+      if (elementCoinName === coinName) {
+        const parentRow = element.closest('tr');
+        if (parentRow) {
+          const labelCell = parentRow.querySelector('td:first-child');
+          if (labelCell && labelCell.textContent.includes(balanceType)) {
+
+            const balanceCell = parentRow.querySelector('td:nth-child(2)');
+            if (balanceCell) {
+              const pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
+              if (pendingSpan) {
+                pendingSpan.remove();
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function setupWalletWebSocketUpdates() {
+    if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
+
+      const currentWalletTicker = window.location.pathname.split('/')[2]?.toUpperCase();
+
+
+      const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
+
+        if (data && data.event) {
+
+          if (data.event === 'coin_balance_updated') {
+            clearTimeout(window.walletBalanceUpdateTimeout);
+            window.walletBalanceUpdateTimeout = setTimeout(() => {
+              updateWalletBalances();
+            }, 2000);
+          }
+
+          if (data.event === 'price_updated' || data.event === 'prices_updated') {
+
+            clearTimeout(window.walletPriceUpdateTimeout);
+            window.walletPriceUpdateTimeout = setTimeout(() => {
+              if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
+
+                window.WalletManager.updatePrices(true);
+              }
+
+            }, 500);
+          }
+
+
+          const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
+          if (swapEvents.includes(data.event)) {
+
+
+            clearTimeout(window.walletSwapEventTimeout);
+            window.walletSwapEventTimeout = setTimeout(() => {
+
+              updateWalletBalances();
+            }, 5000);
+          }
+        }
+      });
+
+      window.walletBalanceHandlerId = balanceHandlerId;
+    }
+  }
+
+  function cleanupWalletBalanceUpdates() {
+    if (window.walletBalanceHandlerId && window.WebSocketManager) {
+      window.WebSocketManager.removeMessageHandler('message', window.walletBalanceHandlerId);
+    }
+    clearTimeout(window.walletBalanceUpdateTimeout);
+    clearTimeout(window.walletSwapEventTimeout);
+    clearTimeout(window.walletPriceUpdateTimeout);
+    if (window.walletPeriodicRefresh) {
+      clearInterval(window.walletPeriodicRefresh);
+      window.walletPeriodicRefresh = null;
+    }
+
+  }
+
+  setupWalletWebSocketUpdates();
+
+  setTimeout(() => {
+    updateWalletBalances();
+  }, 1000);
+
+  window.walletPeriodicRefresh = setInterval(() => {
+    updateWalletBalances();
+  }, 300000);
+
+  window.addEventListener('beforeunload', cleanupWalletBalanceUpdates);
+
   document.getElementById('confirmYes').addEventListener('click', function() {
     if (typeof confirmCallback === 'function') {
       confirmCallback();

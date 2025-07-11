@@ -198,6 +198,25 @@ def threadPollXMRChainState(swap_client, coin_type):
                 )
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
+
+                if swap_client.ws_server:
+                    try:
+                        current_balance = ci.getSpendableBalance()
+                        cached_balance = cc.get("cached_balance", None)
+
+                        if cached_balance is None or current_balance != cached_balance:
+                            cc["cached_balance"] = current_balance
+                            balance_event = {
+                                "event": "coin_balance_updated",
+                                "coin": ci.ticker(),
+                                "height": new_height,
+                            }
+                            swap_client.ws_server.send_message_to_all(
+                                json.dumps(balance_event)
+                            )
+                    except Exception as e:
+                        cc["cached_balance"] = None
+
         except Exception as e:
             swap_client.log.warning(
                 f"threadPollXMRChainState {ci.ticker()}, error: {e}"
@@ -219,6 +238,25 @@ def threadPollWOWChainState(swap_client, coin_type):
                 )
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
+
+                if swap_client.ws_server:
+                    try:
+                        current_balance = ci.getSpendableBalance()
+                        cached_balance = cc.get("cached_balance", None)
+
+                        if cached_balance is None or current_balance != cached_balance:
+                            cc["cached_balance"] = current_balance
+                            balance_event = {
+                                "event": "coin_balance_updated",
+                                "coin": ci.ticker(),
+                                "height": new_height,
+                            }
+                            swap_client.ws_server.send_message_to_all(
+                                json.dumps(balance_event)
+                            )
+                    except Exception as e:
+                        cc["cached_balance"] = None
+
         except Exception as e:
             swap_client.log.warning(
                 f"threadPollWOWChainState {ci.ticker()}, error: {e}"
@@ -244,6 +282,25 @@ def threadPollChainState(swap_client, coin_type):
                     cc["chain_best_block"] = chain_state["bestblockhash"]
                     if "mediantime" in chain_state:
                         cc["chain_median_time"] = chain_state["mediantime"]
+
+                if swap_client.ws_server:
+                    try:
+                        current_balance = ci.getSpendableBalance()
+                        cached_balance = cc.get("cached_balance", None)
+
+                        if cached_balance is None or current_balance != cached_balance:
+                            cc["cached_balance"] = current_balance
+                            balance_event = {
+                                "event": "coin_balance_updated",
+                                "coin": ci.ticker(),
+                                "height": new_height,
+                            }
+                            swap_client.ws_server.send_message_to_all(
+                                json.dumps(balance_event)
+                            )
+                    except Exception as e:
+                        cc["cached_balance"] = None
+
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")
         swap_client.chainstate_delay_event.wait(

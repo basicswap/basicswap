@@ -44,6 +44,7 @@ const PriceManager = (function() {
 
             setTimeout(() => this.getPrices(), 1500);
             isInitialized = true;
+            console.log('PriceManager initialized');
             return this;
         },
 
@@ -59,7 +60,7 @@ const PriceManager = (function() {
                 return fetchPromise;
             }
 
-            //console.log('PriceManager: Fetching latest prices.');
+
             lastFetchTime = Date.now();
             fetchPromise = this.fetchPrices()
                 .then(prices => {
@@ -166,14 +167,14 @@ const PriceManager = (function() {
 
                 const cachedData = CacheManager.get(PRICES_CACHE_KEY);
                 if (cachedData) {
-                    console.log('Using cached price data');
+
                     return cachedData.value;
                 }
 
                 try {
                     const existingCache = localStorage.getItem(PRICES_CACHE_KEY);
                     if (existingCache) {
-                        console.log('Using localStorage cached price data');
+
                         return JSON.parse(existingCache).value;
                     }
                 } catch (e) {
@@ -230,4 +231,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-console.log('PriceManager initialized');
+

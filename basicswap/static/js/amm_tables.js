@@ -23,13 +23,7 @@ const AmmTablesManager = (function() {
     }
 
     function debugLog(message, data) {
-        // if (isDebugEnabled()) {
-        //     if (data) {
-        //         console.log(`[AmmTables] ${message}`, data);
-        //     } else {
-        //         console.log(`[AmmTables] ${message}`);
-        //     }
-        // }
+
     }
 
     function initializeTabs() {
@@ -309,7 +303,10 @@ const AmmTablesManager = (function() {
             `;
         });
 
-        offersBody.innerHTML = tableHtml;
+
+        if (offersBody.innerHTML.trim() !== tableHtml.trim()) {
+            offersBody.innerHTML = tableHtml;
+        }
     }
 
     function renderBidsTable(stateData) {
@@ -441,7 +438,10 @@ const AmmTablesManager = (function() {
             `;
         });
 
-        bidsBody.innerHTML = tableHtml;
+
+        if (bidsBody.innerHTML.trim() !== tableHtml.trim()) {
+            bidsBody.innerHTML = tableHtml;
+        }
     }
 
     function formatDuration(seconds) {
@@ -724,6 +724,429 @@ const AmmTablesManager = (function() {
         }
     }
 
+    function shouldDropdownOptionsShowBalance(select) {
+        const isMakerDropdown = select.id.includes('coin-from');
+        const isTakerDropdown = select.id.includes('coin-to');
+
+
+        const addModal = document.getElementById('add-amm-modal');
+        const editModal = document.getElementById('edit-amm-modal');
+        const addModalVisible = addModal && !addModal.classList.contains('hidden');
+        const editModalVisible = editModal && !editModal.classList.contains('hidden');
+
+        let isBidModal = false;
+        if (addModalVisible) {
+            const dataType = addModal.getAttribute('data-amm-type');
+            if (dataType) {
+                isBidModal = dataType === 'bid';
+            } else {
+
+                const modalTitle = document.getElementById('add-modal-title');
+                isBidModal = modalTitle && modalTitle.textContent && modalTitle.textContent.includes('Bid');
+            }
+        } else if (editModalVisible) {
+            const dataType = editModal.getAttribute('data-amm-type');
+            if (dataType) {
+                isBidModal = dataType === 'bid';
+            } else {
+
+                const modalTitle = document.getElementById('edit-modal-title');
+                isBidModal = modalTitle && modalTitle.textContent && modalTitle.textContent.includes('Bid');
+            }
+        }
+
+
+        const result = isBidModal ? isTakerDropdown : isMakerDropdown;
+
+        console.log(`[DEBUG] shouldDropdownOptionsShowBalance: ${select.id}, isBidModal=${isBidModal}, isMaker=${isMakerDropdown}, isTaker=${isTakerDropdown}, result=${result}`);
+
+        return result;
+    }
+
+    function refreshDropdownOptions() {
+        const dropdownIds = ['add-amm-coin-from', 'add-amm-coin-to', 'edit-amm-coin-from', 'edit-amm-coin-to'];
+
+        dropdownIds.forEach(dropdownId => {
+            const select = document.getElementById(dropdownId);
+            if (!select || select.style.display !== 'none') return;
+
+            const wrapper = select.parentNode.querySelector('.relative');
+            if (!wrapper) return;
+
+
+            const dropdown = wrapper.querySelector('[role="listbox"]');
+            if (!dropdown) return;
+
+
+            const options = dropdown.querySelectorAll('[data-value]');
+            options.forEach(optionElement => {
+                const coinValue = optionElement.getAttribute('data-value');
+                const originalOption = Array.from(select.options).find(opt => opt.value === coinValue);
+                if (!originalOption) return;
+
+
+                const textContainer = optionElement.querySelector('div.flex.flex-col, div.flex.items-center');
+                if (!textContainer) return;
+
+
+                textContainer.innerHTML = '';
+
+                const shouldShowBalance = shouldDropdownOptionsShowBalance(select);
+                const fullText = originalOption.textContent.trim();
+                const balance = originalOption.getAttribute('data-balance') || '0.00000000';
+
+                console.log(`[DEBUG] refreshDropdownOptions: ${select.id}, option=${coinValue}, shouldShowBalance=${shouldShowBalance}, balance=${balance}`);
+
+                if (shouldShowBalance) {
+
+                    textContainer.className = 'flex flex-col';
+
+                    const coinName = fullText.includes(' - Balance: ') ? fullText.split(' - Balance: ')[0] : fullText;
+
+                    const coinNameSpan = document.createElement('span');
+                    coinNameSpan.textContent = coinName;
+                    coinNameSpan.className = 'text-gray-900 dark:text-white';
+
+                    const balanceSpan = document.createElement('span');
+                    balanceSpan.textContent = `Balance: ${balance}`;
+                    balanceSpan.className = 'text-gray-500 dark:text-gray-400 text-xs';
+
+                    textContainer.appendChild(coinNameSpan);
+                    textContainer.appendChild(balanceSpan);
+                } else {
+
+                    textContainer.className = 'flex items-center';
+
+                    const coinNameSpan = document.createElement('span');
+                    const coinName = fullText.includes(' - Balance: ') ? fullText.split(' - Balance: ')[0] : fullText;
+                    coinNameSpan.textContent = coinName;
+                    coinNameSpan.className = 'text-gray-900 dark:text-white';
+
+                    textContainer.appendChild(coinNameSpan);
+                }
+            });
+        });
+    }
+
+
+    function refreshDropdownBalances() {
+        const dropdownIds = ['add-amm-coin-from', 'add-amm-coin-to', 'edit-amm-coin-from', 'edit-amm-coin-to'];
+
+        dropdownIds.forEach(dropdownId => {
+            const select = document.getElementById(dropdownId);
+            if (!select || select.style.display !== 'none') return;
+
+            const wrapper = select.parentNode.querySelector('.relative');
+            if (!wrapper) return;
+
+
+            const dropdownItems = wrapper.querySelectorAll('[data-value]');
+            dropdownItems.forEach(item => {
+                const value = item.getAttribute('data-value');
+                const option = select.querySelector(`option[value="${value}"]`);
+                if (option) {
+                    const balance = option.getAttribute('data-balance') || '0.00000000';
+                    const pendingBalance = option.getAttribute('data-pending-balance') || '';
+
+                    const balanceDiv = item.querySelector('.text-xs');
+                    if (balanceDiv) {
+                        balanceDiv.textContent = `Balance: ${balance}`;
+
+
+                        let pendingDiv = item.querySelector('.text-green-500');
+                        if (pendingBalance && parseFloat(pendingBalance) > 0) {
+                            if (!pendingDiv) {
+
+                                pendingDiv = document.createElement('div');
+                                pendingDiv.className = 'text-green-500 text-xs';
+                                balanceDiv.parentNode.appendChild(pendingDiv);
+                            }
+                            pendingDiv.textContent = `+${pendingBalance} pending`;
+                        } else if (pendingDiv) {
+
+                            pendingDiv.remove();
+                        }
+                    }
+                }
+            });
+
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption) {
+                const textContainer = wrapper.querySelector('button .flex-grow');
+                const balanceDiv = textContainer ? textContainer.querySelector('.text-xs') : null;
+                if (balanceDiv) {
+                    const balance = selectedOption.getAttribute('data-balance') || '0.00000000';
+                    const pendingBalance = selectedOption.getAttribute('data-pending-balance') || '';
+
+                    balanceDiv.textContent = `Balance: ${balance}`;
+
+
+                    let pendingDiv = textContainer.querySelector('.text-green-500');
+                    if (pendingBalance && parseFloat(pendingBalance) > 0) {
+                        if (!pendingDiv) {
+
+                            pendingDiv = document.createElement('div');
+                            pendingDiv.className = 'text-green-500 text-xs';
+                            textContainer.appendChild(pendingDiv);
+                        }
+                        pendingDiv.textContent = `+${pendingBalance} pending`;
+                    } else if (pendingDiv) {
+
+                        pendingDiv.remove();
+                    }
+                }
+            }
+        });
+    }
+
+    function refreshOfferDropdownBalanceDisplay() {
+        refreshDropdownBalances();
+    }
+
+    function refreshBidDropdownBalanceDisplay() {
+        refreshDropdownBalances();
+    }
+
+    function refreshDropdownBalanceDisplay(modalType = null) {
+        if (modalType === 'offer') {
+            refreshOfferDropdownBalanceDisplay();
+        } else if (modalType === 'bid') {
+            refreshBidDropdownBalanceDisplay();
+        } else {
+
+            const addModal = document.getElementById('add-amm-modal');
+            const editModal = document.getElementById('edit-amm-modal');
+            const addModalVisible = addModal && !addModal.classList.contains('hidden');
+            const editModalVisible = editModal && !editModal.classList.contains('hidden');
+
+            let detectedType = null;
+            if (addModalVisible) {
+                detectedType = addModal.getAttribute('data-amm-type');
+            } else if (editModalVisible) {
+                detectedType = editModal.getAttribute('data-amm-type');
+            }
+
+            if (detectedType === 'offer') {
+                refreshOfferDropdownBalanceDisplay();
+            } else if (detectedType === 'bid') {
+                refreshBidDropdownBalanceDisplay();
+            }
+        }
+    }
+
+    function updateDropdownsForModalType(modalPrefix) {
+        const coinFromSelect = document.getElementById(`${modalPrefix}-amm-coin-from`);
+        const coinToSelect = document.getElementById(`${modalPrefix}-amm-coin-to`);
+
+        if (!coinFromSelect || !coinToSelect) return;
+
+
+        const balanceData = {};
+
+
+        Array.from(coinFromSelect.options).forEach(option => {
+            const balance = option.getAttribute('data-balance');
+            if (balance) {
+                balanceData[option.value] = balance;
+            }
+        });
+
+
+        Array.from(coinToSelect.options).forEach(option => {
+            const balance = option.getAttribute('data-balance');
+            if (balance) {
+                balanceData[option.value] = balance;
+            }
+        });
+
+
+        updateDropdownOptions(coinFromSelect, balanceData);
+        updateDropdownOptions(coinToSelect, balanceData);
+    }
+
+    function updateDropdownOptions(select, balanceData, pendingData = {}) {
+        Array.from(select.options).forEach(option => {
+            const coinName = option.value;
+            const balance = balanceData[coinName] || '0.00000000';
+            const pending = pendingData[coinName] || '0.0';
+
+
+            option.setAttribute('data-balance', balance);
+            option.setAttribute('data-pending-balance', pending);
+
+
+            option.textContent = coinName;
+        });
+    }
+
+    function createSimpleDropdown(select, showBalance = false) {
+        if (!select) return;
+
+
+        const existingWrapper = select.parentNode.querySelector('.relative');
+        if (existingWrapper) {
+            existingWrapper.remove();
+            select.style.display = '';
+        }
+
+        select.style.display = 'none';
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'relative';
+
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'flex items-center justify-between w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white';
+        button.style.minHeight = '60px';
+
+
+        const displayContent = document.createElement('div');
+        displayContent.className = 'flex items-center';
+
+        const icon = document.createElement('img');
+        icon.className = 'w-5 h-5 mr-2';
+        icon.alt = '';
+
+        const textContainer = document.createElement('div');
+        textContainer.className = 'flex-grow text-left';
+
+        const arrow = document.createElement('div');
+        arrow.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
+
+        displayContent.appendChild(icon);
+        displayContent.appendChild(textContainer);
+        button.appendChild(displayContent);
+        button.appendChild(arrow);
+
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden dark:bg-gray-700 dark:border-gray-600 max-h-60 overflow-y-auto';
+
+
+        Array.from(select.options).forEach(option => {
+            const item = document.createElement('div');
+            item.className = 'flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer';
+            item.setAttribute('data-value', option.value);
+
+            const itemIcon = document.createElement('img');
+            itemIcon.className = 'w-5 h-5 mr-2';
+            itemIcon.src = `/static/images/coins/${getImageFilename(option.value)}`;
+            itemIcon.alt = '';
+
+            const itemText = document.createElement('div');
+            const coinName = option.textContent.trim();
+            const balance = option.getAttribute('data-balance') || '0.00000000';
+            const pendingBalance = option.getAttribute('data-pending-balance') || '';
+
+            if (showBalance) {
+                itemText.className = 'flex flex-col';
+
+                let html = `
+                    <div class="text-gray-900 dark:text-white">${coinName}</div>
+                    <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${balance}</div>
+                `;
+
+
+                if (pendingBalance && parseFloat(pendingBalance) > 0) {
+                    html += `<div class="text-green-500 text-xs">+${pendingBalance} pending</div>`;
+                }
+
+                itemText.innerHTML = html;
+            } else {
+                itemText.className = 'text-gray-900 dark:text-white';
+                itemText.textContent = coinName;
+            }
+
+            item.appendChild(itemIcon);
+            item.appendChild(itemText);
+
+
+            item.addEventListener('click', function() {
+                select.value = this.getAttribute('data-value');
+
+
+                const selectedOption = select.options[select.selectedIndex];
+                const selectedCoinName = selectedOption.textContent.trim();
+                const selectedBalance = selectedOption.getAttribute('data-balance') || '0.00000000';
+                const selectedPendingBalance = selectedOption.getAttribute('data-pending-balance') || '';
+
+                icon.src = itemIcon.src;
+
+                if (showBalance) {
+                    let html = `
+                        <div class="text-gray-900 dark:text-white">${selectedCoinName}</div>
+                        <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${selectedBalance}</div>
+                    `;
+
+
+                    if (selectedPendingBalance && parseFloat(selectedPendingBalance) > 0) {
+                        html += `<div class="text-green-500 text-xs">+${selectedPendingBalance} pending</div>`;
+                    }
+
+                    textContainer.innerHTML = html;
+                    textContainer.className = 'flex-grow text-left flex flex-col justify-center';
+                } else {
+                    textContainer.textContent = selectedCoinName;
+                    textContainer.className = 'flex-grow text-left';
+                }
+
+                dropdown.classList.add('hidden');
+
+
+                const event = new Event('change', { bubbles: true });
+                select.dispatchEvent(event);
+            });
+
+            dropdown.appendChild(item);
+        });
+
+
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption) {
+            const selectedCoinName = selectedOption.textContent.trim();
+            const selectedBalance = selectedOption.getAttribute('data-balance') || '0.00000000';
+            const selectedPendingBalance = selectedOption.getAttribute('data-pending-balance') || '';
+
+            icon.src = `/static/images/coins/${getImageFilename(selectedOption.value)}`;
+
+            if (showBalance) {
+                let html = `
+                    <div class="text-gray-900 dark:text-white">${selectedCoinName}</div>
+                    <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${selectedBalance}</div>
+                `;
+
+
+                if (selectedPendingBalance && parseFloat(selectedPendingBalance) > 0) {
+                    html += `<div class="text-green-500 text-xs">+${selectedPendingBalance} pending</div>`;
+                }
+
+                textContainer.innerHTML = html;
+                textContainer.className = 'flex-grow text-left flex flex-col justify-center';
+            } else {
+                textContainer.textContent = selectedCoinName;
+                textContainer.className = 'flex-grow text-left';
+            }
+        }
+
+
+        button.addEventListener('click', function() {
+            dropdown.classList.toggle('hidden');
+        });
+
+
+        document.addEventListener('click', function(e) {
+            if (!wrapper.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+
+        wrapper.appendChild(button);
+        wrapper.appendChild(dropdown);
+        select.parentNode.insertBefore(wrapper, select);
+
+    }
+
     function setupButtonHandlers() {
         const addOfferButton = document.getElementById('add-new-offer-btn');
         if (addOfferButton) {
@@ -844,6 +1267,40 @@ const AmmTablesManager = (function() {
             modalTitle.textContent = `Add New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
         }
 
+
+        const modal = document.getElementById('add-amm-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+
+            modal.setAttribute('data-amm-type', type);
+        }
+
+
+        setTimeout(() => {
+
+            updateDropdownsForModalType('add');
+
+            initializeCustomSelects(type);
+
+
+            refreshDropdownBalanceDisplay(type);
+
+
+            if (typeof fetchBalanceData === 'function') {
+                fetchBalanceData()
+                    .then(balanceData => {
+                        if (type === 'offer' && typeof updateOfferDropdownBalances === 'function') {
+                            updateOfferDropdownBalances(balanceData);
+                        } else if (type === 'bid' && typeof updateBidDropdownBalances === 'function') {
+                            updateBidDropdownBalances(balanceData);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error updating dropdown balances:', error);
+                    });
+            }
+        }, 50);
+
         document.getElementById('add-amm-type').value = type;
 
         document.getElementById('add-amm-name').value = 'Unnamed Offer';
@@ -939,11 +1396,6 @@ const AmmTablesManager = (function() {
 
         if (type === 'offer') {
             setupBiddingControls('add');
-        }
-
-        const modal = document.getElementById('add-amm-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
         }
     }
 
@@ -1269,6 +1721,40 @@ const AmmTablesManager = (function() {
                 modalTitle.textContent = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
             }
 
+
+            const modal = document.getElementById('edit-amm-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+
+                modal.setAttribute('data-amm-type', type);
+            }
+
+
+            setTimeout(() => {
+
+                updateDropdownsForModalType('edit');
+
+                initializeCustomSelects(type);
+
+
+                refreshDropdownBalanceDisplay(type);
+
+
+                if (typeof fetchBalanceData === 'function') {
+                    fetchBalanceData()
+                        .then(balanceData => {
+                            if (type === 'offer' && typeof updateOfferDropdownBalances === 'function') {
+                                updateOfferDropdownBalances(balanceData);
+                            } else if (type === 'bid' && typeof updateBidDropdownBalances === 'function') {
+                                updateBidDropdownBalances(balanceData);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error updating dropdown balances:', error);
+                        });
+                }
+            }, 50);
+
             document.getElementById('edit-amm-type').value = type;
             document.getElementById('edit-amm-id').value = id || '';
             document.getElementById('edit-amm-original-name').value = name;
@@ -1282,8 +1768,12 @@ const AmmTablesManager = (function() {
             coinFromSelect.value = item.coin_from || '';
             coinToSelect.value = item.coin_to || '';
 
-            coinFromSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            coinToSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            if (coinFromSelect) {
+                coinFromSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (coinToSelect) {
+                coinToSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
 
             document.getElementById('edit-amm-amount').value = item.amount || '';
 
@@ -1369,11 +1859,6 @@ const AmmTablesManager = (function() {
             if (type === 'offer') {
                 setupBiddingControls('edit');
                 populateBiddingControls('edit', item);
-            }
-
-            const modal = document.getElementById('edit-amm-modal');
-            if (modal) {
-                modal.classList.remove('hidden');
             }
         } catch (error) {
             alert(`Error processing the configuration: ${error.message}`);
@@ -1808,7 +2293,7 @@ const AmmTablesManager = (function() {
         }
     }
 
-    function initializeCustomSelects() {
+    function initializeCustomSelects(modalType = null) {
         const coinSelects = [
             document.getElementById('add-amm-coin-from'),
             document.getElementById('add-amm-coin-to'),
@@ -1821,115 +2306,15 @@ const AmmTablesManager = (function() {
             document.getElementById('edit-offer-swap-type')
         ];
 
-        function createCoinDropdown(select) {
-            if (!select) return;
 
-            const wrapper = document.createElement('div');
-            wrapper.className = 'relative';
-
-            const display = document.createElement('div');
-            display.className = 'flex items-center w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white cursor-pointer';
-
-            const icon = document.createElement('img');
-            icon.className = 'w-5 h-5 mr-2';
-            icon.alt = '';
-
-            const text = document.createElement('span');
-            text.className = 'flex-grow';
-
-            const arrow = document.createElement('span');
-            arrow.className = 'ml-2';
-            arrow.innerHTML = `
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                </svg>
-            `;
-
-            display.appendChild(icon);
-            display.appendChild(text);
-            display.appendChild(arrow);
-
-            const dropdown = document.createElement('div');
-            dropdown.className = 'absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden dark:bg-gray-700 dark:border-gray-600 max-h-60 overflow-y-auto';
-
-            Array.from(select.options).forEach(option => {
-                const item = document.createElement('div');
-                item.className = 'flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-gray-900 dark:text-white';
-                item.setAttribute('data-value', option.value);
-                item.setAttribute('data-symbol', option.getAttribute('data-symbol') || '');
-
-                const optionIcon = document.createElement('img');
-                optionIcon.className = 'w-5 h-5 mr-2';
-                optionIcon.src = `/static/images/coins/${getImageFilename(option.value)}`;
-                optionIcon.alt = '';
-
-                const optionText = document.createElement('span');
-                optionText.textContent = option.textContent.trim();
-
-                item.appendChild(optionIcon);
-                item.appendChild(optionText);
-
-                item.addEventListener('click', function() {
-                    select.value = this.getAttribute('data-value');
-
-                    text.textContent = optionText.textContent;
-                    icon.src = optionIcon.src;
-
-                    dropdown.classList.add('hidden');
-
-                    const event = new Event('change', { bubbles: true });
-                    select.dispatchEvent(event);
-
-                    if (select.id === 'add-amm-coin-from' || select.id === 'add-amm-coin-to') {
-                        const coinFrom = document.getElementById('add-amm-coin-from');
-                        const coinTo = document.getElementById('add-amm-coin-to');
-                        const swapType = document.getElementById('add-offer-swap-type');
-
-                        if (coinFrom && coinTo && swapType) {
-                            updateSwapTypeOptions(coinFrom.value, coinTo.value, swapType);
-                        }
-                    } else if (select.id === 'edit-amm-coin-from' || select.id === 'edit-amm-coin-to') {
-                        const coinFrom = document.getElementById('edit-amm-coin-from');
-                        const coinTo = document.getElementById('edit-amm-coin-to');
-                        const swapType = document.getElementById('edit-offer-swap-type');
-
-                        if (coinFrom && coinTo && swapType) {
-                            updateSwapTypeOptions(coinFrom.value, coinTo.value, swapType);
-                        }
-                    }
-                });
-
-                dropdown.appendChild(item);
-            });
-
-            const selectedOption = select.options[select.selectedIndex];
-            text.textContent = selectedOption.textContent.trim();
-            icon.src = `/static/images/coins/${getImageFilename(selectedOption.value)}`;
-
-            display.addEventListener('click', function(e) {
-                e.stopPropagation();
-                dropdown.classList.toggle('hidden');
-            });
-
-            document.addEventListener('click', function() {
-                dropdown.classList.add('hidden');
-            });
-
-            wrapper.appendChild(display);
-            wrapper.appendChild(dropdown);
-            select.parentNode.insertBefore(wrapper, select);
-
-            select.style.display = 'none';
-
-            select.addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                text.textContent = selectedOption.textContent.trim();
-                icon.src = `/static/images/coins/${getImageFilename(selectedOption.value)}`;
-            });
-        }
 
         function createSwapTypeDropdown(select) {
             if (!select) return;
+
+
+            if (select.style.display === 'none' && select.parentNode.querySelector('.relative')) {
+                return; // Custom dropdown already exists
+            }
 
             const wrapper = document.createElement('div');
             wrapper.className = 'relative';
@@ -1980,7 +2365,9 @@ const AmmTablesManager = (function() {
             });
 
             const selectedOption = select.options[select.selectedIndex];
-            text.textContent = selectedOption.getAttribute('data-desc') || selectedOption.textContent.trim();
+            if (selectedOption) {
+                text.textContent = selectedOption.getAttribute('data-desc') || selectedOption.textContent.trim();
+            }
 
             display.addEventListener('click', function(e) {
                 if (select.disabled) return;
@@ -2000,7 +2387,9 @@ const AmmTablesManager = (function() {
 
             select.addEventListener('change', function() {
                 const selectedOption = this.options[this.selectedIndex];
-                text.textContent = selectedOption.getAttribute('data-desc') || selectedOption.textContent.trim();
+                if (selectedOption) {
+                    text.textContent = selectedOption.getAttribute('data-desc') || selectedOption.textContent.trim();
+                }
             });
 
             const observer = new MutationObserver(function(mutations) {
@@ -2022,7 +2411,18 @@ const AmmTablesManager = (function() {
             }
         }
 
-        coinSelects.forEach(select => createCoinDropdown(select));
+        coinSelects.forEach(select => {
+            if (!select) return;
+
+            let showBalance = false;
+            if (modalType === 'offer' && select.id.includes('coin-from')) {
+                showBalance = true; // OFFER: maker shows balance
+            } else if (modalType === 'bid' && select.id.includes('coin-to')) {
+                showBalance = true; // BID: taker shows balance
+            }
+
+            createSimpleDropdown(select, showBalance);
+        });
 
         swapTypeSelects.forEach(select => createSwapTypeDropdown(select));
     }
@@ -2301,19 +2701,27 @@ const AmmTablesManager = (function() {
 
         if (refreshButton) {
             refreshButton.addEventListener('click', async function() {
+
+                if (refreshButton.disabled) return;
+
                 const icon = refreshButton.querySelector('svg');
+                refreshButton.disabled = true;
+
                 if (icon) {
                     icon.classList.add('animate-spin');
                 }
 
-                await initializePrices();
-                updateTables();
-
-                setTimeout(() => {
-                    if (icon) {
-                        icon.classList.remove('animate-spin');
-                    }
-                }, 1000);
+                try {
+                    await initializePrices();
+                    updateTables();
+                } finally {
+                    setTimeout(() => {
+                        if (icon) {
+                            icon.classList.remove('animate-spin');
+                        }
+                        refreshButton.disabled = false;
+                    }, 500); // Reduced from 1000ms to 500ms
+                }
             });
         }
 
@@ -2326,7 +2734,11 @@ const AmmTablesManager = (function() {
         return {
             updateTables,
             startRefreshTimer,
-            stopRefreshTimer
+            stopRefreshTimer,
+            refreshDropdownBalanceDisplay,
+            refreshOfferDropdownBalanceDisplay,
+            refreshBidDropdownBalanceDisplay,
+            refreshDropdownOptions
         };
     }
 

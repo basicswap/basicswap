@@ -659,6 +659,76 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
     return coins
 
 
+def listAvailableCoinsWithBalances(swap_client, with_variants=True, split_from=False):
+    swap_client.updateWalletsInfo()
+    wallets = swap_client.getCachedWalletsInfo()
+
+    coins_from = []
+    coins = []
+
+    for k, v in swap_client.coin_clients.items():
+        if k not in chainparams:
+            continue
+        if v["connection_type"] == "rpc":
+
+            balance = "0.0"
+            if k in wallets:
+                w = wallets[k]
+                if "balance" in w and "error" not in w and "no_data" not in w:
+                    balance = w["balance"]
+
+            coin_entry = (int(k), getCoinName(k), balance)
+            coins.append(coin_entry)
+            if split_from:
+                coins_from.append(coin_entry)
+
+            if with_variants and k == Coins.PART:
+
+                for variant in (Coins.PART_ANON, Coins.PART_BLIND):
+                    variant_balance = "0.0"
+                    if k in wallets:
+                        w = wallets[k]
+                        if "error" not in w and "no_data" not in w:
+                            if variant == Coins.PART_ANON and "anon_balance" in w:
+                                variant_balance = w["anon_balance"]
+                            elif variant == Coins.PART_BLIND and "blind_balance" in w:
+                                variant_balance = w["blind_balance"]
+
+                    variant_entry = (
+                        int(variant),
+                        getCoinName(variant),
+                        variant_balance,
+                    )
+                    coins.append(variant_entry)
+                    if split_from:
+                        coins_from.append(variant_entry)
+
+            if with_variants and k == Coins.LTC:
+
+                for variant in (Coins.LTC_MWEB,):
+                    variant_balance = "0.0"
+                    if k in wallets:
+                        w = wallets[k]
+                        if (
+                            "error" not in w
+                            and "no_data" not in w
+                            and "mweb_balance" in w
+                        ):
+                            variant_balance = w["mweb_balance"]
+
+                    variant_entry = (
+                        int(variant),
+                        getCoinName(variant),
+                        variant_balance,
+                    )
+
+                    pass
+
+    if split_from:
+        return coins_from, coins
+    return coins
+
+
 def checkAddressesOwned(swap_client, ci, wallet_info):
     if "stealth_address" in wallet_info:
 

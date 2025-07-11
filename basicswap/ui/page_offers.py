@@ -16,6 +16,7 @@ from .util import (
     have_data_entry,
     inputAmount,
     listAvailableCoins,
+    listAvailableCoinsWithBalances,
     PAGE_LIMIT,
     setCoinFilter,
     set_pagination_filters,
@@ -526,7 +527,7 @@ def page_newoffer(self, url_split, post_string):
     if swap_client.debug_ui:
         messages.append("Debug mode active.")
 
-    coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
+    coins_from, coins_to = listAvailableCoinsWithBalances(swap_client, split_from=True)
 
     addrs_from_raw = swap_client.listSMSGAddresses("offer_send_from")
     addrs_to_raw = swap_client.listSMSGAddresses("offer_send_to")
