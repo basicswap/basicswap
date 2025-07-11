@@ -214,7 +214,7 @@ def threadPollXMRChainState(swap_client, coin_type):
                             swap_client.ws_server.send_message_to_all(
                                 json.dumps(balance_event)
                             )
-                    except Exception as e:
+                    except Exception:
                         cc["cached_balance"] = None
 
         except Exception as e:
@@ -254,7 +254,7 @@ def threadPollWOWChainState(swap_client, coin_type):
                             swap_client.ws_server.send_message_to_all(
                                 json.dumps(balance_event)
                             )
-                    except Exception as e:
+                    except Exception:
                         cc["cached_balance"] = None
 
         except Exception as e:
@@ -298,7 +298,7 @@ def threadPollChainState(swap_client, coin_type):
                             swap_client.ws_server.send_message_to_all(
                                 json.dumps(balance_event)
                             )
-                    except Exception as e:
+                    except Exception:
                         cc["cached_balance"] = None
 
         except Exception as e:
