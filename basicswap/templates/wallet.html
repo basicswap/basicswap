@@ -1159,15 +1159,6 @@ document.addEventListener('DOMContentLoaded', function() {
       if (coinData.pending && parseFloat(coinData.pending) > 0) {
         updatePendingBalance('Particl', 'Blind Balance:', coinData.pending, coinData.ticker || 'PART', 'Unconfirmed:', coinData);
       }
-    } else if (coinData.name === 'Litecoin') {
-
-      updateSpecificBalance('Litecoin', 'Balance:', coinData.balance, coinData.ticker || 'LTC');
-
-      if (coinData.pending && parseFloat(coinData.pending) > 0) {
-        updatePendingDisplay(coinData);
-      } else {
-        removePendingDisplay(coinData.name);
-      }
     } else if (coinData.name === 'Litecoin MWEB') {
 
       updateSpecificBalance('Litecoin', 'MWEB Balance:', coinData.balance, coinData.ticker || 'LTC');
