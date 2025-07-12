@@ -29,7 +29,7 @@ class WOWInterface(XMRInterface):
 
     @staticmethod
     def depth_spendable() -> int:
-        return 3
+        return 4
 
     # below only needed until wow is rebased to monero v0.18.4.0+
     def openWallet(self, filename):
