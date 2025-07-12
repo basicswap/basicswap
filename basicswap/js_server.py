@@ -141,7 +141,13 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                 if k in wallets:
                     w = wallets[k]
                     if "balance" in w and "error" not in w and "no_data" not in w:
-                        balance = w["balance"]
+                        raw_balance = w["balance"]
+                        if isinstance(raw_balance, float):
+                            balance = f"{raw_balance:.8f}".rstrip("0").rstrip(".")
+                        elif isinstance(raw_balance, int):
+                            balance = str(raw_balance)
+                        else:
+                            balance = raw_balance
 
                 pending = "0.0"
                 if k in wallets:
@@ -188,7 +194,15 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                             w = wallets[k]
                             if "error" not in w and "no_data" not in w:
                                 if variant_info["balance_field"] in w:
-                                    variant_balance = w[variant_info["balance_field"]]
+                                    raw_balance = w[variant_info["balance_field"]]
+                                    if isinstance(raw_balance, float):
+                                        variant_balance = f"{raw_balance:.8f}".rstrip(
+                                            "0"
+                                        ).rstrip(".")
+                                    elif isinstance(raw_balance, int):
+                                        variant_balance = str(raw_balance)
+                                    else:
+                                        variant_balance = raw_balance
 
                                 if (
                                     variant_info["pending_field"] in w
