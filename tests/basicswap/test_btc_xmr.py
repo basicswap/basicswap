@@ -72,6 +72,11 @@ class TestFunctions(BaseTest):
     node_b_id = 1
     node_c_id = 2
 
+    @classmethod
+    def prepareExtraCoins(cls):
+        for sc in cls.swap_clients:
+            sc._smsg_add_to_outbox = True
+
     def callnoderpc(self, method, params=[], wallet=None, node_id=0):
         return callnoderpc(node_id, method, params, wallet, self.base_rpc_port)
 
@@ -2280,7 +2285,7 @@ class TestBTC(BasicSwapTest):
 
         # Entire system is locked with Particl wallet
         jsw = read_json_api(1800, "wallets/btc")
-        assert "Coin must be unlocked" in jsw["error"]
+        assert "must be unlocked" in jsw["error"]
 
         read_json_api(1800, "unlock", {"coin": "part", "password": "notapassword123"})
 
@@ -2291,7 +2296,7 @@ class TestBTC(BasicSwapTest):
 
         read_json_api(1800, "lock", {"coin": "part"})
         jsw = read_json_api(1800, "wallets/part")
-        assert "Coin must be unlocked" in jsw["error"]
+        assert "must be unlocked" in jsw["error"]
 
         read_json_api(
             1800,

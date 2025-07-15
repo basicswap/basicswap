@@ -31,6 +31,7 @@ from .util import (
 )
 from .util.logging import (
     BSXLogger,
+    LogCategories as LC,
 )
 from .chainparams import (
     Coins,
@@ -43,7 +44,7 @@ def getaddrinfo_tor(*args):
 
 
 class BaseApp(DBMethods):
-    def __init__(self, data_dir, settings, chain, log_name="BasicSwap"):
+    def __init__(self, data_dir, settings, chain, log_name="BasicSwap", **kwargs):
         self.fp = None
         self.log_name = log_name
         self.fail_code = 0
@@ -72,6 +73,24 @@ class BaseApp(DBMethods):
         self.default_socket_timeout = socket.getdefaulttimeout()
         self.default_socket_getaddrinfo = socket.getaddrinfo
         self._force_db_upgrade = False
+
+        self._enabled_log_categories = set()
+        for category in self.settings.get("enabled_log_categories", []):
+            if category == "net":
+                self._enabled_log_categories.add(LC.NET)
+            else:
+                self.log.warning(f"Unknown entry \"{category}\" in \"enabled_log_categories\"")
+
+        if len(self._enabled_log_categories) > 0:
+            self.log.info("Enabled logging categories: {}".format(",".join(sorted([c.name for c in self._enabled_log_categories]))))
+
+        super().__init__(
+            data_dir=data_dir,
+            settings=settings,
+            chain=chain,
+            log_name=log_name,
+            **kwargs,
+        )
 
     def __del__(self):
         if self.fp:
@@ -236,10 +255,15 @@ class BaseApp(DBMethods):
         request = urllib.request.Request(url, headers=headers)
         return opener.open(request, timeout=timeout).read()
 
-    def logException(self, message) -> None:
+    def logException(self, message: str) -> None:
         self.log.error(message)
         if self.debug:
             self.log.error(traceback.format_exc())
+
+    def logD(self, log_category: int, message: str) -> None:
+        if log_category not in self._enabled_log_categories:
+            return
+        self.log.debug("(" + LC(log_category).name + ") " + message)
 
     def torControl(self, query):
         try:

@@ -6,6 +6,8 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import logging
+import random
+import string
 
 from basicswap.chainparams import Coins
 from basicswap.util.smsg import (
@@ -77,7 +79,6 @@ class Test(BaseTest):
         cls.network_thread = NetworkThread()
         cls.network_thread.network_event_loop.set_debug(True)
         cls.network_thread.start()
-        cls.network_thread.network_event_loop.set_debug(True)
 
     @classmethod
     def run_loop_ended(cls):
@@ -88,10 +89,6 @@ class Test(BaseTest):
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising Test")
-
-        # logging.info('Closing down network thread')
-        # cls.network_thread.close()
-
         super(Test, cls).tearDownClass()
 
     @classmethod
@@ -145,3 +142,72 @@ class Test(BaseTest):
         wait_for_smsg(ci0_part, msg_id.hex())
         rv = ci0_part.rpc_wallet("smsg", [msg_id.hex()])
         assert rv["text"] == message_test
+
+        ci1_part = swap_clients[1].ci(Coins.PART)
+        rv = ci1_part.rpc("smsgimport", [encrypted_message.hex(), {"submitmsg": True}])
+        assert rv["msgid"] == msg_id.hex()
+
+    def test_02_plaintext_v2(self):
+        # Test SMSG plaintext version 2
+
+        ci0_part = self.swap_clients[0].ci(Coins.PART)
+
+        len_smsgaddresses_start = len(ci0_part.rpc("smsgaddresses"))
+
+        message_test: str = "Test message"
+        for i in range(2048):
+            message_test += random.choice(string.ascii_letters + string.digits)
+        message_test += "end."
+
+        test_key_recv: bytes = ci0_part.getNewRandomKey()
+        test_key_recv_wif: str = ci0_part.encodeKey(test_key_recv)
+        test_key_recv_pk: bytes = ci0_part.getPubkey(test_key_recv)
+        ci0_part.rpc("smsgimportprivkey", [test_key_recv_wif, "test key"])
+        ro = ci0_part.rpc("smsgoptions", ["set", "addReceivedPubkeys", False])
+        assert "addReceivedPubkeys = false" in str(ro)
+
+        test_addr_core = ci0_part.pubkey_to_address(ci0_part.getPubkey(test_key_recv))
+        test_key_send: bytes = ci0_part.getNewRandomKey()
+        test_pk_bsx = ci0_part.getPubkey(test_key_send)
+
+        logging.info("Test core to BSX")
+        options = {
+            "submitmsg": False,
+            "ttl_is_seconds": True,
+            "plaintext_format_version": 2,
+            "compression": 0,
+            "add_to_outbox": False,
+        }
+        ro = ci0_part.rpc(
+            "smsgsend",
+            [
+                test_addr_core,
+                test_pk_bsx.hex(),
+                message_test,
+                False,
+                self.swap_clients[0].SMSG_SECONDS_IN_HOUR,
+                False,
+                options,
+            ],
+        )
+        encrypted_message = bytes.fromhex(ro["msg"])
+        decrypted_message: bytes = smsgDecrypt(test_key_send, encrypted_message)
+        assert decrypted_message.decode("utf-8") == message_test
+
+        logging.info("Test BSX to core")
+        encrypted_message: bytes = smsgEncrypt(
+            test_key_send, test_key_recv_pk, message_test.encode("utf-8")
+        )
+        msg_id: bytes = smsgGetID(encrypted_message)
+
+        rv = ci0_part.rpc("smsgimport", [encrypted_message.hex(), {"submitmsg": True}])
+        assert rv["msgid"] == msg_id.hex()
+
+        options = {"pubkey_from": True}
+        rv = ci0_part.rpc("smsg", [msg_id.hex(), options])
+        assert rv["text"].endswith("end.")
+        assert rv["msgid"] == msg_id.hex()
+        assert "pubkey_from" in rv
+
+        smsgaddresses = ci0_part.rpc("smsgaddresses")
+        assert len(smsgaddresses) == len_smsgaddresses_start

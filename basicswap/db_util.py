@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2023-2024 The Basicswap Developers
+# Copyright (c) 2023-2025 The Basicswap Developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -26,97 +26,46 @@ def remove_expired_data(self, time_offset: int = 0):
         )
         for offer_row in offer_rows:
             num_offers += 1
+            offer_query_data = {
+                "type_ind": int(Concepts.OFFER),
+                "offer_id": offer_row[0],
+            }
             bid_rows = cursor.execute(
                 "SELECT bids.bid_id FROM bids WHERE bids.offer_id = :offer_id",
-                {"offer_id": offer_row[0]},
+                offer_query_data,
             )
             for bid_row in bid_rows:
                 num_bids += 1
-                cursor.execute(
+                bid_query_data = {"type_ind": int(Concepts.BID), "bid_id": bid_row[0]}
+                for query_str in [
                     "DELETE FROM transactions WHERE transactions.bid_id = :bid_id",
-                    {"bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM eventlog WHERE eventlog.linked_type = :type_ind AND eventlog.linked_id = :bid_id",
-                    {"type_ind": int(Concepts.BID), "bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM automationlinks WHERE automationlinks.linked_type = :type_ind AND automationlinks.linked_id = :bid_id",
-                    {"type_ind": int(Concepts.BID), "bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM prefunded_transactions WHERE prefunded_transactions.linked_type = :type_ind AND prefunded_transactions.linked_id = :bid_id",
-                    {"type_ind": int(Concepts.BID), "bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM history WHERE history.concept_type = :type_ind AND history.concept_id = :bid_id",
-                    {"type_ind": int(Concepts.BID), "bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM xmr_swaps WHERE xmr_swaps.bid_id = :bid_id",
-                    {"bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM actions WHERE actions.linked_id = :bid_id",
-                    {"bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM addresspool WHERE addresspool.bid_id = :bid_id",
-                    {"bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM xmr_split_data WHERE xmr_split_data.bid_id = :bid_id",
-                    {"bid_id": bid_row[0]},
-                )
-                cursor.execute(
                     "DELETE FROM bids WHERE bids.bid_id = :bid_id",
-                    {"bid_id": bid_row[0]},
-                )
-                cursor.execute(
-                    "DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :linked_id",
-                    {"type_ind": int(Concepts.BID), "linked_id": bid_row[0]},
-                )
-                cursor.execute(
-                    "DELETE FROM direct_message_route_links WHERE linked_type = :type_ind AND linked_id = :linked_id",
-                    {"type_ind": int(Concepts.BID), "linked_id": bid_row[0]},
-                )
-
-            cursor.execute(
+                    "DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :bid_id",
+                    "DELETE FROM direct_message_route_links WHERE linked_type = :type_ind AND linked_id = :bid_id",
+                    "DELETE FROM message_network_links WHERE linked_type = :type_ind AND linked_id = :bid_id",
+                ]:
+                    cursor.execute(query_str, bid_query_data)
+            for query_str in [
                 "DELETE FROM eventlog WHERE eventlog.linked_type = :type_ind AND eventlog.linked_id = :offer_id",
-                {"type_ind": int(Concepts.OFFER), "offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM automationlinks WHERE automationlinks.linked_type = :type_ind AND automationlinks.linked_id = :offer_id",
-                {"type_ind": int(Concepts.OFFER), "offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM prefunded_transactions WHERE prefunded_transactions.linked_type = :type_ind AND prefunded_transactions.linked_id = :offer_id",
-                {"type_ind": int(Concepts.OFFER), "offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM history WHERE history.concept_type = :type_ind AND history.concept_id = :offer_id",
-                {"type_ind": int(Concepts.OFFER), "offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM xmr_offers WHERE xmr_offers.offer_id = :offer_id",
-                {"offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM sentoffers WHERE sentoffers.offer_id = :offer_id",
-                {"offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM actions WHERE actions.linked_id = :offer_id",
-                {"offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM offers WHERE offers.offer_id = :offer_id",
-                {"offer_id": offer_row[0]},
-            )
-            cursor.execute(
                 "DELETE FROM message_links WHERE linked_type = :type_ind AND linked_id = :offer_id",
-                {"type_ind": int(Concepts.OFFER), "offer_id": offer_row[0]},
-            )
+                "DELETE FROM message_network_links WHERE linked_type = :type_ind AND linked_id = :offer_id",
+            ]:
+                cursor.execute(query_str, offer_query_data)
 
         if num_offers > 0 or num_bids > 0:
             self.log.info(

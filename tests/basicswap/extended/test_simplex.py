@@ -391,8 +391,8 @@ class TestSimplex(unittest.TestCase):
                 t.join()
 
 
-class Test(BaseTest):
-    __test__ = True
+class TestSimplex2(BaseTest):
+    __test__ = False
     start_ltc_nodes = False
     start_xmr_nodes = True
     group_link = None
@@ -452,7 +452,7 @@ class Test(BaseTest):
     @classmethod
     def tearDownClass(cls):
         logger.info("Finalising Test")
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
         stopDaemons(cls.daemons)
 
     @classmethod
@@ -468,6 +468,10 @@ class Test(BaseTest):
             },
         ]
 
+
+class Test(TestSimplex2):
+    __test__ = True
+
     def test_01_swap(self):
         logger.info("---------- Test adaptor sig swap")
 
@@ -475,6 +479,7 @@ class Test(BaseTest):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = False
+            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -533,6 +538,7 @@ class Test(BaseTest):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = False
+            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -591,6 +597,7 @@ class Test(BaseTest):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = True
+            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -665,6 +672,7 @@ class Test(BaseTest):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = True
+            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -737,6 +745,7 @@ class Test(BaseTest):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = False
+            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"

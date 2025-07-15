@@ -43,7 +43,7 @@ class LockedCoinError(Exception):
         self.coinid = coinid
 
     def __str__(self):
-        return "Coin must be unlocked: " + str(self.coinid)
+        return "must be unlocked: " + str(self.coinid)
 
 
 def ensure(v, err_string):

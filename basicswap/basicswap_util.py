@@ -41,6 +41,11 @@ class MessageNetworks(IntEnum):
     SIMPLEX = auto()
 
 
+class MessageNetworkLinkTypes(IntEnum):
+    RECEIVED_ON = auto()
+    SENT_ON = auto()
+
+
 class MessageTypes(IntEnum):
     OFFER = auto()
     BID = auto()
@@ -59,6 +64,8 @@ class MessageTypes(IntEnum):
     ADS_BID_ACCEPT_FL = auto()
 
     CONNECT_REQ = auto()
+    PORTAL_OFFER = auto()
+    PORTAL_SEND = auto()
 
 
 class AddressTypes(IntEnum):
@@ -66,6 +73,8 @@ class AddressTypes(IntEnum):
     BID = auto()
     RECV_OFFER = auto()
     SEND_OFFER = auto()
+    PORTAL_LOCAL = auto()
+    PORTAL = auto()
 
 
 class SwapTypes(IntEnum):
@@ -395,15 +404,14 @@ def strTxType(tx_type):
 
 
 def strAddressType(addr_type):
-    if addr_type == AddressTypes.OFFER:
-        return "Offer"
-    if addr_type == AddressTypes.BID:
-        return "Bid"
-    if addr_type == AddressTypes.RECV_OFFER:
-        return "Offer recv"
-    if addr_type == AddressTypes.SEND_OFFER:
-        return "Offer send"
-    return "Unknown"
+    return {
+        AddressTypes.OFFER: "Offer",
+        AddressTypes.BID: "Bid",
+        AddressTypes.RECV_OFFER: "Offer recv",
+        AddressTypes.SEND_OFFER: "Offer send",
+        AddressTypes.PORTAL_LOCAL: "Portal (local)",
+        AddressTypes.PORTAL: "Portal",
+    }.get(addr_type, "Unknown")
 
 
 def getLockName(lock_type):

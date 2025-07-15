@@ -144,7 +144,8 @@ class OfferMessage(NonProtobufClass):
         17: ("amount_negotiable", NPBW_INT, NPBF_BOOL),
         18: ("rate_negotiable", NPBW_INT, NPBF_BOOL),
         19: ("proof_utxos", NPBW_BYTES, 0),
-        20: ("auto_accept_type", 0, 0),
+        20: ("auto_accept_type", NPBW_INT, 0),
+        21: ("message_nets", NPBW_BYTES, NPBF_STR),
     }
 
 
@@ -160,6 +161,7 @@ class BidMessage(NonProtobufClass):
         8: ("proof_signature", NPBW_BYTES, NPBF_STR),
         9: ("proof_utxos", NPBW_BYTES, 0),
         10: ("pkhash_buyer_to", NPBW_BYTES, 0),
+        11: ("message_nets", NPBW_BYTES, NPBF_STR),
     }
 
 
@@ -199,6 +201,7 @@ class XmrBidMessage(NonProtobufClass):
         7: ("kbvf", NPBW_BYTES, 0),
         8: ("kbsf_dleag", NPBW_BYTES, 0),
         9: ("dest_af", NPBW_BYTES, 0),
+        10: ("message_nets", NPBW_BYTES, NPBF_STR),
     }
 
 
@@ -261,6 +264,7 @@ class ADSBidIntentMessage(NonProtobufClass):
         3: ("time_valid", NPBW_INT, 0),
         4: ("amount_from", NPBW_INT, 0),
         5: ("amount_to", NPBW_INT, 0),
+        6: ("message_nets", NPBW_BYTES, NPBF_STR),
     }
 
 
@@ -281,4 +285,22 @@ class ConnectReqMessage(NonProtobufClass):
         2: ("network_data", NPBW_BYTES, 0),
         3: ("request_type", NPBW_INT, 0),
         4: ("request_data", NPBW_BYTES, 0),
+    }
+
+
+class MessagePortalOffer(NonProtobufClass):
+    _map = {
+        1: ("network_type_from", NPBW_INT, 0),
+        2: ("network_type_to", NPBW_INT, 0),
+        3: ("portal_address_from", NPBW_BYTES, 0),
+        4: ("portal_address_to", NPBW_BYTES, 0),
+        5: ("time_valid", NPBW_INT, 0),
+        6: ("smsg_difficulty", NPBW_INT, 0),
+    }
+
+
+class MessagePortalSend(NonProtobufClass):
+    _map = {
+        1: ("forward_address", NPBW_BYTES, 0),  # pubkey, 33 bytes
+        2: ("message_bytes", NPBW_BYTES, 0),
     }

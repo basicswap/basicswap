@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 29
+CURRENT_DB_VERSION = 30
 CURRENT_DB_DATA_VERSION = 6
 
 
@@ -185,6 +185,7 @@ class Offer(Table):
     amount_negotiable = Column("bool")
     rate_negotiable = Column("bool")
     auto_accept_type = Column("integer")
+    message_nets = Column("string")
 
     # Local fields
     auto_accept_bids = Column("bool")
@@ -233,6 +234,7 @@ class Bid(Table):
     rate = Column("integer")
 
     pkhash_seller = Column("blob")
+    message_nets = Column("string")
 
     initiate_txn_redeem = Column("blob")
     initiate_txn_refund = Column("blob")
@@ -380,6 +382,8 @@ class SmsgAddress(Table):
     pubkey = Column("string")
     use_type = Column("integer")
     note = Column("string")
+
+    index = Index("smsgaddresses_address_index", "addr")
 
 
 class Action(Table):
@@ -676,6 +680,20 @@ class MessageNetworks(Table):
     created_at = Column("integer")
 
 
+class MessageNetworkLink(Table):
+    __tablename__ = "message_network_links"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+
+    linked_type = Column("integer")
+    linked_id = Column("blob")
+
+    network_id = Column("string")
+    link_type = Column("integer")  # MessageNetworkLinkTypes
+    created_at = Column("integer")
+
+
 class DirectMessageRoute(Table):
     __tablename__ = "direct_message_routes"
 
@@ -694,6 +712,7 @@ class DirectMessageRoute(Table):
 
 class DirectMessageRouteLink(Table):
     __tablename__ = "direct_message_route_links"
+
     record_id = Column("integer", primary_key=True, autoincrement=True)
     active_ind = Column("integer")
     direct_message_route_id = Column("integer")

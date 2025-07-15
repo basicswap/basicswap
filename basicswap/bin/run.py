@@ -415,7 +415,7 @@ def runClient(
         for network in settings.get("networks", []):
             if network.get("enabled", True) is False:
                 continue
-            network_type = network.get("type", "unknown")
+            network_type: str = network.get("type", "unknown")
             if network_type == "simplex":
                 simplex_dir = os.path.join(data_dir, "simplex")
 

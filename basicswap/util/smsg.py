@@ -66,6 +66,11 @@ def smsgGetTimestamp(smsg_message: bytes) -> int:
     return int.from_bytes(smsg_message[11 : 11 + 8], byteorder="little")
 
 
+def smsgGetTTL(smsg_message: bytes) -> int:
+    assert len(smsg_message) > SMSG_HDR_LEN
+    return int.from_bytes(smsg_message[19 : 19 + 4], byteorder="little")
+
+
 def smsgGetPOWHash(smsg_message: bytes) -> bytes:
     assert len(smsg_message) > SMSG_HDR_LEN
     ofs: int = 4
@@ -79,7 +84,7 @@ def smsgGetPOWHash(smsg_message: bytes) -> bytes:
 
 def smsgGetID(smsg_message: bytes) -> bytes:
     assert len(smsg_message) > SMSG_HDR_LEN
-    smsg_timestamp = int.from_bytes(smsg_message[11 : 11 + 8], byteorder="little")
+    smsg_timestamp = smsgGetTimestamp(smsg_message)
     return smsg_timestamp.to_bytes(8, byteorder="big") + ripemd160(smsg_message[8:])
 
 
@@ -89,6 +94,8 @@ def smsgEncrypt(
     payload: bytes,
     smsg_timestamp: int = None,
     deterministic: bool = False,
+    plaintext_format: int = 2,
+    difficulty_target=0x1EFFFFFF,
 ) -> bytes:
     # assert len(payload) < 128  # Requires lz4 if payload > 128 bytes
     # TODO: Add lz4 to match core smsg
@@ -125,13 +132,18 @@ def smsgEncrypt(
     pkh_from: bytes = hash160(pubkey_from)
 
     len_payload = len(payload)
-    address_version = 0
-    plaintext_data: bytes = (
-        bytes((address_version,))
-        + pkh_from
-        + signature
-        + len_payload.to_bytes(4, byteorder="little")
-        + payload
+
+    if plaintext_format == 2:
+        address_version = 249  # Marker for format 2
+        compressed = 0
+        plaintext_data: bytes = bytes((address_version, compressed))
+    elif plaintext_format == 1:
+        address_version = 0
+        plaintext_data: bytes = bytes((address_version,))
+    else:
+        raise ValueError("Unknown plaintext format.")
+    plaintext_data += bytes(
+        pkh_from + signature + len_payload.to_bytes(4, byteorder="little") + payload
     )
 
     ciphertext: bytes = aes_encrypt(plaintext_data, key_e, smsg_iv)
@@ -166,8 +178,7 @@ def smsgEncrypt(
         + ciphertext
     )
 
-    target: int = uint256_from_compact(0x1EFFFFFF)
-
+    target: int = uint256_from_compact(difficulty_target)
     for i in range(1000000):
         pow_hash = smsgGetPOWHash(smsg_message)
         if uint256_from_str(pow_hash) > target:
@@ -216,7 +227,14 @@ def smsgDecrypt(
 
     plaintext = aes_decrypt(ciphertext, key_e, smsg_iv)
 
-    ofs = 1
+    ofs: int = 0
+    version = plaintext[0]
+    if version == 249:
+        compressed = plaintext[1]
+        assert compressed == 0
+        ofs += 1
+
+    ofs += 1
     pkh_from = plaintext[ofs : ofs + 20]
     ofs += 20
     signature = plaintext[ofs : ofs + 65]
@@ -240,6 +258,6 @@ def smsgDecrypt(
             "msgid": smsgGetID(encrypted_message).hex(),
             "sent": smsg_timestamp,
             "hex": payload.hex(),
-            "pk_from": pubkey_signer.hex(),
+            "pubkey_from": pubkey_signer.hex(),
         }
     return payload

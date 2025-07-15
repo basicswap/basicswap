@@ -26,6 +26,7 @@ from basicswap.util.address import (
     b58decode,
     decodeWif,
 )
+from basicswap.basicswap_util import AddressTypes
 
 
 def encode_base64(data: bytes) -> str:
@@ -172,8 +173,7 @@ def waitForConnected(ws_thread, delay_event):
     raise ValueError("waitForConnected timed-out.")
 
 
-def getPrivkeyForAddress(self, addr) -> bytes:
-
+def getPrivkeyForAddress(self, cursor, addr: str) -> bytes:
     ci_part = self.ci(Coins.PART)
     try:
         return ci_part.decodeKey(
@@ -200,6 +200,38 @@ def getPrivkeyForAddress(self, addr) -> bytes:
     raise ValueError("key not found")
 
 
+def getPubkeyForAddress(self, cursor, addr: str) -> bytes:
+    if self._have_smsg_rpc:
+        try:
+            rv = self.callrpc(
+                "smsggetpubkey",
+                [
+                    addr,
+                ],
+            )
+            return b58decode(rv["publickey"])
+        except Exception as e:  # noqa: F841
+            pass
+    use_cursor = self.openDB(cursor)
+    try:
+        query: str = "SELECT pk_from FROM offers WHERE addr_from = :addr_to LIMIT 1"
+        rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
+        if len(rows) > 0:
+            return rows[0][0]
+        query: str = "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr_to LIMIT 1"
+        rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
+        if len(rows) > 0:
+            return rows[0][0]
+        query: str = "SELECT pubkey FROM smsgaddresses WHERE addr = :addr LIMIT 1"
+        rows = use_cursor.execute(query, {"addr": addr}).fetchall()
+        if len(rows) > 0:
+            return bytes.fromhex(rows[0][0])
+        raise ValueError(f"Could not get public key for address: {addr}")
+    finally:
+        if cursor is None:
+            self.closeDB(use_cursor, commit=False)
+
+
 def encryptMsg(
     self,
     addr_from: str,
@@ -209,42 +241,20 @@ def encryptMsg(
     cursor,
     timestamp=None,
     deterministic=False,
+    difficulty_target=0x1EFFFFFF,
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    try:
-        rv = self.callrpc(
-            "smsggetpubkey",
-            [
-                addr_to,
-            ],
-        )
-        pubkey_to: bytes = b58decode(rv["publickey"])
-    except Exception as e:  # noqa: F841
-        use_cursor = self.openDB(cursor)
-        try:
-            query: str = "SELECT pk_from FROM offers WHERE addr_from = :addr_to LIMIT 1"
-            rows = use_cursor.execute(query, {"addr_to": addr_to}).fetchall()
-            if len(rows) > 0:
-                pubkey_to = rows[0][0]
-            else:
-                query: str = (
-                    "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr_to LIMIT 1"
-                )
-                rows = use_cursor.execute(query, {"addr_to": addr_to}).fetchall()
-                if len(rows) > 0:
-                    pubkey_to = rows[0][0]
-                else:
-                    raise ValueError(f"Could not get public key for address {addr_to}")
-        finally:
-            if cursor is None:
-                self.closeDB(use_cursor, commit=False)
+    pubkey_to = getPubkeyForAddress(self, cursor, addr_to)
+    privkey_from = getPrivkeyForAddress(self, cursor, addr_from)
 
-    privkey_from = getPrivkeyForAddress(self, addr_from)
-
-    payload += bytes((0,))  # Include null byte to match smsg
     smsg_msg: bytes = smsgEncrypt(
-        privkey_from, pubkey_to, payload, timestamp, deterministic
+        privkey_from,
+        pubkey_to,
+        payload,
+        timestamp,
+        deterministic,
+        difficulty_target=difficulty_target,
     )
 
     return smsg_msg
@@ -261,11 +271,21 @@ def sendSimplexMsg(
     timestamp: int = None,
     deterministic: bool = False,
     to_user_name: str = None,
+    return_msg: bool = False,
+    difficulty_target=0x1EFFFFFF,
 ) -> bytes:
     self.log.debug("sendSimplexMsg")
 
     smsg_msg: bytes = encryptMsg(
-        self, addr_from, addr_to, payload, msg_valid, cursor, timestamp, deterministic
+        self,
+        addr_from,
+        addr_to,
+        payload,
+        msg_valid,
+        cursor,
+        timestamp,
+        deterministic,
+        difficulty_target,
     )
     smsg_id = smsgGetID(smsg_msg)
 
@@ -280,6 +300,33 @@ def sendSimplexMsg(
         json_str = json.dumps(response, indent=4)
         self.log.debug(f"Response {json_str}")
         raise ValueError("Send failed")
+    if to_user_name is not None:
+        self.num_direct_simplex_messages_sent += 1
+    else:
+        self.num_group_simplex_messages_sent += 1
+
+    if return_msg:
+        return smsg_id, smsg_msg
+    return smsg_id
+
+
+def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
+    smsg_id = smsgGetID(smsg_msg)
+    ws_thread = network["ws_thread"]
+    if to_user_name is not None:
+        to = "@" + to_user_name + " "
+    else:
+        to = "#bsx "
+    sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    if getResponseData(response, "type") != "newChatItems":
+        json_str = json.dumps(response, indent=4)
+        self.log.debug(f"Response {json_str}")
+        raise ValueError("Send failed")
+    if to_user_name is not None:
+        self.num_direct_simplex_messages_sent += 1
+    else:
+        self.num_group_simplex_messages_sent += 1
 
     return smsg_id
 
@@ -292,7 +339,7 @@ def decryptSimplexMsg(self, msg_data):
     try:
         decrypted = smsgDecrypt(network_key, msg_data, output_dict=True)
         decrypted["from"] = ci_part.pubkey_to_address(
-            bytes.fromhex(decrypted["pk_from"])
+            bytes.fromhex(decrypted["pubkey_from"])
         )
         decrypted["to"] = self.network_addr
         decrypted["msg_net"] = "simplex"
@@ -308,30 +355,33 @@ def decryptSimplexMsg(self, msg_data):
                      AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
         UNION
         SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
+        UNION
+        SELECT addr AS address FROM smsgaddresses WHERE active_ind = 1 AND use_type = :local_portal
         )"""
 
     now: int = self.getTime()
 
     try:
         cursor = self.openDB()
-        addr_rows = cursor.execute(query, {"now": now}).fetchall()
+        addr_rows = cursor.execute(
+            query, {"now": now, "local_portal": AddressTypes.PORTAL_LOCAL}
+        ).fetchall()
+        decrypted = None
+        for row in addr_rows:
+            addr = row[0]
+            try:
+                vk_addr = getPrivkeyForAddress(self, cursor, addr)
+                decrypted = smsgDecrypt(vk_addr, msg_data, output_dict=True)
+                decrypted["from"] = ci_part.pubkey_to_address(
+                    bytes.fromhex(decrypted["pubkey_from"])
+                )
+                decrypted["to"] = addr
+                decrypted["msg_net"] = "simplex"
+                return decrypted
+            except Exception as e:  # noqa: F841
+                pass
     finally:
         self.closeDB(cursor, commit=False)
-
-    decrypted = None
-    for row in addr_rows:
-        addr = row[0]
-        try:
-            vk_addr = getPrivkeyForAddress(self, addr)
-            decrypted = smsgDecrypt(vk_addr, msg_data, output_dict=True)
-            decrypted["from"] = ci_part.pubkey_to_address(
-                bytes.fromhex(decrypted["pk_from"])
-            )
-            decrypted["to"] = addr
-            decrypted["msg_net"] = "simplex"
-            return decrypted
-        except Exception as e:  # noqa: F841
-            pass
 
     return decrypted
 
@@ -375,7 +425,6 @@ def parseSimplexMsg(self, chat_item):
         return decrypted_msg
     except Exception as e:  # noqa: F841
         # self.log.debug(f"decryptSimplexMsg error: {e}")
-        self.log.debug(f"decryptSimplexMsg error: {e}")
         pass
     return None
 
@@ -421,7 +470,7 @@ def readSimplexMsgs(self, network):
             elif processEvent(self, ws_thread, msg_type, data):
                 pass
             else:
-                self.log.debug(f"Unknown msg_type: {msg_type}")
+                self.log.debug(f"simplex: Unknown msg_type: {msg_type}")
                 # self.log.debug(f"Message: {json.dumps(data, indent=4)}")
         except Exception as e:
             self.log.debug(f"readSimplexMsgs error: {e}")
@@ -432,10 +481,11 @@ def readSimplexMsgs(self, network):
 
 
 def getResponseData(data, tag=None):
-    if "Right" in data["resp"]:
-        if tag:
-            return data["resp"]["Right"][tag]
-        return data["resp"]["Right"]
+    for pretag in ("Right", "Left"):
+        if pretag in data["resp"]:
+            if tag:
+                return data["resp"][pretag][tag]
+            return data["resp"][pretag]
     if tag:
         return data["resp"][tag]
     return data["resp"]
@@ -474,12 +524,14 @@ def initialiseSimplexNetwork(self, network_config) -> None:
         response = waitForResponse(ws_thread, sent_id, self.delay_event)
         assert "groupLinkId" in getResponseData(response, "connection")
 
-    network = {
+    add_network = {
         "type": "simplex",
         "ws_thread": ws_thread,
     }
+    if "bridged" in network_config:
+        add_network["bridged"] = network_config["bridged"]
 
-    self.active_networks.append(network)
+    self.active_networks.append(add_network)
 
 
 def closeSimplexChat(self, net_i, connId) -> bool:

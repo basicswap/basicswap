@@ -10,6 +10,23 @@ from basicswap.db import getOrderByStr
 
 
 class UIApp:
+    def __init__(self, **kwargs):
+        pass
+
+    def setFilters(self, prefix, filters):
+        key_str = "saved_filters_" + prefix
+        value_str = json.dumps(filters)
+        self.setStringKV(key_str, value_str)
+
+    def getFilters(self, prefix):
+        key_str = "saved_filters_" + prefix
+        value_str = self.getStringKV(key_str)
+        return None if not value_str else json.loads(value_str)
+
+    def clearFilters(self, prefix) -> None:
+        key_str = "saved_filters_" + prefix
+        self.clearStringKV(key_str)
+
     def listMessageRoutes(self, filters={}, action=None):
         cursor = self.openDB()
         try:

@@ -5,9 +5,14 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import logging
+from enum import IntEnum, auto
 from basicswap.util.crypto import (
     sha256,
 )
+
+
+class LogCategories(IntEnum):
+    NET = auto()
 
 
 class BSXLogger(logging.Logger):

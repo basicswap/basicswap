@@ -48,6 +48,7 @@ from .basicswap_util import (
     isActiveBidState,
     KeyTypes,
     MessageNetworks,
+    MessageNetworkLinkTypes,
     MessageTypes,
     NotificationTypes as NT,
     OfferStates,
@@ -94,6 +95,7 @@ from .util.address import (
     pubkeyToAddress,
 )
 from .util.crypto import sha256
+from .util.logging import LogCategories as LC
 from .util.network import is_private_ip_address
 from .util.smsg import smsgGetID
 from .interface.base import Curves
@@ -151,17 +153,12 @@ from .explorers import (
     ExplorerChainz,
 )
 from .network.simplex import (
-    closeSimplexChat,
     encryptMsg,
     getJoinedSimplexLink,
     getResponseData,
-    initialiseSimplexNetwork,
-    readSimplexMsgs,
-    sendSimplexMsg,
 )
-from .network.util import (
-    getMsgPubkey,
-)
+from .network.bsx_network import BSXNetwork, networkTypeToID
+from .network.util import getMsgPubkey
 import basicswap.config as cfg
 import basicswap.network.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
@@ -322,9 +319,8 @@ class WatchedTransaction:
         self.swap_type = swap_type
 
 
-class BasicSwap(BaseApp, UIApp):
+class BasicSwap(BaseApp, BSXNetwork, UIApp):
     ws_server = None
-    _read_zmq_queue: bool = True
     protocolInterfaces = {
         SwapTypes.SELLER_FIRST: atomic_swap_1.AtomicSwapInterface(),
         SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
@@ -357,9 +353,6 @@ class BasicSwap(BaseApp, UIApp):
         self.check_progress_seconds = self.get_int_setting(
             "check_progress_seconds", 60, 1, 10 * 60
         )
-        self.check_smsg_seconds = self.get_int_setting(
-            "check_smsg_seconds", 10, 1, 10 * 60
-        )
         self.check_watched_seconds = self.get_int_setting(
             "check_watched_seconds", 60, 1, 10 * 60
         )
@@ -379,7 +372,6 @@ class BasicSwap(BaseApp, UIApp):
         self._last_checked_expired = 0
         self._last_checked_expiring_bids_offers = 0
         self._last_checked_progress = 0
-        self._last_checked_smsg = 0
         self._last_checked_watched = 0
         self._last_checked_split_messages = 0
         self._last_checked_delayed_auto_accept = 0
@@ -390,9 +382,6 @@ class BasicSwap(BaseApp, UIApp):
         self._expiring_offers = []  # List of offers expiring soon
         self._updating_wallets_info = {}
         self._last_updated_wallets_info = 0
-        self._zmq_queue_enabled = self.settings.get("zmq_queue_enabled", True)
-        self._poll_smsg = self.settings.get("poll_smsg", False)
-
         self._notifications_enabled = self.settings.get("notifications_enabled", True)
         self._disabled_notification_types = self.settings.get(
             "disabled_notification_types", []
@@ -402,11 +391,6 @@ class BasicSwap(BaseApp, UIApp):
         self._expire_db_records = self.settings.get("expire_db_records", False)
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
-        )  # Seconds
-        self._expire_message_routes_after = self._expire_db_records_after = (
-            self.get_int_setting(
-                "expire_message_routes_after", 48 * 3600, 10 * 60, 31 * 86400
-            )
         )  # Seconds
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
@@ -418,9 +402,6 @@ class BasicSwap(BaseApp, UIApp):
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
-
-        self.num_group_simplex_messages_received = 0
-        self.num_direct_simplex_messages_received = 0
 
         self._max_transient_errors = self.settings.get(
             "max_transient_errors", 100
@@ -487,13 +468,8 @@ class BasicSwap(BaseApp, UIApp):
         )
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
         self._bid_expired_leeway = 5
-        self._use_direct_message_routes = True
 
         self.swaps_in_progress = dict()
-
-        self.SMSG_SECONDS_IN_HOUR = (
-            60 * 60
-        )  # Note: Set smsgsregtestadjust=0 for regtest
 
         self.threads = []
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(
@@ -528,18 +504,6 @@ class BasicSwap(BaseApp, UIApp):
             self.commitDB()
         finally:
             self.closeDB(cursor)
-
-        if self._zmq_queue_enabled:
-            self.zmqContext = zmq.Context()
-            self.zmqSubscriber = self.zmqContext.socket(zmq.SUB)
-
-            self.zmqSubscriber.connect(
-                self.settings["zmqhost"] + ":" + str(self.settings["zmqport"])
-            )
-            self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
-
-            if Coins.PART in chainparams:
-                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "hashwtx")
 
         self.with_coins_override = extra_opts.get("with_coins", set())
         self.without_coins_override = extra_opts.get("without_coins", set())
@@ -618,10 +582,8 @@ class BasicSwap(BaseApp, UIApp):
         else:
             self.thread_pool.shutdown()
 
-        if self._zmq_queue_enabled:
-            self.zmqContext.destroy()
-
         self.swaps_in_progress.clear()
+        super().finalise()
 
     def logIDB(self, concept_id: bytes) -> str:
         return self.log.id(concept_id, prefix="B_")
@@ -1105,9 +1067,6 @@ class BasicSwap(BaseApp, UIApp):
         upgradeDatabase(self, self.db_version)
         upgradeDatabaseData(self, self.db_data_version)
 
-        if self._zmq_queue_enabled and self._poll_smsg:
-            self.log.warning("SMSG polling and zmq listener enabled.")
-
         for c in Coins:
             if c not in chainparams:
                 continue
@@ -1181,32 +1140,7 @@ class BasicSwap(BaseApp, UIApp):
             f"network_key {self.network_key}\nnetwork_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"
         )
 
-        self.active_networks = []
-        network_config_list = self.settings.get("networks", [])
-        if len(network_config_list) < 1:
-            network_config_list = [{"type": "smsg", "enabled": True}]
-
-        for network in network_config_list:
-            if network.get("enabled", True) is False:
-                continue
-            if network["type"] == "smsg":
-                self.active_networks.append({"type": "smsg"})
-            elif network["type"] == "simplex":
-                initialiseSimplexNetwork(self, network)
-
-        ro = self.callrpc("smsglocalkeys")
-        found = False
-        for k in ro["smsg_keys"]:
-            if k["address"] == self.network_addr:
-                found = True
-                break
-        if not found:
-            self.log.info("Importing network key to SMSG")
-            self.callrpc("smsgimportprivkey", [self.network_key, "basicswap offers"])
-            ro = self.callrpc("smsglocalkeys", ["anon", "-", self.network_addr])
-            ensure(ro["result"] == "Success.", "smsglocalkeys failed")
-
-        # TODO: Ensure smsg is enabled for the active wallet.
+        self.startNetworks()
 
         # Initialise locked state
         _, _ = self.getLockedState()
@@ -1216,16 +1150,13 @@ class BasicSwap(BaseApp, UIApp):
 
         # Scan inbox
         # TODO: Redundant? small window for zmq messages to go unnoticed during startup?
-        # options = {'encoding': 'hex'}
-        options = {"encoding": "none"}
+        options = {"encoding": "hex"}
+        if self._smsg_plaintext_version >= 2:
+            options["pubkey_from"] = True
         ro = self.callrpc("smsginbox", ["unread", "", options])
         nm = 0
         for msg in ro["messages"]:
-            # TODO: Remove workaround for smsginbox bug
-            get_msg = self.callrpc(
-                "smsg", [msg["msgid"], {"encoding": "hex", "setread": True}]
-            )
-            self.processMsg(get_msg)
+            self.processMsg(msg)
             nm += 1
         self.log.info(f"Scanned {nm} unread messages.")
 
@@ -1607,25 +1538,6 @@ class BasicSwap(BaseApp, UIApp):
             if cursor is None:
                 self.closeDB(use_cursor)
 
-    def getMessageRoute(
-        self, network_id: int, address_from: str, address_to: str, cursor=None
-    ):
-        try:
-            use_cursor = self.openDB(cursor)
-            route = self.queryOne(
-                DirectMessageRoute,
-                use_cursor,
-                {
-                    "network_id": network_id,
-                    "smsg_addr_local": address_from,
-                    "smsg_addr_remote": address_to,
-                },
-            )
-            return route
-        finally:
-            if cursor is None:
-                self.closeDB(use_cursor)
-
     def activateBid(self, cursor, bid) -> None:
         if bid.bid_id in self.swaps_in_progress:
             self.log.debug(f"Bid {self.log.id(bid.bid_id)} is already in progress")
@@ -1841,127 +1753,6 @@ class BasicSwap(BaseApp, UIApp):
         smsg_min_valid = self.SMSG_SECONDS_IN_HOUR * 1
         bid_valid = (bid.expire_at - now) + 10 * 60  # Add 10 minute buffer
         return max(smsg_min_valid, min(smsg_max_valid, bid_valid))
-
-    def getActiveNetwork(self, network_id: int):
-        # TODO: Add more network types
-        for network in self.active_networks:
-            if network["type"] == "simplex":
-                return network
-        raise RuntimeError("Network not found.")
-
-    def getActiveNetworkInterface(self, network_id: int):
-        network = self.getActiveNetwork(network_id)
-        return network["ws_thread"]
-
-    def sendMessage(
-        self,
-        addr_from: str,
-        addr_to: str,
-        payload_hex: bytes,
-        msg_valid: int,
-        cursor,
-        linked_type=None,
-        linked_id=None,
-        timestamp=None,
-        deterministic=False,
-    ) -> bytes:
-        message_id: bytes = None
-
-        message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
-        if message_route:
-            raise RuntimeError("Trying to send through an unestablished direct route.")
-
-        message_route = self.getMessageRoute(2, addr_from, addr_to, cursor=cursor)
-        if message_route:
-            network = self.getActiveNetwork(2)
-            net_i = network["ws_thread"]
-
-            remote_name = None
-            route_data = json.loads(message_route.route_data.decode("UTF-8"))
-            if "localDisplayName" in route_data:
-                remote_name = route_data["localDisplayName"]
-            else:
-                pccConnId = route_data["pccConnId"]
-                self.log.debug(f"Finding name for Simplex chat, ID: {pccConnId}")
-                cmd_id = net_i.send_command("/chats")
-                response = net_i.wait_for_command_response(cmd_id)
-                for chat in getResponseData(response, "chats"):
-                    if (
-                        "chatInfo" not in chat
-                        or "type" not in chat["chatInfo"]
-                        or chat["chatInfo"]["type"] != "direct"
-                    ):
-                        continue
-                    try:
-                        if (
-                            chat["chatInfo"]["contact"]["activeConn"]["connId"]
-                            == pccConnId
-                        ):
-                            remote_name = chat["chatInfo"]["contact"][
-                                "localDisplayName"
-                            ]
-                            break
-                    except Exception as e:
-                        self.log.debug(f"Error parsing chat: {e}")
-
-            if remote_name is None:
-                raise RuntimeError(
-                    f"Unable to find remote name for simplex direct chat, pccConnId: {pccConnId}"
-                )
-
-            message_id = sendSimplexMsg(
-                self,
-                network,
-                addr_from,
-                addr_to,
-                bytes.fromhex(payload_hex),
-                msg_valid,
-                cursor,
-                timestamp,
-                deterministic,
-                to_user_name=remote_name,
-            )
-            return message_id
-
-        # First network in list will set message_id
-        for network in self.active_networks:
-            net_message_id = None
-            if network["type"] == "smsg":
-                net_message_id = self.sendSmsg(
-                    addr_from, addr_to, payload_hex, msg_valid
-                )
-            elif network["type"] == "simplex":
-                net_message_id = sendSimplexMsg(
-                    self,
-                    network,
-                    addr_from,
-                    addr_to,
-                    bytes.fromhex(payload_hex),
-                    msg_valid,
-                    cursor,
-                    timestamp,
-                    deterministic,
-                )
-            else:
-                raise ValueError("Unknown network: {}".format(network["type"]))
-            if not message_id:
-                message_id = net_message_id
-        return message_id
-
-    def sendSmsg(
-        self, addr_from: str, addr_to: str, payload_hex: bytes, msg_valid: int
-    ) -> bytes:
-        options = {"decodehex": True, "ttl_is_seconds": True}
-        try:
-            ro = self.callrpc(
-                "smsgsend",
-                [addr_from, addr_to, payload_hex, False, msg_valid, False, options],
-            )
-            return bytes.fromhex(ro["msgid"])
-        except Exception as e:
-            if self.debug:
-                self.log.error("smsgsend failed {}".format(json.dumps(ro, indent=4)))
-            raise e
 
     def is_reverse_ads_bid(self, coin_from, coin_to) -> bool:
         return coin_from in self.scriptless_coins + self.coins_without_segwit
@@ -2413,6 +2204,8 @@ class BasicSwap(BaseApp, UIApp):
             msg_buf.amount_negotiable = extra_options.get("amount_negotiable", False)
             msg_buf.rate_negotiable = extra_options.get("rate_negotiable", False)
 
+            msg_buf.message_nets = self.getMessageNetsString()
+
             if msg_buf.amount_negotiable or msg_buf.rate_negotiable:
                 ensure(
                     auto_accept_bids is False,
@@ -2503,6 +2296,7 @@ class BasicSwap(BaseApp, UIApp):
             offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+            # Send offers to active and bridged networks, message_nets contains only the active networks.
             offer_id = self.sendMessage(
                 offer_addr, offer_addr_to, payload_hex, msg_valid, cursor
             )
@@ -2541,7 +2335,9 @@ class BasicSwap(BaseApp, UIApp):
                 from_feerate=msg_buf.fee_rate_from,
                 to_feerate=msg_buf.fee_rate_to,
                 auto_accept_type=msg_buf.auto_accept_type,
+                message_nets=msg_buf.message_nets,
             )
+
             offer.setState(OfferStates.OFFER_SENT)
 
             if swap_type == SwapTypes.XMR_SWAP:
@@ -3495,6 +3291,10 @@ class BasicSwap(BaseApp, UIApp):
                 dt.datetime.fromtimestamp(now).date(), contract_count
             )
 
+            bid_message_nets = self.selectMessageNetStringForConcept(
+                Concepts.OFFER, offer_id, offer.message_nets, cursor
+            )
+
             bid = Bid(
                 protocol_version=PROTOCOL_VERSION_SECRET_HASH,
                 active_ind=1,
@@ -3513,6 +3313,7 @@ class BasicSwap(BaseApp, UIApp):
                 was_sent=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
+                message_nets=bid_message_nets,
             )
 
             pkhash_buyer_to = ci_to.pkh(contract_pubkey)
@@ -3861,7 +3662,12 @@ class BasicSwap(BaseApp, UIApp):
 
                 msg_valid: int = self.getAcceptBidMsgValidTime(bid)
                 accept_msg_id = self.sendMessage(
-                    offer.addr_from, bid.bid_addr, payload_hex, msg_valid, use_cursor
+                    offer.addr_from,
+                    bid.bid_addr,
+                    payload_hex,
+                    msg_valid,
+                    use_cursor,
+                    message_nets=bid.message_nets,
                 )
 
                 self.addMessageLink(
@@ -3892,6 +3698,7 @@ class BasicSwap(BaseApp, UIApp):
         msg_valid: int,
         bid_msg_ids,
         cursor,
+        message_nets,
     ) -> None:
 
         dleag_split_size_init, dleag_split_size = xmr_swap.getMsgSplitInfo()
@@ -3911,7 +3718,12 @@ class BasicSwap(BaseApp, UIApp):
                 str.format("{:02x}", MessageTypes.XMR_BID_SPLIT) + msg_bytes.hex()
             )
             bid_msg_ids[num_sent] = self.sendMessage(
-                addr_from, addr_to, payload_hex, msg_valid, cursor
+                addr_from,
+                addr_to,
+                payload_hex,
+                msg_valid,
+                cursor,
+                message_nets=message_nets,
             )
             num_sent += 1
             sent_bytes += size_to_send
@@ -3925,6 +3737,10 @@ class BasicSwap(BaseApp, UIApp):
         msg_buf.amount_from = bid.amount_to
         msg_buf.amount_to = bid.amount
 
+        # Set msg_buf.message_nets to let the remote node know what networks to respond on.
+        # bid.message_nets is a local field denoting the network/s to send to
+        msg_buf.message_nets = self.getMessageNetsString()
+
         return msg_buf
 
     def sendADSBidIntentMessage(self, bid, offer, cursor) -> bytes:
@@ -3934,6 +3750,8 @@ class BasicSwap(BaseApp, UIApp):
         payload_hex = (
             str.format("{:02x}", MessageTypes.ADS_BID_LF) + msg_buf.to_bytes().hex()
         )
+
+        self.logD(LC.NET, f"sendADSBidIntentMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}")
         return self.sendMessage(
             bid.bid_addr,
             offer.addr_from,
@@ -3942,6 +3760,7 @@ class BasicSwap(BaseApp, UIApp):
             cursor,
             timestamp=bid.created_at,
             deterministic=(False if bid.bid_id is None else True),
+            message_nets=bid.message_nets,
         )
 
     def getXmrBidMessage(self, bid, xmr_swap, offer) -> XmrBidMessage:
@@ -3963,6 +3782,10 @@ class BasicSwap(BaseApp, UIApp):
         else:
             msg_buf.kbsf_dleag = xmr_swap.kbsf_dleag
 
+        # Set msg_buf.message_nets to let the remote node know what networks to respond on.
+        # bid.message_nets is a local field denoting the network/s to send to
+        msg_buf.message_nets = self.getMessageNetsString()
+
         return msg_buf
 
     def sendXmrBidMessage(self, bid, xmr_swap, offer, cursor) -> bytes:
@@ -3977,6 +3800,7 @@ class BasicSwap(BaseApp, UIApp):
         )
         msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
 
+        self.logD(LC.NET, f"sendXmrBidMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}")
         bid_msg_id = self.sendMessage(
             bid.bid_addr,
             offer.addr_from,
@@ -3985,6 +3809,7 @@ class BasicSwap(BaseApp, UIApp):
             cursor,
             timestamp=bid.created_at,
             deterministic=(False if bid.bid_id is None else True),
+            message_nets=bid.message_nets,
         )
         bid_id = bid_msg_id
         if bid.bid_id and bid_msg_id != bid.bid_id:
@@ -4005,6 +3830,7 @@ class BasicSwap(BaseApp, UIApp):
                 msg_valid,
                 bid_msg_ids,
                 cursor,
+                message_nets=bid.message_nets,
             )
         for k, msg_id in bid_msg_ids.items():
             self.addMessageLink(
@@ -4037,6 +3863,10 @@ class BasicSwap(BaseApp, UIApp):
         if bid.proof_utxos:
             msg_buf.proof_utxos = bid.proof_utxos
 
+        # Set msg_buf.message_nets to let the remote node know what networks to respond on.
+        # bid.message_nets is a local field denoting the network/s to send to
+        msg_buf.message_nets = self.getMessageNetsString()
+
         return msg_buf
 
     def sendBidMessage(self, bid, offer, cursor) -> bytes:
@@ -4047,6 +3877,7 @@ class BasicSwap(BaseApp, UIApp):
         payload_hex = str.format("{:02x}", MessageTypes.BID) + msg_buf.to_bytes().hex()
         msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
 
+        self.logD(LC.NET, f"sendBidMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}")
         bid_msg_id = self.sendMessage(
             bid.bid_addr,
             offer.addr_from,
@@ -4055,6 +3886,7 @@ class BasicSwap(BaseApp, UIApp):
             cursor,
             timestamp=bid.created_at,
             deterministic=(False if bid.bid_id is None else True),
+            message_nets=bid.message_nets,
         )
         if bid.bid_id and bid_msg_id != bid.bid_id:
             self.log.warning(
@@ -4202,6 +4034,9 @@ class BasicSwap(BaseApp, UIApp):
                 valid_for_seconds,
             )
 
+            bid_message_nets = self.selectMessageNetStringForConcept(
+                Concepts.OFFER, offer.offer_id, offer.message_nets, cursor
+            )
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
@@ -4223,6 +4058,7 @@ class BasicSwap(BaseApp, UIApp):
                     bid_addr=bid_addr,
                     was_sent=True,
                     was_received=False,
+                    message_nets=bid_message_nets,
                 )
 
                 if route_id and route_established is False:
@@ -4338,6 +4174,7 @@ class BasicSwap(BaseApp, UIApp):
                 expire_at=bid_created_at + valid_for_seconds,
                 bid_addr=bid_addr,
                 was_sent=True,
+                message_nets=bid_message_nets,
             )
 
             if route_id and route_established is False:
@@ -4656,7 +4493,12 @@ class BasicSwap(BaseApp, UIApp):
             msg_valid: int = self.getAcceptBidMsgValidTime(bid)
             bid_msg_ids = {}
             bid_msg_ids[0] = self.sendMessage(
-                addr_from, addr_to, payload_hex, msg_valid, use_cursor
+                addr_from,
+                addr_to,
+                payload_hex,
+                msg_valid,
+                use_cursor,
+                message_nets=bid.message_nets,
             )
 
             if ci_to.curve_type() == Curves.ed25519:
@@ -4669,6 +4511,7 @@ class BasicSwap(BaseApp, UIApp):
                     msg_valid,
                     bid_msg_ids,
                     use_cursor,
+                    bid.message_nets,
                 )
 
             bid.setState(BidStates.BID_ACCEPTED)  # ADS
@@ -4805,7 +4648,12 @@ class BasicSwap(BaseApp, UIApp):
             msg_valid: int = self.getAcceptBidMsgValidTime(bid)
             bid_msg_ids = {}
             bid_msg_ids[0] = self.sendMessage(
-                addr_from, addr_to, payload_hex, msg_valid, use_cursor
+                addr_from,
+                addr_to,
+                payload_hex,
+                msg_valid,
+                use_cursor,
+                message_nets=bid.message_nets,
             )
 
             if ci_to.curve_type() == Curves.ed25519:
@@ -4818,6 +4666,7 @@ class BasicSwap(BaseApp, UIApp):
                     msg_valid,
                     bid_msg_ids,
                     use_cursor,
+                    message_nets=bid.message_nets,
                 )
 
             bid.setState(BidStates.BID_REQUEST_ACCEPTED)
@@ -7638,7 +7487,7 @@ class BasicSwap(BaseApp, UIApp):
             self.closeDB(cursor)
 
     def processOffer(self, msg) -> None:
-        offer_bytes = bytes.fromhex(msg["hex"][2:-2])
+        offer_bytes = self.getSmsgMsgBytes(msg)
 
         offer_data = OfferMessage(init_all=False)
         try:
@@ -7695,6 +7544,8 @@ class BasicSwap(BaseApp, UIApp):
         if msg["sent"] + offer_data.time_valid < now:
             self.log.debug("Ignoring expired offer.")
             return
+
+        _ = self.expandMessageNets(offer_data.message_nets)
 
         offer_rate: int = ci_from.make_int(
             offer_data.amount_to / offer_data.amount_from, r=1
@@ -7787,6 +7638,7 @@ class BasicSwap(BaseApp, UIApp):
                         if b"\xa0\x01" in offer_bytes
                         else None
                     ),
+                    message_nets=offer_data.message_nets,
                 )
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 self.add(offer, cursor)
@@ -7812,17 +7664,25 @@ class BasicSwap(BaseApp, UIApp):
 
                     self.add(xmr_offer, cursor)
 
-                self.notify(NT.OFFER_RECEIVED, {"offer_id": offer_id.hex()}, cursor)
+                    self.notify(NT.OFFER_RECEIVED, {"offer_id": offer_id.hex()}, cursor)
             else:
                 existing_offer.setState(OfferStates.OFFER_RECEIVED)
                 self.add(existing_offer, cursor, upsert=True)
+            received_on_net: str = networkTypeToID(msg.get("type", "smsg"))
+            self.addMessageNetworkLink(
+                Concepts.OFFER,
+                offer_id,
+                MessageNetworkLinkTypes.RECEIVED_ON,
+                received_on_net,
+                cursor,
+            )
         finally:
             self.closeDB(cursor)
 
     def processOfferRevoke(self, msg) -> None:
         ensure(msg["to"] == self.network_addr, "Message received on wrong address")
 
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = OfferRevokeMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -8067,7 +7927,7 @@ class BasicSwap(BaseApp, UIApp):
             if cursor is None:
                 self.closeDB(use_cursor)
 
-    def addRecvBidNetworkLink(self, msg, bid_id):
+    def addRecvBidNetworkLink(self, msg, bid_id, cursor=None):
         if "chat_type" not in msg or msg["chat_type"] != "direct":
             return
         conn_id = msg["conn_id"]
@@ -8075,9 +7935,8 @@ class BasicSwap(BaseApp, UIApp):
             "SELECT record_id, network_id, route_data FROM direct_message_routes"
         )
         try:
-            cursor = self.openDB()
-
-            rows = cursor.execute(query_str).fetchall()
+            use_cursor = self.openDB(cursor)
+            rows = use_cursor.execute(query_str).fetchall()
 
             for row in rows:
                 record_id, network_id, route_data = row
@@ -8091,15 +7950,16 @@ class BasicSwap(BaseApp, UIApp):
                         linked_id=bid_id,
                         created_at=self.getTime(),
                     )
-                    self.add(message_route_link, cursor)
+                    self.add(message_route_link, use_cursor)
                     break
         finally:
-            self.closeDB(cursor)
+            if cursor is None:
+                self.closeDB(use_cursor)
 
     def processBid(self, msg) -> None:
         self.log.debug("Processing bid msg {}.".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
-        bid_bytes = bytes.fromhex(msg["hex"][2:-2])
+        bid_bytes = self.getSmsgMsgBytes(msg)
         bid_data = BidMessage(init_all=False)
         bid_data.from_bytes(bid_bytes)
 
@@ -8128,6 +7988,10 @@ class BasicSwap(BaseApp, UIApp):
         bid_rate: int = ci_from.make_int(bid_data.amount_to / bid_data.amount, r=1)
         self.validateBidAmount(offer, bid_data.amount, bid_rate)
 
+        network_type: str = msg.get("msg_net", "smsg")
+        network_type_received_on_id: int = networkTypeToID(network_type)
+        bid_message_nets: str = self.selectMessageNetString([network_type_received_on_id, ], bid_data.message_nets)
+        self.logD(LC.NET, f"processBid offer.message_nets {offer.message_nets}, bid.message_nets {bid_message_nets}, bid_data.message_nets {bid_data.message_nets}")
         # TODO: Allow higher bids
         # assert (bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
@@ -8174,6 +8038,7 @@ class BasicSwap(BaseApp, UIApp):
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
+                message_nets=bid_message_nets,
             )
 
             if len(bid_data.pkhash_buyer_to) > 0:
@@ -8190,9 +8055,21 @@ class BasicSwap(BaseApp, UIApp):
             bid.proof_address = bid_data.proof_address
 
         bid.setState(BidStates.BID_RECEIVED)
-        self.addRecvBidNetworkLink(msg, bid_id)
+        try:
+            cursor = self.openDB()
+            self.addRecvBidNetworkLink(msg, bid_id, cursor)
+            self.saveBidInSession(bid_id, bid, cursor)
+            received_on_net: str = networkTypeToID(msg.get("type", "smsg"))
+            self.addMessageNetworkLink(
+                Concepts.BID,
+                offer_id,
+                MessageNetworkLinkTypes.RECEIVED_ON,
+                received_on_net,
+                cursor,
+            )
+        finally:
+            self.closeDB(cursor)
 
-        self.saveBid(bid_id, bid)
         self.notify(
             NT.BID_RECEIVED,
             {
@@ -8214,7 +8091,7 @@ class BasicSwap(BaseApp, UIApp):
             "Processing bid accepted msg {}".format(self.log.id(msg["msgid"]))
         )
         now: int = self.getTime()
-        bid_accept_bytes = bytes.fromhex(msg["hex"][2:-2])
+        bid_accept_bytes = self.getSmsgMsgBytes(msg)
         bid_accept_data = BidAcceptMessage(init_all=False)
         bid_accept_data.from_bytes(bid_accept_bytes)
 
@@ -8527,7 +8404,7 @@ class BasicSwap(BaseApp, UIApp):
             "Processing adaptor-sig bid msg {}".format(self.log.id(msg["msgid"]))
         )
         now: int = self.getTime()
-        bid_bytes = bytes.fromhex(msg["hex"][2:-2])
+        bid_bytes = self.getSmsgMsgBytes(msg)
         bid_data = XmrBidMessage(init_all=False)
         bid_data.from_bytes(bid_bytes)
 
@@ -8574,6 +8451,11 @@ class BasicSwap(BaseApp, UIApp):
 
         bid_id = bytes.fromhex(msg["msgid"])
 
+        network_type: str = msg.get("msg_net", "smsg")
+        network_type_received_on_id: int = networkTypeToID(network_type)
+        bid_message_nets: str = self.selectMessageNetString([network_type_received_on_id, ], bid_data.message_nets)
+        self.logD(LC.NET, f"processXmrBid offer.message_nets {offer.message_nets}, bid.message_nets {bid_message_nets}, bid_data.message_nets {bid_data.message_nets}")
+
         bid, xmr_swap = self.getXmrBid(bid_id)
         if bid is None:
             pk_from: bytes = getMsgPubkey(self, msg)
@@ -8592,6 +8474,7 @@ class BasicSwap(BaseApp, UIApp):
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
+                message_nets=bid_message_nets,
             )
 
             xmr_swap = XmrSwap(
@@ -8619,19 +8502,26 @@ class BasicSwap(BaseApp, UIApp):
             bid.was_received = True
 
         bid.setState(BidStates.BID_RECEIVING)
-        self.addRecvBidNetworkLink(msg, bid_id)
 
         self.log.info(
             f"Receiving adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid_data.offer_msg_id)}."
         )
-        self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
-
-        if ci_to.curve_type() != Curves.ed25519:
-            try:
-                cursor = self.openDB()
+        try:
+            cursor = self.openDB()
+            self.addRecvBidNetworkLink(msg, bid_id, cursor)
+            self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+            received_on_net: str = networkTypeToID(msg.get("type", "smsg"))
+            self.addMessageNetworkLink(
+                Concepts.BID,
+                offer_id,
+                MessageNetworkLinkTypes.RECEIVED_ON,
+                received_on_net,
+                cursor,
+            )
+            if ci_to.curve_type() != Curves.ed25519:
                 self.receiveXmrBid(bid, cursor)
-            finally:
-                self.closeDB(cursor)
+        finally:
+            self.closeDB(cursor)
 
     def processXmrBidAccept(self, msg) -> None:
         # F receiving MSG1F and MSG2F
@@ -8641,7 +8531,7 @@ class BasicSwap(BaseApp, UIApp):
             )
         )
 
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = XmrBidAcceptMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -8921,7 +8811,12 @@ class BasicSwap(BaseApp, UIApp):
             addr_send_from: str = offer.addr_from if reverse_bid else bid.bid_addr
             addr_send_to: str = bid.bid_addr if reverse_bid else offer.addr_from
             coin_a_lock_tx_sigs_l_msg_id = self.sendMessage(
-                addr_send_from, addr_send_to, payload_hex, msg_valid, cursor
+                addr_send_from,
+                addr_send_to,
+                payload_hex,
+                msg_valid,
+                cursor,
+                message_nets=bid.message_nets,
             )
             self.addMessageLink(
                 Concepts.BID,
@@ -9290,7 +9185,12 @@ class BasicSwap(BaseApp, UIApp):
         addr_send_to: str = offer.addr_from if reverse_bid else bid.bid_addr
         msg_valid: int = self.getActiveBidMsgValidTime()
         coin_a_lock_release_msg_id = self.sendMessage(
-            addr_send_from, addr_send_to, payload_hex, msg_valid, cursor
+            addr_send_from,
+            addr_send_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets=bid.message_nets,
         )
         self.addMessageLink(
             Concepts.BID,
@@ -9713,7 +9613,12 @@ class BasicSwap(BaseApp, UIApp):
 
         msg_valid: int = self.getActiveBidMsgValidTime()
         xmr_swap.coin_a_lock_refund_spend_tx_msg_id = self.sendMessage(
-            addr_send_from, addr_send_to, payload_hex, msg_valid, cursor
+            addr_send_from,
+            addr_send_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets=bid.message_nets,
         )
 
         bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
@@ -9727,7 +9632,7 @@ class BasicSwap(BaseApp, UIApp):
             )
         )
 
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = XmrBidLockTxSigsMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -9868,7 +9773,7 @@ class BasicSwap(BaseApp, UIApp):
             )
         )
 
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = XmrBidLockSpendTxMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -9931,7 +9836,7 @@ class BasicSwap(BaseApp, UIApp):
     def processXmrSplitMessage(self, msg) -> None:
         self.log.debug("Processing xmr split msg {}".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = XmrSplitMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -9981,7 +9886,7 @@ class BasicSwap(BaseApp, UIApp):
             )
         )
 
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = XmrBidLockReleaseMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -10055,7 +9960,7 @@ class BasicSwap(BaseApp, UIApp):
         )
 
         now: int = self.getTime()
-        bid_bytes = bytes.fromhex(msg["hex"][2:-2])
+        bid_bytes = self.getSmsgMsgBytes(msg)
         bid_data = ADSBidIntentMessage(init_all=False)
         bid_data.from_bytes(bid_bytes)
 
@@ -10071,6 +9976,8 @@ class BasicSwap(BaseApp, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}.")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
+
+        _ = self.expandMessageNets(bid_data.message_nets)
 
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
@@ -10090,6 +9997,8 @@ class BasicSwap(BaseApp, UIApp):
             bid_data.amount_from / bid_data.amount_to, r=1
         )
         self.validateBidAmount(offer, bid_data.amount_from, bid_rate)
+
+        _ = self.expandMessageNets(bid_data.message_nets)
 
         bid_id = bytes.fromhex(msg["msgid"])
 
@@ -10112,6 +10021,7 @@ class BasicSwap(BaseApp, UIApp):
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
                 chain_b_height_start=ci_to.getChainHeight(),
+                message_nets=bid_data.message_nets,
             )
 
             xmr_swap = XmrSwap(
@@ -10173,7 +10083,7 @@ class BasicSwap(BaseApp, UIApp):
             )
         )
 
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = ADSBidIntentAcceptMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -10249,7 +10159,7 @@ class BasicSwap(BaseApp, UIApp):
         self.log.debug(
             "Processing connection request msg {}.".format(self.log.id(msg["msgid"]))
         )
-        msg_bytes = bytes.fromhex(msg["hex"][2:-2])
+        msg_bytes = self.getSmsgMsgBytes(msg)
         msg_data = ConnectReqMessage(init_all=False)
         msg_data.from_bytes(msg_bytes)
 
@@ -10306,35 +10216,6 @@ class BasicSwap(BaseApp, UIApp):
 
         finally:
             self.closeDB(cursor)
-
-    def routeEstablishedForBid(self, bid_id: bytes, cursor):
-        self.log.info(f"Route established for bid {self.log.id(bid_id)}")
-
-        bid, offer = self.getBidAndOffer(bid_id, cursor)
-        ensure(bid, "Bid not found")
-        ensure(offer, "Offer not found")
-
-        coin_from = Coins(offer.coin_from)
-        coin_to = Coins(offer.coin_to)
-
-        if offer.swap_type == SwapTypes.XMR_SWAP:
-            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
-
-            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
-            if reverse_bid:
-                bid_id = self.sendADSBidIntentMessage(bid, offer, cursor)
-                bid.setState(BidStates.BID_REQUEST_SENT)
-                self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
-            else:
-                bid_id = self.sendXmrBidMessage(bid, xmr_swap, offer, cursor)
-                bid.setState(BidStates.BID_SENT)
-                self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
-            self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
-        else:
-            bid_id = self.sendBidMessage(bid, offer, cursor)
-            bid.setState(BidStates.BID_SENT)
-            self.log.info(f"Sent BID {self.log.id(bid_id)}")
-            self.saveBidInSession(bid_id, bid, cursor)
 
     def processContactConnected(self, event_data) -> None:
         contact_data = getResponseData(event_data, "contact")
@@ -10399,48 +10280,34 @@ class BasicSwap(BaseApp, UIApp):
         finally:
             self.closeDB(cursor)
 
-    def processContactDisconnected(self, event_data) -> None:
-        net_i = self.getActiveNetworkInterface(2)
-        connId = getResponseData(event_data, "contact")["activeConn"]["connId"]
-        self.log.info(f"Direct message route disconnected, connId: {connId}")
-        closeSimplexChat(self, net_i, connId)
+    def routeEstablishedForBid(self, bid_id: bytes, cursor):
+        self.log.info(f"Route established for bid {self.log.id(bid_id)}")
 
-        query_str = "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes"
-        try:
-            cursor = self.openDB()
+        bid, offer = self.getBidAndOffer(bid_id, cursor)
+        ensure(bid, "Bid not found")
+        ensure(offer, "Offer not found")
 
-            rows = cursor.execute(query_str).fetchall()
+        coin_from = Coins(offer.coin_from)
+        coin_to = Coins(offer.coin_to)
 
-            for row in rows:
-                record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = (
-                    row
-                )
-                route_data = json.loads(route_data.decode("UTF-8"))
+        if offer.swap_type == SwapTypes.XMR_SWAP:
+            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
 
-                if connId == route_data["pccConnId"]:
-                    self.log.debug(f"Removing direct message route: {record_id}.")
-                    cursor.execute(
-                        "DELETE FROM direct_message_routes WHERE record_id = :record_id ",
-                        {"record_id": record_id},
-                    )
-                    break
-        finally:
-            self.closeDB(cursor)
-
-    def closeMessageRoute(self, record_id, network_id, route_data, cursor):
-        net_i = self.getActiveNetworkInterface(2)
-
-        connId = route_data["pccConnId"]
-
-        self.log.info(f"Closing Simplex chat, id: {connId}")
-        closeSimplexChat(self, net_i, connId)
-
-        self.log.debug(f"Removing direct message route: {record_id}.")
-        cursor.execute(
-            "DELETE FROM direct_message_routes WHERE record_id = :record_id ",
-            {"record_id": record_id},
-        )
-        self.commitDB()
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
+            if reverse_bid:
+                bid_id = self.sendADSBidIntentMessage(bid, offer, cursor)
+                bid.setState(BidStates.BID_REQUEST_SENT)
+                self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
+            else:
+                bid_id = self.sendXmrBidMessage(bid, xmr_swap, offer, cursor)
+                bid.setState(BidStates.BID_SENT)
+                self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
+            self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
+        else:
+            bid_id = self.sendBidMessage(bid, offer, cursor)
+            bid.setState(BidStates.BID_SENT)
+            self.log.info(f"Sent BID {self.log.id(bid_id)}")
+            self.saveBidInSession(bid_id, bid, cursor)
 
     def processMsg(self, msg) -> None:
         try:
@@ -10452,6 +10319,14 @@ class BasicSwap(BaseApp, UIApp):
                         )
                     raise ValueError("Invalid msg received {}.".format(msg["msgid"]))
                 return
+
+            network_type = msg.get("msg_net", "smsg")
+            if network_type == "smsg":
+                self.num_smsg_messages_received += 1
+            elif network_type == "simplex":
+                pass  # Counted earlier, split between group and direct
+            else:
+                self.log.warning(f"processMsg unknown network: {network_type}")
             msg_type = int(msg["hex"][:2], 16)
 
             if msg_type == MessageTypes.OFFER:
@@ -10481,6 +10356,10 @@ class BasicSwap(BaseApp, UIApp):
                 self.processADSBidReversedAccept(msg)
             elif msg_type == MessageTypes.CONNECT_REQ:
                 self.processConnectRequest(msg)
+            elif msg_type == MessageTypes.PORTAL_OFFER:
+                self.processPortalOffer(msg)
+            elif msg_type == MessageTypes.PORTAL_SEND:
+                self.processPortalMessage(msg)
 
         except InactiveCoin as ex:
             self.log.debug(
@@ -10497,29 +10376,6 @@ class BasicSwap(BaseApp, UIApp):
                     str(ex),
                     None,
                 )
-
-    def processZmqSmsg(self) -> None:
-        message = self.zmqSubscriber.recv()
-        # Clear
-        _ = self.zmqSubscriber.recv()
-
-        if message[0] == 3:  # Paid smsg
-            return  # TODO: Switch to paid?
-
-        msg_id = message[2:]
-        options = {"encoding": "hex", "setread": True}
-        num_tries = 5
-        for i in range(num_tries + 1):
-            try:
-                msg = self.callrpc("smsg", [msg_id.hex(), options])
-                break
-            except Exception as e:
-                if "Unknown message id" in str(e) and i < num_tries:
-                    self.delay_event.wait(1)
-                else:
-                    raise e
-
-        self.processMsg(msg)
 
     def processZmqHashwtx(self) -> None:
         self.zmqSubscriber.recv()
@@ -10686,20 +10542,9 @@ class BasicSwap(BaseApp, UIApp):
             except Exception as e:
                 self.logException(f"smsg zmq {e}")
 
-        if self._poll_smsg:
-            now: int = self.getTime()
-            if now - self._last_checked_smsg >= self.check_smsg_seconds:
-                self._last_checked_smsg = now
-                options = {"encoding": "hex", "setread": True}
-                msgs = self.callrpc("smsginbox", ["unread", "", options])
-                for msg in msgs["messages"]:
-                    self.processMsg(msg)
+        self.updateNetwork()
 
         try:
-            for network in self.active_networks:
-                if network["type"] == "simplex":
-                    readSimplexMsgs(self, network)
-
             # TODO: Wait for blocks / txns, would need to check multiple coins
             now: int = self.getTime()
             self.expireBidsAndOffers(now)
@@ -12196,15 +12041,6 @@ class BasicSwap(BaseApp, UIApp):
         finally:
             self.closeDB(cursor, commit=False)
 
-    def add_connection(self, host, port, peer_pubkey):
-        self.log.info(f"add_connection {host} {port} {peer_pubkey.hex()}.")
-        self._network.add_connection(host, port, peer_pubkey)
-
-    def get_network_info(self):
-        if not self._network:
-            return {"Error": "Not Initialised"}
-        return self._network.get_info()
-
     def getLockedState(self):
         if self._is_encrypted is None or self._is_locked is None:
             self._is_encrypted, self._is_locked = self.ci(
@@ -12445,24 +12281,3 @@ class BasicSwap(BaseApp, UIApp):
             return rv_array
 
         return rv
-
-    def setMsgSplitInfo(self, xmr_swap) -> None:
-        for network in self.active_networks:
-            if network["type"] == "simplex":
-                xmr_swap.msg_split_info = "9000:11000"
-                return
-        xmr_swap.msg_split_info = "16000:17000"
-
-    def setFilters(self, prefix, filters):
-        key_str = "saved_filters_" + prefix
-        value_str = json.dumps(filters)
-        self.setStringKV(key_str, value_str)
-
-    def getFilters(self, prefix):
-        key_str = "saved_filters_" + prefix
-        value_str = self.getStringKV(key_str)
-        return None if not value_str else json.loads(value_str)
-
-    def clearFilters(self, prefix) -> None:
-        key_str = "saved_filters_" + prefix
-        self.clearStringKV(key_str)

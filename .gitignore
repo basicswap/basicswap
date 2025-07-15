@@ -11,6 +11,7 @@ __pycache__
 .eggs
 .ruff_cache
 .pytest_cache
+.vectorcode
 *~
 
 # geckodriver.log

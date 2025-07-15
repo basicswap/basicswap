@@ -9,8 +9,8 @@ from basicswap.util.address import b58decode
 
 
 def getMsgPubkey(self, msg) -> bytes:
-    if "pk_from" in msg:
-        return bytes.fromhex(msg["pk_from"])
+    if "pubkey_from" in msg:
+        return bytes.fromhex(msg["pubkey_from"])
     rv = self.callrpc(
         "smsggetpubkey",
         [

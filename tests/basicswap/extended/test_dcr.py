@@ -1384,7 +1384,7 @@ class Test(BaseTest):
 
         # Entire system is locked with Particl wallet
         jsw = read_json_api(1800, "wallets/dcr")
-        assert "Coin must be unlocked" in jsw["error"]
+        assert "must be unlocked" in jsw["error"]
 
         read_json_api(1800, "unlock", {"coin": "part", "password": "notapassword123"})
 
@@ -1395,7 +1395,7 @@ class Test(BaseTest):
 
         read_json_api(1800, "lock", {"coin": "part"})
         jsw = read_json_api(1800, "wallets/part")
-        assert "Coin must be unlocked" in jsw["error"]
+        assert "must be unlocked" in jsw["error"]
 
         read_json_api(
             1800,
