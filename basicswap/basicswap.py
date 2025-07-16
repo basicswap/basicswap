@@ -206,14 +206,20 @@ def threadPollXMRChainState(swap_client, coin_type):
                         cached_balance = cc.get("cached_balance", None)
                         cached_total_balance = cc.get("cached_total_balance", None)
 
+                        current_unconfirmed = current_total_balance - current_balance
+                        cached_unconfirmed = cc.get("cached_unconfirmed", None)
+
                         if (
                             cached_balance is None
                             or current_balance != cached_balance
                             or cached_total_balance is None
                             or current_total_balance != cached_total_balance
+                            or cached_unconfirmed is None
+                            or current_unconfirmed != cached_unconfirmed
                         ):
                             cc["cached_balance"] = current_balance
                             cc["cached_total_balance"] = current_total_balance
+                            cc["cached_unconfirmed"] = current_unconfirmed
                             balance_event = {
                                 "event": "coin_balance_updated",
                                 "coin": ci.ticker(),
@@ -225,6 +231,7 @@ def threadPollXMRChainState(swap_client, coin_type):
                     except Exception:
                         cc["cached_balance"] = None
                         cc["cached_total_balance"] = None
+                        cc["cached_unconfirmed"] = None
 
         except Exception as e:
             swap_client.log.warning(
@@ -255,14 +262,20 @@ def threadPollWOWChainState(swap_client, coin_type):
                         cached_balance = cc.get("cached_balance", None)
                         cached_total_balance = cc.get("cached_total_balance", None)
 
+                        current_unconfirmed = current_total_balance - current_balance
+                        cached_unconfirmed = cc.get("cached_unconfirmed", None)
+
                         if (
                             cached_balance is None
                             or current_balance != cached_balance
                             or cached_total_balance is None
                             or current_total_balance != cached_total_balance
+                            or cached_unconfirmed is None
+                            or current_unconfirmed != cached_unconfirmed
                         ):
                             cc["cached_balance"] = current_balance
                             cc["cached_total_balance"] = current_total_balance
+                            cc["cached_unconfirmed"] = current_unconfirmed
                             balance_event = {
                                 "event": "coin_balance_updated",
                                 "coin": ci.ticker(),
@@ -274,6 +287,7 @@ def threadPollWOWChainState(swap_client, coin_type):
                     except Exception:
                         cc["cached_balance"] = None
                         cc["cached_total_balance"] = None
+                        cc["cached_unconfirmed"] = None
 
         except Exception as e:
             swap_client.log.warning(
@@ -308,14 +322,20 @@ def threadPollChainState(swap_client, coin_type):
                         cached_balance = cc.get("cached_balance", None)
                         cached_total_balance = cc.get("cached_total_balance", None)
 
+                        current_unconfirmed = current_total_balance - current_balance
+                        cached_unconfirmed = cc.get("cached_unconfirmed", None)
+
                         if (
                             cached_balance is None
                             or current_balance != cached_balance
                             or cached_total_balance is None
                             or current_total_balance != cached_total_balance
+                            or cached_unconfirmed is None
+                            or current_unconfirmed != cached_unconfirmed
                         ):
                             cc["cached_balance"] = current_balance
                             cc["cached_total_balance"] = current_total_balance
+                            cc["cached_unconfirmed"] = current_unconfirmed
                             balance_event = {
                                 "event": "coin_balance_updated",
                                 "coin": ci.ticker(),
@@ -327,6 +347,7 @@ def threadPollChainState(swap_client, coin_type):
                     except Exception:
                         cc["cached_balance"] = None
                         cc["cached_total_balance"] = None
+                        cc["cached_unconfirmed"] = None
 
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")
@@ -10946,6 +10967,76 @@ class BasicSwap(BaseApp, UIApp):
                         seen_tickers.append(upcased_ticker)
                 if settings_copy.get("enabled_chart_coins", "") != new_value:
                     settings_copy["enabled_chart_coins"] = new_value
+                    settings_changed = True
+
+            if "notifications_new_offers" in data:
+                new_value = data["notifications_new_offers"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_new_offers value not boolean",
+                )
+                if settings_copy.get("notifications_new_offers", False) != new_value:
+                    settings_copy["notifications_new_offers"] = new_value
+                    settings_changed = True
+
+            if "notifications_new_bids" in data:
+                new_value = data["notifications_new_bids"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_new_bids value not boolean",
+                )
+                if settings_copy.get("notifications_new_bids", True) != new_value:
+                    settings_copy["notifications_new_bids"] = new_value
+                    settings_changed = True
+
+            if "notifications_bid_accepted" in data:
+                new_value = data["notifications_bid_accepted"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_bid_accepted value not boolean",
+                )
+                if settings_copy.get("notifications_bid_accepted", True) != new_value:
+                    settings_copy["notifications_bid_accepted"] = new_value
+                    settings_changed = True
+
+            if "notifications_balance_changes" in data:
+                new_value = data["notifications_balance_changes"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_balance_changes value not boolean",
+                )
+                if (
+                    settings_copy.get("notifications_balance_changes", True)
+                    != new_value
+                ):
+                    settings_copy["notifications_balance_changes"] = new_value
+                    settings_changed = True
+
+            if "notifications_outgoing_transactions" in data:
+                new_value = data["notifications_outgoing_transactions"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_outgoing_transactions value not boolean",
+                )
+                if (
+                    settings_copy.get("notifications_outgoing_transactions", True)
+                    != new_value
+                ):
+                    settings_copy["notifications_outgoing_transactions"] = new_value
+                    settings_changed = True
+
+            if "notifications_duration" in data:
+                new_value = data["notifications_duration"]
+                ensure(
+                    isinstance(new_value, int),
+                    "New notifications_duration value not integer",
+                )
+                ensure(
+                    5 <= new_value <= 60,
+                    "notifications_duration must be between 5 and 60 seconds",
+                )
+                if settings_copy.get("notifications_duration", 20) != new_value:
+                    settings_copy["notifications_duration"] = new_value
                     settings_changed = True
 
             if settings_changed:

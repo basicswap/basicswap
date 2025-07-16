@@ -60,6 +60,38 @@ def page_settings(self, url_split, post_string):
                     ),
                 }
                 swap_client.editGeneralSettings(data)
+            elif have_data_entry(form_data, "apply_notifications"):
+                active_tab = "notifications"
+                data = {
+                    "notifications_new_offers": toBool(
+                        get_data_entry_or(
+                            form_data, "notifications_new_offers", "false"
+                        )
+                    ),
+                    "notifications_new_bids": toBool(
+                        get_data_entry_or(form_data, "notifications_new_bids", "false")
+                    ),
+                    "notifications_bid_accepted": toBool(
+                        get_data_entry_or(
+                            form_data, "notifications_bid_accepted", "false"
+                        )
+                    ),
+                    "notifications_balance_changes": toBool(
+                        get_data_entry_or(
+                            form_data, "notifications_balance_changes", "false"
+                        )
+                    ),
+                    "notifications_outgoing_transactions": toBool(
+                        get_data_entry_or(
+                            form_data, "notifications_outgoing_transactions", "false"
+                        )
+                    ),
+                    "notifications_duration": int(
+                        get_data_entry_or(form_data, "notifications_duration", "20")
+                    ),
+                }
+                swap_client.editGeneralSettings(data)
+                messages.append("Notification settings applied.")
             elif have_data_entry(form_data, "apply_tor"):
                 active_tab = "tor"
                 # TODO: Detect if running in docker
@@ -186,6 +218,27 @@ def page_settings(self, url_split, post_string):
         "enabled_chart_coins": swap_client.settings.get("enabled_chart_coins", ""),
     }
 
+    notification_settings = {
+        "notifications_new_offers": swap_client.settings.get(
+            "notifications_new_offers", False
+        ),
+        "notifications_new_bids": swap_client.settings.get(
+            "notifications_new_bids", True
+        ),
+        "notifications_bid_accepted": swap_client.settings.get(
+            "notifications_bid_accepted", True
+        ),
+        "notifications_balance_changes": swap_client.settings.get(
+            "notifications_balance_changes", True
+        ),
+        "notifications_outgoing_transactions": swap_client.settings.get(
+            "notifications_outgoing_transactions", True
+        ),
+        "notifications_duration": swap_client.settings.get(
+            "notifications_duration", 20
+        ),
+    }
+
     tor_control_password = (
         ""
         if swap_client.tor_control_password is None
@@ -209,6 +262,7 @@ def page_settings(self, url_split, post_string):
             "chains": chains_formatted,
             "general_settings": general_settings,
             "chart_settings": chart_settings,
+            "notification_settings": notification_settings,
             "tor_settings": tor_settings,
             "active_tab": active_tab,
         },
