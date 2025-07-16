@@ -23,7 +23,6 @@ from basicswap.chainparams import (
     Coins,
 )
 from basicswap.util.address import (
-    b58decode,
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes
@@ -173,65 +172,6 @@ def waitForConnected(ws_thread, delay_event):
     raise ValueError("waitForConnected timed-out.")
 
 
-def getPrivkeyForAddress(self, cursor, addr: str) -> bytes:
-    ci_part = self.ci(Coins.PART)
-    try:
-        return ci_part.decodeKey(
-            self.callrpc(
-                "smsgdumpprivkey",
-                [
-                    addr,
-                ],
-            )
-        )
-    except Exception as e:  # noqa: F841
-        pass
-    try:
-        return ci_part.decodeKey(
-            ci_part.rpc_wallet(
-                "dumpprivkey",
-                [
-                    addr,
-                ],
-            )
-        )
-    except Exception as e:  # noqa: F841
-        pass
-    raise ValueError("key not found")
-
-
-def getPubkeyForAddress(self, cursor, addr: str) -> bytes:
-    if self._have_smsg_rpc:
-        try:
-            rv = self.callrpc(
-                "smsggetpubkey",
-                [
-                    addr,
-                ],
-            )
-            return b58decode(rv["publickey"])
-        except Exception as e:  # noqa: F841
-            pass
-    use_cursor = self.openDB(cursor)
-    try:
-        query: str = "SELECT pk_from FROM offers WHERE addr_from = :addr_to LIMIT 1"
-        rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
-        if len(rows) > 0:
-            return rows[0][0]
-        query: str = "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr_to LIMIT 1"
-        rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
-        if len(rows) > 0:
-            return rows[0][0]
-        query: str = "SELECT pubkey FROM smsgaddresses WHERE addr = :addr LIMIT 1"
-        rows = use_cursor.execute(query, {"addr": addr}).fetchall()
-        if len(rows) > 0:
-            return bytes.fromhex(rows[0][0])
-        raise ValueError(f"Could not get public key for address: {addr}")
-    finally:
-        if cursor is None:
-            self.closeDB(use_cursor, commit=False)
-
-
 def encryptMsg(
     self,
     addr_from: str,
@@ -245,8 +185,8 @@ def encryptMsg(
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    pubkey_to = getPubkeyForAddress(self, cursor, addr_to)
-    privkey_from = getPrivkeyForAddress(self, cursor, addr_from)
+    pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
+    privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
     smsg_msg: bytes = smsgEncrypt(
         privkey_from,
@@ -370,7 +310,7 @@ def decryptSimplexMsg(self, msg_data):
         for row in addr_rows:
             addr = row[0]
             try:
-                vk_addr = getPrivkeyForAddress(self, cursor, addr)
+                vk_addr = self.getPrivkeyForAddress(cursor, addr)
                 decrypted = smsgDecrypt(vk_addr, msg_data, output_dict=True)
                 decrypted["from"] = ci_part.pubkey_to_address(
                     bytes.fromhex(decrypted["pubkey_from"])

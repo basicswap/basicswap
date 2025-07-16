@@ -7545,7 +7545,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug("Ignoring expired offer.")
             return
 
-        _ = self.expandMessageNets(offer_data.message_nets)
+        _ = self.expandMessageNets(offer_data.message_nets)  # Decode to validate
 
         offer_rate: int = ci_from.make_int(
             offer_data.amount_to / offer_data.amount_from, r=1
@@ -7987,6 +7987,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci_to = self.ci(coin_to)
         bid_rate: int = ci_from.make_int(bid_data.amount_to / bid_data.amount, r=1)
         self.validateBidAmount(offer, bid_data.amount, bid_rate)
+
+        _ = self.expandMessageNets(bid_data.message_nets)  # Decode to validate
 
         network_type: str = msg.get("msg_net", "smsg")
         network_type_received_on_id: int = networkTypeToID(network_type)
@@ -8448,6 +8450,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if ci_to.curve_type() == Curves.ed25519:
             ensure(len(bid_data.kbsf_dleag) <= 16000, "Invalid kbsf_dleag size")
+
+        _ = self.expandMessageNets(bid_data.message_nets)  # Decode to validate
 
         bid_id = bytes.fromhex(msg["msgid"])
 
@@ -9977,7 +9981,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
 
-        _ = self.expandMessageNets(bid_data.message_nets)
+        _ = self.expandMessageNets(bid_data.message_nets)  # Decode to validate
 
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
