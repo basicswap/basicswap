@@ -636,7 +636,7 @@ class BSXNetwork:
         else:
             send_to = addr_to
         if self._smsg_add_to_outbox is False:
-            options["add_to_outbox"] = False
+            options["savemsg"] = False
         if return_msg:
             options["returnmsg"] = True
 
@@ -728,7 +728,7 @@ class BSXNetwork:
                 if "Unknown message id" in str(e) and i < num_tries:
                     self.delay_event.wait(1)
                 else:
-                    raise e
+                    raise RuntimeError(f"\"smsg\" failed for {msg_id.hex()}: {e}")
 
         self.processMsg(msg)
 
