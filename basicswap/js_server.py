@@ -232,8 +232,18 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                             if "mweb_balance" in w:
                                 variant_balance = w["mweb_balance"]
 
-                            if "mweb_pending" in w and float(w["mweb_pending"]) > 0.0:
-                                variant_pending = str(w["mweb_pending"])
+                            pending_amount = 0
+                            if (
+                                "mweb_unconfirmed" in w
+                                and float(w["mweb_unconfirmed"]) > 0.0
+                            ):
+                                pending_amount += float(w["mweb_unconfirmed"])
+                            if "mweb_immature" in w and float(w["mweb_immature"]) > 0.0:
+                                pending_amount += float(w["mweb_immature"])
+                            if pending_amount > 0:
+                                variant_pending = f"{pending_amount:.8f}".rstrip(
+                                    "0"
+                                ).rstrip(".")
 
                     variant_entry = {
                         "id": int(Coins.LTC_MWEB),

@@ -1098,6 +1098,8 @@ document.addEventListener('DOMContentLoaded', function() {
     window.WebSocketManager.initialize();
   }
 
+  window.currentBalances = window.currentBalances || {};
+
   function updateWalletBalances() {
     fetch('/json/walletbalances', {
       headers: {
@@ -1123,6 +1125,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         balanceData.forEach(coin => {
           updateWalletDisplay(coin);
+          updatePercentageButtons(coin);
         });
 
 
@@ -1136,6 +1139,57 @@ document.addEventListener('DOMContentLoaded', function() {
       .catch(error => {
         console.error('[Wallet] Error updating wallet balances:', error);
       });
+  }
+
+  function updatePercentageButtons(coinData) {
+    const currentCoinId = {{ w.cid }};
+
+    if (coinData.id === currentCoinId) {
+      const buttons = document.querySelectorAll('button[onclick*="setAmount"]');
+      buttons.forEach(button => {
+        const onclick = button.getAttribute('onclick');
+        if (onclick) {
+          if (coinData.id === 1) {
+            const anonBalance = coinData.name === 'Particl Anon' ? coinData.balance :
+                              (window.currentBalances && window.currentBalances.anonBalance) || '0';
+            const blindBalance = coinData.name === 'Particl Blind' ? coinData.balance :
+                               (window.currentBalances && window.currentBalances.blindBalance) || '0';
+            const mainBalance = coinData.name === 'Particl' ? coinData.balance :
+                              (window.currentBalances && window.currentBalances.mainBalance) || '0';
+
+            if (coinData.name === 'Particl') window.currentBalances = { ...window.currentBalances, mainBalance: coinData.balance };
+            if (coinData.name === 'Particl Anon') window.currentBalances = { ...window.currentBalances, anonBalance: coinData.balance };
+            if (coinData.name === 'Particl Blind') window.currentBalances = { ...window.currentBalances, blindBalance: coinData.balance };
+
+            const newOnclick = onclick.replace(
+              /setAmount\([^,]+,\s*'[^']*',\s*\d+,\s*'[^']*',\s*'[^']*'\)/,
+              `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${mainBalance}', ${currentCoinId}, '${blindBalance}', '${anonBalance}')`
+            );
+            button.setAttribute('onclick', newOnclick);
+          } else if (coinData.id === 3) {
+            const mwebBalance = coinData.name === 'Litecoin MWEB' ? coinData.balance :
+                              (window.currentBalances && window.currentBalances.mwebBalance) || '0';
+            const mainBalance = coinData.name === 'Litecoin' ? coinData.balance :
+                              (window.currentBalances && window.currentBalances.mainBalance) || '0';
+
+            if (coinData.name === 'Litecoin') window.currentBalances = { ...window.currentBalances, mainBalance: coinData.balance };
+            if (coinData.name === 'Litecoin MWEB') window.currentBalances = { ...window.currentBalances, mwebBalance: coinData.balance };
+
+            const newOnclick = onclick.replace(
+              /setAmount\([^,]+,\s*'[^']*',\s*\d+,\s*'[^']*'\)/,
+              `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${mainBalance}', ${currentCoinId}, '${mwebBalance}')`
+            );
+            button.setAttribute('onclick', newOnclick);
+          } else {
+            const newOnclick = onclick.replace(
+              /setAmount\([^,]+,\s*'[^']*',\s*\d+\)/,
+              `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${coinData.balance}', ${currentCoinId})`
+            );
+            button.setAttribute('onclick', newOnclick);
+          }
+        }
+      });
+    }
   }
 
   function updateWalletDisplay(coinData) {

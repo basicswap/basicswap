@@ -241,9 +241,7 @@ const NotificationManager = (function() {
         clickAction = `onclick="window.location.href='/bid/${options.bidId}'"`;
         cursorStyle = 'cursor-pointer';
       } else if (options.coinSymbol) {
-
-        const coinParam = options.coinSymbol.toLowerCase();
-        clickAction = `onclick="window.location.href='/wallet/${coinParam}'"`;
+        clickAction = `onclick="window.location.href='/wallet/${options.coinSymbol}'"`;
         cursorStyle = 'cursor-pointer';
       }
 
