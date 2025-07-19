@@ -243,6 +243,8 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                         "ticker": chainparams[Coins.LTC]["ticker"],
                     }
 
+                    coins_with_balances.append(variant_entry)
+
         return bytes(json.dumps(coins_with_balances), "UTF-8")
 
     except Exception as e:

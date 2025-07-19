@@ -186,6 +186,50 @@ def validOfferStateToReceiveBid(offer_state):
     return False
 
 
+def checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height):
+    if not swap_client.ws_server:
+        return
+
+    try:
+        blockchain_info = ci.getBlockchainInfo()
+        verification_progress = blockchain_info.get("verificationprogress", 1.0)
+        if verification_progress < 0.99:
+            return
+    except Exception:
+        return
+
+    try:
+        current_balance = ci.getSpendableBalance()
+        current_total_balance = swap_client.getTotalBalance(coin_type)
+        cached_balance = cc.get("cached_balance", None)
+        cached_total_balance = cc.get("cached_total_balance", None)
+
+        current_unconfirmed = current_total_balance - current_balance
+        cached_unconfirmed = cc.get("cached_unconfirmed", None)
+
+        if (
+            cached_balance is None
+            or current_balance != cached_balance
+            or cached_total_balance is None
+            or current_total_balance != cached_total_balance
+            or cached_unconfirmed is None
+            or current_unconfirmed != cached_unconfirmed
+        ):
+            cc["cached_balance"] = current_balance
+            cc["cached_total_balance"] = current_total_balance
+            cc["cached_unconfirmed"] = current_unconfirmed
+            balance_event = {
+                "event": "coin_balance_updated",
+                "coin": ci.ticker(),
+                "height": new_height,
+            }
+            swap_client.ws_server.send_message_to_all(json.dumps(balance_event))
+    except Exception:
+        cc["cached_balance"] = None
+        cc["cached_total_balance"] = None
+        cc["cached_unconfirmed"] = None
+
+
 def threadPollXMRChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
@@ -199,39 +243,7 @@ def threadPollXMRChainState(swap_client, coin_type):
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
 
-                if swap_client.ws_server:
-                    try:
-                        current_balance = ci.getSpendableBalance()
-                        current_total_balance = swap_client.getTotalBalance(coin_type)
-                        cached_balance = cc.get("cached_balance", None)
-                        cached_total_balance = cc.get("cached_total_balance", None)
-
-                        current_unconfirmed = current_total_balance - current_balance
-                        cached_unconfirmed = cc.get("cached_unconfirmed", None)
-
-                        if (
-                            cached_balance is None
-                            or current_balance != cached_balance
-                            or cached_total_balance is None
-                            or current_total_balance != cached_total_balance
-                            or cached_unconfirmed is None
-                            or current_unconfirmed != cached_unconfirmed
-                        ):
-                            cc["cached_balance"] = current_balance
-                            cc["cached_total_balance"] = current_total_balance
-                            cc["cached_unconfirmed"] = current_unconfirmed
-                            balance_event = {
-                                "event": "coin_balance_updated",
-                                "coin": ci.ticker(),
-                                "height": new_height,
-                            }
-                            swap_client.ws_server.send_message_to_all(
-                                json.dumps(balance_event)
-                            )
-                    except Exception:
-                        cc["cached_balance"] = None
-                        cc["cached_total_balance"] = None
-                        cc["cached_unconfirmed"] = None
+                checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height)
 
         except Exception as e:
             swap_client.log.warning(
@@ -255,39 +267,7 @@ def threadPollWOWChainState(swap_client, coin_type):
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
 
-                if swap_client.ws_server:
-                    try:
-                        current_balance = ci.getSpendableBalance()
-                        current_total_balance = swap_client.getTotalBalance(coin_type)
-                        cached_balance = cc.get("cached_balance", None)
-                        cached_total_balance = cc.get("cached_total_balance", None)
-
-                        current_unconfirmed = current_total_balance - current_balance
-                        cached_unconfirmed = cc.get("cached_unconfirmed", None)
-
-                        if (
-                            cached_balance is None
-                            or current_balance != cached_balance
-                            or cached_total_balance is None
-                            or current_total_balance != cached_total_balance
-                            or cached_unconfirmed is None
-                            or current_unconfirmed != cached_unconfirmed
-                        ):
-                            cc["cached_balance"] = current_balance
-                            cc["cached_total_balance"] = current_total_balance
-                            cc["cached_unconfirmed"] = current_unconfirmed
-                            balance_event = {
-                                "event": "coin_balance_updated",
-                                "coin": ci.ticker(),
-                                "height": new_height,
-                            }
-                            swap_client.ws_server.send_message_to_all(
-                                json.dumps(balance_event)
-                            )
-                    except Exception:
-                        cc["cached_balance"] = None
-                        cc["cached_total_balance"] = None
-                        cc["cached_unconfirmed"] = None
+                checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height)
 
         except Exception as e:
             swap_client.log.warning(
@@ -315,39 +295,7 @@ def threadPollChainState(swap_client, coin_type):
                     if "mediantime" in chain_state:
                         cc["chain_median_time"] = chain_state["mediantime"]
 
-                if swap_client.ws_server:
-                    try:
-                        current_balance = ci.getSpendableBalance()
-                        current_total_balance = swap_client.getTotalBalance(coin_type)
-                        cached_balance = cc.get("cached_balance", None)
-                        cached_total_balance = cc.get("cached_total_balance", None)
-
-                        current_unconfirmed = current_total_balance - current_balance
-                        cached_unconfirmed = cc.get("cached_unconfirmed", None)
-
-                        if (
-                            cached_balance is None
-                            or current_balance != cached_balance
-                            or cached_total_balance is None
-                            or current_total_balance != cached_total_balance
-                            or cached_unconfirmed is None
-                            or current_unconfirmed != cached_unconfirmed
-                        ):
-                            cc["cached_balance"] = current_balance
-                            cc["cached_total_balance"] = current_total_balance
-                            cc["cached_unconfirmed"] = current_unconfirmed
-                            balance_event = {
-                                "event": "coin_balance_updated",
-                                "coin": ci.ticker(),
-                                "height": new_height,
-                            }
-                            swap_client.ws_server.send_message_to_all(
-                                json.dumps(balance_event)
-                            )
-                    except Exception:
-                        cc["cached_balance"] = None
-                        cc["cached_total_balance"] = None
-                        cc["cached_unconfirmed"] = None
+                checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height)
 
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")

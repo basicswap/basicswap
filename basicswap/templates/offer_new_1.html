@@ -458,126 +458,17 @@ function updateCoinDropdownBalances(balanceData) {
   });
 }
 
-
-function fetchBalanceData() {
-  return fetch('/json/walletbalances', {
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    }
-  })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status} ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(balanceData => {
-      if (balanceData.error) {
-        throw new Error(balanceData.error);
-      }
-
-
-      if (!Array.isArray(balanceData)) {
-        throw new Error('Invalid response format');
-      }
-
-      return balanceData;
-    });
-}
-
-
-function setupWebSocketBalanceUpdates() {
-  if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
-
-
-
-    const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
-      if (data && data.event) {
-
-        if (data.event === 'coin_balance_updated') {
-          clearTimeout(window.offerBalanceUpdateTimeout);
-          window.offerBalanceUpdateTimeout = setTimeout(() => {
-            fetchBalanceData()
-              .then(balanceData => {
-                updateCoinDropdownBalances(balanceData);
-              })
-              .catch(error => {
-                console.error('Error updating New Offer balances via WebSocket:', error);
-              });
-          }, 2000);
-        }
-
-
-        const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
-        if (swapEvents.includes(data.event)) {
-
-
-
-          clearTimeout(window.offerSwapEventTimeout);
-          window.offerSwapEventTimeout = setTimeout(() => {
-            fetchBalanceData()
-              .then(balanceData => {
-                updateCoinDropdownBalances(balanceData);
-
-              })
-              .catch(error => {
-                console.error('Error updating New Offer balances via swap event:', error);
-              });
-          }, 5000);
-        }
-      }
-    });
-
-
-    window.offerBalanceHandlerId = balanceHandlerId;
-
-  } else {
-
-  }
-
-
-  if (!window.offerPeriodicRefresh) {
-    window.offerPeriodicRefresh = setInterval(() => {
-      fetchBalanceData()
-        .then(balanceData => {
-          updateCoinDropdownBalances(balanceData);
-        })
-        .catch(error => {
-          console.error('Error in periodic New Offer balance refresh:', error);
-        });
-    }, 120000);
-  }
-}
-
-
-function cleanupOfferBalanceUpdates() {
-  if (window.offerBalanceHandlerId && window.WebSocketManager) {
-    window.WebSocketManager.removeMessageHandler('message', window.offerBalanceHandlerId);
-
-  }
-
-  if (window.offerPeriodicRefresh) {
-    clearInterval(window.offerPeriodicRefresh);
-    window.offerPeriodicRefresh = null;
-
-  }
-
-  clearTimeout(window.offerBalanceUpdateTimeout);
-  clearTimeout(window.offerSwapEventTimeout);
-}
-
-
 document.addEventListener('DOMContentLoaded', function() {
-  setupWebSocketBalanceUpdates();
+  window.BalanceUpdatesManager.initialize();
 
-
-  if (window.CleanupManager) {
-    window.CleanupManager.registerResource('offerBalanceUpdates', null, cleanupOfferBalanceUpdates);
-  }
-
-  window.addEventListener('beforeunload', cleanupOfferBalanceUpdates);
-
+  window.BalanceUpdatesManager.setup({
+    contextKey: 'offer',
+    balanceUpdateCallback: updateCoinDropdownBalances,
+    swapEventCallback: updateCoinDropdownBalances,
+    errorContext: 'New Offer',
+    enablePeriodicRefresh: true,
+    periodicInterval: 120000
+  });
 });
 
 </script>

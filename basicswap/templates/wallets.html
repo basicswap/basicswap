@@ -198,21 +198,19 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function setupWalletsWebSocketUpdates() {
+    window.BalanceUpdatesManager.setup({
+      contextKey: 'wallets',
+      balanceUpdateCallback: updateWalletBalances,
+      swapEventCallback: updateWalletBalances,
+      errorContext: 'Wallets',
+      enablePeriodicRefresh: true,
+      periodicInterval: 60000
+    });
+
     if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
-
-
-      const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
+      const priceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
         if (data && data.event) {
-
-          if (data.event === 'coin_balance_updated') {
-            clearTimeout(window.walletsBalanceUpdateTimeout);
-            window.walletsBalanceUpdateTimeout = setTimeout(() => {
-              updateWalletBalances();
-            }, 2000);
-          }
-
           if (data.event === 'price_updated' || data.event === 'prices_updated') {
-
             clearTimeout(window.walletsPriceUpdateTimeout);
             window.walletsPriceUpdateTimeout = setTimeout(() => {
               if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
@@ -220,51 +218,14 @@ document.addEventListener('DOMContentLoaded', function() {
               }
             }, 500);
           }
-
-
-          const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
-          if (swapEvents.includes(data.event)) {
-
-            clearTimeout(window.walletsSwapEventTimeout);
-            window.walletsSwapEventTimeout = setTimeout(() => {
-
-              updateWalletBalances();
-            }, 5000);
-          }
-
-
         }
       });
-
-      window.walletsBalanceHandlerId = balanceHandlerId;
-
-    } else {
-
+      window.walletsPriceHandlerId = priceHandlerId;
     }
   }
 
-  function updateWalletBalances() {
-    fetch('/json/walletbalances', {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`Server error: ${response.status} ${response.statusText}`);
-      }
-      return response.json();
-    })
-    .then(balanceData => {
-      if (balanceData.error) {
-        throw new Error(balanceData.error);
-      }
-
-      if (!Array.isArray(balanceData)) {
-        throw new Error('Invalid response format');
-      }
-
+  function updateWalletBalances(balanceData) {
+    if (balanceData) {
       balanceData.forEach(coin => {
         updateWalletDisplay(coin);
       });
@@ -274,10 +235,13 @@ document.addEventListener('DOMContentLoaded', function() {
           window.WalletManager.updatePrices(true);
         }
       }, 250);
-    })
-    .catch(error => {
-      console.error('Error updating wallet balances:', error);
-    });
+    } else {
+      window.BalanceUpdatesManager.fetchBalanceData()
+        .then(data => updateWalletBalances(data))
+        .catch(error => {
+          console.error('Error updating wallet balances:', error);
+        });
+    }
   }
 
   function updateWalletDisplay(coinData) {
@@ -622,33 +586,21 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function cleanupWalletsBalanceUpdates() {
-    if (window.walletsBalanceHandlerId && window.WebSocketManager) {
-      window.WebSocketManager.removeMessageHandler('message', window.walletsBalanceHandlerId);
+    window.BalanceUpdatesManager.cleanup('wallets');
 
+    if (window.walletsPriceHandlerId && window.WebSocketManager) {
+      window.WebSocketManager.removeMessageHandler('message', window.walletsPriceHandlerId);
     }
 
-    clearTimeout(window.walletsBalanceUpdateTimeout);
-    clearTimeout(window.walletsSwapEventTimeout);
     clearTimeout(window.walletsPriceUpdateTimeout);
-
-    if (window.walletsPeriodicRefresh) {
-      clearInterval(window.walletsPeriodicRefresh);
-      window.walletsPeriodicRefresh = null;
-    }
-
   }
 
+  window.BalanceUpdatesManager.initialize();
   setupWalletsWebSocketUpdates();
 
   setTimeout(() => {
     updateWalletBalances();
   }, 1000);
-
-  window.walletsPeriodicRefresh = setInterval(() => {
-    updateWalletBalances();
-  }, 60000);
-
-
 
   if (window.CleanupManager) {
     window.CleanupManager.registerResource('walletsBalanceUpdates', null, cleanupWalletsBalanceUpdates);

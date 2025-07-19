@@ -55,7 +55,7 @@
         </div>
       </div>
 
-      <div class="border-b pb-5 border-gray-200 dark:border-gray-500">
+      <div class="pb-5">
         <ul class="flex flex-wrap text-sm font-medium text-center text-gray-500 dark:text-gray-400" id="ammTabs" role="tablist">
           <li class="mr-2" role="presentation">
             <button class="inline-block px-4 py-3 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white focus:outline-none focus:ring-0" id="offers-tab" data-tabs-target="#offers-content" type="button" role="tab" aria-controls="offers" aria-selected="true">
@@ -2090,140 +2090,35 @@
       amountInput.dispatchEvent(event);
     }
 
-    function fetchBalanceData() {
-      return fetch('/json/walletbalances', {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Server error: ${response.status} ${response.statusText}`);
-          }
-          return response.json();
-        })
-        .then(balanceData => {
-          if (balanceData.error) {
-            throw new Error(balanceData.error);
-          }
+    function updateAmmModalBalances(balanceData) {
+      const addModal = document.getElementById('add-amm-modal');
+      const editModal = document.getElementById('edit-amm-modal');
+      const addModalVisible = addModal && !addModal.classList.contains('hidden');
+      const editModalVisible = editModal && !editModal.classList.contains('hidden');
 
+      let modalType = null;
+      if (addModalVisible) {
+        modalType = addModal.getAttribute('data-amm-type');
+      } else if (editModalVisible) {
+        modalType = editModal.getAttribute('data-amm-type');
+      }
 
-          if (!Array.isArray(balanceData)) {
-            throw new Error('Invalid response format');
-          }
-
-          return balanceData;
-        });
+      if (modalType === 'offer') {
+        updateOfferDropdownBalances(balanceData);
+      } else if (modalType === 'bid') {
+        updateBidDropdownBalances(balanceData);
+      }
     }
 
     function setupWebSocketBalanceUpdates() {
-      if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
-
-
-
-        const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
-          if (data && data.event) {
-
-            if (data.event === 'coin_balance_updated') {
-              clearTimeout(window.ammBalanceUpdateTimeout);
-              window.ammBalanceUpdateTimeout = setTimeout(() => {
-                fetchBalanceData()
-                  .then(balanceData => {
-
-                    const addModal = document.getElementById('add-amm-modal');
-                    const editModal = document.getElementById('edit-amm-modal');
-                    const addModalVisible = addModal && !addModal.classList.contains('hidden');
-                    const editModalVisible = editModal && !editModal.classList.contains('hidden');
-
-                    let modalType = null;
-                    if (addModalVisible) {
-                      modalType = addModal.getAttribute('data-amm-type');
-                    } else if (editModalVisible) {
-                      modalType = editModal.getAttribute('data-amm-type');
-                    }
-
-                    if (modalType === 'offer') {
-                      updateOfferDropdownBalances(balanceData);
-                    } else if (modalType === 'bid') {
-                      updateBidDropdownBalances(balanceData);
-                    }
-                  })
-                  .catch(error => {
-                    console.error('Error updating AMM balances via WebSocket:', error);
-                  });
-              }, 2000);
-            }
-
-            const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
-            if (swapEvents.includes(data.event)) {
-
-              clearTimeout(window.ammSwapEventTimeout);
-              window.ammSwapEventTimeout = setTimeout(() => {
-                fetchBalanceData()
-                  .then(balanceData => {
-
-                    const addModal = document.getElementById('add-amm-modal');
-                    const editModal = document.getElementById('edit-amm-modal');
-                    const addModalVisible = addModal && !addModal.classList.contains('hidden');
-                    const editModalVisible = editModal && !editModal.classList.contains('hidden');
-
-                    let modalType = null;
-                    if (addModalVisible) {
-                      modalType = addModal.getAttribute('data-amm-type');
-                    } else if (editModalVisible) {
-                      modalType = editModal.getAttribute('data-amm-type');
-                    }
-
-                    if (modalType === 'offer') {
-                      updateOfferDropdownBalances(balanceData);
-                    } else if (modalType === 'bid') {
-                      updateBidDropdownBalances(balanceData);
-                    }
-                  })
-                  .catch(error => {
-                    console.error('Error updating AMM balances via swap event:', error);
-                  });
-              }, 5000);
-            }
-          }
-        });
-
-        window.ammBalanceHandlerId = balanceHandlerId;
-
-      } else {
-
-      }
-
-      if (!window.ammPeriodicRefresh) {
-        window.ammPeriodicRefresh = setInterval(() => {
-          fetchBalanceData()
-            .then(balanceData => {
-
-              const addModal = document.getElementById('add-amm-modal');
-              const editModal = document.getElementById('edit-amm-modal');
-              const addModalVisible = addModal && !addModal.classList.contains('hidden');
-              const editModalVisible = editModal && !editModal.classList.contains('hidden');
-
-              let modalType = null;
-              if (addModalVisible) {
-                modalType = addModal.getAttribute('data-amm-type');
-              } else if (editModalVisible) {
-                modalType = editModal.getAttribute('data-amm-type');
-              }
-
-              if (modalType === 'offer') {
-                updateOfferDropdownBalances(balanceData);
-              } else if (modalType === 'bid') {
-                updateBidDropdownBalances(balanceData);
-              }
-            })
-            .catch(error => {
-              console.error('Error in periodic AMM balance refresh:', error);
-            });
-        }, 120000);
-
-      }
+      window.BalanceUpdatesManager.setup({
+        contextKey: 'amm',
+        balanceUpdateCallback: updateAmmModalBalances,
+        swapEventCallback: updateAmmModalBalances,
+        errorContext: 'AMM',
+        enablePeriodicRefresh: true,
+        periodicInterval: 120000
+      });
     }
 
     function updateAmmDropdownBalances(balanceData) {
@@ -2299,20 +2194,11 @@
 
     }
 
+    window.BalanceUpdatesManager.initialize();
     setupWebSocketBalanceUpdates();
 
     function cleanupAmmBalanceUpdates() {
-      if (window.ammBalanceHandlerId && window.WebSocketManager) {
-        window.WebSocketManager.removeMessageHandler('message', window.ammBalanceHandlerId);
-
-      }
-
-      if (window.ammPeriodicRefresh) {
-        clearInterval(window.ammPeriodicRefresh);
-        window.ammPeriodicRefresh = null;
-
-      }
-
+      window.BalanceUpdatesManager.cleanup('amm');
 
       if (window.ammDropdowns) {
         window.ammDropdowns.forEach(dropdown => {
@@ -2322,9 +2208,6 @@
         });
         window.ammDropdowns = [];
       }
-
-      clearTimeout(window.ammBalanceUpdateTimeout);
-      clearTimeout(window.ammSwapEventTimeout);
     }
 
     if (window.CleanupManager) {

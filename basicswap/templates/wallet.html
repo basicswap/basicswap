@@ -1342,75 +1342,48 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function setupWalletWebSocketUpdates() {
+    window.BalanceUpdatesManager.setup({
+      contextKey: 'wallet',
+      balanceUpdateCallback: updateWalletBalances,
+      swapEventCallback: updateWalletBalances,
+      errorContext: 'Wallet',
+      enablePeriodicRefresh: true,
+      periodicInterval: 120000
+    });
+
     if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
-
-      const currentWalletTicker = window.location.pathname.split('/')[2]?.toUpperCase();
-
-
-      const balanceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
-
+      const priceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
         if (data && data.event) {
-
-          if (data.event === 'coin_balance_updated') {
-            clearTimeout(window.walletBalanceUpdateTimeout);
-            window.walletBalanceUpdateTimeout = setTimeout(() => {
-              updateWalletBalances();
-            }, 2000);
-          }
-
           if (data.event === 'price_updated' || data.event === 'prices_updated') {
-
             clearTimeout(window.walletPriceUpdateTimeout);
             window.walletPriceUpdateTimeout = setTimeout(() => {
               if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
-
                 window.WalletManager.updatePrices(true);
               }
-
             }, 500);
-          }
-
-
-          const swapEvents = ['new_bid', 'bid_accepted', 'swap_completed'];
-          if (swapEvents.includes(data.event)) {
-
-
-            clearTimeout(window.walletSwapEventTimeout);
-            window.walletSwapEventTimeout = setTimeout(() => {
-
-              updateWalletBalances();
-            }, 5000);
           }
         }
       });
-
-      window.walletBalanceHandlerId = balanceHandlerId;
+      window.walletPriceHandlerId = priceHandlerId;
     }
   }
 
   function cleanupWalletBalanceUpdates() {
-    if (window.walletBalanceHandlerId && window.WebSocketManager) {
-      window.WebSocketManager.removeMessageHandler('message', window.walletBalanceHandlerId);
-    }
-    clearTimeout(window.walletBalanceUpdateTimeout);
-    clearTimeout(window.walletSwapEventTimeout);
-    clearTimeout(window.walletPriceUpdateTimeout);
-    if (window.walletPeriodicRefresh) {
-      clearInterval(window.walletPeriodicRefresh);
-      window.walletPeriodicRefresh = null;
+    window.BalanceUpdatesManager.cleanup('wallet');
+
+    if (window.walletPriceHandlerId && window.WebSocketManager) {
+      window.WebSocketManager.removeMessageHandler('message', window.walletPriceHandlerId);
     }
 
+    clearTimeout(window.walletPriceUpdateTimeout);
   }
 
+  window.BalanceUpdatesManager.initialize();
   setupWalletWebSocketUpdates();
 
   setTimeout(() => {
     updateWalletBalances();
   }, 1000);
-
-  window.walletPeriodicRefresh = setInterval(() => {
-    updateWalletBalances();
-  }, 120000);
 
   window.addEventListener('beforeunload', cleanupWalletBalanceUpdates);
 
