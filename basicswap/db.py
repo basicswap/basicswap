@@ -721,6 +721,52 @@ class DirectMessageRouteLink(Table):
     created_at = Column("integer")
 
 
+class NetworkPortal(Table):
+    __tablename__ = "network_portals"
+
+    def __init__(
+        self, time_start, time_valid, network_from, network_to, address_from, address_to
+    ):
+        super().__init__()
+        self.active_ind = 1
+        self.time_start = time_start
+        self.time_valid = time_valid
+        self.network_from = network_from
+        self.network_to = network_to
+        self.address_from = address_from
+        self.address_to = address_to
+
+        self.smsg_difficulty = 0x1EFFFFFF
+
+        self.num_refreshes = 0
+        self.messages_sent = 0
+        self.responses_seen = 0
+        self.time_last_used = 0
+        self.num_issues = 0
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    active_ind = Column("integer")
+    own_portal = Column("integer")
+
+    address_from = Column("string", unique=True)
+    address_to = Column("string")
+
+    network_from = Column("integer")
+    network_to = Column("integer")
+
+    time_start = Column("integer")
+    time_valid = Column("integer")
+    smsg_difficulty = Column("integer")
+    num_refreshes = Column("integer")
+
+    messages_sent = Column("integer")
+    responses_seen = Column("integer")
+    time_last_used = Column("integer")
+    num_issues = Column("integer")
+
+    created_at = Column("integer")
+
+
 def extract_schema() -> dict:
     g = globals().copy()
     tables = {}
