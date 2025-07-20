@@ -1162,7 +1162,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const isCurrentCoin = (coinData.id === currentCoinId);
 
     if (isPartVariant || isLtcVariant || isCurrentCoin) {
-      console.log(`Updating percentage buttons for ${coinData.name} (ID: ${coinData.id}) on wallet page ${currentCoinId}`);
       const buttons = document.querySelectorAll('button[onclick*="setAmount"]');
       buttons.forEach(button => {
         const onclick = button.getAttribute('onclick');
