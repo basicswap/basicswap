@@ -1157,12 +1157,17 @@ document.addEventListener('DOMContentLoaded', function() {
   function updatePercentageButtons(coinData) {
     const currentCoinId = {{ w.cid }};
 
-    if (coinData.id === currentCoinId) {
+    const isPartVariant = (currentCoinId === 1 && (coinData.name === 'Particl' || coinData.name === 'Particl Anon' || coinData.name === 'Particl Blind'));
+    const isLtcVariant = (currentCoinId === 3 && (coinData.name === 'Litecoin' || coinData.name === 'Litecoin MWEB'));
+    const isCurrentCoin = (coinData.id === currentCoinId);
+
+    if (isPartVariant || isLtcVariant || isCurrentCoin) {
+      console.log(`Updating percentage buttons for ${coinData.name} (ID: ${coinData.id}) on wallet page ${currentCoinId}`);
       const buttons = document.querySelectorAll('button[onclick*="setAmount"]');
       buttons.forEach(button => {
         const onclick = button.getAttribute('onclick');
         if (onclick) {
-          if (coinData.id === 1) {
+          if (currentCoinId === 1) {
             window.currentBalances = window.currentBalances || {};
 
             const anonBalance = coinData.name === 'Particl Anon' ? coinData.balance :
@@ -1181,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', function() {
               `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${mainBalance}', ${currentCoinId}, '${blindBalance}', '${anonBalance}')`
             );
             button.setAttribute('onclick', newOnclick);
-          } else if (coinData.id === 3) {
+          } else if (currentCoinId === 3) {
             window.currentBalances = window.currentBalances || {};
 
             const mwebBalance = coinData.name === 'Litecoin MWEB' ? coinData.balance :
