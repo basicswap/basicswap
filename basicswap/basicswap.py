@@ -186,7 +186,9 @@ def validOfferStateToReceiveBid(offer_state):
     return False
 
 
-def checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height):
+def checkAndNotifyBalanceChange(
+    swap_client, coin_type, ci, cc, new_height, trigger_source="block"
+):
     if not swap_client.ws_server:
         return
 
@@ -222,6 +224,7 @@ def checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height):
                 "event": "coin_balance_updated",
                 "coin": ci.ticker(),
                 "height": new_height,
+                "trigger": trigger_source,
             }
             swap_client.ws_server.send_message_to_all(json.dumps(balance_event))
     except Exception:
@@ -243,7 +246,9 @@ def threadPollXMRChainState(swap_client, coin_type):
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
 
-                checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height)
+                checkAndNotifyBalanceChange(
+                    swap_client, coin_type, ci, cc, new_height, "block"
+                )
 
         except Exception as e:
             swap_client.log.warning(
@@ -267,7 +272,9 @@ def threadPollWOWChainState(swap_client, coin_type):
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
 
-                checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height)
+                checkAndNotifyBalanceChange(
+                    swap_client, coin_type, ci, cc, new_height, "block"
+                )
 
         except Exception as e:
             swap_client.log.warning(
@@ -281,6 +288,12 @@ def threadPollWOWChainState(swap_client, coin_type):
 def threadPollChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
+
+    if coin_type == Coins.PART and swap_client._zmq_queue_enabled:
+        poll_delay_range = (40, 60)
+    else:
+        poll_delay_range = (20, 30)
+
     while not swap_client.chainstate_delay_event.is_set():
         try:
             chain_state = ci.getBlockchainInfo()
@@ -295,13 +308,13 @@ def threadPollChainState(swap_client, coin_type):
                     if "mediantime" in chain_state:
                         cc["chain_median_time"] = chain_state["mediantime"]
 
-                checkAndNotifyBalanceChange(swap_client, coin_type, ci, cc, new_height)
+                checkAndNotifyBalanceChange(
+                    swap_client, coin_type, ci, cc, new_height, "block"
+                )
 
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")
-        swap_client.chainstate_delay_event.wait(
-            random.randrange(20, 30)
-        )  # Random to stagger updates
+        swap_client.chainstate_delay_event.wait(random.randrange(*poll_delay_range))
 
 
 class WatchedOutput:  # Watch for spends
@@ -550,6 +563,9 @@ class BasicSwap(BaseApp, UIApp):
                 self.settings["zmqhost"] + ":" + str(self.settings["zmqport"])
             )
             self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
+
+            if Coins.PART in chainparams:
+                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "hashwtx")
 
         self.with_coins_override = extra_opts.get("with_coins", set())
         self.without_coins_override = extra_opts.get("without_coins", set())
@@ -1145,6 +1161,8 @@ class BasicSwap(BaseApp, UIApp):
 
                 if c == Coins.PART:
                     self.coin_clients[c]["have_spent_index"] = ci.haveSpentIndex()
+                    if self._zmq_queue_enabled:
+                        self.checkPARTZmqConfig()
 
                     try:
                         # Sanity checks
@@ -10485,6 +10503,108 @@ class BasicSwap(BaseApp, UIApp):
 
         self.processMsg(msg)
 
+    def processZmqHashwtx(self) -> None:
+        self.zmqSubscriber.recv()
+
+        try:
+            if Coins.PART not in self.coin_clients:
+                return
+
+            ci = self.ci(Coins.PART)
+            cc = self.coin_clients[Coins.PART]
+
+            current_height = cc.get("chain_height", 0)
+
+            import time
+
+            time.sleep(0.1)
+
+            checkAndNotifyBalanceChange(self, Coins.PART, ci, cc, current_height, "zmq")
+
+        except Exception as e:
+            self.log.warning(f"Error processing PART wallet transaction: {e}")
+            if self.debug:
+                self.log.error(traceback.format_exc())
+
+    def checkPARTZmqConfig(self) -> None:
+        try:
+            if Coins.PART not in self.coin_clients:
+                return
+
+            part_settings = self.coin_clients[Coins.PART]
+            if part_settings.get("connection_type") != "rpc":
+                return
+
+            datadir = part_settings.get("datadir")
+            if not datadir:
+                return
+
+            config_path = os.path.join(datadir, "particl.conf")
+
+            if not os.path.exists(config_path):
+                return
+
+            with open(config_path, "r") as f:
+                config_content = f.read()
+
+            zmq_host = self.settings.get("zmqhost", "tcp://127.0.0.1")
+            zmq_port = self.settings.get("zmqport", 14792)
+            expected_line = f"zmqpubhashwtx={zmq_host}:{zmq_port}"
+
+            config_updated = False
+
+            if "zmqpubhashwtx=" not in config_content:
+                with open(config_path, "a") as f:
+                    f.write(f"{expected_line}\n")
+                config_updated = True
+            elif expected_line not in config_content:
+                lines = config_content.split("\n")
+                updated_lines = []
+                for line in lines:
+                    if line.startswith("zmqpubhashwtx="):
+                        updated_lines.append(expected_line)
+                    else:
+                        updated_lines.append(line)
+
+                with open(config_path, "w") as f:
+                    f.write("\n".join(updated_lines))
+                config_updated = True
+
+            if config_updated:
+                self.restartPARTDaemon()
+
+        except Exception as e:
+            self.log.debug(f"Error checking PART ZMQ config: {e}")
+
+    def restartPARTDaemon(self) -> None:
+        try:
+            if Coins.PART not in self.coin_clients:
+                return
+
+            ci = self.ci(Coins.PART)
+            ci.rpc_wallet("stop")
+
+            import time
+
+            time.sleep(3)
+
+            part_settings = self.coin_clients[Coins.PART]
+            datadir = part_settings.get("datadir")
+            bindir = part_settings.get("bindir")
+
+            if datadir and bindir:
+                import subprocess
+
+                daemon_path = os.path.join(bindir, "particld")
+                args = [daemon_path, f"-datadir={datadir}"]
+                subprocess.Popen(args)
+
+                time.sleep(2)
+                self.waitForDaemonRPC(Coins.PART)
+
+        except Exception as e:
+            self.log.debug(f"Error restarting PART daemon: {e}")
+
     def expireBidsAndOffers(self, now) -> None:
         bids_to_expire = set()
         offers_to_expire = set()
@@ -10616,6 +10736,8 @@ class BasicSwap(BaseApp, UIApp):
                     message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
                     if message == b"smsg":
                         self.processZmqSmsg()
+                    elif message == b"hashwtx":
+                        self.processZmqHashwtx()
             except zmq.Again as e:  # noqa: F841
                 pass
             except Exception as e:
