@@ -56,6 +56,42 @@ def signal_handler(sig, frame):
         swap_client.stopRunning()
 
 
+def checkPARTZmqConfigBeforeStart(part_settings, swap_settings):
+    try:
+        datadir = part_settings.get("datadir")
+        if not datadir:
+            return
+
+        config_path = os.path.join(datadir, "particl.conf")
+        if not os.path.exists(config_path):
+            return
+
+        with open(config_path, "r") as f:
+            config_content = f.read()
+
+        zmq_host = swap_settings.get("zmqhost", "tcp://127.0.0.1")
+        zmq_port = swap_settings.get("zmqport", 14792)
+        expected_line = f"zmqpubhashwtx={zmq_host}:{zmq_port}"
+
+        if "zmqpubhashwtx=" not in config_content:
+            with open(config_path, "a") as f:
+                f.write(f"{expected_line}\n")
+        elif expected_line not in config_content:
+            lines = config_content.split("\n")
+            updated_lines = []
+            for line in lines:
+                if line.startswith("zmqpubhashwtx="):
+                    updated_lines.append(expected_line)
+                else:
+                    updated_lines.append(line)
+
+            with open(config_path, "w") as f:
+                f.write("\n".join(updated_lines))
+
+    except Exception as e:
+        logger.debug(f"Error checking PART ZMQ config: {e}")
+
+
 def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
     datadir_path = os.path.expanduser(node_dir)
@@ -548,6 +584,9 @@ def runClient(
                 continue  # /decred
 
             if v["manage_daemon"] is True:
+                if c == "particl" and swap_client._zmq_queue_enabled:
+                    checkPARTZmqConfigBeforeStart(v, swap_client.settings)
+
                 swap_client.log.info(f"Starting {display_name} daemon")
 
                 filename: str = getCoreBinName(coin_id, v, c + "d")

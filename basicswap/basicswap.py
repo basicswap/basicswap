@@ -1161,8 +1161,6 @@ class BasicSwap(BaseApp, UIApp):
 
                 if c == Coins.PART:
                     self.coin_clients[c]["have_spent_index"] = ci.haveSpentIndex()
-                    if self._zmq_queue_enabled:
-                        self.checkPARTZmqConfig()
 
                     try:
                         # Sanity checks
@@ -10525,85 +10523,6 @@ class BasicSwap(BaseApp, UIApp):
             self.log.warning(f"Error processing PART wallet transaction: {e}")
             if self.debug:
                 self.log.error(traceback.format_exc())
-
-    def checkPARTZmqConfig(self) -> None:
-        try:
-            if Coins.PART not in self.coin_clients:
-                return
-
-            part_settings = self.coin_clients[Coins.PART]
-            if part_settings.get("connection_type") != "rpc":
-                return
-
-            datadir = part_settings.get("datadir")
-            if not datadir:
-                return
-
-            config_path = os.path.join(datadir, "particl.conf")
-
-            if not os.path.exists(config_path):
-                return
-
-            with open(config_path, "r") as f:
-                config_content = f.read()
-
-            zmq_host = self.settings.get("zmqhost", "tcp://127.0.0.1")
-            zmq_port = self.settings.get("zmqport", 14792)
-            expected_line = f"zmqpubhashwtx={zmq_host}:{zmq_port}"
-
-            config_updated = False
-
-            if "zmqpubhashwtx=" not in config_content:
-                with open(config_path, "a") as f:
-                    f.write(f"{expected_line}\n")
-                config_updated = True
-            elif expected_line not in config_content:
-                lines = config_content.split("\n")
-                updated_lines = []
-                for line in lines:
-                    if line.startswith("zmqpubhashwtx="):
-                        updated_lines.append(expected_line)
-                    else:
-                        updated_lines.append(line)
-
-                with open(config_path, "w") as f:
-                    f.write("\n".join(updated_lines))
-                config_updated = True
-
-            if config_updated:
-                self.restartPARTDaemon()
-
-        except Exception as e:
-            self.log.debug(f"Error checking PART ZMQ config: {e}")
-
-    def restartPARTDaemon(self) -> None:
-        try:
-            if Coins.PART not in self.coin_clients:
-                return
-
-            ci = self.ci(Coins.PART)
-            ci.rpc_wallet("stop")
-
-            import time
-
-            time.sleep(3)
-
-            part_settings = self.coin_clients[Coins.PART]
-            datadir = part_settings.get("datadir")
-            bindir = part_settings.get("bindir")
-
-            if datadir and bindir:
-                import subprocess
-
-                daemon_path = os.path.join(bindir, "particld")
-                args = [daemon_path, f"-datadir={datadir}"]
-                subprocess.Popen(args)
-
-                time.sleep(2)
-                self.waitForDaemonRPC(Coins.PART)
-
-        except Exception as e:
-            self.log.debug(f"Error restarting PART daemon: {e}")
 
     def expireBidsAndOffers(self, now) -> None:
         bids_to_expire = set()
