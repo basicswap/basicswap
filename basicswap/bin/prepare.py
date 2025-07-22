@@ -79,7 +79,7 @@ WOW_SITE_COMMIT = (
 PIVX_VERSION = os.getenv("PIVX_VERSION", "5.6.1")
 PIVX_VERSION_TAG = os.getenv("PIVX_VERSION_TAG", "")
 
-DASH_VERSION = os.getenv("DASH_VERSION", "22.0.0")
+DASH_VERSION = os.getenv("DASH_VERSION", "22.1.3")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 
 FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.14.1")
