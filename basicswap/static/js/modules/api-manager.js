@@ -367,16 +367,45 @@ const ApiManager = (function() {
 
             const results = {};
             const fetchPromises = coinSymbols.map(async coin => {
-                if (coin === 'WOW') {
+                let useCoinGecko = false;
+                let coingeckoId = null;
+
+                if (window.CoinManager) {
+                    const coinConfig = window.CoinManager.getCoinByAnyIdentifier(coin);
+                    if (coinConfig) {
+                        useCoinGecko = !coinConfig.usesCryptoCompare || coin === 'PART';
+                        coingeckoId = coinConfig.coingeckoId;
+                    }
+                } else {
+                    const coinGeckoCoins = {
+                        'WOW': 'wownero',
+                        'PART': 'particl',
+                        'BTC': 'bitcoin'
+                    };
+                    if (coinGeckoCoins[coin]) {
+                        useCoinGecko = true;
+                        coingeckoId = coinGeckoCoins[coin];
+                    }
+                }
+
+                if (useCoinGecko && coingeckoId) {
                     return this.rateLimiter.queueRequest('coingecko', async () => {
-                        const url = `https://api.coingecko.com/api/v3/coins/wownero/market_chart?vs_currency=usd&days=1`;
+                        let days;
+                        if (resolution === 'day') {
+                            days = 1;
+                        } else if (resolution === 'year') {
+                            days = 365;
+                        } else {
+                            days = 180;
+                        }
+                        const url = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=${days}`;
                         try {
                             const response = await this.makePostRequest(url);
                             if (response && response.prices) {
                                 results[coin] = response.prices;
                             }
                         } catch (error) {
-                            console.error(`Error fetching CoinGecko data for WOW:`, error);
+                            console.error(`Error fetching CoinGecko data for ${coin}:`, error);
                             throw error;
                         }
                     });

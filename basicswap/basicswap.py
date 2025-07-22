@@ -186,6 +186,53 @@ def validOfferStateToReceiveBid(offer_state):
     return False
 
 
+def checkAndNotifyBalanceChange(
+    swap_client, coin_type, ci, cc, new_height, trigger_source="block"
+):
+    if not swap_client.ws_server:
+        return
+
+    try:
+        blockchain_info = ci.getBlockchainInfo()
+        verification_progress = blockchain_info.get("verificationprogress", 1.0)
+        if verification_progress < 0.99:
+            return
+    except Exception:
+        return
+
+    try:
+        current_balance = ci.getSpendableBalance()
+        current_total_balance = swap_client.getTotalBalance(coin_type)
+        cached_balance = cc.get("cached_balance", None)
+        cached_total_balance = cc.get("cached_total_balance", None)
+
+        current_unconfirmed = current_total_balance - current_balance
+        cached_unconfirmed = cc.get("cached_unconfirmed", None)
+
+        if (
+            cached_balance is None
+            or current_balance != cached_balance
+            or cached_total_balance is None
+            or current_total_balance != cached_total_balance
+            or cached_unconfirmed is None
+            or current_unconfirmed != cached_unconfirmed
+        ):
+            cc["cached_balance"] = current_balance
+            cc["cached_total_balance"] = current_total_balance
+            cc["cached_unconfirmed"] = current_unconfirmed
+            balance_event = {
+                "event": "coin_balance_updated",
+                "coin": ci.ticker(),
+                "height": new_height,
+                "trigger": trigger_source,
+            }
+            swap_client.ws_server.send_message_to_all(json.dumps(balance_event))
+    except Exception:
+        cc["cached_balance"] = None
+        cc["cached_total_balance"] = None
+        cc["cached_unconfirmed"] = None
+
+
 def threadPollXMRChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
@@ -198,6 +245,11 @@ def threadPollXMRChainState(swap_client, coin_type):
                 )
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
+
+                checkAndNotifyBalanceChange(
+                    swap_client, coin_type, ci, cc, new_height, "block"
+                )
+
         except Exception as e:
             swap_client.log.warning(
                 f"threadPollXMRChainState {ci.ticker()}, error: {e}"
@@ -219,6 +271,11 @@ def threadPollWOWChainState(swap_client, coin_type):
                 )
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
+
+                checkAndNotifyBalanceChange(
+                    swap_client, coin_type, ci, cc, new_height, "block"
+                )
+
         except Exception as e:
             swap_client.log.warning(
                 f"threadPollWOWChainState {ci.ticker()}, error: {e}"
@@ -231,6 +288,12 @@ def threadPollWOWChainState(swap_client, coin_type):
 def threadPollChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
+
+    if coin_type == Coins.PART and swap_client._zmq_queue_enabled:
+        poll_delay_range = (40, 60)
+    else:
+        poll_delay_range = (20, 30)
+
     while not swap_client.chainstate_delay_event.is_set():
         try:
             chain_state = ci.getBlockchainInfo()
@@ -244,11 +307,14 @@ def threadPollChainState(swap_client, coin_type):
                     cc["chain_best_block"] = chain_state["bestblockhash"]
                     if "mediantime" in chain_state:
                         cc["chain_median_time"] = chain_state["mediantime"]
+
+                checkAndNotifyBalanceChange(
+                    swap_client, coin_type, ci, cc, new_height, "block"
+                )
+
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")
-        swap_client.chainstate_delay_event.wait(
-            random.randrange(20, 30)
-        )  # Random to stagger updates
+        swap_client.chainstate_delay_event.wait(random.randrange(*poll_delay_range))
 
 
 class WatchedOutput:  # Watch for spends
@@ -497,6 +563,9 @@ class BasicSwap(BaseApp, UIApp):
                 self.settings["zmqhost"] + ":" + str(self.settings["zmqport"])
             )
             self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
+
+            if Coins.PART in chainparams:
+                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "hashwtx")
 
         self.with_coins_override = extra_opts.get("with_coins", set())
         self.without_coins_override = extra_opts.get("without_coins", set())
@@ -5409,6 +5478,39 @@ class BasicSwap(BaseApp, UIApp):
             # TODO: Wait for depth?
 
         # bid saved in checkBidState
+
+    def getTotalBalance(self, coin_type) -> int:
+        try:
+            ci = self.ci(coin_type)
+            if hasattr(ci, "rpc_wallet"):
+                if coin_type in (Coins.XMR, Coins.WOW):
+                    balance_info = ci.rpc_wallet("get_balance")
+                    return balance_info["balance"]
+                elif coin_type == Coins.PART:
+                    balances = ci.rpc_wallet("getbalances")
+                    return ci.make_int(
+                        balances["mine"]["trusted"]
+                        + balances["mine"]["untrusted_pending"]
+                    )
+                else:
+                    try:
+                        balances = ci.rpc_wallet("getbalances")
+                        return ci.make_int(
+                            balances["mine"]["trusted"]
+                            + balances["mine"]["untrusted_pending"]
+                        )
+                    except Exception:
+                        wallet_info = ci.rpc_wallet("getwalletinfo")
+                        total = wallet_info.get("balance", 0)
+                        if "unconfirmed_balance" in wallet_info:
+                            total += wallet_info["unconfirmed_balance"]
+                        if "immature_balance" in wallet_info:
+                            total += wallet_info["immature_balance"]
+                        return ci.make_int(total)
+            else:
+                return ci.getSpendableBalance()
+        except Exception:
+            return ci.getSpendableBalance()
 
     def getAddressBalance(self, coin_type, address: str) -> int:
         if self.coin_clients[coin_type]["chain_lookups"] == "explorer":
@@ -10399,6 +10501,29 @@ class BasicSwap(BaseApp, UIApp):
 
         self.processMsg(msg)
 
+    def processZmqHashwtx(self) -> None:
+        self.zmqSubscriber.recv()
+
+        try:
+            if Coins.PART not in self.coin_clients:
+                return
+
+            ci = self.ci(Coins.PART)
+            cc = self.coin_clients[Coins.PART]
+
+            current_height = cc.get("chain_height", 0)
+
+            import time
+
+            time.sleep(0.1)
+
+            checkAndNotifyBalanceChange(self, Coins.PART, ci, cc, current_height, "zmq")
+
+        except Exception as e:
+            self.log.warning(f"Error processing PART wallet transaction: {e}")
+            if self.debug:
+                self.log.error(traceback.format_exc())
+
     def expireBidsAndOffers(self, now) -> None:
         bids_to_expire = set()
         offers_to_expire = set()
@@ -10530,6 +10655,8 @@ class BasicSwap(BaseApp, UIApp):
                     message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
                     if message == b"smsg":
                         self.processZmqSmsg()
+                    elif message == b"hashwtx":
+                        self.processZmqHashwtx()
             except zmq.Again as e:  # noqa: F841
                 pass
             except Exception as e:
@@ -10829,6 +10956,76 @@ class BasicSwap(BaseApp, UIApp):
                         seen_tickers.append(upcased_ticker)
                 if settings_copy.get("enabled_chart_coins", "") != new_value:
                     settings_copy["enabled_chart_coins"] = new_value
+                    settings_changed = True
+
+            if "notifications_new_offers" in data:
+                new_value = data["notifications_new_offers"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_new_offers value not boolean",
+                )
+                if settings_copy.get("notifications_new_offers", False) != new_value:
+                    settings_copy["notifications_new_offers"] = new_value
+                    settings_changed = True
+
+            if "notifications_new_bids" in data:
+                new_value = data["notifications_new_bids"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_new_bids value not boolean",
+                )
+                if settings_copy.get("notifications_new_bids", True) != new_value:
+                    settings_copy["notifications_new_bids"] = new_value
+                    settings_changed = True
+
+            if "notifications_bid_accepted" in data:
+                new_value = data["notifications_bid_accepted"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_bid_accepted value not boolean",
+                )
+                if settings_copy.get("notifications_bid_accepted", True) != new_value:
+                    settings_copy["notifications_bid_accepted"] = new_value
+                    settings_changed = True
+
+            if "notifications_balance_changes" in data:
+                new_value = data["notifications_balance_changes"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_balance_changes value not boolean",
+                )
+                if (
+                    settings_copy.get("notifications_balance_changes", True)
+                    != new_value
+                ):
+                    settings_copy["notifications_balance_changes"] = new_value
+                    settings_changed = True
+
+            if "notifications_outgoing_transactions" in data:
+                new_value = data["notifications_outgoing_transactions"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New notifications_outgoing_transactions value not boolean",
+                )
+                if (
+                    settings_copy.get("notifications_outgoing_transactions", True)
+                    != new_value
+                ):
+                    settings_copy["notifications_outgoing_transactions"] = new_value
+                    settings_changed = True
+
+            if "notifications_duration" in data:
+                new_value = data["notifications_duration"]
+                ensure(
+                    isinstance(new_value, int),
+                    "New notifications_duration value not integer",
+                )
+                ensure(
+                    5 <= new_value <= 60,
+                    "notifications_duration must be between 5 and 60 seconds",
+                )
+                if settings_copy.get("notifications_duration", 20) != new_value:
+                    settings_copy["notifications_duration"] = new_value
                     settings_changed = True
 
             if settings_changed:

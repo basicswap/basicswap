@@ -43,7 +43,7 @@
         });
 
         window.bidsTabNavigationInitialized = true;
-        console.log('Bids tab navigation initialized');
+        //console.log('Bids tab navigation initialized');
     }
 
     function handleInitialNavigation() {
@@ -54,14 +54,14 @@
         const tabToActivate = localStorage.getItem('bidsTabToActivate');
         
         if (tabToActivate) {
-            //console.log('Activating tab from localStorage:', tabToActivate);
+
             localStorage.removeItem('bidsTabToActivate');
             activateTabWithRetry('#' + tabToActivate);
         } else if (window.location.hash) {
-            //console.log('Activating tab from hash:', window.location.hash);
+
             activateTabWithRetry(window.location.hash);
         } else {
-            //console.log('Activating default tab: #all');
+
             activateTabWithRetry('#all');
         }
     }
@@ -73,10 +73,10 @@
         
         const hash = window.location.hash;
         if (hash) {
-            //console.log('Hash changed, activating tab:', hash);
+
             activateTabWithRetry(hash);
         } else {
-            //console.log('Hash cleared, activating default tab: #all');
+
             activateTabWithRetry('#all');
         }
     }
@@ -85,7 +85,7 @@
         const normalizedTabId = tabId.startsWith('#') ? tabId : '#' + tabId;
 
         if (normalizedTabId !== '#all' && normalizedTabId !== '#sent' && normalizedTabId !== '#received') {
-            //console.log('Invalid tab ID, defaulting to #all');
+
             activateTabWithRetry('#all');
             return;
         }
@@ -96,17 +96,17 @@
         
         if (!tabButton) {
             if (retryCount < 5) {
-                //console.log('Tab button not found, retrying...', retryCount + 1);
+
                 setTimeout(() => {
                     activateTabWithRetry(normalizedTabId, retryCount + 1);
                 }, 100);
             } else {
-                //console.error('Failed to find tab button after retries');
+
             }
             return;
         }
         
-        //console.log('Activating tab:', normalizedTabId);
+
 
         tabButton.click();
 
@@ -168,7 +168,7 @@
                                           (tabId === '#sent' ? 'sent' : 'received');
 
                 if (typeof window.updateBidsTable === 'function') {
-                    //console.log('Triggering data load for', tabId);
+
                     window.updateBidsTable();
                 }
             }

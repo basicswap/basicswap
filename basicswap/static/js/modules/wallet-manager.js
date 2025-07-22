@@ -180,8 +180,29 @@ const WalletManager = (function() {
 
         if (coinSymbol) {
           if (coinName === 'Particl') {
-            const isBlind = el.closest('.flex')?.querySelector('h4')?.textContent?.includes('Blind');
-            const isAnon = el.closest('.flex')?.querySelector('h4')?.textContent?.includes('Anon');
+            let isBlind = false;
+            let isAnon = false;
+
+            const flexContainer = el.closest('.flex');
+            if (flexContainer) {
+              const h4Element = flexContainer.querySelector('h4');
+              if (h4Element) {
+                isBlind = h4Element.textContent?.includes('Blind');
+                isAnon = h4Element.textContent?.includes('Anon');
+              }
+            }
+
+            if (!isBlind && !isAnon) {
+              const parentRow = el.closest('tr');
+              if (parentRow) {
+                const labelCell = parentRow.querySelector('td:first-child');
+                if (labelCell) {
+                  isBlind = labelCell.textContent?.includes('Blind');
+                  isAnon = labelCell.textContent?.includes('Anon');
+                }
+              }
+            }
+
             const balanceType = isBlind ? 'blind' : isAnon ? 'anon' : 'public';
             localStorage.setItem(`particl-${balanceType}-amount`, amount.toString());
           } else if (coinName === 'Litecoin') {
@@ -248,8 +269,29 @@ const WalletManager = (function() {
         const usdValue = (amount * price).toFixed(2);
 
         if (coinName === 'Particl') {
-          const isBlind = el.closest('.flex')?.querySelector('h4')?.textContent?.includes('Blind');
-          const isAnon = el.closest('.flex')?.querySelector('h4')?.textContent?.includes('Anon');
+          let isBlind = false;
+          let isAnon = false;
+
+          const flexContainer = el.closest('.flex');
+          if (flexContainer) {
+            const h4Element = flexContainer.querySelector('h4');
+            if (h4Element) {
+              isBlind = h4Element.textContent?.includes('Blind');
+              isAnon = h4Element.textContent?.includes('Anon');
+            }
+          }
+
+          if (!isBlind && !isAnon) {
+            const parentRow = el.closest('tr');
+            if (parentRow) {
+              const labelCell = parentRow.querySelector('td:first-child');
+              if (labelCell) {
+                isBlind = labelCell.textContent?.includes('Blind');
+                isAnon = labelCell.textContent?.includes('Anon');
+              }
+            }
+          }
+
           const balanceType = isBlind ? 'blind' : isAnon ? 'anon' : 'public';
           localStorage.setItem(`particl-${balanceType}-last-value`, usdValue);
           localStorage.setItem(`particl-${balanceType}-amount`, amount.toString());

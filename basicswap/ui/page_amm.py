@@ -14,7 +14,7 @@ import traceback
 import sys
 from urllib import parse
 from urllib.request import Request, urlopen
-from .util import listAvailableCoins
+from .util import listAvailableCoinsWithBalances
 
 DEFAULT_AMM_CONFIG_FILE = "createoffers.json"
 DEFAULT_AMM_STATE_FILE = "createoffers_state.json"
@@ -1286,7 +1286,7 @@ def page_amm(self, _, post_string):
         except Exception as e:
             err_messages.append(f"Failed to read state file: {str(e)}")
 
-    coins = listAvailableCoins(swap_client)
+    coins = listAvailableCoinsWithBalances(swap_client)
 
     template = server.env.get_template("amm.html")
     return self.render_template(

@@ -14,6 +14,62 @@
     z-index: 9999;
 }
 
+/* Toast Notification Animations */
+.toast-slide-in {
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast-slide-out {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Toast Container Styles */
+#ul_updates {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-width: 400px;
+}
+
+#ul_updates li {
+    margin-bottom: 0.5rem;
+}
+
+/* Toast Hover Effects */
+#ul_updates .bg-white:hover {
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
+.dark #ul_updates .dark\:bg-gray-800:hover {
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+    transition: all 0.2s ease-in-out;
+}
+
 /* Table Styles */
 .padded_row td {
     padding-top: 1.5em;

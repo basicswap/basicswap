@@ -123,6 +123,145 @@ def js_coins(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps(coins), "UTF-8")
 
 
+def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+
+    try:
+
+        swap_client.updateWalletsInfo()
+        wallets = swap_client.getCachedWalletsInfo()
+        coins_with_balances = []
+
+        for k, v in swap_client.coin_clients.items():
+            if k not in chainparams:
+                continue
+            if v["connection_type"] == "rpc":
+
+                balance = "0.0"
+                if k in wallets:
+                    w = wallets[k]
+                    if "balance" in w and "error" not in w and "no_data" not in w:
+                        raw_balance = w["balance"]
+                        if isinstance(raw_balance, float):
+                            balance = f"{raw_balance:.8f}".rstrip("0").rstrip(".")
+                        elif isinstance(raw_balance, int):
+                            balance = str(raw_balance)
+                        else:
+                            balance = raw_balance
+
+                pending = "0.0"
+                if k in wallets:
+                    w = wallets[k]
+                    if "error" not in w and "no_data" not in w:
+                        ci = swap_client.ci(k)
+                        pending_amount = 0
+                        if "unconfirmed" in w and float(w["unconfirmed"]) > 0.0:
+                            pending_amount += ci.make_int(w["unconfirmed"])
+                        if "immature" in w and float(w["immature"]) > 0.0:
+                            pending_amount += ci.make_int(w["immature"])
+                        if pending_amount > 0:
+                            pending = ci.format_amount(pending_amount)
+
+                coin_entry = {
+                    "id": int(k),
+                    "name": getCoinName(k),
+                    "balance": balance,
+                    "pending": pending,
+                    "ticker": chainparams[k]["ticker"],
+                }
+
+                coins_with_balances.append(coin_entry)
+
+                if k == Coins.PART:
+                    variants = [
+                        {
+                            "coin": Coins.PART_ANON,
+                            "balance_field": "anon_balance",
+                            "pending_field": "anon_pending",
+                        },
+                        {
+                            "coin": Coins.PART_BLIND,
+                            "balance_field": "blind_balance",
+                            "pending_field": "blind_unconfirmed",
+                        },
+                    ]
+
+                    for variant_info in variants:
+                        variant_balance = "0.0"
+                        variant_pending = "0.0"
+
+                        if k in wallets:
+                            w = wallets[k]
+                            if "error" not in w and "no_data" not in w:
+                                if variant_info["balance_field"] in w:
+                                    raw_balance = w[variant_info["balance_field"]]
+                                    if isinstance(raw_balance, float):
+                                        variant_balance = f"{raw_balance:.8f}".rstrip(
+                                            "0"
+                                        ).rstrip(".")
+                                    elif isinstance(raw_balance, int):
+                                        variant_balance = str(raw_balance)
+                                    else:
+                                        variant_balance = raw_balance
+
+                                if (
+                                    variant_info["pending_field"] in w
+                                    and float(w[variant_info["pending_field"]]) > 0.0
+                                ):
+                                    variant_pending = str(
+                                        w[variant_info["pending_field"]]
+                                    )
+
+                        variant_entry = {
+                            "id": int(variant_info["coin"]),
+                            "name": getCoinName(variant_info["coin"]),
+                            "balance": variant_balance,
+                            "pending": variant_pending,
+                            "ticker": chainparams[Coins.PART]["ticker"],
+                        }
+
+                        coins_with_balances.append(variant_entry)
+
+                elif k == Coins.LTC:
+                    variant_balance = "0.0"
+                    variant_pending = "0.0"
+
+                    if k in wallets:
+                        w = wallets[k]
+                        if "error" not in w and "no_data" not in w:
+                            if "mweb_balance" in w:
+                                variant_balance = w["mweb_balance"]
+
+                            pending_amount = 0
+                            if (
+                                "mweb_unconfirmed" in w
+                                and float(w["mweb_unconfirmed"]) > 0.0
+                            ):
+                                pending_amount += float(w["mweb_unconfirmed"])
+                            if "mweb_immature" in w and float(w["mweb_immature"]) > 0.0:
+                                pending_amount += float(w["mweb_immature"])
+                            if pending_amount > 0:
+                                variant_pending = f"{pending_amount:.8f}".rstrip(
+                                    "0"
+                                ).rstrip(".")
+
+                    variant_entry = {
+                        "id": int(Coins.LTC_MWEB),
+                        "name": getCoinName(Coins.LTC_MWEB),
+                        "balance": variant_balance,
+                        "pending": variant_pending,
+                        "ticker": chainparams[Coins.LTC]["ticker"],
+                    }
+
+                    coins_with_balances.append(variant_entry)
+
+        return bytes(json.dumps(coins_with_balances), "UTF-8")
+
+    except Exception as e:
+        error_data = {"error": str(e)}
+        return bytes(json.dumps(error_data), "UTF-8")
+
+
 def js_wallets(self, url_split, post_string, is_json):
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
@@ -1214,6 +1353,7 @@ def js_messageroutes(self, url_split, post_string, is_json) -> bytes:
 
 endpoints = {
     "coins": js_coins,
+    "walletbalances": js_walletbalances,
     "wallets": js_wallets,
     "offers": js_offers,
     "sentoffers": js_sentoffers,

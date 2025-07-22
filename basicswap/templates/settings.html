@@ -49,6 +49,9 @@
       <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="general" id="general-tab">
        General
       </button>
+      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="notifications" id="notifications-tab">
+       Notifications
+      </button>
       <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="tor" id="tor-tab">
        Tor
       </button>
@@ -431,6 +434,153 @@
     <input type="hidden" name="formid" value="{{ form_id }}">
    </form>
   </div>
+
+  <div class="tab-content hidden" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
+   <form method="post">
+    <div class="space-y-6">
+
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+      <div class="px-6 py-4">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        Notification Settings
+       </h3>
+       <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        Configure which notifications you want to see.
+       </p>
+      </div>
+      <div class="px-6 pb-6 space-y-6">
+
+       <div>
+        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Notification Types</h4>
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+         <div class="space-y-4">
+
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="notifications_new_offers" name="notifications_new_offers" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.notifications_new_offers %} checked{% endif %}>
+            <label for="notifications_new_offers" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">New Offers</label>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications for new network offers</p>
+          </div>
+
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="notifications_new_bids" name="notifications_new_bids" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.notifications_new_bids %} checked{% endif %}>
+            <label for="notifications_new_bids" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">New Bids</label>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications for new bids on your offers</p>
+          </div>
+
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="notifications_bid_accepted" name="notifications_bid_accepted" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.notifications_bid_accepted %} checked{% endif %}>
+            <label for="notifications_bid_accepted" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Bid Accepted</label>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications when your bids are accepted</p>
+          </div>
+
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="notifications_balance_changes" name="notifications_balance_changes" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.notifications_balance_changes %} checked{% endif %}>
+            <label for="notifications_balance_changes" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Balance Changes</label>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications for incoming and outgoing funds</p>
+          </div>
+
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="notifications_outgoing_transactions" name="notifications_outgoing_transactions" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.notifications_outgoing_transactions %} checked{% endif %}>
+            <label for="notifications_outgoing_transactions" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Outgoing Transactions</label>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications for sent funds</p>
+          </div>
+
+         </div>
+        </div>
+       </div>
+
+       <div>
+        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Display Duration</h4>
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+         <div>
+          <label for="notifications_duration" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration</label>
+          <div class="relative w-48">
+           <select id="notifications_duration" name="notifications_duration" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+            <option value="5"{% if notification_settings.notifications_duration == 5 %} selected{% endif %}>5 seconds</option>
+            <option value="10"{% if notification_settings.notifications_duration == 10 %} selected{% endif %}>10 seconds</option>
+            <option value="15"{% if notification_settings.notifications_duration == 15 %} selected{% endif %}>15 seconds</option>
+            <option value="20"{% if notification_settings.notifications_duration == 20 %} selected{% endif %}>20 seconds</option>
+            <option value="30"{% if notification_settings.notifications_duration == 30 %} selected{% endif %}>30 seconds</option>
+            <option value="60"{% if notification_settings.notifications_duration == 60 %} selected{% endif %}>1 minute</option>
+           </select>
+           <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+
+       {% if general_settings.debug_ui %}
+       <div>
+        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Test Notifications</h4>
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+         <div>
+          <button type="button" onclick="window.NotificationManager && window.NotificationManager.testToasts()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+           Test All Notification Types
+          </button>
+         </div>
+        </div>
+       </div>
+       {% endif %}
+
+       <div class="flex justify-end mt-6">
+        <button name="apply_notifications" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Apply Changes
+        </button>
+       </div>
+
+      </div>
+     </div>
+
+    </div>
+    <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
+  </div>
+
+  <script>
+    function syncNotificationSettings() {
+      if (window.NotificationManager && typeof window.NotificationManager.updateSettings === 'function') {
+
+        const backendSettings = {
+          showNewOffers: document.getElementById('notifications_new_offers').checked,
+          showNewBids: document.getElementById('notifications_new_bids').checked,
+          showBidAccepted: document.getElementById('notifications_bid_accepted').checked,
+          showBalanceChanges: document.getElementById('notifications_balance_changes').checked,
+          showOutgoingTransactions: document.getElementById('notifications_outgoing_transactions').checked,
+          notificationDuration: parseInt(document.getElementById('notifications_duration').value) * 1000
+        };
+
+        window.NotificationManager.updateSettings(backendSettings);
+      }
+    }
+
+    document.getElementById('notifications-tab').addEventListener('click', function() {
+      setTimeout(syncNotificationSettings, 100);
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+      syncNotificationSettings();
+    });
+
+    document.addEventListener('change', function(e) {
+      if (e.target.closest('#notifications')) {
+        syncNotificationSettings();
+      }
+    });
+  </script>
 
   <div class="tab-content hidden" id="tor" role="tabpanel" aria-labelledby="tor-tab">
    <form method="post" id="tor-form">

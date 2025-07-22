@@ -443,7 +443,45 @@ const UIEnhancer = {
 
             const selectNameElement = select.nextElementSibling?.querySelector('.select-name');
             if (selectNameElement) {
-                selectNameElement.textContent = name;
+
+                if (select.id === 'coin_from' && name.includes(' - Balance: ')) {
+
+                    const parts = name.split(' - Balance: ');
+                    const coinName = parts[0];
+                    const balanceInfo = parts[1] || '';
+
+
+                    selectNameElement.innerHTML = '';
+                    selectNameElement.style.display = 'flex';
+                    selectNameElement.style.flexDirection = 'column';
+                    selectNameElement.style.alignItems = 'flex-start';
+                    selectNameElement.style.lineHeight = '1.2';
+
+
+                    const coinNameDiv = document.createElement('div');
+                    coinNameDiv.textContent = coinName;
+                    coinNameDiv.style.fontWeight = 'normal';
+                    coinNameDiv.style.color = 'inherit';
+
+
+                    const balanceDiv = document.createElement('div');
+                    balanceDiv.textContent = `Balance: ${balanceInfo}`;
+                    balanceDiv.style.fontSize = '0.75rem';
+                    balanceDiv.style.color = '#6b7280';
+                    balanceDiv.style.marginTop = '1px';
+
+                    selectNameElement.appendChild(coinNameDiv);
+                    selectNameElement.appendChild(balanceDiv);
+
+
+
+                } else {
+
+                    selectNameElement.textContent = name;
+                    selectNameElement.style.display = 'block';
+                    selectNameElement.style.flexDirection = '';
+                    selectNameElement.style.alignItems = '';
+                }
             }
 
             updateSelectCache(select);

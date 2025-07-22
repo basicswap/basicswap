@@ -1382,6 +1382,11 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write(
                 "zmqpubsmsg=tcp://{}:{}\n".format(COINS_RPCBIND_IP, settings["zmqport"])
             )
+            fp.write(
+                "zmqpubhashwtx=tcp://{}:{}\n".format(
+                    COINS_RPCBIND_IP, settings["zmqport"]
+                )
+            )
             fp.write("spentindex=1\n")
             fp.write("txindex=1\n")
             fp.write("staking=0\n")

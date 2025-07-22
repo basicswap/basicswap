@@ -261,9 +261,12 @@ const SummaryManager = (function() {
       }
 
       if (data.event) {
-        publicAPI.fetchSummaryData()
-          .then(() => {})
-          .catch(() => {});
+        const summaryEvents = ['new_offer', 'offer_revoked', 'new_bid', 'bid_accepted', 'swap_completed'];
+        if (summaryEvents.includes(data.event)) {
+          publicAPI.fetchSummaryData()
+            .then(() => {})
+            .catch(() => {});
+        }
 
         if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
           window.NotificationManager.handleWebSocketEvent(data);
@@ -334,9 +337,12 @@ const SummaryManager = (function() {
 
         wsManager.addMessageHandler('message', (data) => {
           if (data.event) {
-            this.fetchSummaryData()
-              .then(() => {})
-              .catch(() => {});
+            const summaryEvents = ['new_offer', 'offer_revoked', 'new_bid', 'bid_accepted', 'swap_completed'];
+            if (summaryEvents.includes(data.event)) {
+              this.fetchSummaryData()
+                .then(() => {})
+                .catch(() => {});
+            }
 
             if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
               window.NotificationManager.handleWebSocketEvent(data);
