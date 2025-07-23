@@ -288,11 +288,11 @@ const CleanupManager = (function() {
                 }
             }
 
-            document.dispatchEvent(new CustomEvent('memoryOptimized', { 
-                detail: { 
+            document.dispatchEvent(new CustomEvent('memoryOptimized', {
+                detail: {
                     timestamp: Date.now(),
                     maxDataSize: options.maxDataSize || 1000
-                } 
+                }
             }));
 
             log('Memory optimization complete');
@@ -311,11 +311,11 @@ const CleanupManager = (function() {
 
                 try {
 
-                    const isDetached = !(listener.element instanceof Node) || 
-                                    !document.body.contains(listener.element) || 
+                    const isDetached = !(listener.element instanceof Node) ||
+                                    !document.body.contains(listener.element) ||
                                     (listener.element.classList && listener.element.classList.contains('hidden')) ||
                                     (listener.element.style && listener.element.style.display === 'none');
-                                    
+
                     if (isDetached) {
                         try {
                             if (listener.element instanceof Node) {
@@ -362,12 +362,12 @@ const CleanupManager = (function() {
                     log(`Error checking resource ${id}: ${e.message}`);
                 }
             });
-            
+
             resourcesForRemoval.forEach(id => {
                 this.unregisterResource(id);
                 removedResources++;
             });
-            
+
             if (removedResources > 0) {
                 log(`Removed ${removedResources} orphaned resources`);
             }
@@ -408,22 +408,22 @@ const CleanupManager = (function() {
             try {
 
                 const tooltipSelectors = [
-                    '[role="tooltip"]', 
-                    '[id^="tooltip-"]', 
-                    '.tippy-box', 
+                    '[role="tooltip"]',
+                    '[id^="tooltip-"]',
+                    '.tippy-box',
                     '[data-tippy-root]'
                 ];
 
                 tooltipSelectors.forEach(selector => {
                     try {
                         const elements = document.querySelectorAll(selector);
-                        
+
                         elements.forEach(element => {
                             try {
 
                                 if (!(element instanceof Element)) return;
-                                
-                                const isDetached = !element.parentElement || 
+
+                                const isDetached = !element.parentElement ||
                                                 !document.body.contains(element.parentElement) ||
                                                 element.classList.contains('hidden') ||
                                                 element.style.display === 'none' ||

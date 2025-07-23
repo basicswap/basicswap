@@ -332,10 +332,10 @@ const ui = {
 
       if (data.price_btc !== undefined && data.price_btc !== null) {
         priceBTC = data.price_btc;
-      } 
+      }
       else if (window.btcPriceUSD && window.btcPriceUSD > 0) {
         priceBTC = priceUSD / window.btcPriceUSD;
-      } 
+      }
       else if (app && app.btcPriceUSD && app.btcPriceUSD > 0) {
         priceBTC = priceUSD / app.btcPriceUSD;
       }
@@ -343,7 +343,7 @@ const ui = {
         priceBTC = 0;
       }
     }
-    
+
     priceChange1d = data.price_change_percentage_24h || 0;
     volume24h = data.total_volume || 0;
     if (isNaN(priceUSD) || isNaN(priceBTC)) {

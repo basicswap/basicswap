@@ -185,7 +185,7 @@ const TooltipManager = (function() {
                             }
                         }
                     );
-                    
+
                     return tippyInstance[0];
                 }
 
@@ -248,7 +248,7 @@ const TooltipManager = (function() {
             this.log('Running tooltip cleanup');
 
             try {
-                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) && 
+                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) &&
                     (document.querySelector('[data-tippy-root]:hover') || document.querySelector('[data-tooltip-trigger-id]:hover'))) {
                     console.log('Skipping tooltip cleanup - tooltip is being hovered');
                     return;
@@ -299,7 +299,7 @@ const TooltipManager = (function() {
             this.log('Cleaning up all tooltips');
 
             try {
-                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) && 
+                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) &&
                     document.querySelector('#offers-body tr:hover')) {
                     this.log('Skipping all tooltips cleanup on offers/bids page with row hover');
                     return;
@@ -328,7 +328,7 @@ const TooltipManager = (function() {
                     if (!isHovered(trigger)) {
                         trigger.removeAttribute('data-tooltip-trigger-id');
                         trigger.removeAttribute('aria-describedby');
-                        
+
                         if (trigger._tippy) {
                             try {
                                 trigger._tippy.destroy();
@@ -350,7 +350,7 @@ const TooltipManager = (function() {
 
                         if (!closestHoveredRow) {
                             const style = window.getComputedStyle(tooltip);
-                            const isVisible = style.display !== 'none' && 
+                            const isVisible = style.display !== 'none' &&
                                         style.visibility !== 'hidden' &&
                                         style.opacity !== '0';
 
@@ -372,8 +372,8 @@ const TooltipManager = (function() {
 
                 tippyElements.forEach(element => {
                     const tooltipId = element.getAttribute('data-for-tooltip-id');
-                    const trigger = tooltipId ? 
-                        document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) : 
+                    const trigger = tooltipId ?
+                        document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) :
                         null;
 
                     if (!trigger || !document.body.contains(trigger)) {
@@ -489,7 +489,7 @@ const TooltipManager = (function() {
 
         performPeriodicCleanup(force = false) {
             try {
-                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) && 
+                if ((window.location.pathname.includes('/offers') || window.location.pathname.includes('/bids')) &&
                     !force) {
                     return;
                 }
@@ -829,7 +829,7 @@ const TooltipManager = (function() {
             const manager = this.getInstance();
             return manager.initializeTooltips(...args);
         },
-        
+
         setDebugMode: function(enabled) {
             const manager = this.getInstance();
             return manager.setDebugMode(enabled);
