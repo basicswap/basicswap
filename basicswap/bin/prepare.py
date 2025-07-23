@@ -356,21 +356,6 @@ monero_wallet_rpc_proxy_config = [
     #   'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
-wownerod_proxy_config = [
-    f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
-    "proxy-allow-dns-leaks=0",
-    "no-igd=1",  # Disable UPnP port mapping
-    "hide-my-port=1",  # Don't share the p2p port
-    "p2p-bind-ip=127.0.0.1",  # Don't broadcast ip
-    "in-peers=0",  # Changes "error" in log to "incoming connections disabled"
-    "out-peers=24",
-    f"tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16",  # Outgoing tx relay to onion
-]
-
-wownero_wallet_rpc_proxy_config = [
-    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
-]
-
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
 default_socket_getaddrinfo = socket.getaddrinfo
@@ -1223,16 +1208,12 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if coin == "monero":
                 if XMR_RPC_USER != "":
                     fp.write(f"rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n")
-                if tor_control_password is not None:
-                    for opt_line in monerod_proxy_config:
-                        fp.write(opt_line + "\n")
-
             if coin == "wownero":
                 if WOW_RPC_USER != "":
                     fp.write(f"rpc-login={WOW_RPC_USER}:{WOW_RPC_PWD}\n")
-                if tor_control_password is not None:
-                    for opt_line in wownerod_proxy_config:
-                        fp.write(opt_line + "\n")
+            if tor_control_password is not None:
+                for opt_line in monerod_proxy_config:
+                    fp.write(opt_line + "\n")
 
         wallets_dir = core_settings.get("walletsdir", data_dir)
         if not os.path.exists(wallets_dir):
@@ -1567,14 +1548,8 @@ def modify_tor_config(
                 # Disable tor first
                 for line in fp_in:
                     skip_line: bool = False
-                    if coin == "monero":
+                    if coin in ("wownero", "monero"):
                         for opt_line in monerod_proxy_config:
-                            setting: str = opt_line[0 : opt_line.find("=") + 1]
-                            if line.startswith(setting):
-                                skip_line = True
-                                break
-                    if coin == "wownero":
-                        for opt_line in wownerod_proxy_config:
                             setting: str = opt_line[0 : opt_line.find("=") + 1]
                             if line.startswith(setting):
                                 skip_line = True
@@ -1582,11 +1557,8 @@ def modify_tor_config(
                     if not skip_line:
                         fp.write(line)
             if enable:
-                if coin == "monero":
+                if coin in ("wownero", "monero"):
                     for opt_line in monerod_proxy_config:
-                        fp.write(opt_line + "\n")
-                if coin == "wownero":
-                    for opt_line in wownerod_proxy_config:
                         fp.write(opt_line + "\n")
 
         with open(wallet_conf_path, "w") as fp:

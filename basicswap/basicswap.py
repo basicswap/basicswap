@@ -259,32 +259,6 @@ def threadPollXMRChainState(swap_client, coin_type):
         )  # Random to stagger updates
 
 
-def threadPollWOWChainState(swap_client, coin_type):
-    ci = swap_client.ci(coin_type)
-    cc = swap_client.coin_clients[coin_type]
-    while not swap_client.chainstate_delay_event.is_set():
-        try:
-            new_height: int = ci.getChainHeight()
-            if new_height != cc["chain_height"]:
-                swap_client.log.debug(
-                    f"New {ci.ticker()} block at height: {new_height}"
-                )
-                with swap_client.mxDB:
-                    cc["chain_height"] = new_height
-
-                checkAndNotifyBalanceChange(
-                    swap_client, coin_type, ci, cc, new_height, "block"
-                )
-
-        except Exception as e:
-            swap_client.log.warning(
-                f"threadPollWOWChainState {ci.ticker()}, error: {e}"
-            )
-        swap_client.chainstate_delay_event.wait(
-            random.randrange(20, 30)
-        )  # Random to stagger updates
-
-
 def threadPollChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
@@ -1150,7 +1124,7 @@ class BasicSwap(BaseApp, UIApp):
 
                 thread_func = {
                     Coins.XMR: threadPollXMRChainState,
-                    Coins.WOW: threadPollWOWChainState,
+                    Coins.WOW: threadPollXMRChainState,
                 }.get(
                     c, threadPollChainState
                 )  # default case
