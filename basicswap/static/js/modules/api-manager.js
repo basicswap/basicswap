@@ -264,9 +264,9 @@ const ApiManager = (function() {
                         window.config.coins
                             .filter(coin => coin.usesCoinGecko)
                             .map(coin => {
-                                return window.config.getCoinBackendId ? 
-                                    window.config.getCoinBackendId(coin.name) : 
-                                    (typeof getCoinBackendId === 'function' ? 
+                                return window.config.getCoinBackendId ?
+                                    window.config.getCoinBackendId(coin.name) :
+                                    (typeof getCoinBackendId === 'function' ?
                                     getCoinBackendId(coin.name) : coin.name.toLowerCase());
                             })
                             .join(',') :
@@ -277,7 +277,7 @@ const ApiManager = (function() {
                     }
 
                     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinList}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`;
-                    
+
                     const response = await this.makePostRequest(url, {
                         'User-Agent': 'Mozilla/5.0',
                         'Accept': 'application/json'
@@ -288,7 +288,7 @@ const ApiManager = (function() {
                     }
 
                     const volumeData = {};
-                    
+
                     Object.entries(response).forEach(([coinId, data]) => {
                         if (data && data.usd_24h_vol !== undefined) {
                             volumeData[coinId] = {

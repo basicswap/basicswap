@@ -147,7 +147,7 @@ window.cleanup = function() {
     if (exportAllButton && typeof EventManager !== 'undefined') {
         EventManager.remove(exportAllButton, 'click');
     }
-    
+
     if (exportSentButton && typeof EventManager !== 'undefined') {
         EventManager.remove(exportSentButton, 'click');
     }

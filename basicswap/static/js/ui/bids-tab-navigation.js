@@ -16,7 +16,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         initBidsTabNavigation();
     });
-    
+
     window.addEventListener('hashchange', handleHashChange);
 
     window.bidsTabNavigationInitialized = false;
@@ -52,7 +52,7 @@
         }
 
         const tabToActivate = localStorage.getItem('bidsTabToActivate');
-        
+
         if (tabToActivate) {
 
             localStorage.removeItem('bidsTabToActivate');
@@ -70,7 +70,7 @@
         if (window.location.pathname !== '/bids') {
             return;
         }
-        
+
         const hash = window.location.hash;
         if (hash) {
 
@@ -90,22 +90,20 @@
             return;
         }
 
-        const tabButtonId = normalizedTabId === '#all' ? 'all-tab' : 
+        const tabButtonId = normalizedTabId === '#all' ? 'all-tab' :
                            (normalizedTabId === '#sent' ? 'sent-tab' : 'received-tab');
         const tabButton = document.getElementById(tabButtonId);
-        
+
         if (!tabButton) {
             if (retryCount < 5) {
 
                 setTimeout(() => {
                     activateTabWithRetry(normalizedTabId, retryCount + 1);
                 }, 100);
-            } else {
-
             }
             return;
         }
-        
+
 
 
         tabButton.click();
@@ -115,7 +113,7 @@
             if (tabsEl) {
                 const allTabs = Array.from(tabsEl.querySelectorAll('[role="tab"]'));
                 const targetTab = allTabs.find(tab => tab.getAttribute('data-tabs-target') === normalizedTabId);
-                
+
                 if (targetTab) {
 
                     allTabs.forEach(tab => {
@@ -133,7 +131,7 @@
                     const allContent = document.getElementById('all');
                     const sentContent = document.getElementById('sent');
                     const receivedContent = document.getElementById('received');
-                    
+
                     if (allContent && sentContent && receivedContent) {
                         allContent.classList.toggle('hidden', normalizedTabId !== '#all');
                         sentContent.classList.toggle('hidden', normalizedTabId !== '#sent');
@@ -146,7 +144,7 @@
         const allPanel = document.getElementById('all');
         const sentPanel = document.getElementById('sent');
         const receivedPanel = document.getElementById('received');
-        
+
         if (allPanel && sentPanel && receivedPanel) {
             allPanel.classList.toggle('hidden', normalizedTabId !== '#all');
             sentPanel.classList.toggle('hidden', normalizedTabId !== '#sent');
@@ -164,7 +162,7 @@
     function triggerDataLoad(tabId) {
         setTimeout(() => {
             if (window.state) {
-                window.state.currentTab = tabId === '#all' ? 'all' : 
+                window.state.currentTab = tabId === '#all' ? 'all' :
                                           (tabId === '#sent' ? 'sent' : 'received');
 
                 if (typeof window.updateBidsTable === 'function') {
@@ -174,9 +172,9 @@
             }
 
             const event = new CustomEvent('tabactivated', {
-                detail: { 
+                detail: {
                     tabId: tabId,
-                    type: tabId === '#all' ? 'all' : 
+                    type: tabId === '#all' ? 'all' :
                           (tabId === '#sent' ? 'sent' : 'received')
                 }
             });
@@ -195,9 +193,9 @@
 
     function navigateToTabDirectly(tabId) {
         const oldScrollPosition = window.scrollY;
-        
+
         activateTabWithRetry(tabId);
-        
+
         setTimeout(function() {
             window.scrollTo(0, oldScrollPosition);
         }, 0);

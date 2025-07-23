@@ -11,15 +11,15 @@ const MemoryManager = (function() {
     debug: false,
     protectedWebSockets: ['wsPort', 'ws_port'],
     interactiveSelectors: [
-      'tr:hover', 
-      '[data-tippy-root]:hover', 
-      '.tooltip:hover', 
-      '[data-tooltip-trigger-id]:hover', 
+      'tr:hover',
+      '[data-tippy-root]:hover',
+      '.tooltip:hover',
+      '[data-tooltip-trigger-id]:hover',
       '[data-tooltip-target]:hover'
     ],
     protectedContainers: [
-      '#sent-tbody', 
-      '#received-tbody', 
+      '#sent-tbody',
+      '#received-tbody',
       '#offers-body'
     ]
   };
@@ -74,10 +74,10 @@ const MemoryManager = (function() {
 
   function shouldSkipCleanup() {
     if (state.isCleanupRunning) return true;
-    
+
     const selector = config.interactiveSelectors.join(', ');
     const hoveredElements = document.querySelectorAll(selector);
-    
+
     return hoveredElements.length > 0;
   }
 
@@ -130,7 +130,7 @@ const MemoryManager = (function() {
         disconnectedRemoved: disconnectedResult,
         memoryBefore: startMemory ? startMemory.usedMB : null,
         memoryAfter: endMemory ? endMemory.usedMB : null,
-        memorySaved: startMemory && endMemory ? 
+        memorySaved: startMemory && endMemory ?
           (startMemory.usedMB - endMemory.usedMB).toFixed(2) : null
       };
 
@@ -162,7 +162,7 @@ const MemoryManager = (function() {
 
       tippyRoots.forEach(root => {
         const tooltipId = root.getAttribute('data-for-tooltip-id');
-        const trigger = tooltipId ? 
+        const trigger = tooltipId ?
           document.querySelector(`[data-tooltip-trigger-id="${tooltipId}"]`) : null;
 
         if (!trigger || !document.body.contains(trigger)) {
@@ -228,7 +228,7 @@ const MemoryManager = (function() {
 
     return true;
   }
-  
+
   function checkMemoryUsage() {
     const result = {
       usedJSHeapSize: 0,
@@ -288,7 +288,7 @@ const MemoryManager = (function() {
       setTimeout(() => {
         processingScheduled = false;
         lastProcessTime = Date.now();
-        
+
         if (state.isCleanupRunning) {
           return;
         }
@@ -298,7 +298,7 @@ const MemoryManager = (function() {
 
         tooltipCount = document.querySelectorAll(tooltipSelectors.join(', ')).length;
 
-        if (tooltipCount > config.maxTooltipsThreshold && 
+        if (tooltipCount > config.maxTooltipsThreshold &&
             (Date.now() - state.lastCleanupTime > config.minTimeBetweenCleanups)) {
 
           removeOrphanedTooltips();
@@ -429,7 +429,7 @@ const MemoryManager = (function() {
 
     return true;
   }
-  
+
   function initialize(options = {}) {
     preserveTooltipFunctions();
 
@@ -492,8 +492,8 @@ const MemoryManager = (function() {
     const stats = getDetailedStats();
 
     console.group('Memory Manager Stats');
-    console.log('Memory Usage:', stats.memory ? 
-      `${stats.memory.usedMB}MB / ${stats.memory.limitMB}MB (${stats.memory.percentUsed}%)` : 
+    console.log('Memory Usage:', stats.memory ?
+      `${stats.memory.usedMB}MB / ${stats.memory.limitMB}MB (${stats.memory.percentUsed}%)` :
       'Not available');
     console.log('Total Cleanups:', stats.metrics.cleanupRuns);
     console.log('Total Tooltips Removed:', stats.metrics.tooltipsRemoved);
@@ -569,7 +569,7 @@ const MemoryManager = (function() {
 })();
 
 document.addEventListener('DOMContentLoaded', function() {
-  const isDevMode = window.location.hostname === 'localhost' || 
+  const isDevMode = window.location.hostname === 'localhost' ||
                    window.location.hostname === '127.0.0.1';
 
   MemoryManager.initialize({
