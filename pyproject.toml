@@ -33,6 +33,7 @@ dev = [
     "codespell",
     "flake8",
     "pip-tools",
+    "pre-commit",
     "pytest",
     "ruff",
     "black==25.1.0",
