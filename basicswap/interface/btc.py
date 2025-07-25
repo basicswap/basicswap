@@ -16,8 +16,8 @@ import shutil
 import sqlite3
 import traceback
 
-
 from io import BytesIO
+from typing import Dict, Optional
 
 from basicswap.basicswap_util import (
     getVoutByAddress,
@@ -25,9 +25,9 @@ from basicswap.basicswap_util import (
 )
 from basicswap.interface.base import Secp256k1Interface
 from basicswap.util import (
+    b2i,
     ensure,
     i2b,
-    b2i,
     i2h,
 )
 from basicswap.util.ecc import (
@@ -36,18 +36,18 @@ from basicswap.util.ecc import (
 )
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.script import (
+    SerialiseNumCompact,
     decodeScriptNum,
     getCompactSizeLen,
-    SerialiseNumCompact,
     getWitnessElementLen,
 )
 from basicswap.util.address import (
-    toWIF,
-    b58encode,
     b58decode,
-    decodeWif,
+    b58encode,
     decodeAddress,
+    decodeWif,
     pubkeyToAddress,
+    toWIF,
 )
 from basicswap.util.crypto import (
     hash160,
@@ -294,6 +294,8 @@ class BTCInterface(Secp256k1Interface):
         self._expect_seedid_hex = None
         self._altruistic = coin_settings.get("altruistic", True)
         self._use_descriptors = coin_settings.get("use_descriptors", False)
+        # Use hardened account indices to match existing wallet keys, only applies when use_descriptors is True
+        self._use_legacy_key_paths = coin_settings.get("use_legacy_key_paths", False)
 
     def open_rpc(self, wallet=None):
         return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
@@ -397,6 +399,13 @@ class BTCInterface(Secp256k1Interface):
             last_block_header = prev_block_header
         raise ValueError(f"Block header not found at time: {time}")
 
+    def getWalletAccountPath(self) -> str:
+        # Use a bip44 style path, however the seed (derived from the particl mnemonic keychain) can't be turned into a bip39 mnemonic without the matching entropy
+        purpose: int = 84  # native segwit
+        coin_type: int = self.chainparams_network()["bip44"]
+        account: int = 0
+        return f"{purpose}h/{coin_type}h/{account}h"
+
     def initialiseWallet(self, key_bytes: bytes, restore_time: int = -1) -> None:
         assert len(key_bytes) == 32
         self._have_checked_seed = False
@@ -405,8 +414,15 @@ class BTCInterface(Secp256k1Interface):
             ek = ExtKeyPair()
             ek.set_seed(key_bytes)
             ek_encoded: str = self.encode_secret_extkey(ek.encode_v())
-            desc_external = descsum_create(f"wpkh({ek_encoded}/0h/0h/*h)")
-            desc_internal = descsum_create(f"wpkh({ek_encoded}/0h/1h/*h)")
+            if self._use_legacy_key_paths:
+                # Match keys from legacy wallets (created from sethdseed)
+                desc_external = descsum_create(f"wpkh({ek_encoded}/0h/0h/*h)")
+                desc_internal = descsum_create(f"wpkh({ek_encoded}/0h/1h/*h)")
+            else:
+                # Use a bip44 path so the seed can be exported as a mnemonic
+                path: str = self.getWalletAccountPath()
+                desc_external = descsum_create(f"wpkh({ek_encoded}/{path}/0/*)")
+                desc_internal = descsum_create(f"wpkh({ek_encoded}/{path}/1/*)")
 
             rv = self.rpc_wallet(
                 "importdescriptors",
@@ -444,6 +460,50 @@ class BTCInterface(Secp256k1Interface):
                 else:
                 """
                 raise (e)
+
+    def canExportToElectrum(self) -> bool:
+        # keychains must be unhardened to export into electrum
+        return self._use_descriptors is True and self._use_legacy_key_paths is False
+
+    def getAccountKey(
+        self,
+        key_bytes: bytes,
+        extkey_prefix: Optional[int] = None,
+        coin_type_overide: Optional[int] = None,
+    ) -> str:
+        # For electrum, must start with zprv to get P2WPKH, addresses
+        # extkey_prefix: 0x04b2430c
+        ek = ExtKeyPair()
+        ek.set_seed(key_bytes)
+        path: str = self.getWalletAccountPath()
+        account_ek = ek.derive_path(path)
+        return self.encode_secret_extkey(account_ek.encode_v(), extkey_prefix)
+
+    def getWalletKeyChains(
+        self, key_bytes: bytes, extkey_prefix: Optional[int] = None
+    ) -> Dict[str, str]:
+        ek = ExtKeyPair()
+        ek.set_seed(key_bytes)
+
+        # extkey must contain keydata to derive hardened child keys
+
+        if self.canExportToElectrum():
+            path: str = self.getWalletAccountPath()
+            external_extkey = ek.derive_path(f"{path}/0")
+            internal_extkey = ek.derive_path(f"{path}/1")
+        else:
+            # Match keychain paths of legacy wallets
+            external_extkey = ek.derive_path("0h/0h")
+            internal_extkey = ek.derive_path("0h/1h")
+
+        def encode_extkey(extkey):
+            return self.encode_secret_extkey(extkey.encode_v(), extkey_prefix)
+
+        rv = {
+            "external": encode_extkey(external_extkey),
+            "internal": encode_extkey(internal_extkey),
+        }
+        return rv
 
     def getWalletInfo(self):
         rv = self.rpc_wallet("getwalletinfo")
@@ -504,10 +564,16 @@ class BTCInterface(Secp256k1Interface):
             if descriptor is None:
                 self._log.debug("Could not find active descriptor.")
                 return "Not found"
-            end = descriptor["desc"].find("/")
+            start = descriptor["desc"].find("]")
+            if start < 3:
+                return "Could not parse descriptor"
+            descriptor = descriptor["desc"][start + 1 :]
+
+            end = descriptor.find("/")
             if end < 10:
-                return "Not found"
-            extkey = descriptor["desc"][5:end]
+                return "Could not parse descriptor"
+            extkey = descriptor[:end]
+
             extkey_data = b58decode(extkey)[4:-4]
             extkey_data_hash: bytes = hash160(extkey_data)
             return extkey_data_hash.hex()
@@ -611,9 +677,10 @@ class BTCInterface(Secp256k1Interface):
         pkh = hash160(pk)
         return segwit_addr.encode(bech32_prefix, version, pkh)
 
-    def encode_secret_extkey(self, ek_data: bytes) -> str:
+    def encode_secret_extkey(self, ek_data: bytes, prefix=None) -> str:
         assert len(ek_data) == 74
-        prefix = self.chainparams_network()["ext_secret_key_prefix"]
+        if prefix is None:
+            prefix = self.chainparams_network()["ext_secret_key_prefix"]
         data: bytes = prefix.to_bytes(4, "big") + ek_data
         checksum = sha256(sha256(data))
         return b58encode(data + checksum[0:4])

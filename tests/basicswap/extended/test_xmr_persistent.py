@@ -124,7 +124,7 @@ def callbtcrpc(
     node_id,
     method,
     params=[],
-    wallet=None,
+    wallet="wallet.dat",
     base_rpc_port=BITCOIN_RPC_PORT_BASE + PORT_OFS,
 ):
     auth = "test_btc_{0}:test_btc_pwd_{0}".format(node_id)
@@ -315,9 +315,7 @@ def start_processes(self):
             ]
             < num_blocks
         ):
-            logging.info(
-                "Mining {} Monero blocks to {}.".format(num_blocks, self.xmr_addr)
-            )
+            logging.info(f"Mining {num_blocks} Monero blocks to {self.xmr_addr}.")
             callrpc_xmr(
                 XMR_BASE_RPC_PORT + 1,
                 "generateblocks",
@@ -336,7 +334,7 @@ def start_processes(self):
     if callbtcrpc(0, "getblockcount") < num_blocks:
         logging.info(f"Mining {num_blocks} Bitcoin blocks to {self.btc_addr}")
         callbtcrpc(0, "generatetoaddress", [num_blocks, self.btc_addr])
-    logging.info("BTC blocks: %d", callbtcrpc(0, "getblockcount"))
+    logging.info("BTC blocks: {}".format(callbtcrpc(0, "getblockcount")))
 
     if "litecoin" in TEST_COINS_LIST:
         self.ltc_addr = callltcrpc(
@@ -345,7 +343,7 @@ def start_processes(self):
         num_blocks: int = 431
         have_blocks: int = callltcrpc(0, "getblockcount")
         if have_blocks < 500:
-            logging.info("Mining %d Litecoin blocks to %s", num_blocks, self.ltc_addr)
+            logging.info(f"Mining {num_blocks} Litecoin blocks to {self.ltc_addr}")
             callltcrpc(
                 0,
                 "generatetoaddress",

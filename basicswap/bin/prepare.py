@@ -401,6 +401,12 @@ def getDescriptorWalletOption(coin_params):
     return toBool(os.getenv(ticker + "_USE_DESCRIPTORS", default_option))
 
 
+def getLegacyKeyPathOption(coin_params):
+    ticker: str = coin_params["ticker"]
+    default_option: bool = False
+    return toBool(os.getenv(ticker + "_USE_LEGACY_KEY_PATHS", default_option))
+
+
 def getKnownVersion(coin_name: str) -> str:
     version, version_tag, _ = known_coins[coin_name]
     return version + version_tag
@@ -2792,6 +2798,8 @@ def main():
             coin_settings["watch_wallet_name"] = getWalletName(
                 coin_params, "bsx_watch", prefix_override=f"{ticker}_WATCH"
             )
+            if getLegacyKeyPathOption(coin_params) is True:
+                coin_settings["use_legacy_key_paths"] = True
 
     if PART_RPC_USER != "":
         chainclients["particl"]["rpcuser"] = PART_RPC_USER
