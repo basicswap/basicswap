@@ -707,6 +707,8 @@ def page_offer(self, url_split, post_string):
         "coin_to": ci_to.coin_name(),
         "coin_from_ind": int(ci_from.coin_type()),
         "coin_to_ind": int(ci_to.coin_type()),
+        "coin_from_exp": ci_from.exp(),
+        "coin_to_exp": ci_to.exp(),
         "amt_from": ci_from.format_amount(offer.amount_from),
         "amt_to": ci_to.format_amount(amount_to),
         "amt_bid_min": ci_from.format_amount(offer.min_bid_amount),
