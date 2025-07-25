@@ -510,7 +510,8 @@ def formatBids(swap_client, bids, filters) -> bytes:
         bid_rate: int = 0 if b[10] is None else b[10]
         amount_to = None
         if ci_to:
-            amount_to = ci_to.format_amount((b[4] * bid_rate) // ci_from.COIN())
+            amount_to_int = (b[4] * bid_rate + ci_from.COIN() - 1) // ci_from.COIN()
+            amount_to = ci_to.format_amount(amount_to_int)
 
         bid_data = {
             "bid_id": b[2].hex(),
@@ -800,16 +801,14 @@ def js_rate(self, url_split, post_string, is_json) -> bytes:
         if amt_from_str is not None:
             rate = ci_to.make_int(rate, r=1)
             amt_from = inputAmount(amt_from_str, ci_from)
-            amount_to = ci_to.format_amount(
-                int((amt_from * rate) // ci_from.COIN()), r=1
-            )
+            amount_to_int = (amt_from * rate + ci_from.COIN() - 1) // ci_from.COIN()
+            amount_to = ci_to.format_amount(amount_to_int)
             return bytes(json.dumps({"amount_to": amount_to}), "UTF-8")
         if amt_to_str is not None:
             rate = ci_from.make_int(1.0 / float(rate), r=1)
             amt_to = inputAmount(amt_to_str, ci_to)
-            amount_from = ci_from.format_amount(
-                int((amt_to * rate) // ci_to.COIN()), r=1
-            )
+            amount_from_int = (amt_to * rate + ci_to.COIN() - 1) // ci_to.COIN()
+            amount_from = ci_from.format_amount(amount_from_int)
             return bytes(json.dumps({"amount_from": amount_from}), "UTF-8")
 
     amt_from: int = inputAmount(get_data_entry(post_data, "amt_from"), ci_from)
