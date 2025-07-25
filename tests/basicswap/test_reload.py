@@ -30,12 +30,12 @@ from tests.basicswap.util import (
     waitForServer,
 )
 from tests.basicswap.common import (
+    callrpc_cli,
     waitForNumOffers,
     waitForNumBids,
     waitForNumSwapping,
 )
 from tests.basicswap.common_xmr import (
-    callrpc_cli,
     prepare_nodes,
 )
 import basicswap.bin.run as runSystem
