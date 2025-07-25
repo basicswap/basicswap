@@ -2290,7 +2290,11 @@ class BasicSwap(BaseApp, UIApp):
                 offer.amount_from == bid_amount, "Bid amount must match offer amount."
             )
         if not offer.rate_negotiable:
-            ensure(offer.rate == bid_rate, "Bid rate must match offer rate.")
+            rate_tolerance = max(1, offer.rate // 10000)
+            ensure(
+                abs(bid_rate - offer.rate) <= rate_tolerance,
+                "Rate mismatch.",
+            )
 
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
