@@ -775,6 +775,11 @@ function resetForm() {
     });
 }
 
+function roundUpToDecimals(value, decimals) {
+    const factor = Math.pow(10, decimals);
+    return Math.ceil(value * factor) / factor;
+}
+
 function updateBidParams(value_changed) {
     const coin_from = document.getElementById('coin_from')?.value;
     const coin_to = document.getElementById('coin_to')?.value;
@@ -807,6 +812,12 @@ function updateBidParams(value_changed) {
             const sendAmount = parseFloat(bidAmountSendInput.value) || 0;
             const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
             bidAmountInput.value = receiveAmount;
+        }
+    } else if (value_changed === 'receiving') {
+        if (bidAmountInput && bidAmountSendInput) {
+            const receiveAmount = parseFloat(bidAmountInput.value) || 0;
+            const sendAmount = roundUpToDecimals(receiveAmount * rate, coin_to_exp).toFixed(coin_to_exp);
+            bidAmountSendInput.value = sendAmount;
         }
     }
 
