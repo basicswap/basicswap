@@ -3751,7 +3751,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             str.format("{:02x}", MessageTypes.ADS_BID_LF) + msg_buf.to_bytes().hex()
         )
 
-        self.logD(LC.NET, f"sendADSBidIntentMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}")
+        self.logD(
+            LC.NET,
+            f"sendADSBidIntentMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}",
+        )
         return self.sendMessage(
             bid.bid_addr,
             offer.addr_from,
@@ -3800,7 +3803,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
 
-        self.logD(LC.NET, f"sendXmrBidMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}")
+        self.logD(
+            LC.NET,
+            f"sendXmrBidMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}",
+        )
         bid_msg_id = self.sendMessage(
             bid.bid_addr,
             offer.addr_from,
@@ -3877,7 +3883,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         payload_hex = str.format("{:02x}", MessageTypes.BID) + msg_buf.to_bytes().hex()
         msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
 
-        self.logD(LC.NET, f"sendBidMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}")
+        self.logD(
+            LC.NET,
+            f"sendBidMessage offer.message_nets {offer.message_nets}, bid.message_nets {bid.message_nets}, msg_buf.message_nets {msg_buf.message_nets}",
+        )
         bid_msg_id = self.sendMessage(
             bid.bid_addr,
             offer.addr_from,
@@ -7992,8 +8001,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         network_type: str = msg.get("msg_net", "smsg")
         network_type_received_on_id: int = networkTypeToID(network_type)
-        bid_message_nets: str = self.selectMessageNetString([network_type_received_on_id, ], bid_data.message_nets)
-        self.logD(LC.NET, f"processBid offer.message_nets {offer.message_nets}, bid.message_nets {bid_message_nets}, bid_data.message_nets {bid_data.message_nets}")
+        bid_message_nets: str = self.selectMessageNetString(
+            [
+                network_type_received_on_id,
+            ],
+            bid_data.message_nets,
+        )
+        self.logD(
+            LC.NET,
+            f"processBid offer.message_nets {offer.message_nets}, bid.message_nets {bid_message_nets}, bid_data.message_nets {bid_data.message_nets}",
+        )
         # TODO: Allow higher bids
         # assert (bid_data.rate != offer['data'].rate), 'Bid rate mismatch'
 
@@ -8457,8 +8474,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         network_type: str = msg.get("msg_net", "smsg")
         network_type_received_on_id: int = networkTypeToID(network_type)
-        bid_message_nets: str = self.selectMessageNetString([network_type_received_on_id, ], bid_data.message_nets)
-        self.logD(LC.NET, f"processXmrBid offer.message_nets {offer.message_nets}, bid.message_nets {bid_message_nets}, bid_data.message_nets {bid_data.message_nets}")
+        bid_message_nets: str = self.selectMessageNetString(
+            [
+                network_type_received_on_id,
+            ],
+            bid_data.message_nets,
+        )
+        self.logD(
+            LC.NET,
+            f"processXmrBid offer.message_nets {offer.message_nets}, bid.message_nets {bid_message_nets}, bid_data.message_nets {bid_data.message_nets}",
+        )
 
         bid, xmr_swap = self.getXmrBid(bid_id)
         if bid is None:

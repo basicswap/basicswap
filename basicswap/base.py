@@ -79,10 +79,16 @@ class BaseApp(DBMethods):
             if category == "net":
                 self._enabled_log_categories.add(LC.NET)
             else:
-                self.log.warning(f"Unknown entry \"{category}\" in \"enabled_log_categories\"")
+                self.log.warning(
+                    f'Unknown entry "{category}" in "enabled_log_categories"'
+                )
 
         if len(self._enabled_log_categories) > 0:
-            self.log.info("Enabled logging categories: {}".format(",".join(sorted([c.name for c in self._enabled_log_categories]))))
+            self.log.info(
+                "Enabled logging categories: {}".format(
+                    ",".join(sorted([c.name for c in self._enabled_log_categories]))
+                )
+            )
 
         super().__init__(
             data_dir=data_dir,

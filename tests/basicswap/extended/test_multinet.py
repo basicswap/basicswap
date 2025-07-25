@@ -95,7 +95,9 @@ class Test(TestSimplex2):
                 settings["networks"][-1]["bridged"] = [{"type": "simplex"}]
 
         for node_id in range(3):
-            settings["enabled_log_categories"] = ["net", ]
+            settings["enabled_log_categories"] = [
+                "net",
+            ]
 
     def test_01_across_networks(self):
         logger.info("---------- Test multinet swap across networks")
@@ -224,7 +226,12 @@ class Test(TestSimplex2):
         swap_value = ci_from.make_int(random.uniform(0.2, 20.0), r=1)
         rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
         offer_id = swap_clients[0].postOffer(
-            coin_from, coin_to, swap_value, rate_swap, swap_value, SwapTypes.SELLER_FIRST
+            coin_from,
+            coin_to,
+            swap_value,
+            rate_swap,
+            swap_value,
+            SwapTypes.SELLER_FIRST,
         )
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)

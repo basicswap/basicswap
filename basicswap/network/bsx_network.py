@@ -131,6 +131,10 @@ class BSXNetwork:
                 have_smsg = True
                 add_network = {"type": "smsg"}
                 if "bridged" in network:
+                    if self._smsg_plaintext_version < 2:
+                        raise ValueError(
+                            'Bridged networks require "smsg_plaintext_version" >= 2'
+                        )
                     add_network["bridged"] = network["bridged"]
                 self.active_networks.append(add_network)
             elif network["type"] == "simplex":
@@ -258,7 +262,9 @@ class BSXNetwork:
             rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
             if len(rows) > 0:
                 return rows[0][0]
-            query: str = "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr_to LIMIT 1"
+            query: str = (
+                "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr_to LIMIT 1"
+            )
             rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
             if len(rows) > 0:
                 return rows[0][0]
@@ -327,7 +333,9 @@ class BSXNetwork:
         all_networks = active_networks_set | bridged_networks_set
         return ",".join(all_networks)
 
-    def selectMessageNetString(self, received_on_network_ids, remote_message_nets: str) -> str:
+    def selectMessageNetString(
+        self, received_on_network_ids, remote_message_nets: str
+    ) -> str:
         if self._smsg_plaintext_version < 2:
             return ""
         active_networks_set = set()
@@ -347,7 +355,10 @@ class BSXNetwork:
         # Pick the received on network if it's in the local node's active networks and the list of remote node's networks
         # else prefer a network the local node has active
         for received_on_id in received_on_network_ids:
-            if received_on_id in active_networks_set and received_on_id in remote_network_ids:
+            if (
+                received_on_id in active_networks_set
+                and received_on_id in remote_network_ids
+            ):
                 return networkIDToType(received_on_id)
         for local_net_id in active_networks_set:
             if local_net_id in remote_network_ids:
@@ -498,7 +509,7 @@ class BSXNetwork:
             return message_id
 
         smsg_difficulty: int = 0x1EFFFFFF
-        if self._have_smsg_rpc:
+        if self._have_smsg_rpc and self._smsg_plaintext_version >= 2:
             smsg_difficulty = self.callrpc("smsggetdifficulty", [-1, True])
         else:
             self.log.debug("TODO, get difficulty from a portal")
@@ -524,9 +535,25 @@ class BSXNetwork:
                 if smsg_msg:
                     self.forwardSmsg(smsg_msg)
                 else:
-                    net_message_id, smsg_msg = self.sendSmsg(
-                        addr_from, addr_to, payload_hex, msg_valid, return_msg=True, cursor=cursor
-                    )
+                    if self._smsg_plaintext_version < 2:
+                        # TODO: Remove when Particl 23.2.8 is min version
+                        net_message_id = self.sendSmsg(
+                            addr_from,
+                            addr_to,
+                            payload_hex,
+                            msg_valid,
+                            return_msg=False,
+                            cursor=cursor,
+                        )
+                    else:
+                        net_message_id, smsg_msg = self.sendSmsg(
+                            addr_from,
+                            addr_to,
+                            payload_hex,
+                            msg_valid,
+                            return_msg=True,
+                            cursor=cursor,
+                        )
             elif network_type == MessageNetworks.SIMPLEX:
                 if smsg_msg:
                     forwardSimplexMsg(self, network, smsg_msg)
@@ -719,7 +746,7 @@ class BSXNetwork:
                 if "Unknown message id" in str(e) and i < num_tries:
                     self.delay_event.wait(1)
                 else:
-                    raise RuntimeError(f"\"smsg\" failed for {msg_id.hex()}: {e}")
+                    raise RuntimeError(f'"smsg" failed for {msg_id.hex()}: {e}')
 
         self.processMsg(msg)
 
@@ -754,7 +781,9 @@ class BSXNetwork:
 
         msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, portal.time_valid)
         if network_from_id == MessageNetworks.SMSG:
-            net_message_id = self.sendSmsg(addr_portal, addr_to, payload_hex, msg_valid, cursor=cursor)
+            net_message_id = self.sendSmsg(
+                addr_portal, addr_to, payload_hex, msg_valid, cursor=cursor
+            )
         elif network_from_id == MessageNetworks.SIMPLEX:
             network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
 
@@ -807,7 +836,9 @@ class BSXNetwork:
         try:
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, portal.time_valid)
             if portal.network_from == MessageNetworks.SMSG:
-                net_message_id = self.sendSmsg(addr_portal, addr_to, payload_hex, msg_valid, cursor=cursor)
+                net_message_id = self.sendSmsg(
+                    addr_portal, addr_to, payload_hex, msg_valid, cursor=cursor
+                )
             elif portal.network_from == MessageNetworks.SIMPLEX:
                 network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
                 net_message_id = sendSimplexMsg(
@@ -844,7 +875,9 @@ class BSXNetwork:
         addr_to: str = portal.address_from
 
         if portal.network_from == MessageNetworks.SMSG:
-            net_message_id = self.sendSmsg(addr_from, addr_to, payload_hex, msg_valid, cursor=cursor)
+            net_message_id = self.sendSmsg(
+                addr_from, addr_to, payload_hex, msg_valid, cursor=cursor
+            )
         elif portal.network_from == MessageNetworks.SIMPLEX:
             network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
 
