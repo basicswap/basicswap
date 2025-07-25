@@ -775,6 +775,11 @@ function resetForm() {
     });
 }
 
+function roundUpToDecimals(value, decimals) {
+    const factor = Math.pow(10, decimals);
+    return Math.ceil(value * factor) / factor;
+}
+
 function updateBidParams(value_changed) {
     const coin_from = document.getElementById('coin_from')?.value;
     const coin_to = document.getElementById('coin_to')?.value;
@@ -809,8 +814,8 @@ function updateBidParams(value_changed) {
     } else if (value_changed === 'receiving') {
         if (bidAmountInput && bidAmountSendInput) {
             const receiveAmount = parseFloat(bidAmountInput.value) || 0;
-            const sendAmount = (receiveAmount * rate).toFixed(8);
-            bidAmountSendInput.value = sendAmount;
+            const sendAmount = roundUpToDecimals(receiveAmount * rate, 8);
+            bidAmountSendInput.value = sendAmount.toFixed(8);
         }
     }
 
