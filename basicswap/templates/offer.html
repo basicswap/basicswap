@@ -775,9 +775,16 @@ function resetForm() {
     });
 }
 
+function roundUpToDecimals(value, decimals) {
+    const factor = Math.pow(10, decimals);
+    return Math.ceil(value * factor) / factor;
+}
+
 function updateBidParams(value_changed) {
     const coin_from = document.getElementById('coin_from')?.value;
     const coin_to = document.getElementById('coin_to')?.value;
+    const coin_from_exp = parseInt(document.getElementById('coin_from_exp')?.value || '8');
+    const coin_to_exp = parseInt(document.getElementById('coin_to_exp')?.value || '8');
     const amt_var = document.getElementById('amt_var')?.value;
     const rate_var = document.getElementById('rate_var')?.value;
     const bidAmountInput = document.getElementById('bid_amount');
@@ -797,19 +804,19 @@ function updateBidParams(value_changed) {
     if (value_changed === 'rate') {
         if (bidAmountSendInput && bidAmountInput) {
             const sendAmount = parseFloat(bidAmountSendInput.value) || 0;
-            const receiveAmount = (sendAmount / rate).toFixed(8);
+            const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
             bidAmountInput.value = receiveAmount;
         }
     } else if (value_changed === 'sending') {
         if (bidAmountSendInput && bidAmountInput) {
             const sendAmount = parseFloat(bidAmountSendInput.value) || 0;
-            const receiveAmount = (sendAmount / rate).toFixed(8);
+            const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
             bidAmountInput.value = receiveAmount;
         }
     } else if (value_changed === 'receiving') {
         if (bidAmountInput && bidAmountSendInput) {
             const receiveAmount = parseFloat(bidAmountInput.value) || 0;
-            const sendAmount = (receiveAmount * rate).toFixed(8);
+            const sendAmount = roundUpToDecimals(receiveAmount * rate, coin_to_exp).toFixed(coin_to_exp);
             bidAmountSendInput.value = sendAmount;
         }
     }
@@ -1084,6 +1091,8 @@ document.addEventListener('DOMContentLoaded', function() {
 <input type="hidden" name="confirm" value="true">
 <input type="hidden" id="coin_from" value="{{ data.coin_from_ind }}">
 <input type="hidden" id="coin_to" value="{{ data.coin_to_ind }}">
+<input type="hidden" id="coin_from_exp" value="{{ data.coin_from_exp }}">
+<input type="hidden" id="coin_to_exp" value="{{ data.coin_to_exp }}">
 <input type="hidden" id="amt_var" value="{{ data.amount_negotiable }}">
 <input type="hidden" id="rate_var" value="{{ data.rate_negotiable }}">
 <input type="hidden" id="amount_from" value="{{ data.amt_from }}">

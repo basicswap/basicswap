@@ -2282,6 +2282,13 @@ class BasicSwap(BaseApp, UIApp):
         if valid_for_seconds > 24 * 60 * 60:
             raise ValueError("Bid TTL too high")
 
+    def calculateRateTolerance(self, offer_rate: int) -> int:
+        return max(1, offer_rate // 10000)
+
+    def ratesMatch(self, rate1: int, rate2: int, offer_rate: int) -> bool:
+        tolerance = self.calculateRateTolerance(offer_rate)
+        return abs(rate1 - rate2) <= tolerance
+
     def validateBidAmount(self, offer, bid_amount: int, bid_rate: int) -> None:
         ensure(bid_amount >= offer.min_bid_amount, "Bid amount below minimum")
         ensure(bid_amount <= offer.amount_from, "Bid amount above offer amount")
@@ -2290,7 +2297,10 @@ class BasicSwap(BaseApp, UIApp):
                 offer.amount_from == bid_amount, "Bid amount must match offer amount."
             )
         if not offer.rate_negotiable:
-            ensure(offer.rate == bid_rate, "Bid rate must match offer rate.")
+            ensure(
+                self.ratesMatch(bid_rate, offer.rate, offer.rate),
+                "Rate mismatch.",
+            )
 
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
@@ -3337,12 +3347,18 @@ class BasicSwap(BaseApp, UIApp):
         bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
 
         if offer.amount_negotiable and not offer.rate_negotiable:
-            if bid_rate != offer.rate and extra_options.get(
-                "adjust_amount_for_rate", True
-            ):
-                self.log.debug("Attempting to reduce amount to match offer rate.")
+
+            if extra_options.get("adjust_amount_for_rate", True):
+                self.log.debug(
+                    "Attempting to reduce amount to match offer rate within tolerance."
+                )
 
                 adjust_tries: int = 10000 if ci_from.exp() > 8 else 1000
+                best_amount = amount
+                best_amount_to = amount_to
+                best_bid_rate = bid_rate
+                best_diff = abs(bid_rate - offer.rate)
+
                 for i in range(adjust_tries):
                     test_amount = amount - i
                     test_amount_to: int = int(
@@ -3351,29 +3367,59 @@ class BasicSwap(BaseApp, UIApp):
                     test_bid_rate: int = ci_from.make_int(
                         test_amount_to / test_amount, r=1
                     )
+                    test_diff = abs(test_bid_rate - offer.rate)
 
-                    if test_bid_rate != offer.rate:
+                    if test_diff < best_diff and self.ratesMatch(
+                        test_bid_rate, offer.rate, offer.rate
+                    ):
+                        best_amount = test_amount
+                        best_amount_to = test_amount_to
+                        best_bid_rate = test_bid_rate
+                        best_diff = test_diff
+
+                        if test_diff == 0:
+                            break
+
+                    if not self.ratesMatch(test_bid_rate, offer.rate, offer.rate):
                         test_amount_to -= 1
                         test_bid_rate: int = ci_from.make_int(
                             test_amount_to / test_amount, r=1
                         )
+                        test_diff = abs(test_bid_rate - offer.rate)
 
-                    if test_bid_rate == offer.rate:
-                        if amount != test_amount:
-                            msg: str = "Reducing bid amount-from"
-                            if not self.log.safe_logs:
-                                msg += f" from {amount} to {test_amount} to match offer rate."
-                            self.log.info(msg)
-                        elif amount_to != test_amount_to:
-                            # Only show on first loop iteration (amount from unchanged)
-                            msg: str = "Reducing bid amount-to"
-                            if not self.log.safe_logs:
-                                msg += f" from {amount_to} to {test_amount_to} to match offer rate."
-                            self.log.info(msg)
-                        amount = test_amount
-                        amount_to = test_amount_to
-                        bid_rate = test_bid_rate
+                        if test_diff < best_diff and self.ratesMatch(
+                            test_bid_rate, offer.rate, offer.rate
+                        ):
+                            best_amount = test_amount
+                            best_amount_to = test_amount_to
+                            best_bid_rate = test_bid_rate
+                            best_diff = test_diff
+
+                            if test_diff == 0:
+                                break
+
+                        if amount == test_amount and amount_to == test_amount_to:
+                            break
+
+                        if best_diff == abs(bid_rate - offer.rate):
+                            best_amount = test_amount
+                            best_amount_to = test_amount_to
+                            best_bid_rate = test_bid_rate
                         break
+                if best_amount != amount or best_amount_to != amount_to:
+                    if amount != best_amount:
+                        msg: str = "Reducing bid amount-from"
+                        if not self.log.safe_logs:
+                            msg += f" from {amount} to {best_amount} to match offer rate (diff: {best_diff})."
+                        self.log.info(msg)
+                    elif amount_to != best_amount_to:
+                        msg: str = "Reducing bid amount-to"
+                        if not self.log.safe_logs:
+                            msg += f" from {amount_to} to {best_amount_to} to match offer rate (diff: {best_diff})."
+                        self.log.info(msg)
+                    amount = best_amount
+                    amount_to = best_amount_to
+                    bid_rate = best_bid_rate
         return amount, amount_to, bid_rate
 
     def postBid(
@@ -7934,8 +7980,8 @@ class BasicSwap(BaseApp, UIApp):
                 raise AutomationConstraint("Bid amount below offer minimum")
 
             if opts.get("exact_rate_only", False) is True:
-                if bid_rate != offer.rate:
-                    raise AutomationConstraint("Need exact rate match")
+                if not self.ratesMatch(bid_rate, offer.rate, offer.rate):
+                    raise AutomationConstraint("Rate outside acceptable tolerance")
 
             active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(
                 offer, use_cursor

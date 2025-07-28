@@ -299,6 +299,82 @@ class Test(unittest.TestCase):
         rate_check = make_int((amount_to / amount_from), scale_from)
         assert rate == rate_check
 
+    def test_rate_tolerance_precision(self):
+        scale = 8
+        amount_from = make_int("0.001", scale)
+        offer_rate = make_int("0.354185354480", scale, r=1)
+        amount_to = int((amount_from * offer_rate) // (10**scale))
+        bid_rate = make_int(amount_to / amount_from, r=1)
+
+        rate_tolerance = max(1, offer_rate // 10000)
+        rate_diff = abs(bid_rate - offer_rate)
+        assert (
+            rate_diff <= rate_tolerance
+        ), f"Rate difference {rate_diff} exceeds tolerance {rate_tolerance}"
+
+        test_cases = [
+            ("0.001", "0.123456789"),
+            ("0.5", "1.23456789"),
+            ("0.00001", "999.99999999"),
+        ]
+
+        for amount_str, rate_str in test_cases:
+            amount_from = make_int(amount_str, scale)
+            offer_rate = make_int(rate_str, scale, r=1)
+            amount_to = int((amount_from * offer_rate) // (10**scale))
+            bid_rate = make_int(amount_to / amount_from, r=1)
+
+            rate_tolerance = max(1, offer_rate // 10000)
+            rate_diff = abs(bid_rate - offer_rate)
+
+            assert rate_diff <= rate_tolerance, (
+                f"Rate difference {rate_diff} exceeds tolerance {rate_tolerance} "
+                f"for amount {amount_str} at rate {rate_str}"
+            )
+
+        large_offer_rate = make_int("1.0", scale)
+        large_tolerance = max(1, large_offer_rate // 10000)
+        bad_bid_rate = large_offer_rate + large_tolerance + 1
+        rate_diff = abs(bad_bid_rate - large_offer_rate)
+        assert (
+            rate_diff > large_tolerance
+        ), "Test setup error: difference should exceed tolerance"
+
+    def test_rate_tolerance_helper_functions(self):
+        class MockBasicSwap:
+            def calculateRateTolerance(self, offer_rate: int) -> int:
+                return max(1, offer_rate // 10000)
+
+            def ratesMatch(self, rate1: int, rate2: int, offer_rate: int) -> bool:
+                tolerance = self.calculateRateTolerance(offer_rate)
+                return abs(rate1 - rate2) <= tolerance
+
+        mock_swap = MockBasicSwap()
+
+        assert mock_swap.calculateRateTolerance(100000000) == 10000
+        assert mock_swap.calculateRateTolerance(1000000) == 100
+        assert mock_swap.calculateRateTolerance(100) == 1
+        assert mock_swap.calculateRateTolerance(50) == 1
+
+        offer_rate = 100000000
+        tolerance = 10000
+
+        assert mock_swap.ratesMatch(offer_rate, offer_rate, offer_rate)
+        assert mock_swap.ratesMatch(offer_rate, offer_rate + tolerance, offer_rate)
+        assert mock_swap.ratesMatch(offer_rate, offer_rate - tolerance, offer_rate)
+        assert mock_swap.ratesMatch(offer_rate + tolerance // 2, offer_rate, offer_rate)
+
+        assert not mock_swap.ratesMatch(
+            offer_rate, offer_rate + tolerance + 1, offer_rate
+        )
+        assert not mock_swap.ratesMatch(
+            offer_rate, offer_rate - tolerance - 1, offer_rate
+        )
+
+        small_rate = 1000
+        assert mock_swap.ratesMatch(small_rate, small_rate + 1, small_rate)
+        assert not mock_swap.ratesMatch(small_rate, small_rate + 2, small_rate)
+
         scale_from = 8
         scale_to = 8
         amount_from = make_int(0.073, scale_from)
