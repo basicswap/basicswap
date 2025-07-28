@@ -10528,14 +10528,18 @@ class BasicSwap(BaseApp, UIApp):
             if Coins.PART not in self.coin_clients:
                 return
 
+            self.thread_pool.submit(self._processZmqHashwtxAsync)
+
+        except Exception as e:
+            self.log.warning(f"Error processing PART wallet transaction: {e}")
+            if self.debug:
+                self.log.error(traceback.format_exc())
+
+    def _processZmqHashwtxAsync(self) -> None:
+        try:
             ci = self.ci(Coins.PART)
             cc = self.coin_clients[Coins.PART]
-
             current_height = cc.get("chain_height", 0)
-
-            import time
-
-            time.sleep(0.1)
 
             checkAndNotifyBalanceChange(self, Coins.PART, ci, cc, current_height, "zmq")
 
