@@ -6,6 +6,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import base64
 import contextlib
 import gnupg
 import hashlib
@@ -26,6 +27,7 @@ import threading
 import time
 import urllib.parse
 import zipfile
+import zmq
 
 from urllib.request import urlopen
 
@@ -1374,6 +1376,13 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     COINS_RPCBIND_IP, settings["zmqport"]
                 )
             )
+            zmqsecret = extra_opts.get("zmqsecret", None)
+            if zmqsecret:
+                try:
+                    _ = base64.b64decode(zmqsecret)
+                except Exception as e:  # noqa: F841
+                    raise ValueError("zmqsecret must be base64 encoded")
+                fp.write(f"serverkeyzmq={zmqsecret}\n")
             fp.write("spentindex=1\n")
             fp.write("txindex=1\n")
             fp.write("staking=0\n")
@@ -3211,6 +3220,9 @@ def main():
         for c in with_coins:
             withchainclients[c] = chainclients[c]
 
+        zmq_public_key, zmq_secret_key = zmq.curve_keypair()
+        extra_opts["zmqsecret"] = base64.b64encode(zmq_secret_key).decode("utf-8")
+
         settings = {
             "debug": True,
             "zmqhost": f"tcp://{PART_RPC_HOST}",
@@ -3226,6 +3238,7 @@ def main():
             "check_watched_seconds": 60,
             "check_expired_seconds": 60,
             "wallet_update_timeout": 10,  # Seconds to wait for wallet page update
+            "zmq_server_key": base64.b64encode(zmq_public_key).decode("utf-8"),
         }
 
         wshost: str = extra_opts.get("wshost", htmlhost)

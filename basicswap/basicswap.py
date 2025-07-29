@@ -10406,9 +10406,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     None,
                 )
 
-    def processZmqHashwtx(self) -> None:
-        self.zmqSubscriber.recv()
-
+    def processZmqHashwtx(self, message) -> None:
         try:
             if Coins.PART not in self.coin_clients:
                 return
@@ -10561,11 +10559,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if self._zmq_queue_enabled:
             try:
                 if self._read_zmq_queue:
-                    message = self.zmqSubscriber.recv(flags=zmq.NOBLOCK)
-                    if message == b"smsg":
-                        self.processZmqSmsg()
-                    elif message == b"hashwtx":
-                        self.processZmqHashwtx()
+                    topic, message, seq = self.zmqSubscriber.recv_multipart(
+                        flags=zmq.NOBLOCK
+                    )
+                    if topic == b"smsg":
+                        self.processZmqSmsg(message)
+                    elif topic == b"hashwtx":
+                        self.processZmqHashwtx(message)
             except zmq.Again as e:  # noqa: F841
                 pass
             except Exception as e:

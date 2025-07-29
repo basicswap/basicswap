@@ -4,6 +4,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import base64
 import json
 import random
 import zmq
@@ -89,6 +90,7 @@ class BSXNetwork:
         self._poll_smsg = self.settings.get("poll_smsg", False)
         self.zmqContext = None
         self.zmqSubscriber = None
+        self.zmq_server_key = self.settings.get("zmq_server_key", None)
 
         self.SMSG_SECONDS_IN_HOUR = (
             60 * 60
@@ -145,12 +147,17 @@ class BSXNetwork:
             if self._zmq_queue_enabled:
                 self.zmqContext = zmq.Context()
                 self.zmqSubscriber = self.zmqContext.socket(zmq.SUB)
-
+                if self.zmq_server_key is not None:
+                    zmq_server_key = base64.b64decode(self.zmq_server_key)
+                    public_key, secret_key = zmq.curve_keypair()
+                    self.zmqSubscriber.setsockopt(zmq.CURVE_PUBLICKEY, public_key)
+                    self.zmqSubscriber.setsockopt(zmq.CURVE_SECRETKEY, secret_key)
+                    self.zmqSubscriber.setsockopt(zmq.CURVE_SERVERKEY, zmq_server_key)
+                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
+                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "hashwtx")
                 self.zmqSubscriber.connect(
                     self.settings["zmqhost"] + ":" + str(self.settings["zmqport"])
                 )
-                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
-                self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "hashwtx")
 
             ro = self.callrpc("smsglocalkeys")
             found = False
@@ -725,11 +732,7 @@ class BSXNetwork:
             return bytes.fromhex(msg["hex"][2:-2])
         return bytes.fromhex(msg["hex"][2:])
 
-    def processZmqSmsg(self) -> None:
-        message = self.zmqSubscriber.recv()
-        # Clear
-        _ = self.zmqSubscriber.recv()
-
+    def processZmqSmsg(self, message) -> None:
         if message[0] == 3:  # Paid smsg
             return  # TODO: Switch to paid?
 
