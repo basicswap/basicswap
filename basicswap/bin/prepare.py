@@ -3220,8 +3220,9 @@ def main():
         for c in with_coins:
             withchainclients[c] = chainclients[c]
 
-        zmq_public_key, zmq_secret_key = zmq.curve_keypair()
-        extra_opts["zmqsecret"] = base64.b64encode(zmq_secret_key).decode("utf-8")
+        zmq_server_pubkey, zmq_server_key = zmq.curve_keypair()
+        zmq_client_pubkey, zmq_client_key = zmq.curve_keypair()
+        extra_opts["zmqsecret"] = base64.b64encode(zmq_server_key).decode("utf-8")
 
         settings = {
             "debug": True,
@@ -3238,7 +3239,9 @@ def main():
             "check_watched_seconds": 60,
             "check_expired_seconds": 60,
             "wallet_update_timeout": 10,  # Seconds to wait for wallet page update
-            "zmq_server_key": base64.b64encode(zmq_public_key).decode("utf-8"),
+            "zmq_client_key": base64.b64encode(zmq_client_key).decode("utf-8"),
+            "zmq_client_pubkey": base64.b64encode(zmq_client_pubkey).decode("utf-8"),
+            "zmq_server_pubkey": base64.b64encode(zmq_server_pubkey).decode("utf-8"),
         }
 
         wshost: str = extra_opts.get("wshost", htmlhost)

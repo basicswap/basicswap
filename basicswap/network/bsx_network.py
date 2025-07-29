@@ -90,7 +90,7 @@ class BSXNetwork:
         self._poll_smsg = self.settings.get("poll_smsg", False)
         self.zmqContext = None
         self.zmqSubscriber = None
-        self.zmq_server_key = self.settings.get("zmq_server_key", None)
+        self.zmq_server_key = self.settings.get("zmq_server_pubkey", None)
 
         self.SMSG_SECONDS_IN_HOUR = (
             60 * 60
@@ -149,9 +149,15 @@ class BSXNetwork:
                 self.zmqSubscriber = self.zmqContext.socket(zmq.SUB)
                 if self.zmq_server_key is not None:
                     zmq_server_key = base64.b64decode(self.zmq_server_key)
-                    public_key, secret_key = zmq.curve_keypair()
-                    self.zmqSubscriber.setsockopt(zmq.CURVE_PUBLICKEY, public_key)
-                    self.zmqSubscriber.setsockopt(zmq.CURVE_SECRETKEY, secret_key)
+                    zmq_client_key = base64.b64decode(self.settings["zmq_client_key"])
+                    zmq_client_pubkey = base64.b64decode(
+                        self.settings["zmq_client_pubkey"]
+                    )
+
+                    self.zmqSubscriber.setsockopt(
+                        zmq.CURVE_PUBLICKEY, zmq_client_pubkey
+                    )
+                    self.zmqSubscriber.setsockopt(zmq.CURVE_SECRETKEY, zmq_client_key)
                     self.zmqSubscriber.setsockopt(zmq.CURVE_SERVERKEY, zmq_server_key)
                 self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "smsg")
                 self.zmqSubscriber.setsockopt_string(zmq.SUBSCRIBE, "hashwtx")

@@ -10556,7 +10556,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
     def update(self) -> None:
-        if self._zmq_queue_enabled:
+        if self._zmq_queue_enabled and self.zmqSubscriber:
             try:
                 if self._read_zmq_queue:
                     topic, message, seq = self.zmqSubscriber.recv_multipart(
