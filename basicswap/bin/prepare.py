@@ -50,6 +50,7 @@ from basicswap.bin.run import (
 )
 
 # Coin clients
+PARTICL_REPO = os.getenv("PARTICL_REPO", "particl")
 PARTICL_VERSION = os.getenv("PARTICL_VERSION", "23.2.7.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
@@ -887,7 +888,6 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             downloadFile(assert_sig_url, assert_sig_path)
     else:
         major_version = int(version.split(".")[0])
-
         use_guix: bool = coin in ("dash",) or major_version >= 22
         arch_name = BIN_ARCH
         if os_name == "osx" and use_guix:
@@ -908,21 +908,21 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     coin, version + version_tag, arch_name, filename_extra, FILE_EXT
                 )
         if coin == "particl":
-            release_url = "https://github.com/particl/particl-core/releases/download/v{}/{}".format(
-                version + version_tag, release_filename
+            release_url = (
+                "https://github.com/{}/particl-core/releases/download/v{}/{}".format(
+                    PARTICL_REPO, version + version_tag, release_filename
+                )
             )
             assert_filename = "{}-{}-{}-build.assert".format(coin, os_name, version)
             if use_guix:
-                assert_url = f"https://raw.githubusercontent.com/particl/guix.sigs/master/{version}/{signing_key_name}/all.SHA256SUMS"
+                assert_url = f"https://raw.githubusercontent.com/{PARTICL_REPO}/guix.sigs/master/{version}/{signing_key_name}/all.SHA256SUMS"
             else:
-                assert_url = (
-                    "https://raw.githubusercontent.com/particl/gitian.sigs/master/%s-%s/%s/%s"
-                    % (
-                        version + version_tag,
-                        os_dir_name,
-                        signing_key_name,
-                        assert_filename,
-                    )
+                assert_url = "https://raw.githubusercontent.com/{}/gitian.sigs/master/{}-{}/{}/{}".format(
+                    PARTICL_REPO,
+                    version + version_tag,
+                    os_dir_name,
+                    signing_key_name,
+                    assert_filename,
                 )
         elif coin == "litecoin":
             release_url = "https://github.com/litecoin-project/litecoin/releases/download/v{}/{}".format(
