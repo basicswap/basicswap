@@ -54,6 +54,8 @@ def ensure(v, err_string):
 def toBool(s) -> bool:
     if isinstance(s, bool):
         return s
+    if isinstance(s, int):
+        return False if s == 0 else True
     return s.lower() in ["1", "true"]
 
 

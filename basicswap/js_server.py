@@ -1053,6 +1053,15 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
     post_data = getFormData(post_string, is_json)
 
     coin_in = get_data_entry(post_data, "coin")
+    extkey_prefix = get_data_entry_or(
+        post_data, "extkey_prefix", 0x04B2430C
+    )  # default, zprv for P2WPKH in electrum
+    if isinstance(extkey_prefix, str):
+        if extkey_prefix.isdigit():
+            extkey_prefix = int(extkey_prefix)
+        else:
+            extkey_prefix = int(extkey_prefix, 16)  # Try hex
+
     try:
         coin = getCoinIdFromName(coin_in)
     except Exception:
@@ -1089,7 +1098,6 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
             wallet_seed_id = ci.getWalletSeedID()
         except Exception as e:
             wallet_seed_id = f"Error: {e}"
-
         rv.update(
             {
                 "seed": seed_key.hex(),
@@ -1098,6 +1106,10 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
                 "current_seed_id": wallet_seed_id,
             }
         )
+        if hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum():
+            rv.update(
+                {"account_key": ci.getAccountKey(seed_key, extkey_prefix)}
+            )  # Master key can be imported into electrum (Must set prefix for P2WPKH)
 
     return bytes(
         json.dumps(rv),

@@ -26,6 +26,7 @@ from basicswap.db import (
 from basicswap.util import (
     make_int,
 )
+from basicswap.util.address import b58decode
 from basicswap.util.address import (
     decodeAddress,
 )
@@ -773,6 +774,10 @@ class TestFunctions(BaseTest):
 class BasicSwapTest(TestFunctions):
 
     test_fee_rate: int = 1000  # sats/kvB
+    expected_addresses = {
+        "external": "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr",
+        "internal": "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a",
+    }
 
     @classmethod
     def setUpClass(cls):
@@ -1211,7 +1216,7 @@ class BasicSwapTest(TestFunctions):
         )
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0'/0'/0'"
-        assert addr == "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr"
+        assert addr == self.expected_addresses["external"]
 
         addr_change = self.callnoderpc("getrawchangeaddress", wallet=new_wallet_name)
         addr_info = self.callnoderpc(
@@ -1223,8 +1228,19 @@ class BasicSwapTest(TestFunctions):
         )
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0'/1'/0'"
-        assert addr_change == "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a"
+        assert addr_change == self.expected_addresses["internal"]
+
         self.callnoderpc("unloadwallet", [new_wallet_name])
+
+        address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
+        for chain in ["external", "internal"]:
+            extkey_data = b58decode(address_chains[chain])[4:-4]
+            ek = ExtKeyPair()
+            ek.decode(extkey_data)
+            addr0h = ci.encodeSegwitAddress(
+                ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
+            )
+            assert addr0h == self.expected_addresses[chain]
 
         self.swap_clients[0].initialiseWallet(Coins.BTC, raise_errors=True)
         assert self.swap_clients[0].checkWalletSeed(Coins.BTC) is True
@@ -1647,7 +1663,7 @@ class BasicSwapTest(TestFunctions):
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0h/0h/0h"
         if self.test_coin_from == Coins.BTC:
-            assert addr == "bcrt1qps7hnjd866e9ynxadgseprkc2l56m00dvwargr"
+            assert addr == self.expected_addresses["external"]
 
         addr_change = self.callnoderpc("getrawchangeaddress", wallet=new_wallet_name)
         addr_info = self.callnoderpc(
@@ -1660,7 +1676,17 @@ class BasicSwapTest(TestFunctions):
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0h/1h/0h"
         if self.test_coin_from == Coins.BTC:
-            assert addr_change == "bcrt1qdl9ryxkqjltv42lhfnqgdjf9tagxsjpp2xak9a"
+            assert addr_change == self.expected_addresses["internal"]
+
+        address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
+        for chain in ["external", "internal"]:
+            extkey_data = b58decode(address_chains[chain])[4:-4]
+            ek = ExtKeyPair()
+            ek.decode(extkey_data)
+            addr0h = ci.encodeSegwitAddress(
+                ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
+            )
+            assert addr0h == self.expected_addresses[chain]
 
         desc_watch = descsum_create(f"addr({addr})")
         self.callnoderpc(

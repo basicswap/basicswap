@@ -87,6 +87,7 @@ from tests.basicswap.common import (
     LTC_BASE_RPC_PORT,
     PREFIX_SECRET_KEY_REGTEST,
     BTC_USE_DESCRIPTORS,
+    BTC_USE_LEGACY_KEY_PATHS,
 )
 from basicswap.db_util import (
     remove_expired_data,
@@ -177,6 +178,7 @@ def prepare_swapclient_dir(
                 "bindir": cfg.BITCOIN_BINDIR,
                 "use_segwit": True,
                 "use_descriptors": BTC_USE_DESCRIPTORS,
+                "use_legacy_key_paths": BTC_USE_LEGACY_KEY_PATHS,
             },
         },
         "check_progress_seconds": 2,

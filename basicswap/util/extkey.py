@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2024 tecnovert
+# Copyright (c) 2024-2025 tecnovert
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from copy import deepcopy
 from .crypto import blake256, hash160, hmac_sha512, ripemd160
 
 from coincurve.keys import PrivateKey, PublicKey
@@ -19,6 +20,10 @@ def BIP32Hash(chaincode: bytes, child_no: int, key_data_type: int, keydata: byte
 
 def hash160_dcr(data: bytes) -> bytes:
     return ripemd160(blake256(data))
+
+
+def hardened(i: int) -> int:
+    return i | (1 << 31)
 
 
 class ExtKeyPair:
@@ -49,6 +54,11 @@ class ExtKeyPair:
 
     def has_key(self) -> bool:
         return False if self._key is None else True
+
+    def get_pubkey(self) -> bytes:
+        return (
+            self._pubkey if self._pubkey else PublicKey.from_secret(self._key).format()
+        )
 
     def neuter(self) -> None:
         if self._key is None:
@@ -83,11 +93,7 @@ class ExtKeyPair:
                 out._pubkey = K.format()
         else:
             k = PrivateKey(self._key)
-            out._fingerprint = self.hash_func(
-                self._pubkey
-                if self._pubkey
-                else PublicKey.from_secret(self._key).format()
-            )[:4]
+            out._fingerprint = self.hash_func(self.get_pubkey())[:4]
             new_hash = BIP32Hash(self._chaincode, child_no, 0, self._key)
             out._chaincode = new_hash[32:]
             k.add(new_hash[:32], update=True)
@@ -96,6 +102,26 @@ class ExtKeyPair:
 
         out.hash_func = self.hash_func
         return out
+
+    def derive_path(self, path: str):
+        path_entries = path.split("/")
+        rv = deepcopy(self)
+        for i, level in enumerate(path_entries):
+            level = level.lower()
+            if i == 0 and level == "s":
+                continue
+            should_harden: bool = False
+            if len(level) > 1 and level.endswith("h") or level.endswith("'"):
+                level = level[:-1]
+                should_harden = True
+            if level.isdigit():
+                child_no: int = int(level)
+                if should_harden:
+                    child_no = hardened(child_no)
+                rv = rv.derive(child_no)
+            else:
+                raise ValueError("Invalid path node")
+        return rv
 
     def encode_v(self) -> bytes:
         return (
@@ -108,17 +134,12 @@ class ExtKeyPair:
         )
 
     def encode_p(self) -> bytes:
-        pubkey = (
-            PublicKey.from_secret(self._key).format()
-            if self._pubkey is None
-            else self._pubkey
-        )
         return (
             self._depth.to_bytes(1, "big")
             + self._fingerprint
             + self._child_no.to_bytes(4, "big")
             + self._chaincode
-            + pubkey
+            + self.get_pubkey()
         )
 
     def decode(self, data: bytes) -> None:

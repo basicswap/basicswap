@@ -33,6 +33,7 @@ from tests.basicswap.common import (
     LTC_BASE_RPC_PORT,
     PIVX_BASE_PORT,
     BTC_USE_DESCRIPTORS,
+    BTC_USE_LEGACY_KEY_PATHS,
 )
 from tests.basicswap.extended.test_nmc import (
     NMC_BASE_PORT,
@@ -146,6 +147,7 @@ def run_prepare(
     os.environ["BTC_RPC_PORT"] = str(BITCOIN_RPC_PORT_BASE)
     os.environ["BTC_PORT"] = str(BITCOIN_PORT_BASE)
     os.environ["BTC_USE_DESCRIPTORS"] = str(BTC_USE_DESCRIPTORS)
+    os.environ["BTC_USE_LEGACY_KEY_PATHS"] = str(BTC_USE_LEGACY_KEY_PATHS)
     os.environ["BTC_ONION_PORT"] = str(BITCOIN_TOR_PORT_BASE)
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
