@@ -1151,7 +1151,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Scan inbox
         # TODO: Redundant? small window for zmq messages to go unnoticed during startup?
         options = {"encoding": "hex"}
-        if self._smsg_plaintext_version >= 2:
+        if self._can_use_smsg_plaintext2:
             options["pubkey_from"] = True
         ro = self.callrpc("smsginbox", ["unread", "", options])
         nm = 0
