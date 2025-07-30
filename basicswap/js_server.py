@@ -416,6 +416,7 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             "is_revoked": True if o.active_ind == 2 else False,
             "is_public": o.addr_to == swap_client.network_addr
             or o.addr_to.strip() == "",
+            "message_nets": o.message_nets,
         }
         offer_data["auto_accept_type"] = getattr(o, "auto_accept_type", 0)
         if with_extra_info:
@@ -433,7 +434,6 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
                 offer_data["feerate_to"] = o.to_feerate
 
             offer_data["automation_strat_id"] = getattr(o, "auto_accept_type", 0)
-            offer_data["auto_accept_type"] = getattr(o, "auto_accept_type", 0)
 
             if o.was_sent:
                 try:

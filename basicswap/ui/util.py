@@ -367,6 +367,7 @@ def describeBid(
         "events": bid_events,
         "debug_ui": swap_client.debug_ui,
         "reverse_bid": reverse_bid,
+        "message_nets": bid.message_nets,
     }
 
     if edit_bid:

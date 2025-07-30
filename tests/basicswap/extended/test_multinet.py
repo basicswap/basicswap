@@ -39,6 +39,9 @@ from tests.basicswap.common import (
     wait_for_bid,
     wait_for_offer,
 )
+from tests.basicswap.util import (
+    read_json_api,
+)
 from tests.basicswap.test_xmr import test_delay_event
 from tests.basicswap.extended.test_simplex import (
     TestSimplex2,
@@ -317,6 +320,9 @@ class Test(TestSimplex2):
             coin_from, coin_to, swap_value, rate_swap, swap_value, SwapTypes.XMR_SWAP
         )
 
+        rv = read_json_api(1802, f"offers/{offer_id.hex()}")
+        assert "smsg" in rv[0]["message_nets"] and "simplex" in rv[0]["message_nets"]
+
         bid_ids = []
         wait_for_offer(test_delay_event, swap_clients[0], offer_id)
         offer = swap_clients[0].getOffer(offer_id)
@@ -324,6 +330,12 @@ class Test(TestSimplex2):
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         bid_ids.append(swap_clients[1].postBid(offer_id, offer.amount_from))
+
+        bid_0 = read_json_api(1800, f"bids/{bid_ids[0].hex()}")
+        assert bid_0["message_nets"] == "simplex"
+
+        bid_1 = read_json_api(1801, f"bids/{bid_ids[1].hex()}")
+        assert bid_1["message_nets"] == "smsg"
 
         for bid_id in bid_ids:
             wait_for_bid(
