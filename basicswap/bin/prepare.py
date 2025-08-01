@@ -1367,6 +1367,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
 
         salt = generate_salt(16)
         if coin == "particl":
+            fp.write("deprecatedrpc=create_bdb\n")
             fp.write("debugexclude=libevent\n")
             fp.write(
                 "zmqpubsmsg=tcp://{}:{}\n".format(COINS_RPCBIND_IP, settings["zmqport"])
