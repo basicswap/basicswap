@@ -14,7 +14,43 @@ import time
 from basicswap.util.daemon import Daemon
 
 
+def serverExistsInDatabase(simplex_db_path: str, server_address: str, logger) -> bool:
+    try:
+        # Extract hostname from SMP URL format: smp://fingerprint@hostname
+        if server_address.startswith("smp://") and "@" in server_address:
+            host = server_address.split("@")[-1]
+        elif ":" in server_address:
+            host = server_address.split(":", 1)[0]
+        else:
+            host = server_address
+
+        with sqlite3.connect(simplex_db_path) as con:
+            c = con.cursor()
+
+            # Check for any server entry with this hostname
+            query = (
+                "SELECT COUNT(*) FROM protocol_servers WHERE host LIKE ? OR host = ?"
+            )
+            host_pattern = f"%{host}%"
+            count = c.execute(query, (host_pattern, host)).fetchone()[0]
+
+            if count > 0:
+                logger.debug(
+                    f"Server {host} already exists in database ({count} entries)"
+                )
+                return True
+            else:
+                logger.debug(f"Server {host} not found in database")
+                return False
+
+    except Exception as e:
+        logger.error(f"Database check failed: {e}")
+        return False
+
+
 def initSimplexClient(args, logger, delay_event):
+    # Need to set initial profile through CLI
+    # TODO: Must be a better way?
     logger.info("Initialising Simplex client")
 
     (pipe_r, pipe_w) = os.pipe()  # subprocess.PIPE is buffered, blocks when read
@@ -86,28 +122,18 @@ def startSimplexClient(
         args += ["--socks-proxy", socks_proxy]
 
     if not os.path.exists(simplex_db_path):
-        # Need to set initial profile through CLI
-        # TODO: Must be a better way?
+        # Database doesn't exist - safe to add server during initialization
+        logger.info("Database not found, initializing Simplex client")
         init_args = args + ["-e", "/help"]  # Run command to exit client
         init_args += ["-s", server_address]
         initSimplexClient(init_args, logger, delay_event)
     else:
-        # Workaround to avoid error:
-        # SQLite3 returned ErrorConstraint while attempting to perform step: UNIQUE constraint failed: protocol_servers.user_id, protocol_servers.host, protocol_servers.port
-        # TODO: Remove?
-        with sqlite3.connect(simplex_db_path) as con:
-            c = con.cursor()
-            if ":" in server_address:
-                host, port = server_address.split(":")
-            else:
-                host = server_address
-                port = ""
-            query: str = (
-                "SELECT COUNT(*) FROM protocol_servers WHERE host = :host and port = :port"
-            )
-            q = c.execute(query, {"host": host, "port": port}).fetchone()
-            if q[0] < 1:
-                args += ["-s", server_address]
+        # Database exists - only add server if it's not already there
+        if not serverExistsInDatabase(simplex_db_path, server_address, logger):
+            logger.debug(f"Adding server to Simplex CLI args: {server_address}")
+            args += ["-s", server_address]
+        else:
+            logger.debug("Server already exists, not adding to CLI args")
 
     args += ["-l", log_level]
 
