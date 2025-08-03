@@ -3928,9 +3928,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.active_networks[0].get("type", "smsg")
                 )
             else:
-                raise RuntimeError(
-                    "Network must be specified if multiple networks are active."
-                )
+                self.logD(LC.NET, "Not using route - Multiple networks.")
+                return None, False
+                # raise RuntimeError(
+                #     "Network must be specified if multiple networks are active."
+                # )
         else:
             network_id: int = networkTypeToID(message_nets)
         if network_id not in (MessageNetworks.SIMPLEX,):
