@@ -2296,7 +2296,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             offer_bytes = msg_buf.to_bytes()
             payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-            # Send offers to active and bridged networks, message_nets contains only the active networks.
+            # Send offers to active and bridged networks
             offer_id = self.sendMessage(
                 offer_addr, offer_addr_to, payload_hex, msg_valid, cursor
             )
@@ -3277,8 +3277,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "amount_from": amount,
                 "amount_to": amount_to,
             }
+            bid_message_nets = self.selectMessageNetStringForConcept(
+                Concepts.OFFER, offer_id, offer.message_nets, cursor
+            )
             route_id, route_established = self.prepareMessageRoute(
-                MessageNetworks.SIMPLEX,
+                bid_message_nets,
                 request_data,
                 bid_addr,
                 offer.addr_from,
@@ -3289,10 +3292,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             contract_count = self.getNewContractId(cursor)
             contract_pubkey = self.getContractPubkey(
                 dt.datetime.fromtimestamp(now).date(), contract_count
-            )
-
-            bid_message_nets = self.selectMessageNetStringForConcept(
-                Concepts.OFFER, offer_id, offer.message_nets, cursor
             )
 
             bid = Bid(
@@ -3905,7 +3904,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def prepareMessageRoute(
         self,
-        network_id,
+        message_nets,
         req_data,
         addr_from: str,
         addr_to: str,
@@ -3915,9 +3914,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if self._use_direct_message_routes is False:
             return None, False
 
+        # message_nets contains the network selected to use:
+        # TODO: allow multiple networks
+        self.logD(LC.NET, f"prepareMessageRoute message_nets {message_nets}")
+
+        if message_nets.startswith("b."):
+            # TODO: get direct messages working through portals
+            self.logD(LC.NET, "Not using route - bridged networks.")
+            return None, False
+        if len(message_nets) == 0:
+            if len(self.active_networks) == 1:
+                network_id: int = networkTypeToID(
+                    self.active_networks[0].get("type", "smsg")
+                )
+            else:
+                raise RuntimeError(
+                    "Network must be specified if multiple networks are active."
+                )
+        else:
+            network_id: int = networkTypeToID(message_nets)
+        if network_id not in (MessageNetworks.SIMPLEX,):
+            return None, False
         try:
-            net_i = self.getActiveNetworkInterface(2)
+            net_i = self.getActiveNetworkInterface(network_id)
         except Exception as e:  # noqa: F841
+            self.logD(
+                LC.NET,
+                f"Not using route - network interface not found for {network_id}.",
+            )
             return None, False
 
         # Look for active route
@@ -3950,13 +3974,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
         connect_req_msgid = self.sendMessage(
-            addr_from, addr_to, payload_hex, msg_valid, cursor
+            addr_from,
+            addr_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets=message_nets,
         )
 
         now: int = self.getTime()
         message_route = DirectMessageRoute(
             active_ind=2,
-            network_id=2,
+            network_id=network_id,
             linked_type=Concepts.OFFER,
             smsg_addr_local=addr_from,
             smsg_addr_remote=addr_to,
@@ -4034,8 +4063,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "amount_from": amount,
                 "amount_to": amount_to,
             }
+            bid_message_nets = self.selectMessageNetStringForConcept(
+                Concepts.OFFER, offer.offer_id, offer.message_nets, cursor
+            )
             route_id, route_established = self.prepareMessageRoute(
-                MessageNetworks.SIMPLEX,
+                bid_message_nets,
                 request_data,
                 bid_addr,
                 offer.addr_from,
@@ -4043,9 +4075,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 valid_for_seconds,
             )
 
-            bid_message_nets = self.selectMessageNetStringForConcept(
-                Concepts.OFFER, offer.offer_id, offer.message_nets, cursor
-            )
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
@@ -7554,7 +7583,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug("Ignoring expired offer.")
             return
 
-        _ = self.expandMessageNets(offer_data.message_nets)  # Decode to validate
+        self.validateMessageNets(offer_data.message_nets)
 
         offer_rate: int = ci_from.make_int(
             offer_data.amount_to / offer_data.amount_from, r=1
@@ -7997,7 +8026,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_rate: int = ci_from.make_int(bid_data.amount_to / bid_data.amount, r=1)
         self.validateBidAmount(offer, bid_data.amount, bid_rate)
 
-        _ = self.expandMessageNets(bid_data.message_nets)  # Decode to validate
+        self.validateMessageNets(bid_data.message_nets)
 
         network_type: str = msg.get("msg_net", "smsg")
         network_type_received_on_id: int = networkTypeToID(network_type)
@@ -8468,7 +8497,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if ci_to.curve_type() == Curves.ed25519:
             ensure(len(bid_data.kbsf_dleag) <= 16000, "Invalid kbsf_dleag size")
 
-        _ = self.expandMessageNets(bid_data.message_nets)  # Decode to validate
+        self.validateMessageNets(bid_data.message_nets)
 
         bid_id = bytes.fromhex(msg["msgid"])
 
@@ -10006,7 +10035,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
 
-        _ = self.expandMessageNets(bid_data.message_nets)  # Decode to validate
+        self.validateMessageNets(bid_data.message_nets)
 
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
@@ -10027,7 +10056,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self.validateBidAmount(offer, bid_data.amount_from, bid_rate)
 
-        _ = self.expandMessageNets(bid_data.message_nets)
+        _, _ = self.expandMessageNets(bid_data.message_nets)
 
         bid_id = bytes.fromhex(msg["msgid"])
 
@@ -10197,7 +10226,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         offer_id = bytes.fromhex(req_data["offer_id"])
         bidder_addr = req_data["bsx_address"]
 
-        net_i = self.getActiveNetworkInterface(2)
+        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
         try:
             cursor = self.openDB()
             offer = self.getOffer(offer_id, cursor)

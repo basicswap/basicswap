@@ -724,7 +724,7 @@ class DirectMessageRouteLink(Table):
 class NetworkPortal(Table):
     __tablename__ = "network_portals"
 
-    def __init__(
+    def set(
         self, time_start, time_valid, network_from, network_to, address_from, address_to
     ):
         super().__init__()

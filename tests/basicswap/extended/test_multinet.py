@@ -106,8 +106,6 @@ class Test(TestSimplex2):
         logger.info("---------- Test multinet swap across networks")
 
         swap_clients = self.swap_clients
-        for sc in swap_clients:
-            sc._use_direct_message_routes = False
         swap_clients[2]._bridge_networks = True
 
         assert len(swap_clients[0].active_networks) == 1
@@ -163,8 +161,6 @@ class Test(TestSimplex2):
         logger.info("---------- Test reversed swap across networks")
 
         swap_clients = self.swap_clients
-        for sc in swap_clients:
-            sc._use_direct_message_routes = False
         swap_clients[2]._bridge_networks = True
 
         coin_from = Coins.XMR
@@ -214,9 +210,8 @@ class Test(TestSimplex2):
         logger.info("---------- Test secret hash swap across networks")
 
         swap_clients = self.swap_clients
-        for sc in swap_clients:
-            sc._use_direct_message_routes = False
         swap_clients[2]._bridge_networks = True
+
         coin_from = Coins.PART
         coin_to = Coins.BTC
         self.prepare_balance(coin_to, 100.0, 1801, 1800)
@@ -271,9 +266,6 @@ class Test(TestSimplex2):
 
         # Messages for bids should only be sent to one network
         swap_clients = self.swap_clients
-
-        for sc in swap_clients:
-            sc._use_direct_message_routes = False
         swap_clients[2]._bridge_networks = True
         assert len(swap_clients[2].active_networks) == 2
 

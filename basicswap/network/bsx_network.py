@@ -50,15 +50,18 @@ def networkTypeToID(type: str) -> int:
         return MessageNetworks.SMSG
     elif type == "simplex":
         return MessageNetworks.SIMPLEX
-    raise RuntimeError(f"Unknown message type: {type}")
+    raise RuntimeError(f"Unknown message network type: {type}")
 
 
-def networkIDToType(id: int) -> str:
+def networkIDToType(id: int, bridged: bool = False) -> str:
+    network_name = None
     if id == MessageNetworks.SMSG:
-        return "smsg"
+        network_name = "smsg"
     elif id == MessageNetworks.SIMPLEX:
-        return "simplex"
-    raise RuntimeError(f"Unknown message network id: {id}")
+        network_name = "simplex"
+    else:
+        raise RuntimeError(f"Unknown message network id: {id}")
+    return ("b." if bridged else "") + network_name
 
 
 class BSXNetwork:
@@ -350,7 +353,11 @@ class BSXNetwork:
             for bridged_network in network.get("bridged", []):
                 bridged_network_type = bridged_network.get("type", "smsg")
                 bridged_networks_set.add(bridged_network_type)
-        all_networks = active_networks_set | bridged_networks_set
+        all_networks = active_networks_set
+        # Join without duplicates, bridged networks are prefixed with "b."
+        for bridged_network in bridged_networks_set:
+            if bridged_network not in active_networks_set:
+                all_networks.add("b." + bridged_network)
         return ",".join(all_networks)
 
     def selectMessageNetString(
@@ -366,26 +373,42 @@ class BSXNetwork:
             for bridged_network in network.get("bridged", []):
                 bridged_network_type = bridged_network.get("type", "smsg")
                 bridged_networks_set.add(networkTypeToID(bridged_network_type))
-        remote_network_ids = self.expandMessageNets(remote_message_nets)
+        remote_active_network_ids, remote_bridged_network_ids = self.expandMessageNets(
+            remote_message_nets
+        )
 
-        if len(remote_network_ids) < 1 and len(received_on_network_ids) < 1:
+        # If no data was sent it must be from an old version
+        if (
+            len(remote_active_network_ids) < 1
+            and len(remote_bridged_network_ids) < 1
+            and len(received_on_network_ids) < 1
+        ):
             return networkIDToType(random.choice(tuple(active_networks_set)))
 
         # Choose which network to respond on
-        # Pick the received on network if it's in the local node's active networks and the list of remote node's networks
+        # Pick the received on network if it's in the local node's active networks and the list of remote node's active networks
         # else prefer a network the local node has active
         for received_on_id in received_on_network_ids:
             if (
                 received_on_id in active_networks_set
-                and received_on_id in remote_network_ids
+                and received_on_id in remote_active_network_ids
             ):
                 return networkIDToType(received_on_id)
+        # Prefer to use a network both nodes have active
         for local_net_id in active_networks_set:
-            if local_net_id in remote_network_ids:
+            if local_net_id in remote_active_network_ids:
                 return networkIDToType(local_net_id)
+        # Else prefer to use a network this node has active
+        for local_net_id in active_networks_set:
+            if local_net_id in remote_bridged_network_ids:
+                return networkIDToType(local_net_id, True)
+
         for local_net_id in bridged_networks_set:
-            if local_net_id in remote_network_ids:
-                return networkIDToType(local_net_id)
+            if local_net_id in remote_active_network_ids:
+                return networkIDToType(local_net_id, True)
+        for local_net_id in bridged_networks_set:
+            if local_net_id in remote_bridged_network_ids:
+                return networkIDToType(local_net_id, True)
         raise RuntimeError("Unable to select network to respond on")
 
     def selectMessageNetStringForConcept(
@@ -409,18 +432,30 @@ class BSXNetwork:
 
         return self.selectMessageNetString(received_on_network_ids, remote_message_nets)
 
-    def expandMessageNets(self, message_nets: str) -> list:
+    def expandMessageNets(self, message_nets: str) -> (list, list):
         if message_nets is None or len(message_nets) < 1:
-            return []
+            return [], []
         if len(message_nets) > 256:
             raise ValueError("message_nets string is too large")
-        rv = []
+        active_networks = []
+        bridged_networks = []
         for network_string in message_nets.split(","):
+            add_to_list = active_networks
+            if network_string.startswith("b."):
+                network_string = network_string[2:]
+                add_to_list = bridged_networks
             try:
-                rv.append(networkTypeToID(network_string))
+                network_id: int = networkTypeToID(network_string)
             except Exception as e:  # noqa: F841
                 self.log.debug(f"Unknown message_net {network_string}")
-        return rv
+            if network_id in active_networks or network_id in bridged_networks:
+                raise ValueError("Malformed networks data.")
+            add_to_list.append(network_id)
+        return active_networks, bridged_networks
+
+    def validateMessageNets(self, message_nets: str) -> None:
+        # Decode to validate
+        _, _ = self.expandMessageNets(message_nets)
 
     def getMessageRoute(
         self, network_id: int, address_from: str, address_to: str, cursor=None
@@ -463,12 +498,14 @@ class BSXNetwork:
         linked_id=None,
         timestamp=None,
         deterministic=False,
-        message_nets=None,  # None -> all, else
+        message_nets=None,  # None|empty -> all
     ) -> bytes:
         message_id: bytes = None
-        networks_list = self.expandMessageNets(
+        active_networks_list, bridged_networks_list = self.expandMessageNets(
             message_nets
-        )  # Empty list means send to all networks
+        )
+        # Empty list means send to all networks
+        networks_list = active_networks_list + bridged_networks_list
         networks_sent_to = set()
 
         # Message routes work only with simplex messages for now.
@@ -478,7 +515,7 @@ class BSXNetwork:
 
         message_route = self.getMessageRoute(2, addr_from, addr_to, cursor=cursor)
         if message_route:
-            network = self.getActiveNetwork(2)
+            network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
             net_i = network["ws_thread"]
 
             remote_name = None
@@ -699,7 +736,7 @@ class BSXNetwork:
         self.num_smsg_messages_sent += 1
 
     def processContactDisconnected(self, event_data) -> None:
-        net_i = self.getActiveNetworkInterface(2)
+        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
         connId = getResponseData(event_data, "contact")["activeConn"]["connId"]
         self.log.info(f"Direct message route disconnected, connId: {connId}")
         closeSimplexChat(self, net_i, connId)
@@ -727,7 +764,7 @@ class BSXNetwork:
             self.closeDB(cursor)
 
     def closeMessageRoute(self, record_id, network_id, route_data, cursor):
-        net_i = self.getActiveNetworkInterface(2)
+        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
 
         connId = route_data["pccConnId"]
 
@@ -774,7 +811,8 @@ class BSXNetwork:
             addr_portal: str = self.prepareSMSGAddress(
                 None, AddressTypes.PORTAL_LOCAL, cursor
             )
-            portal = NetworkPortal(
+            portal = NetworkPortal()
+            portal.set(
                 now, 30 * 60, network_from_id, network_to_id, addr_portal, addr_to
             )
             portal.created_at = now
@@ -971,7 +1009,8 @@ class BSXNetwork:
                 },
             )
             if received_portal is None:
-                received_portal = NetworkPortal(
+                received_portal = NetworkPortal()
+                received_portal.set(
                     time_start,
                     portal_data.time_valid,
                     portal_data.network_type_from,

@@ -457,6 +457,7 @@ class TestSimplex2(BaseTest):
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
+        settings["smsg_plaintext_version"] = 2
         settings["networks"] = [
             {
                 "type": "simplex",
@@ -479,7 +480,6 @@ class Test(TestSimplex2):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = False
-            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -538,7 +538,6 @@ class Test(TestSimplex2):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = False
-            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -597,7 +596,6 @@ class Test(TestSimplex2):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = True
-            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -672,7 +670,6 @@ class Test(TestSimplex2):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = True
-            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
@@ -745,7 +742,6 @@ class Test(TestSimplex2):
 
         for sc in swap_clients:
             sc._use_direct_message_routes = False
-            sc._smsg_plaintext_version = 2
 
         assert len(swap_clients[0].active_networks) == 1
         assert swap_clients[0].active_networks[0]["type"] == "simplex"
