@@ -147,7 +147,7 @@ class Test(BaseTest):
         rv = ci1_part.rpc("smsgimport", [encrypted_message.hex(), {"submitmsg": True}])
         assert rv["msgid"] == msg_id.hex()
 
-    def test_02_plaintext_v2(self):
+    def test_02_payload_v2(self):
         # Test SMSG plaintext version 2
 
         ci0_part = self.swap_clients[0].ci(Coins.PART)
@@ -174,7 +174,7 @@ class Test(BaseTest):
         options = {
             "submitmsg": False,
             "ttl_is_seconds": True,
-            "plaintext_format_version": 2,
+            "payload_format_version": 2,
             "compression": 0,
             "add_to_outbox": False,
         }

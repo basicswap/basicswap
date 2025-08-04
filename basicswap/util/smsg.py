@@ -94,7 +94,7 @@ def smsgEncrypt(
     payload: bytes,
     smsg_timestamp: int = None,
     deterministic: bool = False,
-    plaintext_format: int = 2,
+    payload_format: int = 2,
     difficulty_target=0x1EFFFFFF,
 ) -> bytes:
     # assert len(payload) < 128  # Requires lz4 if payload > 128 bytes
@@ -133,11 +133,11 @@ def smsgEncrypt(
 
     len_payload = len(payload)
 
-    if plaintext_format == 2:
+    if payload_format == 2:
         address_version = 249  # Marker for format 2
         compressed = 0
         plaintext_data: bytes = bytes((address_version, compressed))
-    elif plaintext_format == 1:
+    elif payload_format == 1:
         address_version = 0
         plaintext_data: bytes = bytes((address_version,))
     else:

@@ -73,7 +73,7 @@ class Test(TestSimplex2):
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
         settings["networks"] = []
-        settings["smsg_plaintext_version"] = 2
+        settings["smsg_payload_version"] = 2
         if node_id in (0, 2):
             settings["networks"].append(
                 {

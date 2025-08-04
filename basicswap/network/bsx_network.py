@@ -70,7 +70,7 @@ class BSXNetwork:
     def __init__(self, data_dir, settings, **kwargs):
         self._bridge_networks = self.settings.get("bridge_networks", False)
         self._use_direct_message_routes = True
-        self._smsg_plaintext_version = self.settings.get("smsg_plaintext_version", 1)
+        self._smsg_payload_version = self.settings.get("smsg_payload_version", 1)
         self._smsg_add_to_outbox = self.settings.get("smsg_add_to_outbox", False)
         self._have_smsg_rpc = False  # Set in startNetworks
 
@@ -136,21 +136,21 @@ class BSXNetwork:
                 have_smsg = True
                 add_network = {"type": "smsg"}
                 if "bridged" in network:
-                    if self._smsg_plaintext_version < 2:
+                    if self._smsg_payload_version < 2:
                         raise ValueError(
-                            'Bridged networks require "smsg_plaintext_version" >= 2'
+                            'Bridged networks require "smsg_payload_version" >= 2'
                         )
                     add_network["bridged"] = network["bridged"]
                 self.active_networks.append(add_network)
             elif network["type"] == "simplex":
                 initialiseSimplexNetwork(self, network)
 
-        self._can_use_smsg_plaintext2 = False
+        self._can_use_smsg_payload2 = False
         if (
             Coins.PART in self.coin_clients
             and self.coin_clients[Coins.PART]["core_version"] > 23020700
         ):
-            self._can_use_smsg_plaintext2 = True
+            self._can_use_smsg_payload2 = True
 
         if have_smsg:
             self._have_smsg_rpc = True
@@ -215,7 +215,7 @@ class BSXNetwork:
 
         # TODO: Ensure smsg is enabled for the active wallet.
 
-        if self._can_use_smsg_plaintext2:
+        if self._can_use_smsg_payload2:
             self.callrpc("smsgoptions", ["set", "addReceivedPubkeys", False])
 
         now: int = self.getTime()
@@ -341,7 +341,7 @@ class BSXNetwork:
         return network["ws_thread"]
 
     def getMessageNetsString(self, with_bridged: bool = False) -> str:
-        if self._smsg_plaintext_version < 2:
+        if self._smsg_payload_version < 2:
             return ""
         active_networks_set = set()
         bridged_networks_set = set()
@@ -363,7 +363,7 @@ class BSXNetwork:
     def selectMessageNetString(
         self, received_on_network_ids, remote_message_nets: str
     ) -> str:
-        if self._smsg_plaintext_version < 2:
+        if self._smsg_payload_version < 2:
             return ""
         active_networks_set = set()
         bridged_networks_set = set()
@@ -566,7 +566,7 @@ class BSXNetwork:
             return message_id
 
         smsg_difficulty: int = 0x1EFFFFFF
-        if self._have_smsg_rpc and self._smsg_plaintext_version >= 2:
+        if self._have_smsg_rpc and self._smsg_payload_version >= 2:
             smsg_difficulty = self.callrpc("smsggetdifficulty", [-1, True])
         else:
             self.log.debug("TODO, get difficulty from a portal")
@@ -592,7 +592,7 @@ class BSXNetwork:
                 if smsg_msg:
                     self.forwardSmsg(smsg_msg)
                 else:
-                    if self._smsg_plaintext_version < 2:
+                    if self._smsg_payload_version < 2:
                         # TODO: Remove when Particl 23.2.8 is min version
                         net_message_id = self.sendSmsg(
                             addr_from,
@@ -704,10 +704,10 @@ class BSXNetwork:
         cursor=None,
     ) -> bytes:
         options = {"decodehex": True, "ttl_is_seconds": True}
-        if self._smsg_plaintext_version >= 2:
-            options["plaintext_format_version"] = 2
+        if self._smsg_payload_version >= 2:
+            options["payload_format_version"] = 2
             options["compression"] = 0
-        if self._can_use_smsg_plaintext2:
+        if self._can_use_smsg_payload2:
             send_to = self.getPubkeyForAddress(cursor, addr_to).hex()
         else:
             send_to = addr_to
@@ -779,7 +779,7 @@ class BSXNetwork:
         self.commitDB()
 
     def getSmsgMsgBytes(self, msg) -> bytes:
-        if int(self._smsg_plaintext_version) < 2:
+        if int(self._smsg_payload_version) < 2:
             return bytes.fromhex(msg["hex"][2:-2])
         return bytes.fromhex(msg["hex"][2:])
 
@@ -789,7 +789,7 @@ class BSXNetwork:
 
         msg_id = message[2:]
         options = {"encoding": "hex", "setread": True}
-        if self._can_use_smsg_plaintext2:
+        if self._can_use_smsg_payload2:
             options["pubkey_from"] = True
         num_tries = 5
         for i in range(num_tries + 1):
@@ -1140,7 +1140,7 @@ class BSXNetwork:
             if now - self._last_checked_smsg >= self.check_smsg_seconds:
                 self._last_checked_smsg = now
                 options = {"encoding": "hex", "setread": True}
-                if self._can_use_smsg_plaintext2:
+                if self._can_use_smsg_payload2:
                     options["pubkey_from"] = True
                 msgs = self.callrpc("smsginbox", ["unread", "", options])
                 for msg in msgs["messages"]:

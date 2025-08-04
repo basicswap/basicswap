@@ -457,7 +457,7 @@ class TestSimplex2(BaseTest):
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
-        settings["smsg_plaintext_version"] = 2
+        settings["smsg_payload_version"] = 2
         settings["networks"] = [
             {
                 "type": "simplex",
