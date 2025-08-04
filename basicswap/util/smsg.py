@@ -141,7 +141,7 @@ def smsgEncrypt(
         address_version = 0
         plaintext_data: bytes = bytes((address_version,))
     else:
-        raise ValueError("Unknown plaintext format.")
+        raise ValueError("Unknown payload format.")
     plaintext_data += bytes(
         pkh_from + signature + len_payload.to_bytes(4, byteorder="little") + payload
     )

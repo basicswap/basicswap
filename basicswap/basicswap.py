@@ -2293,11 +2293,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             #     coin_from_t, ensure_balance, proof_of_funds_hash
             # )
 
-            offer_bytes = msg_buf.to_bytes()
-            payload_hex = str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
+            offer_bytes: bytes = msg_buf.to_bytes()
+            payload_hex: str = (
+                str.format("{:02x}", MessageTypes.OFFER) + offer_bytes.hex()
+            )
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             # Send offers to active and bridged networks
-            offer_id = self.sendMessage(
+            offer_id: bytes = self.sendMessage(
                 offer_addr, offer_addr_to, payload_hex, msg_valid, cursor
             )
 
@@ -2337,7 +2339,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 auto_accept_type=msg_buf.auto_accept_type,
                 message_nets=msg_buf.message_nets,
             )
-
             offer.setState(OfferStates.OFFER_SENT)
 
             if swap_type == SwapTypes.XMR_SWAP:
@@ -2411,7 +2412,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, offer.time_valid)
             msg_id = self.sendMessage(
-                offer.addr_from, self.network_addr, payload_hex, msg_valid, cursor
+                offer.addr_from,
+                self.network_addr,
+                payload_hex,
+                msg_valid,
+                cursor,
+                payload_version=offer.smsg_payload_version,
             )
             self.log.debug(
                 f"Revoked offer {self.log.id(offer_id)} in msg {self.log.id(msg_id)}"
@@ -3667,6 +3673,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     msg_valid,
                     use_cursor,
                     message_nets=bid.message_nets,
+                    payload_version=bid.smsg_payload_version,
                 )
 
                 self.addMessageLink(
@@ -3698,6 +3705,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_msg_ids,
         cursor,
         message_nets,
+        payload_version,
     ) -> None:
 
         dleag_split_size_init, dleag_split_size = xmr_swap.getMsgSplitInfo()
@@ -3723,6 +3731,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 msg_valid,
                 cursor,
                 message_nets=message_nets,
+                payload_version=payload_version,
             )
             num_sent += 1
             sent_bytes += size_to_send
@@ -3763,6 +3772,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             timestamp=bid.created_at,
             deterministic=(False if bid.bid_id is None else True),
             message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
         )
 
     def getXmrBidMessage(self, bid, xmr_swap, offer) -> XmrBidMessage:
@@ -3815,6 +3825,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             timestamp=bid.created_at,
             deterministic=(False if bid.bid_id is None else True),
             message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
         )
         bid_id = bid_msg_id
         if bid.bid_id and bid_msg_id != bid.bid_id:
@@ -3836,6 +3847,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid_msg_ids,
                 cursor,
                 message_nets=bid.message_nets,
+                payload_version=offer.smsg_payload_version,
             )
         for k, msg_id in bid_msg_ids.items():
             self.addMessageLink(
@@ -3895,6 +3907,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             timestamp=bid.created_at,
             deterministic=(False if bid.bid_id is None else True),
             message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
         )
         if bid.bid_id and bid_msg_id != bid.bid_id:
             self.log.warning(
@@ -4539,6 +4552,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 msg_valid,
                 use_cursor,
                 message_nets=bid.message_nets,
+                payload_version=offer.smsg_payload_version,
             )
 
             if ci_to.curve_type() == Curves.ed25519:
@@ -4552,6 +4566,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid_msg_ids,
                     use_cursor,
                     bid.message_nets,
+                    payload_version=offer.smsg_payload_version,
                 )
 
             bid.setState(BidStates.BID_ACCEPTED)  # ADS
@@ -4694,6 +4709,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 msg_valid,
                 use_cursor,
                 message_nets=bid.message_nets,
+                payload_version=offer.smsg_payload_version,
             )
 
             if ci_to.curve_type() == Curves.ed25519:
@@ -4707,6 +4723,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid_msg_ids,
                     use_cursor,
                     message_nets=bid.message_nets,
+                    payload_version=offer.smsg_payload_version,
                 )
 
             bid.setState(BidStates.BID_REQUEST_ACCEPTED)
@@ -7529,6 +7546,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def processOffer(self, msg) -> None:
         offer_bytes = self.getSmsgMsgBytes(msg)
 
+        msg_payload_version = self.getSmsgMsgPayloadVersion(msg)
         offer_data = OfferMessage(init_all=False)
         try:
             offer_data.from_bytes(offer_bytes[:2], init_all=False)
@@ -7679,6 +7697,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         else None
                     ),
                     message_nets=offer_data.message_nets,
+                    smsg_payload_version=msg_payload_version,
                 )
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 self.add(offer, cursor)
@@ -7707,6 +7726,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.notify(NT.OFFER_RECEIVED, {"offer_id": offer_id.hex()}, cursor)
             else:
                 existing_offer.setState(OfferStates.OFFER_RECEIVED)
+                existing_offer.pk_from = pk_from
                 self.add(existing_offer, cursor, upsert=True)
             received_on_net: str = networkTypeToID(msg.get("type", "smsg"))
             self.addMessageNetworkLink(
@@ -8068,8 +8088,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_id = bytes.fromhex(msg["msgid"])
 
         bid = self.getBid(bid_id)
+        pk_from: bytes = getMsgPubkey(self, msg)
         if bid is None:
-            pk_from: bytes = getMsgPubkey(self, msg)
             bid = Bid(
                 active_ind=1,
                 bid_id=bid_id,
@@ -8100,6 +8120,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             bid.created_at = msg["sent"]
             bid.expire_at = msg["sent"] + bid_data.time_valid
+            bid.pk_bid_addr = pk_from
             bid.was_received = True
         if len(bid_data.proof_address) > 0:
             bid.proof_address = bid_data.proof_address
@@ -8517,8 +8538,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         bid, xmr_swap = self.getXmrBid(bid_id)
+        pk_from: bytes = getMsgPubkey(self, msg)
         if bid is None:
-            pk_from: bytes = getMsgPubkey(self, msg)
             bid = Bid(
                 active_ind=1,
                 bid_id=bid_id,
@@ -8559,6 +8580,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             # Don't update bid.created_at, it's been used to derive kaf
             bid.expire_at = msg["sent"] + bid_data.time_valid
+            bid.pk_bid_addr = pk_from
             bid.was_received = True
 
         bid.setState(BidStates.BID_RECEIVING)
@@ -8877,6 +8899,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 msg_valid,
                 cursor,
                 message_nets=bid.message_nets,
+                payload_version=offer.smsg_payload_version,
             )
             self.addMessageLink(
                 Concepts.BID,
@@ -9251,6 +9274,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             msg_valid,
             cursor,
             message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
         )
         self.addMessageLink(
             Concepts.BID,
@@ -9679,6 +9703,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             msg_valid,
             cursor,
             message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
         )
 
         bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
@@ -10063,8 +10088,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_id = bytes.fromhex(msg["msgid"])
 
         bid, xmr_swap = self.getXmrBid(bid_id)
+        pk_from: bytes = getMsgPubkey(self, msg)
         if bid is None:
-            pk_from: bytes = getMsgPubkey(self, msg)
             bid = Bid(
                 active_ind=1,
                 bid_id=bid_id,
@@ -10101,6 +10126,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             # Don't update bid.created_at, it's been used to derive kaf
             bid.expire_at = msg["sent"] + bid_data.time_valid
+            bid.pk_bid_addr = pk_from
             bid.was_received = True
 
         bid.setState(BidStates.BID_RECEIVED)  # BID_REQUEST_RECEIVED

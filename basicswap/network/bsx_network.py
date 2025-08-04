@@ -135,7 +135,11 @@ class BSXNetwork:
         ):
             self._can_use_smsg_payload2 = True
         # Set smsg_payload_version automatically if it's unset
-        self._smsg_payload_version = int(self.settings.get("smsg_payload_version", 2 if self._can_use_smsg_payload2 else 1))
+        self._smsg_payload_version = int(
+            self.settings.get(
+                "smsg_payload_version", 2 if self._can_use_smsg_payload2 else 1
+            )
+        )
 
         have_smsg: bool = False
         for network in network_config_list:
@@ -501,6 +505,7 @@ class BSXNetwork:
         timestamp=None,
         deterministic=False,
         message_nets=None,  # None|empty -> all
+        payload_version=None,
     ) -> bytes:
         message_id: bytes = None
         active_networks_list, bridged_networks_list = self.expandMessageNets(
@@ -603,6 +608,7 @@ class BSXNetwork:
                             msg_valid,
                             return_msg=False,
                             cursor=cursor,
+                            payload_version=payload_version,
                         )
                     else:
                         net_message_id, smsg_msg = self.sendSmsg(
@@ -612,6 +618,7 @@ class BSXNetwork:
                             msg_valid,
                             return_msg=True,
                             cursor=cursor,
+                            payload_version=payload_version,
                         )
             elif network_type == MessageNetworks.SIMPLEX:
                 if smsg_msg:
@@ -704,9 +711,13 @@ class BSXNetwork:
         msg_valid: int,
         return_msg: bool = False,
         cursor=None,
+        payload_version: int = None,
     ) -> bytes:
         options = {"decodehex": True, "ttl_is_seconds": True}
-        if self._smsg_payload_version >= 2:
+        use_payload_version = (
+            self._smsg_payload_version if payload_version is None else payload_version
+        )
+        if use_payload_version >= 2:
             options["payload_format_version"] = 2
             options["compression"] = 0
         if self._can_use_smsg_payload2:
@@ -780,8 +791,12 @@ class BSXNetwork:
         )
         self.commitDB()
 
+    def getSmsgMsgPayloadVersion(self, msg) -> int:
+        return msg.get("payloadversion", self._smsg_payload_version)
+
     def getSmsgMsgBytes(self, msg) -> bytes:
-        if int(self._smsg_payload_version) < 2:
+        payload_version = self.getSmsgMsgPayloadVersion(msg)
+        if payload_version < 2:
             return bytes.fromhex(msg["hex"][2:-2])
         return bytes.fromhex(msg["hex"][2:])
 
