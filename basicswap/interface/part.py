@@ -190,6 +190,14 @@ class PARTInterface(BTCInterface):
     def combine_non_segwit_prevouts(self):
         raise RuntimeError("No non-segwit outputs found.")
 
+    def signMessage(self, address: str, message: str) -> str:
+        message_magic: str = self.chainparams()["message_magic"]
+        return self.rpc_wallet("signmessage", [address, message, message_magic])
+
+    def signMessageWithKey(self, key_wif: str, message: str) -> str:
+        message_magic: str = self.chainparams()["message_magic"]
+        return self.rpc("signmessagewithprivkey", [key_wif, message, message_magic])
+
 
 class PARTInterfaceBlind(PARTInterface):
 

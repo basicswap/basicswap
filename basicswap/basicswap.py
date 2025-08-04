@@ -2399,8 +2399,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             msg_buf = OfferRevokeMessage()
             msg_buf.offer_msg_id = offer_id
 
-            signature_enc = self.callcoinrpc(
-                Coins.PART, "signmessage", [offer.addr_from, offer_id.hex() + "_revoke"]
+            signature_enc = self.ci(Coins.PART).signMessage(
+                offer.addr_from, offer_id.hex() + "_revoke"
             )
 
             msg_buf.signature = base64.b64decode(signature_enc)
@@ -7773,14 +7773,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             signature_enc = base64.b64encode(msg_data.signature).decode("UTF-8")
 
-            passed = self.callcoinrpc(
-                Coins.PART,
-                "verifymessage",
-                [
-                    offer.addr_from,
-                    signature_enc,
-                    msg_data.offer_msg_id.hex() + "_revoke",
-                ],
+            passed = self.ci(Coins.PART).verifyMessage(
+                offer.addr_from, signature_enc, msg_data.offer_msg_id.hex() + "_revoke"
             )
             ensure(passed is True, "Signature invalid")
 
@@ -12100,10 +12094,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for pair in self._possibly_revoked_offers:
             if offer_id == pair[0]:
                 signature_enc = base64.b64encode(pair[1]).decode("UTF-8")
-                passed = self.callcoinrpc(
-                    Coins.PART,
-                    "verifymessage",
-                    [offer_addr_from, signature_enc, offer_id.hex() + "_revoke"],
+                passed = self.ci(Coins.PART).verifyMessage(
+                    offer_addr_from, signature_enc, offer_id.hex() + "_revoke"
                 )
                 return (
                     True if passed is True else False
