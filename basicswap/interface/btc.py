@@ -769,6 +769,7 @@ class BTCInterface(Secp256k1Interface):
     ) -> bytes:
         tx = CTransaction()
         tx.nVersion = self.txVersion()
+        tx.nLockTime = 0  # TODO: match locktimes by core
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize()
 
@@ -1045,7 +1046,15 @@ class BTCInterface(Secp256k1Interface):
         self._log.info("Verifying lock tx: {}.".format(self._log.id(txid)))
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
-        ensure(tx.nLockTime == 0, "Bad nLockTime")  # TODO match txns created by cores
+        # locktime must be <= chainheight + 2
+        # TODO: Locktime is set to 0 to keep compaitibility with older nodes.
+        #       Set locktime to current chainheight in createSCLockTx.
+        if tx.nLockTime != 0:
+            current_height: int = self.getChainHeight()
+            if tx.nLockTime > current_height + 2:
+                raise ValueError(
+                    f"{self.coin_name()} - Bad nLockTime {tx.nLockTime}, current height {current_height}"
+                )
 
         script_pk = self.getScriptDest(script_out)
         locked_n = findOutput(tx, script_pk)
@@ -1383,7 +1392,8 @@ class BTCInterface(Secp256k1Interface):
             "feeRate": feerate_str,
         }
         rv = self.rpc_wallet("fundrawtransaction", [tx.hex(), options])
-        return bytes.fromhex(rv["hex"])
+        tx_bytes: bytes = bytes.fromhex(rv["hex"])
+        return tx_bytes
 
     def getNonSegwitOutputs(self):
         unspents = self.rpc_wallet("listunspent", [0, 99999999])

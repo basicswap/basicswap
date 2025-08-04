@@ -490,7 +490,16 @@ class PARTInterfaceBlind(PARTInterface):
         self._log.info("Verifying lock tx: {}.".format(self._log.id(lock_txid_hex)))
 
         ensure(lock_tx_obj["version"] == self.txVersion(), "Bad version")
-        ensure(lock_tx_obj["locktime"] == 0, "Bad nLockTime")
+        lock_time: int = lock_tx_obj["locktime"]
+        # locktime must be <= chainheight + 2
+        # TODO: locktime is set to 0 to keep compaitibility with older nodes.
+        #       Set locktime to current chainheight in createSCLockTx.
+        if lock_time != 0:
+            current_height: int = self.getChainHeight()
+            if lock_time > current_height + 2:
+                raise ValueError(
+                    f"{self.coin_name()} - Bad nLockTime {lock_time}, current height {current_height}"
+                )
 
         # Find the output of the lock tx to verify
         nonce = self.getScriptLockTxNonce(vkbv)
