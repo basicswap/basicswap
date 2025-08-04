@@ -70,7 +70,7 @@ class BSXNetwork:
     def __init__(self, data_dir, settings, **kwargs):
         self._bridge_networks = self.settings.get("bridge_networks", False)
         self._use_direct_message_routes = True
-        self._smsg_payload_version = self.settings.get("smsg_payload_version", 1)
+        self._smsg_payload_version = 0  # Set in startNetworks (if 0)
         self._smsg_add_to_outbox = self.settings.get("smsg_add_to_outbox", False)
         self._have_smsg_rpc = False  # Set in startNetworks
 
@@ -128,6 +128,15 @@ class BSXNetwork:
         if len(network_config_list) < 1:
             network_config_list = [{"type": "smsg", "enabled": True}]
 
+        self._can_use_smsg_payload2 = False
+        if (
+            Coins.PART in self.coin_clients
+            and self.coin_clients[Coins.PART]["core_version"] > 23020700
+        ):
+            self._can_use_smsg_payload2 = True
+        # Set smsg_payload_version automatically if it's unset
+        self._smsg_payload_version = int(self.settings.get("smsg_payload_version", 2 if self._can_use_smsg_payload2 else 1))
+
         have_smsg: bool = False
         for network in network_config_list:
             if network.get("enabled", True) is False:
@@ -144,13 +153,6 @@ class BSXNetwork:
                 self.active_networks.append(add_network)
             elif network["type"] == "simplex":
                 initialiseSimplexNetwork(self, network)
-
-        self._can_use_smsg_payload2 = False
-        if (
-            Coins.PART in self.coin_clients
-            and self.coin_clients[Coins.PART]["core_version"] > 23020700
-        ):
-            self._can_use_smsg_payload2 = True
 
         if have_smsg:
             self._have_smsg_rpc = True
