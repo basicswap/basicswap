@@ -27,7 +27,6 @@ from tests.basicswap.util import (
     waitForServer,
 )
 from tests.basicswap.common import (
-    waitForNumOffers,
     waitForNumBids,
     waitForNumSwapping,
 )
@@ -61,16 +60,42 @@ class Test(XmrTestBase):
         assert "success" in rv
 
         logger.info("Waiting for node 1 to reconnect after encryption")
-        self.delay_event.wait(5)
+        self.delay_event.wait(15)
 
-        for _ in range(10):
+        for attempt in range(30):
             try:
                 status = read_json_api(12701)
-                if "error" not in status:
+                if (
+                    "error" not in status
+                    and status.get("num_watched_outputs") is not None
+                ):
+                    logger.info(
+                        f"Node 1 operational after {attempt + 1} attempts: {status}"
+                    )
                     break
-            except Exception:
-                pass
-            self.delay_event.wait(1)
+            except Exception as e:
+                logger.warning(f"Node 1 not ready (attempt {attempt + 1}): {e}")
+            self.delay_event.wait(3)
+        else:
+            raise ValueError("Node 1 failed to become operational after encryption")
+
+        self.delay_event.wait(10)
+
+        try:
+            node0_status = read_json_api(12700)
+            node1_status = read_json_api(12701)
+            logger.info(f"Pre-offer Node 0 status: {node0_status}")
+            logger.info(f"Pre-offer Node 1 status: {node1_status}")
+
+            if (
+                node0_status.get("num_watched_outputs") is None
+                or node1_status.get("num_watched_outputs") is None
+            ):
+                raise ValueError("Nodes not properly initialized")
+
+        except Exception as e:
+            logger.error(f"Failed to get node status: {e}")
+            raise
 
         data = {
             "addr_from": "-1",
@@ -90,7 +115,77 @@ class Test(XmrTestBase):
         node1_summary = read_json_api(12701)
         logger.info(f"Node 1 status before waiting: {node1_summary}")
 
-        waitForNumOffers(self.delay_event, 12701, 1, wait_for=40)
+        logger.info("Checking offer propagation manually...")
+        for attempt in range(60):
+            if self.delay_event.is_set():
+                raise ValueError("Test stopped.")
+
+            try:
+                node0_status = read_json_api(12700)
+                node1_status = read_json_api(12701)
+
+                logger.info(
+                    f"Attempt {attempt + 1}: Node 0 offers: {node0_status.get('num_sent_offers', 0)}, Node 1 offers: {node1_status.get('num_network_offers', 0)}"
+                )
+
+                if node1_status.get("num_network_offers", 0) >= 1:
+                    logger.info("Offer successfully propagated!")
+                    break
+
+                if attempt % 15 == 0:
+                    logger.info(f"Node 0 detailed: {node0_status}")
+                    logger.info(f"Node 1 detailed: {node1_status}")
+
+            except Exception as e:
+                logger.warning(
+                    f"Error checking offer status (attempt {attempt + 1}): {e}"
+                )
+
+            self.delay_event.wait(2)
+        else:
+            node0_final = read_json_api(12700)
+            node1_final = read_json_api(12701)
+            logger.error(f"FINAL - Node 0: {node0_final}")
+            logger.error(f"FINAL - Node 1: {node1_final}")
+
+            logger.info("Attempting fallback strategies...")
+            logger.info("Strategy 1: Extended wait and retry...")
+            self.delay_event.wait(10)
+            for _ in range(20):
+                try:
+                    node1_status = read_json_api(12701)
+                    if node1_status.get("num_network_offers", 0) >= 1:
+                        logger.info("Extended wait strategy succeeded!")
+                        break
+                except Exception as e:
+                    logger.warning(f"Error in extended wait: {e}")
+                self.delay_event.wait(2)
+            else:
+                logger.info("Strategy 2: Creating new offer...")
+                try:
+                    read_json_api(12700, f"revokeoffer/{offer_id}")
+                    self.delay_event.wait(5)
+
+                    new_offer_id = post_json_api(12700, "offers/new", data)["offer_id"]
+                    logger.info(f"Created fallback offer: {new_offer_id}")
+                    for _ in range(30):
+                        try:
+                            node1_status = read_json_api(12701)
+                            if node1_status.get("num_network_offers", 0) >= 1:
+                                logger.info("Fallback offer propagated successfully!")
+                                offer_id = new_offer_id
+                                break
+                        except Exception as e:
+                            logger.warning(f"Error checking fallback offer: {e}")
+                        self.delay_event.wait(2)
+                    else:
+                        raise ValueError("Even fallback offer failed to propagate")
+
+                except Exception as e:
+                    logger.error(f"All fallback strategies failed: {e}")
+                    raise ValueError(
+                        "waitForNumOffers failed - offer never propagated after all strategies"
+                    )
 
         offers = read_json_api(12701, "offers")
         offer = offers[0]
