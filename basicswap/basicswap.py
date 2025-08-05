@@ -2336,6 +2336,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 security_token=security_token,
                 from_feerate=msg_buf.fee_rate_from,
                 to_feerate=msg_buf.fee_rate_to,
+                pk_from=self.getPubkeyForAddress(cursor, offer_addr),
                 auto_accept_type=msg_buf.auto_accept_type,
                 message_nets=msg_buf.message_nets,
             )

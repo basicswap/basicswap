@@ -6,7 +6,6 @@
 
 import base64
 import json
-import random
 import zmq
 
 from basicswap.basicswap_util import (
@@ -134,10 +133,20 @@ class BSXNetwork:
             and self.coin_clients[Coins.PART]["core_version"] > 23020700
         ):
             self._can_use_smsg_payload2 = True
+
+        self.log.debug(f'"can_use_smsg_payload2": {self._can_use_smsg_payload2}')
         # Set smsg_payload_version automatically if it's unset
-        self._smsg_payload_version = int(
-            self.settings.get(
-                "smsg_payload_version", 2 if self._can_use_smsg_payload2 else 1
+        was_set: bool = False
+        if self._smsg_payload_version == 0:
+            self._smsg_payload_version = int(
+                self.settings.get(
+                    "smsg_payload_version", 2 if self._can_use_smsg_payload2 else 1
+                )
+            )
+            was_set = True
+        self.log.debug(
+            '{}"smsg_payload_version": {}'.format(
+                "Set " if was_set else "", self._smsg_payload_version
             )
         )
 
@@ -382,14 +391,12 @@ class BSXNetwork:
         remote_active_network_ids, remote_bridged_network_ids = self.expandMessageNets(
             remote_message_nets
         )
-
+        if len(received_on_network_ids) < 1:
+            self.log.debug("selectMessageNetString: received_on_network_ids is empty.")
+            received_on_network_ids.append(MessageNetworks.SMSG)
         # If no data was sent it must be from an old version
-        if (
-            len(remote_active_network_ids) < 1
-            and len(remote_bridged_network_ids) < 1
-            and len(received_on_network_ids) < 1
-        ):
-            return networkIDToType(random.choice(tuple(active_networks_set)))
+        if len(remote_active_network_ids) < 1 and len(remote_bridged_network_ids) < 1:
+            return networkIDToType(received_on_network_ids[0])
 
         # Choose which network to respond on
         # Pick the received on network if it's in the local node's active networks and the list of remote node's active networks
@@ -433,10 +440,11 @@ class BSXNetwork:
         )
         for row in rows:
             # TODO: rank networks
-            network_id = row
+            network_id = row[0]
             received_on_network_ids.add(network_id)
-
-        return self.selectMessageNetString(received_on_network_ids, remote_message_nets)
+        return self.selectMessageNetString(
+            list(received_on_network_ids), remote_message_nets
+        )
 
     def expandMessageNets(self, message_nets: str) -> (list, list):
         if message_nets is None or len(message_nets) < 1:

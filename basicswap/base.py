@@ -76,6 +76,7 @@ class BaseApp(DBMethods):
 
         self._enabled_log_categories = set()
         for category in self.settings.get("enabled_log_categories", []):
+            category = category.lower()
             if category == "net":
                 self._enabled_log_categories.add(LC.NET)
             else:
