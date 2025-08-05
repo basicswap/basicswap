@@ -79,6 +79,19 @@ class Test(XmrTestBase):
         else:
             raise ValueError("Node 1 failed to become operational after encryption")
 
+        logger.info(
+            "Restarting node 1 to restore network connectivity after encryption"
+        )
+        c1 = self.processes[1]
+        c1.terminate()
+        c1.join()
+        self.processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
+        self.processes[1].start()
+
+        waitForServer(self.delay_event, 12701)
+        rv = read_json_api(12701, "unlock", {"password": node1_password})
+        assert "success" in rv
+
         self.delay_event.wait(10)
 
         try:
