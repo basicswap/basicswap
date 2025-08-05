@@ -7775,7 +7775,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             signature_enc = base64.b64encode(msg_data.signature).decode("UTF-8")
 
             passed = self.ci(Coins.PART).verifyMessage(
-                offer.addr_from, signature_enc, msg_data.offer_msg_id.hex() + "_revoke"
+                offer.addr_from, msg_data.offer_msg_id.hex() + "_revoke", signature_enc
             )
             ensure(passed is True, "Signature invalid")
 
@@ -12096,7 +12096,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if offer_id == pair[0]:
                 signature_enc = base64.b64encode(pair[1]).decode("UTF-8")
                 passed = self.ci(Coins.PART).verifyMessage(
-                    offer_addr_from, signature_enc, offer_id.hex() + "_revoke"
+                    offer_addr_from, offer_id.hex() + "_revoke", signature_enc
                 )
                 return (
                     True if passed is True else False
