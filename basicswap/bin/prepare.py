@@ -3243,6 +3243,9 @@ def main():
             "zmq_client_key": base64.b64encode(zmq_client_key).decode("utf-8"),
             "zmq_client_pubkey": base64.b64encode(zmq_client_pubkey).decode("utf-8"),
             "zmq_server_pubkey": base64.b64encode(zmq_server_pubkey).decode("utf-8"),
+            "enabled_log_categories": [
+                "net",
+            ],
         }
 
         wshost: str = extra_opts.get("wshost", htmlhost)
