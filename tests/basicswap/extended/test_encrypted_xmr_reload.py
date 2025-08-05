@@ -60,6 +60,18 @@ class Test(XmrTestBase):
         rv = read_json_api(12701, "unlock", {"password": node1_password})
         assert "success" in rv
 
+        logger.info("Waiting for node 1 to reconnect after encryption")
+        self.delay_event.wait(5)
+
+        for _ in range(10):
+            try:
+                status = read_json_api(12701)
+                if "error" not in status:
+                    break
+            except Exception:
+                pass
+            self.delay_event.wait(1)
+
         data = {
             "addr_from": "-1",
             "coin_from": "part",
@@ -72,9 +84,13 @@ class Test(XmrTestBase):
         offer_id = post_json_api(12700, "offers/new", data)["offer_id"]
         summary = read_json_api(12700)
         assert summary["num_sent_offers"] == 1
+        logger.info(f"Node 0 created offer {offer_id}, summary: {summary}")
 
         logger.info("Waiting for offer")
-        waitForNumOffers(self.delay_event, 12701, 1)
+        node1_summary = read_json_api(12701)
+        logger.info(f"Node 1 status before waiting: {node1_summary}")
+
+        waitForNumOffers(self.delay_event, 12701, 1, wait_for=40)
 
         offers = read_json_api(12701, "offers")
         offer = offers[0]
@@ -103,7 +119,7 @@ class Test(XmrTestBase):
 
         waitForNumBids(self.delay_event, 12700, 1)
 
-        for i in range(16):
+        for _ in range(16):
             bids = read_json_api(12700, "bids")
             bid = bids[0]
             if bid["bid_state"] == "Received":
@@ -139,7 +155,7 @@ class Test(XmrTestBase):
         assert rv["revoked_offer"] == offer_id
 
         logger.info("Completing swap")
-        for i in range(240):
+        for _ in range(240):
             if self.delay_event.is_set():
                 raise ValueError("Test stopped.")
             self.delay_event.wait(4)
