@@ -86,6 +86,11 @@ def page_settings(self, url_split, post_string):
                             form_data, "notifications_outgoing_transactions", "false"
                         )
                     ),
+                    "notifications_swap_completed": toBool(
+                        get_data_entry_or(
+                            form_data, "notifications_swap_completed", "false"
+                        )
+                    ),
                     "notifications_duration": int(
                         get_data_entry_or(form_data, "notifications_duration", "20")
                     ),
@@ -233,6 +238,9 @@ def page_settings(self, url_split, post_string):
         ),
         "notifications_outgoing_transactions": swap_client.settings.get(
             "notifications_outgoing_transactions", True
+        ),
+        "notifications_swap_completed": swap_client.settings.get(
+            "notifications_swap_completed", True
         ),
         "notifications_duration": swap_client.settings.get(
             "notifications_duration", 20
