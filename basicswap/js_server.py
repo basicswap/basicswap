@@ -842,9 +842,19 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
     if not swap_client.debug:
         raise ValueError("Debug mode not active.")
 
-    r = random.randint(0, 3)
+    r = random.randint(0, 4)
     if r == 0:
-        swap_client.notify(NT.OFFER_RECEIVED, {"offer_id": random.randbytes(28).hex()})
+        swap_client.notify(
+            NT.OFFER_RECEIVED,
+            {
+                "offer_id": random.randbytes(28).hex(),
+                "coin_from": 2,
+                "coin_to": 6,
+                "amount_from": 100000000,
+                "amount_to": 15500000000000,
+                "rate": 15500000000000,
+            },
+        )
     elif r == 1:
         swap_client.notify(
             NT.BID_RECEIVED,
@@ -852,6 +862,13 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
                 "type": "atomic",
                 "bid_id": random.randbytes(28).hex(),
                 "offer_id": random.randbytes(28).hex(),
+                "coin_from": 2,
+                "coin_to": 6,
+                "amount_from": 100000000,
+                "amount_to": 15500000000000,
+                "bid_amount": 50000000,
+                "bid_amount_to": 7750000000000,
+                "rate": 15500000000000,
             },
         )
     elif r == 2:
@@ -863,8 +880,17 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
                 "type": "ads",
                 "bid_id": random.randbytes(28).hex(),
                 "offer_id": random.randbytes(28).hex(),
+                "coin_from": 1,
+                "coin_to": 3,
+                "amount_from": 500000000,
+                "amount_to": 100000000,
+                "bid_amount": 250000000,
+                "bid_amount_to": 50000000,
+                "rate": 20000000,
             },
         )
+    elif r == 4:
+        swap_client.notify(NT.SWAP_COMPLETED, {"bid_id": random.randbytes(28).hex()})
 
     return bytes(json.dumps({"type": r}), "UTF-8")
 

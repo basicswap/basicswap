@@ -243,6 +243,7 @@ class NotificationTypes(IntEnum):
     OFFER_RECEIVED = auto()
     BID_RECEIVED = auto()
     BID_ACCEPTED = auto()
+    SWAP_COMPLETED = auto()
 
 
 class ConnectionRequestTypes(IntEnum):

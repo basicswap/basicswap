@@ -1784,60 +1784,85 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     f"Invalid swap type for: {coin_from.name} -> {coin_to.name}"
                 )
 
-    def notify(self, event_type, event_data, cursor=None) -> None:
-        show_event = event_type not in self._disabled_notification_types
-        if event_type == NT.OFFER_RECEIVED:
-            offer_id: bytes = bytes.fromhex(event_data["offer_id"])
-            self.log.debug(f"Received new offer {self.log.id(offer_id)}")
-            if self.ws_server and show_event:
-                event_data["event"] = "new_offer"
-                self.ws_server.send_message_to_all(json.dumps(event_data))
-        elif event_type == NT.BID_RECEIVED:
-            offer_id: bytes = bytes.fromhex(event_data["offer_id"])
-            offer_type: str = event_data["type"]
-            bid_id: bytes = bytes.fromhex(event_data["bid_id"])
-            self.log.info(
-                f"Received valid bid {self.log.id(bid_id)} for {offer_type} offer {self.log.id(offer_id)}"
-            )
-            if self.ws_server and show_event:
-                event_data["event"] = "new_bid"
-                self.ws_server.send_message_to_all(json.dumps(event_data))
-        elif event_type == NT.BID_ACCEPTED:
-            bid_id: bytes = bytes.fromhex(event_data["bid_id"])
-            self.log.info(f"Received valid bid accept for {self.log.id(bid_id)}")
-            if self.ws_server and show_event:
-                event_data["event"] = "bid_accepted"
-                self.ws_server.send_message_to_all(json.dumps(event_data))
-        else:
-            self.log.warning(f"Unknown notification {event_type}")
-
+    def _process_notification_safe(self, event_type, event_data) -> None:
         try:
+            show_event = event_type not in self._disabled_notification_types
+            if event_type == NT.OFFER_RECEIVED:
+                offer_id: bytes = bytes.fromhex(event_data["offer_id"])
+                self.log.debug(f"Received new offer {self.log.id(offer_id)}")
+                if self.ws_server and show_event:
+                    event_data["event"] = "new_offer"
+                    self.ws_server.send_message_to_all(json.dumps(event_data))
+            elif event_type == NT.BID_RECEIVED:
+                offer_id: bytes = bytes.fromhex(event_data["offer_id"])
+                offer_type: str = event_data["type"]
+                bid_id: bytes = bytes.fromhex(event_data["bid_id"])
+                self.log.info(
+                    f"Received valid bid {self.log.id(bid_id)} for {offer_type} offer {self.log.id(offer_id)}"
+                )
+                if self.ws_server and show_event:
+                    event_data["event"] = "new_bid"
+                    self.ws_server.send_message_to_all(json.dumps(event_data))
+            elif event_type == NT.BID_ACCEPTED:
+                bid_id: bytes = bytes.fromhex(event_data["bid_id"])
+                self.log.info(f"Received valid bid accept for {self.log.id(bid_id)}")
+                if self.ws_server and show_event:
+                    event_data["event"] = "bid_accepted"
+                    self.ws_server.send_message_to_all(json.dumps(event_data))
+            elif event_type == NT.SWAP_COMPLETED:
+                bid_id: bytes = bytes.fromhex(event_data["bid_id"])
+                self.log.info(f"Swap completed for bid {self.log.id(bid_id)}")
+                event_data["event"] = "swap_completed"
+
+                if self.ws_server and show_event:
+                    self.ws_server.send_message_to_all(json.dumps(event_data))
+            else:
+                self.log.warning(f"Unknown notification {event_type}")
+
             now: int = self.getTime()
-            use_cursor = self.openDB(cursor)
-            self.add(
-                Notification(
-                    active_ind=1,
-                    created_at=now,
-                    event_type=int(event_type),
-                    event_data=bytes(json.dumps(event_data), "UTF-8"),
-                ),
-                use_cursor,
-            )
+            use_cursor = self.openDB(None)
+            try:
+                self.add(
+                    Notification(
+                        active_ind=1,
+                        created_at=now,
+                        event_type=int(event_type),
+                        event_data=bytes(json.dumps(event_data), "UTF-8"),
+                    ),
+                    use_cursor,
+                )
 
-            use_cursor.execute(
-                "DELETE FROM notifications WHERE record_id NOT IN (SELECT record_id FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT ?)",
-                (self._keep_notifications,),
-            )
+                use_cursor.execute(
+                    "DELETE FROM notifications WHERE record_id NOT IN (SELECT record_id FROM notifications WHERE active_ind=1 ORDER BY created_at ASC LIMIT ?)",
+                    (self._keep_notifications,),
+                )
 
-            if show_event:
-                self._notifications_cache[now] = (event_type, event_data)
-            while len(self._notifications_cache) > self._show_notifications:
-                # dicts preserve insertion order in Python 3.7+
-                self._notifications_cache.pop(next(iter(self._notifications_cache)))
+                if show_event:
+                    self._notifications_cache[now] = (event_type, event_data)
+                while len(self._notifications_cache) > self._show_notifications:
+                    # dicts preserve insertion order in Python 3.7+
+                    self._notifications_cache.pop(next(iter(self._notifications_cache)))
 
-        finally:
-            if cursor is None:
+            finally:
                 self.closeDB(use_cursor)
+
+        except Exception as ex:
+            self.log.error(
+                f"Notification processing failed for event_type {event_type}: {ex}"
+            )
+
+    def notify(self, event_type, event_data, cursor=None) -> None:
+        """Submit notification for processing in isolated thread."""
+        try:
+            self.thread_pool.submit(
+                self._process_notification_safe, event_type, event_data
+            )
+        except Exception as ex:
+            self.log.error(f"Failed to submit notification to thread pool: {ex}")
+            try:
+                self._process_notification_safe(event_type, event_data)
+            except Exception as ex2:
+                self.log.error(f"Notification fallback also failed: {ex2}")
 
     def buildNotificationsCache(self, cursor):
         self._notifications_cache.clear()
@@ -2092,6 +2117,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.ratesMatch(bid_rate, offer.rate, offer.rate),
                 "Rate mismatch.",
             )
+
+    def validateMessageNets(self, message_nets: str) -> None:
+        try:
+            self.expandMessageNets(message_nets)
+        except Exception as e:
+            raise ValueError(f"Invalid message networks: {e}")
 
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
@@ -6109,6 +6140,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.setState(BidStates.SWAP_COMPLETED)
                     self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                     self.commitDB()
+                    self.notify(NT.SWAP_COMPLETED, {"bid_id": bid_id.hex()})
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
                 if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                     refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
@@ -6378,6 +6410,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 bid.setState(BidStates.SWAP_COMPLETED)
                 self.saveBid(bid_id, bid)
+                try:
+                    self.notify(
+                        NT.SWAP_COMPLETED,
+                        {
+                            "bid_id": bid_id.hex(),
+                        },
+                    )
+                except Exception as ex:
+                    self.log.warning(
+                        f"Failed to send swap completion notification: {ex}"
+                    )
+
                 return True  # Mark bid for archiving
 
         if save_bid:
@@ -6670,6 +6714,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                     if not was_received:
                         bid.setState(BidStates.SWAP_COMPLETED)
+                        try:
+                            self.notify(
+                                NT.SWAP_COMPLETED,
+                                {
+                                    "bid_id": bid_id.hex(),
+                                },
+                            )
+                        except Exception as ex:
+                            self.log.warning(
+                                f"Failed to send swap completion notification: {ex}"
+                            )
                 else:
                     # Could already be processed if spend was detected in the mempool
                     self.log.warning(
