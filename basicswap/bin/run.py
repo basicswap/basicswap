@@ -797,7 +797,7 @@ def main():
             continue
         if len(s) == 2:
             if name == "datadir":
-                data_dir = os.path.expanduser(s[1])
+                data_dir = os.path.abspath(os.path.expanduser(s[1]))
                 continue
             if name == "logprefix":
                 log_prefix = s[1]

@@ -2352,10 +2352,10 @@ def main():
             continue
         if len(s) == 2:
             if name == "datadir":
-                data_dir = os.path.expanduser(s[1].strip('"'))
+                data_dir = os.path.abspath(os.path.expanduser(s[1].strip('"')))
                 continue
             if name == "bindir":
-                bin_dir = os.path.expanduser(s[1].strip('"'))
+                bin_dir = os.path.abspath(os.path.expanduser(s[1].strip('"')))
                 continue
             if name == "portoffset":
                 port_offset = int(s[1])
@@ -2412,7 +2412,9 @@ def main():
                 extra_opts["walletrestoretime"] = int(s[1])
                 continue
             if name == "keysdirpath":
-                extra_opts["keysdirpath"] = os.path.expanduser(s[1].strip('"'))
+                extra_opts["keysdirpath"] = os.path.abspath(
+                    os.path.expanduser(s[1].strip('"'))
+                )
                 continue
             if name == "trustremotenode":
                 extra_opts["trust_remote_node"] = toBool(s[1])
