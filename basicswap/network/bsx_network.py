@@ -169,6 +169,8 @@ class BSXNetwork:
 
         if have_smsg:
             self._have_smsg_rpc = True
+            if self._can_use_smsg_payload2:
+                self.callrpc("smsgoptions", ["set", "addReceivedPubkeys", False])
             if self._zmq_queue_enabled:
                 self.zmqContext = zmq.Context()
                 self.zmqSubscriber = self.zmqContext.socket(zmq.SUB)
@@ -227,11 +229,6 @@ class BSXNetwork:
                     )
             finally:
                 self.closeDB(cursor)
-
-        # TODO: Ensure smsg is enabled for the active wallet.
-
-        if self._can_use_smsg_payload2:
-            self.callrpc("smsgoptions", ["set", "addReceivedPubkeys", False])
 
         now: int = self.getTime()
 

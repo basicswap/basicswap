@@ -53,6 +53,7 @@ class CoinInterface:
         self._network = network
         self._mx_wallet = threading.Lock()
         self._altruistic = True
+        self._core_version = None  # Set in getDaemonVersion()
 
     def interface_type(self) -> int:
         # coin_type() returns the base coin type, interface_type() returns the coin+balance type.

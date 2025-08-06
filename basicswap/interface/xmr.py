@@ -287,7 +287,10 @@ class XMRInterface(CoinInterface):
         self.rpc_wallet("get_languages")
 
     def getDaemonVersion(self):
-        return self.rpc_wallet("get_version")["version"]
+        # Returns wallet version
+        if self._core_version is None:
+            self._core_version = self.rpc_wallet("get_version")["version"]
+        return self._core_version
 
     def getBlockchainInfo(self):
         get_height = self.rpc2("get_height", timeout=self._rpctimeout)

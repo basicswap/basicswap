@@ -51,7 +51,7 @@ from basicswap.bin.run import (
 
 # Coin clients
 PARTICL_REPO = os.getenv("PARTICL_REPO", "tecnovert")
-PARTICL_VERSION = os.getenv("PARTICL_VERSION", "27.2.1.0")
+PARTICL_VERSION = os.getenv("PARTICL_VERSION", "27.2.2.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 
@@ -1369,7 +1369,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         if coin == "particl":
             fp.write("deprecatedrpc=create_bdb\n")
             fp.write("debugexclude=libevent\n")
-            fp.write("rpcdoccheck=0\n")
+            if chain == "mainnet":
+                fp.write("rpcdoccheck=0\n")
             fp.write(
                 "zmqpubsmsg=tcp://{}:{}\n".format(COINS_RPCBIND_IP, settings["zmqport"])
             )

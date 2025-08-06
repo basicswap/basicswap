@@ -364,7 +364,9 @@ class BTCInterface(Secp256k1Interface):
         self.rpc_wallet("getwalletinfo" if with_wallet else "getblockchaininfo")
 
     def getDaemonVersion(self):
-        return self.rpc("getnetworkinfo")["version"]
+        if self._core_version is None:
+            self._core_version = self.rpc("getnetworkinfo")["version"]
+        return self._core_version
 
     def getBlockchainInfo(self):
         return self.rpc("getblockchaininfo")
