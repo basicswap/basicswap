@@ -77,8 +77,9 @@ cffi==1.17.1 \
     --hash=sha256:f7f5baafcc48261359e14bcd6d9bff6d4b28d9103847c9e136694cb0501aef87 \
     --hash=sha256:fc48c783f9c87e60831201f2cce7f3b2e4846bf4d8728eabe54d60700b318a0b
     # via coincurve
-coincurve @ https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.2.zip \
-    --hash=sha256:c309deef22c929c9ab5b3adf7adbda940bffcea6c6ec7c66202d6c3d4e3ceb79
+# WARNING: pip install will require the following package to be hashed.
+# Consider using a hashable URL like https://github.com/jazzband/pip-tools/archive/SOMECOMMIT.zip
+coincurve @ git+https://github.com/basicswap/coincurve@932366c9d4d8e487162b5c1b2a2d9693e24e0483
     # via -r requirements.in
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
