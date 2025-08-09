@@ -467,6 +467,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "restrict_unknown_seed_wallets", True
         )
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
+        self._force_db_upgrade = self.settings.get("force_db_upgrade", False)
         self._bid_expired_leeway = 5
 
         self.swaps_in_progress = dict()
@@ -507,7 +508,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.with_coins_override = extra_opts.get("with_coins", set())
         self.without_coins_override = extra_opts.get("without_coins", set())
-        self._force_db_upgrade = extra_opts.get("force_db_upgrade", False)
 
         for c in Coins:
             if c in chainparams:
