@@ -293,17 +293,21 @@ class BSXNetwork:
 
         use_cursor = self.openDB(cursor)
         try:
-            query: str = "SELECT pk_from FROM offers WHERE addr_from = :addr_to LIMIT 1"
-            rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
+            query: str = (
+                "SELECT pk_from FROM offers WHERE addr_from = :addr AND pk_from IS NOT NULL LIMIT 1"
+            )
+            rows = use_cursor.execute(query, {"addr": addr}).fetchall()
             if len(rows) > 0:
                 return rows[0][0]
             query: str = (
-                "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr_to LIMIT 1"
+                "SELECT pk_bid_addr FROM bids WHERE bid_addr = :addr AND pk_bid_addr IS NOT NULL LIMIT 1"
             )
-            rows = use_cursor.execute(query, {"addr_to": addr}).fetchall()
+            rows = use_cursor.execute(query, {"addr": addr}).fetchall()
             if len(rows) > 0:
                 return rows[0][0]
-            query: str = "SELECT pubkey FROM smsgaddresses WHERE addr = :addr LIMIT 1"
+            query: str = (
+                "SELECT pubkey FROM smsgaddresses WHERE addr = :addr AND pubkey IS NOT NULL LIMIT 1"
+            )
             rows = use_cursor.execute(query, {"addr": addr}).fetchall()
             if len(rows) > 0:
                 return bytes.fromhex(rows[0][0])

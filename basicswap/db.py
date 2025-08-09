@@ -260,7 +260,6 @@ class Bid(Table):
     chain_b_height_start = Column("integer")
 
     reject_code = Column("integer")
-    smsg_payload_version = Column("integer")
 
     initiate_tx = None
     participate_tx = None

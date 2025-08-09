@@ -3674,7 +3674,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     msg_valid,
                     use_cursor,
                     message_nets=bid.message_nets,
-                    payload_version=bid.smsg_payload_version,
+                    payload_version=offer.smsg_payload_version,
                 )
 
                 self.addMessageLink(
@@ -3748,7 +3748,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Set msg_buf.message_nets to let the remote node know what networks to respond on.
         # bid.message_nets is a local field denoting the network/s to send to
-        msg_buf.message_nets = self.getMessageNetsString()
+        if offer.smsg_payload_version > 1:
+            msg_buf.message_nets = self.getMessageNetsString()
 
         return msg_buf
 
@@ -3797,7 +3798,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Set msg_buf.message_nets to let the remote node know what networks to respond on.
         # bid.message_nets is a local field denoting the network/s to send to
-        msg_buf.message_nets = self.getMessageNetsString()
+        if offer.smsg_payload_version > 1:
+            msg_buf.message_nets = self.getMessageNetsString()
 
         return msg_buf
 
@@ -3883,7 +3885,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Set msg_buf.message_nets to let the remote node know what networks to respond on.
         # bid.message_nets is a local field denoting the network/s to send to
-        msg_buf.message_nets = self.getMessageNetsString()
+        if offer.smsg_payload_version > 1:
+            msg_buf.message_nets = self.getMessageNetsString()
 
         return msg_buf
 
