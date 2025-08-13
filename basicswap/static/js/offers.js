@@ -2611,8 +2611,18 @@ const OrderbookManager = {
         if (coinFromFilter.length === 1 && coinToFilter.length === 1 &&
             coinFromFilter[0] !== 'any' && coinToFilter[0] !== 'any') {
 
-            const baseCoinName = getCoinNameFromValue(coinFromFilter[0], 'coin_from');
-            const quoteCoinName = getCoinNameFromValue(coinToFilter[0], 'coin_to');
+            const coinFromName = getCoinNameFromValue(coinFromFilter[0], 'coin_from');
+            const coinToName = getCoinNameFromValue(coinToFilter[0], 'coin_to');
+
+            let baseCoinName, quoteCoinName;
+
+            if (coinFromName === 'Bitcoin' || coinToName === 'Bitcoin') {
+                baseCoinName = 'Bitcoin';
+                quoteCoinName = coinFromName === 'Bitcoin' ? coinToName : coinFromName;
+            } else {
+                baseCoinName = coinToName;
+                quoteCoinName = coinFromName;
+            }
 
             return {
                 base: baseCoinName,
@@ -2895,12 +2905,14 @@ const OrderbookManager = {
         }
 
         let cumulativeVolume = 0;
+        let cumulativeValue = 0;
 
         return orders.map((order, index) => {
             const volumePercent = maxVolume > 0 ? (order.volume / maxVolume) * 100 : 0;
             cumulativeVolume += order.volume;
 
             const totalValue = order.price * order.volume;
+            cumulativeValue += totalValue;
 
             const quoteSymbolKey = getPriceKey(tradingPair.quote);
             let quotePriceUSD = latestPrices && latestPrices[quoteSymbolKey] ? latestPrices[quoteSymbolKey].usd : null;
@@ -2975,7 +2987,10 @@ const OrderbookManager = {
                                     ≈ ${totalValue.toFixed(8)} ${tradingPair.quote}
                                 </div>
                                 <div class="text-gray-500 dark:text-gray-500">
-                                    Σ ${cumulativeVolume.toFixed(4)} ${tradingPair.base}
+                                    ${side === 'buy' ?
+                                        `Σ ${cumulativeValue < 0.0001 ? cumulativeValue.toFixed(8) : cumulativeValue.toFixed(4)} ${tradingPair.quote}` :
+                                        `Σ ${cumulativeVolume.toFixed(4)} ${tradingPair.base}`
+                                    }
                                 </div>
                             </div>
                         </div>
