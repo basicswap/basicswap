@@ -7,6 +7,7 @@ const NotificationManager = (function() {
     showBidAccepted: true,
     showBalanceChanges: true,
     showOutgoingTransactions: true,
+    showSwapCompleted: true,
     notificationDuration: 20000
   };
 
@@ -34,8 +35,166 @@ const NotificationManager = (function() {
   }
 
   let config = loadConfig();
+  let notificationHistory = [];
+  const MAX_HISTORY_ITEMS = 10;
 
-  function ensureToastContainer() {
+  function loadNotificationHistory() {
+    try {
+      const saved = localStorage.getItem('notification_history');
+      if (saved) {
+        notificationHistory = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Error loading notification history:', e);
+      notificationHistory = [];
+    }
+  }
+
+  function saveNotificationHistory() {
+    try {
+      localStorage.setItem('notification_history', JSON.stringify(notificationHistory));
+    } catch (e) {
+      console.error('Error saving notification history:', e);
+    }
+  }
+
+  function addToHistory(title, type, options) {
+    const historyItem = {
+      id: Date.now(),
+      title: title,
+      type: type,
+      subtitle: options.subtitle || '',
+      coinSymbol: options.coinSymbol || '',
+      coinFrom: options.coinFrom || null,
+      coinTo: options.coinTo || null,
+      timestamp: new Date().toLocaleString(),
+      timestampMs: Date.now()
+    };
+
+    notificationHistory.unshift(historyItem);
+
+    if (notificationHistory.length > MAX_HISTORY_ITEMS) {
+      notificationHistory = notificationHistory.slice(0, MAX_HISTORY_ITEMS);
+    }
+
+    saveNotificationHistory();
+    updateHistoryDropdown();
+  }
+
+  function updateHistoryDropdown() {
+    const dropdown = document.getElementById('notification-history-dropdown');
+    const mobileDropdown = document.getElementById('notification-history-dropdown-mobile');
+
+    const emptyMessage = '<div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No notifications yet</div>';
+    const emptyMessageMobile = '<div class="px-4 py-3 text-sm text-gray-400">No notifications yet</div>';
+
+    if (notificationHistory.length === 0) {
+      if (dropdown) dropdown.innerHTML = emptyMessage;
+      if (mobileDropdown) mobileDropdown.innerHTML = emptyMessageMobile;
+      return;
+    }
+
+    const clearAllButton = `
+      <div class="px-4 py-2 border-t border-gray-100 dark:border-gray-400 text-center">
+        <button onclick="clearAllNotifications()"
+                class="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+          Clear All
+        </button>
+      </div>
+    `;
+
+    let historyHTML = '';
+    let mobileHistoryHTML = '';
+
+    notificationHistory.forEach(item => {
+      let coinIconHtml = '';
+      if (item.coinSymbol) {
+        const coinIcon = getCoinIcon(item.coinSymbol);
+        coinIconHtml = `<img src="/static/images/coins/${coinIcon}" class="w-5 h-5 mr-2 flex-shrink-0" alt="${item.coinSymbol}" onerror="this.style.display='none'">`;
+      }
+
+      const typeIcon = getToastIcon(item.type);
+      const typeColor = getToastColor(item.type, item);
+      const typeIconHtml = `<div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 ${typeColor} rounded-lg text-white mr-3">${typeIcon}</div>`;
+
+      let enhancedTitle = item.title;
+      if ((item.type === 'new_offer' || item.type === 'new_bid') && item.coinFrom && item.coinTo) {
+        const coinFromIcon = getCoinIcon(getCoinDisplayName(item.coinFrom));
+        const coinToIcon = getCoinIcon(getCoinDisplayName(item.coinTo));
+        const coinFromName = getCoinDisplayName(item.coinFrom);
+        const coinToName = getCoinDisplayName(item.coinTo);
+
+        enhancedTitle = item.title
+          .replace(new RegExp(`(\\d+\\.\\d+)\\s+${coinFromName}`, 'g'), `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">$1 ${coinFromName}`)
+          .replace(new RegExp(`(\\d+\\.\\d+)\\s+${coinToName}`, 'g'), `<img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">$1 ${coinToName}`);
+      }
+
+      const clickAction = getNotificationClickAction(item);
+      const itemHTML = `
+        <div class="block py-4 px-4 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white cursor-pointer transition-colors" ${clickAction ? `onclick="${clickAction}"` : ''}>
+          <div class="flex items-center">
+            ${typeIconHtml}
+            ${coinIconHtml}
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-900 dark:text-white break-words">${enhancedTitle}</div>
+              ${item.subtitle ? `<div class="text-xs text-gray-500 dark:text-gray-400 break-words">${item.subtitle}</div>` : ''}
+              <div class="text-xs text-gray-400 dark:text-gray-500">${item.timestamp}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      historyHTML += itemHTML;
+
+      const mobileItemHTML = `
+        <div class="block py-4 px-4 hover:bg-gray-700 text-white cursor-pointer transition-colors" ${clickAction ? `onclick="${clickAction}"` : ''}>
+          <div class="flex items-center">
+            ${typeIconHtml}
+            ${coinIconHtml}
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-gray-100 break-words">${enhancedTitle}</div>
+              ${item.subtitle ? `<div class="text-xs text-gray-300 break-words">${item.subtitle}</div>` : ''}
+              <div class="text-xs text-gray-400">${item.timestamp}</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      mobileHistoryHTML += mobileItemHTML;
+    });
+
+    historyHTML += clearAllButton;
+    mobileHistoryHTML += clearAllButton;
+
+    if (dropdown) dropdown.innerHTML = historyHTML;
+    if (mobileDropdown) mobileDropdown.innerHTML = mobileHistoryHTML;
+  }
+
+  function getNotificationClickAction(item) {
+  if (item.type === 'balance_change' && item.coinSymbol) {
+    return `window.location.href='/wallet/${item.coinSymbol.toLowerCase()}'`;
+  }
+
+  if (item.type === 'new_offer') {
+    return `window.location.href='/offers'`;
+  }
+
+  if (item.type === 'new_bid' || item.type === 'bid_accepted') {
+    return `window.location.href='/bids'`;
+  }
+
+  if (item.title.includes('offer') || item.title.includes('Offer')) {
+    return `window.location.href='/offers'`;
+  }
+
+  if (item.title.includes('bid') || item.title.includes('Bid') || item.title.includes('swap') || item.title.includes('Swap')) {
+    return `window.location.href='/bids'`;
+  }
+
+  return null;
+}
+
+function ensureToastContainer() {
     let container = document.getElementById('ul_updates');
     if (!container) {
       const floating_div = document.createElement('div');
@@ -66,6 +225,9 @@ const NotificationManager = (function() {
       'bid_accepted': `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
       </svg>`,
+      'swap_completed': `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+      </svg>`,
       'balance_change': `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
       </svg>`,
@@ -81,6 +243,7 @@ const NotificationManager = (function() {
       'new_offer': 'bg-blue-500',
       'new_bid': 'bg-green-500',
       'bid_accepted': 'bg-purple-500',
+      'swap_completed': 'bg-green-600',
       'balance_change': 'bg-yellow-500',
       'success': 'bg-blue-500'
     };
@@ -96,20 +259,67 @@ const NotificationManager = (function() {
     return colors[type] || colors['success'];
   }
 
+// Todo: Remove later and use global.
+  function getCoinDisplayName(coinId) {
+    const coinMap = {
+      1: 'PART',
+      2: 'BTC',
+      3: 'LTC',
+      4: 'DCR',
+      5: 'NMC',
+      6: 'XMR',
+      7: 'PART (Blind)',
+      8: 'PART (Anon)',
+      9: 'WOW',
+      11: 'PIVX',
+      12: 'DASH',
+      13: 'FIRO',
+      14: 'NAV',
+      15: 'LTC (MWEB)',
+      17: 'BCH',
+      18: 'DOGE'
+    };
+    return coinMap[coinId] || `Coin ${coinId}`;
+  }
+
+// Todo: Remove later.
+  function formatCoinAmount(amount, coinId) {
+    const divisors = {
+      1: 100000000,   // PART - 8 decimals
+      2: 100000000,   // BTC - 8 decimals
+      3: 100000000,   // LTC - 8 decimals
+      4: 100000000,   // DCR - 8 decimals
+      5: 100000000,   // NMC - 8 decimals
+      6: 1000000000000, // XMR - 12 decimals
+      7: 100000000,   // PART (Blind) - 8 decimals
+      8: 100000000,   // PART (Anon) - 8 decimals
+      9: 100000000000, // WOW - 11 decimals
+      11: 100000000,  // PIVX - 8 decimals
+      12: 100000000,  // DASH - 8 decimals
+      13: 100000000,  // FIRO - 8 decimals
+      14: 100000000,  // NAV - 8 decimals
+      15: 100000000,  // LTC (MWEB) - 8 decimals
+      17: 100000000,  // BCH - 8 decimals
+      18: 100000000   // DOGE - 8 decimals
+    };
+
+    const divisor = divisors[coinId] || 100000000;
+    const displayAmount = amount / divisor;
+
+    return displayAmount.toFixed(8).replace(/\.?0+$/, '');
+  }
+
   const publicAPI = {
     initialize: function(options = {}) {
       Object.assign(config, options);
-
+      loadNotificationHistory();
+      updateHistoryDropdown();
 
       this.initializeBalanceTracking();
 
       if (window.CleanupManager) {
         window.CleanupManager.registerResource('notificationManager', this, (mgr) => {
-  
-          if (this.balanceTimeouts) {
-            Object.values(this.balanceTimeouts).forEach(timeout => clearTimeout(timeout));
-          }
-          console.log('NotificationManager disposed');
+          mgr.dispose();
         });
       }
 
@@ -119,6 +329,16 @@ const NotificationManager = (function() {
     updateSettings: function(newSettings) {
       saveConfig(newSettings);
       return this;
+    },
+
+    getConfig: function() {
+      return { ...config };
+    },
+
+    clearAllNotifications: function() {
+      notificationHistory = [];
+      localStorage.removeItem('notification_history');
+      updateHistoryDropdown();
     },
 
     getSettings: function() {
@@ -170,24 +390,45 @@ const NotificationManager = (function() {
 
       setTimeout(() => {
         this.createToast(
-          'New network offer',
+          '<img src="/static/images/coins/bitcoin.svg" class="w-4 h-4 inline mr-1" alt="BTC" onerror="this.style.display=\'none\'">1.00000000 BTC → <img src="/static/images/coins/monero.svg" class="w-4 h-4 inline mr-1" alt="XMR" onerror="this.style.display=\'none\'">15.50000000 XMR',
           'new_offer',
-          { offerId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66', subtitle: 'Click to view offer' }
+          {
+            offerId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66',
+            subtitle: 'New offer • Rate: 1 BTC = 15.50000000 XMR',
+            coinFrom: 2,
+            coinTo: 6
+          }
         );
       }, 3000);
 
       setTimeout(() => {
         this.createToast(
-          'New bid received',
+          '<img src="/static/images/coins/bitcoin.svg" class="w-4 h-4 inline mr-1" alt="BTC" onerror="this.style.display=\'none\'">0.50000000 BTC → <img src="/static/images/coins/monero.svg" class="w-4 h-4 inline mr-1" alt="XMR" onerror="this.style.display=\'none\'">7.75000000 XMR',
           'new_bid',
-          { bidId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66', subtitle: 'Click to view bid' }
+          {
+            bidId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66',
+            subtitle: 'New bid • Rate: 1 BTC = 15.50000000 XMR',
+            coinFrom: 2,
+            coinTo: 6
+          }
         );
       }, 3500);
+
+      setTimeout(() => {
+        this.createToast(
+          'Swap completed successfully',
+          'swap_completed',
+          {
+            bidId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66',
+            subtitle: 'Click to view details'
+          }
+        );
+      }, 4000);
+
     },
 
-
-
     initializeBalanceTracking: function() {
+      this.checkAndResetStaleBalanceTracking();
 
       fetch('/json/walletbalances')
         .then(response => response.json())
@@ -201,14 +442,17 @@ const NotificationManager = (function() {
               const storageKey = `prev_balance_${coinKey}`;
               const pendingStorageKey = `prev_pending_${coinKey}`;
 
-
               if (!localStorage.getItem(storageKey)) {
                 localStorage.setItem(storageKey, balance.toString());
+                localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
               }
               if (!localStorage.getItem(pendingStorageKey)) {
                 localStorage.setItem(pendingStorageKey, pending.toString());
+                localStorage.setItem(`${pendingStorageKey}_timestamp`, Date.now().toString());
               }
             });
+
+            localStorage.setItem('last_balance_fetch', Date.now().toString());
           }
         })
         .catch(error => {
@@ -216,13 +460,49 @@ const NotificationManager = (function() {
         });
     },
 
+    checkAndResetStaleBalanceTracking: function() {
+      const lastFetch = localStorage.getItem('last_balance_fetch');
+      const now = Date.now();
+      const staleThreshold = 10 * 60 * 1000;
+
+      if (!lastFetch || (now - parseInt(lastFetch)) > staleThreshold) {
+        console.log('Resetting stale balance tracking to prevent false notifications');
+        this.resetBalanceTracking();
+      }
+    },
+
+    resetBalanceTracking: function() {
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('prev_balance_') || key.startsWith('prev_pending_') || key.startsWith('last_notification_') || key.startsWith('balance_change_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    },
+
+    getNotificationHistory: function() {
+      return notificationHistory;
+    },
+
+    clearNotificationHistory: function() {
+      notificationHistory = [];
+      localStorage.removeItem('notification_history');
+      updateHistoryDropdown();
+    },
+
+    updateHistoryDropdown: function() {
+      updateHistoryDropdown();
+    },
+
     createToast: function(title, type = 'success', options = {}) {
+      const plainTitle = title.replace(/<[^>]*>/g, '');
+      addToHistory(plainTitle, type, options);
+
       const messages = ensureToastContainer();
       const message = document.createElement('li');
-      const toastId = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const toastId = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
       const iconColor = getToastColor(type, options);
       const icon = getToastIcon(type);
-
 
       let coinIconHtml = '';
       if (options.coinSymbol) {
@@ -278,7 +558,6 @@ const NotificationManager = (function() {
       `;
       messages.appendChild(message);
 
-
       setTimeout(() => {
         if (message.parentNode) {
           message.classList.add('toast-slide-out');
@@ -286,6 +565,7 @@ const NotificationManager = (function() {
             if (message.parentNode) {
               message.parentNode.removeChild(message);
             }
+
           }, 300);
         }
       }, config.notificationDuration);
@@ -298,16 +578,42 @@ const NotificationManager = (function() {
 
       switch (data.event) {
         case 'new_offer':
-          toastTitle = `New network offer`;
+          if (data.coin_from && data.coin_to && data.amount_from && data.amount_to) {
+            const coinFromName = getCoinDisplayName(data.coin_from);
+            const coinToName = getCoinDisplayName(data.coin_to);
+            const amountFrom = formatCoinAmount(data.amount_from, data.coin_from);
+            const amountTo = formatCoinAmount(data.amount_to, data.coin_to);
+            const coinFromIcon = getCoinIcon(coinFromName);
+            const coinToIcon = getCoinIcon(coinToName);
+            toastTitle = `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">${amountFrom} ${coinFromName} → <img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">${amountTo} ${coinToName}`;
+            toastOptions.subtitle = `New offer • Rate: 1 ${coinFromName} = ${(data.amount_to / data.amount_from).toFixed(8)} ${coinToName}`;
+            toastOptions.coinFrom = data.coin_from;
+            toastOptions.coinTo = data.coin_to;
+          } else {
+            toastTitle = `New network offer`;
+            toastOptions.subtitle = 'Click to view offer';
+          }
           toastType = 'new_offer';
           toastOptions.offerId = data.offer_id;
-          toastOptions.subtitle = 'Click to view offer';
           shouldShowToast = config.showNewOffers;
           break;
         case 'new_bid':
-          toastTitle = `New bid received`;
+          if (data.coin_from && data.coin_to && data.bid_amount && data.bid_amount_to) {
+            const coinFromName = getCoinDisplayName(data.coin_from);
+            const coinToName = getCoinDisplayName(data.coin_to);
+            const bidAmountFrom = formatCoinAmount(data.bid_amount, data.coin_from);
+            const bidAmountTo = formatCoinAmount(data.bid_amount_to, data.coin_to);
+            const coinFromIcon = getCoinIcon(coinFromName);
+            const coinToIcon = getCoinIcon(coinToName);
+            toastTitle = `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">${bidAmountFrom} ${coinFromName} → <img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">${bidAmountTo} ${coinToName}`;
+            toastOptions.subtitle = `New bid • Rate: 1 ${coinFromName} = ${(data.bid_amount_to / data.bid_amount).toFixed(8)} ${coinToName}`;
+            toastOptions.coinFrom = data.coin_from;
+            toastOptions.coinTo = data.coin_to;
+          } else {
+            toastTitle = `New bid received`;
+            toastOptions.subtitle = 'Click to view bid';
+          }
           toastOptions.bidId = data.bid_id;
-          toastOptions.subtitle = 'Click to view bid';
           toastType = 'new_bid';
           shouldShowToast = config.showNewBids;
           break;
@@ -318,6 +624,15 @@ const NotificationManager = (function() {
           toastType = 'bid_accepted';
           shouldShowToast = config.showBidAccepted;
           break;
+
+        case 'swap_completed':
+          toastTitle = `Swap completed successfully`;
+          toastOptions.bidId = data.bid_id;
+          toastOptions.subtitle = 'Click to view details';
+          toastType = 'swap_completed';
+          shouldShowToast = config.showSwapCompleted;
+          break;
+
         case 'coin_balance_updated':
           if (data.coin && config.showBalanceChanges) {
             this.handleBalanceUpdate(data);
@@ -350,7 +665,6 @@ const NotificationManager = (function() {
     },
 
     fetchAndShowBalanceChange: function(coinSymbol) {
-
       fetch('/json/walletbalances')
         .then(response => response.json())
         .then(balanceData => {
@@ -371,6 +685,8 @@ const NotificationManager = (function() {
             coinsToCheck.forEach(coinData => {
               this.checkSingleCoinBalance(coinData, coinSymbol);
             });
+
+            localStorage.setItem('last_balance_fetch', Date.now().toString());
           }
         })
         .catch(error => {
@@ -385,14 +701,47 @@ const NotificationManager = (function() {
       const coinKey = coinData.name.replace(/\s+/g, '_');
       const storageKey = `prev_balance_${coinKey}`;
       const pendingStorageKey = `prev_pending_${coinKey}`;
+      const lastNotificationKey = `last_notification_${coinKey}`;
+
       const prevBalance = parseFloat(localStorage.getItem(storageKey)) || 0;
       const prevPending = parseFloat(localStorage.getItem(pendingStorageKey)) || 0;
-
+      const lastNotificationTime = parseInt(localStorage.getItem(lastNotificationKey)) || 0;
 
       const balanceIncrease = currentBalance - prevBalance;
       const pendingIncrease = currentPending - prevPending;
       const pendingDecrease = prevPending - currentPending;
 
+
+
+      const totalChange = Math.abs(balanceIncrease) + Math.abs(pendingIncrease);
+      const maxReasonableChange = Math.max(currentBalance, prevBalance) * 0.5;
+
+      if (totalChange > maxReasonableChange && totalChange > 1.0) {
+        console.log(`Detected potentially stale balance data for ${coinData.name}, resetting tracking`);
+        localStorage.setItem(storageKey, currentBalance.toString());
+        localStorage.setItem(pendingStorageKey, currentPending.toString());
+        return;
+      }
+
+      const now = Date.now();
+      const minTimeBetweenNotifications = 30000;
+      const balanceChangeKey = `balance_change_${coinKey}`;
+      const lastBalanceChange = localStorage.getItem(balanceChangeKey);
+
+      const currentChangeSignature = `${currentBalance}_${currentPending}`;
+
+      if (lastBalanceChange === currentChangeSignature) {
+        localStorage.setItem(storageKey, currentBalance.toString());
+        localStorage.setItem(pendingStorageKey, currentPending.toString());
+        return;
+      }
+
+      if (now - lastNotificationTime < minTimeBetweenNotifications) {
+        localStorage.setItem(storageKey, currentBalance.toString());
+        localStorage.setItem(pendingStorageKey, currentPending.toString());
+        localStorage.setItem(balanceChangeKey, currentChangeSignature);
+        return;
+      }
 
       const isPendingToConfirmed = pendingDecrease > 0.00000001 && balanceIncrease > 0.00000001;
 
@@ -408,7 +757,9 @@ const NotificationManager = (function() {
         variantInfo = ` (${coinData.name.replace('Litecoin ', '')})`;
       }
 
-      if (balanceIncrease > 0.00000001) {
+      let notificationShown = false;
+
+      if (balanceIncrease > 0.00000001 && config.showBalanceChanges) {
         const displayAmount = balanceIncrease.toFixed(8).replace(/\.?0+$/, '');
         const subtitle = isPendingToConfirmed ? 'Funds confirmed' : 'Incoming funds confirmed';
         this.createToast(
@@ -419,6 +770,7 @@ const NotificationManager = (function() {
             subtitle: subtitle
           }
         );
+        notificationShown = true;
       }
 
       if (balanceIncrease < -0.00000001 && config.showOutgoingTransactions) {
@@ -431,6 +783,7 @@ const NotificationManager = (function() {
             subtitle: 'Funds sent'
           }
         );
+        notificationShown = true;
       }
 
       if (pendingIncrease > 0.00000001) {
@@ -443,6 +796,7 @@ const NotificationManager = (function() {
             subtitle: 'Incoming funds pending'
           }
         );
+        notificationShown = true;
       }
 
       if (pendingIncrease < -0.00000001 && config.showOutgoingTransactions && !isPendingToConfirmed) {
@@ -455,8 +809,8 @@ const NotificationManager = (function() {
             subtitle: 'Funds sending'
           }
         );
+        notificationShown = true;
       }
-
 
       if (pendingDecrease > 0.00000001 && !isPendingToConfirmed) {
         const displayAmount = pendingDecrease.toFixed(8).replace(/\.?0+$/, '');
@@ -468,11 +822,16 @@ const NotificationManager = (function() {
             subtitle: 'Pending funds confirmed'
           }
         );
+        notificationShown = true;
       }
-
 
       localStorage.setItem(storageKey, currentBalance.toString());
       localStorage.setItem(pendingStorageKey, currentPending.toString());
+      localStorage.setItem(balanceChangeKey, currentChangeSignature);
+
+      if (notificationShown) {
+        localStorage.setItem(lastNotificationKey, now.toString());
+      }
     },
 
 
@@ -480,6 +839,20 @@ const NotificationManager = (function() {
     updateConfig: function(newConfig) {
       Object.assign(config, newConfig);
       return this;
+    },
+
+    manualResetBalanceTracking: function() {
+      this.resetBalanceTracking();
+      this.initializeBalanceTracking();
+    },
+
+    dispose: function() {
+      if (this.balanceTimeouts) {
+        Object.values(this.balanceTimeouts).forEach(timeout => {
+          clearTimeout(timeout);
+        });
+        this.balanceTimeouts = {};
+      }
     }
   };
 
@@ -488,7 +861,9 @@ const NotificationManager = (function() {
     while (element.nodeName !== "BUTTON") {
       element = element.parentNode;
     }
-    element.parentNode.parentNode.removeChild(element.parentNode);
+    const toastElement = element.parentNode;
+
+    toastElement.parentNode.removeChild(toastElement);
   };
 
   return publicAPI;
@@ -496,13 +871,21 @@ const NotificationManager = (function() {
 
 window.NotificationManager = NotificationManager;
 
-document.addEventListener('DOMContentLoaded', function() {
+window.resetBalanceTracking = function() {
+  if (window.NotificationManager && window.NotificationManager.manualResetBalanceTracking) {
+    window.NotificationManager.manualResetBalanceTracking();
+  }
+};
 
+window.testNotification = function() {
+  if (window.NotificationManager) {
+    window.NotificationManager.createToast('Test Notification', 'success', { subtitle: 'This is a test notification' });
+  }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
   if (!window.notificationManagerInitialized) {
     window.NotificationManager.initialize(window.notificationConfig || {});
     window.notificationManagerInitialized = true;
   }
 });
-
-
-console.log('NotificationManager initialized');
