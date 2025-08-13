@@ -2735,17 +2735,15 @@ const OrderbookManager = {
             <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
                 <!-- Header with trading pair and icons -->
                 <div class="mb-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center space-x-3">
-                            <div class="flex items-center space-x-2">
-                                <img src="${baseIcon}" class="w-8 h-8 rounded-full" alt="${selectedPair.base}" onerror="console.log('Failed to load base icon:', this.src); this.style.display='none'">
-                                <span class="text-xl font-bold text-gray-900 dark:text-white">${selectedPair.base}</span>
-                                <span class="text-gray-500 dark:text-gray-400">/</span>
-                                <img src="${quoteIcon}" class="w-6 h-6 rounded-full" alt="${selectedPair.quote}" onerror="console.log('Failed to load quote icon:', this.src); this.style.display='none'">
-                                <span class="text-lg font-semibold text-gray-700 dark:text-gray-300">${selectedPair.quote}</span>
-                            </div>
+                    <div class="text-center mb-4">
+                        <div class="flex items-center justify-center space-x-2 mb-2">
+                            <img src="${baseIcon}" class="w-8 h-8 rounded-full" alt="${selectedPair.base}" onerror="console.log('Failed to load base icon:', this.src); this.style.display='none'">
+                            <span class="text-xl font-bold text-gray-900 dark:text-white">${selectedPair.base}</span>
+                            <span class="text-gray-500 dark:text-gray-400">/</span>
+                            <img src="${quoteIcon}" class="w-8 h-8 rounded-full" alt="${selectedPair.quote}" onerror="console.log('Failed to load quote icon:', this.src); this.style.display='none'">
+                            <span class="text-xl font-bold text-gray-900 dark:text-white">${selectedPair.quote}</span>
                         </div>
-                        <div class="text-right">
+                        <div class="text-center">
                             <div class="text-sm text-gray-600 dark:text-gray-400">Last Updated</div>
                             <div class="text-xs text-gray-500 dark:text-gray-500">${lastRefresh}</div>
                         </div>
@@ -3145,10 +3143,10 @@ function toggleOrderbookView() {
         if (orderbookContainer) orderbookContainer.style.display = 'block';
         if (toggleBtn) {
             toggleBtn.innerHTML = `
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
                 </svg>
-                Table View
+                <span>Table View</span>
             `;
         }
         OrderbookManager.updateOrderbook();
@@ -3158,10 +3156,10 @@ function toggleOrderbookView() {
         if (orderbookContainer) orderbookContainer.style.display = 'none';
         if (toggleBtn) {
             toggleBtn.innerHTML = `
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                 </svg>
-                Orderbook View
+                <span>Orderbook View</span>
             `;
         }
         updateOffersTable();
