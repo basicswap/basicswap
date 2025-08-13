@@ -8,6 +8,13 @@ let currentSortDirection = 'desc';
 let filterTimeout = null;
 let isPaginationInProgress = false;
 
+let isOrderbookView = false;
+let orderbookData = {
+    buys: [],
+    sells: [],
+    selectedPair: null
+};
+
 const isSentOffers = window.offersTableConfig.isSentOffers;
 const CACHE_DURATION = window.config.cacheConfig.defaultTTL;
 const wsPort = window.config.wsPort;
@@ -1163,6 +1170,10 @@ async function updateOffersTable(options = {}) {
 
         lastRefreshTime = Date.now();
         updateLastRefreshTime();
+
+        if (isOrderbookView) {
+            OrderbookManager.updateOrderbook();
+        }
 
     } catch (error) {
         console.error('[Debug] Error in updateOffersTable:', error);
@@ -2436,11 +2447,36 @@ async function initializeTableAndData() {
     try {
         await fetchOffers();
         applyFilters();
+
+        if (!isSentOffers) {
+            initializeOrderbook();
+        }
     } catch (error) {
         console.error('Error loading initial data:', error);
         NetworkManager.handleNetworkError(error);
         ui.displayErrorMessage('Error loading data. Retrying in background...');
     }
+}
+
+function initializeOrderbook() {
+    const container = document.getElementById('orderbook-container');
+    if (!container) {
+        console.warn('Orderbook container not found');
+        return;
+    }
+
+
+    isOrderbookView = false;
+
+    OrderbookManager.initKeyboardShortcuts();
+
+    container.innerHTML = `
+        <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p>Select a trading pair to view the orderbook</p>
+            </div>
+        </div>
+    `;
 }
 
 function loadSavedSettings() {
@@ -2489,6 +2525,646 @@ function updateSortIndicators() {
     if (sortIcon) {
         sortIcon.textContent = currentSortDirection === 'asc' ? '↑' : '↓';
         sortIcon.classList.add('text-blue-500');
+    }
+}
+
+const OrderbookManager = {
+    aggregateOffers(offers, baseCoin, quoteCoin) {
+        const buys = [];
+        const sells = [];
+        const priceMap = new Map();
+
+        offers.forEach(offer => {
+            if (!offer || offer.is_revoked) return;
+
+            const coinFrom = offer.coin_from;
+            const coinTo = offer.coin_to;
+            const rate = parseFloat(offer.rate) || 0;
+            const amountFrom = parseFloat(offer.amount_from) || 0;
+            const amountTo = parseFloat(offer.amount_to) || 0;
+
+            if (rate <= 0 || amountFrom <= 0) return;
+
+            let isBuy = false;
+            let price = 0;
+            let volume = 0;
+
+            if (coinFrom === quoteCoin && coinTo === baseCoin) {
+                isBuy = true;
+                price = rate;
+                volume = amountTo;
+            } else if (coinFrom === baseCoin && coinTo === quoteCoin) {
+
+                isBuy = false;
+                price = rate;
+                volume = amountFrom;
+            } else {
+                return;
+            }
+
+            const roundedPrice = this.roundPrice(price);
+            const key = `${isBuy ? 'buy' : 'sell'}_${roundedPrice}`;
+
+            if (!priceMap.has(key)) {
+                priceMap.set(key, {
+                    price: roundedPrice,
+                    volume: 0,
+                    count: 0,
+                    isBuy: isBuy,
+                    offers: []
+                });
+            }
+
+            const level = priceMap.get(key);
+            level.volume += volume;
+            level.count += 1;
+            level.offers.push(offer);
+        });
+
+        priceMap.forEach(level => {
+            if (level.isBuy) {
+                buys.push(level);
+            } else {
+                sells.push(level);
+            }
+        });
+
+        buys.sort((a, b) => b.price - a.price);
+        sells.sort((a, b) => a.price - b.price);
+
+        return { buys, sells };
+    },
+
+    roundPrice(price) {
+        if (price >= 1000) return Math.round(price);
+        if (price >= 100) return Math.round(price * 10) / 10;
+        if (price >= 10) return Math.round(price * 100) / 100;
+        if (price >= 1) return Math.round(price * 1000) / 1000;
+        if (price >= 0.1) return Math.round(price * 10000) / 10000;
+        if (price >= 0.01) return Math.round(price * 100000) / 100000;
+        return Math.round(price * 1000000) / 1000000;
+    },
+
+    getCurrentTradingPair() {
+        const coinFromFilter = getSelectedCoins('coin_from');
+        const coinToFilter = getSelectedCoins('coin_to');
+
+        if (coinFromFilter.length === 1 && coinToFilter.length === 1 &&
+            coinFromFilter[0] !== 'any' && coinToFilter[0] !== 'any') {
+
+            const baseCoinName = getCoinNameFromValue(coinFromFilter[0], 'coin_from');
+            const quoteCoinName = getCoinNameFromValue(coinToFilter[0], 'coin_to');
+
+            return {
+                base: baseCoinName,
+                quote: quoteCoinName,
+                isValid: true
+            };
+        }
+
+        const validOffers = getValidOffers();
+        if (validOffers.length > 0) {
+            const pairCounts = {};
+            validOffers.forEach(offer => {
+                const pair = `${offer.coin_from}/${offer.coin_to}`;
+                pairCounts[pair] = (pairCounts[pair] || 0) + 1;
+            });
+
+            const mostCommonPair = Object.keys(pairCounts).reduce((a, b) =>
+                pairCounts[a] > pairCounts[b] ? a : b
+            );
+
+            if (mostCommonPair) {
+                const [base, quote] = mostCommonPair.split('/');
+                return {
+                    base: base,
+                    quote: quote,
+                    isValid: true
+                };
+            }
+        }
+
+        return {
+            base: 'Bitcoin',
+            quote: 'Monero',
+            isValid: false
+        };
+    },
+
+    updateOrderbook() {
+        if (!isOrderbookView) return;
+
+        const pair = this.getCurrentTradingPair();
+        const validOffers = getValidOffers();
+
+        orderbookData = this.aggregateOffers(validOffers, pair.base, pair.quote);
+        orderbookData.selectedPair = pair;
+
+        this.renderOrderbook();
+    },
+
+    renderOrderbook() {
+        const container = document.getElementById('orderbook-container');
+        if (!container) return;
+
+        const { buys, sells, selectedPair } = orderbookData;
+
+        if (!selectedPair || !selectedPair.isValid) {
+            container.innerHTML = `
+                <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+                    <div class="text-center py-12">
+                        <div class="text-gray-500 dark:text-gray-400 mb-4">
+                            <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Select a Trading Pair</h3>
+                            <p class="text-sm">Use the filters above to select exactly one coin for "From" and one coin for "To" to view the orderbook.</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        const maxVolume = Math.max(
+            buys.length > 0 ? Math.max(...buys.map(b => b.volume)) : 0,
+            sells.length > 0 ? Math.max(...sells.map(s => s.volume)) : 0
+        );
+
+        const totalBuyVolume = buys.reduce((sum, order) => sum + order.volume, 0);
+        const totalSellVolume = sells.reduce((sum, order) => sum + order.volume, 0);
+        const totalOffers = buys.reduce((sum, order) => sum + order.count, 0) + sells.reduce((sum, order) => sum + order.count, 0);
+
+        const baseSymbolKey = getPriceKey(selectedPair.base);
+        let basePriceUSD = latestPrices && latestPrices[baseSymbolKey] ? latestPrices[baseSymbolKey].usd : null;
+
+        if (!basePriceUSD || isNaN(basePriceUSD)) {
+            basePriceUSD = tableRateModule.getFallbackValue(baseSymbolKey);
+        }
+
+        const totalBuyVolumeUSD = basePriceUSD && !isNaN(basePriceUSD) ? totalBuyVolume * basePriceUSD : null;
+        const totalSellVolumeUSD = basePriceUSD && !isNaN(basePriceUSD) ? totalSellVolume * basePriceUSD : null;
+
+        const getImageFilename = (displayName) => {
+            if (displayName.toLowerCase() === 'zcoin' || displayName.toLowerCase() === 'firo') {
+                return 'Firo.png';
+            }
+            return `${displayName.replace(' ', '-')}.png`;
+        };
+
+        const baseIcon = `/static/images/coins/${getImageFilename(selectedPair.base)}`;
+        const quoteIcon = `/static/images/coins/${getImageFilename(selectedPair.quote)}`;
+
+        const bestBid = buys.length > 0 ? buys[0].price : 0;
+        const bestAsk = sells.length > 0 ? sells[0].price : 0;
+        const spread = bestBid && bestAsk ? ((bestAsk - bestBid) / bestAsk * 100) : 0;
+
+        const quoteSymbolKey = getPriceKey(selectedPair.quote);
+        let quotePriceUSD = latestPrices && latestPrices[quoteSymbolKey] ? latestPrices[quoteSymbolKey].usd : null;
+
+        if (!quotePriceUSD || isNaN(quotePriceUSD)) {
+            quotePriceUSD = tableRateModule.getFallbackValue(quoteSymbolKey);
+        }
+
+        const bestBidUSD = bestBid && quotePriceUSD ? bestBid * quotePriceUSD : null;
+        const bestAskUSD = bestAsk && quotePriceUSD ? bestAsk * quotePriceUSD : null;
+
+        const lastRefresh = lastRefreshTime ? new Date(lastRefreshTime).toLocaleTimeString() : 'Never';
+
+        container.innerHTML = `
+            <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+                <!-- Header with trading pair and icons -->
+                <div class="mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="flex items-center space-x-2">
+                                <img src="${baseIcon}" class="w-8 h-8 rounded-full" alt="${selectedPair.base}" onerror="console.log('Failed to load base icon:', this.src); this.style.display='none'">
+                                <span class="text-xl font-bold text-gray-900 dark:text-white">${selectedPair.base}</span>
+                                <span class="text-gray-500 dark:text-gray-400">/</span>
+                                <img src="${quoteIcon}" class="w-6 h-6 rounded-full" alt="${selectedPair.quote}" onerror="console.log('Failed to load quote icon:', this.src); this.style.display='none'">
+                                <span class="text-lg font-semibold text-gray-700 dark:text-gray-300">${selectedPair.quote}</span>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm text-gray-600 dark:text-gray-400">Last Updated</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-500">${lastRefresh}</div>
+                        </div>
+                    </div>
+
+                    <!-- Best Bid/Ask Display -->
+                    ${bestBid || bestAsk ? `
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg text-center">
+                            <div class="text-xs text-green-700 dark:text-green-300 mb-1">Best Bid</div>
+                            <div class="text-lg font-bold text-green-600 dark:text-green-400">
+                                ${bestBid ? bestBid.toFixed(8) : 'N/A'}
+                            </div>
+                            <div class="text-xs text-green-600 dark:text-green-400">
+                                ${bestBid ? `${selectedPair.quote} per ${selectedPair.base}` : ''}
+                            </div>
+                            ${bestBidUSD ? `
+                            <div class="text-xs text-green-500 dark:text-green-300 mt-1">
+                                ≈ $${bestBidUSD.toFixed(2)} USD
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="bg-red-50 dark:bg-red-900 p-4 rounded-lg text-center">
+                            <div class="text-xs text-red-700 dark:text-red-300 mb-1">Best Ask</div>
+                            <div class="text-lg font-bold text-red-600 dark:text-red-400">
+                                ${bestAsk ? bestAsk.toFixed(8) : 'N/A'}
+                            </div>
+                            <div class="text-xs text-red-600 dark:text-red-400">
+                                ${bestAsk ? `${selectedPair.quote} per ${selectedPair.base}` : ''}
+                            </div>
+                            ${bestAskUSD ? `
+                            <div class="text-xs text-red-500 dark:text-red-300 mt-1">
+                                ≈ $${bestAskUSD.toFixed(2)} USD
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Market Statistics -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white dark:bg-gray-600 rounded-lg">
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Offers</div>
+                            <div class="text-lg font-semibold text-gray-900 dark:text-white">${totalOffers}</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Buy Volume</div>
+                            <div class="text-sm font-medium text-green-600 dark:text-green-400">
+                                ${totalBuyVolume.toFixed(4)} ${selectedPair.base}
+                            </div>
+                            ${totalBuyVolumeUSD ? `
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                ≈ $${totalBuyVolumeUSD.toFixed(2)} USD
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Sell Volume</div>
+                            <div class="text-sm font-medium text-red-600 dark:text-red-400">
+                                ${totalSellVolume.toFixed(4)} ${selectedPair.base}
+                            </div>
+                            ${totalSellVolumeUSD ? `
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                ≈ $${totalSellVolumeUSD.toFixed(2)} USD
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Spread</div>
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                ${spread > 0 ? spread.toFixed(2) + '%' : 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Buy Orders (Bids) -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-medium text-green-600 dark:text-green-400 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                                Buy Orders (${buys.length} levels)
+                            </h4>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                Price (${selectedPair.quote}) | Volume (${selectedPair.base})
+                            </div>
+                        </div>
+                        <div class="space-y-1 max-h-96 overflow-y-auto">
+                            ${this.renderOrderSide(buys, maxVolume, 'buy', selectedPair)}
+                        </div>
+                    </div>
+
+                    <!-- Sell Orders (Asks) -->
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-medium text-red-600 dark:text-red-400 flex items-center">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM6.293 9.293a1 1 0 011.414 0L9 10.586V7a1 1 0 112 0v3.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                                Sell Orders (${sells.length} levels)
+                            </h4>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                Price (${selectedPair.quote}) | Volume (${selectedPair.base})
+                            </div>
+                        </div>
+                        <div class="space-y-1 max-h-96 overflow-y-auto">
+                            ${this.renderOrderSide(sells, maxVolume, 'sell', selectedPair)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderOrderSide(orders, maxVolume, side, tradingPair) {
+        if (orders.length === 0) {
+            return `
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <div class="mb-2">
+                        <svg class="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                        </svg>
+                    </div>
+                    <p class="text-sm">No ${side} orders available</p>
+                    <p class="text-xs mt-1">Be the first to place a ${side} order!</p>
+                </div>
+            `;
+        }
+
+        let cumulativeVolume = 0;
+
+        return orders.map((order, index) => {
+            const volumePercent = maxVolume > 0 ? (order.volume / maxVolume) * 100 : 0;
+            cumulativeVolume += order.volume;
+
+            const totalValue = order.price * order.volume;
+
+            const quoteSymbolKey = getPriceKey(tradingPair.quote);
+            let quotePriceUSD = latestPrices && latestPrices[quoteSymbolKey] ? latestPrices[quoteSymbolKey].usd : null;
+
+            if (!quotePriceUSD || isNaN(quotePriceUSD)) {
+                quotePriceUSD = tableRateModule.getFallbackValue(quoteSymbolKey);
+            }
+
+            const priceInUSD = quotePriceUSD && !isNaN(quotePriceUSD) ? order.price * quotePriceUSD : null;
+
+            return `
+                <div class="orderbook-level orderbook-${side} bg-white dark:bg-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-200 border border-transparent hover:border-${side === 'buy' ? 'green' : 'red'}-300 dark:hover:border-${side === 'buy' ? 'green' : 'red'}-600"
+                     onclick="OrderbookManager.showOrderDetails('${side}', ${order.price}, ${index})"
+                     title="Click to view ${order.count} individual offer${order.count !== 1 ? 's' : ''} at this price level">
+                    <!-- Volume bar background -->
+                    <div class="orderbook-volume-bar" style="width: ${volumePercent}%"></div>
+
+                    <!-- Order content -->
+                    <div class="relative">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="flex flex-col">
+                                <span class="orderbook-price text-sm font-bold">
+                                    ${order.price.toFixed(8)}
+                                </span>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">
+                                    ${tradingPair.quote} per ${tradingPair.base}
+                                </span>
+                                ${priceInUSD ? `
+                                <span class="text-xs text-gray-600 dark:text-gray-300">
+                                    ≈ $${priceInUSD.toFixed(2)} USD
+                                </span>
+                                ` : ''}
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">
+                                    ${order.volume.toFixed(4)}
+                                </div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                    ${tradingPair.base}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-gray-600 dark:text-gray-400">
+                                ${order.count} offer${order.count !== 1 ? 's' : ''}
+                            </span>
+                            <div class="text-right">
+                                <div class="text-gray-600 dark:text-gray-400">
+                                    ≈ ${totalValue.toFixed(4)} ${tradingPair.quote}
+                                </div>
+                                <div class="text-gray-500 dark:text-gray-500">
+                                    Σ ${cumulativeVolume.toFixed(4)} ${tradingPair.base}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    showOrderDetails(side, price, levelIndex) {
+        const orders = side === 'buy' ? orderbookData.buys : orderbookData.sells;
+        const level = orders.find(o => o.price === price);
+
+        if (!level) return;
+
+        const { selectedPair } = orderbookData;
+        const sideColor = side === 'buy' ? 'green' : 'red';
+        const sideIcon = side === 'buy' ? '↑' : '↓';
+
+        const modalContent = `
+            <div class="orderbook-modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="this.remove()">
+                <div class="orderbook-modal-content bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto" onclick="event.stopPropagation()">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                            <span class="text-${sideColor}-600 dark:text-${sideColor}-400 mr-2">${sideIcon}</span>
+                            ${side.charAt(0).toUpperCase() + side.slice(1)} Orders at ${price.toFixed(8)}
+                        </h3>
+                        <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 focus:outline-none">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="mb-4 p-3 bg-${sideColor}-50 dark:bg-${sideColor}-900 rounded-lg">
+                        <div class="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <div class="text-${sideColor}-800 dark:text-${sideColor}-200 font-medium">Price Level</div>
+                                <div class="text-${sideColor}-600 dark:text-${sideColor}-400">${price.toFixed(8)} ${selectedPair.quote}</div>
+                                ${(() => {
+                                    const quoteSymbolKey = getPriceKey(selectedPair.quote);
+                                    let quotePriceUSD = latestPrices && latestPrices[quoteSymbolKey] ? latestPrices[quoteSymbolKey].usd : null;
+                                    if (!quotePriceUSD || isNaN(quotePriceUSD)) {
+                                        quotePriceUSD = tableRateModule.getFallbackValue(quoteSymbolKey);
+                                    }
+                                    const priceInUSD = quotePriceUSD && !isNaN(quotePriceUSD) ? price * quotePriceUSD : null;
+                                    return priceInUSD ? `<div class="text-xs text-${sideColor}-500 dark:text-${sideColor}-300">≈ $${priceInUSD.toFixed(2)} USD</div>` : '';
+                                })()}
+                            </div>
+                            <div>
+                                <div class="text-${sideColor}-800 dark:text-${sideColor}-200 font-medium">Total Volume</div>
+                                <div class="text-${sideColor}-600 dark:text-${sideColor}-400">${level.volume.toFixed(4)} ${selectedPair.base}</div>
+                                ${(() => {
+                                    const baseSymbolKey = getPriceKey(selectedPair.base);
+                                    let basePriceUSD = latestPrices && latestPrices[baseSymbolKey] ? latestPrices[baseSymbolKey].usd : null;
+                                    if (!basePriceUSD || isNaN(basePriceUSD)) {
+                                        basePriceUSD = tableRateModule.getFallbackValue(baseSymbolKey);
+                                    }
+                                    const volumeInUSD = basePriceUSD && !isNaN(basePriceUSD) ? level.volume * basePriceUSD : null;
+                                    return volumeInUSD ? `<div class="text-xs text-${sideColor}-500 dark:text-${sideColor}-300">≈ $${volumeInUSD.toFixed(2)} USD</div>` : '';
+                                })()}
+                            </div>
+                            <div>
+                                <div class="text-${sideColor}-800 dark:text-${sideColor}-200 font-medium">Total Value</div>
+                                <div class="text-${sideColor}-600 dark:text-${sideColor}-400">${(price * level.volume).toFixed(4)} ${selectedPair.quote}</div>
+                                ${(() => {
+                                    const quoteSymbolKey = getPriceKey(selectedPair.quote);
+                                    let quotePriceUSD = latestPrices && latestPrices[quoteSymbolKey] ? latestPrices[quoteSymbolKey].usd : null;
+                                    if (!quotePriceUSD || isNaN(quotePriceUSD)) {
+                                        quotePriceUSD = tableRateModule.getFallbackValue(quoteSymbolKey);
+                                    }
+                                    const totalValueInUSD = quotePriceUSD && !isNaN(quotePriceUSD) ? (price * level.volume) * quotePriceUSD : null;
+                                    return totalValueInUSD ? `<div class="text-xs text-${sideColor}-500 dark:text-${sideColor}-300">≈ $${totalValueInUSD.toFixed(2)} USD</div>` : '';
+                                })()}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            Individual Offers (${level.count})
+                        </h4>
+                        ${level.offers.map((offer, index) => `
+                            <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-medium text-gray-900 dark:text-white">
+                                        ${parseFloat(offer.amount_from).toFixed(4)} ${offer.coin_from}
+                                    </span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        → ${parseFloat(offer.amount_to).toFixed(4)} ${offer.coin_to}
+                                    </span>
+                                </div>
+                                <div class="flex flex-col items-end">
+                                    <span class="text-sm text-gray-600 dark:text-gray-400">
+                                        Rate: ${parseFloat(offer.rate).toFixed(8)}
+                                    </span>
+                                    <button onclick="window.location.href='/offer/${offer.offer_id}'"
+                                            class="text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors mt-1 focus:outline-none">
+                                        View Offer
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove());
+
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+    },
+
+    refreshOrderbook() {
+        if (!isOrderbookView) return;
+
+        const container = document.getElementById('orderbook-container');
+        if (container) {
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'absolute inset-0 bg-white dark:bg-gray-500 bg-opacity-75 flex items-center justify-center z-10 rounded-xl';
+            loadingOverlay.innerHTML = `
+                <div class="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                    <svg class="animate-spin w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <span>Refreshing orderbook...</span>
+                </div>
+            `;
+
+            container.style.position = 'relative';
+            container.appendChild(loadingOverlay);
+
+            setTimeout(() => {
+                if (loadingOverlay.parentNode) {
+                    loadingOverlay.remove();
+                }
+            }, 1000);
+        }
+
+        fetchOffers().then(() => {
+            applyFilters();
+        }).catch(error => {
+            console.error('Error refreshing orderbook:', error);
+            if (container && container.querySelector('.absolute')) {
+                container.querySelector('.absolute').remove();
+            }
+        });
+    },
+
+    getMarketDepth() {
+        const { buys, sells } = orderbookData;
+
+        let buyDepth = 0;
+        let sellDepth = 0;
+
+        const buyLevels = buys.map(level => {
+            buyDepth += level.volume;
+            return { price: level.price, depth: buyDepth };
+        });
+
+        const sellLevels = sells.map(level => {
+            sellDepth += level.volume;
+            return { price: level.price, depth: sellDepth };
+        });
+
+        return { buyLevels, sellLevels };
+    },
+
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (!isOrderbookView) return;
+
+            switch(e.key.toLowerCase()) {
+                case 'r':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        this.refreshOrderbook();
+                    }
+                    break;
+                case 'escape':
+                    document.querySelectorAll('.fixed.inset-0').forEach(modal => modal.remove());
+                    break;
+                case 't':
+                    if (!e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        toggleOrderbookView();
+                    }
+                    break;
+            }
+        });
+    }
+};
+
+function toggleOrderbookView() {
+    isOrderbookView = !isOrderbookView;
+
+    const tableContainer = document.querySelector('.w-auto.mt-6.overflow-auto.lg\\:overflow-hidden');
+    const paginationContainer = document.querySelector('.rounded-b-md');
+    const orderbookContainer = document.getElementById('orderbook-container');
+    const toggleBtn = document.getElementById('view-toggle-btn');
+
+    if (isOrderbookView) {
+        if (tableContainer) tableContainer.style.display = 'none';
+        if (paginationContainer) paginationContainer.style.display = 'none';
+        if (orderbookContainer) orderbookContainer.style.display = 'block';
+        if (toggleBtn) {
+            toggleBtn.innerHTML = `
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                </svg>
+                Table View
+            `;
+        }
+        OrderbookManager.updateOrderbook();
+    } else {
+        if (tableContainer) tableContainer.style.display = 'block';
+        if (paginationContainer) paginationContainer.style.display = 'block';
+        if (orderbookContainer) orderbookContainer.style.display = 'none';
+        if (toggleBtn) {
+            toggleBtn.innerHTML = `
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Orderbook View
+            `;
+        }
+        updateOffersTable();
     }
 }
 
