@@ -525,6 +525,33 @@ select.disabled-select-enabled {
     animation: spin 0.5s linear;
 }
 
+/* Orderbook Flash Animations */
+@keyframes flash-green {
+    0% { background-color: rgba(34, 197, 94, 0.3); }
+    100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+    0% { background-color: rgba(239, 68, 68, 0.3); }
+    100% { background-color: transparent; }
+}
+
+.flash-green {
+    animation: flash-green 0.6s ease-out;
+}
+
+.flash-red {
+    animation: flash-red 0.6s ease-out;
+}
+
+.orderbook-level-new {
+    animation: flash-green 0.8s ease-out;
+}
+
+.orderbook-level-updated {
+    animation: flash-red 0.6s ease-out;
+}
+
 /* Cumulative Volume Indicator */
 .cumulative-volume {
     font-family: 'Courier New', monospace;

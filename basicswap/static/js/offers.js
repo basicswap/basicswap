@@ -2554,7 +2554,6 @@ const OrderbookManager = {
                 price = rate;
                 volume = amountTo;
             } else if (coinFrom === baseCoin && coinTo === quoteCoin) {
-
                 isBuy = false;
                 price = rate;
                 volume = amountFrom;
@@ -2661,6 +2660,10 @@ const OrderbookManager = {
         orderbookData.selectedPair = pair;
 
         this.renderOrderbook();
+
+        setTimeout(() => {
+            this.clearFlashAnimations();
+        }, 800);
     },
 
     renderOrderbook() {
@@ -2692,7 +2695,10 @@ const OrderbookManager = {
         );
 
         const totalBuyVolume = buys.reduce((sum, order) => sum + order.volume, 0);
+        const totalBuyValue = buys.reduce((sum, order) => sum + (order.volume * order.price), 0);
         const totalSellVolume = sells.reduce((sum, order) => sum + order.volume, 0);
+        const totalSellValue = sells.reduce((sum, order) => sum + (order.volume * order.price), 0);
+
         const totalOffers = buys.reduce((sum, order) => sum + order.count, 0) + sells.reduce((sum, order) => sum + order.count, 0);
 
         const baseSymbolKey = getPriceKey(selectedPair.base);
@@ -2718,6 +2724,18 @@ const OrderbookManager = {
         const bestBid = buys.length > 0 ? buys[0].price : 0;
         const bestAsk = sells.length > 0 ? sells[0].price : 0;
         const spread = bestBid && bestAsk ? ((bestAsk - bestBid) / bestAsk * 100) : 0;
+
+        const previousBestBid = OrderbookManager.previousBestBid || 0;
+        const previousBestAsk = OrderbookManager.previousBestAsk || 0;
+
+        const bidChanged = previousBestBid !== bestBid && previousBestBid !== 0;
+        const askChanged = previousBestAsk !== bestAsk && previousBestAsk !== 0;
+
+        const bidIncreased = bidChanged && bestBid > previousBestBid;
+        const askIncreased = askChanged && bestAsk > previousBestAsk;
+
+        OrderbookManager.previousBestBid = bestBid;
+        OrderbookManager.previousBestAsk = bestAsk;
 
         const quoteSymbolKey = getPriceKey(selectedPair.quote);
         let quotePriceUSD = latestPrices && latestPrices[quoteSymbolKey] ? latestPrices[quoteSymbolKey].usd : null;
@@ -2752,7 +2770,7 @@ const OrderbookManager = {
                     <!-- Best Bid/Ask Display -->
                     ${bestBid || bestAsk ? `
                     <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg text-center">
+                        <div class="bg-green-50 dark:bg-green-900 p-4 rounded-lg text-center ${bidChanged ? (bidIncreased ? 'flash-green' : 'flash-red') : ''}">
                             <div class="text-xs text-green-700 dark:text-green-300 mb-1">Best Bid</div>
                             <div class="text-lg font-bold text-green-600 dark:text-green-400">
                                 ${bestBid ? bestBid.toFixed(8) : 'N/A'}
@@ -2766,7 +2784,7 @@ const OrderbookManager = {
                             </div>
                             ` : ''}
                         </div>
-                        <div class="bg-red-50 dark:bg-red-900 p-4 rounded-lg text-center">
+                        <div class="bg-red-50 dark:bg-red-900 p-4 rounded-lg text-center ${askChanged ? (askIncreased ? 'flash-red' : 'flash-green') : ''}">
                             <div class="text-xs text-red-700 dark:text-red-300 mb-1">Best Ask</div>
                             <div class="text-lg font-bold text-red-600 dark:text-red-400">
                                 ${bestAsk ? bestAsk.toFixed(8) : 'N/A'}
@@ -2828,10 +2846,10 @@ const OrderbookManager = {
                                 <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.293l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"></path>
                                 </svg>
-                                Buy Orders (${buys.length} levels)
+                                Buy Orders
                             </h4>
                             <div class="text-xs text-gray-500 dark:text-gray-400">
-                                Price (${selectedPair.quote}) | Volume (${selectedPair.base})
+                                Total: ${totalBuyValue < 0.0001 ? totalBuyValue.toFixed(8) : totalBuyValue.toFixed(4)} ${selectedPair.quote}
                             </div>
                         </div>
                         <div class="space-y-1 max-h-96 overflow-y-auto">
@@ -2846,10 +2864,10 @@ const OrderbookManager = {
                                 <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM6.293 9.293a1 1 0 011.414 0L9 10.586V7a1 1 0 112 0v3.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                 </svg>
-                                Sell Orders (${sells.length} levels)
+                                Sell Orders
                             </h4>
                             <div class="text-xs text-gray-500 dark:text-gray-400">
-                                Price (${selectedPair.quote}) | Volume (${selectedPair.base})
+                                Total: ${totalSellVolume.toFixed(4)} ${selectedPair.base}
                             </div>
                         </div>
                         <div class="space-y-1 max-h-96 overflow-y-auto">
@@ -2893,8 +2911,25 @@ const OrderbookManager = {
 
             const priceInUSD = quotePriceUSD && !isNaN(quotePriceUSD) ? order.price * quotePriceUSD : null;
 
+            const mostRecentOffer = order.offers && order.offers.length > 0 ?
+                order.offers.reduce((latest, current) =>
+                    (current.created_at > latest.created_at) ? current : latest
+                ) : null;
+
+            const timeAgo = mostRecentOffer ? formatTime(mostRecentOffer.created_at, true) : '';
+
+            const levelKey = `${side}_${order.price}`;
+            const isNewLevel = !OrderbookManager.previousLevels || !OrderbookManager.previousLevels.has(levelKey);
+            const isUpdatedLevel = OrderbookManager.previousLevels && OrderbookManager.previousLevels.has(levelKey) &&
+                OrderbookManager.previousLevels.get(levelKey) !== order.volume;
+
+            if (!OrderbookManager.previousLevels) OrderbookManager.previousLevels = new Map();
+            OrderbookManager.previousLevels.set(levelKey, order.volume);
+
+            const flashClass = isNewLevel ? 'orderbook-level-new' : (isUpdatedLevel ? 'orderbook-level-updated' : '');
+
             return `
-                <div class="orderbook-level orderbook-${side} bg-white dark:bg-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-200 border border-transparent hover:border-${side === 'buy' ? 'green' : 'red'}-300 dark:hover:border-${side === 'buy' ? 'green' : 'red'}-600"
+                <div class="orderbook-level orderbook-${side} ${flashClass} bg-white dark:bg-gray-600 rounded-lg p-3 cursor-pointer transition-all duration-200 border border-transparent hover:border-${side === 'buy' ? 'green' : 'red'}-300 dark:hover:border-${side === 'buy' ? 'green' : 'red'}-600"
                      onclick="OrderbookManager.showOrderDetails('${side}', ${order.price}, ${index})"
                      title="Click to view ${order.count} individual offer${order.count !== 1 ? 's' : ''} at this price level">
                     <!-- Volume bar background -->
@@ -2923,6 +2958,11 @@ const OrderbookManager = {
                                 <div class="text-xs text-gray-500 dark:text-gray-400">
                                     ${tradingPair.base}
                                 </div>
+                                ${timeAgo ? `
+                                <div class="text-xs text-gray-400 dark:text-gray-500">
+                                    ${timeAgo}
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
 
@@ -2932,7 +2972,7 @@ const OrderbookManager = {
                             </span>
                             <div class="text-right">
                                 <div class="text-gray-600 dark:text-gray-400">
-                                    ≈ ${totalValue.toFixed(4)} ${tradingPair.quote}
+                                    ≈ ${totalValue.toFixed(8)} ${tradingPair.quote}
                                 </div>
                                 <div class="text-gray-500 dark:text-gray-500">
                                     Σ ${cumulativeVolume.toFixed(4)} ${tradingPair.base}
@@ -3102,6 +3142,16 @@ const OrderbookManager = {
         });
 
         return { buyLevels, sellLevels };
+    },
+
+    clearFlashAnimations() {
+        const container = document.getElementById('orderbook-container');
+        if (!container) return;
+
+        const flashElements = container.querySelectorAll('.flash-green, .flash-red, .orderbook-level-new, .orderbook-level-updated');
+        flashElements.forEach(element => {
+            element.classList.remove('flash-green', 'flash-red', 'orderbook-level-new', 'orderbook-level-updated');
+        });
     },
 
     initKeyboardShortcuts() {
