@@ -495,6 +495,16 @@
            <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications for sent funds</p>
           </div>
 
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="notifications_swap_completed" name="notifications_swap_completed" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.notifications_swap_completed %} checked{% endif %}>
+            <label for="notifications_swap_completed" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Swap Completed</label>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications when swaps complete successfully</p>
+          </div>
+
+
+
          </div>
         </div>
        </div>
@@ -553,13 +563,13 @@
   <script>
     function syncNotificationSettings() {
       if (window.NotificationManager && typeof window.NotificationManager.updateSettings === 'function') {
-
         const backendSettings = {
           showNewOffers: document.getElementById('notifications_new_offers').checked,
           showNewBids: document.getElementById('notifications_new_bids').checked,
           showBidAccepted: document.getElementById('notifications_bid_accepted').checked,
           showBalanceChanges: document.getElementById('notifications_balance_changes').checked,
           showOutgoingTransactions: document.getElementById('notifications_outgoing_transactions').checked,
+          showSwapCompleted: document.getElementById('notifications_swap_completed').checked,
           notificationDuration: parseInt(document.getElementById('notifications_duration').value) * 1000
         };
 

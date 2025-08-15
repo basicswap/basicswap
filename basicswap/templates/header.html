@@ -45,6 +45,32 @@
       };
     })();
 
+    function toggleNotificationDropdown(event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      const dropdown = document.getElementById('notification-history-dropdown');
+      const mobileDropdown = document.getElementById('notification-history-dropdown-mobile');
+
+      if (window.innerWidth >= 768) {
+        if (dropdown) {
+          dropdown.classList.toggle('hidden');
+        }
+      } else {
+        if (mobileDropdown) {
+          mobileDropdown.classList.toggle('hidden');
+        }
+      }
+    }
+
+    function clearAllNotifications() {
+      if (window.NotificationManager && typeof window.NotificationManager.clearAllNotifications === 'function') {
+        window.NotificationManager.clearAllNotifications();
+      }
+    }
+
     (function() {
       const isDarkMode = localStorage.getItem('color-theme') === 'dark' ||
         (!localStorage.getItem('color-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -159,11 +185,10 @@
 
           <!-- Place New Offer -->
           <li>
-            <a class="flex rounded-full flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500
-              hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border
-              border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" href="/newoffer">
+            <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm"
+              href="/newoffer">
               {{ new_offer_svg | safe }}
-              <span>Place new Offer</span>
+              <span>Place New Offer</span>
             </a>
           </li>
         </ul>
@@ -173,7 +198,7 @@
           <li>
             <a href="/donation" class="flex items-center py-2 pr-4 pl-3 text-gray-50 text-sm hover:text-gray-100">
               {{ love_svg | safe }}
-              <span class="ml-2">Donate</span>
+              <span class="ml-2">Donations</span>
             </a>
           </li>
         </ul>
@@ -398,7 +423,18 @@
           </ul>
           {% endif %}
 
-          <!-- Theme Toggle -->
+          <div class="relative">
+            <button id="notification-history-button" onclick="toggleNotificationDropdown(event)" type="button"
+                    class="relative text-green-500 dark:text-green-400 focus:outline-none rounded-lg text-sm ml-5 flex items-center justify-center">
+              {{ notifications_svg | safe }}
+            </button>
+            <div id="notification-history-dropdown" class="absolute left-1/2 transform -translate-x-1/2 top-full mt-2 z-50 hidden bg-white divide-y divide-gray-100 shadow w-80 dark:bg-gray-500 dark:divide-gray-400">
+              <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                No notifications yet
+              </div>
+            </div>
+          </div>
+
           <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button"
             class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5">
             {{ sun_svg | safe }}
@@ -585,8 +621,20 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/donation">
             {{ mobile_love_svg | safe }}
-            <span>Donate</span>
+            <span>Donations</span>
           </a>
+        </li>
+        <li>
+          <button id="notification-history-button-mobile" onclick="toggleNotificationDropdown(event)" ontouchstart="toggleNotificationDropdown(event)"
+                  class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded w-full text-left focus:outline-none">
+            {{ notifications_svg | safe }}
+            <span>Notifications</span>
+          </button>
+          <div id="notification-history-dropdown-mobile" class="hidden bg-gray-500 rounded-lg shadow w-full mt-2">
+            <div class="px-4 py-3 text-sm text-gray-400">
+              No notifications yet
+            </div>
+          </div>
         </li>
 
       </ul>
@@ -767,3 +815,34 @@
 </div>
     </div>
   </section>
+
+<script>
+function testNotificationSystem() {
+  if (window.NotificationManager) {
+    window.NotificationManager.createToast('Test Withdrawal', 'balance_change', {
+      coinSymbol: 'PART',
+      subtitle: 'Funds sent'
+    });
+    console.log('Test notification created');
+  } else {
+    console.error('NotificationManager not available');
+  }
+}
+
+function handleOutsideClick(event) {
+  const button = document.getElementById('notification-history-button');
+  const mobileButton = document.getElementById('notification-history-button-mobile');
+  const dropdown = document.getElementById('notification-history-dropdown');
+  const mobileDropdown = document.getElementById('notification-history-dropdown-mobile');
+
+  if (dropdown && !dropdown.contains(event.target) && button && !button.contains(event.target)) {
+    dropdown.classList.add('hidden');
+  }
+  if (mobileDropdown && !mobileDropdown.contains(event.target) && mobileButton && !mobileButton.contains(event.target)) {
+    mobileDropdown.classList.add('hidden');
+  }
+}
+
+document.addEventListener('click', handleOutsideClick);
+document.addEventListener('touchstart', handleOutsideClick);
+</script>

@@ -21,6 +21,15 @@ from basicswap.chainparams import (
     getCoinIdFromTicker,
 )
 
+# Todo: Move at JS
+DONATION_ADDRESSES = {
+    "XMR": "8BuQsYBNdfhfoWsvVR1unE7YuZEoTkC4hANaPm2fD6VR5VM2DzQoJhq2CHHXUN1UCWQfH3dctJgorSRxksVa5U4RNTJkcAc",
+    "LTC": "ltc1qevlumv48nz2afl0re9ml4tdewc56svxq3egkyt",
+    "LTC_MWEB": "ltcmweb1qqt9rwznnxzkghv4s5wgtwxs0m0ry6n3atp95f47slppapxljde3xyqmdlnrc8ag7y2k354jzdc4pc4ks0kr43jehr77lngdecgh6689nn5mgv5yn",
+    "BTC": "bc1q72j07vkn059xnmsrkk8x9up9lgvd9h9xjf8cq8",
+    "PART": "pw1qf59ef0zjdckldjs8smfhv4j04gsjv302w7pdpz",
+}
+
 
 def format_wallet_data(swap_client, ci, w):
     wf = {
@@ -376,6 +385,21 @@ def page_wallet(self, url_split, post_string):
 
         checkAddressesOwned(swap_client, ci, wallet_data)
 
+    donation_info = None
+    ticker = wallet_data.get("ticker", "").upper()
+
+    if ticker == "LTC":
+        donation_info = {
+            "address": DONATION_ADDRESSES["LTC"],
+            "coin_name": wallet_data.get("name", "Litecoin"),
+            "mweb_address": DONATION_ADDRESSES["LTC_MWEB"],
+        }
+    elif ticker in DONATION_ADDRESSES:
+        donation_info = {
+            "address": DONATION_ADDRESSES[ticker],
+            "coin_name": wallet_data.get("name", ticker),
+        }
+
     template = server.env.get_template("wallet.html")
     return self.render_template(
         template,
@@ -385,5 +409,6 @@ def page_wallet(self, url_split, post_string):
             "w": wallet_data,
             "summary": summary,
             "block_unknown_seeds": swap_client._restrict_unknown_seed_wallets,
+            "donation_info": donation_info,
         },
     )
