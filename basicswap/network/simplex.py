@@ -194,6 +194,7 @@ def encryptMsg(
         payload,
         timestamp,
         deterministic,
+        msg_valid,
         difficulty_target=difficulty_target,
     )
 

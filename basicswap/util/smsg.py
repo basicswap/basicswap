@@ -95,6 +95,7 @@ def smsgEncrypt(
     smsg_timestamp: int = None,
     deterministic: bool = False,
     payload_format: int = 2,
+    smsg_ttl: int = SMSG_MIN_TTL,
     difficulty_target=0x1EFFFFFF,
 ) -> bytes:
     # assert len(payload) < 128  # Requires lz4 if payload > 128 bytes
@@ -158,8 +159,6 @@ def smsgEncrypt(
     smsg_nonce = bytes((0,)) * 4
     smsg_version = bytes((2, 1))
     smsg_flags = bytes((0,))
-
-    smsg_ttl = SMSG_MIN_TTL
 
     assert len(R) == 33
     assert len(mac) == 32
