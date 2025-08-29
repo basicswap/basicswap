@@ -382,6 +382,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._expiring_offers = []  # List of offers expiring soon
         self._updating_wallets_info = {}
         self._last_updated_wallets_info = 0
+
+        self.check_updates_seconds = self.get_int_setting(
+            "check_updates_seconds", 24 * 60 * 60, 60 * 60, 7 * 24 * 60 * 60
+        )
+        self._last_checked_updates = 0
+        self._latest_version = None
+        self._update_available = False
         self._notifications_enabled = self.settings.get("notifications_enabled", True)
         self._disabled_notification_types = self.settings.get(
             "disabled_notification_types", []
@@ -1324,6 +1331,65 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci = self.ci(Coins.PART)
         if ci.isWalletLocked():
             raise LockedCoinError(Coins.PART)
+
+    def checkForUpdates(self) -> None:
+        if not self.settings.get("check_updates", True):
+            return
+
+        now = time.time()
+        if now - self._last_checked_updates < self.check_updates_seconds:
+            return
+
+        self._last_checked_updates = now
+        self.log.info("Checking for BasicSwap updates...")
+
+        try:
+            url = "https://api.github.com/repos/basicswap/basicswap/tags"
+            response_data = self.readURL(url, timeout=30)
+            tags_data = json.loads(response_data.decode("utf-8"))
+
+            if not tags_data or not isinstance(tags_data, list) or len(tags_data) == 0:
+                self.log.warning("Could not determine latest version from GitHub tags")
+                return
+
+            latest_tag = tags_data[0].get("name", "").lstrip("v")
+            if not latest_tag:
+                self.log.warning("Could not determine latest version from GitHub tags")
+                return
+
+            self._latest_version = latest_tag
+            current_version = __version__
+
+            def version_tuple(v):
+                return tuple(map(int, v.split(".")))
+
+            try:
+                if version_tuple(latest_tag) > version_tuple(current_version):
+                    if not self._update_available:
+                        self._update_available = True
+                        self.log.info(
+                            f"Update available: v{latest_tag} (current: v{current_version})"
+                        )
+
+                        self.notify(
+                            NT.UPDATE_AVAILABLE,
+                            {
+                                "current_version": current_version,
+                                "latest_version": latest_tag,
+                                "release_url": f"https://github.com/basicswap/basicswap/releases/tag/v{latest_tag}",
+                                "release_notes": f"New version v{latest_tag} is available. Click to view details on GitHub.",
+                            },
+                        )
+                    else:
+                        self.log.info(f"Update v{latest_tag} already notified")
+                else:
+                    self._update_available = False
+                    self.log.info(f"BasicSwap is up to date (v{current_version})")
+            except ValueError as e:
+                self.log.warning(f"Error comparing versions: {e}")
+
+        except Exception as e:
+            self.log.warning(f"Failed to check for updates: {e}")
 
     def isBaseCoinActive(self, c) -> bool:
         if c not in chainparams:
@@ -10797,6 +10863,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ):
                 self.checkDelayedAutoAccept()
                 self._last_checked_delayed_auto_accept = now
+
+            if now - self._last_checked_updates >= self.check_updates_seconds:
+                self.checkForUpdates()
 
         except Exception as ex:
             self.logException(f"update {ex}")

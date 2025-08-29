@@ -410,5 +410,6 @@ def page_wallet(self, url_split, post_string):
             "summary": summary,
             "block_unknown_seeds": swap_client._restrict_unknown_seed_wallets,
             "donation_info": donation_info,
+            "debug_ui": swap_client.debug_ui,
         },
     )
