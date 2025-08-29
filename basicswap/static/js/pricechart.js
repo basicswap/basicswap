@@ -1136,15 +1136,32 @@ const app = {
 
       if (chartModule.chart) {
         window.config.currentResolution = 'day';
-        await chartModule.updateChart('BTC');
-        app.updateResolutionButtons('BTC');
+
+        let defaultCoin = null;
+        if (window.config.coins && window.config.coins.length > 0) {
+          for (const coin of window.config.coins) {
+            const container = document.getElementById(`${coin.symbol.toLowerCase()}-container`);
+            if (container) {
+              defaultCoin = coin.symbol;
+              break;
+            }
+          }
+        }
+
+        if (!defaultCoin) {
+          defaultCoin = 'BTC';
+        }
+
+        await chartModule.updateChart(defaultCoin);
+        app.updateResolutionButtons(defaultCoin);
 
         const chartTitle = document.getElementById('chart-title');
         if (chartTitle) {
-          chartTitle.textContent = 'Price Chart (BTC)';
+          chartTitle.textContent = `Price Chart (${defaultCoin})`;
         }
+
+        ui.setActiveContainer(`${defaultCoin.toLowerCase()}-container`);
       }
-      ui.setActiveContainer('btc-container');
 
       app.setupEventListeners();
       app.initAutoRefresh();
