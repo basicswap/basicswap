@@ -8,6 +8,7 @@ const NotificationManager = (function() {
     showBalanceChanges: true,
     showOutgoingTransactions: true,
     showSwapCompleted: true,
+    showUpdateNotifications: true,
     notificationDuration: 20000
   };
 
@@ -67,6 +68,7 @@ const NotificationManager = (function() {
       coinSymbol: options.coinSymbol || '',
       coinFrom: options.coinFrom || null,
       coinTo: options.coinTo || null,
+      releaseUrl: options.releaseUrl || null,
       timestamp: new Date().toLocaleString(),
       timestampMs: Date.now()
     };
@@ -183,6 +185,10 @@ const NotificationManager = (function() {
     return `window.location.href='/bids'`;
   }
 
+  if (item.type === 'update_available' && item.releaseUrl) {
+    return `window.open('${item.releaseUrl}', '_blank')`;
+  }
+
   if (item.title.includes('offer') || item.title.includes('Offer')) {
     return `window.location.href='/offers'`;
   }
@@ -231,6 +237,9 @@ function ensureToastContainer() {
       'balance_change': `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
       </svg>`,
+      'update_available': `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path>
+      </svg>`,
       'success': `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
       </svg>`
@@ -245,6 +254,7 @@ function ensureToastContainer() {
       'bid_accepted': 'bg-purple-500',
       'swap_completed': 'bg-green-600',
       'balance_change': 'bg-yellow-500',
+      'update_available': 'bg-blue-600',
       'success': 'bg-blue-500'
     };
 
@@ -425,6 +435,18 @@ function ensureToastContainer() {
         );
       }, 4000);
 
+      setTimeout(() => {
+        this.createToast(
+          'Update Available: v0.15.0',
+          'update_available',
+          {
+            subtitle: 'Current: v0.14.6 • Click to view release',
+            releaseUrl: 'https://github.com/basicswap/basicswap/releases/tag/v0.15.0',
+            releaseNotes: 'New version v0.15.0 is available. Click to view details on GitHub.'
+          }
+        );
+      }, 4500);
+
     },
 
     initializeBalanceTracking: function() {
@@ -466,7 +488,6 @@ function ensureToastContainer() {
       const staleThreshold = 10 * 60 * 1000;
 
       if (!lastFetch || (now - parseInt(lastFetch)) > staleThreshold) {
-        console.log('Resetting stale balance tracking to prevent false notifications');
         this.resetBalanceTracking();
       }
     },
@@ -504,6 +525,8 @@ function ensureToastContainer() {
       const iconColor = getToastColor(type, options);
       const icon = getToastIcon(type);
 
+      const isPersistent = type === 'update_available';
+
       let coinIconHtml = '';
       if (options.coinSymbol) {
         const coinIcon = getCoinIcon(options.coinSymbol);
@@ -522,6 +545,9 @@ function ensureToastContainer() {
         cursorStyle = 'cursor-pointer';
       } else if (options.coinSymbol) {
         clickAction = `onclick="window.location.href='/wallet/${options.coinSymbol}'"`;
+        cursorStyle = 'cursor-pointer';
+      } else if (options.releaseUrl) {
+        clickAction = `onclick="window.open('${options.releaseUrl}', '_blank')"`;
         cursorStyle = 'cursor-pointer';
       }
 
@@ -558,17 +584,19 @@ function ensureToastContainer() {
       `;
       messages.appendChild(message);
 
-      setTimeout(() => {
-        if (message.parentNode) {
-          message.classList.add('toast-slide-out');
-          setTimeout(() => {
-            if (message.parentNode) {
-              message.parentNode.removeChild(message);
-            }
+      if (!isPersistent) {
+        setTimeout(() => {
+          if (message.parentNode) {
+            message.classList.add('toast-slide-out');
+            setTimeout(() => {
+              if (message.parentNode) {
+                message.parentNode.removeChild(message);
+              }
 
-          }, 300);
-        }
-      }, config.notificationDuration);
+            }, 300);
+          }
+        }, config.notificationDuration);
+      }
     },
 
     handleWebSocketEvent: function(data) {
@@ -631,6 +659,15 @@ function ensureToastContainer() {
           toastOptions.subtitle = 'Click to view details';
           toastType = 'swap_completed';
           shouldShowToast = config.showSwapCompleted;
+          break;
+
+        case 'update_available':
+          toastTitle = `Update Available: v${data.latest_version}`;
+          toastOptions.subtitle = `Current: v${data.current_version} • Click to view release`;
+          toastOptions.releaseUrl = data.release_url;
+          toastOptions.releaseNotes = data.release_notes;
+          toastType = 'update_available';
+          shouldShowToast = config.showUpdateNotifications;
           break;
 
         case 'coin_balance_updated':

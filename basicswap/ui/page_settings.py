@@ -94,6 +94,9 @@ def page_settings(self, url_split, post_string):
                     "notifications_duration": int(
                         get_data_entry_or(form_data, "notifications_duration", "20")
                     ),
+                    "check_updates": toBool(
+                        get_data_entry_or(form_data, "check_updates", "true")
+                    ),
                 }
                 swap_client.editGeneralSettings(data)
                 messages.append("Notification settings applied.")
@@ -207,6 +210,7 @@ def page_settings(self, url_split, post_string):
         "debug": swap_client.debug,
         "debug_ui": swap_client.debug_ui,
         "expire_db_records": swap_client._expire_db_records,
+        "check_updates": swap_client.settings.get("check_updates", True),
     }
 
     chart_api_key = get_api_key_setting(

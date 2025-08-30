@@ -842,9 +842,19 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
     if not swap_client.debug:
         raise ValueError("Debug mode not active.")
 
-    r = random.randint(0, 3)
+    r = random.randint(0, 4)
     if r == 0:
-        swap_client.notify(NT.OFFER_RECEIVED, {"offer_id": random.randbytes(28).hex()})
+        swap_client.notify(
+            NT.OFFER_RECEIVED,
+            {
+                "offer_id": random.randbytes(28).hex(),
+                "coin_from": 2,
+                "coin_to": 6,
+                "amount_from": 100000000,
+                "amount_to": 15500000000000,
+                "rate": 15500000000000,
+            },
+        )
     elif r == 1:
         swap_client.notify(
             NT.BID_RECEIVED,
@@ -852,6 +862,13 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
                 "type": "atomic",
                 "bid_id": random.randbytes(28).hex(),
                 "offer_id": random.randbytes(28).hex(),
+                "coin_from": 2,
+                "coin_to": 6,
+                "amount_from": 100000000,
+                "amount_to": 15500000000000,
+                "bid_amount": 50000000,
+                "bid_amount_to": 7750000000000,
+                "rate": 15500000000000,
             },
         )
     elif r == 2:
@@ -863,10 +880,69 @@ def js_generatenotification(self, url_split, post_string, is_json) -> bytes:
                 "type": "ads",
                 "bid_id": random.randbytes(28).hex(),
                 "offer_id": random.randbytes(28).hex(),
+                "coin_from": 1,
+                "coin_to": 3,
+                "amount_from": 500000000,
+                "amount_to": 100000000,
+                "bid_amount": 250000000,
+                "bid_amount_to": 50000000,
+                "rate": 20000000,
             },
         )
+    elif r == 4:
+        swap_client.notify(NT.SWAP_COMPLETED, {"bid_id": random.randbytes(28).hex()})
 
     return bytes(json.dumps({"type": r}), "UTF-8")
+
+
+def js_checkupdates(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    from basicswap import __version__
+
+    if not swap_client.settings.get("check_updates", True):
+        return bytes(
+            json.dumps({"error": "Update checking is disabled in settings"}), "UTF-8"
+        )
+
+    import time
+
+    now = time.time()
+    last_manual_check = getattr(swap_client, "_last_manual_update_check", 0)
+
+    if not swap_client.debug and (now - last_manual_check) < 3600:
+        remaining = int(3600 - (now - last_manual_check))
+        return bytes(
+            json.dumps(
+                {
+                    "error": f"Please wait {remaining // 60} minutes before checking again"
+                }
+            ),
+            "UTF-8",
+        )
+
+    swap_client._last_manual_update_check = now
+    swap_client.log.info("Manual update check requested via web interface")
+
+    swap_client.checkForUpdates()
+
+    if swap_client._update_available:
+        swap_client.log.info(
+            f"Manual check result: Update available v{swap_client._latest_version} (current: v{__version__})"
+        )
+    else:
+        swap_client.log.info(f"Manual check result: Up to date (v{__version__})")
+
+    return bytes(
+        json.dumps(
+            {
+                "message": "Update check completed",
+                "current_version": __version__,
+                "latest_version": swap_client._latest_version,
+                "update_available": swap_client._update_available,
+            }
+        ),
+        "UTF-8",
+    )
 
 
 def js_notifications(self, url_split, post_string, is_json) -> bytes:
@@ -1377,6 +1453,7 @@ endpoints = {
     "rates": js_rates,
     "rateslist": js_rates_list,
     "generatenotification": js_generatenotification,
+    "checkupdates": js_checkupdates,
     "notifications": js_notifications,
     "identities": js_identities,
     "automationstrategies": js_automationstrategies,

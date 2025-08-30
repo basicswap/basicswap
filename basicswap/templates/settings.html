@@ -503,6 +503,17 @@
            <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications when swaps complete successfully</p>
           </div>
 
+          <div class="py-2">
+           <div class="flex items-center">
+            <input type="checkbox" id="check_updates" name="check_updates" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if general_settings.check_updates %} checked{% endif %}>
+            <label for="check_updates" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Update Notifications</label>
+            <button type="button" onclick="checkForUpdatesNow()" class="ml-3 text-xs bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 rounded transition-colors focus:outline-none">
+             Check Now
+            </button>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Check for BasicSwap updates and show notifications when available</p>
+          </div>
+
 
 
          </div>
@@ -537,9 +548,15 @@
        <div>
         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Test Notifications</h4>
         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-         <div>
+         <div class="space-y-3">
           <button type="button" onclick="window.NotificationManager && window.NotificationManager.testToasts()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
            Test All Notification Types
+          </button>
+          <button type="button" onclick="testUpdateNotification()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+           Test Update Notification
+          </button>
+          <button type="button" onclick="testLiveUpdateCheck()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+           Test Live Update Check
           </button>
          </div>
         </div>
@@ -570,6 +587,7 @@
           showBalanceChanges: document.getElementById('notifications_balance_changes').checked,
           showOutgoingTransactions: document.getElementById('notifications_outgoing_transactions').checked,
           showSwapCompleted: document.getElementById('notifications_swap_completed').checked,
+          showUpdateNotifications: document.getElementById('check_updates').checked,
           notificationDuration: parseInt(document.getElementById('notifications_duration').value) * 1000
         };
 
@@ -580,6 +598,141 @@
     document.getElementById('notifications-tab').addEventListener('click', function() {
       setTimeout(syncNotificationSettings, 100);
     });
+
+    function testUpdateNotification() {
+      if (window.NotificationManager) {
+        window.NotificationManager.createToast(
+          'Update Available: v0.15.0',
+          'update_available',
+          {
+            subtitle: 'Current: v{{ version }} • Click to view release',
+            releaseUrl: 'https://github.com/basicswap/basicswap/releases/tag/v0.15.0',
+            releaseNotes: 'New version v0.15.0 is available. Click to view details on GitHub.'
+          }
+        );
+      }
+    }
+
+    function testLiveUpdateCheck() {
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = 'Checking...';
+      button.disabled = true;
+
+      fetch('/json/checkupdates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (window.NotificationManager) {
+          if (data.update_available) {
+            window.NotificationManager.createToast(
+              `Live Update Available: v${data.latest_version}`,
+              'update_available',
+              {
+                subtitle: `Current: v${data.current_version} • Click to view release`,
+                releaseUrl: `https://github.com/basicswap/basicswap/releases/tag/v${data.latest_version}`,
+                releaseNotes: 'This is a real update check from GitHub API.'
+              }
+            );
+          } else {
+            window.NotificationManager.createToast(
+              'No Updates Available',
+              'success',
+              {
+                subtitle: `Current version v${data.current_version} is up to date`
+              }
+            );
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Update check failed:', error);
+        if (window.NotificationManager) {
+          window.NotificationManager.createToast(
+            'Update Check Failed',
+            'error',
+            {
+              subtitle: 'Could not check for updates. See console for details.'
+            }
+          );
+        }
+      })
+      .finally(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+      });
+    }
+
+    function checkForUpdatesNow() {
+      const button = event.target;
+      const originalText = button.textContent;
+      button.textContent = 'Checking...';
+      button.disabled = true;
+
+      fetch('/json/checkupdates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          if (window.NotificationManager) {
+            window.NotificationManager.createToast(
+              'Update Check Failed',
+              'error',
+              {
+                subtitle: data.error
+              }
+            );
+          }
+          return;
+        }
+
+        if (window.NotificationManager) {
+          if (data.update_available) {
+            window.NotificationManager.createToast(
+              `Update Available: v${data.latest_version}`,
+              'update_available',
+              {
+                subtitle: `Current: v${data.current_version} • Click to view release`,
+                releaseUrl: `https://github.com/basicswap/basicswap/releases/tag/v${data.latest_version}`,
+                releaseNotes: `New version v${data.latest_version} is available. Click to view details on GitHub.`
+              }
+            );
+          } else {
+            window.NotificationManager.createToast(
+              'You\'re Up to Date!',
+              'success',
+              {
+                subtitle: `Current version v${data.current_version} is the latest`
+              }
+            );
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Update check failed:', error);
+        if (window.NotificationManager) {
+          window.NotificationManager.createToast(
+            'Update Check Failed',
+            'error',
+            {
+              subtitle: 'Network error. Please try again later.'
+            }
+          );
+        }
+      })
+      .finally(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+      });
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
       syncNotificationSettings();
