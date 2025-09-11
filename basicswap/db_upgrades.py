@@ -65,7 +65,7 @@ def upgradeDatabaseData(self, data_version):
                     label="Accept All",
                     type_ind=Concepts.OFFER,
                     data=json.dumps(
-                        {"exact_rate_only": True, "max_concurrent_bids": 5}
+                        {"exact_rate_only": True, "max_concurrent_bids": 1}
                     ).encode("utf-8"),
                     only_known_identities=False,
                     created_at=now,
@@ -78,7 +78,7 @@ def upgradeDatabaseData(self, data_version):
                     label="Accept Known",
                     type_ind=Concepts.OFFER,
                     data=json.dumps(
-                        {"exact_rate_only": True, "max_concurrent_bids": 5}
+                        {"exact_rate_only": True, "max_concurrent_bids": 1}
                     ).encode("utf-8"),
                     only_known_identities=True,
                     note="Accept bids from identities with previously successful swaps only",
