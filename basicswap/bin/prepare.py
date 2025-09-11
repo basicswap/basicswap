@@ -2973,10 +2973,6 @@ def main():
                 "tor_control_password", None
             )
 
-        if particl_wallet_mnemonic != "none":
-            # Ensure Particl wallet is unencrypted or correct password is supplied
-            test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
-
         settings["chainclients"][add_coin] = chainclients[add_coin]
 
         if not no_cores:
