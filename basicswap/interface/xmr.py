@@ -84,7 +84,15 @@ class XMRInterface(CoinInterface):
 
     def is_transient_error(self, ex) -> bool:
         str_error: str = str(ex).lower()
-        if "failed to get earliest fork height" in str_error:
+        if any(
+            response in str_error
+            for response in [
+                "failed to get earliest fork height",
+                "failed to get output distribution",
+                "request-sent",
+                "idle",
+            ]
+        ):
             return True
         return super().is_transient_error(ex)
 
