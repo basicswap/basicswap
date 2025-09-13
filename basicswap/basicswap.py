@@ -233,27 +233,41 @@ def checkAndNotifyBalanceChange(
 def threadPollXMRChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
+    max_retries = 100
+    retry_delay = 10
+
     while not swap_client.chainstate_delay_event.is_set():
-        try:
-            new_height = ci.getChainHeight()
-            if new_height != cc["chain_height"]:
-                swap_client.log.debug(
-                    f"New {ci.ticker()} block at height: {new_height}"
+        for attempt in range(max_retries):
+            try:
+                new_height = ci.getChainHeight()
+                if new_height != cc["chain_height"]:
+                    swap_client.log.debug(
+                        f"New {ci.ticker()} block at height: {new_height}"
+                    )
+                    with swap_client.mxDB:
+                        cc["chain_height"] = new_height
+            except Exception as e:
+                if (
+                    any(
+                        response in str(e)
+                        for response in [
+                            "Request-sent",
+                            "Idle",
+                        ]
+                    )
+                    and attempt < max_retries - 1
+                ):
+                    swap_client.log.warning(
+                        f"threadPollXMRChainState {ci.ticker()} attempt {1 + attempt}/{max_retries}, failed with: {e}."
+                    )
+                    time.sleep(retry_delay * (1 + attempt))
+                    continue
+                swap_client.log.warning(
+                    f"threadPollXMRChainState {ci.ticker()}, error: {e}"
                 )
-                with swap_client.mxDB:
-                    cc["chain_height"] = new_height
-
-                checkAndNotifyBalanceChange(
-                    swap_client, coin_type, ci, cc, new_height, "block"
-                )
-
-        except Exception as e:
-            swap_client.log.warning(
-                f"threadPollXMRChainState {ci.ticker()}, error: {e}"
-            )
-        swap_client.chainstate_delay_event.wait(
-            random.randrange(20, 30)
-        )  # Random to stagger updates
+            swap_client.chainstate_delay_event.wait(
+                random.randrange(20, 30)
+            )  # Random to stagger updates
 
 
 def threadPollChainState(swap_client, coin_type):
@@ -11346,28 +11360,52 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return rv
 
     def getBlockchainInfo(self, coin):
+        future = self.thread_pool.submit(self._sync_getBlockchainInfo, coin)
+        return future.result()
+
+    def _sync_getBlockchainInfo(self, coin):
         ci = self.ci(coin)
+        max_retries = 100
+        retry_delay = 10
 
-        try:
-            blockchaininfo = ci.getBlockchainInfo()
+        for attempt in range(max_retries):
+            try:
+                blockchaininfo = ci.getBlockchainInfo()
 
-            rv = {
-                "version": self.coin_clients[coin]["core_version"],
-                "name": ci.coin_name(),
-                "blocks": blockchaininfo["blocks"],
-                "synced": "{:.2f}".format(
-                    round(100 * blockchaininfo["verificationprogress"], 2)
-                ),
-            }
+                rv = {
+                    "version": self.coin_clients[coin]["core_version"],
+                    "name": ci.coin_name(),
+                    "blocks": blockchaininfo["blocks"],
+                    "synced": "{:.2f}".format(
+                        round(100 * blockchaininfo["verificationprogress"], 2)
+                    ),
+                }
 
-            if "known_block_count" in blockchaininfo:
-                rv["known_block_count"] = blockchaininfo["known_block_count"]
-            if "bootstrapping" in blockchaininfo:
-                rv["bootstrapping"] = blockchaininfo["bootstrapping"]
+                if "known_block_count" in blockchaininfo:
+                    rv["known_block_count"] = blockchaininfo["known_block_count"]
+                if "bootstrapping" in blockchaininfo:
+                    rv["bootstrapping"] = blockchaininfo["bootstrapping"]
 
-            return rv
-        except Exception as e:
-            self.log.warning(f"getWalletInfo failed with: {e}.")
+                return rv
+            except Exception as e:
+                if (
+                    any(
+                        response in str(e)
+                        for response in [
+                            "Request-sent",
+                            "Idle",
+                        ]
+                    )
+                    and attempt < max_retries - 1
+                ):
+                    self.log.warning(
+                        f"getBlockchainInfo for {ci.coin_name()} attempt {1 + attempt}/{max_retries} failed with: {e}."
+                    )
+                    time.sleep(retry_delay * (1 + attempt))
+                    continue
+                self.log.warning(
+                    f"getBlockchainInfo for {ci.coin_name()} failed with: {e}."
+                )
 
     def getWalletInfo(self, coin):
         ci = self.ci(coin)
