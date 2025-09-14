@@ -210,6 +210,8 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_IN_MEMPOOL = auto()
     BCH_MERCY_TX_PUBLISHED = auto()
     BCH_MERCY_TX_FOUND = auto()
+    LOCK_TX_A_IN_MEMPOOL = auto()
+    LOCK_TX_A_CONFLICTS = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -436,6 +438,10 @@ def describeEventEntry(event_type, event_msg):
         return "Lock tx B published"
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
         return "Failed to publish lock tx B spend: " + event_msg
+    if event_type == EventLogTypes.LOCK_TX_A_IN_MEMPOOL:
+        return "Lock tx A seen in mempool"
+    if event_type == EventLogTypes.LOCK_TX_A_CONFLICTS:
+        return "Lock tx A conflicting txn/s"
     if event_type == EventLogTypes.LOCK_TX_A_SEEN:
         return "Lock tx A seen in chain"
     if event_type == EventLogTypes.LOCK_TX_A_CONFIRMED:
@@ -602,6 +608,26 @@ def canAcceptBidState(state):
         BidStates.BID_RECEIVED,
         BidStates.BID_AACCEPT_DELAY,
         BidStates.BID_AACCEPT_FAIL,
+    )
+
+
+def canExpireBidState(state):
+    return state in (
+        BidStates.BID_SENT,
+        BidStates.BID_RECEIVING,
+        BidStates.BID_RECEIVED,
+        BidStates.BID_AACCEPT_DELAY,
+        BidStates.BID_AACCEPT_FAIL,
+        BidStates.BID_REQUEST_SENT,
+    )
+
+
+def canTimeoutBidState(state):
+    return state in (
+        BidStates.BID_ACCEPTED,
+        BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
+        BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX,
+        BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
     )
 
 

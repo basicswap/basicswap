@@ -13,8 +13,8 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 30
-CURRENT_DB_DATA_VERSION = 6
+CURRENT_DB_VERSION = 31
+CURRENT_DB_DATA_VERSION = 7
 
 
 class Concepts(IntEnum):
@@ -619,6 +619,8 @@ class BidState(Table):
     swap_failed = Column("integer")
     swap_ended = Column("integer")
     can_accept = Column("integer")
+    can_expire = Column("integer")
+    can_timeout = Column("integer")
 
     note = Column("string")
     created_at = Column("integer")

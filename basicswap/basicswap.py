@@ -399,6 +399,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
+        self._sc_lock_tx_timeout = self.get_int_setting(
+            "sc_lock_tx_timeout", 48 * 3600, 3600, 6 * 3600
+        )  # Seconds
+        self._sc_lock_tx_mempool_timeout = self.get_int_setting(
+            "sc_lock_tx_mempool_timeout", 48 * 3600, 3600, 12 * 3600
+        )  # Seconds
+
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
         )  # In MB. Set to 0 to disable truncation
@@ -6029,6 +6036,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     and lock_tx_chain_info["height"] == 0
                 ):
                     bid.xmr_a_lock_tx.setState(TxStates.TX_IN_MEMPOOL)
+                    self.logBidEvent(
+                        bid.bid_id, EventLogTypes.LOCK_TX_A_IN_MEMPOOL, "", cursor
+                    )
+
+                if "conflicts" in lock_tx_chain_info:
+                    if (
+                        self.countBidEvents(
+                            bid, EventLogTypes.LOCK_TX_A_CONFLICTS, cursor
+                        )
+                        < 1
+                    ):
+                        self.logBidEvent(
+                            bid.bid_id, EventLogTypes.LOCK_TX_A_CONFLICTS, "", cursor
+                        )
 
                 if (
                     not bid.xmr_a_lock_tx.chain_height
@@ -7387,7 +7408,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 nonlocal num_messages, num_removed
                 try:
                     num_messages += 1
-                    expire_at: int = msg["sent"] + msg["ttl"]
+                    if "sent" not in msg:
+                        # TODO: Always show time sent and ttl from core
+                        options = {"encoding": "none", "export": True}
+                        msg_data = ci_part.json_request(
+                            rpc_conn, "smsg", [msg["msgid"], options]
+                        )
+                        msg_time: int = msg_data["sent"]
+                        msg_ttl: int = msg_data["ttl"]
+                    else:
+                        msg_time: int = msg["sent"]
+                        msg_ttl: int = msg["ttl"]
+                    expire_at: int = msg_time + msg_ttl
                     if expire_at < now:
                         options = {"encoding": "none", "delete": True}
                         ci_part.json_request(rpc_conn, "smsg", [msg["msgid"], options])
@@ -7435,18 +7467,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         now: int = self.getTime()
         cursor = self.openDB()
 
-        grace_period: int = 60 * 60
+        respond_grace_period: int = 60 * 60
+        # Time for transaction to be mined into the chain
+        # Only timeout waiting for the tx to be mined if not the sending the tx.
+        tx_grace_period: int = self._sc_lock_tx_timeout
+        tx_mempool_grace_period: int = self._sc_lock_tx_mempool_timeout
+
         try:
             query_str = (
-                "SELECT bid_id FROM bids "
-                + "WHERE active_ind = 1 AND state = :accepted_state AND expire_at + :grace_period <= :now "
+                "SELECT b.bid_id FROM bids AS b, bidstates AS s "
+                + "WHERE b.active_ind = 1 AND s.state_id = b.state "
+                + " AND ((b.state = :accepted_state AND b.expire_at + :respond_grace_period <= :now) "
+                + "  OR (s.can_timeout AND b.expire_at + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now)) "
+                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_sent_event_type)"
             )
             q = cursor.execute(
                 query_str,
                 {
                     "accepted_state": int(BidStates.BID_ACCEPTED),
                     "now": now,
-                    "grace_period": grace_period,
+                    "respond_grace_period": respond_grace_period,
+                    "tx_grace_period": tx_grace_period,
+                    "tx_mempool_grace_period": tx_mempool_grace_period,
+                    "event_linked_type": int(Concepts.BID),
+                    "tx_mempool_event_type": EventLogTypes.LOCK_TX_A_IN_MEMPOOL,
+                    "tx_sent_event_type": EventLogTypes.LOCK_TX_A_PUBLISHED,
                 },
             )
             for row in q:
@@ -10641,7 +10686,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             cursor = self.openDB()
 
             if check_records:
-                query = """SELECT 1, bid_id, expire_at FROM bids WHERE active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf, :bid_req_sent) AND expire_at <= :check_time
+                query = """SELECT 1, b.bid_id, b.expire_at FROM bids AS b, bidstates AS s WHERE b.active_ind = 1 AND b.expire_at <= :check_time AND s.state_id = b.state AND s.can_expire
                            UNION ALL
                            SELECT 2, offer_id, expire_at FROM offers WHERE active_ind = 1 AND state IN (:offer_received, :offer_sent) AND expire_at <= :check_time
                 """
@@ -10651,11 +10696,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         "offer_received": int(OfferStates.OFFER_RECEIVED),
                         "offer_sent": int(OfferStates.OFFER_SENT),
                         "check_time": now + self.check_expiring_bids_offers_seconds,
-                        "bid_sent": int(BidStates.BID_SENT),
-                        "bid_received": int(BidStates.BID_RECEIVED),
-                        "bid_aad": int(BidStates.BID_AACCEPT_DELAY),
-                        "bid_aaf": int(BidStates.BID_AACCEPT_FAIL),
-                        "bid_req_sent": int(BidStates.BID_REQUEST_SENT),
                     },
                 )
                 for entry in q:
@@ -10673,22 +10713,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             offers_to_expire.add(record_id)
 
             for bid_id in bids_to_expire:
-                query = "SELECT expire_at, states FROM bids WHERE bid_id = :bid_id AND active_ind = 1 AND state IN (:bid_received, :bid_sent, :bid_aad, :bid_aaf, :bid_req_sent)"
+                query = "SELECT b.states FROM bids AS b, bidstates AS s WHERE b.bid_id = :bid_id AND b.active_ind = 1 AND s.state_id = b.state AND s.can_expire"
                 rows = cursor.execute(
                     query,
                     {
                         "bid_id": bid_id,
-                        "bid_received": int(BidStates.BID_RECEIVED),
-                        "bid_sent": int(BidStates.BID_SENT),
-                        "bid_aad": int(BidStates.BID_AACCEPT_DELAY),
-                        "bid_aaf": int(BidStates.BID_AACCEPT_FAIL),
-                        "bid_req_sent": int(BidStates.BID_REQUEST_SENT),
                     },
                 ).fetchall()
                 if len(rows) > 0:
                     new_state: int = int(BidStates.BID_EXPIRED)
                     states = (
-                        bytes() if rows[0][1] is None else rows[0][1]
+                        bytes() if rows[0][0] is None else rows[0][0]
                     ) + pack_state(new_state, now)
                     query = "UPDATE bids SET state = :new_state, states = :states WHERE bid_id = :bid_id"
                     cursor.execute(
@@ -10697,7 +10732,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
                     bids_expired += 1
             for offer_id in offers_to_expire:
-                query = "SELECT expire_at, states FROM offers WHERE offer_id = :offer_id AND active_ind = 1 AND state IN (:offer_received, :offer_sent)"
+                query = "SELECT states FROM offers WHERE offer_id = :offer_id AND active_ind = 1 AND state IN (:offer_received, :offer_sent)"
                 rows = cursor.execute(
                     query,
                     {
@@ -10709,7 +10744,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if len(rows) > 0:
                     new_state: int = int(OfferStates.OFFER_EXPIRED)
                     states = (
-                        bytes() if rows[0][1] is None else rows[0][1]
+                        bytes() if rows[0][0] is None else rows[0][0]
                     ) + pack_state(new_state, now)
                     query = "UPDATE offers SET state = :new_state, states = :states WHERE offer_id = :offer_id"
                     cursor.execute(
@@ -11704,6 +11739,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if offer_id is not None:
                 query_str += "AND bids.offer_id = :filter_offer_id "
                 query_data["filter_offer_id"] = offer_id
+            elif sent is None:
+                pass  # Return both sent and received
             elif sent:
                 query_str += "AND bids.was_sent = 1 "
             else:
