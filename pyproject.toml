@@ -36,7 +36,7 @@ dev = [
     "pre-commit",
     "pytest",
     "ruff",
-    "black==25.1.0",
+    "black==25.9.0",
     "selenium",
 ]
 
