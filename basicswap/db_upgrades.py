@@ -21,6 +21,8 @@ from .db import (
 from .basicswap_util import (
     BidStates,
     canAcceptBidState,
+    canExpireBidState,
+    canTimeoutBidState,
     isActiveBidState,
     isErrorBidState,
     isFailingBidState,
@@ -39,6 +41,8 @@ def addBidState(self, state, now, cursor):
             swap_failed=isFailingBidState(state),
             swap_ended=isFinalBidState(state),
             can_accept=canAcceptBidState(state),
+            can_expire=canExpireBidState(state),
+            can_timeout=canTimeoutBidState(state),
             label=strBidState(state),
             created_at=now,
         ),
@@ -105,19 +109,23 @@ def upgradeDatabaseData(self, data_version):
                     ),
                     cursor,
                 )
-        if data_version > 0 and data_version < 6:
+        if data_version > 0 and data_version < 7:
             for state in BidStates:
                 in_error = isErrorBidState(state)
                 swap_failed = isFailingBidState(state)
                 swap_ended = isFinalBidState(state)
                 can_accept = canAcceptBidState(state)
+                can_expire = canExpireBidState(state)
+                can_timeout = canTimeoutBidState(state)
                 cursor.execute(
-                    "UPDATE bidstates SET can_accept = :can_accept, in_error = :in_error, swap_failed = :swap_failed, swap_ended = :swap_ended WHERE state_id = :state_id",
+                    "UPDATE bidstates SET can_accept = :can_accept, can_expire = :can_expire, can_timeout = :can_timeout, in_error = :in_error, swap_failed = :swap_failed, swap_ended = :swap_ended WHERE state_id = :state_id",
                     {
                         "in_error": in_error,
                         "swap_failed": swap_failed,
                         "swap_ended": swap_ended,
                         "can_accept": can_accept,
+                        "can_expire": can_expire,
+                        "can_timeout": can_timeout,
                         "state_id": int(state),
                     },
                 )

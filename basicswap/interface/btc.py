@@ -296,6 +296,7 @@ class BTCInterface(Secp256k1Interface):
         self._use_descriptors = coin_settings.get("use_descriptors", False)
         # Use hardened account indices to match existing wallet keys, only applies when use_descriptors is True
         self._use_legacy_key_paths = coin_settings.get("use_legacy_key_paths", False)
+        self._disable_lock_tx_rbf = False
 
     def open_rpc(self, wallet=None):
         return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
@@ -775,8 +776,15 @@ class BTCInterface(Secp256k1Interface):
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize()
 
-    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None):
-        return self.fundTx(tx_bytes, feerate)
+    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None) -> bytes:
+        funded_tx = self.fundTx(tx_bytes, feerate)
+
+        if self._disable_lock_tx_rbf:
+            tx = self.loadTx(funded_tx)
+            for txi in tx.vin:
+                txi.nSequence = 0xFFFFFFFE
+            funded_tx = tx.serialize_with_witness()
+        return funded_tx
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> CScript:
 
@@ -1784,6 +1792,10 @@ class BTCInterface(Secp256k1Interface):
                 "height": block_height,
             }
 
+            if "mempoolconflicts" in tx and len(tx["mempoolconflicts"]) > 0:
+                rv["conflicts"] = tx["mempoolconflicts"]
+            elif "walletconflicts" in tx and len(tx["walletconflicts"]) > 0:
+                rv["conflicts"] = tx["walletconflicts"]
         except Exception as e:
             self._log.debug(
                 "getLockTxHeight gettransaction failed: %s, %s", txid.hex(), str(e)
