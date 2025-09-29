@@ -166,6 +166,9 @@ class WebsocketServer(ThreadingMixIn, TCPServer, API):
     def _message_received_(self, handler, msg):
         self.message_received(self.handler_to_client(handler), self, msg)
 
+    def _binary_message_received_(self, handler, msg):
+        self.binary_message_received(self.handler_to_client(handler), self, msg)
+
     def _ping_received_(self, handler, msg):
         handler.send_pong(msg)
 
@@ -309,6 +312,7 @@ class WebSocketHandler(StreamRequestHandler):
         opcode = b1 & OPCODE
         masked = b2 & MASKED
         payload_length = b2 & PAYLOAD_LEN
+        is_binary: bool = False
 
         if opcode == OPCODE_CLOSE_CONN:
             logger.info("Client asked to close connection.")
@@ -322,8 +326,8 @@ class WebSocketHandler(StreamRequestHandler):
             logger.warning("Continuation frames are not supported.")
             return
         elif opcode == OPCODE_BINARY:
-            logger.warning("Binary frames are not supported.")
-            return
+            is_binary = True
+            opcode_handler = self.server._binary_message_received_
         elif opcode == OPCODE_TEXT:
             opcode_handler = self.server._message_received_
         elif opcode == OPCODE_PING:
@@ -345,7 +349,8 @@ class WebSocketHandler(StreamRequestHandler):
         for message_byte in self.read_bytes(payload_length):
             message_byte ^= masks[len(message_bytes) % 4]
             message_bytes.append(message_byte)
-        opcode_handler(self, message_bytes.decode('utf8'))
+
+        opcode_handler(self, message_bytes if is_binary else message_bytes.decode('utf8'))
 
     def send_message(self, message):
         self.send_text(message)
@@ -372,6 +377,35 @@ class WebSocketHandler(StreamRequestHandler):
         # Send CLOSE with status & reason
         header.append(FIN | OPCODE_CLOSE_CONN)
         header.append(payload_length)
+        with self._send_lock:
+            self.request.send(header + payload)
+
+    def send_bytes(self, message, opcode=OPCODE_BINARY):
+        header  = bytearray()
+        payload = message
+        payload_length = len(payload)
+
+        # Normal payload
+        if payload_length <= 125:
+            header.append(FIN | opcode)
+            header.append(payload_length)
+
+        # Extended payload
+        elif payload_length >= 126 and payload_length <= 65535:
+            header.append(FIN | opcode)
+            header.append(PAYLOAD_LEN_EXT16)
+            header.extend(struct.pack(">H", payload_length))
+
+        # Huge extended payload
+        elif payload_length < 18446744073709551616:
+            header.append(FIN | opcode)
+            header.append(PAYLOAD_LEN_EXT64)
+            header.extend(struct.pack(">Q", payload_length))
+
+        else:
+            raise Exception("Message is too big. Consider breaking it into chunks.")
+            return
+
         with self._send_lock:
             self.request.send(header + payload)
 

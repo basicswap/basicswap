@@ -455,12 +455,12 @@ class CTransaction(object):
             self.wit = copy.deepcopy(tx.wit)
             self.strDZeel = copy.deepcopy(tx.strDZeel)
 
-    def deserialize(self, f):
+    def deserialize(self, f, allow_witness: bool = True):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
         self.nTime = struct.unpack("<i", f.read(4))[0]
         self.vin = deser_vector(f, CTxIn)
         flags = 0
-        if len(self.vin) == 0:
+        if len(self.vin) == 0 and allow_witness:
             flags = struct.unpack("<B", f.read(1))[0]
             # Not sure why flags can't be zero, but this
             # matches the implementation in bitcoind

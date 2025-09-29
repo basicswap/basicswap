@@ -521,7 +521,7 @@ class CTransaction(object):
             self.hash = tx.hash
             self.wit = copy.deepcopy(tx.wit)
 
-    def deserialize(self, f):
+    def deserialize(self, f, allow_witness: bool = True):
         ver32bit = struct.unpack("<i", f.read(4))[0]
         self.nVersion = ver32bit & 0xffff
         self.nType = (ver32bit >> 16) & 0xffff

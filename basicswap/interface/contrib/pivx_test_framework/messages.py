@@ -505,7 +505,7 @@ class CTransaction:
             self.sha256 = tx.sha256
             self.hash = tx.hash
 
-    def deserialize(self, f):
+    def deserialize(self, f, allow_witness: bool = True):
         self.nVersion = struct.unpack("<h", f.read(2))[0]
         self.nType = struct.unpack("<h", f.read(2))[0]
         self.vin = deser_vector(f, CTxIn)

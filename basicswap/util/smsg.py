@@ -249,6 +249,7 @@ def smsgDecrypt(
     pubkey_signer = PublicKey.from_signature_and_message(
         signature, payload_hash, hasher=None
     ).format()
+
     pkh_from_recovered: bytes = hash160(pubkey_signer)
     assert pkh_from == pkh_from_recovered
 

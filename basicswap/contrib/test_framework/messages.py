@@ -640,7 +640,7 @@ class CTransaction:
             self.hash = tx.hash
             self.wit = copy.deepcopy(tx.wit)
 
-    def deserialize(self, f):
+    def deserialize(self, f, allow_witness: bool = True):
         self.nVersion = int.from_bytes(f.read(1), "little")
         if self.nVersion == PARTICL_TX_VERSION:
             self.nVersion |= int.from_bytes(f.read(1), "little") << 8
@@ -668,7 +668,7 @@ class CTransaction:
         # self.nVersion = int.from_bytes(f.read(4), "little")
         self.vin = deser_vector(f, CTxIn)
         flags = 0
-        if len(self.vin) == 0:
+        if len(self.vin) == 0 and allow_witness:
             flags = int.from_bytes(f.read(1), "little")
             # Not sure why flags can't be zero, but this
             # matches the implementation in bitcoind

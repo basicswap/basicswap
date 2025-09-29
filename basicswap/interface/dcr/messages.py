@@ -89,7 +89,7 @@ class CTransaction:
             self.locktime = tx.locktime
             self.expiry = tx.expiry
 
-    def deserialize(self, data: bytes) -> None:
+    def deserialize(self, data: bytes, allow_witness: bool = True) -> None:
 
         version = int.from_bytes(data[:4], "little")
         self.version = version & 0xFFFF

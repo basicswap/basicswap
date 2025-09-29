@@ -17,7 +17,7 @@ import sqlite3
 import traceback
 
 from io import BytesIO
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from basicswap.basicswap_util import (
     getVoutByAddress,
@@ -77,17 +77,19 @@ from basicswap.contrib.test_framework.messages import (
 from basicswap.contrib.test_framework.script import (
     CScript,
     CScriptOp,
-    OP_IF,
-    OP_ELSE,
-    OP_ENDIF,
     OP_0,
     OP_2,
-    OP_CHECKSIG,
     OP_CHECKMULTISIG,
     OP_CHECKSEQUENCEVERIFY,
+    OP_CHECKSIG,
     OP_DROP,
-    OP_HASH160,
+    OP_DUP,
+    OP_ELSE,
+    OP_ENDIF,
     OP_EQUAL,
+    OP_EQUALVERIFY,
+    OP_HASH160,
+    OP_IF,
     OP_RETURN,
     SIGHASH_ALL,
     SegwitV0SignatureHash,
@@ -761,10 +763,11 @@ class BTCInterface(Secp256k1Interface):
         # p2wpkh
         return CScript([OP_0, pkh])
 
-    def loadTx(self, tx_bytes: bytes) -> CTransaction:
+    def loadTx(self, tx_bytes: bytes, allow_witness: bool = True) -> CTransaction:
         # Load tx from bytes to internal representation
+        # Transactions with no inputs require allow_witness set to false to decode correctly
         tx = CTransaction()
-        tx.deserialize(BytesIO(tx_bytes))
+        tx.deserialize(BytesIO(tx_bytes), allow_witness)
         return tx
 
     def createSCLockTx(
@@ -800,6 +803,35 @@ class BTCInterface(Secp256k1Interface):
             Kaf_enc, CScriptOp(OP_CHECKSIG),
             CScriptOp(OP_ENDIF)])
         # fmt: on
+
+    def isScriptP2PKH(self, script: bytes) -> bool:
+        if len(script) != 25:
+            return False
+        if script[0] != OP_DUP:
+            return False
+        if script[1] != OP_HASH160:
+            return False
+        if script[2] != 20:
+            return False
+        if script[23] != OP_EQUALVERIFY:
+            return False
+        if script[24] != OP_CHECKSIG:
+            return False
+        return True
+
+    def isScriptP2WPKH(self, script: bytes) -> bool:
+        if len(script) != 22:
+            return False
+        if script[0] != OP_0:
+            return False
+        if script[1] != 20:
+            return False
+        return True
+
+    def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
+        if self.isScriptP2WPKH(script):
+            return [bytes(72), bytes(33)]
+        raise ValueError("Unknown script type")
 
     def createSCLockRefundTx(
         self,
@@ -1958,6 +1990,9 @@ class BTCInterface(Secp256k1Interface):
 
     def getBlockWithTxns(self, block_hash: str):
         return self.rpc("getblock", [block_hash, 2])
+
+    def listUtxos(self):
+        return self.rpc_wallet("listunspent")
 
     def getUnspentsByAddr(self):
         unspent_addr = dict()

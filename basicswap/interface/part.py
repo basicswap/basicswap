@@ -8,6 +8,7 @@
 
 import hashlib
 from enum import IntEnum
+from typing import List
 
 from basicswap.contrib.test_framework.messages import (
     CTxOutPart,
@@ -133,6 +134,11 @@ class PARTInterface(BTCInterface):
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
+
+    def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
+        if self.isScriptP2WPKH(script) or self.isScriptP2PKH(script):
+            return [bytes(72), bytes(33)]
+        raise ValueError("Unknown script type")
 
     def formatStealthAddress(self, scan_pubkey, spend_pubkey) -> str:
         prefix_byte = chainparams[self.coin_type()][self._network]["stealth_key_prefix"]

@@ -1011,7 +1011,7 @@ class BasicSwapTest(TestFunctions):
     def test_002_native_segwit(self):
         # p2wpkh
         logging.info(
-            "---------- Test {} p2sh native segwit".format(self.test_coin_from.name)
+            "---------- Test {} native segwit".format(self.test_coin_from.name)
         )
         ci = self.swap_clients[0].ci(self.test_coin_from)
 
@@ -1073,6 +1073,14 @@ class BasicSwapTest(TestFunctions):
                 tx_signed,
             ],
         )
+        prev_txo = tx["vout"][tx_signed_decoded["vin"][0]["vout"]]
+        prevscript: bytes = bytes.fromhex(prev_txo["scriptPubKey"]["hex"])
+        assert ci.isScriptP2WPKH(prevscript) is True
+        txin_witness = tx_signed_decoded["vin"][0]["txinwitness"]
+        assert len(txin_witness) == 2
+        txin_witness_0 = bytes.fromhex(txin_witness[0])
+        assert len(txin_witness_0) > 68 and len(txin_witness_0) <= 72
+        assert len(bytes.fromhex(txin_witness[1])) == 33
         assert tx_funded_decoded["txid"] == tx_signed_decoded["txid"]
 
     def test_003_cltv(self):
@@ -2294,6 +2302,11 @@ class BasicSwapTest(TestFunctions):
 
     def test_09_expire_accepted_rev(self):
         self.do_test_09_expire_accepted(Coins.XMR, self.test_coin_from)
+
+    def test_10_presigned_txns(self):
+        raise RuntimeError(
+            "TODO"
+        )  # Build without xmr first for quicker test iterations
 
 
 class TestBTC(BasicSwapTest):

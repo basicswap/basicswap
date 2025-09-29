@@ -13,6 +13,8 @@ import logging
 import random
 import traceback
 
+from typing import List
+
 from basicswap.basicswap_util import getVoutByScriptPubKey, TxLockTypes
 from basicswap.chainparams import Coins
 from basicswap.contrib.test_framework.script import (
@@ -1609,11 +1611,11 @@ class DCRInterface(Secp256k1Interface):
         script_pk = self.getScriptDest(script)
         return findOutput(tx, script_pk)
 
-    def getScriptLockTxDummyWitness(self, script: bytes):
+    def getScriptLockTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [bytes(72), bytes(72), bytes(len(script))]
 
-    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes):
-        return [bytes(72), bytes(72), bytes((1,)), bytes(len(script))]
+    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes) -> List[bytes]:
+        return [bytes(72), bytes(72), bytes(len(script))]
 
     def extractLeaderSig(self, tx_bytes: bytes) -> bytes:
         tx = self.loadTx(tx_bytes)

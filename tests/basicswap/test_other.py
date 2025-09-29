@@ -51,7 +51,18 @@ from basicswap.util import (
 from basicswap.messages_npb import (
     BidMessage,
 )
-from basicswap.contrib.test_framework.script import hash160 as hash160_btc
+from basicswap.contrib.test_framework.script import (
+    hash160 as hash160_btc,
+    SegwitV0SignatureHash,
+    SIGHASH_ALL,
+)
+from basicswap.contrib.test_framework.messages import (
+    COutPoint,
+    CTransaction,
+    CTxIn,
+    CTxOut,
+    uint256_from_str,
+)
 
 
 logger = logging.getLogger()
@@ -662,6 +673,37 @@ class Test(unittest.TestCase):
             db_test.add(ki, cursor, upsert=True)
         finally:
             db_test.closeDB(cursor)
+
+    def test_tx_hashes(self):
+        tx = CTransaction()
+        tx.nVersion = 2
+        tx.nLockTime = 0
+        tx.vout.append(CTxOut(1, bytes.fromhex("a15143aa086e05e3b5a73046")))
+        tx.vout.append(CTxOut(2, bytes.fromhex("eed7d63fd86225f7159ed7e5")))
+        tx.vin.append(
+            CTxIn(
+                COutPoint(
+                    uint256_from_str(
+                        bytes.fromhex(
+                            "0101010101010101010101010101010101010010101010101010101010101010"
+                        )
+                    ),
+                    1,
+                ),
+                bytes.fromhex("c2dca8ecbcf058b79f188692"),
+            )
+        )
+        assert (
+            tx.rehash()
+            == "28d0e9afad2740504eb9d0428352bc77a7b94eaafa364ef4cc07aeeff0c631a2"
+        )
+        sighash = SegwitV0SignatureHash(
+            bytes.fromhex("a15143aa086e05e3b5a73046"), tx, 0, SIGHASH_ALL, 3
+        )
+        assert (
+            sighash.hex()
+            == "252cd6e85b99e0fd554c44d5fe638923f7ef563048362406a665cf3400feb1bd"
+        )
 
 
 if __name__ == "__main__":
