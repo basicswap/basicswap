@@ -38,6 +38,7 @@ dev = [
     "ruff",
     "black==25.1.0",
     "selenium",
+    "djlint",
 ]
 
 [tool.hatch.version]
@@ -48,3 +49,6 @@ allow-direct-references = true
 
 [tool.ruff]
 exclude = ["basicswap/contrib","basicswap/interface/contrib"]
+
+[tool.djlint]
+profile="jinja"
