@@ -1768,7 +1768,7 @@ def finalise_daemon(d):
             fp.close()
 
 
-def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
+def test_particl_encryption(data_dir, settings, chain, use_tor_proxy, extra_opts):
     swap_client = None
     daemons = []
     daemon_args = ["-noconnect", "-nodnsseed", "-nofindpeers", "-nostaking"]
@@ -1805,12 +1805,14 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy):
                     "Must set WALLET_ENCRYPTION_PWD to add coin when Particl wallet is encrypted"
                 )
             swap_client.ci(c).unlockWallet(WALLET_ENCRYPTION_PWD)
+        extra_opts["particl_daemon"] = daemons[-1]
     finally:
         if swap_client:
             swap_client.finalise()
             del swap_client
-        for d in daemons:
-            finalise_daemon(d)
+        if "particl_daemon" not in extra_opts:
+            for d in daemons:
+                finalise_daemon(d)
 
 
 def encrypt_wallet(swap_client, coin_type) -> None:
@@ -1904,15 +1906,20 @@ def initialise_wallets(
                         ]
 
                     extra_config = {"stdout_to_file": True, "coin_name": coin_name}
-                    daemons.append(
-                        startDaemon(
-                            coin_settings["datadir"],
-                            coin_settings["bindir"],
-                            filename,
-                            daemon_args + coin_args,
-                            extra_config=extra_config,
+
+                    if c == Coins.PART and "particl_daemon" in extra_opts:
+                        daemons.append(extra_opts["particl_daemon"])
+                        del extra_opts["particl_daemon"]
+                    else:
+                        daemons.append(
+                            startDaemon(
+                                coin_settings["datadir"],
+                                coin_settings["bindir"],
+                                filename,
+                                daemon_args + coin_args,
+                                extra_config=extra_config,
+                            )
                         )
-                    )
                     swap_client.setDaemonPID(c, daemons[-1].handle.pid)
             swap_client.setCoinRunParams(c)
             swap_client.createCoinInterface(c)
@@ -2973,34 +2980,44 @@ def main():
                 "tor_control_password", None
             )
 
-        if particl_wallet_mnemonic != "none":
-            # Ensure Particl wallet is unencrypted or correct password is supplied
-            test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
-
-        settings["chainclients"][add_coin] = chainclients[add_coin]
-
-        if not no_cores:
-            prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
-
-        if not (prepare_bin_only or upgrade_cores):
-            prepareDataDir(
-                add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
-            )
-
+        try:
             if particl_wallet_mnemonic != "none":
-                initialise_wallets(
-                    None,
-                    {
-                        add_coin,
-                    },
-                    data_dir,
-                    settings,
-                    chain,
-                    use_tor_proxy,
-                    extra_opts=extra_opts,
+                # Ensure Particl wallet is unencrypted or correct password is supplied
+                # Keep daemon running to use in initialise_wallets
+                test_particl_encryption(
+                    data_dir, settings, chain, use_tor_proxy, extra_opts
                 )
 
-            save_config(config_path, settings)
+            settings["chainclients"][add_coin] = chainclients[add_coin]
+
+            if not no_cores:
+                prepareCore(
+                    add_coin, known_coins[add_coin], settings, data_dir, extra_opts
+                )
+
+            if not (prepare_bin_only or upgrade_cores):
+                prepareDataDir(
+                    add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
+                )
+
+                if particl_wallet_mnemonic != "none":
+                    initialise_wallets(
+                        None,
+                        {
+                            add_coin,
+                        },
+                        data_dir,
+                        settings,
+                        chain,
+                        use_tor_proxy,
+                        extra_opts=extra_opts,
+                    )
+
+                save_config(config_path, settings)
+        finally:
+            if "particl_daemon" in extra_opts:
+                finalise_daemon(extra_opts["particl_daemon"])
+                del extra_opts["particl_daemon"]
 
         logger.info(f"Done. Coin {add_coin} successfully added.")
         return 0
