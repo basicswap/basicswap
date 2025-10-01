@@ -8,6 +8,7 @@
 
 import logging
 import os
+import time
 
 import basicswap.contrib.ed25519_fast as edf
 import basicswap.ed25519_fast_util as edu
@@ -154,6 +155,8 @@ class XMRInterface(CoinInterface):
         self._walletrpctimeout = coin_settings.get("walletrpctimeout", 120)
         # walletrpctimeoutlong likely unneeded
         self._walletrpctimeoutlong = coin_settings.get("walletrpctimeoutlong", 600)
+        self._num_chaininfo_retries = coin_settings.get("numchaininforetries", 20)
+        self._chaininfo_retry_delay = coin_settings.get("chaininforetrydelay", 1)
 
         self.rpc = make_xmr_rpc_func(
             coin_settings["rpcport"],
@@ -301,7 +304,7 @@ class XMRInterface(CoinInterface):
         return self._core_version
 
     def getBlockchainInfo(self):
-        get_height = self.rpc2("get_height", timeout=self._rpctimeout)
+        get_height = self.getChainHeight(full_output=True)
         rv = {
             "blocks": get_height["height"],
             "verificationprogress": 0.0,
@@ -330,8 +333,16 @@ class XMRInterface(CoinInterface):
 
         return rv
 
-    def getChainHeight(self):
-        return self.rpc2("get_height", timeout=self._rpctimeout)["height"]
+    def getChainHeight(self, full_output: bool = False):
+        for i in range(self._num_chaininfo_retries):
+            try:
+                get_height = self.rpc2("get_height", timeout=self._rpctimeout)
+                return get_height if full_output else get_height["height"]
+            except Exception as e:
+                if i < self._num_chaininfo_retries - 1 and self.is_transient_error(e):
+                    time.sleep(self._chaininfo_retry_delay)
+                    continue
+                raise (e)
 
     def getWalletInfo(self):
         with self._mx_wallet:
@@ -554,16 +565,14 @@ class XMRInterface(CoinInterface):
                         rv = -1
             return rv
 
-    def findTxnByHash(self, txid):
+    def findTxnByHash(self, txid: str):
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             try:
-                current_height = self.rpc2("get_height", timeout=self._rpctimeout)[
-                    "height"
-                ]
+                current_height: int = self.getChainHeight()
                 self._log.info(
                     f"findTxnByHash {self.ticker_str()} current_height {current_height}\nhash: {txid}"
                 )
