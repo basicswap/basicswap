@@ -215,10 +215,10 @@ class XmrSwapInterface(ProtocolInterface):
         if hasattr(ci, "genScriptLockTxScript") and callable(ci.genScriptLockTxScript):
             return ci.genScriptLockTxScript(ci, Kal, Kaf, **kwargs)
 
-        Kal_enc = Kal if len(Kal) == 33 else ci.encodePubkey(Kal)
-        Kaf_enc = Kaf if len(Kaf) == 33 else ci.encodePubkey(Kaf)
+        assert len(Kal) == 33
+        assert len(Kaf) == 33
 
-        return CScript([2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG)])
+        return CScript([2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG)])
 
     def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
         addr_to = self.getMockAddrTo(ci)

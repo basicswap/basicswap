@@ -1087,22 +1087,21 @@ class DCRInterface(Secp256k1Interface):
         return self.fundTx(tx_bytes, feerate)
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> bytes:
-
-        Kal_enc = Kal if len(Kal) == 33 else self.encodePubkey(Kal)
-        Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
+        assert len(Kal) == 33
+        assert len(Kaf) == 33
 
         script = bytearray()
         script += bytes((OP_IF,))
         push_script_data(script, bytes((2,)))
-        push_script_data(script, Kal_enc)
-        push_script_data(script, Kaf_enc)
+        push_script_data(script, Kal)
+        push_script_data(script, Kaf)
         push_script_data(script, bytes((2,)))
         script += bytes((OP_CHECKMULTISIG,))
         script += bytes((OP_ELSE,))
         script += CScriptNum.encode(CScriptNum(csv_val))
         script += bytes((OP_CHECKSEQUENCEVERIFY,))
         script += bytes((OP_DROP,))
-        push_script_data(script, Kaf_enc)
+        push_script_data(script, Kaf)
         script += bytes((OP_CHECKSIG,))
         script += bytes((OP_ENDIF,))
 

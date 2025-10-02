@@ -8,10 +8,9 @@
 
 import logging
 import os
+import secrets
 import time
 
-import basicswap.contrib.ed25519_fast as edf
-import basicswap.ed25519_fast_util as edu
 import basicswap.util_xmr as xmr_util
 from coincurve.ed25519 import (
     ed25519_add,
@@ -34,6 +33,9 @@ from basicswap.util.network import is_private_ip_address
 from basicswap.rpc_xmr import make_xmr_rpc_func, make_xmr_rpc2_func
 from basicswap.chainparams import XMR_COIN, Coins
 from basicswap.interface.base import CoinInterface
+
+
+ed25519_l = 2**252 + 27742317777372353535851937790883648493
 
 
 class XMRInterface(CoinInterface):
@@ -400,22 +402,13 @@ class XMRInterface(CoinInterface):
 
     def getNewRandomKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
-        return i2b(edu.get_secret())
-
-    def pubkey(self, key: bytes) -> bytes:
-        return edf.scalarmult_B(key)
+        return i2b(9 + secrets.randbelow(ed25519_l - 9))
 
     def encodeKey(self, vk: bytes) -> str:
         return vk[::-1].hex()
 
     def decodeKey(self, k_hex: str) -> bytes:
         return bytes.fromhex(k_hex)[::-1]
-
-    def encodePubkey(self, pk: bytes) -> str:
-        return edu.encodepoint(pk)
-
-    def decodePubkey(self, pke):
-        return edf.decodepoint(pke)
 
     def getPubkey(self, privkey):
         return ed25519_get_pubkey(privkey)
@@ -427,7 +420,7 @@ class XMRInterface(CoinInterface):
 
     def verifyKey(self, k: int) -> bool:
         i = b2i(k)
-        return i < edf.l and i > 8
+        return i < ed25519_l and i > 8
 
     def verifyPubkey(self, pubkey_bytes):
         # Calls ed25519_decode_check_point() in secp256k1

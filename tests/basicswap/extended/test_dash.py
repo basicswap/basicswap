@@ -22,6 +22,8 @@ import threading
 import time
 import unittest
 
+from coincurve.keys import PrivateKey
+
 import basicswap.config as cfg
 from basicswap.basicswap import (
     BasicSwap,
@@ -39,9 +41,6 @@ from basicswap.basicswap_util import (
 )
 from basicswap.util.address import (
     toWIF,
-)
-from basicswap.contrib.key import (
-    ECKey,
 )
 from basicswap.http_server import (
     HttpThread,
@@ -291,10 +290,9 @@ class Test(unittest.TestCase):
     def setUpClass(cls):
         super(Test, cls).setUpClass()
 
-        eckey = ECKey()
-        eckey.generate()
-        cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, eckey.get_bytes())
-        cls.network_pubkey = eckey.get_pubkey().get_bytes().hex()
+        k = PrivateKey()
+        cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret)
+        cls.network_pubkey = k.public_key.format().hex()
 
         if os.path.isdir(cfg.TEST_DATADIRS):
             logging.info("Removing " + cfg.TEST_DATADIRS)
