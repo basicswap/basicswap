@@ -11968,9 +11968,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             strategy = self.queryOne(
                 AutomationStrategy, cursor, {"record_id": strategy_id}
             )
+            if strategy is None:
+                raise ValueError("AutomationStrategy not found.")
             if "data" in data:
                 strategy.data = json.dumps(data["data"]).encode("UTF-8")
-                self.log.debug("data {}".format(data["data"]))
             if "note" in data:
                 strategy.note = data["note"]
             if "label" in data:

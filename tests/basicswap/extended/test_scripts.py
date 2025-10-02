@@ -249,15 +249,26 @@ class Test(unittest.TestCase):
             "--debug",
         ]
 
+        # Set defaults
+        post_json = {
+            "set_data": json.dumps({"exact_rate_only": True, "max_concurrent_bids": 5}),
+        }
+        for i in range(3):
+            waitForServer(cls.delay_event, UI_PORT + i)
+            for j in range(1, 3):
+                json_rv = read_json_api(
+                    UI_PORT + i, f"automationstrategies/{j}", post_json
+                )
+                assert json_rv["data"]["max_concurrent_bids"] == 5
+
     @classmethod
     def tearDownClass(cls):
         logging.info("Stopping test")
         cls.thread_http.stop()
 
     def test_enabled(self):
-
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
+        for i in range(2):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         # Test no 'Processing...' messages are shown without config
         node0_test_config = {}
@@ -318,9 +329,8 @@ class Test(unittest.TestCase):
         assert count_lines_with(rv_stdout, "Processing 0 bid templates") == 1
 
     def test_offers(self):
-
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
+        for i in range(2):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         # Reset test
         clear_offers(self.delay_event, 0)
@@ -410,6 +420,7 @@ class Test(unittest.TestCase):
                     "max_coin_from_balance": -1,
                     "min_coin_to_balance": -1,
                     "max_concurrent": 4,
+                    "offers_to_bid_on": "all",  # !?
                 },
                 {
                     "coin_from": "PART",
@@ -421,6 +432,7 @@ class Test(unittest.TestCase):
                     "min_swap_amount": 0.1,
                     "max_coin_from_balance": -1,
                     "min_coin_to_balance": -1,
+                    "offers_to_bid_on": "all",  # !?
                 },
             ],
         }
@@ -553,7 +565,6 @@ class Test(unittest.TestCase):
         result = subprocess.run(self.node1_args, stdout=subprocess.PIPE)
         rv_stdout = result.stdout.decode().split("\n")
         possible_bids = get_possible_bids(rv_stdout)
-        possible_bids = get_possible_bids(rv_stdout)
         assert len(possible_bids) == 1
         assert float(possible_bids[0]["amount_from"]) < 20.0
 
@@ -581,8 +592,8 @@ class Test(unittest.TestCase):
         assert count_lines_with(rv_stdout, "too many failed bids") == 1
 
     def test_offer_amount_step(self):
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
+        for i in range(2):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         # Reset test
         clear_offers(self.delay_event, 0)
@@ -645,8 +656,8 @@ class Test(unittest.TestCase):
         assert len(get_created_offers(rv_stdout)) == 1
 
     def test_error_messages(self):
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
+        for i in range(2):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         # Reset test
         clear_offers(self.delay_event, 0)
@@ -678,15 +689,14 @@ class Test(unittest.TestCase):
         rv_stdout = result.stdout.decode().split("\n")
         assert (
             count_lines_with(
-                rv_stdout, "Error: Server failed to create offer: To amount above max"
+                rv_stdout, "Server failed to create offer: To amount above max"
             )
             == 1
         )
 
     def test_bid_tracking(self):
-
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
+        for i in range(2):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         # Reset test
         clear_offers(self.delay_event, 0)
@@ -870,10 +880,8 @@ class Test(unittest.TestCase):
         assert bid["addr_from"] == addr_bid_from
 
     def test_auto_accept(self):
-
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
-        waitForServer(self.delay_event, UI_PORT + 2)
+        for i in range(3):
+            waitForServer(self.delay_event, UI_PORT + i)
 
         logging.info("Reset test")
         clear_offers(self.delay_event, 0)

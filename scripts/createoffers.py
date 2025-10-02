@@ -69,7 +69,7 @@ Create offers
 
 """
 
-__version__ = "0.3"
+__version__ = "0.4"
 
 import argparse
 import json
@@ -90,6 +90,7 @@ delay_event = threading.Event()
 shutdown_in_progress = False
 coins_map = {}
 read_json_api = None
+read_json_api_wallet = None
 
 DEFAULT_CONFIG_FILE: str = "createoffers.json"
 DEFAULT_STATE_FILE: str = "createoffers_state.json"
@@ -204,42 +205,6 @@ def make_json_api_func(host: str, port: int, auth_string: str = None):
             raise e
 
     return api_func
-
-
-def read_json_api_wallet(path):
-    """Read wallet data from API with error handling"""
-    try:
-        wallet_data = read_json_api(path)
-
-        # Check if wallet_data is a valid dictionary response
-        if not isinstance(wallet_data, dict):
-            # Return safe defaults if response is not a dictionary (e.g., error string)
-            return {
-                "balance": "0",
-                "unconfirmed": "0",
-                "anon_balance": "0",
-                "blind_balance": "0",
-            }
-
-        default_wallet = {
-            "balance": "0",
-            "unconfirmed": "0",
-            "anon_balance": "0",
-            "blind_balance": "0",
-        }
-
-        for key, default_value in default_wallet.items():
-            if key not in wallet_data:
-                wallet_data[key] = default_value
-
-        return wallet_data
-    except Exception:
-        return {
-            "balance": "0",
-            "unconfirmed": "0",
-            "anon_balance": "0",
-            "blind_balance": "0",
-        }
 
 
 def signal_handler(sig, _) -> None:
@@ -706,30 +671,25 @@ def process_offers(args, config, script_state) -> None:
             coin_from_data = coins_map[offer_template["coin_from"]]
             coin_to_data = coins_map[offer_template["coin_to"]]
         except KeyError as e:
+            print(f"Skipping {offer_template['name']} - coin not available")
             if args.debug:
-                print(f"Coin not found in coins_map: {e}")
-            else:
-                print(f"Skipping {offer_template['name']} - coin not available")
+                print(f"Error: {e}")
             continue
 
-        wallet_from = read_json_api_wallet(
-            "wallets/{}".format(coin_from_data["ticker"])
-        )
-
         coin_ticker = coin_from_data["ticker"]
-
         coin_from_data_name = offer_template["coin_from"]
 
         try:
+            wallet_from = read_json_api_wallet(f"wallets/{coin_ticker}")
             if coin_ticker == "PART":
                 if "variant" in coin_from_data:
                     coin_variant = coin_from_data["variant"]
                     if coin_variant == "Anon":
-                        wallet_balance = float(wallet_from.get("anon_balance", 0))
+                        wallet_balance = float(wallet_from["anon_balance"])
                         if args.debug:
                             print(f"Using anon balance: {wallet_balance}")
                     elif coin_variant == "Blind":
-                        wallet_balance = float(wallet_from.get("blind_balance", 0))
+                        wallet_balance = float(wallet_from["blind_balance"])
                         if args.debug:
                             print(f"Using blind balance: {wallet_balance}")
                     else:
@@ -737,19 +697,18 @@ def process_offers(args, config, script_state) -> None:
                             f"{coin_ticker} variant {coin_variant} not handled"
                         )
                 else:
-                    wallet_balance = float(wallet_from.get("balance", 0))
+                    wallet_balance = float(wallet_from["balance"])
                     if args.debug:
                         print(f"Using regular balance: {wallet_balance}")
             else:
-                wallet_balance = float(wallet_from.get("balance", 0))
+                wallet_balance = float(wallet_from["balance"])
                 if args.debug:
                     print(f"Using balance for {coin_ticker}: {wallet_balance}")
         except (KeyError, TypeError, ValueError) as e:
+            print(f"Skipping {offer_template['name']} - wallet balance unavailable")
             if args.debug:
-                print(f"Error getting wallet balance for {coin_ticker}: {e}")
+                print(f"coin_ticker {coin_ticker}, error: {e}")
                 print(f"Wallet data: {wallet_from}")
-            else:
-                print(f"Skipping {offer_template['name']} - wallet balance unavailable")
             continue
 
         for offer in sent_offers:
@@ -1446,8 +1405,8 @@ def process_bids(args, config, script_state) -> None:
                             "wallets/{}".format(coin_from_data["ticker"])
                         )
 
-                        wallet_balance = float(wallet_from.get("balance", 0)) + float(
-                            wallet_from.get("unconfirmed", 0)
+                        wallet_balance = float(wallet_from["balance"]) + float(
+                            wallet_from["unconfirmed"]
                         )
 
                         # Get minimum amount from the offer
@@ -1599,7 +1558,7 @@ def process_bids(args, config, script_state) -> None:
                                 print(
                                     f"Not bidding on offer {offer_id}, offers_to_bid_on is known_only but no successful swaps with this identity."
                                 )
-                            continue
+                                continue
 
                     successful_sent_bids = id_offer_from["num_sent_bids_successful"]
                     failed_sent_bids = id_offer_from["num_sent_bids_failed"]
@@ -1675,11 +1634,12 @@ def process_bids(args, config, script_state) -> None:
                                 print(f"Reduced bid amount to {bid_amount}")
                                 swap_amount_to = adjusted_bid_amount * offer_rate
 
-                        if args.debug:
-                            print(
-                                f"Bid amount would exceed minimum coin to wallet total for offer {offer_id}"
-                            )
-                        continue
+                        if total_balance_to - swap_amount_to < min_coin_to_balance:
+                            if args.debug:
+                                print(
+                                    f"Bid amount would exceed minimum coin to wallet total for offer {offer_id}"
+                                )
+                            continue
                 except (KeyError, TypeError, ValueError) as e:
                     if args.debug:
                         print(
