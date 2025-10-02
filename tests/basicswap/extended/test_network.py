@@ -17,6 +17,8 @@ import time
 import traceback
 import unittest
 
+from coincurve.keys import PrivateKey
+
 import basicswap.config as cfg
 from basicswap.basicswap import (
     BasicSwap,
@@ -32,9 +34,6 @@ from basicswap.util.address import (
 )
 from basicswap.rpc import (
     callrpc,
-)
-from basicswap.contrib.key import (
-    ECKey,
 )
 from basicswap.http_server import (
     HttpThread,
@@ -312,10 +311,9 @@ class Test(unittest.TestCase):
                 )
 
             logging.info("Preparing swap clients.")
-            eckey = ECKey()
-            eckey.generate()
-            cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, eckey.get_bytes())
-            cls.network_pubkey = eckey.get_pubkey().get_bytes().hex()
+            k = PrivateKey()
+            cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret)
+            cls.network_pubkey = k.public_key.format().hex()
 
             for i in range(NUM_NODES):
                 prepare_swapclient_dir(TEST_DIR, i, cls.network_key, cls.network_pubkey)

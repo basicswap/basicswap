@@ -20,6 +20,8 @@ import unittest
 
 from copy import deepcopy
 
+from coincurve.keys import PrivateKey
+
 import basicswap.config as cfg
 from basicswap.db import (
     Concepts,
@@ -47,9 +49,6 @@ from basicswap.rpc_xmr import (
 )
 from basicswap.interface.xmr import (
     XMR_COIN,
-)
-from basicswap.contrib.key import (
-    ECKey,
 )
 from basicswap.http_server import (
     HttpThread,
@@ -342,9 +341,8 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def getRandomPubkey(cls):
-        eckey = ECKey()
-        eckey.generate()
-        return eckey.get_pubkey().get_bytes()
+        k = PrivateKey()
+        return k.public_key.format()
 
     @classmethod
     def setUpClass(cls):
@@ -652,10 +650,9 @@ class BaseTest(unittest.TestCase):
 
             logging.info("Preparing swap clients.")
             if not cls.restore_instance:
-                eckey = ECKey()
-                eckey.generate()
-                cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, eckey.get_bytes())
-                cls.network_pubkey = eckey.get_pubkey().get_bytes().hex()
+                k = PrivateKey()
+                cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret)
+                cls.network_pubkey = k.public_key.format().hex()
 
             for i in range(NUM_NODES):
                 start_nodes = set()

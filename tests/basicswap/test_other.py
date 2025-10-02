@@ -13,9 +13,6 @@ import secrets
 import threading
 import unittest
 
-import basicswap.contrib.ed25519_fast as edf
-import basicswap.ed25519_fast_util as edu
-
 from coincurve.ed25519 import ed25519_get_pubkey
 from coincurve.ecdsaotves import (
     ecdsaotves_enc_sign,
@@ -27,7 +24,7 @@ from coincurve.keys import PrivateKey
 
 from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.db import create_db_, DBMethods, KnownIdentity
-from basicswap.util import i2b, h2b
+from basicswap.util import h2b
 from basicswap.util.address import decodeAddress
 from basicswap.util.crypto import ripemd160, hash160, blake256
 from basicswap.util.extkey import ExtKeyPair
@@ -191,12 +188,13 @@ class Test(unittest.TestCase):
             assert "Too many decimal places" in str(e)
 
     def test_ed25519(self):
-        privkey = edu.get_secret()
-        pubkey = edu.encodepoint(edf.scalarmult_B(privkey))
-
-        privkey_bytes = i2b(privkey)
-        pubkey_test = ed25519_get_pubkey(privkey_bytes)
-        assert pubkey == pubkey_test
+        privkey = bytes.fromhex(
+            "0b4c6e34c21b910f92c7985a8093de526f5f8677a112a8c672d1098139b70e0f"
+        )
+        pubkey = ed25519_get_pubkey(privkey)
+        assert pubkey == bytes.fromhex(
+            "5c26c518fb698e91a5858c33e9075488c55c235f391162fe9e6cbd4f694f80aa"
+        )
 
     def test_ecdsa_otves(self):
         coin_settings = {"rpcport": 0, "rpcauth": "none"}
@@ -591,15 +589,15 @@ class Test(unittest.TestCase):
             assert decode_varint(b) == (i, expect_length)
 
     def test_base58(self):
-        kv = edu.get_secret()
-        Kv = edu.encodepoint(edf.scalarmult_B(kv))
-        ks = edu.get_secret()
-        Ks = edu.encodepoint(edf.scalarmult_B(ks))
+        k = bytes.fromhex(
+            "0b4c6e34c21b910f92c7985a8093de526f5f8677a112a8c672d1098139b70e0f"
+        )
+        K = ed25519_get_pubkey(k)
 
-        addr = xmr_encode_address(Kv, Ks)
+        addr = xmr_encode_address(K, K)
         assert addr.startswith("4")
 
-        addr = xmr_encode_address(Kv, Ks, 4146)
+        addr = xmr_encode_address(K, K, 4146)
         assert addr.startswith("Wo")
 
     def test_blake256(self):

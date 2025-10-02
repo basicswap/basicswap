@@ -30,10 +30,6 @@ from basicswap.util import (
     i2b,
     i2h,
 )
-from basicswap.util.ecc import (
-    pointToCPK,
-    CPKToPoint,
-)
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.script import (
     SerialiseNumCompact,
@@ -744,17 +740,11 @@ class BTCInterface(Secp256k1Interface):
         wif_prefix = self.chainparams_network()["key_prefix"]
         return toWIF(wif_prefix, key_bytes)
 
-    def encodePubkey(self, pk: bytes) -> bytes:
-        return pointToCPK(pk)
-
     def encodeSegwitAddress(self, key_hash: bytes) -> str:
         return segwit_addr.encode(self.chainparams_network()["hrp"], 0, key_hash)
 
     def decodeSegwitAddress(self, addr: str) -> bytes:
         return bytes(segwit_addr.decode(self.chainparams_network()["hrp"], addr)[1])
-
-    def decodePubkey(self, pke):
-        return CPKToPoint(pke)
 
     def decodeKey(self, k: str) -> bytes:
         return decodeWif(k)
@@ -790,17 +780,16 @@ class BTCInterface(Secp256k1Interface):
         return funded_tx
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> CScript:
-
-        Kal_enc = Kal if len(Kal) == 33 else self.encodePubkey(Kal)
-        Kaf_enc = Kaf if len(Kaf) == 33 else self.encodePubkey(Kaf)
+        assert len(Kal) == 33
+        assert len(Kaf) == 33
 
         # fmt: off
         return CScript([
             CScriptOp(OP_IF),
-            2, Kal_enc, Kaf_enc, 2, CScriptOp(OP_CHECKMULTISIG),
+            2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG),
             CScriptOp(OP_ELSE),
             csv_val, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
-            Kaf_enc, CScriptOp(OP_CHECKSIG),
+            Kaf, CScriptOp(OP_CHECKSIG),
             CScriptOp(OP_ENDIF)])
         # fmt: on
 
