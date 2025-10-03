@@ -53,6 +53,7 @@ from coincurve.keys import (
     PrivateKey,
     PublicKey,
 )
+from coincurve.types import ffi
 from coincurve.ecdsaotves import (
     ecdsaotves_enc_sign,
     ecdsaotves_enc_verify,
@@ -1357,7 +1358,17 @@ class BTCInterface(Secp256k1Interface):
         )
 
         eck = PrivateKey(key_bytes)
-        return eck.sign(sig_hash, hasher=None) + bytes((SIGHASH_ALL,))
+        for i in range(10000):
+            # Grind for low-R value
+            if i == 0:
+                nonce = (ffi.NULL, ffi.NULL)
+            else:
+                extra_entropy = i.to_bytes(4, "little") + (b"\0" * 28)
+                nonce = (ffi.NULL, ffi.new("unsigned char [32]", extra_entropy))
+            sig = eck.sign(sig_hash, hasher=None, custom_nonce=nonce)
+            if len(sig) < 71:
+                return sig + bytes((SIGHASH_ALL,))
+        raise RuntimeError("sign failed.")
 
     def signTxOtVES(
         self,

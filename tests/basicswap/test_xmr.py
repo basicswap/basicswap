@@ -1249,6 +1249,10 @@ class Test(BaseTest):
             ci.signTx(b, lock_spend_tx, 0, lock_tx_script, amount),
             lock_tx_script,
         ]
+        assert (
+            len(witness_stack[1]) <= 71
+        )  # Test for low-r, sig size is <= 70 + sighash_type
+        assert len(witness_stack[2]) <= 71
         lock_spend_tx = ci.setTxSignature(lock_spend_tx, witness_stack)
         tx_decoded = ci.rpc("decoderawtransaction", [lock_spend_tx.hex()])
         vsize_actual: int = tx_decoded["vsize"]
