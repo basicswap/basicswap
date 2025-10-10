@@ -866,8 +866,11 @@ destroyChart: function() {
           const allData = await api.fetchHistoricalDataXHR([coinSymbol]);
           data = allData[coinSymbol];
 
-          if (!data || Object.keys(data).length === 0) {
-            throw new Error(`No data returned for ${coinSymbol}`);
+          if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
+            console.warn(`No price data available for ${coinSymbol}`);
+            chartModule.hideChartLoader();
+            chartModule.showNoDataMessage(coinSymbol);
+            return;
           }
 
           CacheManager.set(cacheKey, data, 'chart');
@@ -896,6 +899,8 @@ destroyChart: function() {
         chartModule.destroyChart();
         chartModule.initChart();
       }
+
+      chartModule.hideNoDataMessage();
 
       const chartData = chartModule.prepareChartData(coinSymbol, data);
       if (chartData.length > 0 && chartModule.chart) {
@@ -949,6 +954,41 @@ destroyChart: function() {
     }
     loader.classList.add('hidden');
     chart.classList.remove('hidden');
+  },
+
+  showNoDataMessage: function(coinSymbol) {
+    const chartCanvas = document.getElementById('coin-chart');
+    if (!chartCanvas) {
+      return;
+    }
+
+    if (this.chart) {
+      this.chart.data.datasets[0].data = [];
+      this.chart.update('none');
+    }
+
+    let messageDiv = document.getElementById('chart-no-data-message');
+    if (!messageDiv) {
+      messageDiv = document.createElement('div');
+      messageDiv.id = 'chart-no-data-message';
+      messageDiv.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #888; font-size: 14px; z-index: 10;';
+      chartCanvas.parentElement.style.position = 'relative';
+      chartCanvas.parentElement.appendChild(messageDiv);
+    }
+
+    messageDiv.innerHTML = `
+      <div style="padding: 20px; background: rgba(0,0,0,0.05); border-radius: 8px;">
+        <div style="font-size: 16px; margin-bottom: 8px;">No Price Data Available</div>
+      </div>
+    `;
+    messageDiv.classList.remove('hidden');
+  },
+
+  hideNoDataMessage: function() {
+    const messageDiv = document.getElementById('chart-no-data-message');
+    if (messageDiv) {
+      messageDiv.classList.add('hidden');
+    }
   },
 
   cleanup: function() {

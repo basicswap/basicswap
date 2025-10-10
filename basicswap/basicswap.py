@@ -12592,47 +12592,59 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return return_data
 
             if rate_source == "coingecko.com":
-                coin_ids: str = ""
-                for coin_id in coins_list:
-                    if len(coin_ids) > 0:
-                        coin_ids += ","
-                    exchange_name: str = self.getExchangeName(coin_id, rate_source)
-                    coin_ids += exchange_name
-                    exchange_name_map[exchange_name] = coin_id
+                try:
+                    coin_ids: str = ""
+                    for coin_id in coins_list:
+                        if len(coin_ids) > 0:
+                            coin_ids += ","
+                        exchange_name: str = self.getExchangeName(coin_id, rate_source)
+                        coin_ids += exchange_name
+                        exchange_name_map[exchange_name] = coin_id
 
-                api_key: str = get_api_key_setting(
-                    self.settings,
-                    "coingecko_api_key",
-                    default_coingecko_api_key,
-                    escape=True,
-                )
-                url: str = (
-                    f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true"
-                )
-                if api_key != "":
-                    url += f"&api_key={api_key}"
-
-                js = json.loads(self.readURL(url, timeout=10, headers=headers))
-
-                for k, v in js.items():
-                    coin_id = int(exchange_name_map[k])
-                    volume_24h = v.get("usd_24h_vol")
-                    price_change_24h = v.get("usd_24h_change")
-
-                    # Convert to float if value exists, otherwise keep as None
-                    volume_value = float(volume_24h) if volume_24h is not None else None
-                    price_change_value = (
-                        float(price_change_24h) if price_change_24h is not None else 0.0
+                    api_key: str = get_api_key_setting(
+                        self.settings,
+                        "coingecko_api_key",
+                        default_coingecko_api_key,
+                        escape=True,
                     )
+                    url: str = (
+                        f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true"
+                    )
+                    if api_key != "":
+                        url += f"&api_key={api_key}"
 
-                    return_data[coin_id] = {
-                        "volume_24h": volume_value,
-                        "price_change_24h": price_change_value,
-                    }
-                    new_values[coin_id] = {
-                        "volume_24h": volume_value,
-                        "price_change_24h": price_change_value,
-                    }
+                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
+
+                    for k, v in js.items():
+                        coin_id = int(exchange_name_map[k])
+                        volume_24h = v.get("usd_24h_vol")
+                        price_change_24h = v.get("usd_24h_change")
+
+                        # Convert to float if value exists, otherwise keep as None
+                        volume_value = (
+                            float(volume_24h) if volume_24h is not None else None
+                        )
+                        price_change_value = (
+                            float(price_change_24h)
+                            if price_change_24h is not None
+                            else 0.0
+                        )
+
+                        return_data[coin_id] = {
+                            "volume_24h": volume_value,
+                            "price_change_24h": price_change_value,
+                        }
+                        new_values[coin_id] = {
+                            "volume_24h": volume_value,
+                            "price_change_24h": price_change_value,
+                        }
+                except Exception as e:
+                    self.log.warning(f"Could not fetch volume data: {e}")
+                    for coin_id in need_coins:
+                        return_data[coin_id] = {
+                            "volume_24h": None,
+                            "price_change_24h": 0.0,
+                        }
             else:
                 raise ValueError(f"Unknown rate source {rate_source}")
 
@@ -12723,18 +12735,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
                 for coin_id in need_coins:
-                    exchange_name: str = self.getExchangeName(coin_id, rate_source)
-                    url: str = (
-                        f"https://api.coingecko.com/api/v3/coins/{exchange_name}/market_chart?vs_currency=usd&days={days}"
-                    )
-                    if api_key != "":
-                        url += f"&api_key={api_key}"
+                    try:
+                        exchange_name: str = self.getExchangeName(coin_id, rate_source)
+                        url: str = (
+                            f"https://api.coingecko.com/api/v3/coins/{exchange_name}/market_chart?vs_currency=usd&days={days}"
+                        )
+                        if api_key != "":
+                            url += f"&api_key={api_key}"
 
-                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
+                        js = json.loads(self.readURL(url, timeout=10, headers=headers))
 
-                    if "prices" in js:
-                        return_data[coin_id] = js["prices"]
-                        new_values[coin_id] = js["prices"]
+                        if "prices" in js:
+                            return_data[coin_id] = js["prices"]
+                            new_values[coin_id] = js["prices"]
+                    except Exception as e:
+                        self.log.warning(
+                            f"Could not fetch historical data for {Coins(coin_id).name}: {e}"
+                        )
+                        return_data[coin_id] = []
             else:
                 raise ValueError(f"Unknown rate source {rate_source}")
 
