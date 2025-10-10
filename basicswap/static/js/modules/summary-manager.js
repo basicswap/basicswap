@@ -166,7 +166,7 @@ const SummaryManager = (function() {
     }
 
     if (window.TooltipManager && typeof window.TooltipManager.initializeTooltips === 'function') {
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         window.TooltipManager.initializeTooltips(`[data-tooltip-target="${tooltipId}"]`);
         debugLog(`Re-initialized tooltips for ${tooltipId}`);
       }, 50);
@@ -205,8 +205,16 @@ const SummaryManager = (function() {
   }
 
   function fetchSummaryDataWithTimeout() {
+    if (window.ApiManager) {
+      return window.ApiManager.makeRequest(config.summaryEndpoint, 'GET', {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      });
+    }
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.requestTimeout);
+    const timeoutId = CleanupManager.setTimeout(() => controller.abort(), config.requestTimeout);
 
     return fetch(config.summaryEndpoint, {
       signal: controller.signal,
@@ -217,7 +225,11 @@ const SummaryManager = (function() {
       }
     })
     .then(response => {
-      clearTimeout(timeoutId);
+      if (window.CleanupManager) {
+        window.CleanupManager.clearTimeout(timeoutId);
+      } else {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
@@ -226,7 +238,11 @@ const SummaryManager = (function() {
       return response.json();
     })
     .catch(error => {
-      clearTimeout(timeoutId);
+      if (window.CleanupManager) {
+        window.CleanupManager.clearTimeout(timeoutId);
+      } else {
+        clearTimeout(timeoutId);
+      }
       throw error;
     });
   }
@@ -275,7 +291,7 @@ const SummaryManager = (function() {
     };
 
     webSocket.onclose = () => {
-      setTimeout(setupWebSocket, 5000);
+      CleanupManager.setTimeout(setupWebSocket, 5000);
     };
   }
 
@@ -303,7 +319,7 @@ const SummaryManager = (function() {
       .then(() => {})
       .catch(() => {});
 
-    refreshTimer = setInterval(() => {
+    refreshTimer = CleanupManager.setInterval(() => {
       publicAPI.fetchSummaryData()
         .then(() => {})
         .catch(() => {});
@@ -386,7 +402,7 @@ const SummaryManager = (function() {
             }
 
             return new Promise(resolve => {
-              setTimeout(() => {
+              CleanupManager.setTimeout(() => {
                 resolve(this.fetchSummaryData());
               }, config.retryDelay);
             });
@@ -446,5 +462,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-//console.log('SummaryManager initialized with methods:', Object.keys(SummaryManager));
 console.log('SummaryManager initialized');

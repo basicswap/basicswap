@@ -32,7 +32,7 @@ document.addEventListener('tabactivated', function(event) {
     if (event.detail && event.detail.tabId) {
         const tabType = event.detail.type || (event.detail.tabId === '#all' ? 'all' :
                                              (event.detail.tabId === '#sent' ? 'sent' : 'received'));
-        //console.log('Tab activation event received for:', tabType);
+        
         state.currentTab = tabType;
         updateBidsTable();
     }
@@ -190,8 +190,7 @@ const EventManager = {
 };
 
 function cleanup() {
-    //console.log('Starting comprehensive cleanup process for bids table');
-
+    
     try {
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -326,8 +325,7 @@ window.cleanupBidsTable = cleanup;
 
 CleanupManager.addListener(document, 'visibilitychange', () => {
     if (document.hidden) {
-        //console.log('Page hidden - pausing WebSocket and optimizing memory');
-
+        
         if (WebSocketManager && typeof WebSocketManager.pause === 'function') {
             WebSocketManager.pause();
         } else if (WebSocketManager && typeof WebSocketManager.disconnect === 'function') {
@@ -351,7 +349,7 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
 
         const lastUpdateTime = state.lastRefresh || 0;
         const now = Date.now();
-        const refreshInterval = 5 * 60 * 1000; // 5 minutes
+        const refreshInterval = 5 * 60 * 1000; 
 
         if (now - lastUpdateTime > refreshInterval) {
             setTimeout(() => {
@@ -490,13 +488,7 @@ function coinMatches(offerCoin, filterCoin) {
 
     if (offerCoin === filterCoin) return true;
 
-    if ((offerCoin === 'firo' || offerCoin === 'zcoin') &&
-        (filterCoin === 'firo' || filterCoin === 'zcoin')) {
-        return true;
-    }
-
-    if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
-        (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
+    if (window.CoinUtils && window.CoinUtils.isSameCoin(offerCoin, filterCoin)) {
         return true;
     }
 
@@ -1012,7 +1004,7 @@ const forceTooltipDOMCleanup = () => {
         });
     }
     if (removedCount > 0) {
-       // console.log(`Tooltip cleanup: found ${foundCount}, removed ${removedCount} detached tooltips`);
+       
     }
 }
 
@@ -1323,8 +1315,6 @@ async function fetchBids(type = state.currentTab) {
         const withExpiredSelect = document.getElementById('with_expired');
         const includeExpired = withExpiredSelect ? withExpiredSelect.value === 'true' : true;
 
-        //console.log(`Fetching ${type} bids, include expired:`, includeExpired);
-
         const timeoutId = setTimeout(() => {
             if (activeFetchController) {
                 activeFetchController.abort();
@@ -1372,8 +1362,6 @@ async function fetchBids(type = state.currentTab) {
             }
         }
 
-        //console.log(`Received raw ${type} data:`, data.length, 'bids');
-
         state.filters.with_expired = includeExpired;
 
         let processedData;
@@ -1405,12 +1393,16 @@ const updateTableContent = async (type) => {
     const tbody = elements[`${type}BidsBody`];
     if (!tbody) return;
 
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="animate-pulse">Loading bids...</div></td></tr>';
+
     if (window.TooltipManager) {
-        window.TooltipManager.cleanup();
+        requestAnimationFrame(() => window.TooltipManager.cleanup());
     }
 
-    cleanupTooltips();
-    forceTooltipDOMCleanup();
+    requestAnimationFrame(() => {
+        cleanupTooltips();
+        forceTooltipDOMCleanup();
+    });
 
     tooltipIdsToCleanup.clear();
 
@@ -1420,14 +1412,6 @@ const updateTableContent = async (type) => {
     const endIndex = startIndex + PAGE_SIZE;
 
     const currentPageData = filteredData.slice(startIndex, endIndex);
-
-    //console.log('Updating table content:', {
-    //    type: type,
-    //    totalFilteredBids: filteredData.length,
-    //    currentPageBids: currentPageData.length,
-    //    startIndex: startIndex,
-    //    endIndex: endIndex
-    //});
 
     try {
         if (currentPageData.length > 0) {
@@ -1440,9 +1424,6 @@ const updateTableContent = async (type) => {
                 const rows = await Promise.all(rowPromises);
                 allRows = allRows.concat(rows);
 
-                if (i + BATCH_SIZE < currentPageData.length) {
-                    await new Promise(resolve => setTimeout(resolve, 5));
-                }
             }
 
             const scrollPosition = tbody.parentElement?.scrollTop || 0;
@@ -1495,7 +1476,7 @@ const initializeTooltips = () => {
     const tooltipTriggers = document.querySelectorAll(selector);
     const tooltipCount = tooltipTriggers.length;
     if (tooltipCount > 50) {
-        //console.log(`Optimizing ${tooltipCount} tooltips`);
+        
         const viewportMargin = 200;
         const viewportTooltips = Array.from(tooltipTriggers).filter(trigger => {
             const rect = trigger.getBoundingClientRect();
@@ -1594,13 +1575,6 @@ const updatePaginationControls = (type) => {
     const nextButton = elements[`nextPage${type.charAt(0).toUpperCase() + type.slice(1)}`];
     const currentPageSpan = elements[`currentPage${type.charAt(0).toUpperCase() + type.slice(1)}`];
     const bidsCount = elements[`${type}BidsCount`];
-
-    //console.log('Pagination controls update:', {
-    //    type: type,
-    //    totalBids: data.length,
-    //    totalPages: totalPages,
-    //    currentPage: state.currentPage[type]
-    //});
 
     if (state.currentPage[type] > totalPages) {
         state.currentPage[type] = totalPages > 0 ? totalPages : 1;
@@ -2077,7 +2051,7 @@ const setupEventListeners = () => {
 function setupMemoryMonitoring() {
     const MEMORY_CHECK_INTERVAL = 2 * 60 * 1000;
 
-    const intervalId = setInterval(() => {
+    const intervalId = CleanupManager.setInterval(() => {
         if (document.hidden) {
             console.log('Tab hidden - running memory optimization');
 
@@ -2110,9 +2084,9 @@ function setupMemoryMonitoring() {
         }
     }, MEMORY_CHECK_INTERVAL);
 
-    document.addEventListener('beforeunload', () => {
+    CleanupManager.registerResource('bidsMemoryMonitoring', intervalId, () => {
         clearInterval(intervalId);
-    }, { once: true });
+    });
 }
 
 function initialize() {

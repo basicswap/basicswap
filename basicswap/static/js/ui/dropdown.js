@@ -89,7 +89,7 @@
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') this.hide();
             });
-            window.addEventListener('scroll', this._handleScroll, true);
+            window.addEventListener('scroll', this._handleScroll, { passive: true, capture: true });
             window.addEventListener('resize', this._handleResize);
         }
 
@@ -170,7 +170,7 @@
 
         destroy() {
             document.removeEventListener('click', this._handleOutsideClick);
-            window.removeEventListener('scroll', this._handleScroll, true);
+            window.removeEventListener('scroll', this._handleScroll, { passive: true, capture: true });
             window.removeEventListener('resize', this._handleResize);
 
             const index = dropdownInstances.indexOf(this);

@@ -562,8 +562,49 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         random.seed(secrets.randbits(128))
 
+        self._prepare_rpc_pooling()
+
+    def _prepare_rpc_pooling(self):
+        if "rpc_connection_pool" not in self.settings:
+            self.settings["rpc_connection_pool"] = {
+                "enabled": True,
+                "max_connections_per_daemon": 5,
+            }
+            self._save_settings()
+
+    def _enable_rpc_pooling(self):
+        rpc_pool_settings = self.settings.get("rpc_connection_pool", {})
+        if rpc_pool_settings.get("enabled", False):
+            from basicswap import rpc
+            from basicswap import rpc_pool
+
+            rpc.enable_rpc_pooling(rpc_pool_settings)
+            rpc_pool.set_pool_logger(self.log)
+
+    def _save_settings(self):
+        import shutil
+        from basicswap import config as cfg
+
+        settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+        settings_path_new = settings_path + ".new"
+        try:
+            shutil.copyfile(settings_path, settings_path + ".last")
+            with open(settings_path_new, "w") as fp:
+                json.dump(self.settings, fp, indent=4)
+            shutil.move(settings_path_new, settings_path)
+            self.log.debug("Settings saved to basicswap.json")
+        except Exception as e:
+            self.log.error(f"Failed to save settings: {str(e)}")
+
     def finalise(self):
         self.log.info("Finalising")
+
+        try:
+            from basicswap.rpc_pool import close_all_pools
+
+            close_all_pools()
+        except Exception as e:
+            self.log.debug(f"Error closing RPC pools: {e}")
 
         try:
             from basicswap.ui.page_amm import stop_amm_process, get_amm_status
@@ -1142,6 +1183,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         ci_mweb.init_wallet()
 
                 self.checkWalletSeed(c)
+
+        self._enable_rpc_pooling()
 
         if "p2p_host" in self.settings:
             network_key = self.getNetworkKey(1)
@@ -3867,7 +3910,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Set msg_buf.message_nets to let the remote node know what networks to respond on.
         # bid.message_nets is a local field denoting the network/s to send to
-        if offer.smsg_payload_version > 1:
+        if offer.smsg_payload_version is not None and offer.smsg_payload_version > 1:
             msg_buf.message_nets = self.getMessageNetsString()
 
         return msg_buf
@@ -3917,7 +3960,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Set msg_buf.message_nets to let the remote node know what networks to respond on.
         # bid.message_nets is a local field denoting the network/s to send to
-        if offer.smsg_payload_version > 1:
+        if offer.smsg_payload_version is not None and offer.smsg_payload_version > 1:
             msg_buf.message_nets = self.getMessageNetsString()
 
         return msg_buf
@@ -4004,7 +4047,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Set msg_buf.message_nets to let the remote node know what networks to respond on.
         # bid.message_nets is a local field denoting the network/s to send to
-        if offer.smsg_payload_version > 1:
+        if offer.smsg_payload_version is not None and offer.smsg_payload_version > 1:
             msg_buf.message_nets = self.getMessageNetsString()
 
         return msg_buf
@@ -7908,7 +7951,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                     self.add(xmr_offer, cursor)
 
-                    self.notify(NT.OFFER_RECEIVED, {"offer_id": offer_id.hex()}, cursor)
+                self.notify(
+                    NT.OFFER_RECEIVED,
+                    {
+                        "offer_id": offer_id.hex(),
+                        "coin_from": offer_data.coin_from,
+                        "coin_to": offer_data.coin_to,
+                        "amount_from": offer_data.amount_from,
+                        "amount_to": offer_data.amount_to,
+                    },
+                    cursor,
+                )
             else:
                 existing_offer.setState(OfferStates.OFFER_RECEIVED)
                 existing_offer.pk_from = pk_from
@@ -12329,9 +12382,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         rate_source: str = "coingecko.com",
         saved_ttl: int = 300,
     ):
-        if self.debug:
-            coins_list_display = ", ".join([Coins(c).name for c in coins_list])
-            self.log.debug(f"lookupFiatRates {coins_list_display}.")
+        coins_list_display = ", ".join([Coins(c).name for c in coins_list])
+        self.log.debug(f"lookupFiatRates {coins_list_display}.")
         ensure(len(coins_list) > 0, "Must specify coin/s")
         ensure(saved_ttl >= 0, "Invalid saved time")
 
@@ -12400,7 +12452,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if api_key != "":
                     url += f"&api_key={api_key}"
 
-                self.log.debug(f"lookupFiatRates: {url}")
                 js = json.loads(self.readURL(url, timeout=10, headers=headers))
 
                 for k, v in js.items():
@@ -12414,31 +12465,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     default_chart_api_key,
                     escape=True,
                 )
-                if len(need_coins) == 1:
+                coin_ids: str = ""
+                for coin_id in coins_list:
+                    if len(coin_ids) > 0:
+                        coin_ids += ","
                     coin_ticker: str = chainparams[coin_id]["ticker"]
-                    url: str = (
-                        f"https://min-api.cryptocompare.com/data/price?fsym={coin_ticker}&tsyms={ticker_to}"
-                    )
-                    self.log.debug(f"lookupFiatRates: {url}")
-                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
-                    return_rates[int(coin_id)] = js[ticker_to]
-                    new_values[coin_id] = js[ticker_to]
-                else:
-                    coin_ids: str = ""
-                    for coin_id in coins_list:
-                        if len(coin_ids) > 0:
-                            coin_ids += ","
-                        coin_ticker: str = chainparams[coin_id]["ticker"]
-                        coin_ids += coin_ticker
-                        exchange_name_map[coin_ticker] = coin_id
-                    url: str = (
-                        f"https://min-api.cryptocompare.com/data/pricemulti?fsyms={coin_ids}&tsyms={ticker_to}"
-                    )
-                    self.log.debug(f"lookupFiatRates: {url}")
-                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
-                    for k, v in js.items():
-                        return_rates[int(exchange_name_map[k])] = v[ticker_to]
-                        new_values[exchange_name_map[k]] = v[ticker_to]
+                    coin_ids += coin_ticker
+                    exchange_name_map[coin_ticker] = coin_id
+                url: str = (
+                    f"https://min-api.cryptocompare.com/data/pricemulti?fsyms={coin_ids}&tsyms={ticker_to}"
+                )
+                js = json.loads(self.readURL(url, timeout=10, headers=headers))
+                for k, v in js.items():
+                    return_rates[int(exchange_name_map[k])] = v[ticker_to]
+                    new_values[exchange_name_map[k]] = v[ticker_to]
             else:
                 raise ValueError(f"Unknown rate source {rate_source}")
 
@@ -12481,6 +12521,240 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.commitDB()
             return return_rates
+        finally:
+            self.closeDB(cursor, commit=False)
+
+    def lookupVolume(
+        self,
+        coins_list,
+        rate_source: str = "coingecko.com",
+        saved_ttl: int = 300,
+    ):
+        coins_list_display = ", ".join([Coins(c).name for c in coins_list])
+        self.log.debug(f"lookupVolume {coins_list_display}.")
+        ensure(len(coins_list) > 0, "Must specify coin/s")
+        ensure(saved_ttl >= 0, "Invalid saved time")
+
+        now: int = int(time.time())
+        oldest_time_valid: int = now - saved_ttl
+        return_data = {}
+
+        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+
+        cursor = self.openDB()
+        try:
+            parameters = {
+                "rate_source": rate_source,
+                "oldest_time_valid": oldest_time_valid,
+            }
+            coins_list_query = ""
+            for i, coin_id in enumerate(coins_list):
+                try:
+                    _ = Coins(coin_id)
+                except Exception:
+                    raise ValueError(f"Unknown coin type {coin_id}")
+
+                param_name = f"coin_{i}"
+                if i > 0:
+                    coins_list_query += ","
+                coins_list_query += f":{param_name}"
+                parameters[param_name] = coin_id
+
+            query = f"SELECT coin_id, volume_24h, price_change_24h FROM coinvolume WHERE coin_id IN ({coins_list_query}) AND source = :rate_source AND last_updated >= :oldest_time_valid"
+            rows = cursor.execute(query, parameters)
+
+            for row in rows:
+                volume_24h = None
+                price_change_24h = 0.0
+                try:
+                    if row[1] is not None and row[1] != "None":
+                        volume_24h = float(row[1])
+                except (ValueError, TypeError):
+                    pass
+                try:
+                    if row[2] is not None and row[2] != "None":
+                        price_change_24h = float(row[2])
+                except (ValueError, TypeError):
+                    pass
+                return_data[int(row[0])] = {
+                    "volume_24h": volume_24h,
+                    "price_change_24h": price_change_24h,
+                }
+
+            need_coins = []
+            new_values = {}
+            exchange_name_map = {}
+            for coin_id in coins_list:
+                if coin_id not in return_data:
+                    need_coins.append(coin_id)
+
+            if len(need_coins) < 1:
+                return return_data
+
+            if rate_source == "coingecko.com":
+                coin_ids: str = ""
+                for coin_id in coins_list:
+                    if len(coin_ids) > 0:
+                        coin_ids += ","
+                    exchange_name: str = self.getExchangeName(coin_id, rate_source)
+                    coin_ids += exchange_name
+                    exchange_name_map[exchange_name] = coin_id
+
+                api_key: str = get_api_key_setting(
+                    self.settings,
+                    "coingecko_api_key",
+                    default_coingecko_api_key,
+                    escape=True,
+                )
+                url: str = (
+                    f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true"
+                )
+                if api_key != "":
+                    url += f"&api_key={api_key}"
+
+                js = json.loads(self.readURL(url, timeout=10, headers=headers))
+
+                for k, v in js.items():
+                    coin_id = int(exchange_name_map[k])
+                    volume_24h = v.get("usd_24h_vol")
+                    price_change_24h = v.get("usd_24h_change")
+
+                    # Convert to float if value exists, otherwise keep as None
+                    volume_value = float(volume_24h) if volume_24h is not None else None
+                    price_change_value = (
+                        float(price_change_24h) if price_change_24h is not None else 0.0
+                    )
+
+                    return_data[coin_id] = {
+                        "volume_24h": volume_value,
+                        "price_change_24h": price_change_value,
+                    }
+                    new_values[coin_id] = {
+                        "volume_24h": volume_value,
+                        "price_change_24h": price_change_value,
+                    }
+            else:
+                raise ValueError(f"Unknown rate source {rate_source}")
+
+            if len(new_values) < 1:
+                return return_data
+
+            for coin_id, data in new_values.items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO coinvolume (coin_id, volume_24h, price_change_24h, source, last_updated) VALUES (:coin_id, :volume_24h, :price_change_24h, :rate_source, :last_updated)",
+                    {
+                        "coin_id": coin_id,
+                        "volume_24h": (
+                            str(data["volume_24h"])
+                            if data["volume_24h"] is not None
+                            else "None"
+                        ),
+                        "price_change_24h": str(data["price_change_24h"]),
+                        "rate_source": rate_source,
+                        "last_updated": now,
+                    },
+                )
+
+            self.commitDB()
+            return return_data
+        finally:
+            self.closeDB(cursor, commit=False)
+
+    def lookupHistoricalData(
+        self,
+        coins_list,
+        days: int = 1,
+        rate_source: str = "coingecko.com",
+        saved_ttl: int = 3600,
+    ):
+        coins_list_display = ", ".join([Coins(c).name for c in coins_list])
+        self.log.debug(f"lookupHistoricalData {coins_list_display}, days={days}.")
+        ensure(len(coins_list) > 0, "Must specify coin/s")
+        ensure(saved_ttl >= 0, "Invalid saved time")
+        ensure(days > 0, "Days must be positive")
+
+        now: int = int(time.time())
+        oldest_time_valid: int = now - saved_ttl
+        return_data = {}
+
+        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+
+        cursor = self.openDB()
+        try:
+            parameters = {
+                "rate_source": rate_source,
+                "oldest_time_valid": oldest_time_valid,
+                "days": days,
+            }
+            coins_list_query = ""
+            for i, coin_id in enumerate(coins_list):
+                try:
+                    _ = Coins(coin_id)
+                except Exception:
+                    raise ValueError(f"Unknown coin type {coin_id}")
+
+                param_name = f"coin_{i}"
+                if i > 0:
+                    coins_list_query += ","
+                coins_list_query += f":{param_name}"
+                parameters[param_name] = coin_id
+
+            query = f"SELECT coin_id, price_data FROM coinhistory WHERE coin_id IN ({coins_list_query}) AND days = :days AND source = :rate_source AND last_updated >= :oldest_time_valid"
+            rows = cursor.execute(query, parameters)
+
+            for row in rows:
+                return_data[int(row[0])] = json.loads(row[1])
+
+            need_coins = []
+            new_values = {}
+            for coin_id in coins_list:
+                if coin_id not in return_data:
+                    need_coins.append(coin_id)
+
+            if len(need_coins) < 1:
+                return return_data
+
+            if rate_source == "coingecko.com":
+                api_key: str = get_api_key_setting(
+                    self.settings,
+                    "coingecko_api_key",
+                    default_coingecko_api_key,
+                    escape=True,
+                )
+
+                for coin_id in need_coins:
+                    exchange_name: str = self.getExchangeName(coin_id, rate_source)
+                    url: str = (
+                        f"https://api.coingecko.com/api/v3/coins/{exchange_name}/market_chart?vs_currency=usd&days={days}"
+                    )
+                    if api_key != "":
+                        url += f"&api_key={api_key}"
+
+                    js = json.loads(self.readURL(url, timeout=10, headers=headers))
+
+                    if "prices" in js:
+                        return_data[coin_id] = js["prices"]
+                        new_values[coin_id] = js["prices"]
+            else:
+                raise ValueError(f"Unknown rate source {rate_source}")
+
+            if len(new_values) < 1:
+                return return_data
+
+            for coin_id, price_data in new_values.items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO coinhistory (coin_id, days, price_data, source, last_updated) VALUES (:coin_id, :days, :price_data, :rate_source, :last_updated)",
+                    {
+                        "coin_id": coin_id,
+                        "days": days,
+                        "price_data": json.dumps(price_data),
+                        "rate_source": rate_source,
+                        "last_updated": now,
+                    },
+                )
+
+            self.commitDB()
+            return return_data
         finally:
             self.closeDB(cursor, commit=False)
 

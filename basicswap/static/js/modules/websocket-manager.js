@@ -32,26 +32,24 @@ const WebSocketManager = (function() {
     }
 
     function determineWebSocketPort() {
-        let wsPort;
+        if (window.ConfigManager && window.ConfigManager.wsPort) {
+            return window.ConfigManager.wsPort.toString();
+        }
 
         if (window.config && window.config.wsPort) {
-            wsPort = window.config.wsPort;
-            return wsPort;
+            return window.config.wsPort.toString();
         }
 
         if (window.ws_port) {
-            wsPort = window.ws_port.toString();
-            return wsPort;
+            return window.ws_port.toString();
         }
 
         if (typeof getWebSocketConfig === 'function') {
             const wsConfig = getWebSocketConfig();
-            wsPort = (wsConfig.port || wsConfig.fallbackPort || '11700').toString();
-            return wsPort;
+            return (wsConfig.port || wsConfig.fallbackPort || '11700').toString();
         }
 
-        wsPort = '11700';
-        return wsPort;
+        return '11700';
     }
 
     const publicAPI = {
@@ -77,7 +75,11 @@ const WebSocketManager = (function() {
             }
 
             if (state.reconnectTimeout) {
-                clearTimeout(state.reconnectTimeout);
+                if (window.CleanupManager) {
+                    window.CleanupManager.clearTimeout(state.reconnectTimeout);
+                } else {
+                    clearTimeout(state.reconnectTimeout);
+                }
                 state.reconnectTimeout = null;
             }
 
@@ -96,13 +98,17 @@ const WebSocketManager = (function() {
                 ws = new WebSocket(`ws://${window.location.hostname}:${wsPort}`);
                 setupEventHandlers();
 
-                state.connectTimeout = setTimeout(() => {
+                const timeoutFn = () => {
                     if (state.isConnecting) {
                         log('Connection timeout, cleaning up');
                         cleanup();
                         handleReconnect();
                     }
-                }, 5000);
+                };
+
+                state.connectTimeout = window.CleanupManager
+                    ? window.CleanupManager.setTimeout(timeoutFn, 5000)
+                    : setTimeout(timeoutFn, 5000);
 
                 return true;
             } catch (error) {
@@ -159,17 +165,24 @@ const WebSocketManager = (function() {
         cleanup: function() {
             log('Cleaning up WebSocket resources');
 
-            clearTimeout(state.connectTimeout);
+            if (window.CleanupManager) {
+                window.CleanupManager.clearTimeout(state.connectTimeout);
+            } else {
+                clearTimeout(state.connectTimeout);
+            }
             stopHealthCheck();
 
             if (state.reconnectTimeout) {
-                clearTimeout(state.reconnectTimeout);
+                if (window.CleanupManager) {
+                    window.CleanupManager.clearTimeout(state.reconnectTimeout);
+                } else {
+                    clearTimeout(state.reconnectTimeout);
+                }
                 state.reconnectTimeout = null;
             }
 
             state.isConnecting = false;
             state.messageHandlers = {};
-
 
             if (ws) {
                 ws.onopen = null;
@@ -228,7 +241,11 @@ const WebSocketManager = (function() {
         ws.onopen = () => {
             state.isConnecting = false;
             config.reconnectAttempts = 0;
-            clearTimeout(state.connectTimeout);
+            if (window.CleanupManager) {
+                window.CleanupManager.clearTimeout(state.connectTimeout);
+            } else {
+                clearTimeout(state.connectTimeout);
+            }
             state.lastHealthCheck = Date.now();
             window.ws = ws;
 
@@ -311,24 +328,37 @@ const WebSocketManager = (function() {
         state.isPageHidden = false;
         state.isIntentionallyClosed = false;
 
-        setTimeout(() => {
+        const resumeFn = () => {
             if (!publicAPI.isConnected()) {
                 publicAPI.connect();
             }
             startHealthCheck();
-        }, 0);
+        };
+
+        if (window.CleanupManager) {
+            window.CleanupManager.setTimeout(resumeFn, 0);
+        } else {
+            setTimeout(resumeFn, 0);
+        }
     }
 
     function startHealthCheck() {
         stopHealthCheck();
-        state.healthCheckInterval = setInterval(() => {
+        const healthCheckFn = () => {
             performHealthCheck();
-        }, 30000);
+        };
+        state.healthCheckInterval = window.CleanupManager
+            ? window.CleanupManager.setInterval(healthCheckFn, 30000)
+            : setInterval(healthCheckFn, 30000);
     }
 
     function stopHealthCheck() {
         if (state.healthCheckInterval) {
-            clearInterval(state.healthCheckInterval);
+            if (window.CleanupManager) {
+                window.CleanupManager.clearInterval(state.healthCheckInterval);
+            } else {
+                clearInterval(state.healthCheckInterval);
+            }
             state.healthCheckInterval = null;
         }
     }
@@ -356,7 +386,11 @@ const WebSocketManager = (function() {
     function handleReconnect() {
 
         if (state.reconnectTimeout) {
-            clearTimeout(state.reconnectTimeout);
+            if (window.CleanupManager) {
+                window.CleanupManager.clearTimeout(state.reconnectTimeout);
+            } else {
+                clearTimeout(state.reconnectTimeout);
+            }
             state.reconnectTimeout = null;
         }
 
@@ -369,23 +403,31 @@ const WebSocketManager = (function() {
 
             log(`Scheduling reconnect in ${delay}ms (attempt ${config.reconnectAttempts})`);
 
-            state.reconnectTimeout = setTimeout(() => {
+            const reconnectFn = () => {
                 state.reconnectTimeout = null;
                 if (!state.isIntentionallyClosed) {
                     publicAPI.connect();
                 }
-            }, delay);
+            };
+
+            state.reconnectTimeout = window.CleanupManager
+                ? window.CleanupManager.setTimeout(reconnectFn, delay)
+                : setTimeout(reconnectFn, delay);
         } else {
             log('Max reconnect attempts reached');
             if (typeof updateConnectionStatus === 'function') {
                 updateConnectionStatus('error');
             }
 
-            state.reconnectTimeout = setTimeout(() => {
+            const resetFn = () => {
                 state.reconnectTimeout = null;
                 config.reconnectAttempts = 0;
                 publicAPI.connect();
-            }, 60000);
+            };
+
+            state.reconnectTimeout = window.CleanupManager
+                ? window.CleanupManager.setTimeout(resetFn, 60000)
+                : setTimeout(resetFn, 60000);
         }
     }
 
@@ -442,5 +484,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-//console.log('WebSocketManager initialized with methods:', Object.keys(WebSocketManager));
 console.log('WebSocketManager initialized');

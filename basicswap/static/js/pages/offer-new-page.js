@@ -16,6 +16,30 @@ const DOM = {
     queryAll: (selector) => document.querySelectorAll(selector)
 };
 
+const ErrorModal = {
+    show: function(title, message) {
+        const errorTitle = document.getElementById('errorTitle');
+        const errorMessage = document.getElementById('errorMessage');
+        const modal = document.getElementById('errorModal');
+
+        if (errorTitle) errorTitle.textContent = title || 'Error';
+        if (errorMessage) errorMessage.textContent = message || 'An error occurred';
+        if (modal) modal.classList.remove('hidden');
+    },
+
+    hide: function() {
+        const modal = document.getElementById('errorModal');
+        if (modal) modal.classList.add('hidden');
+    },
+
+    init: function() {
+        const errorOkBtn = document.getElementById('errorOk');
+        if (errorOkBtn) {
+            errorOkBtn.addEventListener('click', this.hide.bind(this));
+        }
+    }
+};
+
 const Storage = {
     get: (key) => {
         try {
@@ -450,19 +474,16 @@ const UIEnhancer = {
                     const coinName = parts[0];
                     const balanceInfo = parts[1] || '';
 
-
                     selectNameElement.innerHTML = '';
                     selectNameElement.style.display = 'flex';
                     selectNameElement.style.flexDirection = 'column';
                     selectNameElement.style.alignItems = 'flex-start';
                     selectNameElement.style.lineHeight = '1.2';
 
-
                     const coinNameDiv = document.createElement('div');
                     coinNameDiv.textContent = coinName;
                     coinNameDiv.style.fontWeight = 'normal';
                     coinNameDiv.style.color = 'inherit';
-
 
                     const balanceDiv = document.createElement('div');
                     balanceDiv.textContent = `Balance: ${balanceInfo}`;
@@ -472,8 +493,6 @@ const UIEnhancer = {
 
                     selectNameElement.appendChild(coinNameDiv);
                     selectNameElement.appendChild(balanceDiv);
-
-
 
                 } else {
 
@@ -575,6 +594,8 @@ function initializeApp() {
     UIEnhancer.handleErrorHighlighting();
     UIEnhancer.updateDisabledStyles();
     UIEnhancer.setupCustomSelects();
+
+    ErrorModal.init();
 }
 
 if (document.readyState === 'loading') {
@@ -582,3 +603,6 @@ if (document.readyState === 'loading') {
 } else {
     initializeApp();
 }
+
+window.showErrorModal = ErrorModal.show.bind(ErrorModal);
+window.hideErrorModal = ErrorModal.hide.bind(ErrorModal);

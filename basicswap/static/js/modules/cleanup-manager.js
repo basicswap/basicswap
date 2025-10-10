@@ -233,7 +233,7 @@ const CleanupManager = (function() {
         },
 
         setupMemoryOptimization: function(options = {}) {
-            const memoryCheckInterval = options.interval || 2 * 60 * 1000; // Default: 2 minutes
+            const memoryCheckInterval = options.interval || 2 * 60 * 1000; 
             const maxCacheSize = options.maxCacheSize || 100;
             const maxDataSize = options.maxDataSize || 1000;
 

@@ -6,6 +6,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import logging
 import traceback
 import urllib
 from xmlrpc.client import (
@@ -14,6 +15,15 @@ from xmlrpc.client import (
     SafeTransport,
 )
 from .util import jsonDecimal
+
+_use_rpc_pooling = False
+_rpc_pool_settings = {}
+
+
+def enable_rpc_pooling(settings):
+    global _use_rpc_pooling, _rpc_pool_settings
+    _use_rpc_pooling = settings.get("enabled", False)
+    _rpc_pool_settings = settings
 
 
 class Jsonrpc:
@@ -91,6 +101,9 @@ class Jsonrpc:
 
 
 def callrpc(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
+    if _use_rpc_pooling:
+        return callrpc_pooled(rpc_port, auth, method, params, wallet, host)
+
     try:
         url = "http://{}@{}:{}/".format(auth, host, rpc_port)
         if wallet is not None:
@@ -108,6 +121,62 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
         raise ValueError("RPC error " + str(r["error"]))
 
     return r["result"]
+
+
+def callrpc_pooled(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
+    from .rpc_pool import get_rpc_pool
+    import http.client
+    import socket
+
+    url = "http://{}@{}:{}/".format(auth, host, rpc_port)
+    if wallet is not None:
+        url += "wallet/" + urllib.parse.quote(wallet)
+
+    max_connections = _rpc_pool_settings.get("max_connections_per_daemon", 5)
+    pool = get_rpc_pool(url, max_connections)
+
+    max_retries = 2
+
+    for attempt in range(max_retries):
+        conn = pool.get_connection()
+
+        try:
+            v = conn.json_request(method, params)
+            r = json.loads(v.decode("utf-8"))
+
+            if "error" in r and r["error"] is not None:
+                pool.discard_connection(conn)
+                raise ValueError("RPC error " + str(r["error"]))
+
+            pool.return_connection(conn)
+            return r["result"]
+
+        except (
+            http.client.RemoteDisconnected,
+            http.client.IncompleteRead,
+            http.client.BadStatusLine,
+            ConnectionError,
+            ConnectionResetError,
+            ConnectionAbortedError,
+            BrokenPipeError,
+            TimeoutError,
+            socket.timeout,
+            socket.error,
+            OSError,
+        ) as ex:
+            pool.discard_connection(conn)
+            if attempt < max_retries - 1:
+                continue
+            logging.warning(
+                f"RPC server error after {max_retries} attempts: {ex}, method: {method}"
+            )
+            raise ValueError(f"RPC server error: {ex}, method: {method}")
+        except ValueError:
+            raise
+        except Exception as ex:
+            pool.discard_connection(conn)
+            logging.error(f"Unexpected RPC error: {ex}, method: {method}")
+            raise ValueError(f"RPC server error: {ex}, method: {method}")
 
 
 def openrpc(rpc_port, auth, wallet=None, host="127.0.0.1"):

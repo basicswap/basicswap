@@ -17,7 +17,7 @@
            </div>
         </div>
         <div class="w-auto p-2">
-          <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" onclick="document.getElementById('messages_{{ m[0] }}').style.display='none';" aria-label="Close"><span class="sr-only">Close</span>
+          <button type="button" class="ms-auto bg-green-50 text-green-500 rounded-lg focus:ring-0 focus:ring-green-400 p-1.5 hover:bg-green-200 inline-flex items-center justify-center h-8 w-8 focus:outline-none dark:bg-gray-800 dark:text-green-400 dark:hover:bg-gray-700" data-close-message="messages_{{ m[0] }}" aria-label="Close"><span class="sr-only">Close</span>
             {{ green_cross_close_svg | safe }}
           </button>
         </div>
@@ -47,7 +47,7 @@
       </div>
         </div>
         <div class="w-auto p-2">
-          <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700" onclick="document.getElementById('err_messages_{{ err_messages[0][0] }}').style.display='none';" aria-label="Close">
+          <button type="button" class="ml-auto bg-red-100 text-red-500 rounded-lg focus:ring-0 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex h-8 w-8 focus:outline-none inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700" data-close-message="err_messages_{{ err_messages[0][0] }}" aria-label="Close">
             <span class="sr-only">Close</span>
             {{ red_cross_close_svg | safe }}
           </button>

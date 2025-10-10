@@ -14,7 +14,7 @@ import threading
 import http.client
 import base64
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from jinja2 import Environment, PackageLoader
 from socket import error as SocketError
 from urllib import parse
@@ -169,15 +169,16 @@ class HttpHandler(BaseHTTPRequestHandler):
         if not session_id:
             return False
 
-        session_data = self.server.active_sessions.get(session_id)
-        if session_data and session_data["expires"] > datetime.now(timezone.utc):
-            session_data["expires"] = datetime.now(timezone.utc) + timedelta(
-                minutes=SESSION_DURATION_MINUTES
-            )
-            return True
+        with self.server.session_lock:
+            session_data = self.server.active_sessions.get(session_id)
+            if session_data and session_data["expires"] > datetime.now(timezone.utc):
+                session_data["expires"] = datetime.now(timezone.utc) + timedelta(
+                    minutes=SESSION_DURATION_MINUTES
+                )
+                return True
 
-        if session_id in self.server.active_sessions:
-            del self.server.active_sessions[session_id]
+            if session_id in self.server.active_sessions:
+                del self.server.active_sessions[session_id]
         return False
 
     def log_error(self, format, *args):
@@ -195,10 +196,11 @@ class HttpHandler(BaseHTTPRequestHandler):
             return None
         form_data = parse.parse_qs(post_string)
         form_id = form_data[b"formid"][0].decode("utf-8")
-        if self.server.last_form_id.get(name, None) == form_id:
-            messages.append("Prevented double submit for form {}.".format(form_id))
-            return None
-        self.server.last_form_id[name] = form_id
+        with self.server.form_id_lock:
+            if self.server.last_form_id.get(name, None) == form_id:
+                messages.append("Prevented double submit for form {}.".format(form_id))
+                return None
+            self.server.last_form_id[name] = form_id
         return form_data
 
     def render_template(
@@ -244,15 +246,17 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if "messages" in args_dict:
             messages_with_ids = []
-            for msg in args_dict["messages"]:
-                messages_with_ids.append((self.server.msg_id_counter, msg))
-                self.server.msg_id_counter += 1
+            with self.server.msg_id_lock:
+                for msg in args_dict["messages"]:
+                    messages_with_ids.append((self.server.msg_id_counter, msg))
+                    self.server.msg_id_counter += 1
             args_dict["messages"] = messages_with_ids
         if "err_messages" in args_dict:
             err_messages_with_ids = []
-            for msg in args_dict["err_messages"]:
-                err_messages_with_ids.append((self.server.msg_id_counter, msg))
-                self.server.msg_id_counter += 1
+            with self.server.msg_id_lock:
+                for msg in args_dict["err_messages"]:
+                    err_messages_with_ids.append((self.server.msg_id_counter, msg))
+                    self.server.msg_id_counter += 1
             args_dict["err_messages"] = err_messages_with_ids
 
         if self.path:
@@ -266,15 +270,17 @@ class HttpHandler(BaseHTTPRequestHandler):
             args_dict["current_page"] = "index"
 
         shutdown_token = os.urandom(8).hex()
-        self.server.session_tokens["shutdown"] = shutdown_token
+        with self.server.session_lock:
+            self.server.session_tokens["shutdown"] = shutdown_token
         args_dict["shutdown_token"] = shutdown_token
 
         encrypted, locked = swap_client.getLockedState()
         args_dict["encrypted"] = encrypted
         args_dict["locked"] = locked
 
-        if self.server.msg_id_counter >= 0x7FFFFFFF:
-            self.server.msg_id_counter = 0
+        with self.server.msg_id_lock:
+            if self.server.msg_id_counter >= 0x7FFFFFFF:
+                self.server.msg_id_counter = 0
 
         args_dict["version"] = version
 
@@ -364,7 +370,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 expires = datetime.now(timezone.utc) + timedelta(
                     minutes=SESSION_DURATION_MINUTES
                 )
-                self.server.active_sessions[session_id] = {"expires": expires}
+                with self.server.session_lock:
+                    self.server.active_sessions[session_id] = {"expires": expires}
                 cookie_header = self._set_session_cookie(session_id)
 
                 if is_json_request:
@@ -628,13 +635,15 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if len(url_split) > 2:
             token = url_split[2]
-            expect_token = self.server.session_tokens.get("shutdown", None)
+            with self.server.session_lock:
+                expect_token = self.server.session_tokens.get("shutdown", None)
             if token != expect_token:
                 return self.page_info("Unexpected token, still running.")
 
         session_id = self._get_session_cookie()
-        if session_id and session_id in self.server.active_sessions:
-            del self.server.active_sessions[session_id]
+        with self.server.session_lock:
+            if session_id and session_id in self.server.active_sessions:
+                del self.server.active_sessions[session_id]
         clear_cookie_header = self._clear_session_cookie()
         extra_headers.append(clear_cookie_header)
 
@@ -935,22 +944,28 @@ class HttpHandler(BaseHTTPRequestHandler):
             return self.page_error(str(ex))
 
     def do_GET(self):
-        response = self.handle_http(200, self.path)
         try:
-            self.wfile.write(response)
-        except SocketError as e:
-            self.server.swap_client.log.debug(f"do_GET SocketError {e}")
+            response = self.handle_http(200, self.path)
+            try:
+                self.wfile.write(response)
+            except SocketError as e:
+                self.server.swap_client.log.debug(f"do_GET SocketError {e}")
+        finally:
+            pass
 
     def do_POST(self):
-        content_length = int(self.headers.get("Content-Length", 0))
-        post_string = self.rfile.read(content_length)
-
-        is_json = True if "json" in self.headers.get("Content-Type", "") else False
-        response = self.handle_http(200, self.path, post_string, is_json)
         try:
-            self.wfile.write(response)
-        except SocketError as e:
-            self.server.swap_client.log.debug(f"do_POST SocketError {e}")
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_string = self.rfile.read(content_length)
+
+            is_json = True if "json" in self.headers.get("Content-Type", "") else False
+            response = self.handle_http(200, self.path, post_string, is_json)
+            try:
+                self.wfile.write(response)
+            except SocketError as e:
+                self.server.swap_client.log.debug(f"do_POST SocketError {e}")
+        finally:
+            pass
 
     def do_HEAD(self):
         self.putHeaders(200, "text/html")
@@ -963,7 +978,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-class HttpThread(threading.Thread, HTTPServer):
+class HttpThread(threading.Thread, ThreadingHTTPServer):
+    daemon_threads = True
+
     def __init__(self, host_name, port_no, allow_cors, swap_client):
         threading.Thread.__init__(self)
 
@@ -979,8 +996,15 @@ class HttpThread(threading.Thread, HTTPServer):
         self.env = env
         self.msg_id_counter = 0
 
+        self.session_lock = threading.Lock()
+        self.form_id_lock = threading.Lock()
+        self.msg_id_lock = threading.Lock()
+
         self.timeout = 60
-        HTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)
+        ThreadingHTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)
+
+        if swap_client.debug:
+            swap_client.log.info("HTTP server initialized with threading support")
 
     def stop(self):
         self.stop_event.set()

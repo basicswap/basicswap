@@ -293,8 +293,14 @@ def test_swap_dir(driver):
         try:
             bid_rows = dict()
             table = driver.find_element(By.XPATH, "//tbody[@id='active-swaps-body']")
-            for row in table.find_elements(By.XPATH, ".//tr"):
+            rows = table.find_elements(By.XPATH, ".//tr")
+            if len(rows) == 0:
+                time.sleep(2)
+                continue
+            for row in rows:
                 tds = row.find_elements(By.XPATH, ".//td")
+                if len(tds) < 6:
+                    continue
                 td_details = tds[2]
                 td_send = tds[5]
                 td_recv = tds[3]
@@ -336,8 +342,14 @@ def test_swap_dir(driver):
         try:
             bid_rows = dict()
             table = driver.find_element(By.XPATH, "//tbody[@id='active-swaps-body']")
-            for row in table.find_elements(By.XPATH, ".//tr"):
+            rows = table.find_elements(By.XPATH, ".//tr")
+            if len(rows) == 0:
+                time.sleep(2)
+                continue
+            for row in rows:
                 tds = row.find_elements(By.XPATH, ".//td")
+                if len(tds) < 6:
+                    continue
                 td_details = tds[2]
                 td_send = tds[5]
                 td_recv = tds[3]

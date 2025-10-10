@@ -711,17 +711,25 @@ def process_offers(args, config, script_state) -> None:
                 print(f"Wallet data: {wallet_from}")
             continue
 
-        for offer in sent_offers:
-            created_offers = script_state.get("offers", {})
-            prev_template_offers = created_offers.get(offer_template["name"], {})
+        created_offers = script_state.get("offers", {})
+        prev_template_offers = created_offers.get(offer_template["name"], [])
 
-            if next(
-                (x for x in prev_template_offers if x["offer_id"] == offer["offer_id"]),
-                None,
-            ):
+        template_offer_ids = set()
+        for prev_offer in prev_template_offers:
+            if "offer_id" in prev_offer:
+                template_offer_ids.add(prev_offer["offer_id"])
+
+        matching_sent_offers = []
+        for offer in sent_offers:
+            offer_id = offer.get("offer_id")
+            if not offer_id:
+                continue
+
+            if offer_id in template_offer_ids:
+                matching_sent_offers.append(offer)
                 offers_found += 1
+
                 if wallet_balance <= float(offer_template["min_coin_from_amt"]):
-                    offer_id = offer["offer_id"]
                     print(
                         "Revoking offer {}, wallet from balance below minimum".format(
                             offer_id
@@ -732,6 +740,57 @@ def process_offers(args, config, script_state) -> None:
                         print("revokeoffer", result)
                     else:
                         print("Offer revoked successfully")
+            else:
+                coin_from_match = offer.get("coin_from") == coin_from_data["id"]
+                coin_to_match = offer.get("coin_to") == coin_to_data["id"]
+
+                if coin_from_match and coin_to_match:
+                    if args.debug:
+                        print(
+                            f"Found untracked offer {offer_id} matching template {offer_template['name']} coins"
+                        )
+                    matching_sent_offers.append(offer)
+                    offers_found += 1
+
+        if len(matching_sent_offers) > 1:
+            print(
+                f"WARNING: Found {len(matching_sent_offers)} active offers for template '{offer_template['name']}'"
+            )
+            if args.debug:
+                print(f"Offer IDs: {[o.get('offer_id') for o in matching_sent_offers]}")
+
+            matching_sent_offers.sort(
+                key=lambda x: x.get("created_at", 0), reverse=True
+            )
+            newest_offer = matching_sent_offers[0]
+
+            for old_offer in matching_sent_offers[1:]:
+                old_offer_id = old_offer.get("offer_id")
+                print(f"Revoking duplicate offer {old_offer_id}")
+                try:
+                    result = read_json_api(f"revokeoffer/{old_offer_id}")
+                    if args.debug:
+                        print(f"Revoke result: {result}")
+
+                    for i, prev_offer in enumerate(prev_template_offers):
+                        if prev_offer.get("offer_id") == old_offer_id:
+                            del prev_template_offers[i]
+                            break
+                except Exception as e:
+                    print(f"Error revoking duplicate offer {old_offer_id}: {e}")
+
+            offers_found = 1
+
+            if newest_offer.get("offer_id") not in template_offer_ids:
+                if "offers" not in script_state:
+                    script_state["offers"] = {}
+                if offer_template["name"] not in script_state["offers"]:
+                    script_state["offers"][offer_template["name"]] = []
+                script_state["offers"][offer_template["name"]].append(
+                    {"offer_id": newest_offer["offer_id"], "time": int(time.time())}
+                )
+                write_state(args.statefile, script_state)
+                print(f"Added untracked offer {newest_offer['offer_id']} to state")
 
         if offers_found > 0:
             continue

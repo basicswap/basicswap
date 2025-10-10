@@ -61,53 +61,8 @@ const AmmTablesManager = (function() {
     }
 
     function getCoinDisplayName(coinId) {
-        if (config.debug) {
-            console.log('[AMM Tables] getCoinDisplayName called with:', coinId, typeof coinId);
-        }
-
-        if (typeof coinId === 'string') {
-            const lowerCoinId = coinId.toLowerCase();
-
-            if (lowerCoinId === 'part_anon' ||
-                lowerCoinId === 'particl_anon' ||
-                lowerCoinId === 'particl anon') {
-                if (config.debug) {
-                    console.log('[AMM Tables] Matched Particl Anon variant:', coinId);
-                }
-                return 'Particl Anon';
-            }
-
-            if (lowerCoinId === 'part_blind' ||
-                lowerCoinId === 'particl_blind' ||
-                lowerCoinId === 'particl blind') {
-                if (config.debug) {
-                    console.log('[AMM Tables] Matched Particl Blind variant:', coinId);
-                }
-                return 'Particl Blind';
-            }
-
-            if (lowerCoinId === 'ltc_mweb' ||
-                lowerCoinId === 'litecoin_mweb' ||
-                lowerCoinId === 'litecoin mweb') {
-                if (config.debug) {
-                    console.log('[AMM Tables] Matched Litecoin MWEB variant:', coinId);
-                }
-                return 'Litecoin MWEB';
-            }
-        }
-
         if (window.CoinManager && window.CoinManager.getDisplayName) {
-            const displayName = window.CoinManager.getDisplayName(coinId);
-            if (displayName) {
-                if (config.debug) {
-                    console.log('[AMM Tables] CoinManager returned:', displayName);
-                }
-                return displayName;
-            }
-        }
-
-        if (config.debug) {
-            console.log('[AMM Tables] Returning coin name as-is:', coinId);
+            return window.CoinManager.getDisplayName(coinId) || coinId;
         }
         return coinId;
     }
@@ -303,7 +258,6 @@ const AmmTablesManager = (function() {
             `;
         });
 
-
         if (offersBody.innerHTML.trim() !== tableHtml.trim()) {
             offersBody.innerHTML = tableHtml;
         }
@@ -438,7 +392,6 @@ const AmmTablesManager = (function() {
             `;
         });
 
-
         if (bidsBody.innerHTML.trim() !== tableHtml.trim()) {
             bidsBody.innerHTML = tableHtml;
         }
@@ -540,7 +493,6 @@ const AmmTablesManager = (function() {
             coinPrice = window.latestPrices[coinName.toUpperCase()];
         }
 
-
         if (!coinPrice || isNaN(coinPrice)) {
             return null;
         }
@@ -550,6 +502,9 @@ const AmmTablesManager = (function() {
 
     function formatUSDPrice(usdValue) {
         if (!usdValue || isNaN(usdValue)) return '';
+        if (window.config && window.config.utils && window.config.utils.formatPrice) {
+            return `($${window.config.utils.formatPrice('USD', usdValue)} USD)`;
+        }
         return `($${usdValue.toFixed(2)} USD)`;
     }
 
@@ -728,7 +683,6 @@ const AmmTablesManager = (function() {
         const isMakerDropdown = select.id.includes('coin-from');
         const isTakerDropdown = select.id.includes('coin-to');
 
-
         const addModal = document.getElementById('add-amm-modal');
         const editModal = document.getElementById('edit-amm-modal');
         const addModalVisible = addModal && !addModal.classList.contains('hidden');
@@ -755,7 +709,6 @@ const AmmTablesManager = (function() {
             }
         }
 
-
         const result = isBidModal ? isTakerDropdown : isMakerDropdown;
 
         console.log(`[DEBUG] shouldDropdownOptionsShowBalance: ${select.id}, isBidModal=${isBidModal}, isMaker=${isMakerDropdown}, isTaker=${isTakerDropdown}, result=${result}`);
@@ -773,10 +726,8 @@ const AmmTablesManager = (function() {
             const wrapper = select.parentNode.querySelector('.relative');
             if (!wrapper) return;
 
-
             const dropdown = wrapper.querySelector('[role="listbox"]');
             if (!dropdown) return;
-
 
             const options = dropdown.querySelectorAll('[data-value]');
             options.forEach(optionElement => {
@@ -784,10 +735,8 @@ const AmmTablesManager = (function() {
                 const originalOption = Array.from(select.options).find(opt => opt.value === coinValue);
                 if (!originalOption) return;
 
-
                 const textContainer = optionElement.querySelector('div.flex.flex-col, div.flex.items-center');
                 if (!textContainer) return;
-
 
                 textContainer.innerHTML = '';
 
@@ -828,7 +777,6 @@ const AmmTablesManager = (function() {
         });
     }
 
-
     function refreshDropdownBalances() {
         const dropdownIds = ['add-amm-coin-from', 'add-amm-coin-to', 'edit-amm-coin-from', 'edit-amm-coin-to'];
 
@@ -838,7 +786,6 @@ const AmmTablesManager = (function() {
 
             const wrapper = select.parentNode.querySelector('.relative');
             if (!wrapper) return;
-
 
             const dropdownItems = wrapper.querySelectorAll('[data-value]');
             dropdownItems.forEach(item => {
@@ -851,7 +798,6 @@ const AmmTablesManager = (function() {
                     const balanceDiv = item.querySelector('.text-xs');
                     if (balanceDiv) {
                         balanceDiv.textContent = `Balance: ${balance}`;
-
 
                         let pendingDiv = item.querySelector('.text-green-500');
                         if (pendingBalance && parseFloat(pendingBalance) > 0) {
@@ -879,7 +825,6 @@ const AmmTablesManager = (function() {
                     const pendingBalance = selectedOption.getAttribute('data-pending-balance') || '';
 
                     balanceDiv.textContent = `Balance: ${balance}`;
-
 
                     let pendingDiv = textContainer.querySelector('.text-green-500');
                     if (pendingBalance && parseFloat(pendingBalance) > 0) {
@@ -940,9 +885,7 @@ const AmmTablesManager = (function() {
 
         if (!coinFromSelect || !coinToSelect) return;
 
-
         const balanceData = {};
-
 
         Array.from(coinFromSelect.options).forEach(option => {
             const balance = option.getAttribute('data-balance');
@@ -951,14 +894,12 @@ const AmmTablesManager = (function() {
             }
         });
 
-
         Array.from(coinToSelect.options).forEach(option => {
             const balance = option.getAttribute('data-balance');
             if (balance) {
                 balanceData[option.value] = balance;
             }
         });
-
 
         updateDropdownOptions(coinFromSelect, balanceData);
         updateDropdownOptions(coinToSelect, balanceData);
@@ -970,10 +911,8 @@ const AmmTablesManager = (function() {
             const balance = balanceData[coinName] || '0.00000000';
             const pending = pendingData[coinName] || '0.0';
 
-
             option.setAttribute('data-balance', balance);
             option.setAttribute('data-pending-balance', pending);
-
 
             option.textContent = coinName;
         });
@@ -981,7 +920,6 @@ const AmmTablesManager = (function() {
 
     function createSimpleDropdown(select, showBalance = false) {
         if (!select) return;
-
 
         const existingWrapper = select.parentNode.querySelector('.relative');
         if (existingWrapper) {
@@ -994,12 +932,10 @@ const AmmTablesManager = (function() {
         const wrapper = document.createElement('div');
         wrapper.className = 'relative';
 
-
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'flex items-center justify-between w-full p-2.5 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white';
         button.style.minHeight = '60px';
-
 
         const displayContent = document.createElement('div');
         displayContent.className = 'flex items-center';
@@ -1019,10 +955,8 @@ const AmmTablesManager = (function() {
         button.appendChild(displayContent);
         button.appendChild(arrow);
 
-
         const dropdown = document.createElement('div');
         dropdown.className = 'absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden dark:bg-gray-700 dark:border-gray-600 max-h-60 overflow-y-auto';
-
 
         Array.from(select.options).forEach(option => {
             const item = document.createElement('div');
@@ -1047,7 +981,6 @@ const AmmTablesManager = (function() {
                     <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${balance}</div>
                 `;
 
-
                 if (pendingBalance && parseFloat(pendingBalance) > 0) {
                     html += `<div class="text-green-500 text-xs">+${pendingBalance} pending</div>`;
                 }
@@ -1061,10 +994,8 @@ const AmmTablesManager = (function() {
             item.appendChild(itemIcon);
             item.appendChild(itemText);
 
-
             item.addEventListener('click', function() {
                 select.value = this.getAttribute('data-value');
-
 
                 const selectedOption = select.options[select.selectedIndex];
                 const selectedCoinName = selectedOption.textContent.trim();
@@ -1079,7 +1010,6 @@ const AmmTablesManager = (function() {
                         <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${selectedBalance}</div>
                     `;
 
-
                     if (selectedPendingBalance && parseFloat(selectedPendingBalance) > 0) {
                         html += `<div class="text-green-500 text-xs">+${selectedPendingBalance} pending</div>`;
                     }
@@ -1093,14 +1023,12 @@ const AmmTablesManager = (function() {
 
                 dropdown.classList.add('hidden');
 
-
                 const event = new Event('change', { bubbles: true });
                 select.dispatchEvent(event);
             });
 
             dropdown.appendChild(item);
         });
-
 
         const selectedOption = select.options[select.selectedIndex];
         if (selectedOption) {
@@ -1116,7 +1044,6 @@ const AmmTablesManager = (function() {
                     <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${selectedBalance}</div>
                 `;
 
-
                 if (selectedPendingBalance && parseFloat(selectedPendingBalance) > 0) {
                     html += `<div class="text-green-500 text-xs">+${selectedPendingBalance} pending</div>`;
                 }
@@ -1129,11 +1056,9 @@ const AmmTablesManager = (function() {
             }
         }
 
-
         button.addEventListener('click', function() {
             dropdown.classList.toggle('hidden');
         });
-
 
         document.addEventListener('click', function(e) {
             if (!wrapper.contains(e.target)) {
@@ -1267,7 +1192,6 @@ const AmmTablesManager = (function() {
             modalTitle.textContent = `Add New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
         }
 
-
         const modal = document.getElementById('add-amm-modal');
         if (modal) {
             modal.classList.remove('hidden');
@@ -1275,16 +1199,13 @@ const AmmTablesManager = (function() {
             modal.setAttribute('data-amm-type', type);
         }
 
-
         setTimeout(() => {
 
             updateDropdownsForModalType('add');
 
             initializeCustomSelects(type);
 
-
             refreshDropdownBalanceDisplay(type);
-
 
             if (typeof fetchBalanceData === 'function') {
                 fetchBalanceData()
@@ -1721,7 +1642,6 @@ const AmmTablesManager = (function() {
                 modalTitle.textContent = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
             }
 
-
             const modal = document.getElementById('edit-amm-modal');
             if (modal) {
                 modal.classList.remove('hidden');
@@ -1729,16 +1649,13 @@ const AmmTablesManager = (function() {
                 modal.setAttribute('data-amm-type', type);
             }
 
-
             setTimeout(() => {
 
                 updateDropdownsForModalType('edit');
 
                 initializeCustomSelects(type);
 
-
                 refreshDropdownBalanceDisplay(type);
-
 
                 if (typeof fetchBalanceData === 'function') {
                     fetchBalanceData()
@@ -1872,7 +1789,6 @@ const AmmTablesManager = (function() {
             dropdown.classList.add('hidden');
         });
     }
-
 
     function closeEditModal() {
         const modal = document.getElementById('edit-amm-modal');
@@ -2306,14 +2222,11 @@ const AmmTablesManager = (function() {
             document.getElementById('edit-offer-swap-type')
         ];
 
-
-
         function createSwapTypeDropdown(select) {
             if (!select) return;
 
-
             if (select.style.display === 'none' && select.parentNode.querySelector('.relative')) {
-                return; // Custom dropdown already exists
+                return; 
             }
 
             const wrapper = document.createElement('div');
@@ -2416,9 +2329,9 @@ const AmmTablesManager = (function() {
 
             let showBalance = false;
             if (modalType === 'offer' && select.id.includes('coin-from')) {
-                showBalance = true; // OFFER: maker shows balance
+                showBalance = true; 
             } else if (modalType === 'bid' && select.id.includes('coin-to')) {
-                showBalance = true; // BID: taker shows balance
+                showBalance = true; 
             }
 
             createSimpleDropdown(select, showBalance);
@@ -2720,7 +2633,7 @@ const AmmTablesManager = (function() {
                             icon.classList.remove('animate-spin');
                         }
                         refreshButton.disabled = false;
-                    }, 500); // Reduced from 1000ms to 500ms
+                    }, 500); 
                 }
             });
         }

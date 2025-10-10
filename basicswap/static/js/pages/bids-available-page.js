@@ -53,9 +53,9 @@ const getTimeStrokeColor = (expireTime) => {
     const now = Math.floor(Date.now() / 1000);
     const timeLeft = expireTime - now;
 
-    if (timeLeft <= 300) return '#9CA3AF'; // 5 minutes or less
-    if (timeLeft <= 1800) return '#3B82F6'; // 30 minutes or less
-    return '#10B981'; // More than 30 minutes
+    if (timeLeft <= 300) return '#9CA3AF'; 
+    if (timeLeft <= 1800) return '#3B82F6'; 
+    return '#10B981'; 
 };
 
 const createTimeTooltip = (bid) => {
@@ -249,7 +249,7 @@ const updateLoadingState = (isLoading) => {
         const refreshText = elements.refreshBidsButton.querySelector('#refreshText');
 
         if (refreshIcon) {
-            // Add CSS transition for smoother animation
+            
             refreshIcon.style.transition = 'transform 0.3s ease';
             refreshIcon.classList.toggle('animate-spin', isLoading);
         }
@@ -631,7 +631,7 @@ if (elements.refreshBidsButton) {
 
         updateLoadingState(true);
 
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => CleanupManager.setTimeout(resolve, 500));
 
         try {
             await updateBidsTable({ resetPage: true, refreshData: true });

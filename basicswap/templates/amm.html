@@ -1,5 +1,6 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, input_arrow_down_svg, arrow_right_svg, input_time_svg %}
+{% from 'style.html' import page_back_svg, page_forwards_svg, filter_clear_svg, filter_apply_svg, input_arrow_down_svg, arrow_right_svg, input_time_svg %}
+{% from 'macros.html' import page_header %}
 
 <script>
   window.ammTablesConfig = {
@@ -9,31 +10,16 @@
   };
 </script>
 
-<section class="py-3 px-4 mt-6">
-  <div class="lg:container lg:px-4 mx-auto">
-   <div class="relative py-8 px-16 bg-coolGray-900 dark:bg-gray-800 rounded-md overflow-hidden">
-    <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-    <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-    <div class="relative z-20 flex flex-wrap items-center -m-3">
-     <div class="w-full md:w-1/2 p-3">
-      <h2 class="text-2xl font-bold text-white tracking-tighter">Automated Market Maker</h2>
-      <p class="hidden lg:flex mt-3 font-normal text-coolGray-200 dark:text-white">
-        Automatically create offers and bids based on your configuration.
-      </p>
-     </div>
-    </div>
-   </div>
-  </div>
- </section>
+{{ page_header('Automated Market Maker', 'Automatically create offers and bids based on your configuration.', dark_bg='dark:bg-gray-500') }}
 
 <div class="xl:container mx-auto">
 {% include 'inc_messages.html' %}
 
  <section>
-  <div class="lg:container px-4 mx-auto">
+  <div class="lg:container mx-auto mt-6 lg:px-0 px-6">
    <div class="flex flex-wrap -mx-4">
     <div class="w-full px-4 mb-8">
-     <div class="p-6 px-0 lg:px-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+     <div class="p-6 px-0 lg:px-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
       <div class="flex sm:pr-6 lg:pr-0 justify-end items-center">
         <div class="flex space-x-2">
           <button id="add-new-offer-btn" class="flex items-center px-4 py-2.5 bg-green-600 hover:bg-green-700 border-green-600 font-medium text-sm text-white border rounded-md shadow-button focus:ring-0 focus:outline-none">
@@ -189,8 +175,8 @@
  <section>
   <div class="lg:container px-4 mx-auto">
    <div class="flex flex-wrap -mx-4">
-    <div class="w-full lg:w-1/2 px-4 mb-8">
-     <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+    <div class="w-full lg:w-1/2 pr-4 mb-8">
+     <div class="p-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
       <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">Control</h3>
       <form method="post" autocomplete="off">
        <div class="mb-4">
@@ -295,7 +281,7 @@
      </div>
 
      {% if debug_ui_mode %}
-     <div class="mt-6 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+     <div class="mt-6 p-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
       <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">Files</h3>
       <div class="mb-4">
        <p class="text-sm text-gray-700 dark:text-gray-300">
@@ -327,8 +313,8 @@
      {% endif %}
     </div>
 
-    <div class="w-full lg:w-1/2 px-4 mb-8">
-     <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+    <div class="w-full lg:w-1/2 pl-4 mb-8">
+     <div class="p-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
       <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">Configuration</h3>
 
       <div class="mb-4 border-b pb-5 border-gray-200 dark:border-gray-500">
@@ -744,280 +730,12 @@
           </div>
         </div>
 
-       <script>
-         document.addEventListener('DOMContentLoaded', function() {
-
-           const configForm = document.querySelector('form[method="post"]');
-           const saveConfigBtn = document.getElementById('save_config_btn');
-
-           const jsonTab = document.getElementById('json-tab');
-           const settingsTab = document.getElementById('settings-tab');
-           const overviewTab = document.getElementById('overview-tab');
-           const jsonContent = document.getElementById('json-content');
-           const settingsContent = document.getElementById('settings-content');
-           const overviewContent = document.getElementById('overview-content');
-
-           const addOfferTab = document.getElementById('add-offer-tab');
-           const addBidTab = document.getElementById('add-bid-tab');
-           const addOfferContent = document.getElementById('add-offer-content');
-           const addBidContent = document.getElementById('add-bid-content');
-
-           if (jsonTab && settingsTab && overviewTab && jsonContent && settingsContent && overviewContent) {
-             const activeConfigTab = localStorage.getItem('amm_active_config_tab');
-
-             function switchConfigTab(tabId) {
-               jsonContent.classList.add('hidden');
-               jsonContent.classList.remove('block');
-               settingsContent.classList.add('hidden');
-               settingsContent.classList.remove('block');
-               overviewContent.classList.add('hidden');
-               overviewContent.classList.remove('block');
-
-               jsonTab.classList.remove('bg-gray-100', 'text-gray-900', 'dark:bg-gray-600', 'dark:text-white');
-               settingsTab.classList.remove('bg-gray-100', 'text-gray-900', 'dark:bg-gray-600', 'dark:text-white');
-               overviewTab.classList.remove('bg-gray-100', 'text-gray-900', 'dark:bg-gray-600', 'dark:text-white');
-
-               if (tabId === 'json-tab') {
-                 jsonContent.classList.remove('hidden');
-                 jsonContent.classList.add('block');
-                 jsonTab.classList.add('bg-gray-100', 'text-gray-900', 'dark:bg-gray-600', 'dark:text-white');
-                 localStorage.setItem('amm_active_config_tab', 'json-tab');
-               } else if (tabId === 'settings-tab') {
-                 settingsContent.classList.remove('hidden');
-                 settingsContent.classList.add('block');
-                 settingsTab.classList.add('bg-gray-100', 'text-gray-900', 'dark:bg-gray-600', 'dark:text-white');
-                 localStorage.setItem('amm_active_config_tab', 'settings-tab');
-
-                 loadSettingsFromJson();
-               } else if (tabId === 'overview-tab') {
-                 overviewContent.classList.remove('hidden');
-                 overviewContent.classList.add('block');
-                 overviewTab.classList.add('bg-gray-100', 'text-gray-900', 'dark:bg-gray-600', 'dark:text-white');
-                 localStorage.setItem('amm_active_config_tab', 'overview-tab');
-               }
-             }
-
-             function loadSettingsFromJson() {
-               const configTextarea = document.querySelector('textarea[name="config_content"]');
-               if (!configTextarea) return;
-
-               try {
-                 const configText = configTextarea.value.trim();
-                 if (!configText) return;
-
-                 const config = JSON.parse(configText);
-
-                 document.getElementById('min_seconds_between_offers').value = config.min_seconds_between_offers || 15;
-                 document.getElementById('max_seconds_between_offers').value = config.max_seconds_between_offers || 60;
-                 document.getElementById('main_loop_delay').value = config.main_loop_delay || 60;
-
-                 const minSecondsBetweenBidsEl = document.getElementById('min_seconds_between_bids');
-                 const maxSecondsBetweenBidsEl = document.getElementById('max_seconds_between_bids');
-                 const pruneStateDelayEl = document.getElementById('prune_state_delay');
-                 const pruneStateAfterSecondsEl = document.getElementById('prune_state_after_seconds');
-
-                 if (minSecondsBetweenBidsEl) minSecondsBetweenBidsEl.value = config.min_seconds_between_bids || 15;
-                 if (maxSecondsBetweenBidsEl) maxSecondsBetweenBidsEl.value = config.max_seconds_between_bids || 60;
-                 if (pruneStateDelayEl) pruneStateDelayEl.value = config.prune_state_delay || 120;
-                 if (pruneStateAfterSecondsEl) pruneStateAfterSecondsEl.value = config.prune_state_after_seconds || 604800;
-                 document.getElementById('auth').value = config.auth || '';
-               } catch (error) {
-                 console.error('Error loading settings from JSON:', error);
-               }
-             }
-
-             jsonTab.addEventListener('click', function() {
-               switchConfigTab('json-tab');
-             });
-
-             settingsTab.addEventListener('click', function() {
-               switchConfigTab('settings-tab');
-             });
-
-             overviewTab.addEventListener('click', function() {
-               switchConfigTab('overview-tab');
-             });
-
-             const returnToTab = localStorage.getItem('amm_return_to_tab');
-             if (returnToTab && (returnToTab === 'json-tab' || returnToTab === 'settings-tab' || returnToTab === 'overview-tab')) {
-               localStorage.removeItem('amm_return_to_tab');
-               switchConfigTab(returnToTab);
-             } else if (activeConfigTab === 'settings-tab') {
-               switchConfigTab('settings-tab');
-             } else if (activeConfigTab === 'overview-tab') {
-               switchConfigTab('overview-tab');
-             } else {
-               switchConfigTab('json-tab');
-             }
-
-             const globalSettingsForm = document.getElementById('global-settings-form');
-             if (globalSettingsForm) {
-               globalSettingsForm.addEventListener('submit', function(e) {
-                 updateJsonFromSettings();
-               });
-             }
-
-             function updateJsonFromSettings() {
-               const configTextarea = document.querySelector('textarea[name="config_content"]');
-               if (!configTextarea) return;
-
-               try {
-                 const configText = configTextarea.value.trim();
-                 if (!configText) return;
-
-                 const config = JSON.parse(configText);
-
-                 config.min_seconds_between_offers = parseInt(document.getElementById('min_seconds_between_offers').value) || 15;
-                 config.max_seconds_between_offers = parseInt(document.getElementById('max_seconds_between_offers').value) || 60;
-                 config.main_loop_delay = parseInt(document.getElementById('main_loop_delay').value) || 60;
-
-                 const minSecondsBetweenBidsEl = document.getElementById('min_seconds_between_bids');
-                 const maxSecondsBetweenBidsEl = document.getElementById('max_seconds_between_bids');
-                 const pruneStateDelayEl = document.getElementById('prune_state_delay');
-                 const pruneStateAfterSecondsEl = document.getElementById('prune_state_after_seconds');
-
-                 config.min_seconds_between_bids = minSecondsBetweenBidsEl ? parseInt(minSecondsBetweenBidsEl.value) || 15 : (config.min_seconds_between_bids || 15);
-                 config.max_seconds_between_bids = maxSecondsBetweenBidsEl ? parseInt(maxSecondsBetweenBidsEl.value) || 60 : (config.max_seconds_between_bids || 60);
-                 config.prune_state_delay = pruneStateDelayEl ? parseInt(pruneStateDelayEl.value) || 120 : (config.prune_state_delay || 120);
-                 config.prune_state_after_seconds = pruneStateAfterSecondsEl ? parseInt(pruneStateAfterSecondsEl.value) || 604800 : (config.prune_state_after_seconds || 604800);
-                 config.auth = document.getElementById('auth').value;
-
-                 delete config.adjust_rates_based_on_market;
-
-                 configTextarea.value = JSON.stringify(config, null, 4);
-               } catch (error) {
-                 console.error('Error updating JSON from settings:', error);
-               }
-             }
-
-           }
-
-           const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
-
-           if (collapsibleHeaders.length > 0) {
-             let collapsibleStates = {};
-             try {
-               const storedStates = localStorage.getItem('amm_collapsible_states');
-               if (storedStates) {
-                 collapsibleStates = JSON.parse(storedStates);
-               }
-             } catch (e) {
-               console.error('Error parsing stored collapsible states:', e);
-               collapsibleStates = {};
-             }
-
-             function toggleCollapsible(header) {
-               const targetId = header.getAttribute('data-target');
-               const content = document.getElementById(targetId);
-               const arrow = header.querySelector('svg');
-
-               if (content) {
-                 if (content.classList.contains('hidden')) {
-                   content.classList.remove('hidden');
-                   arrow.classList.add('rotate-180');
-                   collapsibleStates[targetId] = 'open';
-                 } else {
-                   content.classList.add('hidden');
-                   arrow.classList.remove('rotate-180');
-                   collapsibleStates[targetId] = 'closed';
-                 }
-
-                 localStorage.setItem('amm_collapsible_states', JSON.stringify(collapsibleStates));
-               }
-             }
-
-             collapsibleHeaders.forEach(header => {
-               const targetId = header.getAttribute('data-target');
-               const content = document.getElementById(targetId);
-               const arrow = header.querySelector('svg');
-
-               if (content) {
-                 if (collapsibleStates[targetId] === 'open') {
-                   content.classList.remove('hidden');
-                   arrow.classList.add('rotate-180');
-                 } else {
-                   content.classList.add('hidden');
-                   arrow.classList.remove('rotate-180');
-                   collapsibleStates[targetId] = 'closed';
-                 }
-               }
-
-               header.addEventListener('click', function() {
-                 toggleCollapsible(header);
-               });
-             });
-
-             localStorage.setItem('amm_collapsible_states', JSON.stringify(collapsibleStates));
-           }
-
-           if (configForm && saveConfigBtn) {
-             configForm.addEventListener('submit', function(e) {
-               if (e.submitter && e.submitter.name === 'save_config') {
-                 localStorage.setItem('amm_update_tables', 'true');
-               }
-             });
-
-             if (localStorage.getItem('amm_update_tables') === 'true') {
-               localStorage.removeItem('amm_update_tables');
-               setTimeout(function() {
-                 if (window.ammTablesManager && window.ammTablesManager.updateTables) {
-                   window.ammTablesManager.updateTables();
-                 }
-               }, 500);
-             }
-           }
-
-           if (localStorage.getItem('amm_create_default_refresh') === 'true') {
-             localStorage.removeItem('amm_create_default_refresh');
-
-
-             setTimeout(function() {
-               window.location.href = window.location.pathname + window.location.search;
-             }, 500);
-           }
-
-           const createDefaultBtn = document.getElementById('create_default_btn');
-           if (createDefaultBtn && configForm) {
-             createDefaultBtn.addEventListener('click', function(e) {
-               e.preventDefault();
-
-               const title = 'Create Default Configuration';
-               const message = 'This will overwrite your current configuration with a default template.\n\nAre you sure you want to continue?';
-
-               if (window.showConfirmModal) {
-                 window.showConfirmModal(title, message, function() {
-
-                   const hiddenInput = document.createElement('input');
-                   hiddenInput.type = 'hidden';
-                   hiddenInput.name = 'create_default';
-                   hiddenInput.value = 'true';
-                   configForm.appendChild(hiddenInput);
-
-                   localStorage.setItem('amm_create_default_refresh', 'true');
-
-                   configForm.submit();
-                 });
-               } else {
-                 if (confirm('This will overwrite your current configuration with a default template.\n\nAre you sure you want to continue?')) {
-                   const hiddenInput = document.createElement('input');
-                   hiddenInput.type = 'hidden';
-                   hiddenInput.name = 'create_default';
-                   hiddenInput.value = 'true';
-                   configForm.appendChild(hiddenInput);
-
-                   localStorage.setItem('amm_create_default_refresh', 'true');
-                   configForm.submit();
-                 }
-               }
-             });
-           }
-         });
-       </script>
+       <!-- AMM Configuration Tabs handled by external JS -->
       </form>
      </div>
 
      {% if state_exists and debug_ui_mode %}
-     <div class="mt-6 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+     <div class="mt-6 p-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
       <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">State File (JSON)</h3>
       <div class="mb-4">
        <div class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5 h-64 overflow-y-auto dark:bg-gray-700 dark:border-gray-600 dark:text-white">{{ state_content }}</div>
@@ -1036,10 +754,10 @@
    </div>
 
    {% if debug_ui_mode %}
-   <div class="mb-8">
-    <div class="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+   <div class="mb-8 -mx-4">
+    <div class="p-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
      <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">AMM Logs</h3>
-     <div class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 h-64 overflow-y-auto font-mono text-sm text-gray-900 dark:text-gray-200">
+     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 h-64 overflow-y-auto font-mono text-sm text-gray-900 dark:text-gray-200">
       {% if logs %}
        {% for log in logs %}
         <div class="mb-1">{{ log }}</div>
@@ -1117,9 +835,9 @@
                     <label for="add-amm-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Amount <span class="text-red-500">*</span></label>
                     <input type="text" id="add-amm-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
                     <div class="mt-2 flex space-x-2">
-                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.25, 'add-amm-amount')">25%</button>
-                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.5, 'add-amm-amount')">50%</button>
-                      <button type="button" class="py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(1, 'add-amm-amount')">100%</button>
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" data-set-amm-amount="0.25" data-input-id="add-amm-amount">25%</button>
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" data-set-amm-amount="0.5" data-input-id="add-amm-amount">50%</button>
+                      <button type="button" class="py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" data-set-amm-amount="1" data-input-id="add-amm-amount">100%</button>
                     </div>
                   </div>
 
@@ -1404,9 +1122,9 @@
                     <label for="edit-amm-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Amount <span class="text-red-500">*</span></label>
                     <input type="text" id="edit-amm-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
                     <div class="mt-2 flex space-x-2">
-                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.25, 'edit-amm-amount')">25%</button>
-                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(0.5, 'edit-amm-amount')">50%</button>
-                      <button type="button" class="py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" onclick="setAmmAmount(1, 'edit-amm-amount')">100%</button>
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" data-set-amm-amount="0.25" data-input-id="edit-amm-amount">25%</button>
+                      <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" data-set-amm-amount="0.5" data-input-id="edit-amm-amount">50%</button>
+                      <button type="button" class="py-1 px-2 bg-blue-500 text-white text-xs rounded-md focus:outline-none" data-set-amm-amount="1" data-input-id="edit-amm-amount">100%</button>
                     </div>
                   </div>
 
@@ -1671,550 +1389,8 @@
   </div>
 </div>
 
-<script src="/static/js/amm_tables.js"></script>
-  <script>
-    function saveDebugSetting() {
-      const debugCheckbox = document.getElementById('debug-mode');
-      if (debugCheckbox) {
-        localStorage.setItem('amm_debug_enabled', debugCheckbox.checked);
-      }
-    }
-
-    function loadDebugSetting() {
-      const debugCheckbox = document.getElementById('debug-mode');
-      if (debugCheckbox) {
-        const savedSetting = localStorage.getItem('amm_debug_enabled');
-        if (savedSetting !== null) {
-          debugCheckbox.checked = savedSetting === 'true';
-        }
-      }
-    }
-
-    function saveAutostartSetting(checked) {
-      const bodyData = `autostart=${checked ? 'true' : 'false'}`;
-
-      fetch('/amm/autostart', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: bodyData
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          localStorage.setItem('amm_autostart_enabled', checked);
-
-          if (data.autostart !== checked) {
-            console.warn('WARNING: API returned different autostart value than expected!', {
-              sent: checked,
-              received: data.autostart
-            });
-          }
-        } else {
-          console.error('Failed to save autostart setting:', data.error);
-          const autostartCheckbox = document.getElementById('autostart-amm');
-          if (autostartCheckbox) {
-            autostartCheckbox.checked = !checked;
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Error saving autostart setting:', error);
-        const autostartCheckbox = document.getElementById('autostart-amm');
-        if (autostartCheckbox) {
-          autostartCheckbox.checked = !checked;
-        }
-      });
-    }
-
-    function setupAutostartCheckbox() {
-      const autostartCheckbox = document.getElementById('autostart-amm');
-      if (autostartCheckbox) {
-        autostartCheckbox.addEventListener('change', function() {
-          saveAutostartSetting(this.checked);
-        });
-      }
-    }
-
-    function showErrorModal(title, message) {
-      document.getElementById('errorTitle').textContent = title || 'Error';
-      document.getElementById('errorMessage').textContent = message || 'An error occurred';
-      const modal = document.getElementById('errorModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-      }
-    }
-
-    function hideErrorModal() {
-      const modal = document.getElementById('errorModal');
-      if (modal) {
-        modal.classList.add('hidden');
-      }
-    }
-
-    function showConfirmModal(title, message, callback) {
-      document.getElementById('confirmTitle').textContent = title || 'Confirm Action';
-      document.getElementById('confirmMessage').textContent = message || 'Are you sure?';
-      const modal = document.getElementById('confirmModal');
-      if (modal) {
-        modal.classList.remove('hidden');
-      }
-
-      window.confirmCallback = callback;
-    }
-
-    function hideConfirmModal() {
-      const modal = document.getElementById('confirmModal');
-      if (modal) {
-        modal.classList.add('hidden');
-      }
-      window.confirmCallback = null;
-    }
-
-    function setupStartupValidation() {
-      const controlForm = document.querySelector('form[method="post"]');
-      if (!controlForm) return;
-
-      const startButton = controlForm.querySelector('input[name="start"]');
-      if (!startButton) return;
-
-      startButton.addEventListener('click', function(e) {
-        e.preventDefault();
-        performStartupValidation();
-      });
-    }
-
-    function performStartupValidation() {
-      const feedbackDiv = document.getElementById('startup-feedback');
-      const titleEl = document.getElementById('startup-title');
-      const messageEl = document.getElementById('startup-message');
-      const progressBar = document.getElementById('startup-progress-bar');
-
-      feedbackDiv.classList.remove('hidden');
-
-      let progress = 0;
-      const steps = [
-        { message: 'Checking configuration...', progress: 20 },
-        { message: 'Validating offers and bids...', progress: 40 },
-        { message: 'Checking wallet balances...', progress: 60 },
-        { message: 'Verifying API connection...', progress: 80 },
-        { message: 'Starting AMM process...', progress: 100 }
-      ];
-
-      let currentStep = 0;
-
-      function runNextStep() {
-        if (currentStep >= steps.length) {
-          submitStartForm();
-          return;
-        }
-
-        const step = steps[currentStep];
-        messageEl.textContent = step.message;
-        progressBar.style.width = step.progress + '%';
-
-        setTimeout(() => {
-          validateStep(currentStep).then(result => {
-            if (result.success) {
-              currentStep++;
-              runNextStep();
-            } else {
-              showStartupError(result.error);
-            }
-          }).catch(error => {
-            showStartupError('Validation failed: ' + error.message);
-          });
-        }, 500);
-      }
-
-      runNextStep();
-    }
-
-    async function validateStep(stepIndex) {
-      try {
-        switch (stepIndex) {
-          case 0:
-            return await validateConfiguration();
-          case 1:
-            return await validateOffersAndBids();
-          case 2:
-            return await validateWalletBalances();
-          case 3:
-            return await validateApiConnection();
-          case 4:
-            return { success: true };
-          default:
-            return { success: true };
-        }
-      } catch (error) {
-        return { success: false, error: error.message };
-      }
-    }
-
-    async function validateConfiguration() {
-      const configData = window.ammTablesConfig?.configData;
-      if (!configData) {
-        return { success: false, error: 'No configuration found. Please save a configuration first.' };
-      }
-
-      if (!configData.min_seconds_between_offers || !configData.max_seconds_between_offers) {
-        return { success: false, error: 'Missing timing configuration. Please check your settings.' };
-      }
-
-      return { success: true };
-    }
-
-    async function validateOffersAndBids() {
-      const configData = window.ammTablesConfig?.configData;
-      if (!configData) {
-        return { success: false, error: 'Configuration not available for validation.' };
-      }
-
-      const offers = configData.offers || [];
-      const bids = configData.bids || [];
-      const enabledOffers = offers.filter(o => o.enabled);
-      const enabledBids = bids.filter(b => b.enabled);
-
-      if (enabledOffers.length === 0 && enabledBids.length === 0) {
-        return { success: false, error: 'No enabled offers or bids found. Please enable at least one offer or bid before starting.' };
-      }
-
-      for (const offer of enabledOffers) {
-        if (!offer.amount_step) {
-          return { success: false, error: `Offer "${offer.name}" is missing required Amount Step (privacy feature).` };
-        }
-
-        const amountStep = parseFloat(offer.amount_step);
-        const amount = parseFloat(offer.amount);
-
-        if (amountStep <= 0 || amountStep < 0.001) {
-          return { success: false, error: `Offer "${offer.name}" has invalid Amount Step. Must be >= 0.001.` };
-        }
-
-        if (amountStep > amount) {
-          return { success: false, error: `Offer "${offer.name}" Amount Step (${amountStep}) cannot be greater than offer amount (${amount}).` };
-        }
-      }
-
-      return { success: true };
-    }
-
-    async function validateWalletBalances() {
-      const configData = window.ammTablesConfig?.configData;
-      if (!configData) return { success: true };
-
-      const offers = configData.offers || [];
-      const enabledOffers = offers.filter(o => o.enabled);
-
-      for (const offer of enabledOffers) {
-        if (!offer.min_coin_from_amt || parseFloat(offer.min_coin_from_amt) <= 0) {
-          return { success: false, error: `Offer "${offer.name}" needs a minimum coin amount to protect your wallet balance.` };
-        }
-      }
-
-      return { success: true };
-    }
-
-    async function validateApiConnection() {
-      return { success: true };
-    }
-
-    function showStartupError(errorMessage) {
-      const feedbackDiv = document.getElementById('startup-feedback');
-      feedbackDiv.classList.add('hidden');
-
-      if (window.showErrorModal) {
-        window.showErrorModal('AMM Startup Failed', errorMessage);
-      } else {
-        alert('AMM Startup Failed: ' + errorMessage);
-      }
-    }
-
-    function submitStartForm() {
-      const feedbackDiv = document.getElementById('startup-feedback');
-      const titleEl = document.getElementById('startup-title');
-      const messageEl = document.getElementById('startup-message');
-
-      titleEl.textContent = 'Starting AMM...';
-      messageEl.textContent = 'AMM process is starting. Please wait...';
-
-      const controlForm = document.querySelector('form[method="post"]');
-      if (controlForm) {
-        const formData = new FormData(controlForm);
-        formData.append('start', 'Start');
-
-        fetch(window.location.pathname, {
-          method: 'POST',
-          body: formData
-        }).then(response => {
-          if (response.ok) {
-            window.location.reload();
-          } else {
-            throw new Error('Failed to start AMM');
-          }
-        }).catch(error => {
-          showStartupError('Failed to start AMM: ' + error.message);
-        });
-      }
-    }
-
-    window.showErrorModal = showErrorModal;
-    window.hideErrorModal = hideErrorModal;
-    window.showConfirmModal = showConfirmModal;
-    window.hideConfirmModal = hideConfirmModal;
-
-    document.addEventListener('DOMContentLoaded', function() {
-      loadDebugSetting();
-      setupAutostartCheckbox();
-
-      setupStartupValidation();
-
-      const debugCheckbox = document.getElementById('debug-mode');
-      if (debugCheckbox) {
-        debugCheckbox.addEventListener('change', saveDebugSetting);
-      }
-
-      const errorOkBtn = document.getElementById('errorOk');
-      if (errorOkBtn) {
-        errorOkBtn.addEventListener('click', hideErrorModal);
-      }
-
-      const errorModal = document.getElementById('errorModal');
-      if (errorModal) {
-        errorModal.addEventListener('click', function(e) {
-          if (e.target === errorModal) {
-            hideErrorModal();
-          }
-        });
-      }
-
-      const confirmYesBtn = document.getElementById('confirmYes');
-      if (confirmYesBtn) {
-        confirmYesBtn.addEventListener('click', function() {
-          if (window.confirmCallback && typeof window.confirmCallback === 'function') {
-            window.confirmCallback();
-          }
-          hideConfirmModal();
-        });
-      }
-
-      const confirmNoBtn = document.getElementById('confirmNo');
-      if (confirmNoBtn) {
-        confirmNoBtn.addEventListener('click', hideConfirmModal);
-      }
-
-      const confirmModal = document.getElementById('confirmModal');
-      if (confirmModal) {
-        confirmModal.addEventListener('click', function(e) {
-          if (e.target === confirmModal) {
-            hideConfirmModal();
-          }
-        });
-      }
-
-      const clearStateBtn = document.getElementById('clearStateBtn');
-      if (clearStateBtn) {
-        clearStateBtn.addEventListener('click', function() {
-          showConfirmModal(
-            'Clear AMM State',
-            'This will clear the AMM state file. All running offers/bids will be lost. Are you sure?',
-            function() {
-              const form = clearStateBtn.closest('form');
-              if (form) {
-                const hiddenInput = document.createElement('input');
-                hiddenInput.type = 'hidden';
-                hiddenInput.name = 'prune_state';
-                hiddenInput.value = 'true';
-                form.appendChild(hiddenInput);
-                form.submit();
-              }
-            }
-          );
-        });
-      }
-    });
-
-    function setAmmAmount(percent, fieldId) {
-      const amountInput = document.getElementById(fieldId);
-      let coinSelect;
-
-
-      let modalType = null;
-      if (fieldId.includes('add-amm')) {
-        const addModal = document.getElementById('add-amm-modal');
-        modalType = addModal ? addModal.getAttribute('data-amm-type') : null;
-      } else if (fieldId.includes('edit-amm')) {
-        const editModal = document.getElementById('edit-amm-modal');
-        modalType = editModal ? editModal.getAttribute('data-amm-type') : null;
-      }
-
-
-      if (fieldId.includes('add-amm')) {
-        const isBidModal = modalType === 'bid';
-        coinSelect = document.getElementById(isBidModal ? 'add-amm-coin-to' : 'add-amm-coin-from');
-      } else if (fieldId.includes('edit-amm')) {
-        const isBidModal = modalType === 'bid';
-        coinSelect = document.getElementById(isBidModal ? 'edit-amm-coin-to' : 'edit-amm-coin-from');
-      }
-
-      if (!amountInput || !coinSelect) {
-        console.error('Required elements not found');
-        return;
-      }
-
-      const selectedOption = coinSelect.options[coinSelect.selectedIndex];
-      if (!selectedOption) {
-        alert('Please select a coin first');
-        return;
-      }
-
-      const balance = selectedOption.getAttribute('data-balance');
-      if (!balance) {
-        console.error('Balance not found for selected coin');
-        return;
-      }
-
-      const floatBalance = parseFloat(balance);
-      if (isNaN(floatBalance) || floatBalance <= 0) {
-        alert('Invalid balance for selected coin');
-        return;
-      }
-
-      const calculatedAmount = floatBalance * percent;
-      amountInput.value = calculatedAmount.toFixed(8);
-
-
-      const event = new Event('input', { bubbles: true });
-      amountInput.dispatchEvent(event);
-    }
-
-    function updateAmmModalBalances(balanceData) {
-      const addModal = document.getElementById('add-amm-modal');
-      const editModal = document.getElementById('edit-amm-modal');
-      const addModalVisible = addModal && !addModal.classList.contains('hidden');
-      const editModalVisible = editModal && !editModal.classList.contains('hidden');
-
-      let modalType = null;
-      if (addModalVisible) {
-        modalType = addModal.getAttribute('data-amm-type');
-      } else if (editModalVisible) {
-        modalType = editModal.getAttribute('data-amm-type');
-      }
-
-      if (modalType === 'offer') {
-        updateOfferDropdownBalances(balanceData);
-      } else if (modalType === 'bid') {
-        updateBidDropdownBalances(balanceData);
-      }
-    }
-
-    function setupWebSocketBalanceUpdates() {
-      window.BalanceUpdatesManager.setup({
-        contextKey: 'amm',
-        balanceUpdateCallback: updateAmmModalBalances,
-        swapEventCallback: updateAmmModalBalances,
-        errorContext: 'AMM',
-        enablePeriodicRefresh: true,
-        periodicInterval: 120000
-      });
-    }
-
-    function updateAmmDropdownBalances(balanceData) {
-
-      const balanceMap = {};
-      const pendingMap = {};
-      balanceData.forEach(coin => {
-        balanceMap[coin.name] = coin.balance;
-        pendingMap[coin.name] = coin.pending || '0.0';
-      });
-
-      const dropdownIds = ['add-amm-coin-from', 'edit-amm-coin-from', 'add-amm-coin-to', 'edit-amm-coin-to'];
-
-      dropdownIds.forEach(dropdownId => {
-        const select = document.getElementById(dropdownId);
-        if (!select) {
-          return;
-        }
-
-
-        Array.from(select.options).forEach(option => {
-          const coinName = option.value;
-          const balance = balanceMap[coinName] || '0.0';
-          const pending = pendingMap[coinName] || '0.0';
-
-          option.setAttribute('data-balance', balance);
-          option.setAttribute('data-pending-balance', pending);
-        });
-      });
-
-
-      const addModal = document.getElementById('add-amm-modal');
-      const editModal = document.getElementById('edit-amm-modal');
-      const addModalVisible = addModal && !addModal.classList.contains('hidden');
-      const editModalVisible = editModal && !editModal.classList.contains('hidden');
-
-      let currentModalType = null;
-      if (addModalVisible) {
-        currentModalType = addModal.getAttribute('data-amm-type');
-      } else if (editModalVisible) {
-        currentModalType = editModal.getAttribute('data-amm-type');
-      }
-
-      if (currentModalType && window.ammTablesManager) {
-        if (currentModalType === 'offer' && typeof window.ammTablesManager.refreshOfferDropdownBalanceDisplay === 'function') {
-          window.ammTablesManager.refreshOfferDropdownBalanceDisplay();
-        } else if (currentModalType === 'bid' && typeof window.ammTablesManager.refreshBidDropdownBalanceDisplay === 'function') {
-          window.ammTablesManager.refreshBidDropdownBalanceDisplay();
-        }
-      }
-    }
-
-    function updateOfferDropdownBalances(balanceData) {
-      updateAmmDropdownBalances(balanceData);
-    }
-
-    function updateBidDropdownBalances(balanceData) {
-      updateAmmDropdownBalances(balanceData);
-    }
-
-    function updateOfferCustomDropdownDisplay(select, balanceMap, pendingMap) {
-      console.log(`[DEBUG] updateOfferCustomDropdownDisplay called for ${select.id} - doing nothing`);
-
-    }
-
-    function updateBidCustomDropdownDisplay(select, balanceMap, pendingMap) {
-      console.log(`[DEBUG] updateBidCustomDropdownDisplay called for ${select.id} - doing nothing`);
-
-    }
-
-    function updateCustomDropdownDisplay(select, balanceMap, pendingMap) {
-      console.log(`[DEBUG] updateCustomDropdownDisplay called for ${select.id} - doing nothing`);
-
-    }
-
-    window.BalanceUpdatesManager.initialize();
-    setupWebSocketBalanceUpdates();
-
-    function cleanupAmmBalanceUpdates() {
-      window.BalanceUpdatesManager.cleanup('amm');
-
-      if (window.ammDropdowns) {
-        window.ammDropdowns.forEach(dropdown => {
-          if (dropdown.parentNode) {
-            dropdown.parentNode.removeChild(dropdown);
-          }
-        });
-        window.ammDropdowns = [];
-      }
-    }
-
-    if (window.CleanupManager) {
-      window.CleanupManager.registerResource('ammBalanceUpdates', null, cleanupAmmBalanceUpdates);
-    }
-
-    window.addEventListener('beforeunload', cleanupAmmBalanceUpdates);
-    window.setAmmAmount = setAmmAmount;
-  </script>
+<script src="/static/js/pages/amm-tables.js"></script>
+<script src="/static/js/pages/amm-config-tabs.js"></script>
+<script src="/static/js/pages/amm-page.js"></script>
 
 {% include 'footer.html' %}

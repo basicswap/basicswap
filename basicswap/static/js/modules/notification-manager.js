@@ -1,6 +1,5 @@
 const NotificationManager = (function() {
 
-
   const defaultConfig = {
     showNewOffers: false,
     showNewBids: true,
@@ -11,7 +10,6 @@ const NotificationManager = (function() {
     showUpdateNotifications: true,
     notificationDuration: 20000
   };
-
 
   function loadConfig() {
     const saved = localStorage.getItem('notification_settings');
@@ -24,7 +22,6 @@ const NotificationManager = (function() {
     }
     return { ...defaultConfig };
   }
-
 
   function saveConfig(newConfig) {
     try {
@@ -269,7 +266,6 @@ function ensureToastContainer() {
     return colors[type] || colors['success'];
   }
 
-// Todo: Remove later and use global.
   function getCoinDisplayName(coinId) {
     const coinMap = {
       1: 'PART',
@@ -292,25 +288,24 @@ function ensureToastContainer() {
     return coinMap[coinId] || `Coin ${coinId}`;
   }
 
-// Todo: Remove later.
   function formatCoinAmount(amount, coinId) {
     const divisors = {
-      1: 100000000,   // PART - 8 decimals
-      2: 100000000,   // BTC - 8 decimals
-      3: 100000000,   // LTC - 8 decimals
-      4: 100000000,   // DCR - 8 decimals
-      5: 100000000,   // NMC - 8 decimals
+      1: 100000000,     // PART - 8 decimals
+      2: 100000000,     // BTC - 8 decimals
+      3: 100000000,     // LTC - 8 decimals
+      4: 100000000,     // DCR - 8 decimals
+      5: 100000000,     // NMC - 8 decimals
       6: 1000000000000, // XMR - 12 decimals
-      7: 100000000,   // PART (Blind) - 8 decimals
-      8: 100000000,   // PART (Anon) - 8 decimals
-      9: 100000000000, // WOW - 11 decimals
-      11: 100000000,  // PIVX - 8 decimals
-      12: 100000000,  // DASH - 8 decimals
-      13: 100000000,  // FIRO - 8 decimals
-      14: 100000000,  // NAV - 8 decimals
-      15: 100000000,  // LTC (MWEB) - 8 decimals
-      17: 100000000,  // BCH - 8 decimals
-      18: 100000000   // DOGE - 8 decimals
+      7: 100000000,     // PART (Blind) - 8 decimals
+      8: 100000000,     // PART (Anon) - 8 decimals
+      9: 100000000000,  // WOW - 11 decimals
+      11: 100000000,    // PIVX - 8 decimals
+      12: 100000000,    // DASH - 8 decimals
+      13: 100000000,    // FIRO - 8 decimals
+      14: 100000000,    // NAV - 8 decimals
+      15: 100000000,    // LTC (MWEB) - 8 decimals
+      17: 100000000,    // BCH - 8 decimals
+      18: 100000000     // DOGE - 8 decimals
     };
 
     const divisor = divisors[coinId] || 100000000;
@@ -358,7 +353,7 @@ function ensureToastContainer() {
     testToasts: function() {
       if (!this.createToast) return;
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         this.createToast(
           '+0.05000000 PART',
           'balance_change',
@@ -366,7 +361,7 @@ function ensureToastContainer() {
         );
       }, 500);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         this.createToast(
           '+0.00123456 XMR',
           'balance_change',
@@ -374,7 +369,7 @@ function ensureToastContainer() {
         );
       }, 1000);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         this.createToast(
           '-29.86277595 PART',
           'balance_change',
@@ -382,7 +377,7 @@ function ensureToastContainer() {
         );
       }, 1500);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         this.createToast(
           '-0.05000000 PART (Anon)',
           'balance_change',
@@ -390,7 +385,7 @@ function ensureToastContainer() {
         );
       }, 2000);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         this.createToast(
           '+1.23456789 PART (Anon)',
           'balance_change',
@@ -398,33 +393,37 @@ function ensureToastContainer() {
         );
       }, 2500);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
+        const btcIcon = getCoinIcon('BTC');
+        const xmrIcon = getCoinIcon('XMR');
         this.createToast(
-          '<img src="/static/images/coins/bitcoin.svg" class="w-4 h-4 inline mr-1" alt="BTC" onerror="this.style.display=\'none\'">1.00000000 BTC → <img src="/static/images/coins/monero.svg" class="w-4 h-4 inline mr-1" alt="XMR" onerror="this.style.display=\'none\'">15.50000000 XMR',
+          'New Network Offer',
           'new_offer',
           {
             offerId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66',
-            subtitle: 'New offer • Rate: 1 BTC = 15.50000000 XMR',
+            subtitle: `<img src="/static/images/coins/${btcIcon}" class="w-4 h-4 inline mr-1" alt="BTC" onerror="this.style.display='none'">1.00000000 BTC → <img src="/static/images/coins/${xmrIcon}" class="w-4 h-4 inline mr-1" alt="XMR" onerror="this.style.display='none'">15.50000000 XMR<br>Rate: 1 BTC = 15.50000000 XMR`,
             coinFrom: 2,
             coinTo: 6
           }
         );
       }, 3000);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
+        const btcIcon = getCoinIcon('BTC');
+        const xmrIcon = getCoinIcon('XMR');
         this.createToast(
-          '<img src="/static/images/coins/bitcoin.svg" class="w-4 h-4 inline mr-1" alt="BTC" onerror="this.style.display=\'none\'">0.50000000 BTC → <img src="/static/images/coins/monero.svg" class="w-4 h-4 inline mr-1" alt="XMR" onerror="this.style.display=\'none\'">7.75000000 XMR',
+          'New Bid Received',
           'new_bid',
           {
             bidId: '000000006873f4ef17d4f220730400f4fdd57157492289c5d414ea66',
-            subtitle: 'New bid • Rate: 1 BTC = 15.50000000 XMR',
+            subtitle: `<img src="/static/images/coins/${btcIcon}" class="w-4 h-4 inline mr-1" alt="BTC" onerror="this.style.display='none'">0.50000000 BTC → <img src="/static/images/coins/${xmrIcon}" class="w-4 h-4 inline mr-1" alt="XMR" onerror="this.style.display='none'">7.75000000 XMR<br>Rate: 1 BTC = 15.50000000 XMR`,
             coinFrom: 2,
             coinTo: 6
           }
         );
       }, 3500);
 
-      setTimeout(() => {
+      CleanupManager.setTimeout(() => {
         this.createToast(
           'Swap completed successfully',
           'swap_completed',
@@ -435,25 +434,68 @@ function ensureToastContainer() {
         );
       }, 4000);
 
-      setTimeout(() => {
-        this.createToast(
-          'Update Available: v0.15.0',
-          'update_available',
-          {
-            subtitle: 'Current: v0.14.6 • Click to view release',
-            releaseUrl: 'https://github.com/basicswap/basicswap/releases/tag/v0.15.0',
-            releaseNotes: 'New version v0.15.0 is available. Click to view details on GitHub.'
+      CleanupManager.setTimeout(async () => {
+        try {
+          const response = await fetch('/json/checkupdates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          const data = await response.json();
+
+          if (data.error) {
+            console.warn('Test notification - API returned error, using fallback:', data.error);
+            this.createToast(
+              'Update Available: v0.15.0',
+              'update_available',
+              {
+                subtitle: 'Current: v0.14.6 • Click to view release',
+                releaseUrl: 'https://github.com/basicswap/basicswap/releases/tag/v0.15.0',
+                releaseNotes: 'New version v0.15.0 is available. Click to view details on GitHub.'
+              }
+            );
+            return;
           }
-        );
+
+          const currentVer = (data.current_version && String(data.current_version) !== 'null' && String(data.current_version) !== 'None')
+            ? String(data.current_version)
+            : '0.14.6';
+          const latestVer = (data.latest_version && String(data.latest_version) !== 'null' && String(data.latest_version) !== 'None')
+            ? String(data.latest_version)
+            : currentVer;
+
+          this.createToast(
+            `Update Available: v${latestVer}`,
+            'update_available',
+            {
+              subtitle: `Current: v${currentVer} • Click to view release`,
+              releaseUrl: `https://github.com/basicswap/basicswap/releases/tag/v${latestVer}`,
+              releaseNotes: `New version v${latestVer} is available. Click to view details on GitHub.`
+            }
+          );
+        } catch (error) {
+          console.error('Test notification - API error:', error);
+          this.createToast(
+            'Update Available: v0.15.0',
+            'update_available',
+            {
+              subtitle: 'Current: v0.14.6 • Click to view release',
+              releaseUrl: 'https://github.com/basicswap/basicswap/releases/tag/v0.15.0',
+              releaseNotes: 'New version v0.15.0 is available. Click to view details on GitHub.'
+            }
+          );
+        }
       }, 4500);
 
     },
 
-    initializeBalanceTracking: function() {
+    initializeBalanceTracking: async function() {
       this.checkAndResetStaleBalanceTracking();
 
-      fetch('/json/walletbalances')
-        .then(response => response.json())
+      const fetchBalances = window.ApiManager
+        ? window.ApiManager.makeRequest('/json/walletbalances', 'GET')
+        : fetch('/json/walletbalances').then(response => response.json());
+
+      fetchBalances
         .then(balanceData => {
           if (Array.isArray(balanceData)) {
             balanceData.forEach(coin => {
@@ -533,7 +575,6 @@ function ensureToastContainer() {
         coinIconHtml = `<img src="/static/images/coins/${coinIcon}" class="w-5 h-5 mr-2" alt="${options.coinSymbol}" onerror="this.style.display='none'">`;
       }
 
-
       let clickAction = '';
       let cursorStyle = 'cursor-default';
 
@@ -585,10 +626,10 @@ function ensureToastContainer() {
       messages.appendChild(message);
 
       if (!isPersistent) {
-        setTimeout(() => {
+        CleanupManager.setTimeout(() => {
           if (message.parentNode) {
             message.classList.add('toast-slide-out');
-            setTimeout(() => {
+            CleanupManager.setTimeout(() => {
               if (message.parentNode) {
                 message.parentNode.removeChild(message);
               }
@@ -613,12 +654,12 @@ function ensureToastContainer() {
             const amountTo = formatCoinAmount(data.amount_to, data.coin_to);
             const coinFromIcon = getCoinIcon(coinFromName);
             const coinToIcon = getCoinIcon(coinToName);
-            toastTitle = `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">${amountFrom} ${coinFromName} → <img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">${amountTo} ${coinToName}`;
-            toastOptions.subtitle = `New offer • Rate: 1 ${coinFromName} = ${(data.amount_to / data.amount_from).toFixed(8)} ${coinToName}`;
+            toastTitle = `New Network Offer`;
+            toastOptions.subtitle = `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">${amountFrom} ${coinFromName} → <img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">${amountTo} ${coinToName}<br>Rate: 1 ${coinFromName} = ${(data.amount_to / data.amount_from).toFixed(8)} ${coinToName}`;
             toastOptions.coinFrom = data.coin_from;
             toastOptions.coinTo = data.coin_to;
           } else {
-            toastTitle = `New network offer`;
+            toastTitle = `New Network Offer`;
             toastOptions.subtitle = 'Click to view offer';
           }
           toastType = 'new_offer';
@@ -633,12 +674,12 @@ function ensureToastContainer() {
             const bidAmountTo = formatCoinAmount(data.bid_amount_to, data.coin_to);
             const coinFromIcon = getCoinIcon(coinFromName);
             const coinToIcon = getCoinIcon(coinToName);
-            toastTitle = `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">${bidAmountFrom} ${coinFromName} → <img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">${bidAmountTo} ${coinToName}`;
-            toastOptions.subtitle = `New bid • Rate: 1 ${coinFromName} = ${(data.bid_amount_to / data.bid_amount).toFixed(8)} ${coinToName}`;
+            toastTitle = `New Bid Received`;
+            toastOptions.subtitle = `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">${bidAmountFrom} ${coinFromName} → <img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">${bidAmountTo} ${coinToName}<br>Rate: 1 ${coinFromName} = ${(data.bid_amount_to / data.bid_amount).toFixed(8)} ${coinToName}`;
             toastOptions.coinFrom = data.coin_from;
             toastOptions.coinTo = data.coin_to;
           } else {
-            toastTitle = `New bid received`;
+            toastTitle = `New Bid Received`;
             toastOptions.subtitle = 'Click to view bid';
           }
           toastOptions.bidId = data.bid_id;
@@ -696,14 +737,17 @@ function ensureToastContainer() {
         this.balanceTimeouts = {};
       }
 
-      this.balanceTimeouts[balanceKey] = setTimeout(() => {
+      this.balanceTimeouts[balanceKey] = CleanupManager.setTimeout(() => {
         this.fetchAndShowBalanceChange(data.coin);
       }, 2000);
     },
 
     fetchAndShowBalanceChange: function(coinSymbol) {
-      fetch('/json/walletbalances')
-        .then(response => response.json())
+      const fetchBalances = window.ApiManager
+        ? window.ApiManager.makeRequest('/json/walletbalances', 'GET')
+        : fetch('/json/walletbalances').then(response => response.json());
+
+      fetchBalances
         .then(balanceData => {
           if (Array.isArray(balanceData)) {
 
@@ -748,13 +792,10 @@ function ensureToastContainer() {
       const pendingIncrease = currentPending - prevPending;
       const pendingDecrease = prevPending - currentPending;
 
-
-
       const totalChange = Math.abs(balanceIncrease) + Math.abs(pendingIncrease);
       const maxReasonableChange = Math.max(currentBalance, prevBalance) * 0.5;
 
       if (totalChange > maxReasonableChange && totalChange > 1.0) {
-        console.log(`Detected potentially stale balance data for ${coinData.name}, resetting tracking`);
         localStorage.setItem(storageKey, currentBalance.toString());
         localStorage.setItem(pendingStorageKey, currentPending.toString());
         return;
@@ -781,7 +822,6 @@ function ensureToastContainer() {
       }
 
       const isPendingToConfirmed = pendingDecrease > 0.00000001 && balanceIncrease > 0.00000001;
-
 
       const displaySymbol = originalCoinSymbol;
       let variantInfo = '';
@@ -870,8 +910,6 @@ function ensureToastContainer() {
         localStorage.setItem(lastNotificationKey, now.toString());
       }
     },
-
-
 
     updateConfig: function(newConfig) {
       Object.assign(config, newConfig);

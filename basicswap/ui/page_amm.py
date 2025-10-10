@@ -409,10 +409,6 @@ def get_amm_active_count(swap_client, debug_override=False):
 
     state_path = get_amm_state_path(swap_client)
     if not os.path.exists(state_path):
-        if debug_enabled:
-            swap_client.log.info(
-                f"AMM state file not found at {state_path}, returning count 0"
-            )
         return 0
 
     config_path = get_amm_config_path(swap_client)
@@ -432,11 +428,6 @@ def get_amm_active_count(swap_client, debug_override=False):
                 if bid.get("enabled", False):
                     enabled_bids.add(bid.get("name", ""))
 
-            if debug_enabled:
-                swap_client.log.info(
-                    f"Enabled templates: {len(enabled_offers)} offers, {len(enabled_bids)} bids"
-                )
-
         except Exception as e:
             if debug_enabled:
                 swap_client.log.error(f"Error reading config file: {str(e)}")
@@ -449,11 +440,6 @@ def get_amm_active_count(swap_client, debug_override=False):
     try:
         with open(state_path, "r") as f:
             state_data = json.load(f)
-
-        if debug_enabled:
-            swap_client.log.debug(
-                f"AMM state data loaded with {len(state_data.get('offers', {}))} offer templates"
-            )
 
         try:
             network_offers = swap_client.listOffers()
@@ -501,31 +487,17 @@ def get_amm_active_count(swap_client, debug_override=False):
                         swap_client.log.error(traceback.format_exc())
                     continue
 
-            if debug_enabled:
-                swap_client.log.debug(
-                    f"Found {len(active_network_offers)} active offers in the network"
-                )
-
         except Exception as e:
             if debug_enabled:
                 swap_client.log.error(f"Error getting network offers: {str(e)}")
                 swap_client.log.error(traceback.format_exc())
 
         if len(active_network_offers) == 0:
-            if debug_enabled:
-                swap_client.log.info(
-                    "No active network offers found, trying direct API call"
-                )
-
             try:
                 global amm_host, amm_port
                 if "amm_host" not in globals() or "amm_port" not in globals():
                     amm_host = "127.0.0.1"
                     amm_port = 12700
-                    if debug_enabled:
-                        swap_client.log.info(
-                            f"Using default host {amm_host} and port {amm_port} for API call"
-                        )
 
                 api_url = f"http://{amm_host}:{amm_port}/api/v1/offers"
 
@@ -538,11 +510,6 @@ def get_amm_active_count(swap_client, debug_override=False):
                         if "id" in offer:
                             offer_id = offer["id"]
                             active_network_offers[offer_id] = True
-
-                if debug_enabled:
-                    swap_client.log.info(
-                        f"Found {len(active_network_offers)} active offers via API"
-                    )
 
             except Exception as e:
                 if debug_enabled:
@@ -561,21 +528,6 @@ def get_amm_active_count(swap_client, debug_override=False):
                             active_offer_count += 1
 
                     amm_count += active_offer_count
-                    if debug_enabled:
-                        total_offers = len(offers)
-                        enabled_status = (
-                            "enabled"
-                            if enabled_offers is None or template_name in enabled_offers
-                            else "disabled"
-                        )
-                        if debug_enabled:
-                            swap_client.log.debug(
-                                f"Template '{template_name}' ({enabled_status}): {active_offer_count} active out of {total_offers} total offers"
-                            )
-                elif debug_enabled:
-                    swap_client.log.debug(
-                        f"Template '{template_name}' is disabled, skipping {len(offers)} offers"
-                    )
 
         if "bids" in state_data:
             for template_name, bids in state_data["bids"].items():
@@ -586,36 +538,12 @@ def get_amm_active_count(swap_client, debug_override=False):
                             active_bid_count += 1
 
                     amm_count += active_bid_count
-                    if debug_enabled:
-                        total_bids = len(bids)
-                        enabled_status = (
-                            "enabled"
-                            if enabled_bids is None or template_name in enabled_bids
-                            else "disabled"
-                        )
-
-                        if debug_enabled:
-                            swap_client.log.debug(
-                                f"Template '{template_name}' ({enabled_status}): {active_bid_count} active out of {total_bids} total bids"
-                            )
-                elif debug_enabled:
-                    swap_client.log.debug(
-                        f"Template '{template_name}' is disabled, skipping {len(bids)} bids"
-                    )
-
-        if debug_enabled:
-            swap_client.log.debug(f"Total active AMM count: {amm_count}")
 
         if (
             amm_count == 0
             and len(active_network_offers) == 0
             and "offers" in state_data
         ):
-            if debug_enabled:
-                swap_client.log.info(
-                    "No active network offers found, using most recent offer from state file"
-                )
-
             most_recent_time = 0
             most_recent_offer = None
 
@@ -631,21 +559,8 @@ def get_amm_active_count(swap_client, debug_override=False):
 
                 if offer_age < 3600:
                     amm_count = 1
-                    if debug_enabled:
-                        swap_client.log.info(
-                            f"Using most recent offer as active (age: {offer_age} seconds)"
-                        )
-                        if "offer_id" in most_recent_offer:
-                            swap_client.log.info(
-                                f"Most recent offer ID: {most_recent_offer['offer_id']}"
-                            )
 
         if amm_count == 0 and "delay_next_offer_before" in state_data:
-            if debug_enabled:
-                swap_client.log.info(
-                    "Found delay_next_offer_before in state, AMM is running but waiting to create next offer"
-                )
-
             config_path = get_amm_config_path(swap_client)
             if os.path.exists(config_path):
                 try:
@@ -654,10 +569,6 @@ def get_amm_active_count(swap_client, debug_override=False):
 
                     for offer in config_data.get("offers", []):
                         if offer.get("enabled", False):
-                            if debug_enabled:
-                                swap_client.log.info(
-                                    f"Found enabled offer '{offer.get('name')}', but no active offers in network"
-                                )
                             break
                 except Exception as e:
                     if debug_enabled:
@@ -669,19 +580,12 @@ def get_amm_active_count(swap_client, debug_override=False):
             and "offers" in state_data
             and len(state_data["offers"]) > 0
         ):
-            if debug_enabled:
-                swap_client.log.info(
-                    "AMM is running with offers in state file, but none are active. Setting count to 1."
-                )
             amm_count = 1
     except Exception as e:
         if debug_enabled:
             swap_client.log.error(f"Error getting AMM count: {str(e)}")
             swap_client.log.error(traceback.format_exc())
         return 0
-
-    if debug_enabled:
-        swap_client.log.debug(f"Final AMM active count: {amm_count}")
 
     return amm_count
 

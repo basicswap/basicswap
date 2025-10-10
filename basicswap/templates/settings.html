@@ -1,21 +1,14 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg %}
+{% from 'style.html' import input_arrow_down_svg %}
+{% from 'macros.html' import breadcrumb %}
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
    <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-    <li> {{ breadcrumb_line_svg | safe }} </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/settings">Settings</a>
-     </li>
-    <li> {{ breadcrumb_line_svg | safe }} </li>
-    </ul>
+    {{ breadcrumb([
+      {'text': 'Home', 'url': '/'},
+      {'text': 'Settings', 'url': '/settings'}
+    ]) }}
    </div>
   </div>
  </section>
@@ -268,12 +261,12 @@
           Apply Changes
          </button>
          {% if c.can_disable == true %}
-         <button name="disable_{{ c.name }}" value="Disable" onclick="return confirmPopup('Disable', '{{ c.display_name }}');" type="submit" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         <button name="disable_{{ c.name }}" value="Disable" data-confirm data-confirm-action="Disable" data-confirm-coin="{{ c.display_name }}" type="submit" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
           Disable Coin
          </button>
          {% endif %}
          {% if c.can_reenable == true %}
-         <button name="enable_{{ c.name }}" value="Enable" onclick="return confirmPopup('Enable', '{{ c.display_name }}');" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         <button name="enable_{{ c.name }}" value="Enable" data-confirm data-confirm-action="Enable" data-confirm-coin="{{ c.display_name }}" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
           Enable Coin
          </button>
          {% endif %}
@@ -507,7 +500,7 @@
            <div class="flex items-center">
             <input type="checkbox" id="check_updates" name="check_updates" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if general_settings.check_updates %} checked{% endif %}>
             <label for="check_updates" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Update Notifications</label>
-            <button type="button" onclick="checkForUpdatesNow()" class="ml-3 text-xs bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 rounded transition-colors focus:outline-none">
+            <button type="button" data-check-updates class="ml-3 text-xs bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 rounded transition-colors focus:outline-none">
              Check Now
             </button>
            </div>
@@ -549,10 +542,10 @@
         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Test Notifications</h4>
         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
          <div class="space-y-3">
-          <button type="button" onclick="window.NotificationManager && window.NotificationManager.testToasts()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+          <button type="button" data-test-notification="all" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
            Test All Notification Types
           </button>
-          <button type="button" onclick="testUpdateNotification()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+          <button type="button" data-test-notification="update" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
            Test Update Notification
           </button>
           <button type="button" onclick="testLiveUpdateCheck()" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
@@ -576,174 +569,6 @@
     <input type="hidden" name="formid" value="{{ form_id }}">
    </form>
   </div>
-
-  <script>
-    function syncNotificationSettings() {
-      if (window.NotificationManager && typeof window.NotificationManager.updateSettings === 'function') {
-        const backendSettings = {
-          showNewOffers: document.getElementById('notifications_new_offers').checked,
-          showNewBids: document.getElementById('notifications_new_bids').checked,
-          showBidAccepted: document.getElementById('notifications_bid_accepted').checked,
-          showBalanceChanges: document.getElementById('notifications_balance_changes').checked,
-          showOutgoingTransactions: document.getElementById('notifications_outgoing_transactions').checked,
-          showSwapCompleted: document.getElementById('notifications_swap_completed').checked,
-          showUpdateNotifications: document.getElementById('check_updates').checked,
-          notificationDuration: parseInt(document.getElementById('notifications_duration').value) * 1000
-        };
-
-        window.NotificationManager.updateSettings(backendSettings);
-      }
-    }
-
-    document.getElementById('notifications-tab').addEventListener('click', function() {
-      setTimeout(syncNotificationSettings, 100);
-    });
-
-    function testUpdateNotification() {
-      if (window.NotificationManager) {
-        window.NotificationManager.createToast(
-          'Update Available: v0.15.0',
-          'update_available',
-          {
-            subtitle: 'Current: v{{ version }} • Click to view release',
-            releaseUrl: 'https://github.com/basicswap/basicswap/releases/tag/v0.15.0',
-            releaseNotes: 'New version v0.15.0 is available. Click to view details on GitHub.'
-          }
-        );
-      }
-    }
-
-    function testLiveUpdateCheck() {
-      const button = event.target;
-      const originalText = button.textContent;
-      button.textContent = 'Checking...';
-      button.disabled = true;
-
-      fetch('/json/checkupdates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (window.NotificationManager) {
-          if (data.update_available) {
-            window.NotificationManager.createToast(
-              `Live Update Available: v${data.latest_version}`,
-              'update_available',
-              {
-                subtitle: `Current: v${data.current_version} • Click to view release`,
-                releaseUrl: `https://github.com/basicswap/basicswap/releases/tag/v${data.latest_version}`,
-                releaseNotes: 'This is a real update check from GitHub API.'
-              }
-            );
-          } else {
-            window.NotificationManager.createToast(
-              'No Updates Available',
-              'success',
-              {
-                subtitle: `Current version v${data.current_version} is up to date`
-              }
-            );
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Update check failed:', error);
-        if (window.NotificationManager) {
-          window.NotificationManager.createToast(
-            'Update Check Failed',
-            'error',
-            {
-              subtitle: 'Could not check for updates. See console for details.'
-            }
-          );
-        }
-      })
-      .finally(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-      });
-    }
-
-    function checkForUpdatesNow() {
-      const button = event.target;
-      const originalText = button.textContent;
-      button.textContent = 'Checking...';
-      button.disabled = true;
-
-      fetch('/json/checkupdates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.error) {
-          if (window.NotificationManager) {
-            window.NotificationManager.createToast(
-              'Update Check Failed',
-              'error',
-              {
-                subtitle: data.error
-              }
-            );
-          }
-          return;
-        }
-
-        if (window.NotificationManager) {
-          if (data.update_available) {
-            window.NotificationManager.createToast(
-              `Update Available: v${data.latest_version}`,
-              'update_available',
-              {
-                subtitle: `Current: v${data.current_version} • Click to view release`,
-                releaseUrl: `https://github.com/basicswap/basicswap/releases/tag/v${data.latest_version}`,
-                releaseNotes: `New version v${data.latest_version} is available. Click to view details on GitHub.`
-              }
-            );
-          } else {
-            window.NotificationManager.createToast(
-              'You\'re Up to Date!',
-              'success',
-              {
-                subtitle: `Current version v${data.current_version} is the latest`
-              }
-            );
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Update check failed:', error);
-        if (window.NotificationManager) {
-          window.NotificationManager.createToast(
-            'Update Check Failed',
-            'error',
-            {
-              subtitle: 'Network error. Please try again later.'
-            }
-          );
-        }
-      })
-      .finally(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-      });
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      syncNotificationSettings();
-    });
-
-    document.addEventListener('change', function(e) {
-      if (e.target.closest('#notifications')) {
-        syncNotificationSettings();
-      }
-    });
-  </script>
 
   <div class="tab-content hidden" id="tor" role="tabpanel" aria-labelledby="tor-tab">
    <form method="post" id="tor-form">
@@ -837,131 +662,6 @@
   </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
- const tabButtons = document.querySelectorAll('.tab-button');
- const tabContents = document.querySelectorAll('.tab-content');
-
- function switchTab(targetTab) {
-  tabButtons.forEach(btn => {
-   if (btn.dataset.tab === targetTab) {
-    btn.className = 'tab-button border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0';
-   } else {
-    btn.className = 'tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0';
-   }
-  });
-
-  tabContents.forEach(content => {
-   if (content.id === targetTab) {
-    content.classList.remove('hidden');
-   } else {
-    content.classList.add('hidden');
-   }
-  });
- }
-
- tabButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-   switchTab(btn.dataset.tab);
-  });
- });
-
- const coinHeaders = document.querySelectorAll('.coin-header');
- coinHeaders.forEach(header => {
-  header.addEventListener('click', function() {
-   const coinName = this.dataset.coin;
-   const details = document.getElementById(`details-${coinName}`);
-   const arrow = this.querySelector('.toggle-arrow');
-
-   if (details.classList.contains('hidden')) {
-    details.classList.remove('hidden');
-    arrow.style.transform = 'rotate(180deg)';
-   } else {
-    details.classList.add('hidden');
-    arrow.style.transform = 'rotate(0deg)';
-   }
-  });
- });
-
- let confirmCallback = null;
- let triggerElement = null;
-
- document.getElementById('confirmYes').addEventListener('click', function() {
-  if (typeof confirmCallback === 'function') {
-   confirmCallback();
-  }
-  hideConfirmDialog();
- });
-
- document.getElementById('confirmNo').addEventListener('click', hideConfirmDialog);
-
- function showConfirmDialog(title, message, callback) {
-  confirmCallback = callback;
-  document.getElementById('confirmTitle').textContent = title;
-  document.getElementById('confirmMessage').textContent = message;
-  const modal = document.getElementById('confirmModal');
-  if (modal) {
-   modal.classList.remove('hidden');
-  }
-  return false;
- }
-
- function hideConfirmDialog() {
-  const modal = document.getElementById('confirmModal');
-  if (modal) {
-   modal.classList.add('hidden');
-  }
-  confirmCallback = null;
-  return false;
- }
-
- window.confirmPopup = function(action, coin_name) {
-  triggerElement = document.activeElement;
-  const title = `Confirm ${action} ${coin_name}`;
-  const message = `Are you sure you want to ${action.toLowerCase()} ${coin_name}?\n\nThis will shutdown BasicSwap.`;
-
-  return showConfirmDialog(title, message, function() {
-   if (triggerElement) {
-    const form = triggerElement.form;
-    const hiddenInput = document.createElement('input');
-    hiddenInput.type = 'hidden';
-    hiddenInput.name = triggerElement.name;
-    hiddenInput.value = triggerElement.value;
-    form.appendChild(hiddenInput);
-    form.submit();
-   }
-  });
- };
-
- const overrideButtonConfirm = function(button, action, coinName) {
-  if (button) {
-   button.removeAttribute('onclick');
-   button.addEventListener('click', function(e) {
-    e.preventDefault();
-    triggerElement = this;
-    return confirmPopup(action, coinName);
-   });
-  }
- };
-
- const disableButtons = document.querySelectorAll('button[name^="disable_"]');
- disableButtons.forEach(btn => {
-  const coinName = btn.name.replace('disable_', '');
-  const displayName = btn.closest('.coin-card').querySelector('h3').textContent.split(' (')[0];
-  overrideButtonConfirm(btn, 'Disable', displayName);
- });
-
- const enableButtons = document.querySelectorAll('button[name^="enable_"]');
- enableButtons.forEach(btn => {
-  const coinName = btn.name.replace('enable_', '');
-  const displayName = btn.closest('.coin-card').querySelector('h3').textContent.split(' (')[0];
-  overrideButtonConfirm(btn, 'Enable', displayName);
- });
-
- switchTab('coins');
-});
-
-
-</script>
+<script src="/static/js/pages/settings-page.js"></script>
 
 {% include 'footer.html' %}

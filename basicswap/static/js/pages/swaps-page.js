@@ -127,9 +127,9 @@ const getTimeStrokeColor = (expireTime) => {
     const now = Math.floor(Date.now() / 1000);
     const timeLeft = expireTime - now;
 
-    if (timeLeft <= 300) return '#9CA3AF'; // 5 minutes or less
-    if (timeLeft <= 1800) return '#3B82F6'; // 30 minutes or less
-    return '#10B981'; // More than 30 minutes
+    if (timeLeft <= 300) return '#9CA3AF'; 
+    if (timeLeft <= 1800) return '#3B82F6'; 
+    return '#10B981'; 
 };
 
 const updateConnectionStatus = (status) => {
@@ -520,8 +520,6 @@ const createSwapTableRow = async (swap) => {
 async function updateSwapsTable(options = {}) {
     const { resetPage = false, refreshData = true } = options;
 
-    //console.log('Updating swaps table:', { resetPage, refreshData });
-
     if (state.refreshPromise) {
         await state.refreshPromise;
         return;
@@ -547,19 +545,17 @@ async function updateSwapsTable(options = {}) {
                     }
 
                     const data = await response.json();
-                    //console.log('Received swap data:', data);
-
+                    
                     state.swapsData = Array.isArray(data)
                         ? data.filter(swap => {
                             const isActive = isActiveSwap(swap);
-                            //console.log(`Swap ${swap.bid_id}: ${isActive ? 'Active' : 'Inactive'}`, swap.bid_state);
+                            
                             return isActive;
                         })
                         : [];
 
-                    //console.log('Filtered active swaps:', state.swapsData);
                 } catch (error) {
-                    //console.error('Error fetching swap data:', error);
+                    
                     state.swapsData = [];
                 } finally {
                     state.refreshPromise = null;
@@ -585,8 +581,6 @@ async function updateSwapsTable(options = {}) {
         const endIndex = startIndex + PAGE_SIZE;
         const currentPageSwaps = state.swapsData.slice(startIndex, endIndex);
 
-        //console.log('Current page swaps:', currentPageSwaps);
-
         if (elements.swapsBody) {
             if (currentPageSwaps.length > 0) {
                 const rowPromises = currentPageSwaps.map(swap => createSwapTableRow(swap));
@@ -607,7 +601,7 @@ async function updateSwapsTable(options = {}) {
                     });
                 }
             } else {
-                //console.log('No active swaps found, displaying empty state');
+                
                 elements.swapsBody.innerHTML = `
                     <tr>
                         <td colspan="8" class="text-center py-4 text-gray-500 dark:text-white">
@@ -679,7 +673,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     WebSocketManager.initialize();
     setupEventListeners();
     await updateSwapsTable({ resetPage: true, refreshData: true });
-    const autoRefreshInterval = setInterval(async () => {
+
+    const autoRefreshInterval = CleanupManager.setInterval(async () => {
         await updateSwapsTable({ resetPage: false, refreshData: true });
-    }, 10000);  // 30 seconds
+    }, 10000);
+
+    CleanupManager.registerResource('swapsAutoRefresh', autoRefreshInterval, () => {
+        clearInterval(autoRefreshInterval);
+    });
 });

@@ -1,23 +1,10 @@
 {% include 'header.html' %}
-{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, breadcrumb_line_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg, love_svg %}
+{% from 'style.html' import select_box_arrow_svg, select_box_class, circular_arrows_svg, circular_error_svg, circular_info_svg, cross_close_svg, withdraw_svg, utxo_groups_svg, create_utxo_svg, red_cross_close_svg, blue_cross_close_svg, circular_update_messages_svg, circular_error_messages_svg, love_svg %}
+{% from 'macros.html' import page_header %}
 <script src="/static/js/libs//qrcode.js"></script>
+<script src="/static/js/modules/qrcode-manager.js"></script>
 
- <section class="py-3 px-4 mt-6">
-  <div class="lg:container mx-auto">
-    <div class="relative py-8 px-8 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="wave">
-        <div class="relative z-20 flex flex-wrap items-center -m-3">
-          <div class="w-full md:w-1/2">
-            <h2 class="text-3xl font-bold text-white"> 
-              <span class="inline-block align-middle">
-              <img class="mr-2 h-16" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"></span>({{ w.ticker }}) {{ w.name }} Wallet </h2>
-          </div>
-          <div class="w-full md:w-1/2 p-3 p-6 container flex flex-wrap items-center justify-end items-center mx-auto"></div>
-        </div>
-      </div>
-    </div>
-</section>
+{{ page_header('(' ~ w.ticker ~ ') ' ~ w.name ~ ' Wallet', icon=w.name, title_size='text-3xl', title_extra_class='', dots_style='all') }}
 
 {% include 'inc_messages.html' %}
 
@@ -234,7 +221,7 @@
                 <div class="px-6">
                   {% if w.cid != '4' %} {# DCR #}
                   <div class="flex flex-wrap justify-end">
-                    <div class="w-full md:w-auto p-1.5"> <input class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-lg lg:text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none cursor-pointer" type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" onclick="return confirmReseed();"> </div>
+                    <div class="w-full md:w-auto p-1.5"> <input class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-lg lg:text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none cursor-pointer" type="submit" name="reseed_{{ w.cid }}" value="Reseed wallet" data-confirm-reseed> </div>
                   </div>
                   {% endif %}
                 </div>
@@ -274,7 +261,7 @@
                               <div class="qrcode-border flex">
                                {% if w.cid in '6, 9' %}
                                {# XMR | WOW #}
-                                  <div id="qrcode-monero-main" class="qrcode"></div>
+                                  <div id="qrcode-monero-main" class="qrcode" data-qrcode data-address="{{ w.main_address }}"></div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Main Address: </div>
@@ -282,7 +269,7 @@
                                 <div class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="monero_main_address">{{ w.main_address }}</div>
                               </div>
                                {% else %}
-                                  <div id="qrcode-deposit" class="qrcode"> </div>
+                                  <div id="qrcode-deposit" class="qrcode" data-qrcode data-address="{{ w.deposit_address }}"> </div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Deposit Address: </div>
@@ -309,7 +296,7 @@
                                 <div class="qrcode-border flex">
                                {% if w.cid in '6, 9' %}
                                {# XMR | WOW #}
-                                  <div id="qrcode-monero-sub" class="qrcode"> </div>
+                                  <div id="qrcode-monero-sub" class="qrcode" data-qrcode data-address="{{ w.deposit_address }}"> </div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Subaddress: </div>
@@ -323,7 +310,7 @@
                               </div>
                               {% elif w.cid == '1' %}
                               {# PART #}
-                                  <div id="qrcode-stealth" class="qrcode"> </div>
+                                  <div id="qrcode-stealth" class="qrcode" data-qrcode data-address="{{ w.stealth_address }}"> </div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">Stealth Address: </div>
@@ -333,7 +320,7 @@
                               {# / PART #}
                               {% elif w.cid == '3' %}
                              {# LTC #}
-                                  <div id="qrcode-mweb" class="qrcode"> </div>
+                                  <div id="qrcode-mweb" class="qrcode" data-qrcode data-address="{{ w.mweb_address }}"> </div>
                                 </div>
                               </div>
                               <div class="font-normal bold text-gray-500 text-center dark:text-white mb-5">MWEB Address: </div>
@@ -362,247 +349,9 @@
           </div>
   </section>
 
-{% if w.cid == '1' %}
-  {# PART #}
-  <script>
-    // Particl Stealth
-    var stealthAddress = "{{ w.stealth_address }}";
 
-    var qrCodeStealth = new QRCode(document.getElementById("qrcode-stealth"), {
-      text: stealthAddress,
-      width: 200,
-      height: 200,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  </script>
 
-  {% elif w.cid == '3' %}
-  {# LTC #}
-  <script>
-    // Litecoin MWEB
-    var mwebAddress = "{{ w.mweb_address }}";
-
-    var qrCodeMWEB = new QRCode(document.getElementById("qrcode-mweb"), {
-      text: mwebAddress,
-      width: 200,
-      height: 200,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  </script>
-  {% endif %}
-
-  {% if w.cid in '6, 9' %}
-  {# XMR | WOW #}
-  <script>
-    // Monero Sub
-    var moneroSubAddress = "{{ w.deposit_address }}";
-
-    var qrCodeMoneroSub = new QRCode(document.getElementById("qrcode-monero-sub"), {
-      text: moneroSubAddress,
-      width: 200,
-      height: 200,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  </script>
-
-  <script>
-    // Monero Main
-    var moneroMainAddress = "{{ w.main_address }}";
-
-    var qrCodeMoneroMain = new QRCode(document.getElementById("qrcode-monero-main"), {
-      text: moneroMainAddress,
-      width: 200,
-      height: 200,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  </script>
-
-  {% else %}
-  <script>
-    // Default
-    var defaultAddress = "{{ w.deposit_address }}";
-
-    var qrCodeDepost = new QRCode(document.getElementById("qrcode-deposit"), {
-      text: defaultAddress,
-       width: 200,
-      height: 200,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
-      correctLevel: QRCode.CorrectLevel.L
-    });
-  </script>
-{% endif %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  setupAddressCopy();
-});
-
-function setupAddressCopy() {
-  const copyableElements = [
-    'main_deposit_address',
-    'monero_main_address',
-    'monero_sub_address',
-    'stealth_address'
-  ];
-  
-  copyableElements.forEach(id => {
-    const element = document.getElementById(id);
-    if (!element) return;
-    
-    element.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-600', 'transition-colors');
-    
-    if (!element.querySelector('.copy-icon')) {
-      const copyIcon = document.createElement('span');
-      copyIcon.className = 'copy-icon absolute right-2 inset-y-0 flex items-center text-gray-500 dark:text-gray-300';
-      copyIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>`;
-      
-      element.style.position = 'relative';
-      element.style.paddingRight = '2.5rem';
-      element.appendChild(copyIcon);
-    }
-    
-    element.addEventListener('click', function(e) {
-      const textToCopy = this.innerText.trim();
-      
-      copyToClipboard(textToCopy);
-      
-      this.classList.add('bg-blue-50', 'dark:bg-blue-900');
-      
-      showCopyFeedback(this);
-      
-      setTimeout(() => {
-        this.classList.remove('bg-blue-50', 'dark:bg-blue-900');
-      }, 1000);
-    });
-  });
-}
-
-let activeTooltip = null;
-
-function showCopyFeedback(element) {
-  if (activeTooltip && activeTooltip.parentNode) {
-    activeTooltip.parentNode.removeChild(activeTooltip);
-  }
-  
-  const popup = document.createElement('div');
-  popup.className = 'copy-feedback-popup fixed z-50 bg-blue-600 text-white text-sm py-2 px-3 rounded-md shadow-lg';
-  popup.innerText = 'Copied!';
-  document.body.appendChild(popup);
-  
-  activeTooltip = popup;
-  
-  updateTooltipPosition(popup, element);
-  
-  const scrollHandler = () => {
-    if (popup.parentNode) {
-      updateTooltipPosition(popup, element);
-    }
-  };
-  
-  window.addEventListener('scroll', scrollHandler, { passive: true });
-  
-  popup.style.opacity = '0';
-  popup.style.transition = 'opacity 0.2s ease-in-out';
-  
-  setTimeout(() => {
-    popup.style.opacity = '1';
-  }, 10);
-  
-  setTimeout(() => {
-    window.removeEventListener('scroll', scrollHandler);
-    popup.style.opacity = '0';
-    
-    setTimeout(() => {
-      if (popup.parentNode) {
-        popup.parentNode.removeChild(popup);
-      }
-      if (activeTooltip === popup) {
-        activeTooltip = null;
-      }
-    }, 200);
-  }, 1500);
-}
-
-function updateTooltipPosition(tooltip, element) {
-  const rect = element.getBoundingClientRect();
-  
-  let top = rect.top - tooltip.offsetHeight - 8;
-  const left = rect.left + rect.width / 2;
-  
-  if (top < 10) {
-    top = rect.bottom + 8;
-  }
-  
-  tooltip.style.top = `${top}px`;
-  tooltip.style.left = `${left}px`;
-  tooltip.style.transform = 'translateX(-50%)';
-}
-
-function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).catch(err => {
-      console.error('Failed to copy: ', err);
-      copyToClipboardFallback(text);
-    });
-  } else {
-    copyToClipboardFallback(text);
-  }
-}
-
-function copyToClipboardFallback(text) {
-  const textArea = document.createElement('textarea');
-  textArea.value = text;
-  
-  textArea.style.position = 'fixed';
-  textArea.style.left = '-999999px';
-  textArea.style.top = '-999999px';
-  
-  document.body.appendChild(textArea);
-  textArea.focus();
-  textArea.select();
-  
-  try {
-    document.execCommand('copy');
-  } catch (err) {
-    console.error('Failed to copy text: ', err);
-  }
-  
-  document.body.removeChild(textArea);
-}
-
-function fillDonationAddress(address, type) {
-  const addressInput = document.querySelector('input[name^="to_"]');
-  if (addressInput) {
-    addressInput.value = address;
-    addressInput.focus();
-
-    const typeIndicator = document.getElementById('donation-type-indicator');
-    if (typeIndicator && type) {
-      typeIndicator.textContent = type;
-    }
-
-    const withdrawTypeSelect = document.getElementById('withdraw_type');
-    if (withdrawTypeSelect && type) {
-      if (type === 'LTC') {
-        withdrawTypeSelect.value = 'plain';
-      } else if (type === 'MWEB') {
-        withdrawTypeSelect.value = 'mweb';
-      }
-    }
-  }
-}
-</script>
+<!-- Address copy functionality handled by external JS -->
 
 <section class="p-6">
    <div class="lg:container mx-auto">
@@ -682,12 +431,12 @@ function fillDonationAddress(address, type) {
                    {% if donation_info.mweb_address %}
                    <div class="space-y-2">
                      <div class="flex flex-wrap gap-2">
-                       <button type="button" onclick="fillDonationAddress('{{ donation_info.address }}', 'LTC')"
-                               class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors">
+                       <button type="button" data-fill-donation data-address="{{ donation_info.address }}" data-coin-type="LTC"
+                               class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors focus:ring-0 focus:outline-none">
                          Use LTC Address
                        </button>
-                       <button type="button" onclick="fillDonationAddress('{{ donation_info.mweb_address }}', 'MWEB')"
-                               class="px-3 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded-md transition-colors">
+                       <button type="button" data-fill-donation data-address="{{ donation_info.mweb_address }}" data-coin-type="MWEB"
+                               class="px-3 py-1 bg-purple-500 hover:bg-purple-600 text-white text-xs rounded-md transition-colors focus:ring-0 focus:outline-none">
                          Use MWEB Address
                        </button>
                      </div>
@@ -696,8 +445,8 @@ function fillDonationAddress(address, type) {
                      </div>
                    </div>
                    {% else %}
-                   <button type="button" onclick="fillDonationAddress('{{ donation_info.address }}', '{{ donation_info.coin_name }}')"
-                           class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors">
+                   <button type="button" data-fill-donation data-address="{{ donation_info.address }}" data-coin-type="{{ donation_info.coin_name }}"
+                           class="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md transition-colors focus:ring-0 focus:outline-none">
                      Auto-fill Donation Address
                    </button>
                    {% endif %}
@@ -729,64 +478,6 @@ function fillDonationAddress(address, type) {
 <button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">50%</button>
 <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.blind_balance }}', '{{ w.anon_balance }}')">100%</button>
 
-<script>
-function setAmount(percent, balance, cid, blindBalance, anonBalance) {
- var amountInput = document.getElementById('amount');
- var typeSelect = document.getElementById('withdraw_type');
- var selectedType = typeSelect.value;
- var floatBalance;
- var calculatedAmount;
-
-
-
- const safeParseFloat = (value) => {
-  const numValue = Number(value);
-
-  if (!isNaN(numValue) && numValue > 0) {
-   return numValue;
-  }
-
-  console.warn('Invalid balance value:', value);
-  return 0;
- };
-
- switch(selectedType) {
-  case 'plain':
-   floatBalance = safeParseFloat(balance);
-   break;
-  case 'blind':
-   floatBalance = safeParseFloat(blindBalance);
-   break;
-  case 'anon':
-   floatBalance = safeParseFloat(anonBalance);
-   break;
-  default:
-   floatBalance = safeParseFloat(balance);
-   break;
- }
-
- calculatedAmount = Math.max(0, Math.floor(floatBalance * percent * 100000000) / 100000000);
- 
-
-
- if (percent === 1) {
-  calculatedAmount = floatBalance;
- }
-
- if (calculatedAmount < 0.00000001) {
-  console.warn('Calculated amount too small, setting to zero');
-  calculatedAmount = 0;
- }
-
- amountInput.value = calculatedAmount.toFixed(8);
-
- var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
- if (subfeeCheckbox) {
-  subfeeCheckbox.checked = (percent === 1);
- }
-}
-</script>
-
 {# / PART #}
 
 {% elif w.cid == '3' %}
@@ -795,80 +486,11 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
 <button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">50%</button>
 <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }}, '{{ w.mweb_balance }}')">100%</button>
 
-<script>
- function setAmount(percent, balance, cid, mwebBalance) {
-  var amountInput = document.getElementById('amount');
-  var typeSelect = document.getElementById('withdraw_type');
-  var selectedType = typeSelect.value;
-  var floatBalance;
-  var calculatedAmount;
-
-  switch(selectedType) {
-   case 'plain':
-    floatBalance = parseFloat(balance);
-    break;
-   case 'mweb':
-    floatBalance = parseFloat(mwebBalance);
-    break;
-   default:
-    floatBalance = parseFloat(balance);
-    break;
-  }
-  calculatedAmount = floatBalance * percent;
-  amountInput.value = calculatedAmount.toFixed(8);
-
-  var subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
-  if (subfeeCheckbox) {
-   subfeeCheckbox.checked = (percent === 1);
-  }
- }
-</script>
-
 {# / LTC #}
 {% else %}
 <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.25, '{{ w.balance }}', {{ w.cid }})">25%</button>
 <button type="button" class="hidden md:block ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(0.5, '{{ w.balance }}', {{ w.cid }})">50%</button>
 <button type="button" class="ml-2 py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setAmount(1, '{{ w.balance }}', {{ w.cid }})">100%</button>
-
-<script>
- function setAmount(percent, balance, cid) {
-  var amountInput = document.getElementById('amount');
-  var floatBalance = parseFloat(balance);
-  var calculatedAmount = floatBalance * percent;
-
-  const specialCids = [6, 9];
-
-
-
-  if (specialCids.includes(parseInt(cid)) && percent === 1) {
-   amountInput.setAttribute('data-hidden', 'true');
-   amountInput.placeholder = 'Sweep All';
-   amountInput.value = '';
-   amountInput.disabled = true;
-
-  } else {
-   amountInput.value = calculatedAmount.toFixed(8);
-   amountInput.setAttribute('data-hidden', 'false');
-   amountInput.placeholder = '';
-   amountInput.disabled = false;
-  }
-
-  let sweepAllCheckbox = document.getElementById('sweepall');
-  if (sweepAllCheckbox) {
-   if (specialCids.includes(parseInt(cid)) && percent === 1) {
-    sweepAllCheckbox.checked = true;
-   } else {
-    sweepAllCheckbox.checked = false;
-   }
-  }
-
-  let subfeeCheckbox = document.querySelector(`[name="subfee_${cid}"]`);
-  if (subfeeCheckbox) {
-   subfeeCheckbox.checked = (percent === 1);
-
-  }
- }
-</script>
            {% endif %}
             </div>
             </div>
@@ -974,7 +596,7 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
                     {% else %}
                     <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
                     {% endif %}
-                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" onclick="return confirmWithdrawal();">{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </button></div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" data-confirm-withdrawal>{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </button></div>
                   </div>
                 </div>
               </div>
@@ -1019,7 +641,7 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
                         <td class="py-3 px-6"> <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" id="tx_view" rows="10" readonly>{{ w.utxo_groups }} </textarea> </td>
                       </tr>
                       <tr class="opacity-100 text-gray-500 dark:text-gray-100">
-                        <td class="py-3 px-6"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="create_utxo" name="create_utxo" value="Create UTXO" onclick="return confirmUTXOResize();"> {{ create_utxo_svg | safe }}Create UTXO </button> </td>
+                        <td class="py-3 px-6"> <button type="submit" class="flex flex-wrap justify-center px-4 py-2 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="create_utxo" name="create_utxo" value="Create UTXO" data-confirm-utxo> {{ create_utxo_svg | safe }}Create UTXO </button> </td>
                         <td class="py-3 px-6"> <input placeholder="Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="utxo_value" value="{{ w.utxo_value }}"> </td>
                       </tr>
                     </table>
@@ -1080,492 +702,7 @@ function setAmount(percent, balance, cid, blindBalance, anonBalance) {
   </div>
 </div>
 
-<script>
-let confirmCallback = null;
-let triggerElement = null;
-let currentCoinId = '';
-
-function showConfirmDialog(title, message, callback) {
-  confirmCallback = callback;
-  document.getElementById('confirmTitle').textContent = title;
-  document.getElementById('confirmMessage').textContent = message;
-  const modal = document.getElementById('confirmModal');
-  if (modal) {
-    modal.classList.remove('hidden');
-  }
-  return false;
-}
-
-function hideConfirmDialog() {
-  const modal = document.getElementById('confirmModal');
-  if (modal) {
-    modal.classList.add('hidden');
-  }
-  confirmCallback = null;
-  return false;
-}
-
-function confirmReseed() {
-  triggerElement = document.activeElement;
-  return showConfirmDialog(
-    "Confirm Reseed Wallet",
-    "Are you sure?\nBackup your wallet before and after.\nWon't detect used keys.\nShould only be used for new wallets.",
-    function() {
-      if (triggerElement) {
-        const form = triggerElement.form;
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = triggerElement.name;
-        hiddenInput.value = triggerElement.value;
-        form.appendChild(hiddenInput);
-        form.submit();
-      }
-    }
-  );
-}
-
-function confirmWithdrawal() {
-  triggerElement = document.activeElement;
-  return showConfirmDialog(
-    "Confirm Withdrawal",
-    "Are you sure you want to proceed with this withdrawal?",
-    function() {
-      if (triggerElement) {
-        const form = triggerElement.form;
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = triggerElement.name;
-        hiddenInput.value = triggerElement.value;
-        form.appendChild(hiddenInput);
-        form.submit();
-      }
-    }
-  );
-}
-
-function confirmUTXOResize() {
-  triggerElement = document.activeElement;
-  return showConfirmDialog(
-    "Confirm UTXO Resize",
-    "Are you sure you want to resize UTXOs?",
-    function() {
-      if (triggerElement) {
-        const form = triggerElement.form;
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = triggerElement.name;
-        hiddenInput.value = triggerElement.value;
-        form.appendChild(hiddenInput);
-        form.submit();
-      }
-    }
-  );
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-
-  if (window.WebSocketManager && typeof window.WebSocketManager.initialize === 'function') {
-    window.WebSocketManager.initialize();
-  }
-
-  window.currentBalances = window.currentBalances || {};
-
-  {% if w.cid == '1' %}
-  window.currentBalances = {
-    mainBalance: '{{ w.balance }}',
-    blindBalance: '{{ w.blind_balance }}',
-    anonBalance: '{{ w.anon_balance }}'
-  };
-  {% elif w.cid == '3' %}
-  window.currentBalances = {
-    mainBalance: '{{ w.balance }}',
-    mwebBalance: '{{ w.mweb_balance }}'
-  };
-  {% endif %}
-
-  function updateWalletBalances() {
-    fetch('/json/walletbalances', {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status} ${response.statusText}`);
-        }
-        return response.json();
-      })
-      .then(balanceData => {
-        if (balanceData.error) {
-          throw new Error(balanceData.error);
-        }
-
-        if (!Array.isArray(balanceData)) {
-          throw new Error('Invalid response format');
-        }
-
-
-        balanceData.forEach(coin => {
-          updateWalletDisplay(coin);
-          updatePercentageButtons(coin);
-        });
-
-
-        setTimeout(() => {
-          if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
-            window.WalletManager.updatePrices(true);
-          }
-
-        }, 100);
-      })
-      .catch(error => {
-        console.error('[Wallet] Error updating wallet balances:', error);
-      });
-  }
-
-  function updatePercentageButtons(coinData) {
-    const currentCoinId = {{ w.cid }};
-
-    const isPartVariant = (currentCoinId === 1 && (coinData.name === 'Particl' || coinData.name === 'Particl Anon' || coinData.name === 'Particl Blind'));
-    const isLtcVariant = (currentCoinId === 3 && (coinData.name === 'Litecoin' || coinData.name === 'Litecoin MWEB'));
-    const isCurrentCoin = (coinData.id === currentCoinId);
-
-    if (isPartVariant || isLtcVariant || isCurrentCoin) {
-      const buttons = document.querySelectorAll('button[onclick*="setAmount"]');
-      buttons.forEach(button => {
-        const onclick = button.getAttribute('onclick');
-        if (onclick) {
-          if (currentCoinId === 1) {
-            window.currentBalances = window.currentBalances || {};
-
-            const anonBalance = coinData.name === 'Particl Anon' ? coinData.balance :
-                              (window.currentBalances.anonBalance || '0');
-            const blindBalance = coinData.name === 'Particl Blind' ? coinData.balance :
-                               (window.currentBalances.blindBalance || '0');
-            const mainBalance = coinData.name === 'Particl' ? coinData.balance :
-                              (window.currentBalances.mainBalance || '0');
-
-            if (coinData.name === 'Particl') window.currentBalances.mainBalance = coinData.balance;
-            if (coinData.name === 'Particl Anon') window.currentBalances.anonBalance = coinData.balance;
-            if (coinData.name === 'Particl Blind') window.currentBalances.blindBalance = coinData.balance;
-
-            const newOnclick = onclick.replace(
-              /setAmount\([^,]+,\s*'[^']*',\s*\d+,\s*'[^']*',\s*'[^']*'\)/,
-              `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${mainBalance}', ${currentCoinId}, '${blindBalance}', '${anonBalance}')`
-            );
-            button.setAttribute('onclick', newOnclick);
-          } else if (currentCoinId === 3) {
-            window.currentBalances = window.currentBalances || {};
-
-            const mwebBalance = coinData.name === 'Litecoin MWEB' ? coinData.balance :
-                              (window.currentBalances.mwebBalance || '0');
-            const mainBalance = coinData.name === 'Litecoin' ? coinData.balance :
-                              (window.currentBalances.mainBalance || '0');
-
-            if (coinData.name === 'Litecoin') window.currentBalances.mainBalance = coinData.balance;
-            if (coinData.name === 'Litecoin MWEB') window.currentBalances.mwebBalance = coinData.balance;
-
-            const newOnclick = onclick.replace(
-              /setAmount\([^,]+,\s*'[^']*',\s*\d+,\s*'[^']*'\)/,
-              `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${mainBalance}', ${currentCoinId}, '${mwebBalance}')`
-            );
-            button.setAttribute('onclick', newOnclick);
-          } else {
-            const newOnclick = onclick.replace(
-              /setAmount\([^,]+,\s*'[^']*',\s*\d+\)/,
-              `setAmount(${onclick.match(/setAmount\(([^,]+)/)[1]}, '${coinData.balance}', ${currentCoinId})`
-            );
-            button.setAttribute('onclick', newOnclick);
-          }
-        }
-      });
-    }
-  }
-
-  function updateWalletDisplay(coinData) {
-
-    if (coinData.name === 'Particl') {
-
-      updateSpecificBalance('Particl', 'Balance:', coinData.balance, coinData.ticker || 'PART');
-    } else if (coinData.name === 'Particl Anon') {
-
-      updateSpecificBalance('Particl', 'Anon Balance:', coinData.balance, coinData.ticker || 'PART');
-
-      removePendingBalance('Particl', 'Anon Balance:');
-      if (coinData.pending && parseFloat(coinData.pending) > 0) {
-        updatePendingBalance('Particl', 'Anon Balance:', coinData.pending, coinData.ticker || 'PART', 'Pending:', coinData);
-      }
-    } else if (coinData.name === 'Particl Blind') {
-
-      updateSpecificBalance('Particl', 'Blind Balance:', coinData.balance, coinData.ticker || 'PART');
-
-      removePendingBalance('Particl', 'Blind Balance:');
-      if (coinData.pending && parseFloat(coinData.pending) > 0) {
-        updatePendingBalance('Particl', 'Blind Balance:', coinData.pending, coinData.ticker || 'PART', 'Unconfirmed:', coinData);
-      }
-    } else if (coinData.name === 'Litecoin MWEB') {
-
-      updateSpecificBalance('Litecoin', 'MWEB Balance:', coinData.balance, coinData.ticker || 'LTC');
-
-      if (coinData.pending && parseFloat(coinData.pending) > 0) {
-        updatePendingBalance('Litecoin', 'MWEB Balance:', coinData.pending, coinData.ticker || 'LTC', 'Pending:', coinData);
-      }
-    } else {
-
-      updateSpecificBalance(coinData.name, 'Balance:', coinData.balance, coinData.ticker || coinData.name);
-
-
-      if (coinData.pending && parseFloat(coinData.pending) > 0) {
-        updatePendingDisplay(coinData);
-      } else {
-        removePendingDisplay(coinData.name);
-      }
-    }
-  }
-
-  function updateSpecificBalance(coinName, labelText, balance, ticker, isPending = false) {
-    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
-    let found = false;
-
-    balanceElements.forEach(element => {
-      const elementCoinName = element.getAttribute('data-coinname');
-
-      if (elementCoinName === coinName) {
-        const parentRow = element.closest('tr');
-        if (parentRow) {
-          const labelCell = parentRow.querySelector('td:first-child');
-          if (labelCell) {
-            const currentLabel = labelCell.textContent.trim();
-
-            if (currentLabel.includes(labelText)) {
-              if (isPending) {
-                element.textContent = `+${balance} ${ticker}`;
-              } else {
-                element.textContent = `${balance} ${ticker}`;
-              }
-
-
-              setTimeout(() => {
-                if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
-                  window.WalletManager.updatePrices(false);
-                }
-              }, 50);
-
-              found = true;
-            }
-          }
-        }
-      }
-    });
-  }
-
-  function updatePendingDisplay(coinData) {
-
-    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
-
-    balanceElements.forEach(element => {
-      const elementCoinName = element.getAttribute('data-coinname');
-
-      if (elementCoinName === coinData.name) {
-        const parentRow = element.closest('tr');
-        if (parentRow) {
-          const labelCell = parentRow.querySelector('td:first-child');
-          if (labelCell && labelCell.textContent.includes('Balance:')) {
-
-            const balanceCell = parentRow.querySelector('td:nth-child(2)');
-            if (balanceCell) {
-              let pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
-
-              if (coinData.pending && parseFloat(coinData.pending) > 0) {
-                if (!pendingSpan) {
-
-                  pendingSpan = document.createElement('span');
-                  pendingSpan.className = 'inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500';
-                  balanceCell.appendChild(document.createTextNode(' '));
-                  balanceCell.appendChild(pendingSpan);
-                }
-
-                const ticker = coinData.ticker || coinData.name;
-
-                pendingSpan.textContent = `Pending: +${coinData.pending} ${ticker}`;
-              } else {
-
-                if (pendingSpan) {
-                  pendingSpan.remove();
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-
-  function removePendingDisplay(coinName) {
-    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
-
-    balanceElements.forEach(element => {
-      const elementCoinName = element.getAttribute('data-coinname');
-
-      if (elementCoinName === coinName) {
-        const parentRow = element.closest('tr');
-        if (parentRow) {
-          const balanceCell = parentRow.querySelector('td:nth-child(2)');
-          if (balanceCell) {
-            const pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
-            if (pendingSpan) {
-              pendingSpan.remove();
-            }
-          }
-        }
-      }
-    });
-  }
-
-  function updatePendingBalance(coinName, balanceType, pendingAmount, ticker, pendingLabel, coinData) {
-    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
-
-    balanceElements.forEach(element => {
-      const elementCoinName = element.getAttribute('data-coinname');
-
-      if (elementCoinName === coinName) {
-        const parentRow = element.closest('tr');
-        if (parentRow) {
-          const labelCell = parentRow.querySelector('td:first-child');
-          if (labelCell && labelCell.textContent.includes(balanceType)) {
-
-            const balanceCell = parentRow.querySelector('td:nth-child(2)');
-            if (balanceCell) {
-              let pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
-
-              if (pendingAmount && parseFloat(pendingAmount) > 0) {
-                if (!pendingSpan) {
-
-                  pendingSpan = document.createElement('span');
-                  pendingSpan.className = 'inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500';
-                  balanceCell.appendChild(document.createTextNode(' '));
-                  balanceCell.appendChild(pendingSpan);
-                }
-
-
-                pendingSpan.textContent = `${pendingLabel} +${pendingAmount} ${ticker}`;
-              } else if (pendingSpan) {
-
-                pendingSpan.remove();
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-
-  function removePendingBalance(coinName, balanceType) {
-    const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
-
-    balanceElements.forEach(element => {
-      const elementCoinName = element.getAttribute('data-coinname');
-
-      if (elementCoinName === coinName) {
-        const parentRow = element.closest('tr');
-        if (parentRow) {
-          const labelCell = parentRow.querySelector('td:first-child');
-          if (labelCell && labelCell.textContent.includes(balanceType)) {
-
-            const balanceCell = parentRow.querySelector('td:nth-child(2)');
-            if (balanceCell) {
-              const pendingSpan = balanceCell.querySelector('.inline-block.py-1.px-2.rounded-full.bg-green-100');
-              if (pendingSpan) {
-                pendingSpan.remove();
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-
-  function setupWalletWebSocketUpdates() {
-    window.BalanceUpdatesManager.setup({
-      contextKey: 'wallet',
-      balanceUpdateCallback: updateWalletBalances,
-      swapEventCallback: updateWalletBalances,
-      errorContext: 'Wallet',
-      enablePeriodicRefresh: true,
-      periodicInterval: 120000
-    });
-
-    if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
-      const priceHandlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
-        if (data && data.event) {
-          if (data.event === 'price_updated' || data.event === 'prices_updated') {
-            clearTimeout(window.walletPriceUpdateTimeout);
-            window.walletPriceUpdateTimeout = setTimeout(() => {
-              if (window.WalletManager && typeof window.WalletManager.updatePrices === 'function') {
-                window.WalletManager.updatePrices(true);
-              }
-            }, 500);
-          }
-        }
-      });
-      window.walletPriceHandlerId = priceHandlerId;
-    }
-  }
-
-  function cleanupWalletBalanceUpdates() {
-    window.BalanceUpdatesManager.cleanup('wallet');
-
-    if (window.walletPriceHandlerId && window.WebSocketManager) {
-      window.WebSocketManager.removeMessageHandler('message', window.walletPriceHandlerId);
-    }
-
-    clearTimeout(window.walletPriceUpdateTimeout);
-  }
-
-  window.BalanceUpdatesManager.initialize();
-  setupWalletWebSocketUpdates();
-
-  setTimeout(() => {
-    updateWalletBalances();
-  }, 1000);
-
-  window.addEventListener('beforeunload', cleanupWalletBalanceUpdates);
-
-  document.getElementById('confirmYes').addEventListener('click', function() {
-    if (typeof confirmCallback === 'function') {
-      confirmCallback();
-    }
-    hideConfirmDialog();
-  });
-  
-  document.getElementById('confirmNo').addEventListener('click', hideConfirmDialog);
-  
-  document.querySelectorAll('input[type="submit"][name^="reseed_"]').forEach(function(button) {
-    button.addEventListener('click', function(e) {
-      e.preventDefault();
-      currentCoinId = button.name.split('_')[1];
-      return confirmReseed();
-    });
-  });
-  
-  document.querySelectorAll('button[name^="withdraw_"]').forEach(function(button) {
-    button.addEventListener('click', function(e) {
-      e.preventDefault();
-      currentCoinId = button.name.split('_')[1];
-      return confirmWithdrawal();
-    });
-  });
-  
-  const utxoButton = document.getElementById('create_utxo');
-  if (utxoButton) {
-    utxoButton.addEventListener('click', function(e) {
-      e.preventDefault();
-      return confirmUTXOResize();
-    });
-  }
-});
-</script>
+<script src="/static/js/pages/wallet-page.js"></script>
 
 {% include 'footer.html' %}
 </body>

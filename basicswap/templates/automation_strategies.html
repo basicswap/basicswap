@@ -1,21 +1,14 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, white_automation_svg, page_forwards_svg, page_back_svg, filter_apply_svg %}
+{% from 'style.html' import white_automation_svg, page_forwards_svg, page_back_svg, filter_apply_svg %}
+{% from 'macros.html' import breadcrumb %}
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
    <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-        <li>{{ breadcrumb_line_svg | safe }}</li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/automation">Automation Strategies</a>
-     </li>
-        <li>{{ breadcrumb_line_svg | safe }}</li>
-    </ul>
-    </ul>
+    {{ breadcrumb([
+      {'text': 'Home', 'url': '/'},
+      {'text': 'Automation Strategies', 'url': '/automation'}
+    ]) }}
    </div>
   </div>
  </section>

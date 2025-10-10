@@ -7,7 +7,7 @@
             originalOnload();
         }
 
-        setTimeout(function() {
+        CleanupManager.setTimeout(function() {
             initBidsTabNavigation();
             handleInitialNavigation();
         }, 100);
@@ -15,6 +15,12 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         initBidsTabNavigation();
+
+        if (window.CleanupManager) {
+            CleanupManager.registerResource('bidsTabHashChange', handleHashChange, () => {
+                window.removeEventListener('hashchange', handleHashChange);
+            });
+        }
     });
 
     window.addEventListener('hashchange', handleHashChange);
@@ -43,7 +49,7 @@
         });
 
         window.bidsTabNavigationInitialized = true;
-        //console.log('Bids tab navigation initialized');
+        
     }
 
     function handleInitialNavigation() {
@@ -97,14 +103,12 @@
         if (!tabButton) {
             if (retryCount < 5) {
 
-                setTimeout(() => {
+                CleanupManager.setTimeout(() => {
                     activateTabWithRetry(normalizedTabId, retryCount + 1);
                 }, 100);
             }
             return;
         }
-
-
 
         tabButton.click();
 
@@ -160,7 +164,7 @@
     }
 
     function triggerDataLoad(tabId) {
-        setTimeout(() => {
+        CleanupManager.setTimeout(() => {
             if (window.state) {
                 window.state.currentTab = tabId === '#all' ? 'all' :
                                           (tabId === '#sent' ? 'sent' : 'received');
@@ -181,7 +185,7 @@
             document.dispatchEvent(event);
 
             if (window.TooltipManager && typeof window.TooltipManager.cleanup === 'function') {
-                setTimeout(() => {
+                CleanupManager.setTimeout(() => {
                     window.TooltipManager.cleanup();
                     if (typeof window.initializeTooltips === 'function') {
                         window.initializeTooltips();
@@ -196,7 +200,7 @@
 
         activateTabWithRetry(tabId);
 
-        setTimeout(function() {
+        CleanupManager.setTimeout(function() {
             window.scrollTo(0, oldScrollPosition);
         }, 0);
     }

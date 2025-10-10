@@ -66,7 +66,7 @@ const BidExporter = {
             link.click();
             document.body.removeChild(link);
 
-            setTimeout(() => {
+            CleanupManager.setTimeout(() => {
                 URL.revokeObjectURL(url);
             }, 100);
         } catch (error) {
@@ -104,7 +104,7 @@ const BidExporter = {
 };
 
 document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(function() {
+    CleanupManager.setTimeout(function() {
         if (typeof state !== 'undefined' && typeof EventManager !== 'undefined') {
             const exportAllButton = document.getElementById('exportAllBids');
             if (exportAllButton) {
