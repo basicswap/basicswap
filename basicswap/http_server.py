@@ -218,31 +218,34 @@ class HttpHandler(BaseHTTPRequestHandler):
             args_dict["debug_mode"] = True
         if swap_client.debug_ui:
             args_dict["debug_ui_mode"] = True
-        if swap_client.use_tor_proxy:
-            args_dict["use_tor_proxy"] = True
+
+        is_authenticated = self.is_authenticated() or not swap_client.settings.get(
+            "client_auth_hash"
+        )
+
+        if is_authenticated:
+            if swap_client.use_tor_proxy:
+                args_dict["use_tor_proxy"] = True
+                try:
+                    tor_state = get_tor_established_state(swap_client)
+                    args_dict["tor_established"] = True if tor_state == "1" else False
+                except Exception:
+                    args_dict["tor_established"] = False
+
+            from .ui.page_amm import get_amm_status, get_amm_active_count
+
             try:
-                tor_state = get_tor_established_state(swap_client)
-                args_dict["tor_established"] = True if tor_state == "1" else False
-            except Exception as e:
-                args_dict["tor_established"] = False
-                if swap_client.debug:
-                    swap_client.log.error(f"Error getting Tor state: {str(e)}")
-                    swap_client.log.error(traceback.format_exc())
+                args_dict["current_status"] = get_amm_status()
+                args_dict["amm_active_count"] = get_amm_active_count(swap_client)
+            except Exception:
+                args_dict["current_status"] = "stopped"
+                args_dict["amm_active_count"] = 0
 
-        from .ui.page_amm import get_amm_status, get_amm_active_count
-
-        try:
-            args_dict["current_status"] = get_amm_status()
-            args_dict["amm_active_count"] = get_amm_active_count(swap_client)
-        except Exception as e:
-            args_dict["current_status"] = "stopped"
+            if swap_client._show_notifications:
+                args_dict["notifications"] = swap_client.getNotifications()
+        else:
+            args_dict["current_status"] = "unknown"
             args_dict["amm_active_count"] = 0
-            if swap_client.debug:
-                swap_client.log.error(f"Error getting AMM state: {str(e)}")
-                swap_client.log.error(traceback.format_exc())
-
-        if swap_client._show_notifications:
-            args_dict["notifications"] = swap_client.getNotifications()
 
         if "messages" in args_dict:
             messages_with_ids = []
@@ -274,9 +277,19 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.server.session_tokens["shutdown"] = shutdown_token
         args_dict["shutdown_token"] = shutdown_token
 
-        encrypted, locked = swap_client.getLockedState()
-        args_dict["encrypted"] = encrypted
-        args_dict["locked"] = locked
+        if is_authenticated:
+            try:
+                encrypted, locked = swap_client.getLockedState()
+                args_dict["encrypted"] = encrypted
+                args_dict["locked"] = locked
+            except Exception as e:
+                args_dict["encrypted"] = False
+                args_dict["locked"] = False
+                if swap_client.debug:
+                    swap_client.log.warning(f"Could not get wallet locked state: {e}")
+        else:
+            args_dict["encrypted"] = args_dict.get("encrypted", False)
+            args_dict["locked"] = args_dict.get("locked", False)
 
         with self.server.msg_id_lock:
             if self.server.msg_id_counter >= 0x7FFFFFFF:

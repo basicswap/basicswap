@@ -12354,11 +12354,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.closeDB(cursor, commit=False)
 
     def getLockedState(self):
-        if self._is_encrypted is None or self._is_locked is None:
-            self._is_encrypted, self._is_locked = self.ci(
-                Coins.PART
-            ).isWalletEncryptedLocked()
-        return self._is_encrypted, self._is_locked
+        try:
+            if self._is_encrypted is None or self._is_locked is None:
+                self._is_encrypted, self._is_locked = self.ci(
+                    Coins.PART
+                ).isWalletEncryptedLocked()
+            return self._is_encrypted, self._is_locked
+        except Exception as e:
+            self.log.warning(f"getLockedState failed: {e}")
+            return False, False
 
     def getExchangeName(self, coin_id: int, exchange_name: str) -> str:
         if coin_id == Coins.BCH:

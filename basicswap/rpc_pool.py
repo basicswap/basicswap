@@ -12,7 +12,7 @@ from basicswap.rpc import Jsonrpc
 
 class RPCConnectionPool:
     def __init__(
-        self, url, max_connections=5, timeout=30, logger=None, max_idle_time=300
+        self, url, max_connections=5, timeout=10, logger=None, max_idle_time=300
     ):
         self.url = url
         self.max_connections = max_connections
