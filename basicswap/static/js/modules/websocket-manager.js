@@ -315,24 +315,16 @@ const WebSocketManager = (function() {
     function handlePageHidden() {
         log('Page hidden');
         state.isPageHidden = true;
-        stopHealthCheck();
-
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            state.isIntentionallyClosed = true;
-            ws.close(1000, 'Page hidden');
-        }
     }
 
     function handlePageVisible() {
         log('Page visible');
         state.isPageHidden = false;
-        state.isIntentionallyClosed = false;
 
         const resumeFn = () => {
             if (!publicAPI.isConnected()) {
                 publicAPI.connect();
             }
-            startHealthCheck();
         };
 
         if (window.CleanupManager) {
