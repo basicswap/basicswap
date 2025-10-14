@@ -413,6 +413,166 @@ select.disabled-select-enabled {
     color: #fff;
 }
 
+/* Orderbook Styles */
+.orderbook-level {
+    position: relative;
+    overflow: hidden;
+}
+
+.orderbook-volume-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    transition: width 0.3s ease;
+    border-radius: 0.5rem;
+}
+
+.orderbook-buy .orderbook-volume-bar {
+    background: rgba(34, 197, 94, 0.2);
+}
+
+.orderbook-sell .orderbook-volume-bar {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.dark .orderbook-buy .orderbook-volume-bar {
+    background: rgba(34, 197, 94, 0.3);
+}
+
+.dark .orderbook-sell .orderbook-volume-bar {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+.orderbook-price {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+}
+
+.orderbook-buy .orderbook-price {
+    color: #059669;
+}
+
+.orderbook-sell .orderbook-price {
+    color: #DC2626;
+}
+
+.dark .orderbook-buy .orderbook-price {
+    color: #10B981;
+}
+
+.dark .orderbook-sell .orderbook-price {
+    color: #EF4444;
+}
+
+.orderbook-level:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.dark .orderbook-level:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.orderbook-level:first-child {
+    margin-top: 2px;
+}
+
+.orderbook-level:first-child:hover {
+    margin-top: 1px;
+}
+
+/* Orderbook Modal Styles */
+.orderbook-modal {
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+.orderbook-modal-content {
+    animation: modalSlideIn 0.2s ease-out;
+}
+
+/* Modal close button styling */
+.orderbook-modal .text-gray-400:hover {
+    color: #6B7280;
+}
+
+.dark .orderbook-modal .text-gray-400:hover {
+    color: #FFFFFF;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Orderbook Refresh Button Animation */
+.orderbook-refresh-btn:hover svg {
+    animation: spin 0.5s linear;
+}
+
+/* Orderbook Flash Animations */
+@keyframes flash-green {
+    0% { background-color: rgba(34, 197, 94, 0.3); }
+    100% { background-color: transparent; }
+}
+
+@keyframes flash-red {
+    0% { background-color: rgba(239, 68, 68, 0.3); }
+    100% { background-color: transparent; }
+}
+
+.flash-green {
+    animation: flash-green 0.6s ease-out;
+}
+
+.flash-red {
+    animation: flash-red 0.6s ease-out;
+}
+
+.orderbook-level-new {
+    animation: flash-green 0.8s ease-out;
+}
+
+.orderbook-level-updated {
+    animation: flash-red 0.6s ease-out;
+}
+
+/* Cumulative Volume Indicator */
+.cumulative-volume {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    opacity: 0.8;
+}
+
+/* Price Level Hover Effects */
+.orderbook-level:hover .orderbook-price {
+    font-weight: 700;
+    transform: scale(1.02);
+}
+
+/* Market Depth Visualization */
+.market-depth-bar {
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, currentColor 100%);
+    margin-top: 2px;
+    border-radius: 1px;
+}
+
 /* Toggle Button Styles */
 #toggle-volume.active {
     @apply bg-green-500 hover:bg-green-600 focus:ring-green-300;

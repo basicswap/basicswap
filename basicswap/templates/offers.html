@@ -312,6 +312,18 @@
                     </button>
                   </div>
                 </div>
+                {% if not sent_offers %}
+                <div class="w-full md:w-auto p-1.5">
+                  <div class="relative">
+                    <button type="button" id="view-toggle-btn" onclick="toggleOrderbookView()" class="transition-opacity duration-200 flex items-center justify-center w-full px-4 py-2.5 font-medium text-sm hover:text-white dark:text-white dark:bg-gray-500 bg-coolGray-200 hover:bg-green-600 hover:border-green-600 rounded-lg transition duration-200 border border-coolGray-200 dark:border-gray-400 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                      </svg>
+                      <span>Orderbook View</span>
+                    </button>
+                  </div>
+                </div>
+                {% endif %}
               </div>
             </div>
           </form>
@@ -330,6 +342,10 @@
 <section>
   <div class="lg:container mx-auto lg:px-0 px-6">
     <div class="pt-0 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+
+      <div id="orderbook-container" style="display: none;" class="px-6">
+      </div>
+
       <div class="px-0">
        <div class="w-auto mt-6 overflow-auto lg:overflow-hidden">
           <table class="w-full min-w-max">
