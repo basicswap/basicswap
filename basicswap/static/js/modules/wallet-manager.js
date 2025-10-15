@@ -11,8 +11,7 @@ const WalletManager = (function() {
     defaultTTL: 300,
     priceSource: {
       primary: 'coingecko.com',
-      fallback: 'cryptocompare.com',
-      enabledSources: ['coingecko.com', 'cryptocompare.com']
+      enabledSources: ['coingecko.com']
     }
   };
 

@@ -9,8 +9,7 @@ const ApiManager = (function() {
             requestTimeout: 60000,
             retryDelays: [5000, 15000, 30000],
             rateLimits: {
-                coingecko: { requestsPerMinute: 50, minInterval: 1200 },
-                cryptocompare: { requestsPerMinute: 30, minInterval: 2000 }
+                coingecko: { requestsPerMinute: 50, minInterval: 1200 }
             }
         };
     }

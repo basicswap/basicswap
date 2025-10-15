@@ -35,20 +35,13 @@ const ConfigManager = (function() {
         },
         itemsPerPage: 50,
         apiEndpoints: {
-            cryptoCompare: 'https://min-api.cryptocompare.com/data/pricemultifull',
             coinGecko: 'https://api.coingecko.com/api/v3',
-            cryptoCompareHistorical: 'https://min-api.cryptocompare.com/data/v2/histoday',
-            cryptoCompareHourly: 'https://min-api.cryptocompare.com/data/v2/histohour',
             volumeEndpoint: 'https://api.coingecko.com/api/v3/simple/price'
         },
         rateLimits: {
             coingecko: {
                 requestsPerMinute: 50,
                 minInterval: 1200
-            },
-            cryptocompare: {
-                requestsPerMinute: 30,
-                minInterval: 2000
             }
         },
         retryDelays: [5000, 15000, 30000],
@@ -99,12 +92,10 @@ const ConfigManager = (function() {
             if (typeof window.getAPIKeys === 'function') {
                 const apiKeys = window.getAPIKeys();
                 return {
-                    cryptoCompare: apiKeys.cryptoCompare || '',
                     coinGecko: apiKeys.coinGecko || ''
                 };
             }
             return {
-                cryptoCompare: '',
                 coinGecko: ''
             };
         },

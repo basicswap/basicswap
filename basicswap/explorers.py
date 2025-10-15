@@ -8,9 +8,6 @@
 import json
 
 
-default_chart_api_key = (
-    "95dd900af910656e0e17c41f2ddc5dba77d01bf8b0e7d2787634a16bd976c553"
-)
 default_coingecko_api_key = "CG-8hm3r9iLfpEXv4ied8oLbeUj"
 
 

@@ -49,9 +49,6 @@ def page_settings(self, url_split, post_string):
                 active_tab = "general"
                 data = {
                     "show_chart": toBool(get_data_entry(form_data, "showchart")),
-                    "chart_api_key": html.unescape(
-                        get_data_entry_or(form_data, "chartapikey", "")
-                    ),
                     "coingecko_api_key": html.unescape(
                         get_data_entry_or(form_data, "coingeckoapikey", "")
                     ),
@@ -213,16 +210,12 @@ def page_settings(self, url_split, post_string):
         "check_updates": swap_client.settings.get("check_updates", True),
     }
 
-    chart_api_key = get_api_key_setting(
-        swap_client.settings, "chart_api_key", escape=True
-    )
     coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", escape=True
+        swap_client.settings, "coingecko_api_key", default_value="", escape=True
     )
 
     chart_settings = {
         "show_chart": swap_client.settings.get("show_chart", True),
-        "chart_api_key": chart_api_key,
         "coingecko_api_key": coingecko_api_key,
         "enabled_chart_coins": swap_client.settings.get("enabled_chart_coins", ""),
     }

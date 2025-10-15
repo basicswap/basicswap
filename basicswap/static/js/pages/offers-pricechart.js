@@ -24,7 +24,6 @@ const api = {
             }
 
             const volumeData = await Api.fetchVolumeData({
-                cryptoCompare: apiKeys.cryptoCompare,
                 coinGecko: apiKeys.coinGecko
             });
 
@@ -109,10 +108,7 @@ const api = {
 
             const historicalData = await Api.fetchHistoricalData(
                 coinSymbols,
-                window.config.currentResolution,
-                {
-                    cryptoCompare: window.config.getAPIKeys().cryptoCompare
-                }
+                window.config.currentResolution
             );
 
             Object.keys(historicalData).forEach(coin => {
@@ -146,8 +142,7 @@ const api = {
 const rateLimiter = {
     lastRequestTime: {},
     minRequestInterval: {
-        coingecko: window.config.rateLimits.coingecko.minInterval,
-        cryptocompare: window.config.rateLimits.cryptocompare.minInterval
+        coingecko: window.config.rateLimits.coingecko.minInterval
     },
     requestQueue: {},
     retryDelays: window.config.retryDelays,
