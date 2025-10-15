@@ -918,6 +918,12 @@ const forceTooltipDOMCleanup = () => {
     foundCount += allTooltipElements.length;
 
     allTooltipElements.forEach(element => {
+        const isInTooltipContainer = element.closest('.tooltip-container');
+
+        if (isInTooltipContainer) {
+            return;
+        }
+
         const isDetached = !document.body.contains(element) ||
                            element.classList.contains('hidden') ||
                            element.style.display === 'none';
@@ -1138,7 +1144,7 @@ const createTableRow = async (bid) => {
         `;
     }
 
-    return `
+    const rowHtml = `
         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <!-- Time Column -->
             <td class="py-3 pl-6 pr-3">
@@ -1224,13 +1230,16 @@ const createTableRow = async (bid) => {
                 </div>
             </td>
         </tr>
+    `;
 
-        <!-- Tooltips -->
+    const tooltipIdentityHtml = `
         <div id="tooltip-identity-${uniqueId}" role="tooltip" class="fixed z-50 py-3 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600 max-w-sm pointer-events-none">
             ${tooltipContent}
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
+    `;
 
+    const tooltipStatusHtml = `
         <div id="tooltip-status-${uniqueId}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600">
             <div class="text-white">
                 <p class="font-bold mb-2">Transaction Status</p>
@@ -1248,6 +1257,12 @@ const createTableRow = async (bid) => {
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
     `;
+
+    return {
+        rowHtml,
+        tooltipIdentityHtml,
+        tooltipStatusHtml
+    };
 };
 
 function cleanupOffscreenTooltips() {
@@ -1393,16 +1408,13 @@ const updateTableContent = async (type) => {
     const tbody = elements[`${type}BidsBody`];
     if (!tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="animate-pulse">Loading bids...</div></td></tr>';
-
     if (window.TooltipManager) {
-        requestAnimationFrame(() => window.TooltipManager.cleanup());
+        window.TooltipManager.cleanup();
     }
 
-    requestAnimationFrame(() => {
-        cleanupTooltips();
-        forceTooltipDOMCleanup();
-    });
+    cleanupTooltips();
+
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="animate-pulse">Loading bids...</div></td></tr>';
 
     tooltipIdsToCleanup.clear();
 
@@ -1413,36 +1425,55 @@ const updateTableContent = async (type) => {
 
     const currentPageData = filteredData.slice(startIndex, endIndex);
 
+    let tooltipContainerId = `tooltip-container-${type}`;
+    let tooltipContainer = document.getElementById(tooltipContainerId);
+
+    if (!tooltipContainer) {
+        tooltipContainer = document.createElement('div');
+        tooltipContainer.id = tooltipContainerId;
+        tooltipContainer.className = 'tooltip-container';
+        document.body.appendChild(tooltipContainer);
+    } else {
+        tooltipContainer.innerHTML = '';
+    }
+
     try {
         if (currentPageData.length > 0) {
             const BATCH_SIZE = 10;
             let allRows = [];
+            let allTooltips = [];
 
             for (let i = 0; i < currentPageData.length; i += BATCH_SIZE) {
                 const batch = currentPageData.slice(i, i + BATCH_SIZE);
                 const rowPromises = batch.map(bid => createTableRow(bid));
-                const rows = await Promise.all(rowPromises);
-                allRows = allRows.concat(rows);
+                const rowData = await Promise.all(rowPromises);
 
+                rowData.forEach(data => {
+                    allRows.push(data.rowHtml);
+                    allTooltips.push(data.tooltipIdentityHtml);
+                    allTooltips.push(data.tooltipStatusHtml);
+                });
             }
 
             const scrollPosition = tbody.parentElement?.scrollTop || 0;
 
             tbody.innerHTML = allRows.join('');
+            tooltipContainer.innerHTML = allTooltips.join('');
 
             if (tbody.parentElement && scrollPosition > 0) {
                 tbody.parentElement.scrollTop = scrollPosition;
             }
 
             if (document.visibilityState === 'visible') {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        initializeTooltips();
 
-                setTimeout(() => {
-                    initializeTooltips();
-
-                    setTimeout(() => {
-                        forceTooltipDOMCleanup();
-                    }, 100);
-                }, 10);
+                        setTimeout(() => {
+                            forceTooltipDOMCleanup();
+                        }, 100);
+                    });
+                });
             }
         } else {
             tbody.innerHTML = `

@@ -744,6 +744,16 @@ async function fetchLatestPrices() {
     }
 }
 
+async function fetchPricesAsync() {
+    try {
+        const prices = await window.PriceManager.getPrices(false);
+        return prices;
+    } catch (error) {
+        console.error('Error fetching prices asynchronously:', error);
+        return null;
+    }
+}
+
 async function fetchOffers() {
     const refreshButton = document.getElementById('refreshOffers');
     const refreshIcon = document.getElementById('refreshIcon');
@@ -778,11 +788,7 @@ async function fetchOffers() {
             refreshButton.classList.add('opacity-75', 'cursor-wait');
         }
 
-        const [offersResponse, pricesData] = await Promise.all([
-            fetchWithRetry(isSentOffers ? '/json/sentoffers' : '/json/offers'),
-            fetchLatestPrices()
-        ]);
-
+        const offersResponse = await fetchWithRetry(isSentOffers ? '/json/sentoffers' : '/json/offers');
         const data = await offersResponse.json();
 
         if (data.error) {
@@ -812,12 +818,19 @@ async function fetchOffers() {
         jsonData = formatInitialData(processedData);
         originalJsonData = [...jsonData];
 
-        latestPrices = pricesData || getEmptyPriceData();
-
         CacheManager.set('offers_cached', jsonData, 'offers');
 
         applyFilters();
         updatePaginationInfo();
+
+        fetchPricesAsync().then(prices => {
+            if (prices) {
+                latestPrices = prices;
+                updateProfitLossDisplays();
+            }
+        }).catch(error => {
+            console.error('Error fetching prices after offers refresh:', error);
+        });
 
     } catch (error) {
         console.error('[Debug] Error fetching offers:', error);
