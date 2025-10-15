@@ -14,6 +14,9 @@ const TooltipManager = (function() {
             this.debug = false;
             this.tooltipData = new WeakMap();
             this.resources = {};
+            this.creationQueue = [];
+            this.batchSize = 5;
+            this.isProcessingQueue = false;
 
             if (window.CleanupManager) {
                 CleanupManager.registerResource(
@@ -48,38 +51,67 @@ const TooltipManager = (function() {
                 this.performPeriodicCleanup(true);
             }
 
-            const createTooltip = () => {
-                if (!document.body.contains(element)) return;
+            this.creationQueue.push({ element, content, options });
 
-                const rect = element.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    this.createTooltipInstance(element, content, options);
-                } else {
-                    let retryCount = 0;
-                    const maxRetries = 3;
+            if (!this.isProcessingQueue) {
+                this.processCreationQueue();
+            }
 
-                    const retryCreate = () => {
-                        const newRect = element.getBoundingClientRect();
-                        if ((newRect.width > 0 && newRect.height > 0) || retryCount >= maxRetries) {
-                            if (newRect.width > 0 && newRect.height > 0) {
-                                this.createTooltipInstance(element, content, options);
-                            }
-                        } else {
-                            retryCount++;
-                            CleanupManager.setTimeout(() => {
-                                CleanupManager.requestAnimationFrame(retryCreate);
-                            }, 100);
-                        }
-                    };
-
-                    CleanupManager.setTimeout(() => {
-                        CleanupManager.requestAnimationFrame(retryCreate);
-                    }, 100);
-                }
-            };
-
-            CleanupManager.requestAnimationFrame(createTooltip);
             return null;
+        }
+
+        processCreationQueue() {
+            if (this.creationQueue.length === 0) {
+                this.isProcessingQueue = false;
+                return;
+            }
+
+            this.isProcessingQueue = true;
+            const batch = this.creationQueue.splice(0, this.batchSize);
+
+            CleanupManager.requestAnimationFrame(() => {
+                batch.forEach(({ element, content, options }) => {
+                    this.createTooltipSync(element, content, options);
+                });
+
+                if (this.creationQueue.length > 0) {
+                    CleanupManager.setTimeout(() => {
+                        this.processCreationQueue();
+                    }, 0);
+                } else {
+                    this.isProcessingQueue = false;
+                }
+            });
+        }
+
+        createTooltipSync(element, content, options) {
+            if (!document.body.contains(element)) return;
+
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                this.createTooltipInstance(element, content, options);
+            } else {
+                let retryCount = 0;
+                const maxRetries = 3;
+
+                const retryCreate = () => {
+                    const newRect = element.getBoundingClientRect();
+                    if ((newRect.width > 0 && newRect.height > 0) || retryCount >= maxRetries) {
+                        if (newRect.width > 0 && newRect.height > 0) {
+                            this.createTooltipInstance(element, content, options);
+                        }
+                    } else {
+                        retryCount++;
+                        CleanupManager.setTimeout(() => {
+                            CleanupManager.requestAnimationFrame(retryCreate);
+                        }, 100);
+                    }
+                };
+
+                CleanupManager.setTimeout(() => {
+                    CleanupManager.requestAnimationFrame(retryCreate);
+                }, 100);
+            }
         }
 
         createTooltipInstance(element, content, options = {}) {
@@ -191,6 +223,9 @@ const TooltipManager = (function() {
 
                 return null;
             } catch (error) {
+                if (window.ErrorHandler) {
+                    return window.ErrorHandler.handleError(error, 'TooltipManager.createTooltipInstance', null);
+                }
                 console.error('Error creating tooltip:', error);
                 return null;
             }
@@ -199,7 +234,7 @@ const TooltipManager = (function() {
         destroy(element) {
             if (!element) return;
 
-            try {
+            const destroyFn = () => {
                 const tooltipId = element.getAttribute('data-tooltip-trigger-id');
                 if (!tooltipId) return;
 
@@ -224,8 +259,16 @@ const TooltipManager = (function() {
 
                 this.tooltipData.delete(element);
                 tooltipInstanceMap.delete(element);
-            } catch (error) {
-                console.error('Error destroying tooltip:', error);
+            };
+
+            if (window.ErrorHandler) {
+                window.ErrorHandler.safeExecute(destroyFn, 'TooltipManager.destroy', null);
+            } else {
+                try {
+                    destroyFn();
+                } catch (error) {
+                    console.error('Error destroying tooltip:', error);
+                }
             }
         }
 
@@ -738,10 +781,40 @@ const TooltipManager = (function() {
             }
         }
 
+        initializeLazyTooltips(selector = '[data-tooltip-target]') {
+            
+            const initializedTooltips = new Set();
+
+            const initializeTooltip = (element) => {
+                const targetId = element.getAttribute('data-tooltip-target');
+                if (!targetId || initializedTooltips.has(targetId)) return;
+
+                const tooltipContent = document.getElementById(targetId);
+                if (tooltipContent) {
+                    this.create(element, tooltipContent.innerHTML, {
+                        placement: element.getAttribute('data-tooltip-placement') || 'top'
+                    });
+                    initializedTooltips.add(targetId);
+                }
+            };
+
+            document.addEventListener('mouseover', (e) => {
+                const target = e.target.closest(selector);
+                if (target) {
+                    initializeTooltip(target);
+                }
+            }, { passive: true, capture: true });
+
+            this.log('Lazy tooltip initialization enabled');
+        }
+
         dispose() {
             this.log('Disposing TooltipManager');
 
             try {
+                this.creationQueue = [];
+                this.isProcessingQueue = false;
+
                 this.cleanup();
 
                 Object.values(this.resources).forEach(resourceId => {
@@ -828,6 +901,11 @@ const TooltipManager = (function() {
         initializeTooltips: function(...args) {
             const manager = this.getInstance();
             return manager.initializeTooltips(...args);
+        },
+
+        initializeLazyTooltips: function(...args) {
+            const manager = this.getInstance();
+            return manager.initializeLazyTooltips(...args);
         },
 
         setDebugMode: function(enabled) {

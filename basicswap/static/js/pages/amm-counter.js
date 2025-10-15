@@ -16,13 +16,7 @@ const AmmCounterManager = (function() {
     }
 
     function debugLog(message, data) {
-        // if (isDebugEnabled()) {
-        //     if (data) {
-        //         console.log(`[AmmCounter] ${message}`, data);
-        //     } else {
-        //         console.log(`[AmmCounter] ${message}`);
-        //     }
-        // }
+        
     }
 
     function updateAmmCounter(count, status) {
@@ -103,7 +97,7 @@ const AmmCounterManager = (function() {
         }
 
         if (window.TooltipManager && typeof window.TooltipManager.initializeTooltips === 'function') {
-            setTimeout(() => {
+            CleanupManager.setTimeout(() => {
                 window.TooltipManager.initializeTooltips(`[data-tooltip-target="${tooltipId}"]`);
                 debugLog(`Re-initialized tooltips for ${tooltipId}`);
             }, 50);
@@ -148,7 +142,7 @@ const AmmCounterManager = (function() {
                 debugLog(`Retrying AMM status fetch (${fetchRetryCount}/${config.maxRetries}) in ${config.retryDelay/1000}s`);
 
                 return new Promise(resolve => {
-                    setTimeout(() => {
+                    CleanupManager.setTimeout(() => {
                         resolve(fetchAmmStatus());
                     }, config.retryDelay);
                 });
@@ -168,7 +162,7 @@ const AmmCounterManager = (function() {
             .then(() => {})
             .catch(() => {});
 
-        refreshTimer = setInterval(() => {
+        refreshTimer = CleanupManager.setInterval(() => {
             fetchAmmStatus()
                 .then(() => {})
                 .catch(() => {});
@@ -251,5 +245,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!window.ammCounterManagerInitialized) {
         window.AmmCounterManager = AmmCounterManager.initialize();
         window.ammCounterManagerInitialized = true;
+
+        if (window.CleanupManager) {
+            CleanupManager.registerResource('ammCounter', window.AmmCounterManager, (mgr) => {
+                if (mgr && mgr.dispose) mgr.dispose();
+            });
+        }
     }
 });

@@ -1395,6 +1395,111 @@ def js_coinprices(self, url_split, post_string, is_json) -> bytes:
     )
 
 
+def js_coinvolume(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+    if not have_data_entry(post_data, "coins"):
+        raise ValueError("Requires coins list.")
+
+    rate_source: str = "coingecko.com"
+    if have_data_entry(post_data, "source"):
+        rate_source = get_data_entry(post_data, "source")
+
+    match_input_key: bool = toBool(
+        get_data_entry_or(post_data, "match_input_key", "true")
+    )
+    ttl: int = int(get_data_entry_or(post_data, "ttl", 300))
+
+    coins = get_data_entry(post_data, "coins")
+    coins_list = coins.split(",")
+    coin_ids = []
+    input_id_map = {}
+    for coin in coins_list:
+        if coin.isdigit():
+            try:
+                coin_id = Coins(int(coin))
+            except Exception:
+                raise ValueError(f"Unknown coin type {coin}")
+        else:
+            try:
+                coin_id = getCoinIdFromTicker(coin)
+            except Exception:
+                try:
+                    coin_id = getCoinIdFromName(coin)
+                except Exception:
+                    raise ValueError(f"Unknown coin type {coin}")
+        coin_ids.append(coin_id)
+        input_id_map[coin_id] = coin
+
+    volume_data = swap_client.lookupVolume(
+        coin_ids, rate_source=rate_source, saved_ttl=ttl
+    )
+
+    rv = {}
+    for k, v in volume_data.items():
+        if match_input_key:
+            rv[input_id_map[k]] = v
+        else:
+            rv[int(k)] = v
+    return bytes(
+        json.dumps({"source": rate_source, "data": rv}),
+        "UTF-8",
+    )
+
+
+def js_coinhistory(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+    if not have_data_entry(post_data, "coins"):
+        raise ValueError("Requires coins list.")
+
+    rate_source: str = "coingecko.com"
+    if have_data_entry(post_data, "source"):
+        rate_source = get_data_entry(post_data, "source")
+
+    match_input_key: bool = toBool(
+        get_data_entry_or(post_data, "match_input_key", "true")
+    )
+    ttl: int = int(get_data_entry_or(post_data, "ttl", 3600))
+    days: int = int(get_data_entry_or(post_data, "days", 1))
+
+    coins = get_data_entry(post_data, "coins")
+    coins_list = coins.split(",")
+    coin_ids = []
+    input_id_map = {}
+    for coin in coins_list:
+        if coin.isdigit():
+            try:
+                coin_id = Coins(int(coin))
+            except Exception:
+                raise ValueError(f"Unknown coin type {coin}")
+        else:
+            try:
+                coin_id = getCoinIdFromTicker(coin)
+            except Exception:
+                try:
+                    coin_id = getCoinIdFromName(coin)
+                except Exception:
+                    raise ValueError(f"Unknown coin type {coin}")
+        coin_ids.append(coin_id)
+        input_id_map[coin_id] = coin
+
+    historical_data = swap_client.lookupHistoricalData(
+        coin_ids, days=days, rate_source=rate_source, saved_ttl=ttl
+    )
+
+    rv = {}
+    for k, v in historical_data.items():
+        if match_input_key:
+            rv[input_id_map[k]] = v
+        else:
+            rv[int(k)] = v
+    return bytes(
+        json.dumps({"source": rate_source, "days": days, "data": rv}),
+        "UTF-8",
+    )
+
+
 def js_messageroutes(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = {} if post_string == "" else getFormData(post_string, is_json)
@@ -1467,6 +1572,8 @@ endpoints = {
     "readurl": js_readurl,
     "active": js_active,
     "coinprices": js_coinprices,
+    "coinvolume": js_coinvolume,
+    "coinhistory": js_coinhistory,
     "messageroutes": js_messageroutes,
 }
 

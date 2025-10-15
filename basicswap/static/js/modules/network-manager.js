@@ -108,7 +108,7 @@ const NetworkManager = (function() {
 
             log(`Scheduling reconnection attempt in ${delay/1000} seconds`);
 
-            state.reconnectTimer = setTimeout(() => {
+            state.reconnectTimer = CleanupManager.setTimeout(() => {
                 state.reconnectTimer = null;
                 this.attemptReconnect();
             }, delay);
@@ -167,7 +167,20 @@ const NetworkManager = (function() {
                 });
         },
 
-        testBackendConnection: function() {
+        testBackendConnection: async function() {
+            if (window.ApiManager) {
+                try {
+                    await window.ApiManager.makeRequest(config.connectionTestEndpoint, 'HEAD', {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    });
+                    return true;
+                } catch (error) {
+                    log('Backend connection test failed:', error.message);
+                    return false;
+                }
+            }
+
             return fetch(config.connectionTestEndpoint, {
                 method: 'HEAD',
                 headers: {
@@ -275,6 +288,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-//console.log('NetworkManager initialized with methods:', Object.keys(NetworkManager));
 console.log('NetworkManager initialized');
-

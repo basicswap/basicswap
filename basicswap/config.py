@@ -9,6 +9,8 @@ import os
 CONFIG_FILENAME = "basicswap.json"
 BASICSWAP_DATADIR = os.getenv("BASICSWAP_DATADIR", os.path.join("~", ".basicswap"))
 DEFAULT_ALLOW_CORS = False
+DEFAULT_RPC_POOL_ENABLED = True
+DEFAULT_RPC_POOL_MAX_CONNECTIONS = 5
 TEST_DATADIRS = os.path.expanduser(os.getenv("DATADIRS", "/tmp/basicswap"))
 DEFAULT_TEST_BINDIR = os.path.expanduser(
     os.getenv("DEFAULT_TEST_BINDIR", os.path.join("~", ".basicswap", "bin"))

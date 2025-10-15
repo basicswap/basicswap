@@ -23,10 +23,24 @@ const IdentityManager = (function() {
                 return null;
             }
 
-            const cachedData = this.getCachedIdentity(address);
-            if (cachedData) {
-                log(`Cache hit for ${address}`);
-                return cachedData;
+            const cached = state.cache.get(address);
+            const now = Date.now();
+
+            if (cached && (now - cached.timestamp) < state.config.cacheTimeout) {
+                log(`Cache hit (fresh) for ${address}`);
+                return cached.data;
+            }
+
+            if (cached && (now - cached.timestamp) < state.config.cacheTimeout * 2) {
+                log(`Cache hit (stale) for ${address}, refreshing in background`);
+
+                const staleData = cached.data;
+
+                if (!state.pendingRequests.has(address)) {
+                    this.refreshIdentityInBackground(address);
+                }
+
+                return staleData;
             }
 
             if (state.pendingRequests.has(address)) {
@@ -45,6 +59,20 @@ const IdentityManager = (function() {
             } finally {
                 state.pendingRequests.delete(address);
             }
+        },
+
+        refreshIdentityInBackground: function(address) {
+            const request = fetchWithRetry(address);
+            state.pendingRequests.set(address, request);
+
+            request.then(data => {
+                this.setCachedIdentity(address, data);
+                log(`Background refresh completed for ${address}`);
+            }).catch(error => {
+                log(`Background refresh failed for ${address}:`, error);
+            }).finally(() => {
+                state.pendingRequests.delete(address);
+            });
         },
 
         getCachedIdentity: function(address) {
@@ -155,15 +183,23 @@ const IdentityManager = (function() {
 
     async function fetchWithRetry(address, attempt = 1) {
         try {
-            const response = await fetch(`/json/identities/${address}`, {
-                signal: AbortSignal.timeout(5000)
-            });
+            let data;
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            if (window.ApiManager) {
+                data = await window.ApiManager.makeRequest(`/json/identities/${address}`, 'GET');
+            } else {
+                const response = await fetch(`/json/identities/${address}`, {
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                data = await response.json();
             }
 
-            return await response.json();
+            return data;
         } catch (error) {
             if (attempt >= state.config.maxRetries) {
                 console.error(`[IdentityManager] Error:`, error.message);
@@ -171,7 +207,10 @@ const IdentityManager = (function() {
                 return null;
             }
 
-            await new Promise(resolve => setTimeout(resolve, state.config.retryDelay * attempt));
+            const delay = state.config.retryDelay * attempt;
+            await new Promise(resolve => {
+                CleanupManager.setTimeout(resolve, delay);
+            });
             return fetchWithRetry(address, attempt + 1);
         }
     }
@@ -188,5 +227,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-//console.log('IdentityManager initialized with methods:', Object.keys(IdentityManager));
 console.log('IdentityManager initialized');

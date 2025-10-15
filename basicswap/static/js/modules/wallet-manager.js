@@ -11,8 +11,7 @@ const WalletManager = (function() {
     defaultTTL: 300,
     priceSource: {
       primary: 'coingecko.com',
-      fallback: 'cryptocompare.com',
-      enabledSources: ['coingecko.com', 'cryptocompare.com']
+      enabledSources: ['coingecko.com']
     }
   };
 
@@ -95,21 +94,31 @@ const WalletManager = (function() {
 
         const fetchCoinsString = coinsToFetch.join(',');
 
-        const mainResponse = await fetch("/json/coinprices", {
-          method: "POST",
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
+        let mainData;
+
+        if (window.ApiManager) {
+          mainData = await window.ApiManager.makeRequest("/json/coinprices", "POST", {}, {
             coins: fetchCoinsString,
             source: currentSource,
             ttl: config.defaultTTL
-          })
-        });
+          });
+        } else {
+          const mainResponse = await fetch("/json/coinprices", {
+            method: "POST",
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              coins: fetchCoinsString,
+              source: currentSource,
+              ttl: config.defaultTTL
+            })
+          });
 
-        if (!mainResponse.ok) {
-          throw new Error(`HTTP error: ${mainResponse.status}`);
+          if (!mainResponse.ok) {
+            throw new Error(`HTTP error: ${mainResponse.status}`);
+          }
+
+          mainData = await mainResponse.json();
         }
-
-        const mainData = await mainResponse.json();
 
         if (mainData && mainData.rates) {
           document.querySelectorAll('.coinname-value').forEach(el => {
@@ -154,7 +163,7 @@ const WalletManager = (function() {
 
         if (attempt < config.maxRetries - 1) {
           const delay = Math.min(config.baseDelay * Math.pow(2, attempt), 10000);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise(resolve => CleanupManager.setTimeout(resolve, delay));
         }
       }
     }
@@ -428,7 +437,7 @@ const WalletManager = (function() {
         clearTimeout(state.toggleDebounceTimer);
       }
 
-      state.toggleDebounceTimer = window.setTimeout(async () => {
+      state.toggleDebounceTimer = CleanupManager.setTimeout(async () => {
         state.toggleInProgress = false;
         if (newVisibility) {
           await updatePrices(true);
@@ -539,7 +548,6 @@ const WalletManager = (function() {
     }
   }
 
-  // Public API
   const publicAPI = {
     initialize: async function(options) {
       if (state.initialized) {
@@ -579,7 +587,7 @@ const WalletManager = (function() {
         clearInterval(state.priceUpdateInterval);
       }
 
-      state.priceUpdateInterval = setInterval(() => {
+      state.priceUpdateInterval = CleanupManager.setInterval(() => {
         if (localStorage.getItem('balancesVisible') === 'true' && !state.toggleInProgress) {
           updatePrices(false);
         }
@@ -661,5 +669,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-//console.log('WalletManager initialized with methods:', Object.keys(WalletManager));
 console.log('WalletManager initialized');

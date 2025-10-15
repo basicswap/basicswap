@@ -25,7 +25,6 @@
   <script>
     function getAPIKeys() {
       return {
-        cryptoCompare: "{{ chart_api_key|safe }}",
         coinGecko: "{{ coingecko_api_key|safe }}"
       };
     }
@@ -88,9 +87,13 @@
   <script src="/static/js/libs/tippy.js"></script>
   <!-- UI Components -->
   <script src="/static/js/ui/tabs.js"></script>
-  <script src="/static/js/ui/bids-tab-navigation.js"></script>
   <script src="/static/js/ui/dropdown.js"></script>
   <!-- Core functionality -->
+  <script src="/static/js/modules/error-handler.js"></script>
+  <script src="/static/js/modules/dom-cache.js"></script>
+  <script src="/static/js/modules/event-handlers.js"></script>
+  <script src="/static/js/modules/form-validator.js"></script>
+  <script src="/static/js/modules/coin-utils.js"></script>
   <script src="/static/js/modules/coin-manager.js"></script>
   <script src="/static/js/modules/config-manager.js"></script>
   <script src="/static/js/modules/cache-manager.js"></script>
@@ -104,7 +107,8 @@
   <script src="/static/js/modules/balance-updates.js"></script>
   <script src="/static/js/modules/identity-manager.js"></script>
   <script src="/static/js/modules/summary-manager.js"></script>
-  <script src="/static/js/amm_counter.js"></script>
+  <script src="/static/js/modules/wallet-amount.js"></script>
+  <script src="/static/js/pages/amm-counter.js"></script>
   {% if current_page == 'wallets' or current_page == 'wallet' %}
   <script src="/static/js/modules/wallet-manager.js"></script>
   {% endif %}
@@ -817,18 +821,6 @@
   </section>
 
 <script>
-function testNotificationSystem() {
-  if (window.NotificationManager) {
-    window.NotificationManager.createToast('Test Withdrawal', 'balance_change', {
-      coinSymbol: 'PART',
-      subtitle: 'Funds sent'
-    });
-    console.log('Test notification created');
-  } else {
-    console.error('NotificationManager not available');
-  }
-}
-
 function handleOutsideClick(event) {
   const button = document.getElementById('notification-history-button');
   const mobileButton = document.getElementById('notification-history-button-mobile');

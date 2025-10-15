@@ -1,25 +1,16 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, circular_arrows_svg, input_arrow_down_svg, small_arrow_white_right_svg %}
+{% from 'style.html' import circular_arrows_svg, input_arrow_down_svg, small_arrow_white_right_svg %}
+{% from 'macros.html' import breadcrumb %}
 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
    <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-      <li> {{ breadcrumb_line_svg | safe }} </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Bids</a>
-     </li>
-      <li> {{ breadcrumb_line_svg | safe }} </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{{ bid_id }}">BID ID: {{ bid_id }}</a>
-     </li>
-    </ul>
+    {{ breadcrumb([
+      {'text': 'Home', 'url': '/'},
+      {'text': 'Bids', 'url': '#'},
+      {'text': 'BID ID: ' ~ bid_id, 'url': bid_id}
+    ]) }}
    </div>
   </div>
  </section>
@@ -534,14 +525,14 @@
                     </div>
                     {% if data.can_abandon == true and not edit_bid %}
                     <div class="w-full md:w-auto p-1.5">
-                     <button name="abandon_bid" type="submit" value="Abandon Bid" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Abandon Bid</button>
+                     <button name="abandon_bid" type="submit" value="Abandon Bid" data-confirm class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Abandon Bid</button>
                     </div>
                     {% endif %}
                     {% endif %}
                     {% endif %}
                      {% if data.was_received and not edit_bid and data.can_accept_bid %}
                     <div class="w-full md:w-auto p-1.5">
-                     <button name="accept_bid" value="Accept Bid" type="submit" onclick='return confirmPopup("Accept");' class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Accept Bid</button>
+                     <button name="accept_bid" value="Accept Bid" type="submit" data-confirm data-confirm-action="Accept" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Accept Bid</button>
                     </div>
                     {% endif %}
                     </div>

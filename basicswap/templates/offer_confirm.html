@@ -1,20 +1,15 @@
-{% include 'header.html' %} {% from 'style.html' import breadcrumb_line_svg, input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg, select_setup_svg, input_time_svg, select_target_svg , select_auto_strategy_svg %}
+{% include 'header.html' %} {% from 'style.html' import input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg, select_setup_svg, input_time_svg, select_target_svg , select_auto_strategy_svg %}
+{% from 'macros.html' import breadcrumb %}
 <div class="container mx-auto">
   <section class="p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
       <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li> <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-              <p>Home</p>
-            </a> </li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/newoffer">Place</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Setup</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Confirm</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-        </ul>
+        {{ breadcrumb([
+          {'text': 'Home', 'url': '/'},
+          {'text': 'Place', 'url': '/newoffer'},
+          {'text': 'Setup', 'url': '#'},
+          {'text': 'Confirm', 'url': '#'}
+        ]) }}
       </div>
     </div>
   </section>
@@ -465,7 +460,7 @@
   <input type="hidden" name="rate_var" value="rv">
 {% endif %}
 </form>
-  <script src="static/js/new_offer.js"></script>
+  <script src="static/js/pages/offer-new-page.js"></script>
 </div>
 </div>
 </div>

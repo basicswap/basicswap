@@ -1,29 +1,16 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, input_arrow_down_svg, circular_arrows_svg, confirm_green_svg, green_cross_close_svg, circular_info_messages_svg %}
+{% from 'style.html' import input_arrow_down_svg, circular_arrows_svg, confirm_green_svg, green_cross_close_svg, circular_info_messages_svg %}
+{% from 'macros.html' import breadcrumb %}
 
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
    <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-     <li>
-      {{ breadcrumb_line_svg | safe }}
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="#">Offer</a>
-     </li>
-     <li>
-      {{ breadcrumb_line_svg | safe }}
-     </li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{{ offer_id }}">OFFER ID: {{ offer_id }}</a>
-     </li>
-    </ul>
+    {{ breadcrumb([
+      {'text': 'Home', 'url': '/'},
+      {'text': 'Offer', 'url': '#'},
+      {'text': 'OFFER ID: ' ~ offer_id, 'url': offer_id}
+    ]) }}
    </div>
   </div>
  </section>
@@ -414,58 +401,7 @@
     </div>
   </td>
 </tr>
-<script>
-function handleBidsPageAddress() {
-    const selectElement = document.querySelector('select[name="addr_from"]');
-    const STORAGE_KEY = 'lastUsedAddressBids';
-
-    if (!selectElement) return;
-
-    function loadInitialAddress() {
-        const savedAddressJSON = localStorage.getItem(STORAGE_KEY);
-        if (savedAddressJSON) {
-            try {
-                const savedAddress = JSON.parse(savedAddressJSON);
-                selectElement.value = savedAddress.value;
-            } catch (e) {
-                selectFirstAddress();
-            }
-        } else {
-            selectFirstAddress();
-        }
-    }
-
-    function selectFirstAddress() {
-        if (selectElement.options.length > 1) {
-            const firstOption = selectElement.options[1];
-            if (firstOption) {
-                selectElement.value = firstOption.value;
-                saveAddress(firstOption.value, firstOption.text);
-            }
-        }
-    }
-
-    function saveAddress(value, text) {
-        const addressData = {
-            value: value,
-            text: text
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(addressData));
-    }
-
-    selectElement.addEventListener('change', (event) => {
-        saveAddress(event.target.value, event.target.selectedOptions[0].text);
-    });
-
-    loadInitialAddress();
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', handleBidsPageAddress);
-} else {
-    handleBidsPageAddress();
-}
-</script>
+<!-- Address handling functionality moved to external JS -->
 {% if data.amount_negotiable == true %}
 <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
     <td class="px-6">
@@ -626,7 +562,7 @@ if (document.readyState === 'loading') {
      <div class="w-full md:w-0/12">
   <div class="flex flex-wrap justify-end pt-6 pr-6 border-t border-gray-100 dark:border-gray-400">
     <div class="w-full md:w-auto p-1.5">
-        <button type="button" onclick="resetForm()" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+        <button type="button" data-reset-form class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
             Clear Form
         </button>
     </div>
@@ -652,6 +588,29 @@ if (document.readyState === 'loading') {
   </div>
 </div>
 </section>
+<div id="errorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
+          <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="errorTitle">Error</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="errorMessage">An error occurred</p>
+        <div class="flex justify-center">
+          <button type="button" id="errorOk"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
   <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
   <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
@@ -690,7 +649,7 @@ if (document.readyState === 'loading') {
                   class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             Confirm
           </button>
-          <button type="button" onclick="hideConfirmModal()"
+          <button type="button" data-hide-modal
                   class="px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
             Cancel
           </button>
@@ -699,347 +658,8 @@ if (document.readyState === 'loading') {
     </div>
   </div>
 </div>
-<script>
-const xhr_rates = new XMLHttpRequest();
-xhr_rates.onload = () => {
-    if (xhr_rates.status == 200) {
-        const obj = JSON.parse(xhr_rates.response);
-        const inner_html = '<h4 class="bold>Rates</h4><pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
-        const ratesDisplay = document.getElementById('rates_display');
-        if (ratesDisplay) {
-            ratesDisplay.innerHTML = inner_html;
-        }
-    }
-};
 
-const xhr_bid_params = new XMLHttpRequest();
-xhr_bid_params.onload = () => {
-    if (xhr_bid_params.status == 200) {
-        const obj = JSON.parse(xhr_bid_params.response);
-        const bidAmountSendInput = document.getElementById('bid_amount_send');
-        if (bidAmountSendInput) {
-            bidAmountSendInput.value = obj['amount_to'];
-        }
-        updateModalValues();
-    }
-};
-
-function lookup_rates() {
-    const coin_from = document.getElementById('coin_from')?.value;
-    const coin_to = document.getElementById('coin_to')?.value;
-
-    if (!coin_from || !coin_to || coin_from === '-1' || coin_to === '-1') {
-        alert('Coins from and to must be set first.');
-        return;
-    }
-
-    const ratesDisplay = document.getElementById('rates_display');
-    if (ratesDisplay) {
-        ratesDisplay.innerHTML = '<h4>Rates</h4><p>Updating...</p>';
-    }
-
-    xhr_rates.open('POST', '/json/rates');
-    xhr_rates.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    xhr_rates.send(`coin_from=${coin_from}&coin_to=${coin_to}`);
-}
-
-function resetForm() {
-    const bidAmountSendInput = document.getElementById('bid_amount_send');
-    const bidAmountInput = document.getElementById('bid_amount');
-    const bidRateInput = document.getElementById('bid_rate');
-    const validMinsInput = document.querySelector('input[name="validmins"]');
-    const amtVar = document.getElementById('amt_var')?.value === 'True';
-    if (bidAmountSendInput) {
-        bidAmountSendInput.value = amtVar ? '' : bidAmountSendInput.getAttribute('max');
-    }
-    if (bidAmountInput) {
-        bidAmountInput.value = amtVar ? '' : bidAmountInput.getAttribute('max');
-    }
-    if (bidRateInput && !bidRateInput.disabled) {
-        const defaultRate = document.getElementById('offer_rate')?.value || '';
-        bidRateInput.value = defaultRate;
-    }
-    if (validMinsInput) {
-        validMinsInput.value = "60";
-    }
-    if (!amtVar) {
-        updateBidParams('rate');
-    }
-    updateModalValues();
-    const errorMessages = document.querySelectorAll('.error-message');
-    errorMessages.forEach(msg => msg.remove());
-
-    const inputs = document.querySelectorAll('input');
-    inputs.forEach(input => {
-        input.classList.remove('border-red-500', 'focus:border-red-500');
-    });
-}
-
-function roundUpToDecimals(value, decimals) {
-    const factor = Math.pow(10, decimals);
-    return Math.ceil(value * factor) / factor;
-}
-
-function updateBidParams(value_changed) {
-    const coin_from = document.getElementById('coin_from')?.value;
-    const coin_to = document.getElementById('coin_to')?.value;
-    const coin_from_exp = parseInt(document.getElementById('coin_from_exp')?.value || '8');
-    const coin_to_exp = parseInt(document.getElementById('coin_to_exp')?.value || '8');
-    const amt_var = document.getElementById('amt_var')?.value;
-    const rate_var = document.getElementById('rate_var')?.value;
-    const bidAmountInput = document.getElementById('bid_amount');
-    const bidAmountSendInput = document.getElementById('bid_amount_send');
-    const amountFromInput = document.getElementById('amount_from');
-    const bidRateInput = document.getElementById('bid_rate');
-    const offerRateInput = document.getElementById('offer_rate');
-
-    if (!coin_from || !coin_to || !amt_var || !rate_var) return;
-
-    const rate = rate_var === 'True' && bidRateInput ?
-        parseFloat(bidRateInput.value) || 0 :
-        parseFloat(offerRateInput?.value || '0');
-
-    if (!rate) return;
-
-    if (value_changed === 'rate') {
-        if (bidAmountSendInput && bidAmountInput) {
-            const sendAmount = parseFloat(bidAmountSendInput.value) || 0;
-            const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
-            bidAmountInput.value = receiveAmount;
-        }
-    } else if (value_changed === 'sending') {
-        if (bidAmountSendInput && bidAmountInput) {
-            const sendAmount = parseFloat(bidAmountSendInput.value) || 0;
-            const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
-            bidAmountInput.value = receiveAmount;
-        }
-    } else if (value_changed === 'receiving') {
-        if (bidAmountInput && bidAmountSendInput) {
-            const receiveAmount = parseFloat(bidAmountInput.value) || 0;
-            const sendAmount = roundUpToDecimals(receiveAmount * rate, coin_to_exp).toFixed(coin_to_exp);
-            bidAmountSendInput.value = sendAmount;
-        }
-    }
-
-    validateAmountsAfterChange();
-
-    xhr_bid_params.open('POST', '/json/rate');
-    xhr_bid_params.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-    xhr_bid_params.send(`coin_from=${coin_from}&coin_to=${coin_to}&rate=${rate}&amt_from=${bidAmountInput?.value || '0'}`);
-
-    updateModalValues();
-}
-
-function validateAmountsAfterChange() {
-    const bidAmountSendInput = document.getElementById('bid_amount_send');
-    const bidAmountInput = document.getElementById('bid_amount');
-
-    if (bidAmountSendInput) {
-        const maxSend = parseFloat(bidAmountSendInput.getAttribute('max'));
-        validateMaxAmount(bidAmountSendInput, maxSend);
-    }
-    if (bidAmountInput) {
-        const maxReceive = parseFloat(bidAmountInput.getAttribute('max'));
-        validateMaxAmount(bidAmountInput, maxReceive);
-    }
-}
-
-function validateMaxAmount(input, maxAmount) {
-    if (!input) return;
-    const value = parseFloat(input.value) || 0;
-    if (value > maxAmount) {
-        input.value = maxAmount;
-    }
-}
-
-function showConfirmModal() {
-    const bidAmountSendInput = document.getElementById('bid_amount_send');
-    const bidAmountInput = document.getElementById('bid_amount');
-
-    let sendAmount = 0;
-    let receiveAmount = 0;
-
-    if (bidAmountSendInput && bidAmountSendInput.value) {
-        sendAmount = parseFloat(bidAmountSendInput.value) || 0;
-    }
-    if (bidAmountInput && bidAmountInput.value) {
-        receiveAmount = parseFloat(bidAmountInput.value) || 0;
-    }
-
-    if (sendAmount <= 0 && bidAmountSendInput && !bidAmountSendInput.disabled) {
-        return false;
-    }
-
-    if (receiveAmount <= 0 && bidAmountInput && !bidAmountInput.disabled) {
-        return false;
-    }
-
-    updateModalValues();
-    const modal = document.getElementById('confirmModal');
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-    return false;
-}
-
-function hideConfirmModal() {
-    const modal = document.getElementById('confirmModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-    return false;
-}
-
-function updateModalValues() {
-    const bidAmountInput = document.getElementById('bid_amount');
-    const bidAmountSendInput = document.getElementById('bid_amount_send');
-
-    if (bidAmountInput) {
-        const modalAmtReceive = document.getElementById('modal-amt-receive');
-        if (modalAmtReceive) {
-            modalAmtReceive.textContent = bidAmountInput.value;
-        }
-
-        const modalReceiveCurrency = document.getElementById('modal-receive-currency');
-        if (modalReceiveCurrency) {
-            modalReceiveCurrency.textContent = ' {{ data.tla_from }}';
-        }
-    }
-
-    if (bidAmountSendInput) {
-        const modalAmtSend = document.getElementById('modal-amt-send');
-        if (modalAmtSend) {
-            modalAmtSend.textContent = bidAmountSendInput.value;
-        }
-
-        const modalSendCurrency = document.getElementById('modal-send-currency');
-        if (modalSendCurrency) {
-            modalSendCurrency.textContent = ' {{ data.tla_to }}';
-        }
-    }
-
-    const modalFeeInfo = document.getElementById('modal-fee-info');
-    if (modalFeeInfo) {
-        {% if data.xmr_type == true %}
-        modalFeeInfo.textContent = `(excluding estimated {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} in tx fees)`;
-        {% else %}
-        modalFeeInfo.textContent = '(excluding a tx fee)';
-        {% endif %}
-    }
-
-    const addrSelect = document.querySelector('select[name="addr_from"]');
-    if (addrSelect) {
-        const modalAddrFrom = document.getElementById('modal-addr-from');
-        if (modalAddrFrom) {
-            const selectedOption = addrSelect.options[addrSelect.selectedIndex];
-            const addrText = selectedOption.value === '-1' ? 'New Address' : selectedOption.text.split(' ')[0];
-            modalAddrFrom.textContent = addrText;
-        }
-    }
-
-    const validMinsInput = document.querySelector('input[name="validmins"]');
-    if (validMinsInput) {
-        const modalValidMins = document.getElementById('modal-valid-mins');
-        if (modalValidMins) {
-            modalValidMins.textContent = validMinsInput.value;
-        }
-    }
-}
-
-function handleBidsPageAddress() {
-    const selectElement = document.querySelector('select[name="addr_from"]');
-    const STORAGE_KEY = 'lastUsedAddressBids';
-
-    if (!selectElement) return;
-
-    function loadInitialAddress() {
-        try {
-            const savedAddressJSON = localStorage.getItem(STORAGE_KEY);
-            if (savedAddressJSON) {
-                const savedAddress = JSON.parse(savedAddressJSON);
-                if (savedAddress && savedAddress.value) {
-                    selectElement.value = savedAddress.value;
-                } else {
-                    selectFirstAddress();
-                }
-            } else {
-                selectFirstAddress();
-            }
-        } catch (e) {
-            console.error('Error loading saved address:', e);
-            selectFirstAddress();
-        }
-    }
-
-    function selectFirstAddress() {
-        if (selectElement.options.length > 1) {
-            const firstOption = selectElement.options[1];
-            if (firstOption) {
-                selectElement.value = firstOption.value;
-                saveAddress(firstOption.value, firstOption.text);
-            }
-        }
-    }
-
-    selectElement.addEventListener('change', (event) => {
-        if (event.target.selectedOptions[0]) {
-            saveAddress(event.target.value, event.target.selectedOptions[0].text);
-        }
-    });
-
-    loadInitialAddress();
-}
-
-function saveAddress(value, text) {
-    try {
-        const addressData = { value, text };
-        localStorage.setItem('lastUsedAddressBids', JSON.stringify(addressData));
-    } catch (e) {
-        console.error('Error saving address:', e);
-    }
-}
-
-function confirmPopup() {
-    return confirm("Are you sure?");
-}
-
-function handleCancelClick(event) {
-    if (event) event.preventDefault();
-    const pathParts = window.location.pathname.split('/');
-    const offerId = pathParts[pathParts.indexOf('offer') + 1];
-    window.location.href = `/offer/${offerId}`;
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-
-    const sendBidBtn = document.querySelector('button[name="sendbid"][value="Send Bid"]');
-    if (sendBidBtn) {
-        sendBidBtn.onclick = showConfirmModal;
-    }
-
-    const modalCancelBtn = document.querySelector('#confirmModal .flex button:last-child');
-    if (modalCancelBtn) {
-        modalCancelBtn.onclick = hideConfirmModal;
-    }
-
-    const mainCancelBtn = document.querySelector('button[name="cancel"]');
-    if (mainCancelBtn) {
-        mainCancelBtn.onclick = handleCancelClick;
-    }
-
-    const validMinsInput = document.querySelector('input[name="validmins"]');
-    if (validMinsInput) {
-        validMinsInput.addEventListener('input', updateModalValues);
-    }
-
-    const addrFromSelect = document.querySelector('select[name="addr_from"]');
-    if (addrFromSelect) {
-        addrFromSelect.addEventListener('change', updateModalValues);
-    }
-
-    handleBidsPageAddress();
-});
-</script>
+<script src="/static/js/pages/offer-page.js"></script>
 
 {% else %}
 <section>
@@ -1063,13 +683,13 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <!-- todo
         {% if data.active_ind == 1 %}
-        <div class="w-full md:w-auto p-1.5"><button name="archive_offer" value="Archive Offer" type="submit" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2"
+        <div class="w-full md:w-auto p-1.5"><button name="archive_offer" value="Archive Offer" type="submit" data-confirm class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-red-500 hover:text-red-600 border border-red-400 hover:border-red-500 bg-white rounded-md shadow-button focus:ring-0 focus:outline-none"><svg class="text-gray-500 w-5 h-5 mr-2"
         xmlns="http://www.w3.org/2000/svg" height="24" width="24" viewBox="0 0 24 24"><g stroke-linecap="round" stroke-width="2" fill="none" stroke="#ef5844" stroke-linejoin="round"><polyline data-cap="butt" points="23 15 16 15 16 18 8 18 8 15 1 15"></polyline><line data-cap="butt" x1="12" y1="1" x2="12" y2="11" stroke="#ef5844"></line><path d="M18.558,6a2,2,0,0,1,1.9,1.368L23,15v6a2,2,0,0,1-2,2H3a2,2,0,0,1-2-2V15L3.544,7.368A2,2,0,0,1,5.442,6"></path><polyline points="15 8 12 11 9 8" stroke="#ef5844"></polyline></g></svg>Archive Offer</button></div>
         {% endif %}
         -->
         {% if data.was_revoked != true %}
         <div class="w-full md:w-auto p-1.5">
-         <button name="revoke_offer" value="Revoke Offer" type="submit" onclick="return confirmPopup();" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Revoke Offer</button>
+         <button name="revoke_offer" value="Revoke Offer" type="submit" data-confirm class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Revoke Offer</button>
         </div>
         {% endif %}
         {% endif %}
@@ -1097,6 +717,10 @@ document.addEventListener('DOMContentLoaded', function() {
 <input type="hidden" id="rate_var" value="{{ data.rate_negotiable }}">
 <input type="hidden" id="amount_from" value="{{ data.amt_from }}">
 <input type="hidden" id="offer_rate" value="{{ data.rate }}">
+<input type="hidden" id="coin_from_name" value="{{ data.coin_from }}">
+<input type="hidden" id="coin_to_name" value="{{ data.coin_to }}">
+<input type="hidden" id="tla_from" value="{{ data.tla_from }}">
+<input type="hidden" id="tla_to" value="{{ data.tla_to }}">
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 <p id="rates_display"></p>

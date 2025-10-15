@@ -35,38 +35,22 @@ const ConfigManager = (function() {
         },
         itemsPerPage: 50,
         apiEndpoints: {
-            cryptoCompare: 'https://min-api.cryptocompare.com/data/pricemultifull',
             coinGecko: 'https://api.coingecko.com/api/v3',
-            cryptoCompareHistorical: 'https://min-api.cryptocompare.com/data/v2/histoday',
-            cryptoCompareHourly: 'https://min-api.cryptocompare.com/data/v2/histohour',
             volumeEndpoint: 'https://api.coingecko.com/api/v3/simple/price'
         },
         rateLimits: {
             coingecko: {
                 requestsPerMinute: 50,
                 minInterval: 1200
-            },
-            cryptocompare: {
-                requestsPerMinute: 30,
-                minInterval: 2000
             }
         },
         retryDelays: [5000, 15000, 30000],
         get coins() {
-            return window.CoinManager ? window.CoinManager.getAllCoins() : [
-                { symbol: 'BTC', name: 'bitcoin', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'XMR', name: 'monero', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'PART', name: 'particl', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'BCH', name: 'bitcoincash', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'PIVX', name: 'pivx', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'FIRO', name: 'firo', displayName: 'Firo', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'DASH', name: 'dash', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'LTC', name: 'litecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'DOGE', name: 'dogecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'DCR', name: 'decred', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'NMC', name: 'namecoin', usesCryptoCompare: true, usesCoinGecko: true, historicalDays: 30 },
-                { symbol: 'WOW', name: 'wownero', usesCryptoCompare: false, usesCoinGecko: true, historicalDays: 30 }
-            ];
+            if (window.CoinManager) {
+                return window.CoinManager.getAllCoins();
+            }
+            console.warn('[ConfigManager] CoinManager not available, returning empty array');
+            return [];
         },
         chartConfig: {
             colors: {
@@ -108,12 +92,10 @@ const ConfigManager = (function() {
             if (typeof window.getAPIKeys === 'function') {
                 const apiKeys = window.getAPIKeys();
                 return {
-                    cryptoCompare: apiKeys.cryptoCompare || '',
                     coinGecko: apiKeys.coinGecko || ''
                 };
             }
             return {
-                cryptoCompare: '',
                 coinGecko: ''
             };
         },
@@ -122,55 +104,20 @@ const ConfigManager = (function() {
             if (window.CoinManager) {
                 return window.CoinManager.getPriceKey(coinName);
             }
-            const nameMap = {
-                'bitcoin-cash': 'bitcoincash',
-                'bitcoin cash': 'bitcoincash',
-                'firo': 'firo',
-                'zcoin': 'firo',
-                'bitcoincash': 'bitcoin-cash'
-            };
-            const lowerCoinName = typeof coinName === 'string' ? coinName.toLowerCase() : '';
-            return nameMap[lowerCoinName] || lowerCoinName;
+            if (window.CoinUtils) {
+                return window.CoinUtils.normalizeCoinName(coinName);
+            }
+            return typeof coinName === 'string' ? coinName.toLowerCase() : '';
         },
         coinMatches: function(offerCoin, filterCoin) {
             if (!offerCoin || !filterCoin) return false;
             if (window.CoinManager) {
                 return window.CoinManager.coinMatches(offerCoin, filterCoin);
             }
-            offerCoin = offerCoin.toLowerCase();
-            filterCoin = filterCoin.toLowerCase();
-            if (offerCoin === filterCoin) return true;
-            if ((offerCoin === 'firo' || offerCoin === 'zcoin') &&
-                (filterCoin === 'firo' || filterCoin === 'zcoin')) {
-                return true;
+            if (window.CoinUtils) {
+                return window.CoinUtils.isSameCoin(offerCoin, filterCoin);
             }
-            if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
-                (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
-                return true;
-            }
-            const particlVariants = ['particl', 'particl anon', 'particl blind'];
-            if (filterCoin === 'particl' && particlVariants.includes(offerCoin)) {
-                return true;
-            }
-
-            if (filterCoin.includes(' ') || offerCoin.includes(' ')) {
-                const filterFirstWord = filterCoin.split(' ')[0];
-                const offerFirstWord = offerCoin.split(' ')[0];
-
-                if (filterFirstWord === 'bitcoin' && offerFirstWord === 'bitcoin') {
-                    const filterHasCash = filterCoin.includes('cash');
-                    const offerHasCash = offerCoin.includes('cash');
-                    return filterHasCash === offerHasCash;
-                }
-
-                if (filterFirstWord === offerFirstWord && filterFirstWord.length > 4) {
-                    return true;
-                }
-            }
-            if (particlVariants.includes(filterCoin)) {
-                return offerCoin === filterCoin;
-            }
-            return false;
+            return offerCoin.toLowerCase() === filterCoin.toLowerCase();
         },
         update: function(path, value) {
             const parts = path.split('.');
@@ -229,7 +176,7 @@ const ConfigManager = (function() {
             let timeoutId;
             return function(...args) {
                 clearTimeout(timeoutId);
-                timeoutId = setTimeout(() => func(...args), delay);
+                timeoutId = CleanupManager.setTimeout(() => func(...args), delay);
             };
         },
         formatTimeLeft: function(timestamp) {

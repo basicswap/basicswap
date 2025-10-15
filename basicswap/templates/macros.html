@@ -1,0 +1,52 @@
+{# Page Header Banner Macro #}
+{% macro page_header(title, description='', icon='', dark_bg='dark:bg-blue-500', container_class='lg:container mx-auto', inner_padding='py-8 px-8', title_size='text-2xl', title_extra_class='mb-3 tracking-tighter', dots_style='two') %}
+<section class="py-3 px-4 mt-6">
+  <div class="{{ container_class }}">
+    <div class="relative {{ inner_padding }} bg-coolGray-900 {{ dark_bg }} rounded-md overflow-hidden">
+      {% if dots_style == 'one' %}
+      <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+      {% elif dots_style == 'all' %}
+      <img class="absolute z-10 left-4 top-4 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="dots-red">
+      {% else %}
+      <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
+      <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
+      {% endif %}
+      <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="{% if dots_style == 'one' %}{% else %}wave{% endif %}">
+      <div class="relative z-20 flex flex-wrap items-center -m-3">
+        <div class="w-full md:w-1/2 p-3">
+          <h2 class="{{ title_extra_class }} {{ title_size }} font-bold text-white">
+            {% if icon %}
+            <span class="inline-block align-middle">
+              <img class="mr-2 h-16" src="/static/images/coins/{{ icon }}.png" alt="{{ icon }}">
+            </span>
+            {% endif %}
+            {{ title }}
+          </h2>
+          {% if description %}
+          <p class="font-normal text-coolGray-200 dark:text-white">
+            {{ description }}
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endmacro %}
+
+{# Breadcrumb Macro #}
+{% macro breadcrumb(items) %}
+{% from 'style.html' import breadcrumb_line_svg %}
+<ul class="flex flex-wrap items-center gap-x-3 mb-2">
+  {% for item in items %}
+  <li>
+    <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="{{ item.url }}">
+      <p>{{ item.text }}</p>
+    </a>
+  </li>
+  {% if not loop.last %}
+  <li>{{ breadcrumb_line_svg | safe }}</li>
+  {% endif %}
+  {% endfor %}
+</ul>
+{% endmacro %}

@@ -15,7 +15,21 @@ const BalanceUpdatesManager = (function() {
     initialized: false
   };
 
-  function fetchBalanceData() {
+  async function fetchBalanceData() {
+    if (window.ApiManager) {
+      const data = await window.ApiManager.makeRequest('/json/walletbalances', 'GET');
+
+      if (data && data.error) {
+        throw new Error(data.error);
+      }
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format');
+      }
+
+      return data;
+    }
+
     return fetch('/json/walletbalances', {
       headers: {
         'Accept': 'application/json',
@@ -43,27 +57,41 @@ const BalanceUpdatesManager = (function() {
 
   function clearTimeoutByKey(key) {
     if (state.timeouts.has(key)) {
-      clearTimeout(state.timeouts.get(key));
+      const timeoutId = state.timeouts.get(key);
+      if (window.CleanupManager) {
+        window.CleanupManager.clearTimeout(timeoutId);
+      } else {
+        clearTimeout(timeoutId);
+      }
       state.timeouts.delete(key);
     }
   }
 
   function setTimeoutByKey(key, callback, delay) {
     clearTimeoutByKey(key);
-    const timeoutId = setTimeout(callback, delay);
+    const timeoutId = window.CleanupManager
+      ? window.CleanupManager.setTimeout(callback, delay)
+      : setTimeout(callback, delay);
     state.timeouts.set(key, timeoutId);
   }
 
   function clearIntervalByKey(key) {
     if (state.intervals.has(key)) {
-      clearInterval(state.intervals.get(key));
+      const intervalId = state.intervals.get(key);
+      if (window.CleanupManager) {
+        window.CleanupManager.clearInterval(intervalId);
+      } else {
+        clearInterval(intervalId);
+      }
       state.intervals.delete(key);
     }
   }
 
   function setIntervalByKey(key, callback, interval) {
     clearIntervalByKey(key);
-    const intervalId = setInterval(callback, interval);
+    const intervalId = window.CleanupManager
+      ? window.CleanupManager.setInterval(callback, interval)
+      : setInterval(callback, interval);
     state.intervals.set(key, intervalId);
   }
 

@@ -1,17 +1,13 @@
-{% include 'header.html' %} {% from 'style.html' import breadcrumb_line_svg, input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg %}
+{% include 'header.html' %} {% from 'style.html' import input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg %}
+{% from 'macros.html' import breadcrumb %}
 <div class="container mx-auto">
   <section class="p-5 mt-5">
     <div class="flex flex-wrap items-center -m-2">
       <div class="w-full md:w-1/2 p-2">
-        <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-              <p>Home</p>
-            </a>
-          </li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-          <li><a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/newoffer">Place</a></li>
-          <li>{{ breadcrumb_line_svg | safe }}</li>
-        </ul>
+        {{ breadcrumb([
+          {'text': 'Home', 'url': '/'},
+          {'text': 'Place', 'url': '/newoffer'}
+        ]) }}
       </div>
     </div>
   </section>
@@ -168,9 +164,9 @@
                         <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0 bold" placeholder="0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');">
                       </div>
                       <div class="mt-2 flex space-x-2">
-                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setOfferAmount(0.25, 'amt_from')">25%</button>
-                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setOfferAmount(0.5, 'amt_from')">50%</button>
-                        <button type="button" class="py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" onclick="setOfferAmount(1, 'amt_from')">100%</button>
+                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-offer-amount="0.25" data-input-id="amt_from">25%</button>
+                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-offer-amount="0.5" data-input-id="amt_from">50%</button>
+                        <button type="button" class="py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-offer-amount="1" data-input-id="amt_from">100%</button>
                       </div>
                     </div>
                   </div>
@@ -315,7 +311,7 @@
                 <div class="px-6">
                   <div class="flex flex-wrap justify-end">
                     <div class="w-full md:w-auto p-1.5">
-                      <button name="check_rates" type="button" value="Check Current Prices/Rates (JSON)" onclick='lookup_rates();' class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+                      <button name="check_rates" type="button" value="Check Current Prices/Rates (JSON)" data-lookup-rates class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
                         <span>Check Current Prices/Rates (JSON)</span>
                     </button>
                   </div>
@@ -338,6 +334,29 @@
   </section>
 </div>
 
+<div id="errorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
+      <div class="text-center">
+        <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900 mb-4">
+          <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="errorTitle">Error</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="errorMessage">An error occurred</p>
+        <div class="flex justify-center">
+          <button type="button" id="errorOk"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function setOfferAmount(percent, fieldId) {
   const amountInput = document.getElementById(fieldId);
@@ -350,7 +369,11 @@ function setOfferAmount(percent, fieldId) {
 
   const selectedOption = coinFromSelect.options[coinFromSelect.selectedIndex];
   if (!selectedOption || selectedOption.value === '-1') {
-    alert('Please select a coin first');
+    if (window.showErrorModal) {
+      window.showErrorModal('Validation Error', 'Please select a coin first');
+    } else {
+      alert('Please select a coin first');
+    }
     return;
   }
 
@@ -362,7 +385,11 @@ function setOfferAmount(percent, fieldId) {
 
   const floatBalance = parseFloat(balance);
   if (isNaN(floatBalance) || floatBalance <= 0) {
-    alert('Invalid balance for selected coin');
+    if (window.showErrorModal) {
+      window.showErrorModal('Invalid Balance', 'The selected coin has no available balance. Please select a coin with a positive balance.');
+    } else {
+      alert('Invalid balance for selected coin');
+    }
     return;
   }
 
@@ -473,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </script>
 
-<script src="static/js/new_offer.js"></script>
+<script src="static/js/pages/offer-new-page.js"></script>
 {% include 'footer.html' %}
 </div>
 </body>

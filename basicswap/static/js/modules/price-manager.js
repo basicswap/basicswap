@@ -42,7 +42,7 @@ const PriceManager = (function() {
                 });
             }
 
-            setTimeout(() => this.getPrices(), 1500);
+            CleanupManager.setTimeout(() => this.getPrices(), 1500);
             isInitialized = true;
             console.log('PriceManager initialized');
             return this;
@@ -59,7 +59,6 @@ const PriceManager = (function() {
             if (fetchPromise && Date.now() - lastFetchTime < MIN_FETCH_INTERVAL) {
                 return fetchPromise;
             }
-
 
             lastFetchTime = Date.now();
             fetchPromise = this.fetchPrices()
@@ -89,8 +88,6 @@ const PriceManager = (function() {
                     : (window.config.coins
                         ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                         : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
-
-                //console.log('PriceManager: lookupFiatRates ' + coinSymbols.join(', '));
 
                 if (!coinSymbols.length) {
                     throw new Error('No valid coins configured');
@@ -133,15 +130,15 @@ const PriceManager = (function() {
                         const coin = window.CoinManager.getCoinByAnyIdentifier(coinId);
                         if (coin) {
                             normalizedCoinId = window.CoinManager.getPriceKey(coin.name);
+                        } else if (window.CoinUtils) {
+                            normalizedCoinId = window.CoinUtils.normalizeCoinName(coinId);
                         } else {
-                            normalizedCoinId = coinId === 'bitcoincash' ? 'bitcoin-cash' : coinId.toLowerCase();
+                            normalizedCoinId = coinId.toLowerCase();
                         }
+                    } else if (window.CoinUtils) {
+                        normalizedCoinId = window.CoinUtils.normalizeCoinName(coinId);
                     } else {
-                        normalizedCoinId = coinId === 'bitcoincash' ? 'bitcoin-cash' : coinId.toLowerCase();
-                    }
-
-                    if (coinId.toLowerCase() === 'zcoin') {
-                        normalizedCoinId = 'firo';
+                        normalizedCoinId = coinId.toLowerCase();
                     }
 
                     processedData[normalizedCoinId] = {
@@ -230,5 +227,3 @@ document.addEventListener('DOMContentLoaded', function() {
         window.priceManagerInitialized = true;
     }
 });
-
-

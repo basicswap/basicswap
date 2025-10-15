@@ -1,9 +1,19 @@
 const CacheManager = (function() {
-  const defaults = window.config?.cacheConfig?.storage || {
-    maxSizeBytes: 10 * 1024 * 1024,
-    maxItems: 200,
-    defaultTTL: 5 * 60 * 1000
-  };
+  function getDefaults() {
+    if (window.config?.cacheConfig?.storage) {
+      return window.config.cacheConfig.storage;
+    }
+    if (window.ConfigManager?.cacheConfig?.storage) {
+      return window.ConfigManager.cacheConfig.storage;
+    }
+    return {
+      maxSizeBytes: 10 * 1024 * 1024,
+      maxItems: 200,
+      defaultTTL: 5 * 60 * 1000
+    };
+  }
+
+  const defaults = getDefaults();
 
   const PRICES_CACHE_KEY = 'crypto_prices_unified';
 
@@ -45,8 +55,12 @@ const CacheManager = (function() {
 
   const cacheAPI = {
     getTTL: function(resourceType) {
-      const ttlConfig = window.config?.cacheConfig?.ttlSettings || {};
-      return ttlConfig[resourceType] || window.config?.cacheConfig?.defaultTTL || defaults.defaultTTL;
+      const ttlConfig = window.config?.cacheConfig?.ttlSettings ||
+                        window.ConfigManager?.cacheConfig?.ttlSettings || {};
+      const defaultTTL = window.config?.cacheConfig?.defaultTTL ||
+                         window.ConfigManager?.cacheConfig?.defaultTTL ||
+                         defaults.defaultTTL;
+      return ttlConfig[resourceType] || defaultTTL;
     },
 
     set: function(key, value, resourceTypeOrCustomTtl = null) {
@@ -73,13 +87,18 @@ const CacheManager = (function() {
           expiresAt: Date.now() + ttl
         };
 
-        let serializedItem;
-        try {
-          serializedItem = JSON.stringify(item);
-        } catch (e) {
-          console.error('Failed to serialize cache item:', e);
-          return false;
-        }
+        const serializedItem = window.ErrorHandler
+          ? window.ErrorHandler.safeExecute(() => JSON.stringify(item), 'CacheManager.set.serialize', null)
+          : (() => {
+              try {
+                return JSON.stringify(item);
+              } catch (e) {
+                console.error('Failed to serialize cache item:', e);
+                return null;
+              }
+            })();
+
+        if (!serializedItem) return false;
 
         const itemSize = new Blob([serializedItem]).size;
         if (itemSize > defaults.maxSizeBytes) {
@@ -118,7 +137,7 @@ const CacheManager = (function() {
             const keysToDelete = Array.from(memoryCache.keys())
               .filter(k => isCacheKey(k))
               .sort((a, b) => memoryCache.get(a).timestamp - memoryCache.get(b).timestamp)
-              .slice(0, Math.floor(memoryCache.size * 0.2)); // Remove oldest 20%
+              .slice(0, Math.floor(memoryCache.size * 0.2)); 
 
             keysToDelete.forEach(k => memoryCache.delete(k));
           }
@@ -285,7 +304,7 @@ const CacheManager = (function() {
         const keysToDelete = Array.from(memoryCache.keys())
           .filter(key => isCacheKey(key))
           .sort((a, b) => memoryCache.get(a).timestamp - memoryCache.get(b).timestamp)
-          .slice(0, Math.floor(memoryCache.size * 0.3)); // Remove oldest 30% during aggressive cleanup
+          .slice(0, Math.floor(memoryCache.size * 0.3)); 
 
         keysToDelete.forEach(key => memoryCache.delete(key));
       }
@@ -328,7 +347,6 @@ const CacheManager = (function() {
         .filter(key => isCacheKey(key))
         .forEach(key => memoryCache.delete(key));
 
-      //console.log("Cache cleared successfully");
       return true;
     },
 
@@ -531,6 +549,4 @@ const CacheManager = (function() {
 
 window.CacheManager = CacheManager;
 
-
-//console.log('CacheManager initialized with methods:', Object.keys(CacheManager));
 console.log('CacheManager initialized');

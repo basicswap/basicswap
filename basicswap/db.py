@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 31
+CURRENT_DB_VERSION = 32
 CURRENT_DB_DATA_VERSION = 7
 
 
@@ -670,6 +670,28 @@ class CoinRates(Table):
     currency_from = Column("integer")
     currency_to = Column("integer")
     rate = Column("string")
+    source = Column("string")
+    last_updated = Column("integer")
+
+
+class CoinVolume(Table):
+    __tablename__ = "coinvolume"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    coin_id = Column("integer")
+    volume_24h = Column("string")
+    price_change_24h = Column("string")
+    source = Column("string")
+    last_updated = Column("integer")
+
+
+class CoinHistory(Table):
+    __tablename__ = "coinhistory"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    coin_id = Column("integer")
+    days = Column("integer")
+    price_data = Column("blob")
     source = Column("string")
     last_updated = Column("integer")
 

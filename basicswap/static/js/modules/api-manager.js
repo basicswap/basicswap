@@ -4,34 +4,34 @@ const ApiManager = (function() {
         isInitialized: false
     };
 
-    const config = {
-        requestTimeout: 60000,
-        retryDelays: [5000, 15000, 30000],
-        rateLimits: {
-            coingecko: {
-                requestsPerMinute: 50,
-                minInterval: 1200
-            },
-            cryptocompare: {
-                requestsPerMinute: 30,
-                minInterval: 2000
+    function getConfig() {
+        return window.config || window.ConfigManager || {
+            requestTimeout: 60000,
+            retryDelays: [5000, 15000, 30000],
+            rateLimits: {
+                coingecko: { requestsPerMinute: 50, minInterval: 1200 }
             }
-        }
-    };
+        };
+    }
 
     const rateLimiter = {
         lastRequestTime: {},
-        minRequestInterval: {
-            coingecko: 1200,
-            cryptocompare: 2000
-        },
         requestQueue: {},
-        retryDelays: [5000, 15000, 30000],
+
+        getMinInterval: function(apiName) {
+            const config = getConfig();
+            return config.rateLimits?.[apiName]?.minInterval || 1200;
+        },
+
+        getRetryDelays: function() {
+            const config = getConfig();
+            return config.retryDelays || [5000, 15000, 30000];
+        },
 
         canMakeRequest: function(apiName) {
             const now = Date.now();
             const lastRequest = this.lastRequestTime[apiName] || 0;
-            return (now - lastRequest) >= this.minRequestInterval[apiName];
+            return (now - lastRequest) >= this.getMinInterval(apiName);
         },
 
         updateLastRequestTime: function(apiName) {
@@ -41,7 +41,7 @@ const ApiManager = (function() {
         getWaitTime: function(apiName) {
             const now = Date.now();
             const lastRequest = this.lastRequestTime[apiName] || 0;
-            return Math.max(0, this.minRequestInterval[apiName] - (now - lastRequest));
+            return Math.max(0, this.getMinInterval(apiName) - (now - lastRequest));
         },
 
         queueRequest: async function(apiName, requestFn, retryCount = 0) {
@@ -55,29 +55,30 @@ const ApiManager = (function() {
                 const executeRequest = async () => {
                     const waitTime = this.getWaitTime(apiName);
                     if (waitTime > 0) {
-                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                        await new Promise(resolve => CleanupManager.setTimeout(resolve, waitTime));
                     }
 
                     try {
                         this.updateLastRequestTime(apiName);
                         return await requestFn();
                     } catch (error) {
-                        if (error.message.includes('429') && retryCount < this.retryDelays.length) {
-                            const delay = this.retryDelays[retryCount];
+                        const retryDelays = this.getRetryDelays();
+                        if (error.message.includes('429') && retryCount < retryDelays.length) {
+                            const delay = retryDelays[retryCount];
                             console.log(`Rate limit hit, retrying in ${delay/1000} seconds...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
+                            await new Promise(resolve => CleanupManager.setTimeout(resolve, delay));
                             return publicAPI.rateLimiter.queueRequest(apiName, requestFn, retryCount + 1);
                         }
 
                         if ((error.message.includes('timeout') || error.name === 'NetworkError') &&
-                            retryCount < this.retryDelays.length) {
-                            const delay = this.retryDelays[retryCount];
+                            retryCount < retryDelays.length) {
+                            const delay = retryDelays[retryCount];
                             console.warn(`Request failed, retrying in ${delay/1000} seconds...`, {
                                 apiName,
                                 retryCount,
                                 error: error.message
                             });
-                            await new Promise(resolve => setTimeout(resolve, delay));
+                            await new Promise(resolve => CleanupManager.setTimeout(resolve, delay));
                             return publicAPI.rateLimiter.queueRequest(apiName, requestFn, retryCount + 1);
                         }
 
@@ -118,19 +119,7 @@ const ApiManager = (function() {
             }
 
             if (options.config) {
-                Object.assign(config, options.config);
-            }
-
-            if (config.rateLimits) {
-                Object.keys(config.rateLimits).forEach(api => {
-                    if (config.rateLimits[api].minInterval) {
-                        rateLimiter.minRequestInterval[api] = config.rateLimits[api].minInterval;
-                    }
-                });
-            }
-
-            if (config.retryDelays) {
-                rateLimiter.retryDelays = [...config.retryDelays];
+                console.log('[ApiManager] Config options provided, but using ConfigManager instead');
             }
 
             if (window.CleanupManager) {
@@ -143,6 +132,31 @@ const ApiManager = (function() {
         },
 
         makeRequest: async function(url, method = 'GET', headers = {}, body = null) {
+            if (window.ErrorHandler) {
+                return window.ErrorHandler.safeExecuteAsync(async () => {
+                    const options = {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...headers
+                        },
+                        signal: AbortSignal.timeout(getConfig().requestTimeout || 60000)
+                    };
+
+                    if (body) {
+                        options.body = JSON.stringify(body);
+                    }
+
+                    const response = await fetch(url, options);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    return await response.json();
+                }, `ApiManager.makeRequest(${url})`, null);
+            }
+
             try {
                 const options = {
                     method: method,
@@ -150,7 +164,7 @@ const ApiManager = (function() {
                         'Content-Type': 'application/json',
                         ...headers
                     },
-                    signal: AbortSignal.timeout(config.requestTimeout)
+                    signal: AbortSignal.timeout(getConfig().requestTimeout || 60000)
                 };
 
                 if (body) {
@@ -233,10 +247,7 @@ const ApiManager = (function() {
                             .join(',') :
                         'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin';
 
-                    //console.log('Fetching coin prices for:', coins);
                     const response = await this.fetchCoinPrices(coins);
-
-                    //console.log('Full API response:', response);
 
                     if (!response || typeof response !== 'object') {
                         throw new Error('Invalid response type');
@@ -260,101 +271,41 @@ const ApiManager = (function() {
         fetchVolumeData: async function() {
             return this.rateLimiter.queueRequest('coingecko', async () => {
                 try {
-                    let coinList = (window.config && window.config.coins) ?
-                        window.config.coins
-                            .filter(coin => coin.usesCoinGecko)
-                            .map(coin => {
-                                return window.config.getCoinBackendId ?
-                                    window.config.getCoinBackendId(coin.name) :
-                                    (typeof getCoinBackendId === 'function' ?
-                                    getCoinBackendId(coin.name) : coin.name.toLowerCase());
-                            })
-                            .join(',') :
-                        'bitcoin,monero,particl,bitcoin-cash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin,wownero';
+                    const coinSymbols = window.CoinManager
+                        ? window.CoinManager.getAllCoins().map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
+                        : (window.config.coins
+                            ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
+                            : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
 
-                    if (!coinList.includes('zcoin') && coinList.includes('firo')) {
-                        coinList = coinList + ',zcoin';
-                    }
-
-                    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinList}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true`;
-
-                    const response = await this.makePostRequest(url, {
-                        'User-Agent': 'Mozilla/5.0',
-                        'Accept': 'application/json'
+                    const response = await this.makeRequest('/json/coinvolume', 'POST', {}, {
+                        coins: coinSymbols.join(','),
+                        source: 'coingecko.com',
+                        ttl: 300
                     });
 
-                    if (!response || typeof response !== 'object') {
-                        throw new Error('Invalid response from CoinGecko API');
+                    if (!response) {
+                        console.error('No response from backend');
+                        throw new Error('Invalid response from backend');
+                    }
+
+                    if (!response.data) {
+                        console.error('Response missing data field:', response);
+                        throw new Error('Invalid response from backend');
                     }
 
                     const volumeData = {};
 
-                    Object.entries(response).forEach(([coinId, data]) => {
-                        if (data && data.usd_24h_vol !== undefined) {
-                            volumeData[coinId] = {
-                                total_volume: data.usd_24h_vol || 0,
-                                price_change_percentage_24h: data.usd_24h_change || 0
-                            };
-                        }
+                    Object.entries(response.data).forEach(([coinSymbol, data]) => {
+                        const coinKey = coinSymbol.toLowerCase();
+                        volumeData[coinKey] = {
+                            total_volume: (data.volume_24h !== undefined && data.volume_24h !== null) ? data.volume_24h : null,
+                            price_change_percentage_24h: data.price_change_24h || 0
+                        };
                     });
-
-                    const coinMappings = {
-                        'firo': ['firo', 'zcoin'],
-                        'zcoin': ['zcoin', 'firo'],
-                        'bitcoin-cash': ['bitcoin-cash', 'bitcoincash', 'bch'],
-                        'bitcoincash': ['bitcoincash', 'bitcoin-cash', 'bch'],
-                        'particl': ['particl', 'part']
-                    };
-
-                    if (response['zcoin'] && (!volumeData['firo'] || volumeData['firo'].total_volume === 0)) {
-                        volumeData['firo'] = {
-                            total_volume: response['zcoin'].usd_24h_vol || 0,
-                            price_change_percentage_24h: response['zcoin'].usd_24h_change || 0
-                        };
-                    }
-
-                    if (response['bitcoin-cash'] && (!volumeData['bitcoincash'] || volumeData['bitcoincash'].total_volume === 0)) {
-                        volumeData['bitcoincash'] = {
-                            total_volume: response['bitcoin-cash'].usd_24h_vol || 0,
-                            price_change_percentage_24h: response['bitcoin-cash'].usd_24h_change || 0
-                        };
-                    }
-
-                    for (const [mainCoin, alternativeIds] of Object.entries(coinMappings)) {
-                        if (!volumeData[mainCoin] || volumeData[mainCoin].total_volume === 0) {
-                            for (const altId of alternativeIds) {
-                                if (response[altId] && response[altId].usd_24h_vol) {
-                                    volumeData[mainCoin] = {
-                                        total_volume: response[altId].usd_24h_vol,
-                                        price_change_percentage_24h: response[altId].usd_24h_change || 0
-                                    };
-                                    break;
-                                }
-                            }
-                        }
-                    }
 
                     return volumeData;
                 } catch (error) {
                     console.error("Error fetching volume data:", error);
-                    throw error;
-                }
-            });
-        },
-
-        fetchCryptoCompareData: function(coin) {
-            return this.rateLimiter.queueRequest('cryptocompare', async () => {
-                try {
-                    const apiKey = window.config?.apiKeys?.cryptoCompare || '';
-                    const url = `https://min-api.cryptocompare.com/data/pricemultifull?fsyms=${coin}&tsyms=USD,BTC&api_key=${apiKey}`;
-                    const headers = {
-                        'User-Agent': 'Mozilla/5.0',
-                        'Accept': 'application/json'
-                    };
-
-                    return await this.makePostRequest(url, headers);
-                } catch (error) {
-                    console.error(`CryptoCompare request failed for ${coin}:`, error);
                     throw error;
                 }
             });
@@ -365,81 +316,40 @@ const ApiManager = (function() {
                 coinSymbols = [coinSymbols];
             }
 
-            const results = {};
-            const fetchPromises = coinSymbols.map(async coin => {
-                let useCoinGecko = false;
-                let coingeckoId = null;
-
-                if (window.CoinManager) {
-                    const coinConfig = window.CoinManager.getCoinByAnyIdentifier(coin);
-                    if (coinConfig) {
-                        useCoinGecko = !coinConfig.usesCryptoCompare || coin === 'PART';
-                        coingeckoId = coinConfig.coingeckoId;
+            return this.rateLimiter.queueRequest('coingecko', async () => {
+                try {
+                    let days;
+                    if (resolution === 'day') {
+                        days = 1;
+                    } else if (resolution === 'year') {
+                        days = 365;
+                    } else {
+                        days = 180;
                     }
-                } else {
-                    const coinGeckoCoins = {
-                        'WOW': 'wownero',
-                        'PART': 'particl',
-                        'BTC': 'bitcoin'
-                    };
-                    if (coinGeckoCoins[coin]) {
-                        useCoinGecko = true;
-                        coingeckoId = coinGeckoCoins[coin];
+
+                    const response = await this.makeRequest('/json/coinhistory', 'POST', {}, {
+                        coins: coinSymbols.join(','),
+                        days: days,
+                        source: 'coingecko.com',
+                        ttl: 3600
+                    });
+
+                    if (!response) {
+                        console.error('No response from backend');
+                        throw new Error('Invalid response from backend');
                     }
-                }
 
-                if (useCoinGecko && coingeckoId) {
-                    return this.rateLimiter.queueRequest('coingecko', async () => {
-                        let days;
-                        if (resolution === 'day') {
-                            days = 1;
-                        } else if (resolution === 'year') {
-                            days = 365;
-                        } else {
-                            days = 180;
-                        }
-                        const url = `https://api.coingecko.com/api/v3/coins/${coingeckoId}/market_chart?vs_currency=usd&days=${days}`;
-                        try {
-                            const response = await this.makePostRequest(url);
-                            if (response && response.prices) {
-                                results[coin] = response.prices;
-                            }
-                        } catch (error) {
-                            console.error(`Error fetching CoinGecko data for ${coin}:`, error);
-                            throw error;
-                        }
-                    });
-                } else {
-                    return this.rateLimiter.queueRequest('cryptocompare', async () => {
-                        try {
-                            const apiKey = window.config?.apiKeys?.cryptoCompare || '';
-                            let url;
+                    if (!response.data) {
+                        console.error('Response missing data field:', response);
+                        throw new Error('Invalid response from backend');
+                    }
 
-                            if (resolution === 'day') {
-                                url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${coin}&tsym=USD&limit=24&api_key=${apiKey}`;
-                            } else if (resolution === 'year') {
-                                url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coin}&tsym=USD&limit=365&api_key=${apiKey}`;
-                            } else {
-                                url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${coin}&tsym=USD&limit=180&api_key=${apiKey}`;
-                            }
-
-                            const response = await this.makePostRequest(url);
-                            if (response.Response === "Error") {
-                                console.error(`API Error for ${coin}:`, response.Message);
-                                throw new Error(response.Message);
-                            } else if (response.Data && response.Data.Data) {
-                                results[coin] = response.Data;
-                            }
-                        } catch (error) {
-                            console.error(`Error fetching CryptoCompare data for ${coin}:`, error);
-                            throw error;
-                        }
-                    });
+                    return response.data;
+                } catch (error) {
+                    console.error('Error fetching historical data:', error);
+                    throw error;
                 }
             });
-
-            await Promise.all(fetchPromises);
-            return results;
         },
 
         dispose: function() {
@@ -453,17 +363,6 @@ const ApiManager = (function() {
     return publicAPI;
 })();
 
-function getCoinBackendId(coinName) {
-    const nameMap = {
-        'bitcoin-cash': 'bitcoincash',
-        'bitcoin cash': 'bitcoincash',
-        'firo': 'zcoin',
-        'zcoin': 'zcoin',
-        'bitcoincash': 'bitcoin-cash'
-    };
-    return nameMap[coinName.toLowerCase()] || coinName.toLowerCase();
-}
-
 window.Api = ApiManager;
 window.ApiManager = ApiManager;
 
@@ -474,5 +373,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-//console.log('ApiManager initialized with methods:', Object.keys(ApiManager));
 console.log('ApiManager initialized');

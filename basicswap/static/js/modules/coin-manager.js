@@ -178,19 +178,7 @@ const CoinManager = (function() {
     function getCoinByAnyIdentifier(identifier) {
         if (!identifier) return null;
         const normalizedId = identifier.toString().toLowerCase().trim();
-        const coin = coinAliasesMap[normalizedId];
-        if (coin) return coin;
-        if (normalizedId.includes('bitcoin') && normalizedId.includes('cash') ||
-            normalizedId === 'bch') {
-            return symbolToInfo['bch'];
-        }
-        if (normalizedId === 'zcoin' || normalizedId.includes('firo')) {
-            return symbolToInfo['firo'];
-        }
-        if (normalizedId.includes('particl')) {
-            return symbolToInfo['part'];
-        }
-        return null;
+        return coinAliasesMap[normalizedId] || null;
     }
 
     return {

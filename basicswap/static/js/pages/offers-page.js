@@ -5,8 +5,8 @@ let jsonData = [];
 let originalJsonData = [];
 let currentSortColumn = 0;
 let currentSortDirection = 'desc';
-let filterTimeout = null;
 let isPaginationInProgress = false;
+let autoRefreshInterval = null;
 
 const isSentOffers = window.offersTableConfig.isSentOffers;
 const CACHE_DURATION = window.config.cacheConfig.defaultTTL;
@@ -28,6 +28,9 @@ window.tableRateModule = {
     processedOffers: new Set(),
 
     getCachedValue(key) {
+        if (window.CacheManager) {
+            return window.CacheManager.get(key);
+        }
         const cachedItem = localStorage.getItem(key);
         if (cachedItem) {
             const parsedItem = JSON.parse(cachedItem);
@@ -41,6 +44,14 @@ window.tableRateModule = {
     },
 
     setCachedValue(key, value, resourceType = null) {
+        if (window.CacheManager) {
+            const ttl = resourceType ?
+                window.config.cacheConfig.ttlSettings[resourceType] ||
+                window.config.cacheConfig.defaultTTL :
+                900000;
+            window.CacheManager.set(key, value, ttl);
+            return;
+        }
         const ttl = resourceType ?
             window.config.cacheConfig.ttlSettings[resourceType] ||
             window.config.cacheConfig.defaultTTL :
@@ -63,26 +74,6 @@ window.tableRateModule = {
         }
         this.processedOffers.add(offerId);
         return true;
-    },
-
-    formatUSD(value) {
-        if (Math.abs(value) < 0.000001) {
-            return value.toExponential(8) + ' USD';
-        } else if (Math.abs(value) < 0.01) {
-            return value.toFixed(8) + ' USD';
-        } else {
-            return value.toFixed(2) + ' USD';
-        }
-    },
-
-    formatNumber(value, decimals) {
-        if (Math.abs(value) < 0.000001) {
-            return value.toExponential(decimals);
-        } else if (Math.abs(value) < 0.01) {
-            return value.toFixed(decimals);
-        } else {
-            return value.toFixed(Math.min(2, decimals));
-        }
     },
 
     getFallbackValue(coinSymbol) {
@@ -151,6 +142,41 @@ function initializeTooltips() {
     }
 }
 
+function initializeTooltipsInBatches() {
+    if (!window.TooltipManager) return;
+
+    const tooltipElements = document.querySelectorAll('[data-tooltip-target]');
+    const BATCH_SIZE = 5; 
+    let currentIndex = 0;
+
+    function processBatch() {
+        const endIndex = Math.min(currentIndex + BATCH_SIZE, tooltipElements.length);
+
+        for (let i = currentIndex; i < endIndex; i++) {
+            const element = tooltipElements[i];
+            const targetId = element.getAttribute('data-tooltip-target');
+            if (!targetId) continue;
+
+            const tooltipContent = document.getElementById(targetId);
+            if (tooltipContent) {
+                window.TooltipManager.create(element, tooltipContent.innerHTML, {
+                    placement: element.getAttribute('data-tooltip-placement') || 'top'
+                });
+            }
+        }
+
+        currentIndex = endIndex;
+
+        if (currentIndex < tooltipElements.length) {
+            CleanupManager.setTimeout(processBatch, 0);
+        }
+    }
+
+    if (tooltipElements.length > 0) {
+        CleanupManager.setTimeout(processBatch, 0);
+    }
+}
+
 function getValidOffers() {
     if (!jsonData) {
         return [];
@@ -180,14 +206,12 @@ function saveFilterSettings() {
     }));
 }
 
-
 function getSelectedCoins(filterType) {
 
     const dropdown = document.getElementById(`${filterType}_dropdown`);
     if (!dropdown) {
         return ['any'];
     }
-
 
     const allCheckboxes = dropdown.querySelectorAll('input[type="checkbox"]');
 
@@ -252,7 +276,6 @@ function updateFilterButtonText(filterType) {
         textSpan.textContent = `Filter ${filterLabel} (${selected.length} selected)`;
     }
 
-
     button.style.width = '210px';
 }
 
@@ -270,7 +293,6 @@ function updateCoinBadges(filterType) {
             const coinName = getCoinNameFromValue(coinValue, filterType);
             const badge = document.createElement('span');
 
-
             const isBidsFilter = filterType === 'coin_to' && !isSentOffers;
             const isOffersFilter = filterType === 'coin_from' && !isSentOffers;
             const isReceivingFilter = filterType === 'coin_to' && isSentOffers;
@@ -284,7 +306,6 @@ function updateCoinBadges(filterType) {
             }
 
             badge.className = badgeClass + ' cursor-pointer hover:opacity-80';
-
 
             const coinImage = getCoinImage(coinName);
 
@@ -350,13 +371,7 @@ function coinMatches(offerCoin, filterCoins) {
             return true;
         }
 
-        if ((normalizedOfferCoin === 'firo' || normalizedOfferCoin === 'zcoin') &&
-            (normalizedFilterCoin === 'firo' || normalizedFilterCoin === 'zcoin')) {
-            return true;
-        }
-
-        if ((normalizedOfferCoin === 'bitcoincash' && normalizedFilterCoin === 'bitcoin cash') ||
-            (normalizedOfferCoin === 'bitcoin cash' && normalizedFilterCoin === 'bitcoincash')) {
+        if (window.CoinUtils && window.CoinUtils.isSameCoin(normalizedOfferCoin, normalizedFilterCoin)) {
             return true;
         }
 
@@ -467,14 +482,12 @@ function removeCoinFilter(filterType, coinValue) {
     if (checkbox) {
         checkbox.checked = false;
 
-
         updateFilterButtonText(filterType);
         updateCoinBadges(filterType);
         applyFilters();
         updateClearFiltersButton();
     }
 }
-
 
 window.removeCoinFilter = removeCoinFilter;
 
@@ -510,7 +523,6 @@ function filterAndSortData() {
             return false;
         }
 
-
         if (selectedCoinTo.length > 0 && !(selectedCoinTo.length === 1 && selectedCoinTo[0] === 'any')) {
             const coinNames = selectedCoinTo.map(value => getCoinNameFromValue(value, 'coin_to'));
             const matches = coinMatches(offer.coin_to, coinNames);
@@ -518,7 +530,6 @@ function filterAndSortData() {
                 return false;
             }
         }
-
 
         if (selectedCoinFrom.length > 0 && !(selectedCoinFrom.length === 1 && selectedCoinFrom[0] === 'any')) {
             const coinNames = selectedCoinFrom.map(value => getCoinNameFromValue(value, 'coin_from'));
@@ -674,10 +685,9 @@ async function calculateProfitLoss(fromCoin, toCoin, fromAmount, toAmount, isOwn
             if (window.CoinManager) {
                 normalizedCoin = window.CoinManager.getPriceKey(coin) || normalizedCoin;
             } else {
-                if (normalizedCoin === 'zcoin') normalizedCoin = 'firo';
-                if (normalizedCoin === 'bitcoincash' || normalizedCoin === 'bitcoin cash')
-                    normalizedCoin = 'bitcoin-cash';
-                if (normalizedCoin.includes('particl')) normalizedCoin = 'particl';
+                if (window.CoinUtils) {
+                    normalizedCoin = window.CoinUtils.normalizeCoinName(normalizedCoin, latestPrices);
+                }
             }
             let price = null;
             if (latestPrices && latestPrices[normalizedCoin]) {
@@ -734,10 +744,37 @@ async function fetchLatestPrices() {
     }
 }
 
+async function fetchPricesAsync() {
+    try {
+        const prices = await window.PriceManager.getPrices(false);
+        return prices;
+    } catch (error) {
+        console.error('Error fetching prices asynchronously:', error);
+        return null;
+    }
+}
+
 async function fetchOffers() {
     const refreshButton = document.getElementById('refreshOffers');
     const refreshIcon = document.getElementById('refreshIcon');
     const refreshText = document.getElementById('refreshText');
+
+    const fetchWithRetry = async (url, maxRetries = 3) => {
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response;
+            } catch (error) {
+                if (i === maxRetries - 1) throw error;
+                console.log(`Fetch retry ${i + 1}/${maxRetries} for ${url}`);
+                
+                await new Promise(resolve => CleanupManager.setTimeout(resolve, 100 * Math.pow(2, i)));
+            }
+        }
+    };
 
     try {
         if (!NetworkManager.isOnline()) {
@@ -751,15 +788,7 @@ async function fetchOffers() {
             refreshButton.classList.add('opacity-75', 'cursor-wait');
         }
 
-        const [offersResponse, pricesData] = await Promise.all([
-            fetch(isSentOffers ? '/json/sentoffers' : '/json/offers'),
-            fetchLatestPrices()
-        ]);
-
-        if (!offersResponse.ok) {
-            throw new Error(`HTTP error! status: ${offersResponse.status}`);
-        }
-
+        const offersResponse = await fetchWithRetry(isSentOffers ? '/json/sentoffers' : '/json/offers');
         const data = await offersResponse.json();
 
         if (data.error) {
@@ -789,12 +818,19 @@ async function fetchOffers() {
         jsonData = formatInitialData(processedData);
         originalJsonData = [...jsonData];
 
-        latestPrices = pricesData || getEmptyPriceData();
-
         CacheManager.set('offers_cached', jsonData, 'offers');
 
         applyFilters();
         updatePaginationInfo();
+
+        fetchPricesAsync().then(prices => {
+            if (prices) {
+                latestPrices = prices;
+                updateProfitLossDisplays();
+            }
+        }).catch(error => {
+            console.error('Error fetching prices after offers refresh:', error);
+        });
 
     } catch (error) {
         console.error('[Debug] Error fetching offers:', error);
@@ -871,26 +907,36 @@ function updateConnectionStatus(status) {
 }
 
 function updateRowTimes() {
-    requestAnimationFrame(() => {
-        const rows = document.querySelectorAll('[data-offer-id]');
-        rows.forEach(row => {
-            const offerId = row.getAttribute('data-offer-id');
-            const offer = jsonData.find(o => o.offer_id === offerId);
-            if (!offer) return;
+    
+    const rows = document.querySelectorAll('[data-offer-id]');
+    const updates = [];
 
-            const newPostedTime = formatTime(offer.created_at, true);
-            const newExpiresIn = formatTimeLeft(offer.expire_at);
+    rows.forEach(row => {
+        const offerId = row.getAttribute('data-offer-id');
+        const offer = jsonData.find(o => o.offer_id === offerId);
+        if (!offer) return;
 
-            const postedElement = row.querySelector('.text-xs:first-child');
-            const expiresElement = row.querySelector('.text-xs:last-child');
+        const newPostedTime = formatTime(offer.created_at, true);
+        const newExpiresIn = formatTimeLeft(offer.expire_at);
 
-            if (postedElement && postedElement.textContent !== `Posted: ${newPostedTime}`) {
-                postedElement.textContent = `Posted: ${newPostedTime}`;
-            }
-            if (expiresElement && expiresElement.textContent !== `Expires in: ${newExpiresIn}`) {
-                expiresElement.textContent = `Expires in: ${newExpiresIn}`;
-            }
+        const postedElement = row.querySelector('.text-xs:first-child');
+        const expiresElement = row.querySelector('.text-xs:last-child');
+
+        updates.push({
+            postedElement,
+            expiresElement,
+            newPostedTime,
+            newExpiresIn
         });
+    });
+
+    updates.forEach(({ postedElement, expiresElement, newPostedTime, newExpiresIn }) => {
+        if (postedElement && postedElement.textContent !== `Posted: ${newPostedTime}`) {
+            postedElement.textContent = `Posted: ${newPostedTime}`;
+        }
+        if (expiresElement && expiresElement.textContent !== `Expires in: ${newExpiresIn}`) {
+            expiresElement.textContent = `Expires in: ${newExpiresIn}`;
+        }
     });
 }
 
@@ -1097,8 +1143,13 @@ async function updateOffersTable(options = {}) {
             return;
         }
 
+        const isIncrementalUpdate = options.incremental === true;
+        if (!options.skipSkeleton && !isIncrementalUpdate && offersBody) {
+            offersBody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="animate-pulse">Loading offers...</div></td></tr>';
+        }
+
         if (window.TooltipManager) {
-            window.TooltipManager.cleanup();
+            requestAnimationFrame(() => window.TooltipManager.cleanup());
         }
 
         const validOffers = getValidOffers();
@@ -1138,28 +1189,72 @@ async function updateOffersTable(options = {}) {
                 if (row) fragment.appendChild(row);
             });
 
-            if (i + BATCH_SIZE < itemsToDisplay.length) {
-                await new Promise(resolve => setTimeout(resolve, 16));
-            }
         }
 
         if (offersBody) {
-            const existingRows = offersBody.querySelectorAll('tr');
-            existingRows.forEach(row => cleanupRow(row));
-            offersBody.textContent = '';
-            offersBody.appendChild(fragment);
+            if (isIncrementalUpdate && offersBody.children.length > 0) {
+                
+                const existingRows = Array.from(offersBody.querySelectorAll('tr[data-offer-id]'));
+                const newRows = Array.from(fragment.querySelectorAll('tr[data-offer-id]'));
+
+                const existingMap = new Map(existingRows.map(row => [row.getAttribute('data-offer-id'), row]));
+                const newMap = new Map(newRows.map(row => [row.getAttribute('data-offer-id'), row]));
+
+                existingRows.forEach(row => {
+                    const offerId = row.getAttribute('data-offer-id');
+                    if (!newMap.has(offerId)) {
+                        cleanupRow(row);
+                        row.remove();
+                    }
+                });
+
+                newRows.forEach((newRow, index) => {
+                    const offerId = newRow.getAttribute('data-offer-id');
+                    const existingRow = existingMap.get(offerId);
+
+                    if (existingRow) {
+                        
+                        const currentIndex = Array.from(offersBody.children).indexOf(existingRow);
+                        if (currentIndex !== index) {
+                            
+                            if (index >= offersBody.children.length) {
+                                offersBody.appendChild(existingRow);
+                            } else {
+                                offersBody.insertBefore(existingRow, offersBody.children[index]);
+                            }
+                        }
+                        
+                    } else {
+                        
+                        if (index >= offersBody.children.length) {
+                            offersBody.appendChild(newRow);
+                        } else {
+                            offersBody.insertBefore(newRow, offersBody.children[index]);
+                        }
+                    }
+                });
+            } else {
+                
+                const existingRows = offersBody.querySelectorAll('tr');
+                existingRows.forEach(row => cleanupRow(row));
+                offersBody.textContent = '';
+                offersBody.appendChild(fragment);
+            }
         }
 
-        initializeTooltips();
+        initializeTooltipsInBatches();
 
-        requestAnimationFrame(() => {
+        CleanupManager.setTimeout(() => {
             updateRowTimes();
             updatePaginationInfo();
             updateProfitLossDisplays();
+        }, 10);
+
+        CleanupManager.setTimeout(() => {
             if (tableRateModule?.initializeTable) {
                 tableRateModule.initializeTable();
             }
-        });
+        }, 50);
 
         lastRefreshTime = Date.now();
         updateLastRefreshTime();
@@ -1171,7 +1266,10 @@ async function updateOffersTable(options = {}) {
 }
 
 function updateProfitLossDisplays() {
+    
     const rows = document.querySelectorAll('[data-offer-id]');
+    const updates = [];
+
     rows.forEach(row => {
         const offerId = row.getAttribute('data-offer-id');
         const offer = jsonData.find(o => o.offer_id === offerId);
@@ -1179,6 +1277,17 @@ function updateProfitLossDisplays() {
 
         const fromAmount = parseFloat(offer.amount_from) || 0;
         const toAmount = parseFloat(offer.amount_to) || 0;
+
+        updates.push({
+            row,
+            offerId,
+            offer,
+            fromAmount,
+            toAmount
+        });
+    });
+
+    updates.forEach(({ row, offerId, offer, fromAmount, toAmount }) => {
         updateProfitLoss(row, offer.coin_from, offer.coin_to, fromAmount, toAmount, offer.is_own_offer);
 
         const rateTooltipId = `tooltip-rate-${offerId}`;
@@ -1494,7 +1603,6 @@ function createRateColumn(offer, coinFrom, coinTo) {
     `;
 }
 
-
 function createPercentageColumn(offer) {
     return `
         <td class="py-3 px-2 bold text-sm text-center monospace items-center rate-table-info">
@@ -1731,45 +1839,10 @@ function createTooltipContent(isSentOffers, coinFrom, coinTo, fromAmount, toAmou
 
     const getPriceKey = (coin) => {
         if (!coin) return null;
-
-        const lowerCoin = coin.toLowerCase();
-
-        if (lowerCoin === 'zcoin') return 'firo';
-
-        if (lowerCoin === 'bitcoin cash' || lowerCoin === 'bitcoincash' || lowerCoin === 'bch') {
-
-            if (latestPrices && latestPrices['bitcoin-cash']) {
-                return 'bitcoin-cash';
-            } else if (latestPrices && latestPrices['bch']) {
-                return 'bch';
-            }
-            return 'bitcoin-cash';
+        if (window.CoinUtils) {
+            return window.CoinUtils.normalizeCoinName(coin, latestPrices);
         }
-
-        if (lowerCoin === 'part' || lowerCoin === 'particl' || lowerCoin.includes('particl')) {
-            return 'part';
-        }
-
-        if (window.config && window.config.coinMappings && window.config.coinMappings.nameToSymbol) {
-            const symbol = window.config.coinMappings.nameToSymbol[coin];
-            if (symbol) {
-                if (symbol.toUpperCase() === 'BCH') {
-                    if (latestPrices && latestPrices['bitcoin-cash']) {
-                        return 'bitcoin-cash';
-                    } else if (latestPrices && latestPrices['bch']) {
-                        return 'bch';
-                    }
-                    return 'bitcoin-cash';
-                }
-
-                if (symbol.toUpperCase() === 'PART') {
-                    return 'part';
-                }
-
-                return symbol.toLowerCase();
-            }
-        }
-        return lowerCoin;
+        return coin.toLowerCase();
     };
 
     const fromSymbol = getPriceKey(coinFrom);
@@ -1849,44 +1922,10 @@ function createCombinedRateTooltip(offer, coinFrom, coinTo, treatAsSentOffer) {
 
     const getPriceKey = (coin) => {
         if (!coin) return null;
-
-        const lowerCoin = coin.toLowerCase();
-
-        if (lowerCoin === 'zcoin') return 'firo';
-
-        if (lowerCoin === 'bitcoin cash' || lowerCoin === 'bitcoincash' || lowerCoin === 'bch') {
-            if (latestPrices && latestPrices['bitcoin-cash']) {
-                return 'bitcoin-cash';
-            } else if (latestPrices && latestPrices['bch']) {
-                return 'bch';
-            }
-
-            return 'bitcoin-cash';
+        if (window.CoinUtils) {
+            return window.CoinUtils.normalizeCoinName(coin, latestPrices);
         }
-
-        if (lowerCoin === 'part' || lowerCoin === 'particl' || lowerCoin.includes('particl')) {
-            return 'part';
-        }
-
-        if (window.config && window.config.coinMappings && window.config.coinMappings.nameToSymbol) {
-            const symbol = window.config.coinMappings.nameToSymbol[coin];
-            if (symbol) {
-                if (symbol.toUpperCase() === 'BCH') {
-
-                    if (latestPrices && latestPrices['bitcoin-cash']) {
-                        return 'bitcoin-cash';
-                    } else if (latestPrices && latestPrices['bch']) {
-                        return 'bch';
-                    }
-                    return 'bitcoin-cash';
-                }
-                if (symbol.toUpperCase() === 'PART') {
-                    return 'part';
-                }
-                return symbol.toLowerCase();
-            }
-        }
-        return lowerCoin;
+        return coin.toLowerCase();
     };
 
     const fromSymbol = getPriceKey(coinFrom);
@@ -1958,23 +1997,23 @@ function updateTooltipTargets(row, uniqueId) {
     });
 }
 
-function applyFilters() {
-    if (filterTimeout) {
-        clearTimeout(filterTimeout);
-        filterTimeout = null;
+function applyFilters(options = {}) {
+    if (window.filterTimeout) {
+        clearTimeout(window.filterTimeout);
+        window.filterTimeout = null;
     }
 
     try {
-        filterTimeout = setTimeout(() => {
+        window.filterTimeout = CleanupManager.setTimeout(() => {
             currentPage = 1;
             jsonData = filterAndSortData();
-            updateOffersTable();
+            updateOffersTable(options);
             updateClearFiltersButton();
-            filterTimeout = null;
+            window.filterTimeout = null;
         }, 250);
     } catch (error) {
         console.error('Error in filter timeout:', error);
-        filterTimeout = null;
+        window.filterTimeout = null;
     }
 }
 
@@ -2037,13 +2076,10 @@ function formatTimeLeft(timestamp) {
 }
 
 function getDisplayName(coinName) {
-    if (window.CoinManager) {
+    if (window.CoinManager && window.CoinManager.getDisplayName) {
         return window.CoinManager.getDisplayName(coinName) || coinName;
     }
-    if (coinName.toLowerCase() === 'zcoin') {
-        return 'Firo';
-    }
-    return window.config.coinMappings.nameToDisplayName[coinName] || coinName;
+    return coinName;
 }
 
 function getCoinSymbolLowercase(coin) {
@@ -2085,38 +2121,23 @@ function escapeHtml(unsafe) {
 }
 
 function getPriceKey(coin) {
-
     if (window.CoinManager) {
         return window.CoinManager.getPriceKey(coin);
     }
-
-    if (!coin) return null;
-
-    const lowerCoin = coin.toLowerCase();
-
-    if (lowerCoin === 'zcoin') {
-        return 'firo';
+    if (window.CoinUtils) {
+        return window.CoinUtils.normalizeCoinName(coin);
     }
-
-    if (lowerCoin === 'bitcoin cash' || lowerCoin === 'bitcoincash' || lowerCoin === 'bch') {
-        return 'bitcoin-cash';
-    }
-
-    if (lowerCoin === 'part' || lowerCoin === 'particl' ||
-        lowerCoin.includes('particl')) {
-        return 'particl';
-    }
-
-    return lowerCoin;
+    return coin ? coin.toLowerCase() : null;
 }
 
 function getCoinSymbol(fullName) {
-
     if (window.CoinManager) {
         return window.CoinManager.getSymbol(fullName) || fullName;
     }
-
-    return window.config.coinMappings.nameToSymbol[fullName] || fullName;
+    if (window.CoinUtils) {
+        return window.CoinUtils.getCoinSymbol(fullName);
+    }
+    return fullName;
 }
 
 function initializeTableEvents() {
@@ -2140,7 +2161,6 @@ function initializeTableEvents() {
     const statusSelect = document.getElementById('status');
     const sentFromSelect = document.getElementById('sent_from');
 
-
     if (coinToButton && coinToDropdown) {
         CleanupManager.addListener(coinToButton, 'click', (e) => {
             e.stopPropagation();
@@ -2154,7 +2174,6 @@ function initializeTableEvents() {
             });
         });
     }
-
 
     if (coinFromButton && coinFromDropdown) {
         CleanupManager.addListener(coinFromButton, 'click', (e) => {
@@ -2220,15 +2239,16 @@ function initializeTableEvents() {
                 refreshButton.classList.remove('bg-blue-600', 'hover:bg-green-600', 'border-blue-500', 'hover:border-green-600');
                 refreshButton.classList.add('bg-red-600', 'border-red-500', 'cursor-not-allowed');
 
-                if (countdownInterval) clearInterval(countdownInterval);
+                if (window.countdownInterval) clearInterval(window.countdownInterval);
 
-                countdownInterval = setInterval(() => {
+                window.countdownInterval = CleanupManager.setInterval(() => {
                     const currentTime = Date.now();
                     const elapsedTime = currentTime - startTime;
                     const remainingTime = Math.ceil((REFRESH_COOLDOWN - elapsedTime) / 1000);
 
                     if (remainingTime <= 0) {
-                        clearInterval(countdownInterval);
+                        clearInterval(window.countdownInterval);
+                        window.countdownInterval = null;
                         refreshText.textContent = 'Refresh';
 
                         refreshButton.classList.remove('bg-red-600', 'border-red-500', 'cursor-not-allowed');
@@ -2240,7 +2260,6 @@ function initializeTableEvents() {
                 return;
             }
 
-            console.log('Manual refresh initiated');
             lastRefreshTime = now;
             const refreshIcon = document.getElementById('refreshIcon');
             const refreshText = document.getElementById('refreshText');
@@ -2267,18 +2286,16 @@ function initializeTableEvents() {
                 if (!priceData && previousPrices) {
                     console.log('Using previous price data after failed refresh');
                     latestPrices = previousPrices;
-                    applyFilters();
+                    applyFilters({ incremental: false });
                 } else if (priceData) {
                     latestPrices = priceData;
-                    applyFilters();
+                    applyFilters({ incremental: false });
                 } else {
                     throw new Error('Unable to fetch price data');
                 }
                 updatePaginationInfo();
                 lastRefreshTime = now;
                 updateLastRefreshTime();
-
-                console.log('Manual refresh completed successfully');
 
             } catch (error) {
                 console.error('Error during manual refresh:', error);
@@ -2320,7 +2337,7 @@ function initializeTableEvents() {
                     await updateOffersTable({ fromPaginationClick: true });
                     updatePaginationInfo();
                 } finally {
-                    setTimeout(() => {
+                    CleanupManager.setTimeout(() => {
                         isPaginationInProgress = false;
                     }, 100);
                 }
@@ -2340,7 +2357,7 @@ function initializeTableEvents() {
                     await updateOffersTable({ fromPaginationClick: true });
                     updatePaginationInfo();
                 } finally {
-                    setTimeout(() => {
+                    CleanupManager.setTimeout(() => {
                         isPaginationInProgress = false;
                     }, 100);
                 }
@@ -2416,9 +2433,36 @@ function handleTableSort(columnIndex, header) {
         clearTimeout(window.sortTimeout);
     }
 
-    window.sortTimeout = setTimeout(() => {
+    window.sortTimeout = CleanupManager.setTimeout(() => {
         applyFilters();
     }, 100);
+}
+
+function startAutoRefresh() {
+    const REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
+
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+
+    autoRefreshInterval = CleanupManager.setInterval(async () => {
+        try {
+          
+            const response = await fetch(isSentOffers ? '/json/sentoffers' : '/json/offers');
+            if (response.ok) {
+                
+            }
+        } catch (error) {
+            console.error('[Auto-refresh] Error during background refresh:', error);
+        }
+    }, REFRESH_INTERVAL);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
 }
 
 async function initializeTableAndData() {
@@ -2426,7 +2470,6 @@ async function initializeTableAndData() {
     updateClearFiltersButton();
     initializeTableEvents();
     initializeTooltips();
-
 
     updateFilterButtonText('coin_to');
     updateFilterButtonText('coin_from');
@@ -2527,24 +2570,44 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (window.WebSocketManager) {
             WebSocketManager.addMessageHandler('message', async (data) => {
                 if (data.event === 'new_offer' || data.event === 'offer_revoked') {
-                    //console.log('WebSocket event received:', data.event);
                     try {
+                        
+                        const fetchWithRetry = async (url, maxRetries = 3) => {
+                            for (let i = 0; i < maxRetries; i++) {
+                                try {
+                                    const response = await fetch(url);
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP error! status: ${response.status}`);
+                                    }
+                                    return response;
+                                } catch (error) {
+                                    if (i === maxRetries - 1) throw error;
+                                    
+                                    await new Promise(resolve => CleanupManager.setTimeout(resolve, 100 * Math.pow(2, i)));
+                                }
+                            }
+                        };
 
-                        const previousPrices = latestPrices;
-
-                        const offersResponse = await fetch(isSentOffers ? '/json/sentoffers' : '/json/offers');
-                        if (!offersResponse.ok) {
-                            throw new Error(`HTTP error! status: ${offersResponse.status}`);
-                        }
-
+                        const offersResponse = await fetchWithRetry(isSentOffers ? '/json/sentoffers' : '/json/offers');
                         const newData = await offersResponse.json();
                         const processedNewData = Array.isArray(newData) ? newData : Object.values(newData);
-                        jsonData = formatInitialData(processedNewData);
+                        const newFormattedData = formatInitialData(processedNewData);
+
+                        const oldOfferIds = originalJsonData.map(o => o.offer_id).sort().join(',');
+                        const newOfferIds = newFormattedData.map(o => o.offer_id).sort().join(',');
+                        const dataChanged = oldOfferIds !== newOfferIds;
+
+                        if (!dataChanged) {
+                            return;
+                        }
+
+                        jsonData = newFormattedData;
                         originalJsonData = [...jsonData];
 
+                        const previousPrices = latestPrices;
                         let priceData;
                         if (window.PriceManager) {
-                            priceData = await window.PriceManager.getPrices(true);
+                            priceData = await window.PriceManager.getPrices(false); 
                         } else {
                             priceData = await fetchLatestPrices();
                         }
@@ -2553,12 +2616,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                             latestPrices = priceData;
                             CacheManager.set('prices_coingecko', priceData, 'prices');
                         } else if (previousPrices) {
-                            console.log('Using previous price data after failed refresh');
                             latestPrices = previousPrices;
                         }
 
-                        applyFilters();
-
+                        applyFilters({ incremental: true, skipSkeleton: true });
                         updateProfitLossDisplays();
 
                         document.querySelectorAll('.usd-value').forEach(usdValue => {
@@ -2569,8 +2630,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                                 if (price !== undefined && price !== null) {
                                     const amount = parseFloat(usdValue.getAttribute('data-amount') || '0');
                                     if (!isNaN(amount) && amount > 0) {
-                                        const usdValue = amount * price;
-                                        usdValue.textContent = tableRateModule.formatUSD(usdValue);
+                                        const calculatedUSD = amount * price;
+                                        const formattedUSD = calculatedUSD < 0.01
+                                            ? calculatedUSD.toFixed(8) + ' USD'
+                                            : calculatedUSD.toFixed(2) + ' USD';
+
+                                        if (usdValue.textContent !== formattedUSD) {
+                                            usdValue.textContent = formattedUSD;
+                                        }
                                     }
                                 }
                             }
@@ -2578,7 +2645,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
                         updatePaginationInfo();
 
-                        //console.log('WebSocket-triggered refresh completed successfully');
                     } catch (error) {
                         console.error('Error during WebSocket-triggered refresh:', error);
                         NetworkManager.handleNetworkError(error);
@@ -2613,9 +2679,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         }
 
-        if (window.config.autoRefreshEnabled) {
-            startAutoRefresh();
-        }
+        startAutoRefresh();
 
         const filterForm = document.getElementById('filterForm');
         if (filterForm) {
@@ -2649,20 +2713,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         });
 
-        const rowTimeInterval = setInterval(updateRowTimes, 30000);
-        if (CleanupManager.registerResource) {
-            CleanupManager.registerResource('rowTimeInterval', rowTimeInterval, () => {
-                clearInterval(rowTimeInterval);
-            });
-        } else if (CleanupManager.addResource) {
-            CleanupManager.addResource('rowTimeInterval', rowTimeInterval, () => {
-                clearInterval(rowTimeInterval);
-            });
-        } else {
-
-            window._cleanupIntervals = window._cleanupIntervals || [];
-            window._cleanupIntervals.push(rowTimeInterval);
-        }
+        const rowTimeInterval = CleanupManager.setInterval(updateRowTimes, 30000);
+        CleanupManager.registerResource('rowTimeInterval', rowTimeInterval, () => {
+            clearInterval(rowTimeInterval);
+        });
 
     } catch (error) {
         console.error('Error during initialization:', error);
@@ -2693,6 +2747,8 @@ function cleanup() {
       clearInterval(window.countdownInterval);
       window.countdownInterval = null;
     }
+
+    stopAutoRefresh();
 
     if (window._cleanupIntervals && Array.isArray(window._cleanupIntervals)) {
       window._cleanupIntervals.forEach(interval => {
@@ -2739,7 +2795,6 @@ function cleanup() {
       }
     }
 
-    //console.log('Offers.js cleanup completed');
   } catch (error) {
     console.error('Error during cleanup:', error);
   }

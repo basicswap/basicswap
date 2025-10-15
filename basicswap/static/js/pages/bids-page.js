@@ -32,7 +32,7 @@ document.addEventListener('tabactivated', function(event) {
     if (event.detail && event.detail.tabId) {
         const tabType = event.detail.type || (event.detail.tabId === '#all' ? 'all' :
                                              (event.detail.tabId === '#sent' ? 'sent' : 'received'));
-        //console.log('Tab activation event received for:', tabType);
+        
         state.currentTab = tabType;
         updateBidsTable();
     }
@@ -190,8 +190,7 @@ const EventManager = {
 };
 
 function cleanup() {
-    //console.log('Starting comprehensive cleanup process for bids table');
-
+    
     try {
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -326,8 +325,7 @@ window.cleanupBidsTable = cleanup;
 
 CleanupManager.addListener(document, 'visibilitychange', () => {
     if (document.hidden) {
-        //console.log('Page hidden - pausing WebSocket and optimizing memory');
-
+        
         if (WebSocketManager && typeof WebSocketManager.pause === 'function') {
             WebSocketManager.pause();
         } else if (WebSocketManager && typeof WebSocketManager.disconnect === 'function') {
@@ -351,7 +349,7 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
 
         const lastUpdateTime = state.lastRefresh || 0;
         const now = Date.now();
-        const refreshInterval = 5 * 60 * 1000; // 5 minutes
+        const refreshInterval = 5 * 60 * 1000; 
 
         if (now - lastUpdateTime > refreshInterval) {
             setTimeout(() => {
@@ -490,13 +488,7 @@ function coinMatches(offerCoin, filterCoin) {
 
     if (offerCoin === filterCoin) return true;
 
-    if ((offerCoin === 'firo' || offerCoin === 'zcoin') &&
-        (filterCoin === 'firo' || filterCoin === 'zcoin')) {
-        return true;
-    }
-
-    if ((offerCoin === 'bitcoincash' && filterCoin === 'bitcoin cash') ||
-        (offerCoin === 'bitcoin cash' && filterCoin === 'bitcoincash')) {
+    if (window.CoinUtils && window.CoinUtils.isSameCoin(offerCoin, filterCoin)) {
         return true;
     }
 
@@ -926,6 +918,12 @@ const forceTooltipDOMCleanup = () => {
     foundCount += allTooltipElements.length;
 
     allTooltipElements.forEach(element => {
+        const isInTooltipContainer = element.closest('.tooltip-container');
+
+        if (isInTooltipContainer) {
+            return;
+        }
+
         const isDetached = !document.body.contains(element) ||
                            element.classList.contains('hidden') ||
                            element.style.display === 'none';
@@ -1012,7 +1010,7 @@ const forceTooltipDOMCleanup = () => {
         });
     }
     if (removedCount > 0) {
-       // console.log(`Tooltip cleanup: found ${foundCount}, removed ${removedCount} detached tooltips`);
+       
     }
 }
 
@@ -1146,7 +1144,7 @@ const createTableRow = async (bid) => {
         `;
     }
 
-    return `
+    const rowHtml = `
         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <!-- Time Column -->
             <td class="py-3 pl-6 pr-3">
@@ -1232,13 +1230,16 @@ const createTableRow = async (bid) => {
                 </div>
             </td>
         </tr>
+    `;
 
-        <!-- Tooltips -->
+    const tooltipIdentityHtml = `
         <div id="tooltip-identity-${uniqueId}" role="tooltip" class="fixed z-50 py-3 px-4 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600 max-w-sm pointer-events-none">
             ${tooltipContent}
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
+    `;
 
+    const tooltipStatusHtml = `
         <div id="tooltip-status-${uniqueId}" role="tooltip" class="inline-block absolute z-50 py-2 px-3 text-sm font-medium text-white bg-gray-400 rounded-lg shadow-sm opacity-0 transition-opacity duration-300 tooltip dark:bg-gray-600">
             <div class="text-white">
                 <p class="font-bold mb-2">Transaction Status</p>
@@ -1256,6 +1257,12 @@ const createTableRow = async (bid) => {
             <div class="tooltip-arrow" data-popper-arrow></div>
         </div>
     `;
+
+    return {
+        rowHtml,
+        tooltipIdentityHtml,
+        tooltipStatusHtml
+    };
 };
 
 function cleanupOffscreenTooltips() {
@@ -1323,8 +1330,6 @@ async function fetchBids(type = state.currentTab) {
         const withExpiredSelect = document.getElementById('with_expired');
         const includeExpired = withExpiredSelect ? withExpiredSelect.value === 'true' : true;
 
-        //console.log(`Fetching ${type} bids, include expired:`, includeExpired);
-
         const timeoutId = setTimeout(() => {
             if (activeFetchController) {
                 activeFetchController.abort();
@@ -1372,8 +1377,6 @@ async function fetchBids(type = state.currentTab) {
             }
         }
 
-        //console.log(`Received raw ${type} data:`, data.length, 'bids');
-
         state.filters.with_expired = includeExpired;
 
         let processedData;
@@ -1410,7 +1413,8 @@ const updateTableContent = async (type) => {
     }
 
     cleanupTooltips();
-    forceTooltipDOMCleanup();
+
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500 dark:text-gray-400"><div class="animate-pulse">Loading bids...</div></td></tr>';
 
     tooltipIdsToCleanup.clear();
 
@@ -1421,47 +1425,55 @@ const updateTableContent = async (type) => {
 
     const currentPageData = filteredData.slice(startIndex, endIndex);
 
-    //console.log('Updating table content:', {
-    //    type: type,
-    //    totalFilteredBids: filteredData.length,
-    //    currentPageBids: currentPageData.length,
-    //    startIndex: startIndex,
-    //    endIndex: endIndex
-    //});
+    let tooltipContainerId = `tooltip-container-${type}`;
+    let tooltipContainer = document.getElementById(tooltipContainerId);
+
+    if (!tooltipContainer) {
+        tooltipContainer = document.createElement('div');
+        tooltipContainer.id = tooltipContainerId;
+        tooltipContainer.className = 'tooltip-container';
+        document.body.appendChild(tooltipContainer);
+    } else {
+        tooltipContainer.innerHTML = '';
+    }
 
     try {
         if (currentPageData.length > 0) {
             const BATCH_SIZE = 10;
             let allRows = [];
+            let allTooltips = [];
 
             for (let i = 0; i < currentPageData.length; i += BATCH_SIZE) {
                 const batch = currentPageData.slice(i, i + BATCH_SIZE);
                 const rowPromises = batch.map(bid => createTableRow(bid));
-                const rows = await Promise.all(rowPromises);
-                allRows = allRows.concat(rows);
+                const rowData = await Promise.all(rowPromises);
 
-                if (i + BATCH_SIZE < currentPageData.length) {
-                    await new Promise(resolve => setTimeout(resolve, 5));
-                }
+                rowData.forEach(data => {
+                    allRows.push(data.rowHtml);
+                    allTooltips.push(data.tooltipIdentityHtml);
+                    allTooltips.push(data.tooltipStatusHtml);
+                });
             }
 
             const scrollPosition = tbody.parentElement?.scrollTop || 0;
 
             tbody.innerHTML = allRows.join('');
+            tooltipContainer.innerHTML = allTooltips.join('');
 
             if (tbody.parentElement && scrollPosition > 0) {
                 tbody.parentElement.scrollTop = scrollPosition;
             }
 
             if (document.visibilityState === 'visible') {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        initializeTooltips();
 
-                setTimeout(() => {
-                    initializeTooltips();
-
-                    setTimeout(() => {
-                        forceTooltipDOMCleanup();
-                    }, 100);
-                }, 10);
+                        setTimeout(() => {
+                            forceTooltipDOMCleanup();
+                        }, 100);
+                    });
+                });
             }
         } else {
             tbody.innerHTML = `
@@ -1495,7 +1507,7 @@ const initializeTooltips = () => {
     const tooltipTriggers = document.querySelectorAll(selector);
     const tooltipCount = tooltipTriggers.length;
     if (tooltipCount > 50) {
-        //console.log(`Optimizing ${tooltipCount} tooltips`);
+        
         const viewportMargin = 200;
         const viewportTooltips = Array.from(tooltipTriggers).filter(trigger => {
             const rect = trigger.getBoundingClientRect();
@@ -1594,13 +1606,6 @@ const updatePaginationControls = (type) => {
     const nextButton = elements[`nextPage${type.charAt(0).toUpperCase() + type.slice(1)}`];
     const currentPageSpan = elements[`currentPage${type.charAt(0).toUpperCase() + type.slice(1)}`];
     const bidsCount = elements[`${type}BidsCount`];
-
-    //console.log('Pagination controls update:', {
-    //    type: type,
-    //    totalBids: data.length,
-    //    totalPages: totalPages,
-    //    currentPage: state.currentPage[type]
-    //});
 
     if (state.currentPage[type] > totalPages) {
         state.currentPage[type] = totalPages > 0 ? totalPages : 1;
@@ -2077,7 +2082,7 @@ const setupEventListeners = () => {
 function setupMemoryMonitoring() {
     const MEMORY_CHECK_INTERVAL = 2 * 60 * 1000;
 
-    const intervalId = setInterval(() => {
+    const intervalId = CleanupManager.setInterval(() => {
         if (document.hidden) {
             console.log('Tab hidden - running memory optimization');
 
@@ -2110,9 +2115,9 @@ function setupMemoryMonitoring() {
         }
     }, MEMORY_CHECK_INTERVAL);
 
-    document.addEventListener('beforeunload', () => {
+    CleanupManager.registerResource('bidsMemoryMonitoring', intervalId, () => {
         clearInterval(intervalId);
-    }, { once: true });
+    });
 }
 
 function initialize() {

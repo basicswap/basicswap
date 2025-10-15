@@ -1,24 +1,15 @@
 {% include 'header.html' %}
-{% from 'style.html' import breadcrumb_line_svg, red_cross_close_svg %} 
+{% from 'style.html' import red_cross_close_svg %}
+{% from 'macros.html' import breadcrumb %}
 <div class="container mx-auto">
  <section class="p-5 mt-5">
   <div class="flex flex-wrap items-center -m-2">
    <div class="w-full md:w-1/2 p-2">
-    <ul class="flex flex-wrap items-center gap-x-3 mb-2">
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/">
-       <p>Home</p>
-      </a>
-     </li>
-    <li>{{ breadcrumb_line_svg | safe }}</li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/smsgaddresses">Identity</a>
-     </li>
-    <li>{{ breadcrumb_line_svg | safe }}</li>
-     <li>
-      <a class="flex font-medium text-xs text-coolGray-500 dark:text-gray-300 hover:text-coolGray-700" href="/identity/{{ data.identity_address }}">Address: {{ data.identity_address }}</a>
-     </li>
-    </ul>
+    {{ breadcrumb([
+      {'text': 'Home', 'url': '/'},
+      {'text': 'Identity', 'url': '/smsgaddresses'},
+      {'text': 'Address: ' ~ data.identity_address, 'url': '/identity/' ~ data.identity_address}
+    ]) }}
    </div>
   </div>
  </section>
