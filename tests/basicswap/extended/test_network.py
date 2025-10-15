@@ -35,9 +35,6 @@ from basicswap.util.address import (
 from basicswap.rpc import (
     callrpc,
 )
-from basicswap.http_server import (
-    HttpThread,
-)
 from tests.basicswap.util import (
     read_json_api,
 )
@@ -84,7 +81,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
         "p2p_port": BASE_P2P_PORT + node_id,
         "zmqhost": "tcp://127.0.0.1",
         "zmqport": BASE_ZMQ_PORT + node_id,
-        "htmlhost": "127.0.0.1",
+        "htmlhost": TEST_HTTP_HOST,
         "htmlport": TEST_HTTP_PORT + node_id,
         "network_key": network_key,
         "network_pubkey": network_pubkey,
@@ -185,7 +182,6 @@ class Test(unittest.TestCase):
 
         cls.update_thread = None
         cls.coins_update_thread = None
-        cls.http_threads = []
         cls.swap_clients = []
         cls.part_daemons = []
         cls.btc_daemons = []
@@ -334,10 +330,6 @@ class Test(unittest.TestCase):
                 sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
                 sc.start()
 
-                t = HttpThread(TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
-                cls.http_threads.append(t)
-                t.start()
-
             cls.btc_addr = callnoderpc(
                 0,
                 "getnewaddress",
@@ -388,9 +380,6 @@ class Test(unittest.TestCase):
             except Exception:
                 logging.info("Failed to join coins_update_thread")
 
-        for t in cls.http_threads:
-            t.stop()
-            t.join()
         for c in cls.swap_clients:
             c.finalise()
 
@@ -399,7 +388,6 @@ class Test(unittest.TestCase):
 
         cls.part_daemons.clear()
         cls.btc_daemons.clear()
-        cls.http_threads.clear()
         cls.swap_clients.clear()
 
         super(Test, cls).tearDownClass()

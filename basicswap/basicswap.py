@@ -66,12 +66,14 @@ from .chainparams import (
     Fiat,
     ticker_map,
 )
+from .contrib.websocket_server import WebsocketServer
 from .db_upgrades import upgradeDatabase, upgradeDatabaseData
 from .db_util import remove_expired_data
+from .http_server import HttpThread
 from .rpc import escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
-from .ui.util import getCoinName
 from .ui.app import UIApp
+from .ui.util import getCoinName
 from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
@@ -644,6 +646,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self._network.stopNetwork()
             self._network = None
 
+        self.log.info("Stopping threads.")
         for t in self.threads:
             if hasattr(t, "stop") and callable(t.stop):
                 t.stop()
@@ -1306,6 +1309,43 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self._price_fetch_thread.start()
         self.log.info("Background price fetching started")
+
+        if "htmlhost" in self.settings:
+            self.log.info(
+                "Starting HTTP server at http://{}:{}".format(
+                    self.settings["htmlhost"], self.settings["htmlport"]
+                )
+            )
+            allow_cors: bool = (
+                self.settings["allowcors"]
+                if "allowcors" in self.settings
+                else cfg.DEFAULT_ALLOW_CORS
+            )
+            thread_http = HttpThread(
+                self.settings["htmlhost"],
+                self.settings["htmlport"],
+                allow_cors,
+                self,
+            )
+            self.threads.append(thread_http)
+            thread_http.start()
+
+        if "wshost" in self.settings:
+            ws_url = "ws://{}:{}".format(
+                self.settings["wshost"], self.settings["wsport"]
+            )
+            self.log.info(f"Starting WebSocket server at {ws_url}")
+
+            self.ws_server = WebsocketServer(
+                host=self.settings["wshost"], port=self.settings["wsport"]
+            )
+            self.ws_server.client_port = self.settings.get(
+                "wsclientport", self.settings["wsport"]
+            )
+            self.ws_server.set_fn_new_client(self.ws_new_client)
+            self.ws_server.set_fn_client_left(self.ws_client_left)
+            self.ws_server.set_fn_message_received(self.ws_message_received)
+            self.ws_server.run_forever(threaded=True)
 
     def stopDaemon(self, coin) -> None:
         if coin in (Coins.XMR, Coins.DCR, Coins.WOW):
@@ -12904,3 +12944,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return rv_array
 
         return rv
+
+    def ws_new_client(self, client, server):
+        self.log.debug(f'ws_new_client {client["id"]}')
+
+    def ws_client_left(self, client, server):
+        if client is None:
+            return
+        self.log.debug(f'ws_client_left {client["id"]}')
+
+    def ws_message_received(self, client, server, message):
+        if len(message) > 200:
+            message = message[:200] + ".."
+        self.log.debug(f'ws_message_received {client["id"]} {message}')
