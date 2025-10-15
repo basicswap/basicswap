@@ -50,9 +50,6 @@ from basicswap.rpc_xmr import (
 from basicswap.interface.xmr import (
     XMR_COIN,
 )
-from basicswap.http_server import (
-    HttpThread,
-)
 from tests.basicswap.util import (
     make_boolean,
     post_json_req,
@@ -151,7 +148,7 @@ def prepare_swapclient_dir(
         "debug": True,
         "zmqhost": "tcp://127.0.0.1",
         "zmqport": BASE_ZMQ_PORT + node_id,
-        "htmlhost": "127.0.0.1",
+        "htmlhost": TEST_HTTP_HOST,
         "htmlport": TEST_HTTP_PORT + node_id,
         "network_key": network_key,
         "network_pubkey": network_pubkey,
@@ -320,7 +317,6 @@ class BaseTest(unittest.TestCase):
     __test__ = False
     update_thread = None
     coins_update_thread = None
-    http_threads = []
     swap_clients = []
     part_daemons = []
     btc_daemons = []
@@ -707,9 +703,6 @@ class BaseTest(unittest.TestCase):
                     # Import a random seed to keep the existing test behaviour. BTC core rescans even with timestamp: now.
                     sc.ci(Coins.BTC).initialiseWallet(random.randbytes(32))
 
-                t = HttpThread(TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
-                cls.http_threads.append(t)
-                t.start()
             # Set future block rewards to nowhere (a random address), so wallet amounts stay constant
             void_block_rewards_pubkey = cls.getRandomPubkey()
             if cls.restore_instance:
@@ -969,9 +962,6 @@ class BaseTest(unittest.TestCase):
                 cls.coins_update_thread.join()
             except Exception:
                 logging.info("Failed to join coins_update_thread")
-        for t in cls.http_threads:
-            t.stop()
-            t.join()
         logging.info("Stopping swap clients")
         for c in cls.swap_clients:
             c.finalise()
@@ -982,7 +972,6 @@ class BaseTest(unittest.TestCase):
         stopDaemons(cls.btc_daemons)
         stopDaemons(cls.ltc_daemons)
 
-        cls.http_threads.clear()
         cls.swap_clients.clear()
         cls.part_daemons.clear()
         cls.btc_daemons.clear()

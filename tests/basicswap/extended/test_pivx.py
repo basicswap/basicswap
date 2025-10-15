@@ -42,9 +42,6 @@ from basicswap.basicswap_util import (
 from basicswap.util.address import (
     toWIF,
 )
-from basicswap.http_server import (
-    HttpThread,
-)
 from tests.basicswap.util import (
     read_json_api,
 )
@@ -58,7 +55,6 @@ from tests.basicswap.common import (
     wait_for_unspent,
     wait_for_in_progress,
     wait_for_bid_tx_state,
-    TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,
     BASE_RPC_PORT,
@@ -318,7 +314,6 @@ class Test(unittest.TestCase):
 
         cls.daemons = []
         cls.swap_clients = []
-        cls.http_threads = []
 
         btc_data_dir = os.path.join(cfg.TEST_DATADIRS, str(BTC_NODE))
         if os.path.exists(os.path.join(cfg.BITCOIN_BINDIR, "bitcoin-wallet")):
@@ -418,10 +413,6 @@ class Test(unittest.TestCase):
             sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
             sc.start()
 
-            t = HttpThread(TEST_HTTP_HOST, TEST_HTTP_PORT + i, False, sc)
-            cls.http_threads.append(t)
-            t.start()
-
         waitForRPC(pivxRpc, delay_event)
         num_blocks = 1352  # CHECKLOCKTIMEVERIFY soft-fork activates at (regtest) block height 1351.
         logging.info("Mining %d pivx blocks", num_blocks)
@@ -471,14 +462,10 @@ class Test(unittest.TestCase):
         stop_test = True
         cls.update_thread.join()
         cls.coins_update_thread.join()
-        for t in cls.http_threads:
-            t.stop()
-            t.join()
         for c in cls.swap_clients:
             c.finalise()
 
         stopDaemons(cls.daemons)
-        cls.http_threads.clear()
         cls.swap_clients.clear()
         cls.daemons.clear()
 
