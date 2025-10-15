@@ -18,7 +18,7 @@ from util import (
     BSX_0_PORT,
     get_driver,
 )
-from basicswap.ui.page_offers import default_chart_api_key
+from basicswap.explorers import default_coingecko_api_key
 
 
 def click_option(el, option_text):
@@ -102,13 +102,13 @@ def test_settings(driver):
                 settings = json.load(fs)
 
             assert settings["show_chart"] is expected_chart_state
-            chart_api_key = bytes.fromhex(settings.get("chart_api_key_enc", "")).decode(
-                "utf-8"
-            )
-            assert chart_api_key == difficult_text
+            coingecko_api_key = bytes.fromhex(
+                settings.get("coingecko_api_key_enc", "")
+            ).decode("utf-8")
+            assert coingecko_api_key == difficult_text
 
-            hex_text = default_chart_api_key
-            el = driver.find_element(By.NAME, "chartapikey")
+            hex_text = default_coingecko_api_key
+            el = driver.find_element(By.NAME, "coingeckoapikey")
             el.clear()
             el.send_keys(hex_text)
             btn_apply_chart = wait.until(
@@ -117,13 +117,13 @@ def test_settings(driver):
             btn_apply_chart.click()
             time.sleep(1)
 
-            el = driver.find_element(By.NAME, "chartapikey")
+            el = driver.find_element(By.NAME, "coingeckoapikey")
             assert el.get_property("value") == hex_text
 
             with open(settings_path_0) as fs:
                 settings = json.load(fs)
 
-            assert settings.get("chart_api_key") == hex_text
+            assert settings.get("coingecko_api_key") == hex_text
         else:
             print("Chart settings not accessible, skipping chart tests")
             expected_chart_state = None
