@@ -625,7 +625,7 @@ def runClient(
             swap_client.start()
             if "htmlhost" in settings:
                 swap_client.log.info(
-                    "Starting http server at http://%s:%d."
+                    "Starting http server at http://%s:%d"
                     % (settings["htmlhost"], settings["htmlport"])
                 )
                 allow_cors = (
@@ -644,7 +644,7 @@ def runClient(
 
             if "wshost" in settings:
                 ws_url = "ws://{}:{}".format(settings["wshost"], settings["wsport"])
-                swap_client.log.info(f"Starting ws server at {ws_url}.")
+                swap_client.log.info(f"Starting ws server at {ws_url}")
 
                 swap_client.ws_server = WebsocketServer(
                     host=settings["wshost"], port=settings["wsport"]
