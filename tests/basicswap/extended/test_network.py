@@ -119,6 +119,7 @@ def prepare_swapclient_dir(datadir, node_id, network_key, network_pubkey):
         "min_delay_retry": 2,
         "max_delay_retry": 10,
         "restrict_unknown_seed_wallets": False,
+        "check_updates": False,
     }
 
     with open(settings_path, "w") as fp:

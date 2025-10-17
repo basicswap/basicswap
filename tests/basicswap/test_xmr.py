@@ -190,6 +190,7 @@ def prepare_swapclient_dir(
         "max_delay_retry": 10,
         "debug_ui": True,
         "restrict_unknown_seed_wallets": False,
+        "check_updates": False,
     }
 
     if BTC_USE_DESCRIPTORS:
