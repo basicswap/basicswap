@@ -145,7 +145,19 @@ const CoinManager = (function() {
             usesCoinGecko: true,
             historicalDays: 30,
             icon: 'Wownero.png'
-        }
+        },
+	{
+	    symbol: 'SAL',
+	    name: 'salvium',
+	    displayName: 'Salvium',
+	    aliases: ['sal','salvium','sal1'],
+	    coingeckoId: 'salvium',
+	    cryptocompareId: 'SAL',
+	    usesCryptoCompare: false,
+	    usesCoinGecko: true,
+            historicalDays: 30,
+	    icon: 'Salvium.png'
+	}
     ];
     const symbolToInfo = {};
     const nameToInfo = {};

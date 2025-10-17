@@ -73,6 +73,9 @@ XMR_SITE_COMMIT = (
     "df28b670cb3a174d7763dd6d22fb4ef20597d0ac"  # Lock hashes.txt to monero version
 )
 
+SALVIUM_VERSION = os.getenv("SALVIUM_VERSION", "1.0.6")
+SALVIUM_VERSION_TAG = os.getenv("SALVIUM_VERSION_TAG", "")
+
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
 WOWNERO_VERSION_TAG = os.getenv("WOWNERO_VERSION_TAG", "")
 WOW_SITE_COMMIT = (
@@ -105,6 +108,7 @@ known_coins = {
     "decred": (DCR_VERSION, DCR_VERSION_TAG, ("decred_release",)),
     "namecoin": (NMC_VERSION, NMC_VERSION_TAG, ("RoseTuring",)),
     "monero": (MONERO_VERSION, MONERO_VERSION_TAG, ("binaryfate",)),
+    "salvium": (SALVIUM_VERSION, SALVIUM_VERSION_TAG, ("salvium_dev",)),
     "wownero": (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ("wowario",)),
     "pivx": (PIVX_VERSION, PIVX_VERSION_TAG, ("fuzzbawls",)),
     "dash": (DASH_VERSION, DASH_VERSION_TAG, ("pasta",)),
@@ -251,6 +255,17 @@ XMR_RPC_USER = os.getenv("XMR_RPC_USER", "")
 XMR_RPC_PWD = os.getenv("XMR_RPC_PWD", "")
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv("DEFAULT_XMR_RESTORE_HEIGHT", 2245107))
 
+SAL_RPC_HOST = os.getenv("SAL_RPC_HOST", "127.0.0.1")
+SAL_RPC_PORT = int(os.getenv("SAL_RPC_PORT", 19081))
+SAL_ZMQ_PORT = int(os.getenv("SAL_ZMQ_PORT", 19083))
+SAL_WALLET_RPC_PORT = int(os.getenv("SAL_WALLET_RPC_PORT", 19082))
+SAL_WALLET_RPC_HOST = os.getenv("SAL_WALLET_RPC_HOST", "127.0.0.1")
+SAL_WALLET_RPC_USER = os.getenv("SAL_WALLET_RPC_USER", "sal_wallet_user")
+SAL_WALLET_RPC_PWD = os.getenv("SAL_WALLET_RPC_PWD", "sal_wallet_pwd")
+SAL_RPC_USER = os.getenv("SAL_RPC_USER", "")
+SAL_RPC_PWD = os.getenv("SAL_RPC_PWD", "")
+DEFAULT_SAL_RESTORE_HEIGHT = int(os.getenv("DEFAULT_SAL_RESTORE_HEIGHT", 334750))
+
 WOW_RPC_HOST = os.getenv("WOW_RPC_HOST", "127.0.0.1")
 WOW_RPC_PORT = int(os.getenv("WOW_RPC_PORT", 34598))
 WOW_ZMQ_PORT = int(os.getenv("WOW_ZMQ_PORT", 34698))
@@ -356,6 +371,36 @@ monerod_proxy_config = [
 ]
 
 monero_wallet_rpc_proxy_config = [
+    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
+]
+
+salviumd_proxy_config = [
+    f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
+    "proxy-allow-dns-leaks=0",
+    "no-igd=1",  # Disable UPnP port mapping
+    "hide-my-port=1",  # Don't share the p2p port
+    "p2p-bind-ip=127.0.0.1",  # Don't broadcast ip
+    "in-peers=0",  # Changes "error" in log to "incoming connections disabled"
+    "out-peers=24",
+    f"tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16",  # Outgoing tx relay to onion
+]
+
+salvium_wallet_rpc_proxy_config = [
+    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
+]
+
+wownerod_proxy_config = [
+    f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
+    "proxy-allow-dns-leaks=0",
+    "no-igd=1",  # Disable UPnP port mapping
+    "hide-my-port=1",  # Don't share the p2p port
+    "p2p-bind-ip=127.0.0.1",  # Don't broadcast ip
+    "in-peers=0",  # Changes "error" in log to "incoming connections disabled"
+    "out-peers=24",
+    f"tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16",  # Outgoing tx relay to onion
+]
+
+wownero_wallet_rpc_proxy_config = [
     #   'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
@@ -651,35 +696,51 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
     logger.info(f"Extracting core {coin} v{version}{version_tag}")
     extract_core_overwrite = extra_opts.get("extract_core_overwrite", True)
 
-    if coin in ("monero", "firo", "wownero"):
-        if coin in ("monero", "wownero"):
+    if coin in ("monero", "firo", "salvium", "wownero"):
+        if coin in ("monero", "salvium", "wownero"):
             bins = [coin + "d", coin + "-wallet-rpc"]
         elif coin == "firo":
             bins = [coin + "d", coin + "-cli", coin + "-tx"]
         else:
             raise ValueError("Unknown coin")
 
-        if "win32" in BIN_ARCH or "win64" in BIN_ARCH:
+        # Salvium uses zip files, others use tar
+        if coin == "salvium":
             with zipfile.ZipFile(release_path) as fz:
                 namelist = fz.namelist()
                 for b in bins:
-                    b += ".exe"
-                    out_path = os.path.join(bin_dir, b)
-                    if (not os.path.exists(out_path)) or extract_core_overwrite:
-                        for entry in namelist:
-                            if entry.endswith(b):
-                                with open(out_path, "wb") as fout:
-                                    fout.write(fz.read(entry))
-                                try:
-                                    os.chmod(
-                                        out_path,
-                                        stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH,
-                                    )
-                                except Exception as e:
-                                    logging.warning(
-                                        f"Unable to set file permissions: {e}, for {out_path}"
-                                    )
+                    b_path = os.path.join(bin_dir, b)
+                    if extract_core_overwrite or not os.path.exists(b_path):
+                        for nm in namelist:
+                            if nm.endswith("/" + b) or nm.endswith(b):
+                                with open(b_path, "wb") as fout:
+                                    fout.write(fz.read(nm))
+                                st = os.stat(b_path)
+                                os.chmod(b_path, st.st_mode | stat.S_IEXEC)
                                 break
+            return
+        else:
+            if "win32" in BIN_ARCH or "win64" in BIN_ARCH:
+                with zipfile.ZipFile(release_path) as fz:
+                    namelist = fz.namelist()
+                    for b in bins:
+                        b += ".exe"
+                        out_path = os.path.join(bin_dir, b)
+                        if (not os.path.exists(out_path)) or extract_core_overwrite:
+                            for entry in namelist:
+                                if entry.endswith(b):
+                                    with open(out_path, "wb") as fout:
+                                        fout.write(fz.read(entry))
+                                    try:
+                                        os.chmod(
+                                            out_path,
+                                            stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH,
+                                        )
+                                    except Exception as e:
+                                        logging.warning(
+                                            f"Unable to set file permissions: {e}, for {out_path}"
+                                        )
+                                    break
             return
 
         num_exist = 0
@@ -815,6 +876,33 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
+
+    elif coin == "salvium":
+        use_file_ext = "zip"
+
+        # Determine platform-specific filename
+        if "win32" in BIN_ARCH or "win64" in BIN_ARCH:
+            platform_name = "win64"
+            release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/salvium-v{version}-{platform_name}.{use_file_ext}"
+        elif "osx" in BIN_ARCH:
+            if "arm" in BIN_ARCH or "aarch64" in BIN_ARCH:
+                platform_name = "macos-arm64"
+            else:
+                platform_name = "macos-x86_64"
+            release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/salvium-v{version}-{platform_name}.{use_file_ext}"
+        else:  # Linux - use Ubuntu 22.04 build for BasicSwap compatibility
+            platform_name = "ubuntu22.04-linux-x86_64"
+            # Use your custom build for now
+            release_url = f"https://www.whiskymine.io/salvium-v{version}-{platform_name}.{use_file_ext}"
+
+        release_filename = f"salvium-v{version}-{platform_name}.{use_file_ext}"
+        release_path = os.path.join(bin_dir, release_filename)
+        downloadRelease(release_url, release_path, extra_opts)
+
+        # Skip verification and extract
+        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
+        return
+
     elif coin == "wownero":
         use_file_ext = "tar.bz2" if FILE_EXT == "tar.gz" else FILE_EXT
         release_filename = "{}-{}-{}.{}".format(coin, version, BIN_ARCH, use_file_ext)
@@ -1188,7 +1276,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
-    if coin in ("wownero", "monero"):
+    if coin in ("wownero", "salvium", "monero"):
         conf_filename: str = core_settings.get("config_filename", coin + "d.conf")
         core_conf_path = os.path.join(data_dir, conf_filename)
         if os.path.exists(core_conf_path):
@@ -1216,11 +1304,22 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if coin == "monero":
                 if XMR_RPC_USER != "":
                     fp.write(f"rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n")
+                if tor_control_password is not None:
+                    for opt_line in monerod_proxy_config:
+                        fp.write(opt_line + "\n")
+
+            if coin == "salvium":
+                if SAL_RPC_USER != "":
+                    fp.write(f"rpc-login={SAL_RPC_USER}:{SAL_RPC_PWD}\n")
+                if tor_control_password is not None:
+                    for opt_line in salviumd_proxy_config:
+                        fp.write(opt_line + "\n")
+
             if coin == "wownero":
                 if WOW_RPC_USER != "":
                     fp.write(f"rpc-login={WOW_RPC_USER}:{WOW_RPC_PWD}\n")
             if tor_control_password is not None:
-                for opt_line in monerod_proxy_config:
+                for opt_line in wownerod_proxy_config:
                     fp.write(opt_line + "\n")
 
         wallets_dir = core_settings.get("walletsdir", data_dir)
@@ -1255,6 +1354,12 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 )
             )
             if coin == "monero":
+                fp.write(
+                    "shared-ringdb-dir={}\n".format(
+                        os.path.join(config_datadir, "shared-ringdb")
+                    )
+                )
+            elif coin == "salvium":
                 fp.write(
                     "shared-ringdb-dir={}\n".format(
                         os.path.join(config_datadir, "shared-ringdb")
@@ -1705,6 +1810,11 @@ def printHelp():
         )
     )
     print(
+        "--salrestoreheight=n     Block height to restore Salvium wallet from, default:{}.".format(
+            DEFAULT_SAL_RESTORE_HEIGHT
+        )
+    )
+    print(
         "--wowrestoreheight=n     Block height to restore Wownero wallet from, default:{}.".format(
             DEFAULT_WOW_RESTORE_HEIGHT
         )
@@ -1862,6 +1972,21 @@ def initialise_wallets(
             c = swap_client.getCoinIdFromName(coin_name)
 
             if c == Coins.XMR:
+                if coin_settings["manage_wallet_daemon"]:
+                    filename = (
+                        coin_name + "-wallet-rpc" + (".exe" if os.name == "nt" else "")
+                    )
+                    filename: str = getWalletBinName(
+                        c, coin_settings, coin_name + "-wallet-rpc"
+                    )
+                    daemons.append(
+                        startXmrWalletDaemon(
+                            coin_settings["datadir"],
+                            coin_settings["bindir"],
+                            filename,
+                        )
+                    )
+            elif c == Coins.SAL:
                 if coin_settings["manage_wallet_daemon"]:
                     filename = (
                         coin_name + "-wallet-rpc" + (".exe" if os.name == "nt" else "")
@@ -2066,7 +2191,7 @@ def initialise_wallets(
                 swap_client.initialiseWallet(
                     c, raise_errors=True, restore_time=restore_time
                 )
-                if c not in (Coins.XMR, Coins.WOW):
+                if c not in (Coins.XMR, Coins.SAL, Coins.WOW):
                     if restore_time == -1:
                         restore_time = int(time.time())
                         coin_settings["restore_time"] = restore_time
@@ -2268,6 +2393,7 @@ def main():
     disable_coin = ""
     htmlhost = "127.0.0.1"
     xmr_restore_height = DEFAULT_XMR_RESTORE_HEIGHT
+    sal_restore_height = DEFAULT_SAL_RESTORE_HEIGHT
     wow_restore_height = DEFAULT_WOW_RESTORE_HEIGHT
     print_versions = False
     prepare_bin_only = False
@@ -2411,6 +2537,9 @@ def main():
                 continue
             if name == "xmrrestoreheight":
                 xmr_restore_height = int(s[1])
+                continue
+            if name == "salrestoreheight":
+                sal_restore_height = int(s[1])
                 continue
             if name == "wowrestoreheight":
                 wow_restore_height = int(s[1])
@@ -2672,6 +2801,29 @@ def main():
             "core_version_no": getKnownVersion("monero"),
             "core_type_group": "xmr",
         },
+        "salvium": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("SAL"),
+            "manage_wallet_daemon": shouldManageDaemon("SAL_WALLET"),
+            "rpcport": SAL_RPC_PORT + port_offset,
+            "zmqport": SAL_ZMQ_PORT + port_offset,
+            "walletrpcport": SAL_WALLET_RPC_PORT + port_offset,
+            "rpchost": SAL_RPC_HOST,
+            "trusted_daemon": extra_opts.get("trust_remote_node", True),
+            "walletrpchost": SAL_WALLET_RPC_HOST,
+            "walletrpcuser": SAL_WALLET_RPC_USER,
+            "walletrpcpassword": SAL_WALLET_RPC_PWD,
+            "datadir": os.getenv("SAL_DATA_DIR", os.path.join(data_dir, "salvium")),
+            "bindir": os.path.join(bin_dir, "salvium"),
+            "restore_height": sal_restore_height,
+            "blocks_confirmed": 10,
+            "rpctimeout": 60,
+            "walletrpctimeout": 120,
+            "walletrpctimeoutlong": 600,
+            "wallet_config_filename": "salvium_wallet.conf",
+            "core_version_no": getKnownVersion("salvium"),
+            "core_type_group": "xmr",
+        },
         "wownero": {
             "connection_type": "rpc",
             "manage_daemon": shouldManageDaemon("WOW"),
@@ -2840,6 +2992,9 @@ def main():
     if XMR_RPC_USER != "":
         chainclients["monero"]["rpcuser"] = XMR_RPC_USER
         chainclients["monero"]["rpcpassword"] = XMR_RPC_PWD
+    if SAL_RPC_USER != "":
+        chainclients["salvium"]["rpcuser"] = SAL_RPC_USER
+        chainclients["salvium"]["rpcpassword"] = SAL_RPC_PWD
     if WOW_RPC_USER != "":
         chainclients["wownero"]["rpcuser"] = WOW_RPC_USER
         chainclients["wownero"]["rpcpassword"] = WOW_RPC_PWD
@@ -2858,6 +3013,9 @@ def main():
 
     chainclients["monero"]["walletsdir"] = os.getenv(
         "XMR_WALLETS_DIR", chainclients["monero"]["datadir"]
+    )
+    chainclients["salvium"]["walletsdir"] = os.getenv(
+        "SAL_WALLETS_DIR", chainclients["salvium"]["datadir"]
     )
     chainclients["wownero"]["walletsdir"] = os.getenv(
         "WOW_WALLETS_DIR", chainclients["wownero"]["datadir"]
@@ -2955,6 +3113,12 @@ def main():
     extra_opts["data_dir"] = data_dir
     extra_opts["tor_control_password"] = tor_control_password
 
+    # Debug: Check if chainclients is properly populated
+    if "salvium" in chainclients:
+        logger.info(f"Salvium chainclients keys before addcoin: {list(chainclients['salvium'].keys())}")
+        if "walletrpcport" in chainclients["salvium"]:
+            logger.info(f"walletrpcport value: {chainclients['salvium']['walletrpcport']}")
+
     if add_coin != "":
         logger.info(f"Adding coin: {add_coin}")
         settings = load_config(config_path)
@@ -2981,6 +3145,25 @@ def main():
             )
 
         try:
+            if particl_wallet_mnemonic != "none":
+                # Ensure Particl wallet is unencrypted or correct password is supplied
+                test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
+
+            settings["chainclients"][add_coin] = chainclients[add_coin]
+
+            if add_coin == "salvium":
+                logger.info(f"Salvium settings keys after assignment: {list(settings['chainclients']['salvium'].keys())}")
+                if "walletrpcport" in settings["chainclients"]["salvium"]:
+                    logger.info(f"walletrpcport in settings: {settings['chainclients']['salvium']['walletrpcport']}")
+
+            if not no_cores:
+                prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
+
+            if not (prepare_bin_only or upgrade_cores):
+                prepareDataDir(
+                    add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
+                )
+
             if particl_wallet_mnemonic != "none":
                 # Ensure Particl wallet is unencrypted or correct password is supplied
                 # Keep daemon running to use in initialise_wallets
