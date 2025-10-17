@@ -87,7 +87,7 @@ const PriceManager = (function() {
                     ? window.CoinManager.getAllCoins().map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                     : (window.config.coins
                         ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
-                        : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
+                        : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW', 'SAL']);
 
                 if (!coinSymbols.length) {
                     throw new Error('No valid coins configured');

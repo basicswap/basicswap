@@ -2178,7 +2178,7 @@ const AmmTablesManager = (function() {
         }
     }
 
-    const adaptor_sig_only_coins = ['6', 'Monero', '7', 'Particl Blind', '8', 'Particl Anon', '9', 'Wownero', '13', 'Firo', '16', 'Zano', '17', 'Bitcoin Cash', '18', 'Dogecoin'];
+    const adaptor_sig_only_coins = ['6', 'Monero', '7', 'Particl Blind', '8', 'Particl Anon', '9', 'Wownero', '13', 'Firo', '16', 'Zano', '17', 'Bitcoin Cash', '18', 'Dogecoin', '19', 'Salvium'];
     const secret_hash_only_coins = ['11', 'PIVX', '12', 'Dash'];
 
     function updateSwapTypeOptions(coinFromValue, coinToValue, swapTypeSelect) {

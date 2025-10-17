@@ -97,7 +97,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
 
         coin_to: int = ci_follower.interface_type()
         base_coin_to: int = ci_follower.coin_type()
-        if coin_to in (Coins.XMR, Coins.WOW):
+        if coin_to in (Coins.XMR, Coins.SAL, Coins.WOW):
             address_to = self.getCachedMainWalletAddress(ci_follower, use_cursor)
         elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
             address_to = self.getCachedStealthAddressForCoin(base_coin_to, use_cursor)

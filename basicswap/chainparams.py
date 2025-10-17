@@ -12,7 +12,7 @@ from .util import (
 
 XMR_COIN = 10**12
 WOW_COIN = 10**11
-
+SAL_COIN = 10**8
 
 class Coins(IntEnum):
     PART = 1
@@ -33,6 +33,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    SAL = 19
 
 
 class Fiat(IntEnum):
@@ -316,6 +317,33 @@ chainparams = {
             "min_amount": 1000000000,
             "max_amount": 10000000 * XMR_COIN,
             "address_prefix": 18,
+        },
+    },
+    Coins.SAL: {
+        "name": "salvium",
+        "ticker": "SAL",
+        "client": "sal",
+        "decimal_places": 8,
+        "mainnet": {
+            "rpcport": 19081,
+            "walletrpcport": 19082,
+            "min_amount": 100000000,  # 1 SAL
+            "max_amount": 10000000 * SAL_COIN,
+            "address_prefix": 0x180c96,
+        },
+        "testnet": {
+            "rpcport": 29081,
+            "walletrpcport": 29082,
+            "min_amount": 100000000,
+            "max_amount": 10000000 * SAL_COIN,
+            "address_prefix": 0x254c96,
+        },
+        "regtest": {
+            "rpcport": 39081,
+            "walletrpcport": 39082,
+            "min_amount": 100000000,
+            "max_amount": 10000000 * SAL_COIN,
+            "address_prefix": 0x24cc96,
         },
     },
     Coins.WOW: {
