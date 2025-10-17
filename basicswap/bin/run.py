@@ -192,9 +192,13 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
     daemon_path = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
 
     datadir_path = os.path.expanduser(node_dir)
-    config_filename = (
-        "wownerod.conf" if daemon_bin.startswith("wow") else "monerod.conf"
-    )
+    if daemon_bin.startswith("wow"):
+        config_filename = "wownerod.conf"
+    elif daemon_bin.startswith("sal"):
+        config_filename = "salviumd.conf"
+    else:
+        config_filename = "monerod.conf"
+
     args = [
         daemon_path,
         "--non-interactive",
@@ -233,11 +237,13 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
 
     data_dir = os.path.expanduser(node_dir)
 
-    wallet_config_filename = (
-        "wownero-wallet-rpc.conf"
-        if wallet_bin.startswith("wow")
-        else "monero_wallet.conf"
-    )
+    if wallet_bin.startswith("wow"):
+        wallet_config_filename = "wownero-wallet-rpc.conf"
+    elif wallet_bin.startswith("sal"):
+        wallet_config_filename = "salvium_wallet.conf"
+    else:
+        wallet_config_filename = "monero_wallet.conf"
+
     config_path = os.path.join(data_dir, wallet_config_filename)
     if os.path.exists(config_path):
         args += ["--config-file=" + config_path]
@@ -442,7 +448,7 @@ def runClient(
             except Exception as e:  # noqa: F841
                 logger.warning(f"Not starting unknown coin: {c}")
                 continue
-            if c in ("monero", "wownero"):
+            if c in ("monero", "salvium", "wownero"):
                 if v["manage_daemon"] is True:
                     swap_client.log.info(f"Starting {display_name} daemon")
                     filename: str = getCoreBinName(coin_id, v, c + "d")

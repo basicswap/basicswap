@@ -90,7 +90,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data["coin_from"] = getCoinType(get_data_entry(form_data, "coin_from"))
         coin_from = Coins(page_data["coin_from"])
         ci_from = swap_client.ci(coin_from)
-        if coin_from not in (Coins.XMR, Coins.WOW):
+        if coin_from not in (Coins.XMR, Coins.SAL, Coins.WOW):
             page_data["fee_from_conf"] = ci_from._conf_target  # Set default value
         parsed_data["coin_from"] = coin_from
     except Exception:
@@ -100,7 +100,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data["coin_to"] = getCoinType(get_data_entry(form_data, "coin_to"))
         coin_to = Coins(page_data["coin_to"])
         ci_to = swap_client.ci(coin_to)
-        if coin_to not in (Coins.XMR, Coins.WOW):
+        if coin_to not in (Coins.XMR, Coins.SAL, Coins.WOW):
             page_data["fee_to_conf"] = ci_to._conf_target  # Set default value
         parsed_data["coin_to"] = coin_to
     except Exception:
@@ -289,7 +289,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 )
                 page_data["tla_from"] = ci_from.ticker()
 
-            if ci_to in (Coins.XMR, Coins.WOW):
+            if ci_to in (Coins.XMR, Coins.SAL, Coins.WOW):
                 if have_data_entry(form_data, "fee_rate_to"):
                     page_data["to_fee_override"] = get_data_entry(
                         form_data, "fee_rate_to"
