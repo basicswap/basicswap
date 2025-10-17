@@ -55,6 +55,7 @@ from tests.basicswap.common import (
     wait_for_unspent,
     wait_for_in_progress,
     wait_for_bid_tx_state,
+    TEST_HTTP_HOST,
     TEST_HTTP_PORT,
     BASE_PORT,
     BASE_RPC_PORT,
@@ -169,8 +170,8 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         "debug": True,
         "zmqhost": "tcp://127.0.0.1",
         "zmqport": BASE_ZMQ_PORT + nodeId,
-        "htmlhost": "127.0.0.1",
-        "htmlport": 12700 + nodeId,
+        "htmlhost": TEST_HTTP_HOST,
+        "htmlport": TEST_HTTP_PORT + nodeId,
         "network_key": network_key,
         "network_pubkey": network_pubkey,
         "chainclients": {
@@ -212,6 +213,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         "min_delay_retry": 2,
         "max_delay_retry": 10,
         "restrict_unknown_seed_wallets": False,
+        "check_updates": False,
     }
     with open(settings_path, "w") as fp:
         json.dump(settings, fp, indent=4)

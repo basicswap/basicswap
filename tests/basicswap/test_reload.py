@@ -77,7 +77,7 @@ class Test(unittest.TestCase):
         prepare_nodes(3, "bitcoin")
 
     def run_thread(self, client_id):
-        client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
+        client_path = os.path.join(TEST_PATH, f"client{client_id}")
         testargs = [
             "basicswap-run",
             "-datadir=" + client_path,

@@ -161,10 +161,10 @@ expected_key_ids = {
 }
 
 GUIX_SSL_CERT_DIR = None
-OVERRIDE_DISABLED_COINS = toBool(os.getenv("OVERRIDE_DISABLED_COINS", "false"))
+OVERRIDE_DISABLED_COINS = toBool(os.getenv("OVERRIDE_DISABLED_COINS", False))
 
 # If SKIP_GPG_VALIDATION is set to true the script will check hashes but not signatures
-SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", "false"))
+SKIP_GPG_VALIDATION = toBool(os.getenv("SKIP_GPG_VALIDATION", False))
 
 USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
 if USE_PLATFORM == "Darwin":
@@ -192,11 +192,11 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger("gnupg").setLevel(logging.INFO)
 
-BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", "false"))
-BSX_LOCAL_TOR = toBool(os.getenv("BSX_LOCAL_TOR", "false"))
-BSX_TEST_MODE = toBool(os.getenv("BSX_TEST_MODE", "false"))
+BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", False))
+BSX_LOCAL_TOR = toBool(os.getenv("BSX_LOCAL_TOR", False))
+BSX_TEST_MODE = toBool(os.getenv("BSX_TEST_MODE", False))
 BSX_UPDATE_UNMANAGED = toBool(
-    os.getenv("BSX_UPDATE_UNMANAGED", "true")
+    os.getenv("BSX_UPDATE_UNMANAGED", True)
 )  # Disable updating unmanaged coin cores.
 UI_HTML_PORT = int(os.getenv("UI_HTML_PORT", 12700))
 UI_WS_PORT = int(os.getenv("UI_WS_PORT", 11700))
@@ -321,10 +321,8 @@ def setTorrcVars():
     )
 
 
-TEST_TOR_PROXY = toBool(
-    os.getenv("TEST_TOR_PROXY", "true")
-)  # Expects a known exit node
-TEST_ONION_LINK = toBool(os.getenv("TEST_ONION_LINK", "false"))
+TEST_TOR_PROXY = toBool(os.getenv("TEST_TOR_PROXY", True))  # Expects a known exit node
+TEST_ONION_LINK = toBool(os.getenv("TEST_ONION_LINK", False))
 
 BITCOIN_FASTSYNC_URL = os.getenv(
     "BITCOIN_FASTSYNC_URL",
@@ -340,6 +338,8 @@ BITCOIN_FASTSYNC_SIG_URL = os.getenv(
 
 # Encrypt new wallets with this password, must match the Particl wallet password when adding coins
 WALLET_ENCRYPTION_PWD = os.getenv("WALLET_ENCRYPTION_PWD", "")
+
+CHECK_FOR_BSX_UPDATES = toBool(os.getenv("CHECK_FOR_BSX_UPDATES", True))
 
 use_tor_proxy: bool = False
 with_coins_changed: bool = False
@@ -2973,7 +2973,7 @@ def main():
                 save_config(config_path, settings)
                 logger.info("Done.")
                 return 0
-            exitWithError("{} is already in the settings file".format(add_coin))
+            exitWithError(f"{add_coin} is already in the settings file")
 
         if tor_control_password is None and settings.get("use_tor", False):
             extra_opts["tor_control_password"] = settings.get(
@@ -3273,6 +3273,11 @@ def main():
         if wshost != "none":
             settings["wshost"] = wshost
             settings["wsport"] = UI_WS_PORT + port_offset
+
+        if "CHECK_FOR_BSX_UPDATES" in os.environ:
+            settings["check_updates"] = CHECK_FOR_BSX_UPDATES
+        elif BSX_TEST_MODE is True:
+            settings["check_updates"] = False
 
     if use_tor_proxy:
         tor_control_password = generate_salt(24)
