@@ -1,15 +1,14 @@
 (define-module (guix)
 #:use-module (guix packages)
 #:use-module ((guix licenses) #:prefix license:)
-#:use-module (guix build-system python)
-#:use-module (guix build-system pyproject)
 #:use-module (guix build-system gnu)
-#:use-module (guix git-download)
+#:use-module (guix build-system pyproject)
+#:use-module (guix build-system python)
 #:use-module (guix download)
+#:use-module (guix git-download)
 #:use-module (guix search-paths)
 #:use-module (guix utils)
 #:use-module (gnu packages)
-#:use-module (gnu packages pkg-config)
 #:use-module (gnu packages autotools)
 #:use-module (gnu packages certs)
 #:use-module (gnu packages check)
@@ -17,15 +16,17 @@
 #:use-module (gnu packages databases)
 #:use-module (gnu packages finance)
 #:use-module (gnu packages gnupg)
+#:use-module (gnu packages libffi)
+#:use-module (gnu packages license)
+#:use-module (gnu packages nss)
+#:use-module (gnu packages pkg-config)
 #:use-module (gnu packages python)
 #:use-module (gnu packages python-build)
 #:use-module (gnu packages python-check)
 #:use-module (gnu packages python-crypto)
 #:use-module (gnu packages python-science)
 #:use-module (gnu packages python-web)
-#:use-module (gnu packages python-xyz)
-#:use-module (gnu packages libffi)
-#:use-module (gnu packages license))
+#:use-module (gnu packages python-xyz))
 
 
 (define libsecp256k1-basicswap
@@ -134,15 +135,15 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.14.6")
+  (version "0.15.0")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "8c06508e7c50ae64ca81626b346252f45f8e40f0")))
+      (commit "336e92fff6faaf644d09438e4bcccffcea723cf0")))
     (sha256
       (base32
-        "0kqlk8gvs9l47win2x9l415vcmv8alf874rvma0641ihkzid47g5"))
+        "1x75jj7bf7f488dm77b3pb4pd7a50pxnwmp144mv9g2x455pjbc2"))
     (file-name (git-file-name name version))))
   (build-system pyproject-build-system)
 
