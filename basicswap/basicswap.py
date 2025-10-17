@@ -1175,7 +1175,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 thread_func = {
                     Coins.XMR: threadPollXMRChainState,
                     Coins.SAL: threadPollSALChainState,
-                    Coins.WOW: threadPollWOWChainState,
+                    Coins.WOW: threadPollXMRChainState,
                 }.get(
                     c, threadPollChainState
                 )  # default case
