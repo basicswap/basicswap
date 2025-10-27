@@ -14,6 +14,7 @@ XMR_COIN = 10**12
 WOW_COIN = 10**11
 SAL_COIN = 10**8
 
+
 class Coins(IntEnum):
     PART = 1
     BTC = 2

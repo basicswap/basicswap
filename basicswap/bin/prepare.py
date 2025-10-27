@@ -374,35 +374,6 @@ monero_wallet_rpc_proxy_config = [
     #   'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
-salviumd_proxy_config = [
-    f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
-    "proxy-allow-dns-leaks=0",
-    "no-igd=1",  # Disable UPnP port mapping
-    "hide-my-port=1",  # Don't share the p2p port
-    "p2p-bind-ip=127.0.0.1",  # Don't broadcast ip
-    "in-peers=0",  # Changes "error" in log to "incoming connections disabled"
-    "out-peers=24",
-    f"tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16",  # Outgoing tx relay to onion
-]
-
-salvium_wallet_rpc_proxy_config = [
-    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
-]
-
-wownerod_proxy_config = [
-    f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
-    "proxy-allow-dns-leaks=0",
-    "no-igd=1",  # Disable UPnP port mapping
-    "hide-my-port=1",  # Don't share the p2p port
-    "p2p-bind-ip=127.0.0.1",  # Don't broadcast ip
-    "in-peers=0",  # Changes "error" in log to "incoming connections disabled"
-    "out-peers=24",
-    f"tx-proxy=tor,{TOR_PROXY_HOST}:{TOR_PROXY_PORT},disable_noise,16",  # Outgoing tx relay to onion
-]
-
-wownero_wallet_rpc_proxy_config = [
-    #   'daemon-ssl-allow-any-cert=1', moved to startup flag
-]
 
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
@@ -879,8 +850,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
     elif coin == "salvium":
         use_file_ext = "zip"
-
-        # Determine platform-specific filename
+    
         if "win32" in BIN_ARCH or "win64" in BIN_ARCH:
             platform_name = "win64"
             release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/salvium-v{version}-{platform_name}.{use_file_ext}"
@@ -890,18 +860,20 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             else:
                 platform_name = "macos-x86_64"
             release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/salvium-v{version}-{platform_name}.{use_file_ext}"
-        else:  # Linux - use Ubuntu 22.04 build for BasicSwap compatibility
+        else:  # Linux
             platform_name = "ubuntu22.04-linux-x86_64"
-            # Use your custom build for now
+            use_file_ext = "tar.gz"
             release_url = f"https://www.whiskymine.io/salvium-v{version}-{platform_name}.{use_file_ext}"
-
+    
         release_filename = f"salvium-v{version}-{platform_name}.{use_file_ext}"
         release_path = os.path.join(bin_dir, release_filename)
         downloadRelease(release_url, release_path, extra_opts)
-
-        # Skip verification and extract
-        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
-        return
+    
+        assert_filename = f"salvium-{version}-hashes.txt"
+        assert_url = f"https://www.whiskymine.io/salvium-{version}-hashes.txt"
+        assert_path = os.path.join(bin_dir, assert_filename)
+        if not os.path.exists(assert_path):
+            downloadFile(assert_url, assert_path)
 
     elif coin == "wownero":
         use_file_ext = "tar.bz2" if FILE_EXT == "tar.gz" else FILE_EXT
@@ -1304,22 +1276,16 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             if coin == "monero":
                 if XMR_RPC_USER != "":
                     fp.write(f"rpc-login={XMR_RPC_USER}:{XMR_RPC_PWD}\n")
-                if tor_control_password is not None:
-                    for opt_line in monerod_proxy_config:
-                        fp.write(opt_line + "\n")
-
-            if coin == "salvium":
+            elif coin == "salvium":
                 if SAL_RPC_USER != "":
                     fp.write(f"rpc-login={SAL_RPC_USER}:{SAL_RPC_PWD}\n")
-                if tor_control_password is not None:
-                    for opt_line in salviumd_proxy_config:
-                        fp.write(opt_line + "\n")
-
-            if coin == "wownero":
+            elif coin == "wownero":
                 if WOW_RPC_USER != "":
                     fp.write(f"rpc-login={WOW_RPC_USER}:{WOW_RPC_PWD}\n")
-            if tor_control_password is not None:
-                for opt_line in wownerod_proxy_config:
+
+            # Tor proxy for monero/wownero only
+            if coin in ("monero", "wownero") and tor_control_password is not None:
+                for opt_line in monerod_proxy_config:
                     fp.write(opt_line + "\n")
 
         wallets_dir = core_settings.get("walletsdir", data_dir)
@@ -1353,13 +1319,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     core_settings["walletrpcuser"], core_settings["walletrpcpassword"]
                 )
             )
-            if coin == "monero":
-                fp.write(
-                    "shared-ringdb-dir={}\n".format(
-                        os.path.join(config_datadir, "shared-ringdb")
-                    )
-                )
-            elif coin == "salvium":
+            if coin in ("monero", "salvium"):
                 fp.write(
                     "shared-ringdb-dir={}\n".format(
                         os.path.join(config_datadir, "shared-ringdb")
@@ -1971,22 +1931,7 @@ def initialise_wallets(
             wallet_name = coin_settings.get("wallet_name", "wallet.dat")
             c = swap_client.getCoinIdFromName(coin_name)
 
-            if c == Coins.XMR:
-                if coin_settings["manage_wallet_daemon"]:
-                    filename = (
-                        coin_name + "-wallet-rpc" + (".exe" if os.name == "nt" else "")
-                    )
-                    filename: str = getWalletBinName(
-                        c, coin_settings, coin_name + "-wallet-rpc"
-                    )
-                    daemons.append(
-                        startXmrWalletDaemon(
-                            coin_settings["datadir"],
-                            coin_settings["bindir"],
-                            filename,
-                        )
-                    )
-            elif c == Coins.SAL:
+            if c in (Coins.XMR, Coins.SAL):
                 if coin_settings["manage_wallet_daemon"]:
                     filename = (
                         coin_name + "-wallet-rpc" + (".exe" if os.name == "nt" else "")
@@ -3150,11 +3095,6 @@ def main():
                 test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
 
             settings["chainclients"][add_coin] = chainclients[add_coin]
-
-            if add_coin == "salvium":
-                logger.info(f"Salvium settings keys after assignment: {list(settings['chainclients']['salvium'].keys())}")
-                if "walletrpcport" in settings["chainclients"]["salvium"]:
-                    logger.info(f"walletrpcport in settings: {settings['chainclients']['salvium']['walletrpcport']}")
 
             if not no_cores:
                 prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
