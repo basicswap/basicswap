@@ -374,6 +374,15 @@ monero_wallet_rpc_proxy_config = [
     #   'daemon-ssl-allow-any-cert=1', moved to startup flag
 ]
 
+salviumd_proxy_config = [
+    f"proxy={TOR_PROXY_HOST}:{TOR_PROXY_PORT}",
+    "proxy-allow-dns-leaks=0",
+    "no-igd=1",
+    "hide-my-port=1",
+    "p2p-bind-ip=127.0.0.1",
+    "in-peers=0",
+    "out-peers=24",
+]
 
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
@@ -1283,10 +1292,14 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 if WOW_RPC_USER != "":
                     fp.write(f"rpc-login={WOW_RPC_USER}:{WOW_RPC_PWD}\n")
 
-            # Tor proxy for monero/wownero only
-            if coin in ("monero", "wownero") and tor_control_password is not None:
-                for opt_line in monerod_proxy_config:
-                    fp.write(opt_line + "\n")
+            # Tor proxy for salvium or monero/wownero only
+            if coin in ("monero", "wownero", "salvium") and tor_control_password is not None:
+                if coin == "salvium":
+                    for opt_line in salviumd_proxy_config:
+                        fp.write(opt_line + "\n")
+                else:
+                    for opt_line in monerod_proxy_config:
+                        fp.write(opt_line + "\n")
 
         wallets_dir = core_settings.get("walletsdir", data_dir)
         if not os.path.exists(wallets_dir):
@@ -3090,20 +3103,6 @@ def main():
             )
 
         try:
-            if particl_wallet_mnemonic != "none":
-                # Ensure Particl wallet is unencrypted or correct password is supplied
-                test_particl_encryption(data_dir, settings, chain, use_tor_proxy)
-
-            settings["chainclients"][add_coin] = chainclients[add_coin]
-
-            if not no_cores:
-                prepareCore(add_coin, known_coins[add_coin], settings, data_dir, extra_opts)
-
-            if not (prepare_bin_only or upgrade_cores):
-                prepareDataDir(
-                    add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
-                )
-
             if particl_wallet_mnemonic != "none":
                 # Ensure Particl wallet is unencrypted or correct password is supplied
                 # Keep daemon running to use in initialise_wallets

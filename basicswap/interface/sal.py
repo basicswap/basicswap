@@ -32,7 +32,29 @@ class SALInterface(XMRInterface):
     @staticmethod
     def depth_spendable() -> int:
         return 20
-    
+
+    def openWallet(self, filename):
+        params = {"filename": filename}
+        if self._wallet_password is not None:
+            params["password"] = self._wallet_password
+
+        try:
+            self.rpc_wallet("open_wallet", params)
+        except Exception as e:
+            if "no connection to daemon" in str(e):
+                self._log.debug(f"{self.coin_name()} {e}")
+                return
+
+            try:
+                self.rpc_wallet("store")
+                self.rpc_wallet("close_wallet")
+                self._log.debug(f"Attempt to save and close {self.coin_name()} wallet")
+            except Exception as e:
+                pass
+
+            self.rpc_wallet("open_wallet", params)
+            self._log.debug(f"Reattempt to open {self.coin_name()} wallet")
+
     def getMainAddress(self) -> str:
         """Override to specify SAL1 asset type"""
         return self.rpc_wallet('get_address', {'account_index': 0, 'asset_type': 'SAL1'})['address']

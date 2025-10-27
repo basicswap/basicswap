@@ -229,7 +229,6 @@ def checkAndNotifyBalanceChange(
         cc["cached_total_balance"] = None
         cc["cached_unconfirmed"] = None
 
-
 def threadPollXMRChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
