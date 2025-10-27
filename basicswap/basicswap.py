@@ -1153,9 +1153,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.coin_clients[c]["core_version"] = core_version
 
                 if c in (Coins.XMR, Coins.SAL, Coins.WOW):
-                    thread_func = threadPollXMRChainstate
+                    thread_func = threadPollXMRChainState
                 else:
-                    thread_func = threadPollChainstate
+                    thread_func = threadPollChainState
 
                 t = threading.Thread(target=thread_func, args=(self, c))
                 self.threads.append(t)
