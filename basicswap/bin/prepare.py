@@ -684,43 +684,28 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
         else:
             raise ValueError("Unknown coin")
 
-        # Salvium uses zip files, others use tar
-        if coin == "salvium":
+        if "win32" in BIN_ARCH or "win64" in BIN_ARCH or coin == "salvium":
             with zipfile.ZipFile(release_path) as fz:
                 namelist = fz.namelist()
                 for b in bins:
-                    b_path = os.path.join(bin_dir, b)
-                    if extract_core_overwrite or not os.path.exists(b_path):
-                        for nm in namelist:
-                            if nm.endswith("/" + b) or nm.endswith(b):
-                                with open(b_path, "wb") as fout:
-                                    fout.write(fz.read(nm))
-                                st = os.stat(b_path)
-                                os.chmod(b_path, st.st_mode | stat.S_IEXEC)
-                                break
-            return
-        else:
-            if "win32" in BIN_ARCH or "win64" in BIN_ARCH:
-                with zipfile.ZipFile(release_path) as fz:
-                    namelist = fz.namelist()
-                    for b in bins:
+                    if "win" in BIN_ARCH:
                         b += ".exe"
-                        out_path = os.path.join(bin_dir, b)
-                        if (not os.path.exists(out_path)) or extract_core_overwrite:
-                            for entry in namelist:
-                                if entry.endswith(b):
-                                    with open(out_path, "wb") as fout:
-                                        fout.write(fz.read(entry))
-                                    try:
-                                        os.chmod(
-                                            out_path,
-                                            stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH,
-                                        )
-                                    except Exception as e:
-                                        logging.warning(
-                                            f"Unable to set file permissions: {e}, for {out_path}"
-                                        )
-                                    break
+                    out_path = os.path.join(bin_dir, b)
+                    if (not os.path.exists(out_path)) or extract_core_overwrite:
+                        for entry in namelist:
+                            if entry.endswith(b):
+                                with open(out_path, "wb") as fout:
+                                    fout.write(fz.read(entry))
+                                try:
+                                    os.chmod(
+                                        out_path,
+                                        stat.S_IRWXU | stat.S_IXGRP | stat.S_IXOTH,
+                                    )
+                                except Exception as e:
+                                    logging.warning(
+                                        f"Unable to set file permissions: {e}, for {out_path}"
+                                    )
+                                break
             return
 
         num_exist = 0
@@ -1293,7 +1278,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     fp.write(f"rpc-login={WOW_RPC_USER}:{WOW_RPC_PWD}\n")
 
             # Tor proxy for salvium or monero/wownero only
-            if coin in ("monero", "wownero", "salvium") and tor_control_password is not None:
+            if tor_control_password is not None:
                 if coin == "salvium":
                     for opt_line in salviumd_proxy_config:
                         fp.write(opt_line + "\n")
