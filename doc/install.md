@@ -189,7 +189,7 @@ If installing on an older distro such as Debian 11 you may need to use a newer P
 If installed on OSX, you may need to install additional root ssl certificates for the ssl module.
 From https://pypi.org/project/certifi/
 
-    sudo python3 bin/install_certifi.py
+    pip3 install certifi
 
 
 Continue installing dependencies and Basicswap.
