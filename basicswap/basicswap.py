@@ -2966,25 +2966,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info_s(f"In txn: {txid}")
         return txid
 
-    def withdrawLTC(self, type_from, value, addr_to, subfee: bool) -> str:
-        ci = self.ci(Coins.LTC)
+    def withdrawCoinExtended(
+        self, coin_type, type_from, value, addr_to, subfee: bool
+    ) -> str:
+        ci = self.ci(coin_type)
         self.log.info(
-            "withdrawLTC{}".format(
-                ""
-                if self.log.safe_logs
-                else " {} {} to {} {}".format(
-                    value, type_from, addr_to, " subfee" if subfee else ""
-                )
-            )
-        )
-        txid = ci.withdrawCoin(value, type_from, addr_to, subfee)
-        self.log.info_s(f"In txn: {txid}")
-        return txid
-
-    def withdrawFIRO(self, type_from, value, addr_to, subfee: bool) -> str:
-        ci = self.ci(Coins.FIRO)
-        self.log.info(
-            "withdrawFIRO{}".format(
+            "withdrawCoinExtended{}".format(
                 ""
                 if self.log.safe_logs
                 else " {} {} to {} {}".format(
@@ -3145,15 +3132,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.setStringKV(key_str, addr)
         return addr
 
-    def cacheNewSparkAddressForCoin(self, coin_type):
-        """Cache a new Spark address for FIRO."""
-        self.log.debug(f"cacheNewSparkAddressForCoin {Coins(coin_type).name}")
-        ci = self.ci(coin_type)
-        key_str = "spark_addr_" + ci.coin_name().lower()
-        addr = ci.getNewSparkAddress()
-        self.setStringKV(key_str, addr)
-        return addr
-
     def getCachedStealthAddressForCoin(self, coin_type, cursor=None):
         self.log.debug(f"getCachedStealthAddressForCoin {Coins(coin_type).name}")
 
@@ -3167,23 +3145,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if addr is None:
                 addr = ci.getNewStealthAddress()
                 self.log.info(f"Generated new stealth address for {ci.coin_name()}")
-                self.setStringKV(key_str, addr, use_cursor)
-        finally:
-            if cursor is None:
-                self.closeDB(use_cursor)
-        return addr
-
-    def getCachedSparkAddressForCoin(self, coin_type, cursor=None):
-        """Get cached Spark address for FIRO, generating one if needed."""
-        self.log.debug(f"getCachedSparkAddressForCoin {Coins(coin_type).name}")
-        ci = self.ci(coin_type)
-        key_str = "spark_addr_" + ci.coin_name().lower()
-        use_cursor = self.openDB(cursor)
-        try:
-            addr = self.getStringKV(key_str, use_cursor)
-            if addr is None:
-                addr = ci.getNewSparkAddress()
-                self.log.info(f"Generated new Spark address for {ci.coin_name()}")
                 self.setStringKV(key_str, addr, use_cursor)
         finally:
             if cursor is None:
@@ -11661,14 +11622,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             elif coin == Coins.FIRO:
                 try:
-                    rv["spark_address"] = self.getCachedSparkAddressForCoin(Coins.FIRO)
+                    rv["spark_address"] = self.getCachedStealthAddressForCoin(
+                        Coins.FIRO
+                    )
                 except Exception as e:
                     self.log.warning(
-                        f"getCachedSparkAddressForCoin for {ci.coin_name()} failed with: {e}."
+                        f"getCachedStealthAddressForCoin for {ci.coin_name()} failed with: {e}."
                     )
-                rv["spark_balance"] = walletinfo["spark_balance"]
-                rv["spark_pending"] = (
+                # Spark balances are in atomic units, format them
+                rv["spark_balance"] = (
+                    0
+                    if walletinfo["spark_balance"] == 0
+                    else ci.format_amount(walletinfo["spark_balance"])
+                )
+                spark_pending_int = (
                     walletinfo["spark_unconfirmed"] + walletinfo["spark_immature"]
+                )
+                rv["spark_pending"] = (
+                    0 if spark_pending_int == 0 else ci.format_amount(spark_pending_int)
                 )
 
             return rv
@@ -11792,6 +11763,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         if row2[0].startswith("stealth"):
                             if coin_id == Coins.LTC:
                                 wallet_data["mweb_address"] = row2[1]
+                            elif coin_id == Coins.FIRO:
+                                wallet_data["spark_address"] = row2[1]
                             else:
                                 wallet_data["stealth_address"] = row2[1]
                         else:

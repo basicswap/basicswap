@@ -168,7 +168,7 @@ def page_wallet(self, url_split, post_string):
         elif have_data_entry(form_data, "newmwebaddr_" + cid):
             swap_client.cacheNewStealthAddressForCoin(coin_id)
         elif have_data_entry(form_data, "newsparkaddr_" + cid):
-            swap_client.cacheNewSparkAddressForCoin(coin_id)
+            swap_client.cacheNewStealthAddressForCoin(coin_id)
         elif have_data_entry(form_data, "reseed_" + cid):
             try:
                 swap_client.reseedWallet(coin_id)
@@ -214,15 +214,7 @@ def page_wallet(self, url_split, post_string):
                     page_data["wd_type_to_" + cid] = type_to
                 except Exception as e:  # noqa: F841
                     err_messages.append("Missing type")
-            elif coin_id == Coins.LTC:
-                try:
-                    type_from = form_data[bytes("withdraw_type_from_" + cid, "utf-8")][
-                        0
-                    ].decode("utf-8")
-                    page_data["wd_type_from_" + cid] = type_from
-                except Exception as e:  # noqa: F841
-                    err_messages.append("Missing type")
-            elif coin_id == Coins.FIRO:
+            elif coin_id in (Coins.LTC, Coins.FIRO):
                 try:
                     type_from = form_data[bytes("withdraw_type_from_" + cid, "utf-8")][
                         0
@@ -244,18 +236,9 @@ def page_wallet(self, url_split, post_string):
                                 value, ticker, type_from, type_to, address, txid
                             )
                         )
-                    elif coin_id == Coins.LTC:
-                        txid = swap_client.withdrawLTC(
-                            type_from, value, address, subfee
-                        )
-                        messages.append(
-                            "Withdrew {} {} (from {}) to address {}<br/>In txid: {}".format(
-                                value, ticker, type_from, address, txid
-                            )
-                        )
-                    elif coin_id == Coins.FIRO:
-                        txid = swap_client.withdrawFIRO(
-                            type_from, value, address, subfee
+                    elif coin_id in (Coins.LTC, Coins.FIRO):
+                        txid = swap_client.withdrawCoinExtended(
+                            coin_id, type_from, value, address, subfee
                         )
                         messages.append(
                             "Withdrew {} {} (from {}) to address {}<br/>In txid: {}".format(

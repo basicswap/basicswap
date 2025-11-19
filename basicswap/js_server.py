@@ -79,12 +79,11 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
         txid_hex = swap_client.withdrawParticl(
             type_from, type_to, value, address, subfee
         )
-    elif coin_type == Coins.LTC:
+    elif coin_type in (Coins.LTC, Coins.FIRO):
         type_from = get_data_entry_or(post_data, "type_from", "plain")
-        txid_hex = swap_client.withdrawLTC(type_from, value, address, subfee)
-    elif coin_type == Coins.FIRO:
-        type_from = get_data_entry_or(post_data, "type_from", "plain")
-        txid_hex = swap_client.withdrawFIRO(type_from, value, address, subfee)
+        txid_hex = swap_client.withdrawCoinExtended(
+            coin_type, type_from, value, address, subfee
+        )
     elif coin_type in (Coins.XMR, Coins.WOW):
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, sweepall)
     else:
