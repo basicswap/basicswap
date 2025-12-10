@@ -73,8 +73,11 @@ XMR_SITE_COMMIT = (
     "a1bd4cd48a85b6012de20d9e490f83936f477be2"  # Lock hashes.txt to monero version
 )
 
-SALVIUM_VERSION = os.getenv("SALVIUM_VERSION", "1.0.6")
+SALVIUM_VERSION = os.getenv("SALVIUM_VERSION", "1.0.7")
 SALVIUM_VERSION_TAG = os.getenv("SALVIUM_VERSION_TAG", "")
+SAL_SITE_COMMIT = (
+    "7acf8068ea08dbed4a8db6c0f7c3c6b2cd789d22" # Lock  hashes to salvium version
+)
 
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
 WOWNERO_VERSION_TAG = os.getenv("WOWNERO_VERSION_TAG", "")
@@ -844,30 +847,43 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
 
     elif coin == "salvium":
         use_file_ext = "zip"
-    
-        if "win32" in BIN_ARCH or "win64" in BIN_ARCH:
+        # Determine platform-specific filename
+        if "linux" in BIN_ARCH:
+            if "aarch64" in BIN_ARCH or "arm64" in BIN_ARCH:
+                platform_name = "ubuntu22.04-linux-aarch64"
+            else:
+                platform_name = "ubuntu22.04-linux-x86_64"
+        elif "win" in BIN_ARCH:
             platform_name = "win64"
-            release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/salvium-v{version}-{platform_name}.{use_file_ext}"
-        elif "osx" in BIN_ARCH:
+        elif "darwin" in BIN_ARCH or "osx" in BIN_ARCH:
             if "arm" in BIN_ARCH or "aarch64" in BIN_ARCH:
-                platform_name = "macos-arm64"
+                platform_name = "macos-aarch64"
             else:
                 platform_name = "macos-x86_64"
-            release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/salvium-v{version}-{platform_name}.{use_file_ext}"
-        else:  # Linux
-            platform_name = "ubuntu22.04-linux-x86_64"
-            use_file_ext = "tar.gz"
-            release_url = f"https://www.whiskymine.io/salvium-v{version}-{platform_name}.{use_file_ext}"
-    
+        else:
+            raise ValueError(f"Unsupported platform for Salvium: {BIN_ARCH}")
+
         release_filename = f"salvium-v{version}-{platform_name}.{use_file_ext}"
+        release_url = f"https://github.com/salvium/salvium/releases/download/v{version}/{release_filename}"
         release_path = os.path.join(bin_dir, release_filename)
+
+        # Download the release
         downloadRelease(release_url, release_path, extra_opts)
-    
-        assert_filename = f"salvium-{version}-hashes.txt"
-        assert_url = f"https://www.whiskymine.io/salvium-{version}-hashes.txt"
+
+        # Download and verify checksums
+        assert_filename = f"salvium-v{version}-hashes.txt"
+        assert_url = f"https://raw.githubusercontent.com/salvium/salvium/{SAL_SITE_COMMIT}/salvium-v{version}-hashes.txt"
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             downloadFile(assert_url, assert_path)
+
+        # Verify the download - THIS IS THE KEY FIX
+        release_hash = getFileHash(release_path)
+        ensureFileHashInFile(release_hash, assert_path)
+
+        # Extract the binaries
+        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
+        return
 
     elif coin == "wownero":
         use_file_ext = "tar.bz2" if FILE_EXT == "tar.gz" else FILE_EXT
