@@ -24,7 +24,7 @@ env:
   XMR_RPC_PWD: xmr_pwd
 
 jobs:
-  ci:
+  install:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -57,6 +57,9 @@ jobs:
         # Print the core versions to a file for caching
         basicswap-prepare --version --withcoins=bitcoin | tail -n +2 > core_versions.txt
         cat core_versions.txt
+  lint:
+    needs: install
+    steps:
     - name: Run flake8
       run: |
         flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
@@ -66,6 +69,9 @@ jobs:
     - name: Run black
       run: |
         black --check --diff --exclude="contrib" .
+  setup:
+    needs: install
+    steps:
     - name: Run test_other
       run: |
         pytest tests/basicswap/test_other.py
@@ -77,11 +83,13 @@ jobs:
       with:
         path: /tmp/cached_bin
         key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
-
     - if: ${{ steps.cache-cores.outputs.cache-hit != 'true' }}
       name: Running basicswap-prepare
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
+  ci:
+    needs: setup
+    steps:
     - name: Run test_prepare
       run: |
         export PYTHONPATH=$(pwd)
@@ -102,6 +110,9 @@ jobs:
         mkdir -p ${TEST_PATH}/bin
         cp -r $BIN_DIR/* ${TEST_PATH}/bin/
         pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+  ci_ui:
+    needs: ci
+    steps:
     - name: Run selenium tests
       run: |
         export TEST_PATH=/tmp/test_persistent
