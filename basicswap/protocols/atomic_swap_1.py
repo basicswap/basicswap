@@ -130,10 +130,7 @@ def redeemITx(self, bid_id: bytes, cursor):
 
     bid.initiate_tx.spend_txid = bytes.fromhex(txid)
     self.log.debug(
-        "Submitted initiate redeem txn %s to %s chain for bid %s",
-        txid,
-        ci_from.coin_name(),
-        bid_id.hex(),
+        f"Submitted initiate redeem txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.logIDB(bid_id)}"
     )
     self.logEvent(Concepts.BID, bid_id, EventLogTypes.ITX_REDEEM_PUBLISHED, "", cursor)
 

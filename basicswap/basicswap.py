@@ -3848,7 +3848,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 txid = ci_from.publishTx(bytes.fromhex(txn))
                 self.log.debug(
-                    f"Submitted initiate txn {txid} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
+                    f"Submitted initiate txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
                 )
                 bid.initiate_tx = SwapTx(
                     bid_id=bid_id,
@@ -5514,7 +5514,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
                 txid = ci_to.publishTx(bytes.fromhex(txn))
                 self.log.debug(
-                    f"Submitted participate tx {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}"
+                    f"Submitted participate tx {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}"
                 )
                 bid.setPTxState(TxStates.TX_SENT)
                 self.logEvent(
@@ -5622,7 +5622,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             txn = self.createRedeemTxn(ci_to.coin_type(), bid)
             txid = ci_to.publishTx(bytes.fromhex(txn))
             self.log.debug(
-                f"Submitted participate redeem tx {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                f"Submitted participate redeem tx {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logEvent(
                 Concepts.BID, bid.bid_id, EventLogTypes.PTX_REDEEM_PUBLISHED, "", None
@@ -5908,7 +5908,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
 
                             self.log.info(
-                                f"Submitted coin a lock refund spend tx for bid {self.log.id(bid_id)}, txid {self.log.id(txid_str)}"
+                                f"Submitted coin a lock refund spend tx for bid {self.log.id(bid_id)}, txid {self.logIDT(txid_str)}"
                             )
                             bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND] = SwapTx(
                                 bid_id=bid_id,
@@ -5983,7 +5983,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                         txid=bytes.fromhex(txid_hex),
                                     )
                                     self.log.info(
-                                        f"Submitted mercy tx for bid {self.log.id(bid_id)}, txid {self.log.id(txid_hex)}"
+                                        f"Submitted mercy tx for bid {self.log.id(bid_id)}, txid {self.logIDT(txid_hex)}"
                                     )
                                     self.logBidEvent(
                                         bid_id,
@@ -6670,7 +6670,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 txid = ci_to.publishTx(bid.participate_txn_refund)
                 self.log.debug(
-                    f"Submitted participate refund txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                    f"Submitted participate refund txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
                 )
                 self.logEvent(
                     Concepts.BID,
@@ -6726,7 +6726,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def removeWatchedTransaction(self, coin_type, bid_id: bytes, txid_hex: str) -> None:
         # Remove all for bid if txid is None
         self.log.debug(
-            f"Removing watched transaction {Coins(coin_type).name} {self.log.id(bid_id)} {self.log.id(txid_hex)}"
+            f"Removing watched transaction {Coins(coin_type).name} {self.log.id(bid_id)} {self.logIDT(txid_hex)}"
         )
         watched = self.coin_clients[coin_type]["watched_transactions"]
         old_len = len(watched)
@@ -6735,7 +6735,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if wo.bid_id == bid_id and (txid_hex is None or wo.txid_hex == txid_hex):
                 del watched[i]
                 self.log.debug(
-                    f"Removed watched transaction {Coins(coin_type).name} {self.log.id(bid_id)} {self.log.id(wo.txid_hex)}"
+                    f"Removed watched transaction {Coins(coin_type).name} {self.log.id(bid_id)} {self.logIDT(wo.txid_hex)}"
                 )
 
     def addWatchedOutput(
@@ -6756,7 +6756,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def removeWatchedOutput(self, coin_type, bid_id: bytes, txid_hex: str) -> None:
         # Remove all for bid if txid is None
         self.log.debug(
-            f"Removing watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.log.id(txid_hex)}"
+            f"Removing watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.logIDT(txid_hex)}"
         )
         watched = self.coin_clients[coin_type]["watched_outputs"]
         old_len = len(watched)
@@ -6765,7 +6765,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if wo.bid_id == bid_id and (txid_hex is None or wo.txid_hex == txid_hex):
                 del watched[i]
                 self.log.debug(
-                    f"Removed watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.log.id(wo.txid_hex)}"
+                    f"Removed watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.logIDT(wo.txid_hex)}"
                 )
 
     def addWatchedScript(
@@ -9408,7 +9408,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.a_lock_tx, xmr_swap.a_lock_tx_script
             )
             self.log.debug(
-                f"Submitted lock tx {self.log.id(txid_hex)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}.",
+                f"Submitted lock tx {self.logIDT(txid_hex)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}.",
             )
 
             if bid.xmr_a_lock_tx is None:
@@ -9560,7 +9560,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         self.log.debug(
-            f"Submitted lock txn {self.log.id(bid_id)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+            f"Submitted lock txn {self.logIDT(b_lock_tx_id)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
         )
         bid.xmr_b_lock_tx = SwapTx(
             bid_id=bid_id,
@@ -9733,7 +9733,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         txid = bytes.fromhex(ci_from.publishTx(xmr_swap.a_lock_spend_tx))
         self.log.debug(
-            f"Submitted lock spend txn {self.log.id(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}."
+            f"Submitted lock spend txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}."
         )
         self.logBidEvent(
             bid.bid_id, EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED, "", cursor
@@ -9843,7 +9843,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 lock_tx_vout=lock_tx_vout,
             )
             self.log.debug(
-                f"Submitted lock B spend txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                f"Submitted lock B spend txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logBidEvent(
                 bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, "", cursor
@@ -9958,7 +9958,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ),
             )
             self.log.debug(
-                f"Submitted lock B refund txn {self.log.id(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                f"Submitted lock B refund txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logBidEvent(
                 bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, "", cursor
