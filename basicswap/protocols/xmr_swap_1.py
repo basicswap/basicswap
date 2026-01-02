@@ -119,7 +119,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
             lock_tx_vout=lock_tx_vout,
         )
         self.log.debug(
-            f"Submitted lock B spend txn {self.log.id(txid)} to {ci_follower.coin_name()} chain for bid {self.log.id(bid_id)}."
+            f"Submitted lock B spend txn {self.logIDT(txid)} to {ci_follower.coin_name()} chain for bid {self.log.id(bid_id)}."
         )
         self.logBidEvent(
             bid.bid_id,
