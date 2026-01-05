@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1919,8 +1919,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.activateBid(cursor, bid)
                     except Exception as ex:
                         self.logException(f"Failed to activate bid! Error: {ex}")
+                        self.logEvent(
+                            Concepts.BID,
+                            bid.bid_id,
+                            EventLogTypes.ERROR,
+                            "Failed to activate",
+                            cursor,
+                        )
                         try:
-                            bid.setState(BidStates.BID_ERROR, "Failed to activate")
+                            bid.setState(BidStates.BID_ERROR)
 
                             offer = self.queryOne(
                                 Offer, cursor, {"offer_id": bid.offer_id}
@@ -3194,12 +3201,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Must specify offer for save_in_progress")
             self.swaps_in_progress[bid_id] = (bid, save_in_progress)  # (bid, offer)
 
-    def saveBid(self, bid_id: bytes, bid, xmr_swap=None) -> None:
-        cursor = self.openDB()
+    def saveBid(self, bid_id: bytes, bid, xmr_swap=None, cursor=None) -> None:
         try:
-            self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+            use_cursor = self.openDB(cursor)
+            self.saveBidInSession(bid_id, bid, use_cursor, xmr_swap)
         finally:
-            self.closeDB(cursor)
+            if cursor is None:
+                self.closeDB(use_cursor)
 
     def createActionInSession(
         self, delay: int, action_type: int, linked_id: bytes, cursor
@@ -5002,13 +5010,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT, cursor=cursor)
 
     def setBidError(
-        self, bid_id: bytes, bid, error_str: str, save_bid: bool = True, xmr_swap=None
+        self,
+        bid_id: bytes,
+        bid,
+        error_str: str,
+        save_bid: bool = True,
+        xmr_swap=None,
+        cursor=None,
     ) -> None:
         self.log.error(f"Bid {self.log.id(bid_id)} - Error: {error_str}")
+        self.logEvent(Concepts.BID, bid_id, EventLogTypes.ERROR, error_str, cursor)
         bid.setState(BidStates.BID_ERROR)
-        bid.state_note = "error msg: " + error_str
         if save_bid:
-            self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
+            self.saveBid(bid_id, bid, xmr_swap=xmr_swap, cursor=cursor)
 
     def createInitiateTxn(
         self, coin_type, bid_id: bytes, bid, initiate_script, prefunded_tx=None
@@ -7020,6 +7034,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid,
                     "Unexpected txn spent coin a lock tx: {}".format(spend_txid_hex),
                     save_bid=False,
+                    cursor=use_cursor,
                 )
 
             self.saveBidInSession(
@@ -7729,12 +7744,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.logException(err_msg)
 
                     bid_id = linked_id
+                    self.logEvent(
+                        Concepts.BID, bid_id, EventLogTypes.ERROR, err_msg, cursor
+                    )
                     # Failing to accept a bid should not set an error state as the bid has not begun yet
                     if accepting_bid:
-                        self.logEvent(
-                            Concepts.BID, bid_id, EventLogTypes.ERROR, err_msg, cursor
-                        )
-
                         # If delaying with no (further) queued actions reset state
                         if self.countQueuedActions(cursor, bid_id, None) < 2:
                             bid, offer = self.getBidAndOffer(bid_id, cursor)
@@ -7754,7 +7768,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     else:
                         bid = self.getBid(bid_id, cursor)
                         if bid:
-                            bid.setState(BidStates.BID_ERROR, err_msg)
+                            bid.setState(BidStates.BID_ERROR)
                             self.saveBidInSession(bid_id, bid, cursor)
 
             query: str = "DELETE FROM actions WHERE trigger_at <= :now"
@@ -7845,7 +7859,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Expiring partially received {bid_type}: {self.log.id(bid.bid_id)}."
                     )
-                    bid.setState(BidStates.BID_ERROR, "Timed out")
+                    self.logEvent(
+                        Concepts.BID,
+                        bid.bid_id,
+                        EventLogTypes.ERROR,
+                        "Timed out (partially received bid)",
+                        cursor,
+                    )
+                    bid.setState(BidStates.BID_ERROR)
                     self.updateDB(
                         bid,
                         cursor,
@@ -9548,7 +9569,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             else:
                 self.setBidError(
-                    bid_id, bid, "publishBLockTx failed: " + str(ex), save_bid=False
+                    bid_id,
+                    bid,
+                    "publishBLockTx failed: " + str(ex),
+                    save_bid=False,
+                    cursor=cursor,
                 )
                 self.saveBidInSession(
                     bid_id, bid, cursor, xmr_swap, save_in_progress=offer
@@ -9871,7 +9896,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             else:
                 self.setBidError(
-                    bid_id, bid, "spendBLockTx failed: " + str(ex), save_bid=False
+                    bid_id,
+                    bid,
+                    "spendBLockTx failed: " + str(ex),
+                    save_bid=False,
+                    cursor=cursor,
                 )
                 self.saveBidInSession(
                     bid_id, bid, cursor, xmr_swap, save_in_progress=offer
@@ -9990,6 +10019,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid,
                     "spendBLockTx for refund failed: " + str(ex),
                     save_bid=False,
+                    cursor=cursor,
                 )
                 self.saveBidInSession(
                     bid_id, bid, cursor, xmr_swap, save_in_progress=offer

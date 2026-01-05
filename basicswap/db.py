@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 32
+CURRENT_DB_VERSION = 33
 CURRENT_DB_DATA_VERSION = 7
 
 
@@ -135,6 +135,20 @@ class Index:
         self.column_3 = column_3
 
 
+class StateRows:
+    state = Column("integer")
+    state_time = Column("integer")  # Timestamp of last state change
+    states = Column("blob")  # Packed states and times
+
+    def setState(self, new_state, state_time=None):
+        now = int(time.time()) if state_time is None else state_time
+        self.state = new_state
+        if self.isSet("states") is False:
+            self.states = pack_state(new_state, now)
+        else:
+            self.states += pack_state(new_state, now)
+
+
 class DBKVInt(Table):
     __tablename__ = "kv_int"
 
@@ -149,7 +163,7 @@ class DBKVString(Table):
     value = Column("string")
 
 
-class Offer(Table):
+class Offer(Table, StateRows):
     __tablename__ = "offers"
 
     offer_id = Column("blob", primary_key=True)
@@ -197,19 +211,8 @@ class Offer(Table):
     bid_reversed = Column("bool")
     smsg_payload_version = Column("integer")
 
-    state = Column("integer")
-    states = Column("blob")  # Packed states and times
 
-    def setState(self, new_state):
-        now = int(time.time())
-        self.state = new_state
-        if self.isSet("states") is False:
-            self.states = pack_state(new_state, now)
-        else:
-            self.states += pack_state(new_state, now)
-
-
-class Bid(Table):
+class Bid(Table, StateRows):
     __tablename__ = "bids"
 
     bid_id = Column("blob", primary_key=True)
@@ -244,11 +247,7 @@ class Bid(Table):
     participate_txn_refund = Column("blob")
 
     in_progress = Column("integer")
-    state = Column("integer")
-    state_time = Column("integer")  # Timestamp of last state change
-    states = Column("blob")  # Packed states and times
 
-    state_note = Column("string")
     was_sent = Column("bool")  # Sent by node
     was_received = Column("bool")
     contract_count = Column("integer")
@@ -287,25 +286,13 @@ class Bid(Table):
         if self.isSet("participate_tx"):
             self.participate_tx.setState(new_state)
 
-    def setState(self, new_state, state_note=None):
-        now = int(time.time())
-        self.state = new_state
-        self.state_time = now
-
-        if self.isSet("state_note"):
-            self.state_note = state_note
-        if self.isSet("states") is False:
-            self.states = pack_state(new_state, now)
-        else:
-            self.states += pack_state(new_state, now)
-
     def getLockTXBVout(self):
         if self.isSet("xmr_b_lock_tx"):
             return self.xmr_b_lock_tx.vout
         return None
 
 
-class SwapTx(Table):
+class SwapTx(Table, StateRows):
     __tablename__ = "transactions"
 
     bid_id = Column("blob")
@@ -328,20 +315,7 @@ class SwapTx(Table):
     block_height = Column("integer")
     block_time = Column("integer")
 
-    state = Column("integer")
-    states = Column("blob")  # Packed states and times
-
     primary_key = PrimaryKeyConstraint("bid_id", "tx_type")
-
-    def setState(self, new_state):
-        if self.state == new_state:
-            return
-        self.state = new_state
-        now: int = int(time.time())
-        if self.isSet("states") is False:
-            self.states = pack_state(new_state, now)
-        else:
-            self.states += pack_state(new_state, now)
 
 
 class PrefundedTx(Table):
