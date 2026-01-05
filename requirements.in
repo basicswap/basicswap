@@ -1,5 +1,5 @@
 pyzmq==27.1.0
-python-gnupg==0.5.5
+python-gnupg==0.5.6
 Jinja2==3.1.6
 pycryptodome==3.23.0
 PySocks==1.7.1
