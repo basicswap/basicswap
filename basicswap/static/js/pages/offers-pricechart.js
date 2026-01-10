@@ -910,7 +910,6 @@ destroyChart: function() {
             window.config.currentResolution === 'year' ? 'month' : 'day';
         }
         chartModule.chart.update('active');
-        chartModule.currentCoin = coinSymbol;
         const loadTime = Date.now() - chartModule.loadStartTime;
         ui.updateLoadTimeAndCache(loadTime, cachedData);
       }
@@ -927,6 +926,7 @@ destroyChart: function() {
         }
       }
     } finally {
+      chartModule.currentCoin = coinSymbol;
       chartModule.hideChartLoader();
     }
   },
