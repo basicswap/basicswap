@@ -3271,16 +3271,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.debug(f"logBidEvent {self.log.id(bid_id)} {event_type}")
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, cursor)
 
-    def countBidEvents(self, bid, event_type, cursor):
+    def countEvents(self, linked_type: int, linked_id: bytes, event_type: int, cursor):
         q = cursor.execute(
             "SELECT COUNT(*) FROM eventlog WHERE linked_type = :linked_type AND linked_id = :linked_id AND event_type = :event_type",
             {
                 "linked_type": int(Concepts.BID),
-                "linked_id": bid.bid_id,
+                "linked_id": linked_id,
                 "event_type": int(event_type),
             },
         ).fetchone()
         return q[0]
+
+    def countBidEvents(self, bid, event_type: int, cursor):
+        return self.countEvents(int(Concepts.BID), bid.bid_id, int(event_type))
 
     def getEvents(self, linked_type: int, linked_id: bytes):
         events = []
@@ -5011,18 +5014,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def setBidError(
         self,
-        bid_id: bytes,
         bid,
         error_str: str,
         save_bid: bool = True,
         xmr_swap=None,
         cursor=None,
     ) -> None:
-        self.log.error(f"Bid {self.log.id(bid_id)} - Error: {error_str}")
-        self.logEvent(Concepts.BID, bid_id, EventLogTypes.ERROR, error_str, cursor)
+        self.log.error(f"Bid {self.log.id(bid.bid_id)} - Error: {error_str}")
+        self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.ERROR, error_str, cursor)
         bid.setState(BidStates.BID_ERROR)
         if save_bid:
-            self.saveBid(bid_id, bid, xmr_swap=xmr_swap, cursor=cursor)
+            self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap, cursor=cursor)
 
     def createInitiateTxn(
         self, coin_type, bid_id: bytes, bid, initiate_script, prefunded_tx=None
@@ -7030,7 +7032,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
             else:
                 self.setBidError(
-                    bid.bid_id,
                     bid,
                     "Unexpected txn spent coin a lock tx: {}".format(spend_txid_hex),
                     save_bid=False,
@@ -9154,7 +9155,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
-            self.setBidError(bid.bid_id, bid, str(ex), xmr_swap=xmr_swap)
+            self.setBidError(bid, str(ex), xmr_swap=xmr_swap)
 
     def watchXmrSwap(self, bid, offer, xmr_swap, cursor=None) -> None:
         self.log.debug(f"Adaptor-sig swap in progress, bid {self.log.id(bid.bid_id)}.")
@@ -9498,7 +9499,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
             return
 
-        unlock_time = 0
+        unlock_time: int = 0
         if bid.debug_ind in (
             DebugTypes.CREATE_INVALID_COIN_B_LOCK,
             DebugTypes.B_LOCK_TX_MISSED_SEND,
@@ -9569,7 +9570,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             else:
                 self.setBidError(
-                    bid_id,
                     bid,
                     "publishBLockTx failed: " + str(ex),
                     save_bid=False,
@@ -9597,7 +9597,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, "", cursor)
         if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_B_LOCK:
             self.log.debug(
-                "Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
+                f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
             )
             bid.setState(BidStates.BID_STALLED_FOR_TEST)
             self.logBidEvent(
@@ -9896,7 +9896,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             else:
                 self.setBidError(
-                    bid_id,
                     bid,
                     "spendBLockTx failed: " + str(ex),
                     save_bid=False,
@@ -10015,7 +10014,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             else:
                 self.setBidError(
-                    bid_id,
                     bid,
                     "spendBLockTx for refund failed: " + str(ex),
                     save_bid=False,
@@ -10220,7 +10218,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
-            self.setBidError(bid_id, bid, str(ex))
+            self.setBidError(bid, str(ex))
 
     def processXmrBidLockSpendTx(self, msg) -> None:
         # Follower receiving MSG4F
@@ -10285,7 +10283,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
-            self.setBidError(bid_id, bid, str(ex))
+            self.setBidError(bid, str(ex))
 
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
@@ -10387,7 +10385,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
-            self.setBidError(bid_id, bid, str(ex))
+            self.setBidError(bid, str(ex))
             self.swaps_in_progress[bid_id] = (bid, offer)
             return
 
@@ -11000,9 +10998,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             to_remove = []
             if now - self._last_checked_progress >= self.check_progress_seconds:
                 for bid_id, v in self.swaps_in_progress.items():
+                    bid, offer = v
                     try:
-                        if self.checkBidState(bid_id, v[0], v[1]) is True:
-                            to_remove.append((bid_id, v[0], v[1]))
+                        if self.checkBidState(bid_id, bid, offer) is True:
+                            to_remove.append((bid_id, bid, offer))
                     except Exception as ex:
                         if self.debug:
                             self.log.error("checkBidState %s", traceback.format_exc())
@@ -11018,7 +11017,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
                         else:
                             self.log.error(f"checkBidState {self.log.id(bid_id)} {ex}.")
-                            self.setBidError(bid_id, v[0], str(ex))
+                            self.setBidError(bid, str(ex))
 
                 for bid_id, bid, offer in to_remove:
                     self.deactivateBid(None, offer, bid)
