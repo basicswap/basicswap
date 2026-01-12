@@ -663,6 +663,7 @@ class Test(unittest.TestCase):
             ki.record_id = 1
             ki.address = "test1"
             ki.label = "test1"
+            ki.note = "note1"
             try:
                 db_test.add(ki, cursor, upsert=False)
             except Exception as e:
@@ -670,6 +671,65 @@ class Test(unittest.TestCase):
             else:
                 raise ValueError("Should have errored.")
             db_test.add(ki, cursor, upsert=True)
+
+            # Test columns list
+            ki_test = db_test.queryOne(
+                KnownIdentity,
+                cursor,
+                {"address": "test1"},
+                columns_list=[
+                    "label",
+                ],
+            )
+            assert ki_test.label == "test1"
+            assert ki_test.address is None
+
+            # Test updating partial row
+            ki_test.label = "test2"
+            ki_test.record_id = 1
+            db_test.add(
+                ki_test,
+                cursor,
+                upsert=True,
+                columns_list=[
+                    "record_id",
+                    "label",
+                ],
+            )
+            ki_test = db_test.queryOne(KnownIdentity, cursor, {"address": "test1"})
+            assert ki_test.record_id == 1
+            assert ki_test.address == "test1"
+            assert ki_test.label == "test2"
+            assert ki_test.note == "note1"
+
+            ki_test.note = "test2"
+            ki_test.label = "test3"
+
+            db_test.updateDB(
+                ki_test,
+                cursor,
+                ["record_id"],
+                columns_list=[
+                    "label",
+                ],
+            )
+            ki_test = db_test.queryOne(KnownIdentity, cursor, {"address": "test1"})
+            assert ki_test.record_id == 1
+            assert ki_test.address == "test1"
+            assert ki_test.label == "test3"
+            assert ki_test.note == "note1"
+
+            # Test partially initialised object
+            ki_test_p = KnownIdentity(
+                _init_all_columns=False, record_id=1, label="test4"
+            )
+            db_test.add(ki_test_p, cursor, upsert=True)
+            ki_test = db_test.queryOne(KnownIdentity, cursor, {"address": "test1"})
+            assert ki_test.record_id == 1
+            assert ki_test.address == "test1"
+            assert ki_test.label == "test4"
+            assert ki_test.note == "note1"
+
         finally:
             db_test.closeDB(cursor)
 

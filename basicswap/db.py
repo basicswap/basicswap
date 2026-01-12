@@ -76,10 +76,16 @@ class Table:
     __sqlite3_table__ = True
 
     def __init__(self, **kwargs):
+        init_all_columns: bool = True
         for name, value in kwargs.items():
+            if name == "_init_all_columns":
+                init_all_columns = value
+                continue
             if not hasattr(self, name):
                 raise ValueError(f"Unknown attribute {name}")
             setattr(self, name, value)
+        if init_all_columns is False:
+            return
         # Init any unset columns to None
         for mc in inspect.getmembers(self):
             mc_name, mc_obj = mc
@@ -1033,7 +1039,7 @@ class DBMethods:
             if cursor is None:
                 self.closeDB(use_cursor, commit=False)
 
-    def add(self, obj, cursor, upsert: bool = False):
+    def add(self, obj, cursor, upsert: bool = False, columns_list=None):
         if cursor is None:
             raise ValueError("Cursor is null")
         if not hasattr(obj, "__tablename__"):
@@ -1046,7 +1052,8 @@ class DBMethods:
         # See if the instance overwrote any class methods
         for mc in inspect.getmembers(obj.__class__):
             mc_name, mc_obj = mc
-
+            if columns_list is not None and mc_name not in columns_list:
+                continue
             if not hasattr(mc_obj, "__sqlite3_column__"):
                 continue
 
@@ -1087,6 +1094,7 @@ class DBMethods:
         order_by={},
         query_suffix=None,
         extra_query_data={},
+        columns_list=None,
     ):
         if cursor is None:
             raise ValueError("Cursor is null")
@@ -1099,6 +1107,8 @@ class DBMethods:
 
         for mc in inspect.getmembers(table_class):
             mc_name, mc_obj = mc
+            if columns_list is not None and mc_name not in columns_list:
+                continue
             if not hasattr(mc_obj, "__sqlite3_column__"):
                 continue
             if len(columns) > 0:
@@ -1167,6 +1177,7 @@ class DBMethods:
         order_by={},
         query_suffix=None,
         extra_query_data={},
+        columns_list=None,
     ):
         return firstOrNone(
             self.query(
@@ -1176,10 +1187,11 @@ class DBMethods:
                 order_by,
                 query_suffix,
                 extra_query_data,
+                columns_list,
             )
         )
 
-    def updateDB(self, obj, cursor, constraints=[]):
+    def updateDB(self, obj, cursor, constraints=[], columns_list=None):
         if cursor is None:
             raise ValueError("Cursor is null")
         if not hasattr(obj, "__tablename__"):
@@ -1191,7 +1203,6 @@ class DBMethods:
         values = {}
         for mc in inspect.getmembers(obj.__class__):
             mc_name, mc_obj = mc
-
             if not hasattr(mc_obj, "__sqlite3_column__"):
                 continue
 
@@ -1203,7 +1214,8 @@ class DBMethods:
             if mc_name in constraints:
                 values[mc_name] = m_obj
                 continue
-
+            if columns_list is not None and mc_name not in columns_list:
+                continue
             if len(values) > 0:
                 query += ", "
             query += f"{mc_name} = :{mc_name}"
