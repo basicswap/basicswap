@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
-# Copyright (c) 2025 The Basicswap developers
+# Copyright (c) 2025-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -30,6 +30,7 @@ from basicswap.util.ecc import (
 )
 from coincurve.dleag import verify_secp256k1_point
 from coincurve.keys import (
+    PrivateKey,
     PublicKey,
 )
 
@@ -227,8 +228,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         return pubkey.verify(sig, signed_hash, hasher=None)
 
     def sumKeys(self, ka: bytes, kb: bytes) -> bytes:
-        # TODO: Add to coincurve
-        return i2b((b2i(ka) + b2i(kb)) % ep.o)
+        return PrivateKey(ka).add(kb).secret
 
     def sumPubkeys(self, Ka: bytes, Kb: bytes) -> bytes:
         return PublicKey.combine_keys([PublicKey(Ka), PublicKey(Kb)]).format()

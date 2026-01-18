@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -67,6 +67,18 @@ logger = logging.getLogger()
 
 class Test(unittest.TestCase):
 
+    @staticmethod
+    def ci_btc():
+        btc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        btc_coin_settings.update(REQUIRED_SETTINGS)
+        return BTCInterface(btc_coin_settings, "regtest")
+
+    @staticmethod
+    def ci_xmr():
+        xmr_coin_settings = {"rpcport": 0, "walletrpcport": 0, "walletrpcauth": "none"}
+        xmr_coin_settings.update(REQUIRED_SETTINGS)
+        return XMRInterface(xmr_coin_settings, "regtest")
+
     def test_serialise_num(self):
         def test_case(v, nb=None):
             b = SerialiseNum(v)
@@ -86,10 +98,7 @@ class Test(unittest.TestCase):
         test_case(4194642)
 
     def test_sequence(self):
-        coin_settings = {"rpcport": 0, "rpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-
-        ci = BTCInterface(coin_settings, "regtest")
+        ci = self.ci_btc()
 
         time_val = 48 * 60 * 60
         encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, time_val)
@@ -197,10 +206,47 @@ class Test(unittest.TestCase):
             "5c26c518fb698e91a5858c33e9075488c55c235f391162fe9e6cbd4f694f80aa"
         )
 
+    def test_key_summing(self):
+        ci_btc = self.ci_btc()
+        ci_xmr = self.ci_xmr()
+        keys = [
+            bytes.fromhex(
+                "e6b8e7c2ca3a88fe4f28591aa0f91fec340179346559e4ec430c2531aecc19aa"
+            ),
+            bytes.fromhex(
+                "b725b6359bd2b510d9d5a7bba7bdee17abbf113253f6338ea50a8f0cf45fd0d0"
+            ),
+        ]
+        sum_secp256k1: bytes = ci_btc.sumKeys(keys[0], keys[1])
+        assert (
+            sum_secp256k1.hex()
+            == "9dde9df8660d3e0f28fe00d648b70e052511ad800a07783f284455b1d2f5a939"
+        )
+
+        sum_ed25519: bytes = ci_xmr.sumKeys(keys[0], keys[1])
+        assert (
+            sum_ed25519.hex()
+            == "0dde9df8660d3e0f28fe00d648b70e0323e9c192fe9b94f1cf7138515e877725"
+        )
+
+        sum_secp256k1 = ci_btc.sumPubkeys(
+            ci_btc.getPubkey(keys[0]), ci_btc.getPubkey(keys[1])
+        )
+        assert (
+            sum_secp256k1.hex()
+            == "028c30392e35620af0787b363a03cf9a695336759664436e1f609481c869541a5c"
+        )
+
+        sum_ed25519 = ci_xmr.sumPubkeys(
+            ci_xmr.getPubkey(keys[0]), ci_xmr.getPubkey(keys[1])
+        )
+        assert (
+            sum_ed25519.hex()
+            == "4b2dd2dc9acc9be7efed4fdbfb96f0002aeb9e4c8638c5b24562a7158b283626"
+        )
+
     def test_ecdsa_otves(self):
-        coin_settings = {"rpcport": 0, "rpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-        ci = BTCInterface(coin_settings, "regtest")
+        ci = self.ci_btc()
         vk_sign = ci.getNewRandomKey()
         vk_encrypt = ci.getNewRandomKey()
 
@@ -209,21 +255,16 @@ class Test(unittest.TestCase):
         sign_hash = secrets.token_bytes(32)
 
         cipher_text = ecdsaotves_enc_sign(vk_sign, pk_encrypt, sign_hash)
-
         assert ecdsaotves_enc_verify(pk_sign, pk_encrypt, sign_hash, cipher_text)
 
         sig = ecdsaotves_dec_sig(vk_encrypt, cipher_text)
-
         assert ci.verifySig(pk_sign, sign_hash, sig)
 
         recovered_key = ecdsaotves_rec_enc_key(pk_encrypt, cipher_text, sig)
-
         assert vk_encrypt == recovered_key
 
     def test_sign(self):
-        coin_settings = {"rpcport": 0, "rpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-        ci = BTCInterface(coin_settings, "regtest")
+        ci = self.ci_btc()
 
         vk = ci.getNewRandomKey()
         pk = ci.getPubkey(vk)
@@ -236,9 +277,7 @@ class Test(unittest.TestCase):
         ci.verifySig(pk, message_hash, sig)
 
     def test_sign_compact(self):
-        coin_settings = {"rpcport": 0, "rpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-        ci = BTCInterface(coin_settings, "regtest")
+        ci = self.ci_btc()
 
         vk = ci.getNewRandomKey()
         pk = ci.getPubkey(vk)
@@ -251,9 +290,7 @@ class Test(unittest.TestCase):
         assert sig == sig2
 
     def test_sign_recoverable(self):
-        coin_settings = {"rpcport": 0, "rpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-        ci = BTCInterface(coin_settings, "regtest")
+        ci = self.ci_btc()
 
         vk = ci.getNewRandomKey()
         pk = ci.getPubkey(vk)
@@ -267,18 +304,13 @@ class Test(unittest.TestCase):
         assert sig == sig2
 
     def test_pubkey_to_address(self):
-        coin_settings = {"rpcport": 0, "rpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-        ci = BTCInterface(coin_settings, "regtest")
+        ci = self.ci_btc()
         pk = h2b("02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6")
         addr = ci.pubkey_to_address(pk)
         assert addr == "mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8"
 
     def test_dleag(self):
-        coin_settings = {"rpcport": 0, "walletrpcport": 0, "walletrpcauth": "none"}
-        coin_settings.update(REQUIRED_SETTINGS)
-
-        ci = XMRInterface(coin_settings, "regtest")
+        ci = self.ci_xmr()
 
         key = ci.getNewRandomKey()
         proof = ci.proveDLEAG(key)
@@ -409,15 +441,8 @@ class Test(unittest.TestCase):
         amount_to_recreate = int((amount_from * rate) // (10**scale_from))
         assert "10.00000000" == format_amount(amount_to_recreate, scale_to)
 
-        coin_settings = {
-            "rpcport": 0,
-            "rpcauth": "none",
-            "walletrpcport": 0,
-            "walletrpcauth": "none",
-        }
-        coin_settings.update(REQUIRED_SETTINGS)
-        ci_xmr = XMRInterface(coin_settings, "regtest")
-        ci_btc = BTCInterface(coin_settings, "regtest")
+        ci_xmr = self.ci_xmr()
+        ci_btc = self.ci_btc()
 
         for i in range(10000):
             test_pairs = random.randint(0, 3)

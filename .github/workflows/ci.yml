@@ -45,14 +45,16 @@ jobs:
           echo "Pin: origin packages.mozilla.org" | sudo tee -a /etc/apt/preferences.d/mozilla
           echo "Pin-Priority: 1000" | sudo tee -a /etc/apt/preferences.d/mozilla
           sudo apt-get update
-          sudo apt-get install -y firefox
+          sudo apt-get install -y firefox gnupg
         fi
         python -m pip install --upgrade pip
-        pip install python-gnupg
         pip install -e .[dev]
         pip install -r requirements.txt --require-hashes
     - name: Install
       run: |
+        # Install dependencies again to avoid occasional: No module named 'gnupg'
+        pip uninstall -y pgp python-gnupg
+        pip install -r requirements.txt --require-hashes
         pip install .
         # Print the core versions to a file for caching
         basicswap-prepare --version --withcoins=bitcoin | tail -n +2 > core_versions.txt
