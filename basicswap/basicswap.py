@@ -1280,12 +1280,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         else:
             self.log.info("AMM autostart is disabled")
 
-        self._price_fetch_running = True
-        self._price_fetch_thread = threading.Thread(
-            target=self._backgroundPriceFetchLoop, daemon=True
+        if self.settings.get("fetchpricesthread", True):
+            self._price_fetch_running = True
+            self._price_fetch_thread = threading.Thread(
+                target=self._backgroundPriceFetchLoop, daemon=True
+            )
+            self._price_fetch_thread.start()
+        self.log.info(
+            "Background price fetching {}".format(
+                "started" if self._price_fetch_running else "is disabled"
+            )
         )
-        self._price_fetch_thread.start()
-        self.log.info("Background price fetching started")
 
         if "htmlhost" in self.settings:
             self.log.info(

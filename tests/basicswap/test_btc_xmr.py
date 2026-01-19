@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -921,10 +921,10 @@ class BasicSwapTest(TestFunctions):
     @classmethod
     def setUpClass(cls):
         super(BasicSwapTest, cls).setUpClass()
-        if False:
-            for client in cls.swap_clients:
-                client.log.safe_logs = True
-                client.log.safe_logs_prefix = b"tests"
+
+    @classmethod
+    def addCoinSettings(cls, settings, datadir, node_id):
+        settings["fetchpricesthread"] = False
 
     def test_001_nested_segwit(self):
         # p2sh-p2wpkh
