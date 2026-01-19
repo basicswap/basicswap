@@ -3271,7 +3271,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.debug(f"logBidEvent {self.log.id(bid_id)} {event_type}")
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, cursor)
 
-    def countEvents(self, linked_type: int, linked_id: bytes, event_type: int, cursor):
+    def countEvents(
+        self, linked_type: int, linked_id: bytes, event_type: int, cursor
+    ) -> int:
         q = cursor.execute(
             "SELECT COUNT(*) FROM eventlog WHERE linked_type = :linked_type AND linked_id = :linked_id AND event_type = :event_type",
             {
@@ -3282,8 +3284,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ).fetchone()
         return q[0]
 
-    def countBidEvents(self, bid, event_type: int, cursor):
-        return self.countEvents(int(Concepts.BID), bid.bid_id, int(event_type))
+    def countBidEvents(self, bid, event_type: int, cursor) -> int:
+        return self.countEvents(int(Concepts.BID), bid.bid_id, int(event_type), cursor)
 
     def getEvents(self, linked_type: int, linked_id: bytes):
         events = []
