@@ -330,21 +330,21 @@ chainparams = {
             "walletrpcport": 19082,
             "min_amount": 100000000,  # 1 SAL
             "max_amount": 10000000 * SAL_COIN,
-            "address_prefix": 0x180c96,
+            "address_prefix": 0x180C96,
         },
         "testnet": {
             "rpcport": 29081,
             "walletrpcport": 29082,
             "min_amount": 100000000,
             "max_amount": 10000000 * SAL_COIN,
-            "address_prefix": 0x254c96,
+            "address_prefix": 0x254C96,
         },
         "regtest": {
             "rpcport": 39081,
             "walletrpcport": 39082,
             "min_amount": 100000000,
             "max_amount": 10000000 * SAL_COIN,
-            "address_prefix": 0x24cc96,
+            "address_prefix": 0x24CC96,
         },
     },
     Coins.WOW: {

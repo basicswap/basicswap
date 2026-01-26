@@ -49,7 +49,7 @@ class SALInterface(XMRInterface):
                 self.rpc_wallet("store")
                 self.rpc_wallet("close_wallet")
                 self._log.debug(f"Attempt to save and close {self.coin_name()} wallet")
-            except Exception as e:
+            except Exception:
                 pass
 
             self.rpc_wallet("open_wallet", params)
@@ -57,42 +57,44 @@ class SALInterface(XMRInterface):
 
     def getMainAddress(self) -> str:
         """Override to specify SAL1 asset type"""
-        return self.rpc_wallet('get_address', {'account_index': 0, 'asset_type': 'SAL1'})['address']
-    
+        return self.rpc_wallet(
+            "get_address", {"account_index": 0, "asset_type": "SAL1"}
+        )["address"]
+
     def createTx(self, addr_to, amount, priority=2, subaddr_indices=None):
         """Override to specify SAL1 asset type for transactions"""
         params = {
-            'destinations': [{'amount': amount, 'address': addr_to}],
-            'priority': priority,
-            'asset_type': 'SAL1'
+            "destinations": [{"amount": amount, "address": addr_to}],
+            "priority": priority,
+            "asset_type": "SAL1",
         }
         if subaddr_indices:
-            params['subaddr_indices'] = subaddr_indices
-        return self.rpc_wallet('transfer', params)
-    
+            params["subaddr_indices"] = subaddr_indices
+        return self.rpc_wallet("transfer", params)
+
     def getUnspentOutputs(self, subaddr_indices=None):
         """Override to specify SAL1 asset type"""
-        params = {'asset_type': 'SAL1'}
+        params = {"asset_type": "SAL1"}
         if subaddr_indices:
-            params['subaddr_indices'] = subaddr_indices
-        return self.rpc_wallet('incoming_transfers', params)
+            params["subaddr_indices"] = subaddr_indices
+        return self.rpc_wallet("incoming_transfers", params)
 
     def getCachedMainWalletAddress(self, session=None):
         """Return Carrot address for seed verification"""
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            result = self.rpc_wallet('get_address', {'account_index': 0})
+            result = self.rpc_wallet("get_address", {"account_index": 0})
             # Top-level 'address' is legacy - must use addresses[0].address_carrot
-            if 'addresses' in result and len(result['addresses']) > 0:
-                return result['addresses'][0]['address_carrot']
-            return result.get('address', '')  # Fallback
+            if "addresses" in result and len(result["addresses"]) > 0:
+                return result["addresses"][0]["address_carrot"]
+            return result.get("address", "")  # Fallback
 
     def getBalance(self, subaddress_indices=None):
         """Override to specify SAL1 asset type for balance queries"""
-        params = {'asset_type': 'SAL1'}
+        params = {"asset_type": "SAL1"}
         if subaddress_indices:
-            params['address_indices'] = subaddress_indices
-        return self.rpc_wallet('get_balance', params)  # Make sure this returns a dict
+            params["address_indices"] = subaddress_indices
+        return self.rpc_wallet("get_balance", params)  # Make sure this returns a dict
 
     def getWalletInfo(self):
         with self._mx_wallet:
@@ -117,20 +119,29 @@ class SALInterface(XMRInterface):
                 balance_info = self.rpc_wallet("get_balance", {"asset_type": "SAL1"})
 
                 # Handle response format - could be array or single balance
-                if 'balances' in balance_info:
-                    sal_balance = next((b for b in balance_info['balances'] if b.get('asset_type') == 'SAL1'), None)
+                if "balances" in balance_info:
+                    sal_balance = next(
+                        (
+                            b
+                            for b in balance_info["balances"]
+                            if b.get("asset_type") == "SAL1"
+                        ),
+                        None,
+                    )
                     if sal_balance:
-                        unlocked = sal_balance.get('unlocked_balance', 0)
-                        total = sal_balance.get('balance', 0)
+                        unlocked = sal_balance.get("unlocked_balance", 0)
+                        total = sal_balance.get("balance", 0)
                     else:
                         unlocked = total = 0
                 else:
-                    unlocked = balance_info.get('unlocked_balance', 0)
-                    total = balance_info.get('balance', 0)
+                    unlocked = balance_info.get("unlocked_balance", 0)
+                    total = balance_info.get("balance", 0)
 
             except Exception as e:
                 if "not found in wallet" in str(e):
-                    self._log.info(f"{self.coin_name()} wallet has no SAL1 yet - needs to receive funds first")
+                    self._log.info(
+                        f"{self.coin_name()} wallet has no SAL1 yet - needs to receive funds first"
+                    )
                     unlocked = total = 0
                 else:
                     raise
@@ -150,20 +161,19 @@ class SALInterface(XMRInterface):
     def getNewAddress(self, placeholder) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            new_address = self.rpc_wallet("create_address", {
-                "account_index": 0,
-                "asset_type": "SAL1"
-            })["address"]
+            new_address = self.rpc_wallet(
+                "create_address", {"account_index": 0, "asset_type": "SAL1"}
+            )["address"]
             self.rpc_wallet("store")
             return new_address
 
     def threadPollSALChainState(swap_client, coin_type):
-        swap_client.log.info('threadPollSALChainState starting')
+        swap_client.log.info("threadPollSALChainState starting")
         while not swap_client.delay_event.is_set():
             try:
                 swap_client.ci(coin_type).checkWallets()
             except Exception as e:
-                swap_client.log.error(f'threadPollSALChainState error: {e}')
+                swap_client.log.error(f"threadPollSALChainState error: {e}")
             swap_client.delay_event.wait(swap_client._check_wallet_seconds)
 
     def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
@@ -183,12 +193,18 @@ class SALInterface(XMRInterface):
             self.openWallet(self._wallet_filename)
             self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
-    
+
             Kbv = self.getPubkey(kbv)
             shared_addr = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
-    
+
             params = {
-                "destinations": [{"amount": output_amount, "address": shared_addr, "asset_type": "SAL1"}],
+                "destinations": [
+                    {
+                        "amount": output_amount,
+                        "address": shared_addr,
+                        "asset_type": "SAL1",
+                    }
+                ],
                 "source_asset": "SAL1",
                 "dest_asset": "SAL1",
                 "tx_type": 3,  # TRANSFER
@@ -219,15 +235,24 @@ class SALInterface(XMRInterface):
                 balance = self.rpc_wallet("get_balance", {"asset_type": "SAL1"})
                 # Handle balances array format
                 bal_info = balance
-                if 'balances' in balance:
-                    sal_bal = next((b for b in balance['balances'] if b.get('asset_type') == 'SAL1'), None)
+                if "balances" in balance:
+                    sal_bal = next(
+                        (
+                            b
+                            for b in balance["balances"]
+                            if b.get("asset_type") == "SAL1"
+                        ),
+                        None,
+                    )
                     if sal_bal:
                         bal_info = sal_bal
                     else:
                         raise ValueError("No SAL1 balance found")
 
                 if bal_info["balance"] != bal_info["unlocked_balance"]:
-                    raise ValueError("Balance must be fully confirmed to use sweep all.")
+                    raise ValueError(
+                        "Balance must be fully confirmed to use sweep all."
+                    )
 
                 self._log.info(
                     "{} {} sweep_all.".format(
@@ -235,7 +260,9 @@ class SALInterface(XMRInterface):
                         "estimate fee" if estimate_fee else "withdraw",
                     )
                 )
-                self._log.debug("{} balance: {}".format(self.ticker_str(), bal_info["balance"]))
+                self._log.debug(
+                    "{} balance: {}".format(self.ticker_str(), bal_info["balance"])
+                )
 
                 params = {
                     "address": addr_to,
@@ -257,7 +284,9 @@ class SALInterface(XMRInterface):
 
             value_sats: int = self.make_int(value)
             params = {
-                "destinations": [{"amount": value_sats, "address": addr_to, "asset_type": "SAL1"}],
+                "destinations": [
+                    {"amount": value_sats, "address": addr_to, "asset_type": "SAL1"}
+                ],
                 "source_asset": "SAL1",
                 "dest_asset": "SAL1",
                 "tx_type": 3,  # TRANSFER
@@ -362,9 +391,9 @@ class SALInterface(XMRInterface):
             Kbv = self.getPubkey(kbv)
             Kbs = self.getPubkey(kbs)
             address_b58 = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
-    
+
             wallet_filename = address_b58 + "_spend"
-    
+
             params = {
                 "filename": wallet_filename,
                 "address": address_b58,
@@ -385,8 +414,10 @@ class SALInterface(XMRInterface):
             # Get SAL1 balance
             rv = self.rpc_wallet("get_balance", {"asset_type": "SAL1"})
             bal_info = rv
-            if 'balances' in rv:
-                sal_bal = next((b for b in rv['balances'] if b.get('asset_type') == 'SAL1'), None)
+            if "balances" in rv:
+                sal_bal = next(
+                    (b for b in rv["balances"] if b.get("asset_type") == "SAL1"), None
+                )
                 if sal_bal:
                     bal_info = sal_bal
 
@@ -434,7 +465,7 @@ class SALInterface(XMRInterface):
                 params["priority"] = self._fee_priority
 
             rv = self.rpc_wallet("sweep_all", params)
-    
+
             return bytes.fromhex(rv["tx_hash_list"][0])
 
     def findTxnByHash(self, txid):
@@ -445,7 +476,9 @@ class SALInterface(XMRInterface):
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             try:
-                current_height = self.rpc2("get_height", timeout=self._rpctimeout)["height"]
+                current_height = self.rpc2("get_height", timeout=self._rpctimeout)[
+                    "height"
+                ]
                 self._log.info(
                     f"findTxnByHash {self.ticker_str()} current_height {current_height}\nhash: {txid}"
                 )
@@ -460,7 +493,8 @@ class SALInterface(XMRInterface):
                 for transfer in rv["transfers"]:
                     if transfer["tx_hash"] == txid and (
                         current_height is None
-                        or current_height - transfer["block_height"] > self.blocks_confirmed
+                        or current_height - transfer["block_height"]
+                        > self.blocks_confirmed
                     ):
                         return {
                             "txid": transfer["tx_hash"],
@@ -470,23 +504,30 @@ class SALInterface(XMRInterface):
 
             return None
 
-    def initialiseWallet(self, key_view: bytes, key_spend: bytes, restore_height=None) -> None:
+    def initialiseWallet(
+        self, key_view: bytes, key_spend: bytes, restore_height=None
+    ) -> None:
         import os
-        self._log.info(f"=== SAL initialiseWallet called ===")
 
-        wallet_path = os.path.join(self._sc.getChainClientSettings(self.coin_type())['datadir'], 'wallets', self._wallet_filename)
+        self._log.info("=== SAL initialiseWallet called ===")
+
+        wallet_path = os.path.join(
+            self._sc.getChainClientSettings(self.coin_type())["datadir"],
+            "wallets",
+            self._wallet_filename,
+        )
         self._log.info(f"Checking: {wallet_path}.keys")
         self._log.info(f"File exists: {os.path.exists(wallet_path + '.keys')}")
 
         # If wallet file exists, don't recreate
-        if os.path.exists(wallet_path + '.keys'):
-            self._log.info(f"Salvium wallet file EXISTS - NOT recreating")
+        if os.path.exists(wallet_path + ".keys"):
+            self._log.info("Salvium wallet file EXISTS - NOT recreating")
             return
 
-        self._log.info(f"Salvium wallet doesn't exist - CREATING")
+        self._log.info("Salvium wallet doesn't exist - CREATING")
         # Wallet doesn't exist, create it
         super().initialiseWallet(key_view, key_spend, restore_height)
-        self._log.info(f"=== SAL initialiseWallet complete ===")
+        self._log.info("=== SAL initialiseWallet complete ===")
 
     def getAddressFromKeys(self, key_view: bytes, key_spend: bytes) -> str:
         """Salvium Carrot addresses cannot be derived - must query wallet RPC"""
@@ -494,25 +535,26 @@ class SALInterface(XMRInterface):
             try:
                 # The wallet should already exist - just open and query it
                 self.openWallet(self._wallet_filename)
-                result = self.rpc_wallet('get_address', {'account_index': 0})
-            
-                if 'addresses' in result and len(result['addresses']) > 0:
-                    addr = result['addresses'][0]['address_carrot']
+                result = self.rpc_wallet("get_address", {"account_index": 0})
+
+                if "addresses" in result and len(result["addresses"]) > 0:
+                    addr = result["addresses"][0]["address_carrot"]
                     self._log.info(f"getAddressFromKeys returning: {addr}")
                     return addr
             except Exception as e:
                 self._log.error(f"Failed to get Salvium address from wallet: {e}")
-                raise ValueError("Salvium Carrot addresses require wallet RPC - cannot derive from keys alone") from e
-        
+                raise ValueError(
+                    "Salvium Carrot addresses require wallet RPC - cannot derive from keys alone"
+                ) from e
+
             raise ValueError("Salvium wallet returned no addresses")
 
     def getSpendableBalance(self) -> int:
         """Override to handle SAL's balance array structure"""
         balance_info = self.getBalance()
         # SAL returns: {"balances": [{"asset_type": "SAL1", "unlocked_balance": X}]}
-        if 'balances' in balance_info and len(balance_info['balances']) > 0:
-            for bal in balance_info['balances']:
-                if bal.get('asset_type') == 'SAL1':
-                    return bal.get('unlocked_balance', 0)
+        if "balances" in balance_info and len(balance_info["balances"]) > 0:
+            for bal in balance_info["balances"]:
+                if bal.get("asset_type") == "SAL1":
+                    return bal.get("unlocked_balance", 0)
         return 0
-

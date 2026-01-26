@@ -76,7 +76,7 @@ XMR_SITE_COMMIT = (
 SALVIUM_VERSION = os.getenv("SALVIUM_VERSION", "1.0.7")
 SALVIUM_VERSION_TAG = os.getenv("SALVIUM_VERSION_TAG", "")
 SAL_SITE_COMMIT = (
-    "7acf8068ea08dbed4a8db6c0f7c3c6b2cd789d22" # Lock  hashes to salvium version
+    "7acf8068ea08dbed4a8db6c0f7c3c6b2cd789d22"  # Lock hashes to salvium version
 )
 
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
@@ -3074,9 +3074,13 @@ def main():
 
     # Debug: Check if chainclients is properly populated
     if "salvium" in chainclients:
-        logger.info(f"Salvium chainclients keys before addcoin: {list(chainclients['salvium'].keys())}")
+        logger.info(
+            f"Salvium chainclients keys before addcoin: {list(chainclients['salvium'].keys())}"
+        )
         if "walletrpcport" in chainclients["salvium"]:
-            logger.info(f"walletrpcport value: {chainclients['salvium']['walletrpcport']}")
+            logger.info(
+                f"walletrpcport value: {chainclients['salvium']['walletrpcport']}"
+            )
 
     if add_coin != "":
         logger.info(f"Adding coin: {add_coin}")
