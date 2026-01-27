@@ -1282,6 +1282,8 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write("zmq-rpc-bind-port={}\n".format(core_settings["zmqport"]))
             fp.write("zmq-rpc-bind-ip={}\n".format(COINS_RPCBIND_IP))
             fp.write("prune-blockchain=1\n")
+            if coin == "salvium":
+                fp.write("fast-block-sync=0\n")
 
             if coin == "monero":
                 if XMR_RPC_USER != "":
