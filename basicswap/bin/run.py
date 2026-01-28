@@ -303,24 +303,21 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
         if prepare is False and use_tor_proxy:
             if coin_id == Coins.BCH:
                 # Without this BCH (27.1) will bind to the default BTC port, even with proxy set
-                port: int = int(coin_settings["port"])
-                onionport: int = coin_settings.get("onionport", 8335)
-                extra_args.append(f"--bind=127.0.0.1:{port}")
-                extra_args.append(f"--bind=127.0.0.1:{onionport}=onion")
+                extra_args.append("--bind=127.0.0.1:" + str(int(coin_settings["port"])))
         else:
             extra_args.append("--port=" + str(int(coin_settings["port"])))
+
     # BTC versions from v28 fail to start if the onionport is in use.
     # As BCH may use port 8334, disable it here.
     # When tor is enabled a bind option for the onionport will be added to bitcoin.conf.
     # https://github.com/bitcoin/bitcoin/blob/master/doc/release-notes/release-notes-28.0.md?plain=1#L84
-    if prepare is False and coin_id in (Coins.BTC, Coins.NMC):
+    if (
+        prepare is False
+        and use_tor_proxy is False
+        and coin_id in (Coins.BTC, Coins.NMC)
+    ):
         port: int = coin_settings.get("port", 8333)
-        if use_tor_proxy:
-            onionport: int = coin_settings.get("onionport", 8334)
-            extra_args.append(f"--bind=0.0.0.0:{port}")
-            extra_args.append(f"--bind=127.0.0.1:{onionport}=onion")
-        else:
-            extra_args.append(f"--bind=0.0.0.0:{port}")
+        extra_args.append(f"--bind=0.0.0.0:{port}")
     return extra_args
 
 
