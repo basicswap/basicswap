@@ -30,6 +30,7 @@ def _close_socket_safe(sock):
 
 DEFAULT_ELECTRUM_SERVERS = {
     "bitcoin": [
+        {"host": "bitcoin.stackwallet.com", "port": 50002, "ssl": True},
         {"host": "electrum.blockstream.info", "port": 50002, "ssl": True},
         {"host": "electrum.emzy.de", "port": 50002, "ssl": True},
         {"host": "electrum.bitaroo.net", "port": 50002, "ssl": True},
@@ -37,6 +38,7 @@ DEFAULT_ELECTRUM_SERVERS = {
         {"host": "btc.lastingcoin.net", "port": 50002, "ssl": True},
     ],
     "litecoin": [
+        {"host": "litecoin.stackwallet.com", "port": 20063, "ssl": True},
         {"host": "electrum-ltc.bysh.me", "port": 50002, "ssl": True},
         {"host": "electrum.ltc.xurious.com", "port": 50002, "ssl": True},
         {"host": "backup.electrum-ltc.org", "port": 443, "ssl": True},
