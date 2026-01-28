@@ -6,11 +6,15 @@
     confirmCallback: null,
     triggerElement: null,
 
+    originalConnectionTypes: {},
+
     init: function() {
       this.setupTabs();
       this.setupCoinHeaders();
       this.setupConfirmModal();
       this.setupNotificationSettings();
+      this.setupMigrationIndicator();
+      this.setupServerDiscovery();
     },
 
     setupTabs: function() {
@@ -59,6 +63,144 @@
           }
         });
       });
+    },
+
+    pendingModeSwitch: null,
+
+    setupMigrationIndicator: function() {
+      const connectionTypeSelects = document.querySelectorAll('select[name^="connection_type_"]');
+      connectionTypeSelects.forEach(select => {
+        const originalValue = select.dataset.originalValue || select.value;
+        this.originalConnectionTypes[select.name] = originalValue;
+      });
+
+      this.setupWalletModeModal();
+
+      const coinsForm = document.getElementById('coins-form');
+      if (coinsForm) {
+        coinsForm.addEventListener('submit', (e) => {
+          const submitter = e.submitter;
+          if (!submitter || !submitter.name.startsWith('apply_')) return;
+
+          const coinName = submitter.name.replace('apply_', '');
+          const select = document.querySelector(`select[name="connection_type_${coinName}"]`);
+          if (!select) return;
+
+          const original = this.originalConnectionTypes[select.name];
+          const current = select.value;
+
+          if (original && current && original !== current) {
+            e.preventDefault();
+            const direction = (original === 'rpc' && current === 'electrum') ? 'lite' : 'rpc';
+            this.showWalletModeConfirmation(coinName, direction, submitter);
+          }
+        });
+      }
+    },
+
+    setupWalletModeModal: function() {
+      const confirmBtn = document.getElementById('walletModeConfirm');
+      const cancelBtn = document.getElementById('walletModeCancel');
+
+      if (confirmBtn) {
+        confirmBtn.addEventListener('click', () => {
+          this.hideWalletModeModal();
+          if (this.pendingModeSwitch) {
+            const { coinName, direction, submitter } = this.pendingModeSwitch;
+            this.showMigrationModal(coinName.toUpperCase(), direction);
+            const form = submitter.form;
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = submitter.name;
+            hiddenInput.value = submitter.value;
+            form.appendChild(hiddenInput);
+            form.submit();
+          }
+        });
+      }
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+          this.hideWalletModeModal();
+          if (this.pendingModeSwitch) {
+            const { coinName } = this.pendingModeSwitch;
+            const select = document.querySelector(`select[name="connection_type_${coinName}"]`);
+            if (select) {
+              select.value = this.originalConnectionTypes[select.name];
+            }
+          }
+          this.pendingModeSwitch = null;
+        });
+      }
+    },
+
+    showWalletModeConfirmation: function(coinName, direction, submitter) {
+      const modal = document.getElementById('walletModeModal');
+      const title = document.getElementById('walletModeTitle');
+      const message = document.getElementById('walletModeMessage');
+      const details = document.getElementById('walletModeDetails');
+
+      if (!modal || !title || !message || !details) return;
+
+      this.pendingModeSwitch = { coinName, direction, submitter };
+
+      const displayName = coinName.charAt(0).toUpperCase() + coinName.slice(1).toLowerCase();
+
+      if (direction === 'lite') {
+        title.textContent = `Switch ${displayName} to Lite Wallet Mode`;
+        message.textContent = 'Please confirm you want to switch to lite wallet mode.';
+        details.innerHTML = `
+          <p class="mb-2"><strong>Before switching:</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Active swaps must be completed first</li>
+            <li>Wait for any pending transactions to confirm</li>
+          </ul>
+          <p class="mt-3 text-green-600 dark:text-green-400">
+            <strong>Note:</strong> Your balance will remain accessible - same seed means same funds in both modes.
+          </p>
+        `;
+      } else {
+        title.textContent = `Switch ${displayName} to Full Node Mode`;
+        message.textContent = 'Please confirm you want to switch to full node mode.';
+        details.innerHTML = `
+          <p class="mb-2"><strong>Switching to full node mode:</strong></p>
+          <ul class="list-disc list-inside space-y-1">
+            <li>Requires synced ${displayName} blockchain</li>
+            <li>Your wallet addresses will be synced</li>
+            <li>Active swaps must be completed first</li>
+            <li>Restart required after switch</li>
+          </ul>
+          <p class="mt-3 text-green-600 dark:text-green-400">
+            <strong>Note:</strong> Your balance will remain accessible - same seed means same funds in both modes.
+          </p>
+        `;
+      }
+
+      modal.classList.remove('hidden');
+    },
+
+    hideWalletModeModal: function() {
+      const modal = document.getElementById('walletModeModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+    },
+
+    showMigrationModal: function(coinName, direction) {
+      const modal = document.getElementById('migrationModal');
+      const title = document.getElementById('migrationTitle');
+      const message = document.getElementById('migrationMessage');
+
+      if (modal && title && message) {
+        if (direction === 'lite') {
+          title.textContent = `Migrating ${coinName} to Lite Wallet`;
+          message.textContent = 'Checking wallet balance and migrating addresses. Please wait...';
+        } else {
+          title.textContent = `Switching ${coinName} to Full Node`;
+          message.textContent = 'Syncing wallet indices. Please wait...';
+        }
+        modal.classList.remove('hidden');
+      }
     },
 
     setupConfirmModal: function() {
@@ -305,6 +447,166 @@
         }
       });
     }
+  };
+
+  SettingsPage.setupServerDiscovery = function() {
+    const discoverBtns = document.querySelectorAll('.discover-servers-btn');
+    discoverBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const coin = btn.dataset.coin;
+        this.discoverServers(coin, btn);
+      });
+    });
+
+    const closeBtns = document.querySelectorAll('.close-discovered-btn');
+    closeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const coin = btn.dataset.coin;
+        const panel = document.getElementById(`discovered-servers-${coin}`);
+        if (panel) panel.classList.add('hidden');
+      });
+    });
+  };
+
+  SettingsPage.discoverServers = function(coin, button) {
+    const originalHtml = button.innerHTML;
+    button.innerHTML = `<svg class="w-3.5 h-3.5 mr-1 animate-spin inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Discovering...`;
+    button.disabled = true;
+
+    const panel = document.getElementById(`discovered-servers-${coin}`);
+    const listContainer = document.getElementById(`discovered-list-${coin}`);
+
+    fetch('/json/electrumdiscover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin: coin, ping: true })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        listContainer.innerHTML = `<div class="text-sm text-red-500">${data.error}</div>`;
+      } else {
+        let html = '';
+
+        if (data.current_server) {
+          html += `
+            <div class="flex items-center mb-4 p-3 bg-gray-100 dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded-lg">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
+              <span class="text-sm text-gray-900 dark:text-white">
+                Connected to: <span class="font-mono font-medium">${data.current_server.host}:${data.current_server.port}</span>
+              </span>
+            </div>`;
+        }
+
+        if (data.clearnet_servers && data.clearnet_servers.length > 0) {
+          html += `
+            <div class="mb-4">
+              <div class="text-sm font-semibold text-gray-900 dark:text-white mb-2 pb-2 border-b border-gray-200 dark:border-gray-600">
+                Clearnet
+              </div>
+              <div class="space-y-1">`;
+          data.clearnet_servers.forEach(srv => {
+            const statusClass = srv.online ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500';
+            const statusText = srv.online ? (srv.latency_ms ? srv.latency_ms.toFixed(0) + 'ms' : 'online') : 'offline';
+            const statusDot = srv.online ? 'bg-green-500' : 'bg-gray-400';
+            html += `
+                <div class="flex items-center justify-between py-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg cursor-pointer add-server-btn transition-colors border border-transparent hover:border-blue-500"
+                     data-coin="${coin}" data-host="${srv.host}" data-port="${srv.port}" data-type="clearnet">
+                  <div class="flex items-center flex-1 min-w-0">
+                    <svg class="w-4 h-4 mr-2 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span class="font-mono text-sm text-gray-900 dark:text-white truncate">${srv.host}:${srv.port}</span>
+                  </div>
+                  <div class="flex items-center ml-3">
+                    <span class="w-2 h-2 ${statusDot} rounded-full mr-2"></span>
+                    <span class="text-xs ${statusClass}">${statusText}</span>
+                  </div>
+                </div>`;
+          });
+          html += `
+              </div>
+            </div>`;
+        }
+
+        if (data.onion_servers && data.onion_servers.length > 0) {
+          html += `
+            <div class="mb-4">
+              <div class="text-sm font-semibold text-gray-900 dark:text-white mb-2 pb-2 border-b border-gray-200 dark:border-gray-600">
+                TOR (.onion)
+              </div>
+              <div class="space-y-1">`;
+          data.onion_servers.forEach(srv => {
+            const statusClass = srv.online ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500';
+            const statusText = srv.online ? (srv.latency_ms ? srv.latency_ms.toFixed(0) + 'ms' : 'online') : 'offline';
+            const statusDot = srv.online ? 'bg-green-500' : 'bg-gray-400';
+            html += `
+                <div class="flex items-center justify-between py-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg cursor-pointer add-server-btn transition-colors border border-transparent hover:border-blue-500"
+                     data-coin="${coin}" data-host="${srv.host}" data-port="${srv.port}" data-type="onion">
+                  <div class="flex items-center flex-1 min-w-0">
+                    <svg class="w-4 h-4 mr-2 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    <span class="font-mono text-sm text-gray-900 dark:text-white truncate" title="${srv.host}">${srv.host.substring(0, 24)}...:${srv.port}</span>
+                  </div>
+                  <div class="flex items-center ml-3">
+                    <span class="w-2 h-2 ${statusDot} rounded-full mr-2"></span>
+                    <span class="text-xs ${statusClass}">${statusText}</span>
+                  </div>
+                </div>`;
+          });
+          html += `
+              </div>
+            </div>`;
+        }
+
+        if (!data.clearnet_servers?.length && !data.onion_servers?.length) {
+          html = '<div class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">No servers discovered. The connected server may not support peer discovery.</div>';
+        } else {
+          html += `<div class="text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-600">Click a server to add it to your list</div>`;
+        }
+
+        listContainer.innerHTML = html;
+
+        listContainer.querySelectorAll('.add-server-btn').forEach(item => {
+          item.addEventListener('click', () => {
+            const host = item.dataset.host;
+            const port = item.dataset.port;
+            const type = item.dataset.type;
+            const coinName = item.dataset.coin;
+
+            const textareaId = type === 'onion' ?
+              `electrum_onion_${coinName}` : `electrum_clearnet_${coinName}`;
+            const textarea = document.getElementById(textareaId);
+
+            if (textarea) {
+              const serverLine = `${host}:${port}`;
+              const currentValue = textarea.value.trim();
+
+              if (currentValue.split('\n').some(line => line.trim() === serverLine)) {
+                item.classList.add('bg-yellow-100', 'dark:bg-yellow-800/30');
+                setTimeout(() => item.classList.remove('bg-yellow-100', 'dark:bg-yellow-800/30'), 500);
+                return;
+              }
+
+              textarea.value = currentValue ? currentValue + '\n' + serverLine : serverLine;
+              item.classList.add('bg-green-100', 'dark:bg-green-800/30');
+              setTimeout(() => item.classList.remove('bg-green-100', 'dark:bg-green-800/30'), 500);
+            }
+          });
+        });
+      }
+
+      panel.classList.remove('hidden');
+    })
+    .catch(err => {
+      listContainer.innerHTML = `<div class="text-xs text-red-500">Failed to discover servers: ${err.message}</div>`;
+      panel.classList.remove('hidden');
+    })
+    .finally(() => {
+      button.innerHTML = originalHtml;
+      button.disabled = false;
+    });
   };
 
   SettingsPage.cleanup = function() {

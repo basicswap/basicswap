@@ -86,6 +86,56 @@
           }
         }
       }
+
+      if (coinData.scan_status) {
+        this.updateScanStatus(coinData);
+      }
+
+      if (coinData.version) {
+        const versionEl = document.querySelector(`.electrum-version[data-coin="${coinData.name}"]`);
+        if (versionEl && versionEl.textContent !== coinData.version) {
+          versionEl.textContent = coinData.version;
+        }
+      }
+      if (coinData.electrum_server) {
+        const serverEl = document.querySelector(`.electrum-server[data-coin="${coinData.name}"]`);
+        if (serverEl && serverEl.textContent !== coinData.electrum_server) {
+          serverEl.textContent = coinData.electrum_server;
+        }
+      }
+    },
+
+    updateScanStatus: function(coinData) {
+      const scanStatusEl = document.querySelector(`.scan-status[data-coin="${coinData.name}"]`);
+      if (!scanStatusEl) return;
+
+      const status = coinData.scan_status;
+      if (status.in_progress) {
+        scanStatusEl.innerHTML = `
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-blue-600 dark:text-blue-300">
+              <svg class="inline-block w-3 h-3 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Scanning ${status.status}
+            </span>
+            <span class="text-blue-500 dark:text-blue-200 font-medium">${status.progress}%</span>
+          </div>
+          <div class="w-full bg-blue-200 dark:bg-gray-700 rounded-full h-1 mt-1">
+            <div class="bg-blue-600 dark:bg-blue-400 h-1 rounded-full transition-all" style="width: ${status.progress}%"></div>
+          </div>
+        `;
+      } else {
+        scanStatusEl.innerHTML = `
+          <div class="flex items-center text-xs text-green-600 dark:text-green-400">
+            <svg class="inline-block w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            Electrum Wallet Synced
+          </div>
+        `;
+      }
     },
 
     updateSpecificBalance: function(coinName, labelText, balance, ticker, isPending = false) {
@@ -102,12 +152,13 @@
             const currentLabel = labelElement.textContent.trim();
 
             if (currentLabel === labelText) {
+              const cleanBalance = balance.toString().replace(/^\+/, '');
               if (isPending) {
-                const cleanBalance = balance.toString().replace(/^\+/, '');
                 element.textContent = `+${cleanBalance} ${ticker}`;
               } else {
                 element.textContent = `${balance} ${ticker}`;
               }
+              element.setAttribute('data-original-value', `${cleanBalance} ${ticker}`);
             }
           }
         }
@@ -139,6 +190,7 @@
         if (pendingSpan) {
           const cleanPending = coinData.pending.toString().replace(/^\+/, '');
           pendingSpan.textContent = `+${cleanPending} ${coinData.ticker || coinData.name}`;
+          pendingSpan.setAttribute('data-original-value', `+${cleanPending} ${coinData.ticker || coinData.name}`);
         }
 
         let initialUSD = '$0.00';
@@ -218,7 +270,7 @@
       const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
       for (const element of balanceElements) {
         if (element.getAttribute('data-coinname') === coinName) {
-          return element.closest('.bg-white, .dark\\:bg-gray-500');
+          return element.closest('.bg-gray-50, .dark\\:bg-gray-500');
         }
       }
       return null;
@@ -330,6 +382,7 @@
         if (pendingSpan) {
           const cleanPending = pendingAmount.toString().replace(/^\+/, '');
           pendingSpan.textContent = `+${cleanPending} ${ticker}`;
+          pendingSpan.setAttribute('data-original-value', `+${cleanPending} ${ticker}`);
         }
       }
     }

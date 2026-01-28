@@ -13,6 +13,7 @@
       this.setupWithdrawalConfirmation();
       this.setupTransactionDisplay();
       this.setupWebSocketUpdates();
+      this.setupTransactionPagination();
     },
 
     setupAddressCopy: function() {
@@ -340,13 +341,289 @@
     },
 
     handleBalanceUpdate: function(balanceData) {
-      
-      console.log('Balance updated:', balanceData);
+      if (!balanceData || !Array.isArray(balanceData)) return;
+
+      const coinId = this.currentCoinId;
+      if (!coinId) return;
+
+      const matchingCoins = balanceData.filter(coin =>
+        coin.ticker && coin.ticker.toLowerCase() === coinId.toLowerCase()
+      );
+
+      matchingCoins.forEach(coinData => {
+        const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+        balanceElements.forEach(element => {
+          const elementCoinName = element.getAttribute('data-coinname');
+          if (elementCoinName === coinData.name) {
+            const currentText = element.textContent;
+            const ticker = coinData.ticker || coinId.toUpperCase();
+            const newBalance = `${coinData.balance} ${ticker}`;
+            if (currentText !== newBalance) {
+              element.textContent = newBalance;
+              console.log(`Updated balance: ${coinData.name} -> ${newBalance}`);
+            }
+          }
+        });
+
+        this.updatePendingForCoin(coinData);
+      });
+
+      this.refreshTransactions();
+    },
+
+    updatePendingForCoin: function(coinData) {
+      const pendingAmount = parseFloat(coinData.pending || '0');
+
+
+      const pendingElements = document.querySelectorAll('.inline-block.py-1.px-2.rounded-full.bg-green-100');
+
+      pendingElements.forEach(el => {
+        const text = el.textContent || '';
+
+        if (text.includes('Pending:') && text.includes(coinData.ticker)) {
+          if (pendingAmount > 0) {
+            el.textContent = `Pending: +${coinData.pending} ${coinData.ticker}`;
+            el.style.display = '';
+          } else {
+            el.style.display = 'none';
+          }
+        }
+      });
+    },
+
+    refreshTransactions: function() {
+      const txTable = document.querySelector('#transaction-history-section tbody');
+      if (txTable) {
+        const pathParts = window.location.pathname.split('/');
+        const ticker = pathParts[pathParts.length - 1];
+
+        fetch(`/json/wallettransactions/${ticker}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ page_no: 1 })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.transactions && data.transactions.length > 0) {
+            const currentPageSpan = document.getElementById('currentPageTx');
+            const totalPagesSpan = document.getElementById('totalPagesTx');
+            if (currentPageSpan) currentPageSpan.textContent = data.page_no;
+            if (totalPagesSpan) totalPagesSpan.textContent = data.total_pages;
+          }
+        })
+        .catch(error => console.error('Error refreshing transactions:', error));
+      }
     },
 
     handleSwapEvent: function(eventData) {
-      
-      console.log('Swap event:', eventData);
+      if (window.BalanceUpdatesManager) {
+        window.BalanceUpdatesManager.fetchBalanceData()
+          .then(data => this.handleBalanceUpdate(data))
+          .catch(error => console.error('Error updating balance after swap:', error));
+      }
+    },
+
+    setupTransactionPagination: function() {
+      const txContainer = document.getElementById('tx-container');
+      if (!txContainer) return;
+
+      const pathParts = window.location.pathname.split('/');
+      const ticker = pathParts[pathParts.length - 1];
+
+      let currentPage = 1;
+      let totalPages = 1;
+      let isLoading = false;
+
+      const prevBtn = document.getElementById('prevPageTx');
+      const nextBtn = document.getElementById('nextPageTx');
+      const currentPageSpan = document.getElementById('currentPageTx');
+      const totalPagesSpan = document.getElementById('totalPagesTx');
+      const paginationControls = document.getElementById('tx-pagination-section');
+
+      const copyToClipboard = (text, button) => {
+        const showSuccess = () => {
+          const originalHTML = button.innerHTML;
+          button.innerHTML = `<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>`;
+          setTimeout(() => {
+            button.innerHTML = originalHTML;
+          }, 1500);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(showSuccess).catch(err => {
+            console.error('Clipboard API failed:', err);
+            fallbackCopy(text, showSuccess);
+          });
+        } else {
+          fallbackCopy(text, showSuccess);
+        }
+      };
+
+      const fallbackCopy = (text, onSuccess) => {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          onSuccess();
+        } catch (err) {
+          console.error('Fallback copy failed:', err);
+        }
+        document.body.removeChild(textArea);
+      };
+
+      const loadTransactions = async (page) => {
+        if (isLoading) return;
+        isLoading = true;
+
+        try {
+          const response = await fetch(`/json/wallettransactions/${ticker}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ page_no: page })
+          });
+
+          const data = await response.json();
+
+          if (data.error) {
+            console.error('Error loading transactions:', data.error);
+            return;
+          }
+
+          currentPage = data.page_no;
+          totalPages = data.total_pages;
+
+          currentPageSpan.textContent = currentPage;
+          totalPagesSpan.textContent = totalPages;
+
+          txContainer.innerHTML = '';
+
+          if (data.transactions && data.transactions.length > 0) {
+            data.transactions.forEach(tx => {
+              const card = document.createElement('div');
+              card.className = 'bg-white dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-500 p-4 hover:shadow-md transition-shadow';
+
+              let typeClass = 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300';
+              let amountClass = 'text-gray-700 dark:text-gray-200';
+              let typeIcon = '';
+              let amountPrefix = '';
+              if (tx.type === 'Incoming') {
+                typeClass = 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300';
+                amountClass = 'text-green-600 dark:text-green-400';
+                typeIcon = '↓';
+                amountPrefix = '+';
+              } else if (tx.type === 'Outgoing') {
+                typeClass = 'bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300';
+                amountClass = 'text-red-600 dark:text-red-400';
+                typeIcon = '↑';
+                amountPrefix = '-';
+              }
+
+              let confirmClass = 'text-gray-600 dark:text-gray-300';
+              if (tx.confirmations === 0) {
+                confirmClass = 'text-yellow-600 dark:text-yellow-400 font-medium';
+              } else if (tx.confirmations >= 1 && tx.confirmations <= 5) {
+                confirmClass = 'text-blue-600 dark:text-blue-400';
+              } else if (tx.confirmations >= 6) {
+                confirmClass = 'text-green-600 dark:text-green-400';
+              }
+
+              card.innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center gap-1 py-1 px-2 rounded-full text-xs font-semibold ${typeClass}">
+                      ${typeIcon} ${tx.type}
+                    </span>
+                    <span class="font-semibold ${amountClass}">
+                      ${amountPrefix}${tx.amount} ${ticker.toUpperCase()}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-4 text-sm">
+                    <span class="${confirmClass}">${tx.confirmations} Confirmations</span>
+                    <span class="text-gray-500 dark:text-gray-400">${tx.timestamp}</span>
+                  </div>
+                </div>
+                ${tx.address ? `
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0">Address:</span>
+                  <span class="font-mono text-xs text-gray-700 dark:text-gray-200 break-all flex-1">${tx.address}</span>
+                  <button class="copy-address-btn p-1.5 hover:bg-gray-100 dark:hover:bg-gray-500 rounded flex-shrink-0 focus:outline-none focus:ring-0" title="Copy Address">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                </div>
+                ` : ''}
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0">Txid:</span>
+                  <span class="font-mono text-xs text-gray-700 dark:text-gray-200 break-all flex-1">${tx.txid}</span>
+                  <button class="copy-txid-btn p-1.5 hover:bg-gray-100 dark:hover:bg-gray-500 rounded flex-shrink-0 focus:outline-none focus:ring-0" title="Copy Transaction ID">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                  </button>
+                </div>
+              `;
+
+              const copyAddressBtn = card.querySelector('.copy-address-btn');
+              if (copyAddressBtn) {
+                copyAddressBtn.addEventListener('click', () => copyToClipboard(tx.address, copyAddressBtn));
+              }
+
+              const copyTxidBtn = card.querySelector('.copy-txid-btn');
+              if (copyTxidBtn) {
+                copyTxidBtn.addEventListener('click', () => copyToClipboard(tx.txid, copyTxidBtn));
+              }
+
+              txContainer.appendChild(card);
+            });
+
+            if (totalPages > 1 && paginationControls) {
+              paginationControls.style.display = 'block';
+            } else if (paginationControls) {
+              paginationControls.style.display = 'none';
+            }
+          } else {
+            txContainer.innerHTML = '<div class="text-center py-8 text-gray-500 dark:text-gray-400">No transactions found</div>';
+            if (paginationControls) paginationControls.style.display = 'none';
+          }
+
+          prevBtn.style.display = currentPage > 1 ? 'inline-flex' : 'none';
+          nextBtn.style.display = currentPage < totalPages ? 'inline-flex' : 'none';
+
+        } catch (error) {
+          console.error('Error fetching transactions:', error);
+        } finally {
+          isLoading = false;
+        }
+      };
+
+      if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+          if (currentPage > 1) {
+            loadTransactions(currentPage - 1);
+          }
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+          if (currentPage < totalPages) {
+            loadTransactions(currentPage + 1);
+          }
+        });
+      }
+
+      loadTransactions(1);
     }
   };
 

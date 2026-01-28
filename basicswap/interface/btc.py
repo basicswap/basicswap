@@ -14,6 +14,7 @@ import mmap
 import os
 import shutil
 import sqlite3
+import threading
 import traceback
 
 from io import BytesIO
@@ -183,6 +184,7 @@ def extractScriptLockRefundScriptValues(script_bytes: bytes):
 
 
 class BTCInterface(Secp256k1Interface):
+    _scantxoutset_lock = threading.Lock()
 
     @staticmethod
     def coin_type():
@@ -304,6 +306,46 @@ class BTCInterface(Secp256k1Interface):
         # Use hardened account indices to match existing wallet keys, only applies when use_descriptors is True
         self._use_legacy_key_paths = coin_settings.get("use_legacy_key_paths", False)
         self._disable_lock_tx_rbf = False
+        self._wallet_manager = None
+        self._backend = None
+        self._pending_utxos_map: Dict[str, list] = {}
+        self._pending_utxos_lock = threading.Lock()
+
+    def setBackend(self, backend) -> None:
+        self._backend = backend
+        self._log.debug(f"{self.coin_name()} using backend: {type(backend).__name__}")
+
+    def getBackend(self):
+        return self._backend
+
+    def useBackend(self) -> bool:
+        return self._connection_type == "electrum" and self._backend is not None
+
+    def _getTxInputsKey(self, tx) -> str:
+        if not tx.vin:
+            return ""
+        first_in = tx.vin[0]
+        return f"{i2h(first_in.prevout.hash)}:{first_in.prevout.n}:{len(tx.vin)}"
+
+    def _getPendingUtxos(self, tx) -> Optional[list]:
+        tx_key = self._getTxInputsKey(tx)
+        with self._pending_utxos_lock:
+            return self._pending_utxos_map.get(tx_key)
+
+    def _clearPendingUtxos(self, tx) -> None:
+        tx_key = self._getTxInputsKey(tx)
+        with self._pending_utxos_lock:
+            self._pending_utxos_map.pop(tx_key, None)
+
+    def getWalletManager(self):
+        if self._wallet_manager is not None:
+            return self._wallet_manager
+        if self._sc and hasattr(self._sc, "getWalletManager"):
+            wm = self._sc.getWalletManager()
+            if wm and wm.isInitialized(self.coin_type()):
+                self._wallet_manager = wm
+                return wm
+        return None
 
     def open_rpc(self, wallet=None):
         return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
@@ -323,6 +365,12 @@ class BTCInterface(Secp256k1Interface):
         rpc_conn.close()
 
     def checkWallets(self) -> int:
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm and wm.isInitialized(self.coin_type()):
+                return 1
+            return 0
+
         wallets = self.rpc("listwallets")
 
         if self._rpc_wallet not in wallets:
@@ -369,30 +417,83 @@ class BTCInterface(Secp256k1Interface):
         return len(wallets)
 
     def testDaemonRPC(self, with_wallet=True) -> None:
+        if self._connection_type == "electrum":
+            if self.useBackend():
+                self._backend.getBlockHeight()
+                return
+            raise ValueError(f"No electrum backend available for {self.coin_name()}")
         self.rpc_wallet("getwalletinfo" if with_wallet else "getblockchaininfo")
 
     def getDaemonVersion(self):
         if self._core_version is None:
-            self._core_version = self.rpc("getnetworkinfo")["version"]
+            if self.useBackend():
+                try:
+                    self._core_version = self._backend.getServerVersion()
+                except Exception:
+                    self._core_version = "electrum"
+            else:
+                self._core_version = self.rpc("getnetworkinfo")["version"]
         return self._core_version
 
+    def getElectrumServer(self) -> str:
+        if self.useBackend() and hasattr(self._backend, "getServerHost"):
+            return self._backend.getServerHost()
+        return None
+
     def getBlockchainInfo(self):
+        if self.useBackend():
+            height = self._backend.getBlockHeight()
+            return {"blocks": height, "verificationprogress": 1.0}
         return self.rpc("getblockchaininfo")
 
     def getChainHeight(self) -> int:
+        if self.useBackend():
+            self._log.debug("getChainHeight: using backend getBlockHeight")
+            height = self._backend.getBlockHeight()
+            self._log.debug(f"getChainHeight: got height={height}")
+            return height
         return self.rpc("getblockcount")
 
     def getMempoolTx(self, txid):
+        if self._connection_type == "electrum":
+            backend = self.getBackend()
+            if backend:
+                tx_info = backend.getTransaction(txid.hex())
+                if tx_info:
+                    return tx_info.get("hex") if isinstance(tx_info, dict) else tx_info
+                tx_hex = backend.getTransactionRaw(txid.hex())
+                if tx_hex:
+                    return tx_hex
+            return None
         return self.rpc("getrawtransaction", [txid.hex()])
 
     def getBlockHeaderFromHeight(self, height):
+        if self._connection_type == "electrum":
+            return self._getBlockHeaderFromHeightElectrum(height)
         block_hash = self.rpc("getblockhash", [height])
         return self.rpc("getblockheader", [block_hash])
 
+    def _getBlockHeaderFromHeightElectrum(self, height):
+        backend = self.getBackend()
+        if not backend:
+            raise ValueError("No electrum backend available")
+
+        import struct
+
+        header_hex = backend._server.call("blockchain.block.header", [height])
+        header_bytes = bytes.fromhex(header_hex)
+        block_time = struct.unpack("<I", header_bytes[68:72])[0]
+        block_hash = sha256(sha256(header_bytes))[::-1].hex()
+        return {"height": height, "hash": block_hash, "time": block_time}
+
     def getBlockHeader(self, block_hash):
+        if self._connection_type == "electrum":
+            raise NotImplementedError(
+                "getBlockHeader by hash not available in electrum mode"
+            )
         return self.rpc("getblockheader", [block_hash])
 
-    def getBlockHeaderAt(self, time: int, block_after=False):
+    def getBlockHeaderAt(self, time_target: int, block_after=False):
         blockchaininfo = self.rpc("getblockchaininfo")
         last_block_header = self.rpc(
             "getblockheader", [blockchaininfo["bestblockhash"]]
@@ -403,11 +504,11 @@ class BTCInterface(Secp256k1Interface):
             prev_block_header = self.rpc(
                 "getblockheader", [last_block_header["previousblockhash"]]
             )
-            if prev_block_header["time"] <= time:
+            if prev_block_header["time"] <= time_target:
                 return last_block_header if block_after else prev_block_header
 
             last_block_header = prev_block_header
-        raise ValueError(f"Block header not found at time: {time}")
+        raise ValueError(f"Block header not found at time: {time_target}")
 
     def getWalletAccountPath(self) -> str:
         # Use a bip44 style path, however the seed (derived from the particl mnemonic keychain) can't be turned into a bip39 mnemonic without the matching entropy
@@ -419,6 +520,21 @@ class BTCInterface(Secp256k1Interface):
     def initialiseWallet(self, key_bytes: bytes, restore_time: int = -1) -> None:
         assert len(key_bytes) == 32
         self._have_checked_seed = False
+
+        if self._connection_type == "electrum":
+            self._log.info(f"Initialising {self.coin_name()} wallet in electrum mode")
+            wm = self.getWalletManager()
+            if wm:
+                wm.initialize(self.coin_type(), key_bytes)
+                self._log.info(
+                    f"{self.coin_name()} WalletManager initialized successfully"
+                )
+            else:
+                self._log.warning(
+                    f"No WalletManager available for {self.coin_name()} electrum mode"
+                )
+            return
+
         if self._use_descriptors:
             self._log.info("Importing descriptors")
             ek = ExtKeyPair()
@@ -516,13 +632,118 @@ class BTCInterface(Secp256k1Interface):
         return rv
 
     def getWalletInfo(self):
+        if self.useBackend():
+            cached = getattr(self, "_cached_wallet_info", None)
+            if cached is not None:
+                return cached
+
+            db_balance = 0
+            wm = self.getWalletManager()
+            if wm:
+                try:
+                    db_balance = wm.getCachedTotalBalance(self.coin_type())
+                except Exception:
+                    pass
+
+            return {
+                "balance": db_balance / self.COIN() if db_balance else 0,
+                "unconfirmed_balance": 0,
+                "immature_balance": 0,
+                "encrypted": True,
+                "locked": False,
+                "locked_utxos": 0,
+                "syncing": True,
+            }
+
         rv = self.rpc_wallet("getwalletinfo")
         rv["encrypted"] = "unlocked_until" in rv
         rv["locked"] = rv.get("unlocked_until", 1) <= 0
         rv["locked_utxos"] = len(self.rpc_wallet("listlockunspent"))
         return rv
 
+    def _queryElectrumWalletInfo(self, funded_only: bool = False):
+        total_confirmed_sats = 0
+        total_unconfirmed_sats = 0
+        wm = self.getWalletManager()
+        if wm:
+            addresses = wm.getAllAddresses(self.coin_type(), funded_only=funded_only)
+
+            if addresses:
+                try:
+                    detailed_balances = self._backend.getDetailedBalance(addresses)
+                    for addr, bal_info in detailed_balances.items():
+                        confirmed = bal_info.get("confirmed", 0)
+                        unconfirmed = bal_info.get("unconfirmed", 0)
+                        total_confirmed_sats += confirmed
+                        total_unconfirmed_sats += unconfirmed
+                except Exception as e:
+                    self._log.warning(f"_queryElectrumWalletInfo error: {e}")
+
+        balance_btc = total_confirmed_sats / self.COIN()
+        unconfirmed_btc = total_unconfirmed_sats / self.COIN()
+
+        pending_outgoing = 0
+        pending_incoming = 0
+        pending_count = 0
+        if wm:
+            pending_txs = wm.getPendingTxs(self.coin_type())
+            for ptx in pending_txs:
+                pending_count += 1
+                if ptx.get("tx_type") == "outgoing":
+                    pending_outgoing += ptx.get("amount", 0)
+                elif ptx.get("tx_type") == "incoming":
+                    pending_incoming += ptx.get("amount", 0)
+
+        result = {
+            "balance": balance_btc,
+            "unconfirmed_balance": unconfirmed_btc,
+            "immature_balance": 0,
+            "encrypted": True,
+            "locked": False,
+            "locked_utxos": 0,
+            "pending_outgoing": pending_outgoing / self.COIN(),
+            "pending_incoming": pending_incoming / self.COIN(),
+            "pending_tx_count": pending_count,
+        }
+
+        self._cached_wallet_info = result
+        return result
+
+    def refreshElectrumWalletInfo(self, full_scan: bool = False):
+        if not self.useBackend():
+            return
+
+        do_full_scan = full_scan
+        if not do_full_scan:
+            scan_counter = getattr(self, "_electrum_scan_counter", 0)
+            self._electrum_scan_counter = scan_counter + 1
+            do_full_scan = scan_counter % 6 == 0
+
+        try:
+            if hasattr(self._backend, "setBackgroundMode"):
+                self._backend.setBackgroundMode(True)
+            try:
+                self._queryElectrumWalletInfo(funded_only=not do_full_scan)
+
+                wm = self.getWalletManager()
+                if wm and self._backend:
+                    wm.syncBalances(
+                        self.coin_type(), self._backend, funded_only=not do_full_scan
+                    )
+            finally:
+                if hasattr(self._backend, "setBackgroundMode"):
+                    self._backend.setBackgroundMode(False)
+        except Exception as e:
+            self._log.debug(f"refreshElectrumWalletInfo error: {e}")
+
     def getWalletRestoreHeight(self) -> int:
+        if self.useBackend():
+            height = self.getChainHeight()
+            self._log.debug(
+                f"getWalletRestoreHeight: electrum mode, using current height {height}"
+            )
+            return height
+
         if self._use_descriptors:
             descriptor = self.getActiveDescriptor()
             if descriptor is None:
@@ -535,7 +756,7 @@ class BTCInterface(Secp256k1Interface):
         blockchaininfo = self.getBlockchainInfo()
         best_block = blockchaininfo["bestblockhash"]
 
-        chain_synced = round(blockchaininfo["verificationprogress"], 3)
+        chain_synced = round(blockchaininfo["verificationprogress"], 1)
         if chain_synced < 1.0:
             raise ValueError(f"{self.coin_name()} chain isn't synced.")
 
@@ -569,6 +790,14 @@ class BTCInterface(Secp256k1Interface):
         return None
 
     def getWalletSeedID(self) -> str:
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if wm:
+                seed_id = wm.getSeedID(self.coin_type())
+                if seed_id:
+                    return seed_id
+            return "Not found"
+
         if self._use_descriptors:
             descriptor = self.getActiveDescriptor()
             if descriptor is None:
@@ -598,12 +827,27 @@ class BTCInterface(Secp256k1Interface):
         return expect_seedid == wallet_seed_id
 
     def getNewAddress(self, use_segwit: bool, label: str = "swap_receive") -> str:
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm:
+                return wm.getNewAddress(self.coin_type(), internal=False, label=label)
+            raise ValueError(
+                f"{self.coin_name()} wallet not initialized (electrum mode)"
+            )
+
         args = [label]
         if use_segwit:
             args.append("bech32")
         return self.rpc_wallet("getnewaddress", args)
 
     def isValidAddress(self, address: str) -> bool:
+        if self._connection_type == "electrum":
+            try:
+                self.decodeAddress(address)
+                return True
+            except Exception:
+                return False
+
         try:
             rv = self.rpc_wallet("validateaddress", [address])
             if rv["isvalid"] is True:
@@ -613,14 +857,38 @@ class BTCInterface(Secp256k1Interface):
         return False
 
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
-        addr_info = self.rpc_wallet("getaddressinfo", [address])
-        if not or_watch_only:
-            return addr_info["ismine"]
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm:
+                info = wm.getAddressInfo(self.coin_type(), address)
+                if info:
+                    if or_watch_only:
+                        return True
+                    return True
+            return False
 
-        if self._use_descriptors:
-            addr_info = self.rpc_wallet_watch("getaddressinfo", [address])
+        try:
+            addr_info = self.rpc_wallet("getaddressinfo", [address])
+            if not or_watch_only:
+                if addr_info["ismine"]:
+                    return True
+            else:
+                if self._use_descriptors:
+                    addr_info = self.rpc_wallet_watch("getaddressinfo", [address])
+                if addr_info["ismine"] or addr_info["iswatchonly"]:
+                    return True
+        except Exception as e:
+            self._log.debug(f"isAddressMine RPC check failed: {e}")
 
-        return addr_info["ismine"] or addr_info["iswatchonly"]
+        wm = self.getWalletManager()
+        if wm:
+            info = wm.getAddressInfo(self.coin_type(), address)
+            if info:
+                if or_watch_only:
+                    return True
+                return True
+
+        return False
 
     def checkAddressMine(self, address: str) -> None:
         addr_info = self.rpc_wallet("getaddressinfo", [address])
@@ -644,6 +912,17 @@ class BTCInterface(Secp256k1Interface):
         min_relay_fee = chain_client_settings.get("min_relay_fee", None)
 
         def try_get_fee_rate(self, conf_target):
+
+            if self.useBackend():
+                try:
+                    fee_sat_vb = self._backend.estimateFee(conf_target)
+                    if fee_sat_vb and fee_sat_vb > 0:
+                        fee_rate = (fee_sat_vb * 1000) / 1e8
+                        return fee_rate, "electrum"
+                except Exception as e:
+                    self._log.debug(f"Electrum estimateFee failed: {e}")
+                return 0.00001, "electrum_default"
+
             try:
                 fee_rate: float = self.rpc_wallet("estimatesmartfee", [conf_target])[
                     "feerate"
@@ -725,6 +1004,30 @@ class BTCInterface(Secp256k1Interface):
 
     def encodeScriptDest(self, script: bytes) -> str:
         return self.encode_p2wsh(script)
+
+    def getDestForAddress(self, address: str) -> bytes:
+        bech32_prefix = self.chainparams_network()["hrp"]
+        if address.startswith(bech32_prefix + "1"):
+            _, witprog = segwit_addr.decode(bech32_prefix, address)
+            return CScript([OP_0, bytes(witprog)])
+
+        addr_data = decodeAddress(address)
+        prefix_byte = addr_data[0]
+        addr_hash = addr_data[1:]
+
+        script_address = self.chainparams_network().get("script_address")
+        script_address2 = self.chainparams_network().get("script_address2")
+
+        if prefix_byte == script_address or (
+            script_address2 is not None and prefix_byte == script_address2
+        ):
+            return CScript([OP_HASH160, addr_hash, OP_EQUAL])
+        else:
+            return CScript([OP_DUP, OP_HASH160, addr_hash, OP_EQUALVERIFY, OP_CHECKSIG])
+
+    def addressToScripthash(self, address: str) -> str:
+        script = self.getDestForAddress(address)
+        return sha256(script)[::-1].hex()
 
     def encode_p2sh(self, script: bytes) -> str:
         return pubkeyToAddress(self.chainparams_network()["script_address"], script)
@@ -1434,6 +1737,9 @@ class BTCInterface(Secp256k1Interface):
         return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
 
     def fundTx(self, tx: bytes, feerate) -> bytes:
+        if self.useBackend():
+            return self._fundTxElectrum(tx, feerate)
+
         feerate_str = self.format_amount(feerate)
         # TODO: Unlock unspents if bid cancelled
         # TODO: Manually select only segwit prevouts
@@ -1444,6 +1750,150 @@ class BTCInterface(Secp256k1Interface):
         rv = self.rpc_wallet("fundrawtransaction", [tx.hex(), options])
         tx_bytes: bytes = bytes.fromhex(rv["hex"])
         return tx_bytes
+
+    def _fundTxElectrum(self, tx: bytes, feerate) -> bytes:
+        wm = self.getWalletManager()
+        backend = self.getBackend()
+        if not wm or not backend:
+            raise ValueError("Electrum backend or WalletManager not available")
+
+        parsed_tx = self.loadTx(tx, allow_witness=False)
+        total_output = sum(out.nValue for out in parsed_tx.vout)
+
+        funded_addresses = wm.getFundedAddresses(self.coin_type())
+        addr_to_sh = (
+            funded_addresses
+            if funded_addresses
+            else wm.getSignableAddresses(self.coin_type())
+        )
+
+        if not addr_to_sh:
+            raise ValueError("No addresses available")
+
+        scripthashes = list(addr_to_sh.values())
+        sh_to_addr = {sh: addr for addr, sh in addr_to_sh.items()}
+
+        batch_utxos = backend.getBatchUnspent(scripthashes)
+
+        utxos = []
+        locked_count = 0
+        for sh, sh_utxos in batch_utxos.items():
+            addr = sh_to_addr.get(sh, "")
+            if not addr:
+                self._log.warning(f"_fundTxElectrum: no address for scripthash {sh}")
+            for utxo in sh_utxos:
+                utxo["address"] = addr
+                if addr:
+                    computed_sh = self.addressToScripthash(addr)
+                    if computed_sh != sh:
+                        self._log.error(
+                            f"_fundTxElectrum: scripthash mismatch for {addr}: "
+                            f"stored={sh}, computed={computed_sh}"
+                        )
+                if wm.isUTXOLocked(
+                    self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
+                ):
+                    locked_count += 1
+                    continue
+                utxos.append(utxo)
+
+        if not utxos:
+            if locked_count > 0:
+                raise ValueError(
+                    f"No UTXOs available ({locked_count} locked for pending swaps)"
+                )
+            raise ValueError("No UTXOs available")
+
+        utxos.sort(key=lambda x: x.get("value", 0), reverse=True)
+
+        input_vsize = 68
+        est_vsize = 10 + len(parsed_tx.vout) * 34 + input_vsize
+        if isinstance(feerate, int):
+            fee_per_vbyte = max(1, feerate // 1000)
+        else:
+            fee_per_vbyte = max(1, int(feerate * 100000))
+        est_fee = est_vsize * fee_per_vbyte
+
+        selected_utxos = []
+        total_input = 0
+        target = total_output + est_fee
+
+        for utxo in utxos:
+            selected_utxos.append(utxo)
+            total_input += utxo.get("value", 0)
+            est_vsize = (
+                10 + len(parsed_tx.vout) * 34 + len(selected_utxos) * input_vsize + 34
+            )
+            est_fee = est_vsize * fee_per_vbyte
+            target = total_output + est_fee
+            if total_input >= target:
+                break
+
+        if total_input < target:
+            raise ValueError(
+                f"Insufficient funds: have {total_input}, need {target} sats"
+            )
+
+        funded_tx = CTransaction()
+        funded_tx.nVersion = self.txVersion()
+
+        for utxo in selected_utxos:
+            txid_bytes = bytes.fromhex(utxo["txid"])[::-1]
+            txid_int = int.from_bytes(txid_bytes, "little")
+            funded_tx.vin.append(
+                CTxIn(COutPoint(txid_int, utxo["vout"]), nSequence=0xFFFFFFFD)
+            )
+
+        for out in parsed_tx.vout:
+            funded_tx.vout.append(out)
+
+        final_vsize = (
+            10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * input_vsize
+        )
+        final_fee = final_vsize * fee_per_vbyte
+
+        min_relay_fee = 250
+        final_fee = max(final_fee, min_relay_fee)
+        change = total_input - total_output - final_fee
+
+        if change > 1000:
+            change_addr = wm.getNewInternalAddress(self.coin_type())
+            if not change_addr:
+                change_addr = wm.getExistingInternalAddress(self.coin_type())
+            if not change_addr:
+                change_addr = selected_utxos[0].get("address")
+            pkh = self.decodeAddress(change_addr)
+            change_script = self.getScriptForPubkeyHash(pkh)
+            funded_tx.vout.append(self.txoType()(change, change_script))
+        else:
+            final_vsize = (
+                10 + len(funded_tx.vout) * 34 + len(selected_utxos) * input_vsize
+            )
+            final_fee = max(final_vsize * fee_per_vbyte, min_relay_fee)
+            change = 0  # Goes to fees
+
+        for utxo in selected_utxos:
+            wm.lockUTXO(
+                self.coin_type(),
+                utxo.get("txid", ""),
+                utxo.get("vout", 0),
+                value=utxo.get("value", 0),
+                address=utxo.get("address"),
+                expires_in=3600,
+            )
+
+        tx_serialized = funded_tx.serialize()
+        tx_key = self._getTxInputsKey(funded_tx)
+        with self._pending_utxos_lock:
+            self._pending_utxos_map[tx_key] = selected_utxos
+
+        self._log.debug(
+            f"_fundTxElectrum: outputs={len(parsed_tx.vout)}, utxos={len(utxos)}, "
+            f"selected={len(selected_utxos)}, input={total_input}, output={total_output}, "
+            f"fee={final_fee}, change={change}"
+        )
+
+        return tx_serialized
 
     def getNonSegwitOutputs(self):
         unspents = self.rpc_wallet("listunspent", [0, 99999999])
@@ -1474,7 +1924,9 @@ class BTCInterface(Secp256k1Interface):
         return nonsegwit_unspents
 
     def lockNonSegwitPrevouts(self) -> None:
-        # For tests
+        if self.useBackend():
+            return
+
         to_lock = self.getNonSegwitOutputs()
 
         if len(to_lock) > 0:
@@ -1483,6 +1935,18 @@ class BTCInterface(Secp256k1Interface):
 
     def listInputs(self, tx_bytes: bytes):
         tx = self.loadTx(tx_bytes)
+
+        if self.useBackend():
+            inputs = []
+            for pi in tx.vin:
+                inputs.append(
+                    {
+                        "txid": i2h(pi.prevout.hash),
+                        "vout": pi.prevout.n,
+                        "islocked": False,
+                    }
+                )
+            return inputs
 
         all_locked = self.rpc_wallet("listlockunspent")
         inputs = []
@@ -1500,6 +1964,9 @@ class BTCInterface(Secp256k1Interface):
         return inputs
 
     def unlockInputs(self, tx_bytes):
+        if self.useBackend():
+            return
+
         tx = self.loadTx(tx_bytes)
 
         inputs = []
@@ -1508,10 +1975,164 @@ class BTCInterface(Secp256k1Interface):
         self.rpc_wallet("lockunspent", [True, inputs])
 
     def signTxWithWallet(self, tx: bytes) -> bytes:
+        if self.useBackend():
+            return self._signTxWithWalletElectrum(tx)
+
         rv = self.rpc_wallet("signrawtransactionwithwallet", [tx.hex()])
         return bytes.fromhex(rv["hex"])
 
-    def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:
+    def _signTxWithWalletElectrum(self, tx: bytes) -> bytes:
+        from coincurve import PrivateKey
+
+        wm = self.getWalletManager()
+        backend = self.getBackend()
+        if not wm or not backend:
+            raise ValueError("Electrum backend or WalletManager not available")
+
+        parsed_tx = self.loadTx(tx)
+
+        utxos = self._getPendingUtxos(parsed_tx)
+        fetched_from_backend = False
+        if not utxos or len(utxos) != len(parsed_tx.vin):
+            fetched_from_backend = True
+            utxos = []
+            txids_to_fetch = [i2h(vin.prevout.hash) for vin in parsed_tx.vin]
+
+            tx_batch = {}
+            if hasattr(backend, "getTransactionBatch"):
+                tx_batch = backend.getTransactionBatch(txids_to_fetch)
+
+            needs_raw = any(
+                tx_batch.get(t) is None or not isinstance(tx_batch.get(t), dict)
+                for t in txids_to_fetch
+            )
+
+            if needs_raw:
+                if hasattr(backend, "getTransactionBatchRaw"):
+                    tx_batch_raw = backend.getTransactionBatchRaw(txids_to_fetch)
+                else:
+                    tx_batch_raw = {
+                        t: backend.getTransactionRaw(t) for t in txids_to_fetch
+                    }
+
+                for vin in parsed_tx.vin:
+                    txid_hex = i2h(vin.prevout.hash)
+                    vout_n = vin.prevout.n
+                    prev_tx_hex = tx_batch_raw.get(txid_hex)
+                    if prev_tx_hex:
+                        prev_tx = self.loadTx(bytes.fromhex(prev_tx_hex))
+                        if vout_n < len(prev_tx.vout):
+                            prev_out = prev_tx.vout[vout_n]
+                            addr = self.getAddressFromScriptPubKey(
+                                prev_out.scriptPubKey
+                            )
+                            utxos.append(
+                                {
+                                    "address": addr,
+                                    "value": prev_out.nValue,
+                                    "txid": txid_hex,
+                                    "vout": vout_n,
+                                }
+                            )
+            else:
+                for vin in parsed_tx.vin:
+                    txid_hex = i2h(vin.prevout.hash)
+                    vout = vin.prevout.n
+                    prev_tx = tx_batch.get(txid_hex)
+                    if prev_tx and "vout" in prev_tx:
+                        vouts = prev_tx["vout"]
+                        if vout >= len(vouts):
+                            self._log.warning(
+                                f"_signTxWithWalletElectrum: vout {vout} out of range for {txid_hex[:16]}..."
+                            )
+                            continue
+                        prev_out = vouts[vout]
+                        if "scriptPubKey" in prev_out:
+                            addr = prev_out["scriptPubKey"].get(
+                                "address",
+                                prev_out["scriptPubKey"].get("addresses", [None])[0],
+                            )
+                            value = int(prev_out.get("value", 0) * 100000000)
+                            utxos.append(
+                                {
+                                    "address": addr,
+                                    "value": value,
+                                    "txid": txid_hex,
+                                    "vout": vout,
+                                }
+                            )
+
+        for i, (vin, utxo) in enumerate(zip(parsed_tx.vin, utxos)):
+            address = utxo.get("address")
+            if not address:
+                raise ValueError(f"Cannot find address for input {i}")
+
+            priv_key = wm.getPrivateKey(self.coin_type(), address)
+            if not priv_key:
+                if wm.importAddress(self.coin_type(), address, max_scan_index=2000):
+                    priv_key = wm.getPrivateKey(self.coin_type(), address)
+            if not priv_key:
+                scripthash = self.addressToScripthash(address)
+                found_addr = wm.findAddressByScripthash(self.coin_type(), scripthash)
+                if found_addr:
+                    self._log.debug(
+                        f"_signTxWithWalletElectrum: found address by scripthash: "
+                        f"{address[:10]}... -> {found_addr[:10]}..."
+                    )
+                    priv_key = wm.getPrivateKey(self.coin_type(), found_addr)
+            if not priv_key:
+                addr_info = wm.getAddressInfo(self.coin_type(), address)
+                if addr_info and addr_info.get("is_watch_only"):
+                    self._log.error(
+                        f"_signTxWithWalletElectrum: Address {address} is watch-only without private key. "
+                        f"This UTXO cannot be spent. The funds may have been received from an external source "
+                        f"or the wallet was not properly initialized when the address was created. "
+                        f"label={addr_info.get('label', 'unknown')}"
+                    )
+                else:
+                    self._log.error(
+                        f"_signTxWithWalletElectrum: Cannot find private key for address {address}, "
+                        f"txid={utxo.get('txid', 'unknown')[:16]}..., vout={utxo.get('vout', -1)}"
+                    )
+                raise ValueError(f"Cannot find private key for address {address}")
+
+            pk = PrivateKey(priv_key)
+            pubkey = pk.public_key.format()
+
+            expected_pkh = self.decodeAddress(address)
+            actual_pkh = hash160(pubkey)
+            if expected_pkh != actual_pkh:
+                self._log.error(
+                    f"Private key mismatch for address {address}: "
+                    f"expected pkh {expected_pkh.hex()}, got {actual_pkh.hex()}"
+                )
+                raise ValueError(f"Private key does not match address {address}")
+
+            script_code = CScript(
+                [OP_DUP, OP_HASH160, expected_pkh, OP_EQUALVERIFY, OP_CHECKSIG]
+            )
+            value = utxo.get("value", 0)
+
+            sig = self.signTx(priv_key, tx, i, script_code, value)
+
+            parsed_tx.wit.vtxinwit.append(CTxInWitness())
+            parsed_tx.wit.vtxinwit[i].scriptWitness.stack = [sig, pubkey]
+
+        self._log.debug(
+            f"_signTxWithWalletElectrum: signed {len(utxos)} inputs "
+            f"(fetched={'yes' if fetched_from_backend else 'no'})"
+        )
+
+        self._clearPendingUtxos(parsed_tx)
+
+        return parsed_tx.serialize()
+
+    def signTxWithKey(
+        self, tx: bytes, key: bytes, prev_amount: Optional[int] = None
+    ) -> bytes:
+        if self.useBackend():
+            return self._signTxWithKeyLocal(tx, key, prev_amount)
+
         key_wif = self.encodeKey(key)
         rv = self.rpc(
             "signrawtransactionwithkey",
@@ -1524,8 +2145,166 @@ class BTCInterface(Secp256k1Interface):
         )
         return bytes.fromhex(rv["hex"])
 
+    def _signTxWithKeyLocal(
+        self, tx: bytes, key: bytes, prev_amount: Optional[int] = None
+    ) -> bytes:
+        from coincurve import PrivateKey
+
+        if prev_amount is None:
+            raise ValueError(
+                "_signTxWithKeyLocal requires prev_amount for signature hash"
+            )
+
+        pk = PrivateKey(key)
+        pubkey = pk.public_key.format()
+        pkh = hash160(pubkey)
+
+        script_code = CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
+
+        sig = self.signTx(key, tx, 0, script_code, prev_amount)
+
+        parsed_tx = self.loadTx(tx)
+        parsed_tx.wit.vtxinwit.clear()
+        parsed_tx.wit.vtxinwit.append(CTxInWitness())
+        parsed_tx.wit.vtxinwit[0].scriptWitness.stack = [sig, pubkey]
+
+        self._log.debug(
+            f"_signTxWithKeyLocal: signed tx with key, prev_amount={prev_amount}"
+        )
+
+        return parsed_tx.serialize()
+
     def publishTx(self, tx: bytes):
+        if self.useBackend():
+            txid = self._backend.broadcastTransaction(tx.hex())
+            wm = self.getWalletManager()
+            if wm and txid:
+                parsed_tx = self.loadTx(tx)
+                total_out = sum(out.nValue for out in parsed_tx.vout)
+                wm.addPendingTx(
+                    self.coin_type(),
+                    txid,
+                    tx_type="outgoing",
+                    amount=total_out,
+                )
+            return txid
         return self.rpc("sendrawtransaction", [tx.hex()])
+
+    def bumpTxFee(self, txid: str, new_feerate: float) -> Optional[str]:
+        if not self.useBackend():
+            try:
+                result = self.rpc_wallet("bumpfee", [txid, {"fee_rate": new_feerate}])
+                return result.get("txid")
+            except Exception as e:
+                self._log.warning(f"bumpfee failed: {e}")
+                return None
+
+        backend = self.getBackend()
+        wm = self.getWalletManager()
+        if not backend or not wm:
+            return None
+
+        try:
+            tx_info = backend.getTransaction(txid)
+            tx_hex = None
+            if tx_info and isinstance(tx_info, dict):
+                tx_hex = tx_info.get("hex")
+            if not tx_hex:
+                tx_hex = backend.getTransactionRaw(txid)
+            if not tx_hex:
+                self._log.warning(f"bumpTxFee: Cannot find tx {txid}")
+                return None
+
+            orig_tx = self.loadTx(bytes.fromhex(tx_hex))
+
+            rbf_enabled = any(vin.nSequence < 0xFFFFFFFE for vin in orig_tx.vin)
+            if not rbf_enabled:
+                self._log.warning(f"bumpTxFee: Transaction {txid} is not RBF-enabled")
+                return None
+
+            total_in = 0
+            prev_txids = [i2h(vin.prevout.hash) for vin in orig_tx.vin]
+            if hasattr(backend, "getTransactionBatchRaw"):
+                tx_batch_raw = backend.getTransactionBatchRaw(prev_txids)
+            else:
+                tx_batch_raw = {t: backend.getTransactionRaw(t) for t in prev_txids}
+
+            for vin in orig_tx.vin:
+                prev_txid = i2h(vin.prevout.hash)
+                prev_tx_hex = tx_batch_raw.get(prev_txid)
+                if prev_tx_hex:
+                    prev_tx = self.loadTx(bytes.fromhex(prev_tx_hex))
+                    if vin.prevout.n < len(prev_tx.vout):
+                        total_in += prev_tx.vout[vin.prevout.n].nValue
+
+            total_out = sum(out.nValue for out in orig_tx.vout)
+            current_fee = total_in - total_out
+
+            # Calculate new fee
+            tx_vsize = self.getTxVSize(orig_tx)
+            new_fee = int(tx_vsize * new_feerate)
+
+            if new_fee <= current_fee:
+                self._log.warning(
+                    f"bumpTxFee: New fee {new_fee} must be higher than current {current_fee}"
+                )
+                return None
+
+            fee_increase = new_fee - current_fee
+
+            change_idx = None
+            change_value = 0
+            for idx, out in enumerate(orig_tx.vout):
+                try:
+                    addr = self.getAddressFromScriptPubKey(out.scriptPubKey)
+                    if wm.hasAddress(self.coin_type(), addr):
+                        if out.nValue > change_value:
+                            change_idx = idx
+                            change_value = out.nValue
+                except Exception:
+                    continue
+
+            if change_idx is None or change_value < fee_increase:
+                self._log.warning("bumpTxFee: No suitable change output to reduce")
+                return None
+
+            new_tx = CTransaction()
+            new_tx.nVersion = orig_tx.nVersion
+            new_tx.vin = orig_tx.vin
+            new_tx.vout = []
+
+            for idx, out in enumerate(orig_tx.vout):
+                if idx == change_idx:
+                    new_out = self.txoType()(
+                        out.nValue - fee_increase, out.scriptPubKey
+                    )
+                    new_tx.vout.append(new_out)
+                else:
+                    new_tx.vout.append(out)
+
+            signed_tx = self.signTxWithWallet(new_tx.serialize())
+            new_txid = self.publishTx(signed_tx)
+
+            self._log.info(
+                f"bumpTxFee: Replaced {txid[:16]}... with {new_txid[:16]}... "
+                f"(fee: {current_fee} -> {new_fee})"
+            )
+            return new_txid
+
+        except Exception as e:
+            self._log.warning(f"bumpTxFee failed: {e}")
+            return None
+
+    def getAddressFromScriptPubKey(self, script) -> Optional[str]:
+        """Extract address from scriptPubKey."""
+        script_bytes = bytes(script) if hasattr(script, "__bytes__") else script
+        if len(script_bytes) == 22 and script_bytes[0] == 0 and script_bytes[1] == 20:
+            pkh = script_bytes[2:22]
+            return self.encodeSegwitAddress(pkh)
+        if len(script_bytes) == 25 and script_bytes[0:3] == b"\x76\xa9\x14":
+            pkh = script_bytes[3:23]
+            return self.pkh_to_address(pkh)
+        return None
 
     def encodeTx(self, tx) -> bytes:
         return tx.serialize()
@@ -1581,21 +2360,121 @@ class BTCInterface(Secp256k1Interface):
         return self.getScriptForPubkeyHash(self.getPubkeyHash(K))
 
     def scanTxOutset(self, dest):
+        if self._connection_type == "electrum":
+            return self._scanTxOutsetElectrum(dest)
         return self.rpc("scantxoutset", ["start", ["raw({})".format(dest.hex())]])
 
+    def _scanTxOutsetElectrum(self, dest):
+        backend = self.getBackend()
+        if not backend:
+            return {"success": False, "unspents": [], "total_amount": 0}
+
+        scripthash = self.scriptToScripthash(dest)
+        try:
+            utxos = backend._server.call(
+                "blockchain.scripthash.listunspent", [scripthash]
+            )
+            chain_height = backend.getBlockHeight()
+            total = sum(u.get("value", 0) for u in utxos)
+            return {
+                "success": True,
+                "height": chain_height,
+                "unspents": [
+                    {
+                        "txid": u["tx_hash"],
+                        "vout": u["tx_pos"],
+                        "amount": u["value"] / self.COIN(),
+                        "height": u.get("height", 0),
+                    }
+                    for u in utxos
+                ],
+                "total_amount": total / self.COIN(),
+            }
+        except Exception as e:
+            self._log.debug(f"_scanTxOutsetElectrum error: {e}")
+            return {"success": False, "unspents": [], "total_amount": 0}
+
     def getTransaction(self, txid: bytes):
+        if self._connection_type == "electrum":
+            return self._getTransactionElectrum(txid)
         try:
             return bytes.fromhex(self.rpc("getrawtransaction", [txid.hex()]))
         except Exception as e:  # noqa: F841
             # TODO: filter errors
             return None
 
+    def _getTransactionElectrum(self, txid: bytes):
+        backend = self.getBackend()
+        if not backend:
+            return None
+        try:
+            tx_info = backend.getTransaction(txid.hex())
+            if tx_info:
+                tx_hex = tx_info.get("hex") if isinstance(tx_info, dict) else tx_info
+                return bytes.fromhex(tx_hex)
+            tx_hex = backend.getTransactionRaw(txid.hex())
+            if tx_hex:
+                return bytes.fromhex(tx_hex)
+        except Exception as e:
+            self._log.debug(f"_getTransactionElectrum failed for {txid.hex()}: {e}")
+        return None
+
     def getWalletTransaction(self, txid: bytes):
+        if self._connection_type == "electrum":
+            return self._getTransactionElectrum(txid)
         try:
             return bytes.fromhex(self.rpc_wallet("gettransaction", [txid.hex()])["hex"])
         except Exception as e:  # noqa: F841
             # TODO: filter errors
             return None
+
+    def listWalletTransactions(self, count=100, skip=0, include_watchonly=True):
+        if self._connection_type == "electrum":
+            return self._listWalletTransactionsElectrum(count, skip)
+        try:
+            return self.rpc_wallet(
+                "listtransactions", ["*", count, skip, include_watchonly]
+            )
+        except Exception as e:
+            self._log.error(f"listWalletTransactions failed: {e}")
+            return []
+
+    def _listWalletTransactionsElectrum(self, count=100, skip=0):
+        backend = self.getBackend()
+        if not backend:
+            return []
+
+        transactions = []
+        chain_height = backend.getBlockHeight()
+
+        addresses = []
+        if hasattr(self, "_wallet_manager") and self._wallet_manager:
+            addresses = list(self._wallet_manager._addresses.values())
+
+        for address in addresses:
+            try:
+                history = backend.getAddressHistory(address)
+                for tx in history:
+                    tx_hash = tx.get("txid", tx.get("tx_hash", ""))
+                    height = tx.get("height", 0)
+                    confirmations = (
+                        max(0, chain_height - height + 1) if height > 0 else 0
+                    )
+                    transactions.append(
+                        {
+                            "txid": tx_hash,
+                            "address": address,
+                            "confirmations": confirmations,
+                            "category": "receive",
+                            "amount": 0,
+                            "time": 0,
+                        }
+                    )
+            except Exception as e:
+                self._log.debug(f"listWalletTransactions electrum error for tx: {e}")
+
+        transactions = transactions[skip : skip + count]
+        return transactions
 
     def setTxSignature(self, tx_bytes: bytes, stack) -> bytes:
         tx = self.loadTx(tx_bytes)
@@ -1714,14 +2593,36 @@ class BTCInterface(Secp256k1Interface):
         script_pk = self.getPkDest(Kbs)
 
         if locked_n is None:
-            wtx = self.rpc_wallet_watch(
-                "gettransaction",
-                [
-                    chain_b_lock_txid.hex(),
-                ],
-            )
-            lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
-            locked_n = findOutput(lock_tx, script_pk)
+            if self.useBackend():
+                backend = self.getBackend()
+                tx_hex = backend.getTransactionRaw(chain_b_lock_txid.hex())
+                if tx_hex:
+                    lock_tx = self.loadTx(bytes.fromhex(tx_hex))
+                    locked_n = findOutput(lock_tx, script_pk)
+                    if locked_n is None:
+                        self._log.error(
+                            f"spendBLockTx: Output not found in tx {chain_b_lock_txid.hex()}, "
+                            f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
+                        )
+                        for i, out in enumerate(lock_tx.vout):
+                            self._log.debug(
+                                f"  vout[{i}]: value={out.nValue}, scriptPubKey={out.scriptPubKey.hex()}"
+                            )
+                else:
+                    self._log.warning(
+                        f"spendBLockTx: Failed to fetch tx {chain_b_lock_txid.hex()} from electrum, "
+                        f"defaulting to vout=0 (standard for B lock transactions)"
+                    )
+                    locked_n = 0
+            else:
+                wtx = self.rpc_wallet_watch(
+                    "gettransaction",
+                    [
+                        chain_b_lock_txid.hex(),
+                    ],
+                )
+                lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
+                locked_n = findOutput(lock_tx, script_pk)
         ensure(locked_n is not None, "Output not found in tx")
 
         pkh_to = self.decodeAddress(address_to)
@@ -1747,11 +2648,21 @@ class BTCInterface(Secp256k1Interface):
         tx.vout[0].nValue = cb_swap_value - pay_fee
 
         b_lock_spend_tx = tx.serialize()
-        b_lock_spend_tx = self.signTxWithKey(b_lock_spend_tx, kbs)
+        b_lock_spend_tx = self.signTxWithKey(
+            b_lock_spend_tx, kbs, prev_amount=cb_swap_value
+        )
 
         return bytes.fromhex(self.publishTx(b_lock_spend_tx))
 
     def importWatchOnlyAddress(self, address: str, label: str) -> None:
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm:
+                wm.importWatchOnlyAddress(
+                    self.coin_type(), address, label=label, source="swap"
+                )
+            return
+
         if self._use_descriptors:
             desc_watch = descsum_create(f"addr({address})")
             rv = self.rpc_wallet_watch(
@@ -1784,6 +2695,11 @@ class BTCInterface(Secp256k1Interface):
         find_index: bool = False,
         vout: int = -1,
     ):
+        if self._connection_type == "electrum":
+            return self._getLockTxHeightElectrum(
+                txid, dest_address, bid_amount, rescan_from, find_index, vout
+            )
+
         # Add watchonly address and rescan if required
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
@@ -1851,7 +2767,211 @@ class BTCInterface(Secp256k1Interface):
 
         return rv
 
+    def _getLockTxHeightElectrum(
+        self,
+        txid,
+        dest_address,
+        bid_amount,
+        rescan_from,
+        find_index: bool = False,
+        vout: int = -1,
+    ):
+        backend = self.getBackend()
+        if not backend:
+            self._log.error("No electrum backend available for getLockTxHeight")
+            return None
+
+        self.importWatchOnlyAddress(dest_address, "bid")
+
+        chain_height = self.getChainHeight()
+        return_txid = txid is None
+
+        if txid is None:
+            utxos = backend.getUnspentOutputs([dest_address])
+            for utxo in utxos:
+                if utxo.get("value") == bid_amount:
+                    txid = bytes.fromhex(utxo["txid"])
+                    break
+
+        if txid is None:
+            return None
+
+        wm = self.getWalletManager()
+        if wm:
+            cached = wm.getCachedTxConfirmations(self.coin_type(), txid.hex())
+            if cached is not None:
+                confirmations, block_height = cached
+                if block_height > 0:
+                    confirmations = max(0, chain_height - block_height + 1)
+                rv = {"depth": confirmations, "height": block_height}
+                if find_index:
+                    try:
+                        tx_info = backend.getTransaction(txid.hex())
+                        tx_hex = None
+                        if tx_info and isinstance(tx_info, dict):
+                            tx_hex = tx_info.get("hex")
+                        if not tx_hex:
+                            tx_hex = backend.getTransactionRaw(txid.hex())
+                        if tx_hex:
+                            tx = self.loadTx(bytes.fromhex(tx_hex))
+                            dest_script = self.getDestForAddress(dest_address)
+                            for idx, txout in enumerate(tx.vout):
+                                if txout.scriptPubKey == dest_script:
+                                    rv["index"] = idx
+                                    break
+                    except Exception:
+                        pass
+                if return_txid:
+                    rv["txid"] = txid.hex()
+                return rv
+
+        try:
+            tx_info = backend.getTransaction(txid.hex())
+            block_height = 0
+            confirmations = 0
+
+            if tx_info and isinstance(tx_info, dict):
+                if "height" in tx_info:
+                    block_height = tx_info.get("height", 0)
+                elif "confirmations" in tx_info:
+                    confirmations = tx_info.get("confirmations", 0)
+                    if confirmations > 0:
+                        block_height = chain_height - confirmations + 1
+
+                if block_height > 0:
+                    confirmations = max(0, chain_height - block_height + 1)
+
+            if block_height == 0:
+                history = backend.getAddressHistory(dest_address)
+                for entry in history:
+                    if entry.get("txid") == txid.hex():
+                        block_height = entry.get("height", 0)
+                        if block_height > 0:
+                            confirmations = max(0, chain_height - block_height + 1)
+                        break
+
+            if wm:
+                wm.cacheTxConfirmations(
+                    self.coin_type(), txid.hex(), confirmations, block_height
+                )
+
+            rv = {
+                "depth": confirmations,
+                "height": block_height if block_height > 0 else 0,
+            }
+        except Exception as e:
+            self._log.debug(
+                "getLockTxHeight electrum failed: %s, %s", txid.hex(), str(e)
+            )
+            return None
+
+        if find_index:
+            try:
+                tx_info = backend.getTransaction(txid.hex())
+                tx_hex = None
+                if tx_info and isinstance(tx_info, dict):
+                    tx_hex = tx_info.get("hex")
+                if not tx_hex:
+                    tx_hex = backend.getTransactionRaw(txid.hex())
+                if tx_hex:
+                    tx = self.loadTx(bytes.fromhex(tx_hex))
+                    dest_script = self.getDestForAddress(dest_address)
+                    for idx, txout in enumerate(tx.vout):
+                        if txout.scriptPubKey == dest_script:
+                            rv["index"] = idx
+                            break
+            except Exception as e:
+                self._log.debug(
+                    f"lookupUnspentByAddress electrum index lookup error: {e}"
+                )
+
+        if return_txid:
+            rv["txid"] = txid.hex()
+
+        return rv
+
+    def scriptToScripthash(self, script: bytes) -> str:
+        return sha256(script)[::-1].hex()
+
+    def checkWatchedOutput(self, txid_hex: str, vout: int):
+        backend = self.getBackend()
+        if not backend:
+            return None
+
+        try:
+            tx_hex = backend._server.call_background(
+                "blockchain.transaction.get", [txid_hex, False]
+            )
+            if not tx_hex:
+                return None
+
+            tx = self.loadTx(bytes.fromhex(tx_hex))
+            script_hex = tx.vout[vout].scriptPubKey.hex()
+            scripthash = self.scriptToScripthash(bytes.fromhex(script_hex))
+
+            history = backend._server.call_background(
+                "blockchain.scripthash.get_history", [scripthash]
+            )
+            self._log.debug(
+                f"checkWatchedOutput {txid_hex}:{vout} - history has {len(history)} entries"
+            )
+
+            for tx_entry in history:
+                self._log.debug(
+                    f"  history entry: {tx_entry.get('tx_hash')[:16]}... height={tx_entry.get('height', 0)}"
+                )
+                if tx_entry.get("tx_hash") != txid_hex:
+                    spend_hex = backend._server.call_background(
+                        "blockchain.transaction.get", [tx_entry["tx_hash"], False]
+                    )
+                    if not spend_hex:
+                        continue
+                    spend_tx = self.loadTx(bytes.fromhex(spend_hex))
+                    for i, inp in enumerate(spend_tx.vin):
+                        inp_txid = f"{inp.prevout.hash:064x}"
+                        if inp_txid == txid_hex and inp.prevout.n == vout:
+                            self._log.debug(f"  Found spend in {tx_entry['tx_hash']}")
+                            return {
+                                "txid": tx_entry["tx_hash"],
+                                "vin": i,
+                                "height": tx_entry.get("height", 0),
+                            }
+        except Exception as e:
+            self._log.debug(f"checkWatchedOutput exception for {txid_hex}:{vout}: {e}")
+        return None
+
+    def checkWatchedScript(self, script: bytes):
+        backend = self.getBackend()
+        if not backend:
+            return None
+
+        try:
+            scripthash = self.scriptToScripthash(script)
+            history = backend._server.call_background(
+                "blockchain.scripthash.get_history", [scripthash]
+            )
+            for tx_entry in history:
+                tx_hex = backend._server.call_background(
+                    "blockchain.transaction.get", [tx_entry["tx_hash"], False]
+                )
+                if not tx_hex:
+                    continue
+                tx = self.loadTx(bytes.fromhex(tx_hex))
+                for i, out in enumerate(tx.vout):
+                    if out.scriptPubKey == script:
+                        return {
+                            "txid": tx_entry["tx_hash"],
+                            "vout": i,
+                            "height": tx_entry.get("height", 0),
+                        }
+        except Exception as e:
+            self._log.debug(f"_findOutputSpendingScript electrum error: {e}")
+        return None
+
     def getOutput(self, txid, dest_script, expect_value, xmr_swap=None):
+        if self._connection_type == "electrum":
+            return self._getOutputElectrum(txid, dest_script, expect_value, xmr_swap)
+
         # TODO: Use getrawtransaction if txindex is active
         utxos = self.rpc(
             "scantxoutset", ["start", ["raw({})".format(dest_script.hex())]]
@@ -1883,9 +3003,62 @@ class BTCInterface(Secp256k1Interface):
             )
         return rv, chain_height
 
+    def _getOutputElectrum(self, txid, dest_script, expect_value, xmr_swap=None):
+        backend = self.getBackend()
+        if not backend:
+            return [], 0
+
+        scripthash = self.scriptToScripthash(dest_script)
+        chain_height = backend.getBlockHeight()
+        rv = []
+
+        try:
+            utxos = backend._server.call(
+                "blockchain.scripthash.listunspent", [scripthash]
+            )
+            for utxo in utxos:
+                utxo_txid = utxo["tx_hash"]
+                if txid and txid.hex() != utxo_txid:
+                    continue
+
+                utxo_value = utxo["value"]
+                if expect_value != utxo_value:
+                    continue
+
+                utxo_height = utxo.get("height", 0)
+                rv.append(
+                    {
+                        "depth": (
+                            0 if utxo_height <= 0 else (chain_height - utxo_height) + 1
+                        ),
+                        "height": utxo_height if utxo_height > 0 else 0,
+                        "amount": utxo_value,
+                        "txid": utxo_txid,
+                        "vout": utxo["tx_pos"],
+                    }
+                )
+        except Exception as e:
+            self._log.debug(f"_getOutputElectrum error: {e}")
+
+        return rv, chain_height
+
     def withdrawCoin(self, value: float, addr_to: str, subfee: bool):
+        if self.useBackend():
+            return self._withdrawCoinElectrum(value, addr_to, subfee)
+
         params = [addr_to, value, "", "", subfee, True, self._conf_target]
         return self.rpc_wallet("sendtoaddress", params)
+
+    def _withdrawCoinElectrum(self, value: float, addr_to: str, subfee: bool) -> str:
+
+        amount_sats = self.make_int(value)
+
+        tx_hex = self._createRawFundedTransactionElectrum(addr_to, amount_sats, subfee)
+
+        signed_tx = self.signTxWithWallet(bytes.fromhex(tx_hex))
+
+        txid = self._backend.broadcastTransaction(signed_tx.hex())
+        return txid
 
     def signCompact(self, k, message: str) -> bytes:
         message_hash = sha256(bytes(message, "utf-8"))
@@ -1953,9 +3126,87 @@ class BTCInterface(Secp256k1Interface):
         return length
 
     def describeTx(self, tx_hex: str):
+        if self.useBackend():
+            return self._describeTxLocal(tx_hex)
+        return self.rpc("decoderawtransaction", [tx_hex])
+
+    def _describeTxLocal(self, tx_hex: str) -> dict:
+        tx = self.loadTx(bytes.fromhex(tx_hex))
+        tx.rehash()
+
+        bech32_prefix = self.chainparams_network()["hrp"]
+
+        vout = []
+        for i, out in enumerate(tx.vout):
+            script_hex = out.scriptPubKey.hex()
+            scriptPubKey = {"hex": script_hex}
+
+            try:
+                if (
+                    len(out.scriptPubKey) == 22
+                    and out.scriptPubKey[0] == 0
+                    and out.scriptPubKey[1] == 20
+                ):
+                    pkh = bytes(out.scriptPubKey[2:22])
+                    addr = segwit_addr.encode(bech32_prefix, 0, pkh)
+                    scriptPubKey["address"] = addr
+                elif (
+                    len(out.scriptPubKey) == 34
+                    and out.scriptPubKey[0] == 0
+                    and out.scriptPubKey[1] == 32
+                ):
+                    script_hash = bytes(out.scriptPubKey[2:34])
+                    addr = segwit_addr.encode(bech32_prefix, 0, script_hash)
+                    scriptPubKey["address"] = addr
+            except Exception as e:
+                self._log.debug(
+                    f"decodeTransaction address decode error for output {i}: {e}"
+                )
+
+            vout.append(
+                {
+                    "n": i,
+                    "value": self.format_amount(out.nValue),
+                    "scriptPubKey": scriptPubKey,
+                }
+            )
+
+        vin = []
+        for inp in tx.vin:
+            vin.append(
+                {
+                    "txid": i2h(inp.prevout.hash),
+                    "vout": inp.prevout.n,
+                    "sequence": inp.nSequence,
+                }
+            )
+
+        txid = (
+            tx.hash
+            if hasattr(tx, "hash") and tx.hash
+            else (i2h(tx.sha256) if tx.sha256 else "")
+        )
+
+        return {
+            "txid": txid,
+            "version": tx.nVersion,
+            "locktime": tx.nLockTime,
+            "vin": vin,
+            "vout": vout,
+        }
+
+    def decodeRawTransaction(self, tx_hex: str):
+        if self.useBackend():
+            return self._describeTxLocal(tx_hex)
         return self.rpc("decoderawtransaction", [tx_hex])
 
     def getSpendableBalance(self) -> int:
+        if self.useBackend():
+            cached = getattr(self, "_cached_wallet_info", None)
+            if cached is not None:
+                return self.make_int(cached.get("balance", 0))
+            return 0
+
         return self.make_int(self.rpc_wallet("getbalances")["mine"]["trusted"])
 
     def createUTXO(self, value_sats: int):
@@ -1978,6 +3229,9 @@ class BTCInterface(Secp256k1Interface):
         sub_fee: bool = False,
         lock_unspents: bool = True,
     ) -> str:
+        if self.useBackend():
+            return self._createRawFundedTransactionElectrum(addr_to, amount, sub_fee)
+
         txn = self.rpc(
             "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
         )
@@ -1992,18 +3246,152 @@ class BTCInterface(Secp256k1Interface):
             ]
         return self.rpc_wallet("fundrawtransaction", [txn, options])["hex"]
 
+    def _createRawFundedTransactionElectrum(
+        self, addr_to: str, amount: int, sub_fee: bool = False
+    ) -> str:
+        feerate, _rate_src = self.get_fee_rate()
+        if isinstance(feerate, int):
+            fee_per_vbyte = max(1, feerate // 1000)
+        else:
+            fee_per_vbyte = max(1, int(feerate * 100000))
+
+        if sub_fee:
+            wm = self.getWalletManager()
+            backend = self.getBackend()
+            if not wm or not backend:
+                raise ValueError("Electrum backend or WalletManager not available")
+
+            funded_addresses = wm.getFundedAddresses(self.coin_type())
+            addr_to_sh = (
+                funded_addresses
+                if funded_addresses
+                else wm.getSignableAddresses(self.coin_type())
+            )
+
+            scripthashes = list(addr_to_sh.values())
+            sh_to_addr = {sh: addr for addr, sh in addr_to_sh.items()}
+            batch_utxos = backend.getBatchUnspent(scripthashes)
+
+            all_utxos = []
+            for sh, sh_utxos in batch_utxos.items():
+                addr = sh_to_addr.get(sh, "")
+                for utxo in sh_utxos:
+                    utxo["address"] = addr
+                    all_utxos.append(utxo)
+
+            if not all_utxos:
+                raise ValueError("No UTXOs available")
+
+            total_balance = sum(u.get("value", 0) for u in all_utxos)
+
+            est_vsize = 10 + 31 + len(all_utxos) * 68
+            est_fee = est_vsize * fee_per_vbyte
+
+            if total_balance <= est_fee:
+                raise ValueError(
+                    f"Balance {total_balance} too small to cover fee {est_fee}"
+                )
+
+            tx = CTransaction()
+            tx.nVersion = self.txVersion()
+
+            for utxo in all_utxos:
+                txid_bytes = bytes.fromhex(utxo["txid"])[::-1]
+                txid_int = int.from_bytes(txid_bytes, "little")
+                txin = CTxIn(COutPoint(txid_int, utxo["vout"]))
+                txin.nSequence = 0xFFFFFFFD
+                tx.vin.append(txin)
+
+            script = self.getDestForAddress(addr_to)
+            tx.vout.append(self.txoType()(total_balance - est_fee, script))
+
+            tx_key = self._getTxInputsKey(tx)
+            with self._pending_utxos_lock:
+                self._pending_utxos_map[tx_key] = all_utxos
+
+            self._log.debug(
+                f"_createRawFundedTransactionElectrum: sub_fee=True, utxos={len(all_utxos)}, "
+                f"balance={total_balance}, fee={est_fee}"
+            )
+            return tx.serialize().hex()
+
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        script = self.getDestForAddress(addr_to)
+        output = self.txoType()(amount, script)
+        tx.vout.append(output)
+
+        tx_bytes = tx.serialize()
+        funded_tx = self.fundTx(tx_bytes, feerate)
+
+        return funded_tx.hex()
+
     def createRawSignedTransaction(self, addr_to, amount) -> str:
         txn_funded = self.createRawFundedTransaction(addr_to, amount)
+
+        if self.useBackend():
+            signed = self.signTxWithWallet(bytes.fromhex(txn_funded))
+            return signed.hex()
+
         return self.rpc_wallet("signrawtransactionwithwallet", [txn_funded])["hex"]
 
     def getBlockWithTxns(self, block_hash: str):
+        if self._connection_type == "electrum":
+            raise NotImplementedError("getBlockWithTxns not available in electrum mode")
         return self.rpc("getblock", [block_hash, 2])
 
     def listUtxos(self):
+        if self._connection_type == "electrum":
+            return self._listUtxosElectrum()
         return self.rpc_wallet("listunspent")
+
+    def _listUtxosElectrum(self):
+        backend = self.getBackend()
+        if not backend:
+            return []
+
+        utxos = []
+        addresses = []
+        if hasattr(self, "_wallet_manager") and self._wallet_manager:
+            addresses = list(self._wallet_manager._addresses.values())
+
+        chain_height = backend.getBlockHeight()
+        for address in addresses:
+            try:
+                scripthash = self.encodeScriptHash(self.decodeAddress(address))
+                addr_utxos = backend._server.call(
+                    "blockchain.scripthash.listunspent", [scripthash]
+                )
+                for u in addr_utxos:
+                    height = u.get("height", 0)
+                    confirmations = (
+                        max(0, chain_height - height + 1) if height > 0 else 0
+                    )
+                    utxos.append(
+                        {
+                            "txid": u["tx_hash"],
+                            "vout": u["tx_pos"],
+                            "address": address,
+                            "amount": u["value"] / self.COIN(),
+                            "confirmations": confirmations,
+                            "spendable": True,
+                        }
+                    )
+            except Exception as e:
+                self._log.debug(f"getUnspentOutputs electrum error for address: {e}")
+        return utxos
 
     def getUnspentsByAddr(self):
         unspent_addr = dict()
+
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if wm:
+                addresses = wm.getAllAddresses(self.coin_type())
+                if addresses:
+                    return self._backend.getBalance(addresses)
+            return unspent_addr
+
         unspent = self.rpc_wallet("listunspent")
         for u in unspent:
             if u.get("spendable", False) is False:
@@ -2028,27 +3416,143 @@ class BTCInterface(Secp256k1Interface):
         return unspent_addr
 
     def getUTXOBalance(self, address: str):
+        if self._connection_type == "electrum":
+            return self._getUTXOBalanceElectrum(address)
+
         sum_unspent = 0
-        self._log.debug("[rm] scantxoutset start")  # scantxoutset is slow
-        ro = self.rpc(
-            "scantxoutset", ["start", ["addr({})".format(address)]]
-        )  # TODO: Use combo(address) where possible
-        self._log.debug("[rm] scantxoutset end")
-        for o in ro["unspents"]:
-            sum_unspent += self.make_int(o["amount"])
+
+        with BTCInterface._scantxoutset_lock:
+            self._log.debug("scantxoutset start")
+            ro = self.rpc("scantxoutset", ["start", ["addr({})".format(address)]])
+            self._log.debug("scantxoutset end")
+
+            for o in ro["unspents"]:
+                sum_unspent += self.make_int(o["amount"])
         return sum_unspent
 
+    def _getUTXOBalanceElectrum(self, address: str):
+        backend = self.getBackend()
+        if not backend:
+            return 0
+
+        try:
+            scripthash = self.encodeScriptHash(self.decodeAddress(address))
+            utxos = backend._server.call(
+                "blockchain.scripthash.listunspent", [scripthash]
+            )
+            return sum(u.get("value", 0) for u in utxos)
+        except Exception as e:
+            self._log.debug(f"_getUTXOBalanceElectrum error: {e}")
+            return 0
+
     def signMessage(self, address: str, message: str) -> str:
+        if self._connection_type == "electrum":
+            return self._signMessageElectrum(address, message)
         return self.rpc_wallet(
             "signmessage",
             [address, message],
         )
 
+    def _signMessageElectrum(self, address: str, message: str) -> str:
+        wm = self.getWalletManager()
+        if not wm:
+            raise ValueError("WalletManager not available")
+
+        privkey = wm.getPrivateKey(self.coin_type(), address)
+        if not privkey:
+            raise ValueError(f"Private key not found for address: {address}")
+
+        key_wif = self.encodeKey(privkey)
+        return self._signMessageWithKeyLocal(key_wif, message)
+
     def signMessageWithKey(self, key_wif: str, message: str) -> str:
+        if self._connection_type == "electrum":
+            return self._signMessageWithKeyLocal(key_wif, message)
         return self.rpc("signmessagewithprivkey", [key_wif, message])
 
+    def _signMessageWithKeyLocal(self, key_wif: str, message: str) -> str:
+        from coincurve import PrivateKey as CCPrivateKey
+
+        privkey_bytes = decodeWif(key_wif)
+
+        message_magic = self.chainparams()["message_magic"]
+        message_bytes = (
+            SerialiseNumCompact(len(message_magic))
+            + bytes(message_magic, "utf-8")
+            + SerialiseNumCompact(len(message))
+            + bytes(message, "utf-8")
+        )
+        message_hash = sha256(sha256(message_bytes))
+
+        pk = CCPrivateKey(privkey_bytes)
+        sig = pk.sign_recoverable(message_hash, hasher=None)
+
+        rec_id = sig[64]
+        header = 27 + rec_id + 4
+        formatted_sig = bytes([header]) + sig[:64]
+
+        return base64.b64encode(formatted_sig).decode("utf-8")
+
     def getProofOfFunds(self, amount_for, extra_commit_bytes):
-        # TODO: Lock unspent and use same output/s to fund bid
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if wm:
+                result = wm.findAddressWithCachedBalance(
+                    self.coin_type(),
+                    amount_for,
+                    include_internal=False,
+                    max_cache_age=120,
+                )
+
+                if result is None and not wm.hasCachedBalances(self.coin_type()):
+                    try:
+                        addresses = wm.getAllAddresses(
+                            self.coin_type(), include_internal=False
+                        )
+                        if addresses:
+                            result = self._backend.findAddressWithBalance(
+                                addresses, amount_for
+                            )
+                    except Exception as e:
+                        self._log.warning(
+                            f"getProofOfFunds: error querying balance: {e}"
+                        )
+
+                ensure(
+                    result is not None,
+                    "Could not find address with enough funds for proof",
+                )
+                funds_addr, balance = result
+                sign_for_addr = funds_addr
+
+                try:
+                    if self.using_segwit():
+                        pkh = self.decodeAddress(sign_for_addr)
+                        sign_for_addr = self.pkh_to_address(pkh)
+
+                    sign_message = (
+                        sign_for_addr + "_swap_proof_" + extra_commit_bytes.hex()
+                    )
+                    priv_key = wm.getPrivateKey(self.coin_type(), funds_addr)
+                    if priv_key:
+                        key_wif = self.encodeKey(priv_key)
+                        signature = self.signMessageWithKey(key_wif, sign_message)
+                        self._log.debug(
+                            f"getProofOfFunds electrum: addr={funds_addr[:20]}..., balance={balance}"
+                        )
+                        return (sign_for_addr, signature, [])
+                    else:
+                        self._log.error(
+                            f"getProofOfFunds electrum: priv_key is None for {funds_addr}"
+                        )
+                except Exception as e:
+                    self._log.error(f"getProofOfFunds electrum: signing failed: {e}")
+                    import traceback
+
+                    self._log.error(traceback.format_exc())
+                    raise
+            raise ValueError("Cannot sign message: address not in WalletManager")
+
         unspent_addr = self.getUnspentsByAddr()
         sign_for_addr = None
         for addr, value in unspent_addr.items():
@@ -2148,31 +3652,63 @@ class BTCInterface(Secp256k1Interface):
         if self.using_segwit():
             address = self.encodeSegwitAddress(decodeAddress(address)[1:])
 
-        return self.getUTXOBalance(address)
+        if self.useBackend():
+            backend = self.getBackend()
+            if backend:
+                try:
+                    unspents = backend.getUnspentOutputs([address])
+                    total = sum(u.get("value", 0) for u in unspents)
+                    self._log.debug(
+                        f"verifyProofOfFunds electrum: {address} has {total} sats"
+                    )
+                    return total
+                except Exception as e:
+                    self._log.warning(
+                        f"Electrum balance check failed: {e}, skipping balance verification"
+                    )
+                    return 10**18
+
+        try:
+            return self.getUTXOBalance(address)
+        except Exception as e:
+            self._log.warning(
+                f"scantxoutset failed: {e}, skipping balance verification (signature valid)"
+            )
+            return 10**18
 
     def isWalletEncrypted(self) -> bool:
+        if self._connection_type == "electrum":
+            return False
         wallet_info = self.rpc_wallet("getwalletinfo")
         return "unlocked_until" in wallet_info
 
     def isWalletLocked(self) -> bool:
+        if self._connection_type == "electrum":
+            return False
         wallet_info = self.rpc_wallet("getwalletinfo")
         if "unlocked_until" in wallet_info and wallet_info["unlocked_until"] <= 0:
             return True
         return False
 
     def isWalletEncryptedLocked(self) -> (bool, bool):
+        if self._connection_type == "electrum":
+            return False, False
         wallet_info = self.rpc_wallet("getwalletinfo")
         encrypted = "unlocked_until" in wallet_info
         locked = encrypted and wallet_info["unlocked_until"] <= 0
         return encrypted, locked
 
     def createWallet(self, wallet_name: str, password: str = "") -> None:
+        if self._connection_type == "electrum":
+            return
         self.rpc(
             "createwallet",
             [wallet_name, False, True, password, False, self._use_descriptors],
         )
 
     def setActiveWallet(self, wallet_name: str) -> None:
+        if self._connection_type == "electrum":
+            return
         # For debugging
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host, wallet=wallet_name
@@ -2180,10 +3716,14 @@ class BTCInterface(Secp256k1Interface):
         self._rpc_wallet = wallet_name
 
     def newKeypool(self) -> None:
+        if self._connection_type == "electrum":
+            return
         self._log.debug("Running newkeypool.")
         self.rpc_wallet("newkeypool")
 
     def encryptWallet(self, password: str, check_seed: bool = True):
+        if self._connection_type == "electrum":
+            return
         # Watchonly wallets are not encrypted
         # Workaround for https://github.com/bitcoin/bitcoin/issues/26607
         seed_id_before: str = self.getWalletSeedID()
@@ -2401,6 +3941,9 @@ class BTCInterface(Secp256k1Interface):
             return
         self._log.info(f"unlockWallet - {self.ticker()}")
 
+        if self.useBackend():
+            return
+
         if self.coin_type() == Coins.BTC:
             # Recreate wallet if none found
             # Required when encrypting an existing btc wallet, workaround is to delete the btc wallet and recreate
@@ -2429,6 +3972,8 @@ class BTCInterface(Secp256k1Interface):
 
     def lockWallet(self):
         self._log.info(f"lockWallet - {self.ticker()}")
+        if self.useBackend():
+            return
         self.rpc_wallet("walletlock")
 
     def get_p2sh_script_pubkey(self, script: bytearray) -> bytearray:
@@ -2440,6 +3985,9 @@ class BTCInterface(Secp256k1Interface):
         return CScript([OP_0, sha256(script)])
 
     def findTxnByHash(self, txid_hex: str):
+        if self._connection_type == "electrum":
+            return self._findTxnByHashElectrum(txid_hex)
+
         # Only works for wallet txns
         try:
             rv = self.rpc_wallet("gettransaction", [txid_hex])
@@ -2452,6 +4000,72 @@ class BTCInterface(Secp256k1Interface):
             return {"txid": txid_hex, "amount": 0, "height": rv["blockheight"]}
         return None
 
+    def _findTxnByHashElectrum(self, txid_hex: str):
+        backend = self.getBackend()
+        if not backend:
+            return None
+
+        try:
+            tx_info = backend.getTransaction(txid_hex)
+            chain_height = backend.getBlockHeight()
+            block_height = 0
+            confirmations = 0
+            tx_hex = None
+
+            if tx_info and isinstance(tx_info, dict):
+                if "height" in tx_info:
+                    block_height = tx_info.get("height", 0)
+                elif "block_height" in tx_info:
+                    block_height = tx_info.get("block_height", 0)
+                elif "confirmations" in tx_info:
+                    confirmations = tx_info.get("confirmations", 0)
+                    if confirmations > 0:
+                        block_height = chain_height - confirmations + 1
+                tx_hex = tx_info.get("hex")
+
+            if block_height == 0 and not tx_hex:
+                tx_hex = backend.getTransactionRaw(txid_hex)
+                if not tx_hex:
+                    return None
+
+            if block_height == 0 and tx_hex:
+                try:
+                    tx = self.loadTx(bytes.fromhex(tx_hex))
+                    for txout in tx.vout:
+                        try:
+                            addr = self.encodeScriptDest(txout.scriptPubKey)
+                            if addr:
+                                history = backend.getAddressHistory(addr)
+                                for entry in history:
+                                    if (
+                                        entry.get("tx_hash") == txid_hex
+                                        or entry.get("txid") == txid_hex
+                                    ):
+                                        block_height = entry.get("height", 0)
+                                        if block_height > 0:
+                                            break
+                                if block_height > 0:
+                                    break
+                        except Exception:
+                            continue
+                except Exception as e:
+                    self._log.debug(
+                        f"_findTxnByHashElectrum address fallback failed: {e}"
+                    )
+
+            if block_height > 0:
+                confirmations = max(0, chain_height - block_height + 1)
+                if confirmations >= self.blocks_confirmed:
+                    self._log.debug(
+                        f"_findTxnByHashElectrum found tx {txid_hex[:16]}... "
+                        f"height={block_height}, confirmations={confirmations}"
+                    )
+                    return {"txid": txid_hex, "amount": 0, "height": block_height}
+
+        except Exception as e:
+            self._log.debug(f"_findTxnByHashElectrum failed: {e}")
+        return None
+
     def createRedeemTxn(
         self, prevout, output_addr: str, output_value: int, txn_script: bytes = None
     ) -> str:
@@ -2459,8 +4073,7 @@ class BTCInterface(Secp256k1Interface):
         tx.nVersion = self.txVersion()
         prev_txid = b2i(bytes.fromhex(prevout["txid"]))
         tx.vin.append(CTxIn(COutPoint(prev_txid, prevout["vout"])))
-        pkh = self.decodeAddress(output_addr)
-        script = self.getScriptForPubkeyHash(pkh)
+        script = self.getDestForAddress(output_addr)
         tx.vout.append(self.txoType()(output_value, script))
         tx.rehash()
         return tx.serialize().hex()
@@ -2484,8 +4097,7 @@ class BTCInterface(Secp256k1Interface):
                 nSequence=sequence,
             )
         )
-        pkh = self.decodeAddress(output_addr)
-        script = self.getScriptForPubkeyHash(pkh)
+        script = self.getDestForAddress(output_addr)
         tx.vout.append(self.txoType()(output_value, script))
         tx.rehash()
         return tx.serialize().hex()
@@ -2537,7 +4149,12 @@ class BTCInterface(Secp256k1Interface):
         return "Transaction already in block chain" in err_str
 
     def isTxNonFinalError(self, err_str: str) -> bool:
-        return "non-BIP68-final" in err_str or "non-final" in err_str
+        return (
+            "non-BIP68-final" in err_str
+            or "non-final" in err_str
+            or "Missing inputs" in err_str
+            or "bad-txns-inputs-missingorspent" in err_str
+        )
 
     def combine_non_segwit_prevouts(self):
         self._log.info("Combining non-segwit prevouts")

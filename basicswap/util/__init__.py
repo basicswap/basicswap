@@ -190,11 +190,14 @@ def format_amount(i: int, display_scale: int, scale: int = None) -> str:
     return rv
 
 
-def format_timestamp(value: int, with_seconds: bool = False) -> str:
+def format_timestamp(
+    value: int, with_seconds: bool = False, with_timezone: bool = False
+) -> str:
     str_format = "%Y-%m-%d %H:%M"
     if with_seconds:
         str_format += ":%S"
-    str_format += " %z"
+    if with_timezone:
+        str_format += " %z"
     return time.strftime(str_format, time.localtime(value))
 
 

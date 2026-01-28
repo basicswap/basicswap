@@ -218,6 +218,8 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     if have_data_entry(form_data, "fee_from_extra"):
         page_data["fee_from_extra"] = int(get_data_entry(form_data, "fee_from_extra"))
         parsed_data["fee_from_extra"] = page_data["fee_from_extra"]
+    else:
+        page_data["fee_from_extra"] = 0
 
     if have_data_entry(form_data, "fee_to_conf"):
         page_data["fee_to_conf"] = int(get_data_entry(form_data, "fee_to_conf"))
@@ -226,6 +228,8 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     if have_data_entry(form_data, "fee_to_extra"):
         page_data["fee_to_extra"] = int(get_data_entry(form_data, "fee_to_extra"))
         parsed_data["fee_to_extra"] = page_data["fee_to_extra"]
+    else:
+        page_data["fee_to_extra"] = 0
 
     if have_data_entry(form_data, "check_offer"):
         page_data["check_offer"] = True

@@ -32,11 +32,15 @@ DONATION_ADDRESSES = {
 
 
 def format_wallet_data(swap_client, ci, w):
+    coin_id = ci.coin_type()
+    connection_type = swap_client.coin_clients.get(coin_id, {}).get(
+        "connection_type", w.get("connection_type", "rpc")
+    )
     wf = {
         "name": ci.coin_name(),
         "version": w.get("version", "?"),
         "ticker": ci.ticker_mainnet(),
-        "cid": str(int(ci.coin_type())),
+        "cid": str(int(coin_id)),
         "balance": w.get("balance", "?"),
         "blocks": w.get("blocks", "?"),
         "synced": w.get("synced", "?"),
@@ -45,6 +49,7 @@ def format_wallet_data(swap_client, ci, w):
         "locked": w.get("locked", "?"),
         "updating": w.get("updating", "?"),
         "havedata": True,
+        "connection_type": connection_type,
     }
 
     if "wallet_blocks" in w:
@@ -70,6 +75,9 @@ def format_wallet_data(swap_client, ci, w):
     if pending > 0.0:
         wf["pending"] = ci.format_amount(pending)
 
+    if "unconfirmed" in w and float(w["unconfirmed"]) < 0.0:
+        wf["pending_out"] = ci.format_amount(abs(ci.make_int(w["unconfirmed"])))
+
     if ci.coin_type() == Coins.PART:
         wf["stealth_address"] = w.get("stealth_address", "?")
         wf["blind_balance"] = w.get("blind_balance", "?")
@@ -83,8 +91,83 @@ def format_wallet_data(swap_client, ci, w):
         wf["mweb_balance"] = w.get("mweb_balance", "?")
         wf["mweb_pending"] = w.get("mweb_pending", "?")
 
+    if hasattr(ci, "getScanStatus"):
+        wf["scan_status"] = ci.getScanStatus()
+
+    if connection_type == "electrum" and hasattr(ci, "_backend") and ci._backend:
+        backend = ci._backend
+        wf["electrum_server"] = backend.getServerHost()
+        wf["electrum_version"] = backend.getServerVersion()
+        try:
+            conn_status = backend.getConnectionStatus()
+            wf["electrum_connected"] = conn_status.get("connected", False)
+            wf["electrum_failures"] = conn_status.get("failures", 0)
+            wf["electrum_using_defaults"] = conn_status.get("using_defaults", True)
+            wf["electrum_all_failed"] = conn_status.get("all_failed", False)
+            wf["electrum_last_error"] = conn_status.get("last_error")
+            if conn_status.get("connected"):
+                wf["electrum_status"] = "connected"
+            elif conn_status.get("all_failed"):
+                wf["electrum_status"] = "all_failed"
+            else:
+                wf["electrum_status"] = "disconnected"
+        except Exception:
+            wf["electrum_connected"] = False
+            wf["electrum_status"] = "error"
+
     checkAddressesOwned(swap_client, ci, wf)
     return wf
+
+
+def format_transactions(ci, transactions, coin_id):
+    formatted_txs = []
+
+    if coin_id in (Coins.XMR, Coins.WOW):
+        for tx in transactions:
+            tx_type = tx.get("type", "")
+            direction = (
+                "Incoming"
+                if tx_type == "in"
+                else "Outgoing" if tx_type == "out" else tx_type.capitalize()
+            )
+
+            formatted_txs.append(
+                {
+                    "txid": tx.get("txid", ""),
+                    "type": direction,
+                    "amount": ci.format_amount(tx.get("amount", 0)),
+                    "confirmations": tx.get("confirmations", 0),
+                    "timestamp": format_timestamp(tx.get("timestamp", 0)),
+                    "height": tx.get("height", 0),
+                }
+            )
+    else:
+        for tx in transactions:
+            category = tx.get("category", "")
+            if category == "send":
+                direction = "Outgoing"
+                amount = abs(tx.get("amount", 0))
+            elif category == "receive":
+                direction = "Incoming"
+                amount = tx.get("amount", 0)
+            else:
+                direction = category.capitalize()
+                amount = abs(tx.get("amount", 0))
+
+            formatted_txs.append(
+                {
+                    "txid": tx.get("txid", ""),
+                    "type": direction,
+                    "amount": ci.format_amount(ci.make_int(amount)),
+                    "confirmations": tx.get("confirmations", 0),
+                    "timestamp": format_timestamp(
+                        tx.get("time", tx.get("timereceived", 0))
+                    ),
+                    "address": tx.get("address", ""),
+                }
+            )
+
+    return formatted_txs
 
 
 def page_wallets(self, url_split, post_string):
@@ -131,6 +214,7 @@ def page_wallets(self, url_split, post_string):
             "err_messages": err_messages,
             "wallets": wallets_formatted,
             "summary": summary,
+            "use_tor": getattr(swap_client, "use_tor_proxy", False),
         },
     )
 
@@ -151,8 +235,25 @@ def page_wallet(self, url_split, post_string):
     show_utxo_groups: bool = False
     withdrawal_successful: bool = False
     force_refresh: bool = False
+
+    tx_filters = {
+        "page_no": 1,
+        "limit": 30,
+        "offset": 0,
+    }
+
     form_data = self.checkForm(post_string, "wallet", err_messages)
     if form_data:
+        if have_data_entry(form_data, "pageback"):
+            tx_filters["page_no"] = int(form_data[b"pageno"][0]) - 1
+            if tx_filters["page_no"] < 1:
+                tx_filters["page_no"] = 1
+        elif have_data_entry(form_data, "pageforwards"):
+            tx_filters["page_no"] = int(form_data[b"pageno"][0]) + 1
+
+        if tx_filters["page_no"] > 1:
+            tx_filters["offset"] = (tx_filters["page_no"] - 1) * 30
+
         cid = str(int(coin_id))
 
         estimate_fee: bool = have_data_entry(form_data, "estfee_" + cid)
@@ -169,6 +270,22 @@ def page_wallet(self, url_split, post_string):
                 messages.append("Reseed complete " + str(coin_id))
             except Exception as ex:
                 err_messages.append("Reseed failed " + str(ex))
+            swap_client.updateWalletsInfo(True, coin_id)
+        elif have_data_entry(form_data, "importkey_" + cid):
+            try:
+                wif_key = form_data[bytes("wifkey_" + cid, "utf-8")][0].decode("utf-8")
+                if wif_key:
+                    result = swap_client.importWIFKey(coin_id, wif_key)
+                    if result.get("success"):
+                        messages.append(
+                            f"Imported key for address: {result['address']}"
+                        )
+                    else:
+                        err_messages.append(f"Import failed: {result.get('error')}")
+                else:
+                    err_messages.append("Missing WIF key")
+            except Exception as ex:
+                err_messages.append(f"Import failed: {ex}")
             swap_client.updateWalletsInfo(True, coin_id)
         elif withdraw or estimate_fee:
             subfee = True if have_data_entry(form_data, "subfee_" + cid) else False
@@ -215,7 +332,14 @@ def page_wallet(self, url_split, post_string):
                     ].decode("utf-8")
                     page_data["wd_type_from_" + cid] = type_from
                 except Exception as e:  # noqa: F841
-                    err_messages.append("Missing type")
+                    if (
+                        swap_client.coin_clients[coin_id].get("connection_type")
+                        == "electrum"
+                    ):
+                        type_from = "plain"
+                        page_data["wd_type_from_" + cid] = type_from
+                    else:
+                        err_messages.append("Missing type")
 
             if len(err_messages) == 0:
                 ci = swap_client.ci(coin_id)
@@ -328,6 +452,9 @@ def page_wallet(self, url_split, post_string):
         cid = str(int(coin_id))
 
         wallet_data = format_wallet_data(swap_client, ci, w)
+        wallet_data["is_electrum_mode"] = (
+            getattr(ci, "_connection_type", "rpc") == "electrum"
+        )
 
         fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
         est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
@@ -400,6 +527,26 @@ def page_wallet(self, url_split, post_string):
             "coin_name": wallet_data.get("name", ticker),
         }
 
+    transactions = []
+    total_transactions = 0
+    is_electrum_mode = False
+    if wallet_data.get("havedata", False) and not wallet_data.get("error"):
+        try:
+            ci = swap_client.ci(coin_id)
+            is_electrum_mode = getattr(ci, "_connection_type", "rpc") == "electrum"
+            if not is_electrum_mode:
+                count = tx_filters.get("limit", 30)
+                skip = tx_filters.get("offset", 0)
+
+                all_txs = ci.listWalletTransactions(count=10000, skip=0)
+                all_txs = list(reversed(all_txs)) if all_txs else []
+                total_transactions = len(all_txs)
+
+                raw_txs = all_txs[skip : skip + count] if all_txs else []
+                transactions = format_transactions(ci, raw_txs, coin_id)
+        except Exception as e:
+            swap_client.log.warning(f"Failed to fetch transactions for {ticker}: {e}")
+
     template = server.env.get_template("wallet.html")
     return self.render_template(
         template,
@@ -411,5 +558,11 @@ def page_wallet(self, url_split, post_string):
             "block_unknown_seeds": swap_client._restrict_unknown_seed_wallets,
             "donation_info": donation_info,
             "debug_ui": swap_client.debug_ui,
+            "transactions": transactions,
+            "tx_page_no": tx_filters.get("page_no", 1),
+            "tx_total": total_transactions,
+            "tx_limit": tx_filters.get("limit", 30),
+            "is_electrum_mode": is_electrum_mode,
+            "use_tor": getattr(swap_client, "use_tor_proxy", False),
         },
     )

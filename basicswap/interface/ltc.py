@@ -27,12 +27,21 @@ class LTCInterface(BTCInterface):
         )
 
     def getNewMwebAddress(self, use_segwit=False, label="swap_receive") -> str:
+        if self.useBackend():
+            raise ValueError("MWEB addresses not supported in electrum mode")
         return self.rpc_wallet_mweb("getnewaddress", [label, "mweb"])
 
     def getNewStealthAddress(self, label=""):
+        if self.useBackend():
+            raise ValueError("MWEB addresses not supported in electrum mode")
         return self.getNewMwebAddress(False, label)
 
     def withdrawCoin(self, value, type_from: str, addr_to: str, subfee: bool) -> str:
+        if self.useBackend():
+            if type_from == "mweb":
+                raise ValueError("MWEB withdrawals not supported in electrum mode")
+            return self._withdrawCoinElectrum(value, addr_to, subfee)
+
         params = [addr_to, value, "", "", subfee, True, self._conf_target]
         if type_from == "mweb":
             return self.rpc_wallet_mweb("sendtoaddress", params)
@@ -53,14 +62,27 @@ class LTCInterface(BTCInterface):
 
     def getWalletInfo(self):
         rv = super(LTCInterface, self).getWalletInfo()
-        mweb_info = self.rpc_wallet_mweb("getwalletinfo")
-        rv["mweb_balance"] = mweb_info["balance"]
-        rv["mweb_unconfirmed"] = mweb_info["unconfirmed_balance"]
-        rv["mweb_immature"] = mweb_info["immature_balance"]
+        if not self.useBackend():
+            try:
+                mweb_info = self.rpc_wallet_mweb("getwalletinfo")
+                rv["mweb_balance"] = mweb_info["balance"]
+                rv["mweb_unconfirmed"] = mweb_info["unconfirmed_balance"]
+                rv["mweb_immature"] = mweb_info["immature_balance"]
+            except Exception:
+                pass
         return rv
 
     def getUnspentsByAddr(self):
         unspent_addr = dict()
+
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if wm:
+                addresses = wm.getAllAddresses(self.coin_type())
+                if addresses:
+                    return self._backend.getBalance(addresses)
+            return unspent_addr
+
         unspent = self.rpc_wallet("listunspent")
         for u in unspent:
             if u.get("spendable", False) is False:
@@ -151,6 +173,9 @@ class LTCInterfaceMWEB(LTCInterface):
         if password == "":
             return
         self._log.info("unlockWallet - {}".format(self.ticker()))
+
+        if self.useBackend():
+            return
 
         if not self.has_mweb_wallet():
             self.init_wallet(password)

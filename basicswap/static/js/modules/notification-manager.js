@@ -250,6 +250,7 @@ function ensureToastContainer() {
       'new_bid': 'bg-green-500',
       'bid_accepted': 'bg-purple-500',
       'swap_completed': 'bg-green-600',
+      'sweep_completed': 'bg-orange-500',
       'balance_change': 'bg-yellow-500',
       'update_available': 'bg-blue-600',
       'success': 'bg-blue-500'
@@ -733,6 +734,17 @@ function ensureToastContainer() {
           toastOptions.releaseNotes = data.release_notes;
           toastType = 'update_available';
           shouldShowToast = config.showUpdateNotifications;
+          break;
+
+        case 'sweep_completed':
+          const sweepAmount = parseFloat(data.amount || 0).toFixed(8).replace(/\.?0+$/, '');
+          const sweepFee = parseFloat(data.fee || 0).toFixed(8).replace(/\.?0+$/, '');
+          toastTitle = `Swept ${sweepAmount} ${data.coin_name} to RPC wallet`;
+          toastOptions.subtitle = `Fee: ${sweepFee} ${data.coin_name} • TXID: ${(data.txid || '').substring(0, 12)}...`;
+          toastOptions.coinSymbol = data.coin_name;
+          toastOptions.txid = data.txid;
+          toastType = 'sweep_completed';
+          shouldShowToast = true;
           break;
 
         case 'coin_balance_updated':

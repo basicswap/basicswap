@@ -1253,7 +1253,8 @@ def amm_autostart_api(swap_client, post_string, params=None):
 
             settings_path = os.path.join(swap_client.data_dir, cfg.CONFIG_FILENAME)
             settings_path_new = settings_path + ".new"
-            shutil.copyfile(settings_path, settings_path + ".last")
+            if os.path.exists(settings_path):
+                shutil.copyfile(settings_path, settings_path + ".last")
             with open(settings_path_new, "w") as fp:
                 json.dump(swap_client.settings, fp, indent=4)
             shutil.move(settings_path_new, settings_path)

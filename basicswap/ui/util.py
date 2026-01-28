@@ -331,6 +331,7 @@ def describeBid(
         "ticker_from": ci_from.ticker(),
         "ticker_to": ci_to.ticker(),
         "bid_state": strBidState(bid.state),
+        "bid_state_ind": int(bid.state),
         "state_description": state_description,
         "itx_state": strTxState(bid.getITxState()),
         "ptx_state": strTxState(bid.getPTxState()),
@@ -343,6 +344,8 @@ def describeBid(
             if for_api
             else format_timestamp(bid.created_at, with_seconds=True)
         ),
+        "created_at_timestamp": bid.created_at,
+        "state_time_timestamp": getLastStateTimestamp(bid),
         "expired_at": (
             bid.expire_at
             if for_api
@@ -623,6 +626,14 @@ def listOldBidStates(bid):
     return old_states
 
 
+def getLastStateTimestamp(bid):
+    if not bid.states or len(bid.states) < 12:
+        return None
+    num_states = len(bid.states) // 12
+    last_entry = struct.unpack_from("<iq", bid.states[(num_states - 1) * 12 :])
+    return last_entry[1]
+
+
 def getCoinName(c):
     if c == Coins.PART_ANON:
         return chainparams[Coins.PART]["name"].capitalize() + " Anon"
@@ -643,7 +654,7 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
     for k, v in swap_client.coin_clients.items():
         if k not in chainparams:
             continue
-        if v["connection_type"] == "rpc":
+        if v["connection_type"] in ("rpc", "electrum"):
             coins.append((int(k), getCoinName(k)))
             if split_from:
                 coins_from.append(coins[-1])
@@ -670,7 +681,7 @@ def listAvailableCoinsWithBalances(swap_client, with_variants=True, split_from=F
     for k, v in swap_client.coin_clients.items():
         if k not in chainparams:
             continue
-        if v["connection_type"] == "rpc":
+        if v["connection_type"] in ("rpc", "electrum"):
 
             balance = "0.0"
             if k in wallets:
@@ -735,10 +746,23 @@ def checkAddressesOwned(swap_client, ci, wallet_info):
 
         if wallet_info["stealth_address"] != "?":
             if not ci.isAddressMine(wallet_info["stealth_address"]):
-                ci._log.error(
-                    "Unowned stealth address: {}".format(wallet_info["stealth_address"])
+                ci._log.warning(
+                    "Unowned stealth address: {} - clearing cache and regenerating".format(
+                        wallet_info["stealth_address"]
+                    )
                 )
-                wallet_info["stealth_address"] = "Error: unowned address"
+                key_str = "stealth_addr_" + ci.coin_name().lower()
+                swap_client.clearStringKV(key_str)
+                try:
+                    new_addr = ci.getNewStealthAddress()
+                    swap_client.setStringKV(key_str, new_addr)
+                    wallet_info["stealth_address"] = new_addr
+                    ci._log.info(
+                        "Regenerated stealth address for {}".format(ci.coin_name())
+                    )
+                except Exception as e:
+                    ci._log.error("Failed to regenerate stealth address: {}".format(e))
+                    wallet_info["stealth_address"] = "Error: unowned address"
             elif (
                 swap_client._restrict_unknown_seed_wallets and not ci.knownWalletSeed()
             ):
@@ -747,10 +771,24 @@ def checkAddressesOwned(swap_client, ci, wallet_info):
     if "deposit_address" in wallet_info:
         if wallet_info["deposit_address"] != "Refresh necessary":
             if not ci.isAddressMine(wallet_info["deposit_address"]):
-                ci._log.error(
-                    "Unowned deposit address: {}".format(wallet_info["deposit_address"])
+                ci._log.warning(
+                    "Unowned deposit address: {} - clearing cache and regenerating".format(
+                        wallet_info["deposit_address"]
+                    )
                 )
-                wallet_info["deposit_address"] = "Error: unowned address"
+                key_str = "receive_addr_" + ci.coin_name().lower()
+                swap_client.clearStringKV(key_str)
+                try:
+                    coin_type = ci.coin_type()
+                    new_addr = swap_client.getReceiveAddressForCoin(coin_type)
+                    swap_client.setStringKV(key_str, new_addr)
+                    wallet_info["deposit_address"] = new_addr
+                    ci._log.info(
+                        "Regenerated deposit address for {}".format(ci.coin_name())
+                    )
+                except Exception as e:
+                    ci._log.error("Failed to regenerate deposit address: {}".format(e))
+                    wallet_info["deposit_address"] = "Error: unowned address"
             elif (
                 swap_client._restrict_unknown_seed_wallets and not ci.knownWalletSeed()
             ):

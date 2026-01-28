@@ -1748,6 +1748,13 @@ def printHelp():
     )
     print("--client-auth-password=  Set or update the password to protect the web UI.")
     print("--disable-client-auth    Remove password protection from the web UI.")
+    print(
+        "--light                  Use light wallet mode (Electrum) for all supported coins."
+    )
+    print("--btc-mode=MODE          Set BTC connection mode: rpc, electrum, or remote.")
+    print("--ltc-mode=MODE          Set LTC connection mode: rpc, electrum, or remote.")
+    print("--btc-electrum-server=   Custom Electrum server for BTC (host:port:ssl).")
+    print("--ltc-electrum-server=   Custom Electrum server for LTC (host:port:ssl).")
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -1955,6 +1962,11 @@ def initialise_wallets(
                     hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
                     createDCRWallet(args, hex_seed, logger, threading.Event())
                     continue
+                if coin_settings.get("connection_type") == "electrum":
+                    logger.info(
+                        f"Skipping RPC wallet creation for {getCoinName(c)} (electrum mode)."
+                    )
+                    continue
                 swap_client.waitForDaemonRPC(c, with_wallet=False)
                 # Create wallet if it doesn't exist yet
                 wallets = swap_client.callcoinrpc(c, "listwallets")
@@ -2052,7 +2064,11 @@ def initialise_wallets(
             c = swap_client.getCoinIdFromName(coin_name)
             if c in (Coins.PART,):
                 continue
-            if c not in (Coins.DCR,):
+            if coin_settings.get("connection_type") == "electrum":
+                logger.info(
+                    f"Skipping daemon RPC wait for {getCoinName(c)} (electrum mode)."
+                )
+            elif c not in (Coins.DCR,):
                 # initialiseWallet only sets main_wallet_seedid_
                 swap_client.waitForDaemonRPC(c)
             try:
@@ -2279,6 +2295,9 @@ def main():
     tor_control_password = None
     client_auth_pwd_value = None
     disable_client_auth_flag = False
+    light_mode = False
+    coin_modes = {}
+    electrum_servers = {}
     extra_opts = {}
 
     if os.getenv("SSL_CERT_DIR", "") == "" and GUIX_SSL_CERT_DIR is not None:
@@ -2432,6 +2451,32 @@ def main():
 
         if name == "disable-client-auth":
             disable_client_auth_flag = True
+            continue
+        if name == "light":
+            light_mode = True
+            continue
+        if name.endswith("-mode") and len(s) == 2:
+            coin_prefix = name[:-5]
+            mode_value = s[1].strip().lower()
+            if mode_value not in ("rpc", "electrum", "remote"):
+                exitWithError(
+                    f"Invalid mode '{mode_value}' for {coin_prefix}. Use: rpc, electrum, or remote"
+                )
+            coin_modes[coin_prefix] = mode_value
+            continue
+        if name.endswith("-electrum-server") and len(s) == 2:
+            coin_prefix = name[:-16]
+            server_str = s[1].strip()
+            parts = server_str.split(":")
+            if len(parts) >= 2:
+                server = {
+                    "host": parts[0],
+                    "port": int(parts[1]),
+                    "ssl": parts[2].lower() == "true" if len(parts) > 2 else True,
+                }
+                if coin_prefix not in electrum_servers:
+                    electrum_servers[coin_prefix] = []
+                electrum_servers[coin_prefix].append(server)
             continue
         if len(s) != 2:
             exitWithError("Unknown argument {}".format(v))
@@ -2790,6 +2835,32 @@ def main():
             "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
     }
+
+    electrum_supported_coins = {
+        "bitcoin": "btc",
+        "litecoin": "ltc",
+    }
+
+    for coin_name, coin_prefix in electrum_supported_coins.items():
+        if coin_name not in chainclients:
+            continue
+
+        use_electrum = False
+        if light_mode and coin_name != "particl":
+            use_electrum = True
+        if coin_prefix in coin_modes:
+            if coin_modes[coin_prefix] == "electrum":
+                use_electrum = True
+            elif coin_modes[coin_prefix] == "rpc":
+                use_electrum = False
+
+        if use_electrum:
+            chainclients[coin_name]["connection_type"] = "electrum"
+            chainclients[coin_name]["manage_daemon"] = False
+            if coin_prefix in electrum_servers:
+                chainclients[coin_name]["electrum_servers"] = electrum_servers[
+                    coin_prefix
+                ]
 
     for coin_name, coin_settings in chainclients.items():
         coin_id = getCoinIdFromName(coin_name)

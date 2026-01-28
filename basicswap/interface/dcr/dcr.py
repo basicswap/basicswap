@@ -632,6 +632,15 @@ class DCRInterface(Secp256k1Interface):
             # TODO: filter errors
             return None
 
+    def listWalletTransactions(self, count=100, skip=0, include_watchonly=True):
+        try:
+            return self.rpc_wallet(
+                "listtransactions", ["*", count, skip, include_watchonly]
+            )
+        except Exception as e:
+            self._log.error(f"listWalletTransactions failed: {e}")
+            return []
+
     def getProofOfFunds(self, amount_for, extra_commit_bytes):
         # TODO: Lock unspent and use same output/s to fund bid
 

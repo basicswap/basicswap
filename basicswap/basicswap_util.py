@@ -212,6 +212,10 @@ class EventLogTypes(IntEnum):
     BCH_MERCY_TX_FOUND = auto()
     LOCK_TX_A_IN_MEMPOOL = auto()
     LOCK_TX_A_CONFLICTS = auto()
+    LOCK_TX_B_RPC_ERROR = auto()
+    LOCK_TX_A_SPEND_TX_SEEN = auto()
+    LOCK_TX_B_SPEND_TX_SEEN = auto()
+    LOCK_TX_B_REFUND_TX_SEEN = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -247,6 +251,7 @@ class NotificationTypes(IntEnum):
     BID_ACCEPTED = auto()
     SWAP_COMPLETED = auto()
     UPDATE_AVAILABLE = auto()
+    SWEEP_COMPLETED = auto()
 
 
 class ConnectionRequestTypes(IntEnum):
@@ -458,6 +463,8 @@ def describeEventEntry(event_type, event_msg):
         return "Failed to publish lock tx B refund"
     if event_type == EventLogTypes.LOCK_TX_B_INVALID:
         return "Detected invalid lock Tx B"
+    if event_type == EventLogTypes.LOCK_TX_B_RPC_ERROR:
+        return "Temporary RPC error checking lock tx B: " + event_msg
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED:
         return "Lock tx A pre-refund tx published"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED:
@@ -498,6 +505,12 @@ def describeEventEntry(event_type, event_msg):
         return "BCH mercy tx found"
     if event_type == EventLogTypes.BCH_MERCY_TX_PUBLISHED:
         return "Lock tx B mercy tx published"
+    if event_type == EventLogTypes.LOCK_TX_A_SPEND_TX_SEEN:
+        return "Lock tx A spend tx seen in chain"
+    if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN:
+        return "Lock tx B spend tx seen in chain"
+    if event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_SEEN:
+        return "Lock tx B refund tx seen in chain"
 
 
 def getVoutByAddress(txjs, p2sh):
