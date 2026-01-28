@@ -475,6 +475,9 @@ class ElectrumBackend(WalletBackend):
                         "transaction already exists",
                         "insufficient fee",
                         "dust",
+                        "non-bip68-final",
+                        "non-final",
+                        "locktime",
                     ]
                 ):
                     raise
