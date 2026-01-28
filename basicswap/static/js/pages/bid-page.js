@@ -6,8 +6,14 @@ const BidPage = {
   elapsedTimeInterval: null,
   AUTO_REFRESH_SECONDS: 60,
   refreshPaused: false,
+  swapType: null,
+  coinFrom: null,
+  coinTo: null,
+  previousStateInd: null,
 
   INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
+
+  DELAYING_STATE: 20,
 
   STATE_TOOLTIPS: {
     'Bid Sent': 'Your bid has been broadcast to the network',
@@ -18,14 +24,14 @@ const BidPage = {
     'Bid Initiated': 'Swap initiated. First lock transaction is being created',
     'Bid Participating': 'Participating in the swap. Second lock transaction is being created',
     'Bid Completed': 'Swap completed successfully! Both parties received their coins',
-    'Bid Script coin locked': 'Your coins are locked in the atomic swap contract on the script chain (e.g., BTC/LTC)',
-    'Bid Script coin spend tx valid': 'The spend transaction for the script coin has been validated and is ready',
-    'Bid Scriptless coin locked': 'The other party\'s coins are locked using adaptor signatures (e.g., XMR)',
-    'Bid Script coin lock released': 'Secret key revealed. The script coin can now be claimed',
-    'Bid Script tx redeemed': 'Script coin has been successfully claimed',
+    'Bid Script coin locked': null,
+    'Bid Script coin spend tx valid': null,
+    'Bid Scriptless coin locked': null,
+    'Bid Script coin lock released': 'Adaptor signature revealed. The script coin can now be claimed',
+    'Bid Script tx redeemed': null,
     'Bid Script pre-refund tx in chain': 'Pre-refund transaction detected. Swap may be failing',
-    'Bid Scriptless tx redeemed': 'Scriptless coin (e.g., XMR) has been successfully claimed',
-    'Bid Scriptless tx recovered': 'Scriptless coin recovered after swap failure',
+    'Bid Scriptless tx redeemed': null,
+    'Bid Scriptless tx recovered': null,
     'Bid Failed, refunded': 'Swap failed but your coins have been refunded',
     'Bid Failed, swiped': 'Swap failed due to an unexpected issue. Please check the event log for details',
     'Bid Failed': 'Swap failed. Check events for details',
@@ -35,7 +41,7 @@ const BidPage = {
     'Bid Error': 'An error occurred. Check events for details',
     'Bid Rejected': 'Bid was rejected by the offer owner',
     'Bid Stalled (debug)': 'Debug mode: swap intentionally stalled for testing',
-    'Bid Exchanged script lock tx sigs msg': 'Exchanging cryptographic signatures needed for lock transactions',
+    'Bid Exchanged script lock tx sigs msg': 'Exchanging adaptor signatures needed for lock transactions',
     'Bid Exchanged script lock spend tx msg': 'Exchanging signed spend transaction for locked coins',
     'Bid Request sent': 'Connection request sent to the other party',
     'Bid Request accepted': 'Connection request accepted',
@@ -44,7 +50,7 @@ const BidPage = {
     'Bid Auto accept failed': 'Automation failed to accept this bid',
     'Bid Connect request sent': 'Sent connection request to peer',
     'Bid Unknown bid state': 'Unknown state - please check the swap details',
-  
+
     'ITX Sent': 'Initiate transaction has been broadcast to the network',
     'ITX Confirmed': 'Initiate transaction has been confirmed by miners',
     'ITX Redeemed': 'Initiate transaction has been successfully claimed',
@@ -57,6 +63,38 @@ const BidPage = {
     'PTX Refunded': 'Participate transaction has been refunded',
     'PTX In Mempool': 'Participate transaction is in the mempool (unconfirmed)',
     'PTX In Chain': 'Participate transaction is included in a block'
+  },
+
+  getStateTooltip: function(stateText) {
+    const staticTooltip = this.STATE_TOOLTIPS[stateText];
+    if (staticTooltip !== null && staticTooltip !== undefined) {
+      return staticTooltip;
+    }
+
+    const scriptlessCoins = ['XMR', 'WOW'];
+    let scriptCoin, scriptlessCoin;
+
+    if (scriptlessCoins.includes(this.coinFrom)) {
+      scriptlessCoin = this.coinFrom;
+      scriptCoin = this.coinTo;
+    } else if (scriptlessCoins.includes(this.coinTo)) {
+      scriptlessCoin = this.coinTo;
+      scriptCoin = this.coinFrom;
+    } else {
+      scriptCoin = this.coinFrom;
+      scriptlessCoin = this.coinTo;
+    }
+
+    const dynamicTooltips = {
+      'Bid Script coin locked': `${scriptCoin} is locked in the atomic swap contract`,
+      'Bid Script coin spend tx valid': `The ${scriptCoin} spend transaction has been validated and is ready`,
+      'Bid Scriptless coin locked': `${scriptlessCoin} is locked using adaptor signatures`,
+      'Bid Script tx redeemed': `${scriptCoin} has been successfully claimed`,
+      'Bid Scriptless tx redeemed': `${scriptlessCoin} has been successfully claimed`,
+      'Bid Scriptless tx recovered': `${scriptlessCoin} recovered after swap failure`,
+    };
+
+    return dynamicTooltips[stateText] || null;
   },
 
   EVENT_TOOLTIPS: {
@@ -131,18 +169,80 @@ const BidPage = {
     34: { phase: 'negotiation', order: 0.4, label: 'Negotiation' }  // CONNECT_REQ_SENT
   },
 
-  init: function(bidId, bidStateInd, createdAtTimestamp, stateTimeTimestamp) {
+  init: function(bidId, bidStateInd, createdAtTimestamp, stateTimeTimestamp, options) {
     this.bidId = bidId;
     this.bidStateInd = bidStateInd;
     this.createdAtTimestamp = createdAtTimestamp;
     this.stateTimeTimestamp = stateTimeTimestamp;
     this.tooltipCounter = 0;
 
+    options = options || {};
+    this.swapType = options.swapType || 'secret-hash';
+    this.coinFrom = options.coinFrom || '';
+    this.coinTo = options.coinTo || '';
+
+    if (this.bidStateInd === this.DELAYING_STATE) {
+      this.previousStateInd = this.findPreviousState();
+    }
+
     this.applyStateTooltips();
     this.applyEventTooltips();
     this.createProgressBar();
     this.startElapsedTimeUpdater();
     this.setupAutoRefresh();
+  },
+
+  findPreviousState: function() {
+    const sections = document.querySelectorAll('section');
+    let oldStatesSection = null;
+
+    sections.forEach(section => {
+      const h4 = section.querySelector('h4');
+      if (h4 && h4.textContent.includes('Old states')) {
+        oldStatesSection = section.nextElementSibling;
+      }
+    });
+
+    if (oldStatesSection) {
+      const table = oldStatesSection.querySelector('table');
+      if (table) {
+        const rows = table.querySelectorAll('tr');
+
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const cells = rows[i].querySelectorAll('td');
+          if (cells.length >= 2) {
+            const stateText = cells[cells.length - 1].textContent.trim();
+            if (!stateText.includes('Delaying')) {
+              return this.stateTextToIndex(stateText);
+            }
+          }
+        }
+      }
+    }
+    return null;
+  },
+
+  stateTextToIndex: function(stateText) {
+    const stateMap = {
+      'Sent': 1, 'Receiving': 2, 'Received': 3, 'Receiving accept': 4,
+      'Accepted': 5, 'Initiated': 6, 'Participating': 7, 'Completed': 8,
+      'Script coin locked': 9, 'Script coin spend tx valid': 10,
+      'Scriptless coin locked': 11, 'Script coin lock released': 12,
+      'Script tx redeemed': 13, 'Script pre-refund tx in chain': 14,
+      'Scriptless tx redeemed': 15, 'Scriptless tx recovered': 16,
+      'Failed, refunded': 17, 'Failed, swiped': 18, 'Failed': 19,
+      'Delaying': 20, 'Timed-out': 21, 'Abandoned': 22, 'Error': 23,
+      'Rejected': 25, 'Exchanged script lock tx sigs msg': 27,
+      'Exchanged script lock spend tx msg': 28, 'Request sent': 29,
+      'Request accepted': 30, 'Expired': 31
+    };
+
+    for (const [key, value] of Object.entries(stateMap)) {
+      if (stateText.includes(key)) {
+        return value;
+      }
+    }
+    return null;
   },
 
   isActiveState: function() {
@@ -243,7 +343,7 @@ const BidPage = {
           if (cells.length >= 2) {
             const stateCell = cells[cells.length - 1];
             const stateText = stateCell.textContent.trim();
-            const tooltip = this.STATE_TOOLTIPS[stateText];
+            const tooltip = this.getStateTooltip(stateText) || this.getStateTooltip('Bid ' + stateText);
             if (tooltip) {
               this.addHelpIcon(stateCell, tooltip);
             }
@@ -261,7 +361,7 @@ const BidPage = {
           const valueCell = row.querySelectorAll('td')[1];
           if (valueCell) {
             const stateText = valueCell.textContent.trim();
-            const tooltip = this.STATE_TOOLTIPS[stateText] || this.STATE_TOOLTIPS['Bid ' + stateText];
+            const tooltip = this.getStateTooltip(stateText) || this.getStateTooltip('Bid ' + stateText);
             if (tooltip) {
               this.addHelpIcon(valueCell, tooltip);
             }
@@ -340,7 +440,15 @@ const BidPage = {
   },
 
   createProgressBar: function() {
-    const phaseInfo = this.STATE_PHASES[this.bidStateInd];
+    let stateForProgress = this.bidStateInd;
+    let isDelaying = false;
+
+    if (this.bidStateInd === this.DELAYING_STATE && this.previousStateInd) {
+      stateForProgress = this.previousStateInd;
+      isDelaying = true;
+    }
+
+    const phaseInfo = this.STATE_PHASES[stateForProgress];
     if (!phaseInfo) return;
 
     let progressPercent = 0;
@@ -373,7 +481,17 @@ const BidPage = {
     const isError = ['failed', 'error'].includes(phase);
     const isComplete = phase === 'complete';
     const barColor = isError ? 'bg-red-500' : (isComplete ? 'bg-green-500' : 'bg-blue-500');
-    const phaseLabel = isError ? phaseInfo.label : (isComplete ? 'Complete' : `${phaseInfo.label} (${progressPercent}%)`);
+
+    let phaseLabel;
+    if (isError) {
+      phaseLabel = phaseInfo.label;
+    } else if (isComplete) {
+      phaseLabel = 'Complete';
+    } else if (isDelaying) {
+      phaseLabel = `${phaseInfo.label} (${progressPercent}%) - Delaying`;
+    } else {
+      phaseLabel = `${phaseInfo.label} (${progressPercent}%)`;
+    }
 
     progressRow.innerHTML = `
       <td class="py-3 px-6 bold">Swap Progress</td>

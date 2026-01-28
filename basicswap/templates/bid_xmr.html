@@ -968,7 +968,11 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/static/js/pages/bid-page.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  BidPage.init('{{ bid_id }}', {{ data.bid_state_ind }}, {{ data.created_at_timestamp }}, {{ data.state_time_timestamp or 'null' }});
+  BidPage.init('{{ bid_id }}', {{ data.bid_state_ind }}, {{ data.created_at_timestamp }}, {{ data.state_time_timestamp or 'null' }}, {
+    swapType: 'adaptor-sig',
+    coinFrom: '{{ data.ticker_from }}',
+    coinTo: '{{ data.ticker_to }}'
+  });
 });
 </script>
 </div>
