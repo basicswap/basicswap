@@ -4,7 +4,8 @@ const BidPage = {
   createdAtTimestamp: null,
   autoRefreshInterval: null,
   elapsedTimeInterval: null,
-  AUTO_REFRESH_SECONDS: 15,
+  AUTO_REFRESH_SECONDS: 60,
+  refreshPaused: false,
 
   INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
 
@@ -156,14 +157,24 @@ const BidPage = {
     const refreshBtn = document.getElementById('refresh');
     if (!refreshBtn) return;
 
-    let countdown = this.AUTO_REFRESH_SECONDS;
     const originalSpan = refreshBtn.querySelector('span');
     if (!originalSpan) return;
 
+    let countdown = this.AUTO_REFRESH_SECONDS;
+    let isRefreshing = false;
+
     const updateCountdown = () => {
+      if (this.refreshPaused || isRefreshing) return;
+
       originalSpan.textContent = `Auto-refresh in ${countdown}s`;
       countdown--;
-      if (countdown < 0) {
+
+      if (countdown < 0 && !isRefreshing) {
+        isRefreshing = true;
+        if (this.autoRefreshInterval) {
+          clearInterval(this.autoRefreshInterval);
+          this.autoRefreshInterval = null;
+        }
         window.location.href = window.location.pathname + window.location.search;
       }
     };
@@ -172,16 +183,21 @@ const BidPage = {
     this.autoRefreshInterval = setInterval(updateCountdown, 1000);
 
     refreshBtn.addEventListener('mouseenter', () => {
+      this.refreshPaused = true;
       if (this.autoRefreshInterval) {
         clearInterval(this.autoRefreshInterval);
-        originalSpan.textContent = 'Click to refresh (paused)';
+        this.autoRefreshInterval = null;
       }
+      originalSpan.textContent = 'Click to refresh (paused)';
     });
 
     refreshBtn.addEventListener('mouseleave', () => {
+      this.refreshPaused = false;
       countdown = this.AUTO_REFRESH_SECONDS;
-      updateCountdown();
-      this.autoRefreshInterval = setInterval(updateCountdown, 1000);
+      if (!this.autoRefreshInterval) {
+        updateCountdown();
+        this.autoRefreshInterval = setInterval(updateCountdown, 1000);
+      }
     });
   },
 
