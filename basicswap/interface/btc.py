@@ -2937,7 +2937,11 @@ class BTCInterface(Secp256k1Interface):
                                 "height": tx_entry.get("height", 0),
                             }
         except Exception as e:
-            self._log.debug(f"checkWatchedOutput exception for {txid_hex}:{vout}: {e}")
+            error_msg = str(e).lower()
+            if "no such mempool or blockchain transaction" not in error_msg:
+                self._log.debug(
+                    f"checkWatchedOutput exception for {txid_hex}:{vout}: {e}"
+                )
         return None
 
     def checkWatchedScript(self, script: bytes):
