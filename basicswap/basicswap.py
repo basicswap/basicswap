@@ -740,6 +740,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self._network.stopNetwork()
             self._network = None
 
+        for coin_type, interface in self.coin_interfaces.items():
+            if hasattr(interface, "_backend") and interface._backend is not None:
+                try:
+                    if hasattr(interface._backend, "_server"):
+                        interface._backend._server.disconnect()
+                    self.log.debug(f"Disconnected electrum backend for {coin_type}")
+                except Exception as e:
+                    self.log.debug(f"Error disconnecting electrum backend: {e}")
+
         self.log.info("Stopping threads.")
         for t in self.threads:
             if hasattr(t, "stop") and callable(t.stop):
