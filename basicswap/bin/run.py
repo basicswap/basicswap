@@ -371,19 +371,6 @@ def runClient(
     with open(settings_path) as fs:
         settings = json.load(fs)
 
-    # TEMP:
-    config_changed = False
-    for coin_name, coin_data in settings.get("chainclients", {}).items():
-        for key in ["electrum_clearnet_servers", "electrum_onion_servers"]:
-            servers = coin_data.get(key)
-            if servers and isinstance(servers, list) and len(servers) > 0:
-                if isinstance(servers[0], dict):
-                    coin_data[key] = [f"{s['host']}:{s['port']}" for s in servers]
-                    config_changed = True
-    if config_changed:
-        with open(settings_path, "w") as fs:
-            json.dump(settings, fs, indent=4)
-
     swap_client = BasicSwap(
         data_dir, settings, chain, log_name=log_prefix, extra_opts=extra_opts
     )
