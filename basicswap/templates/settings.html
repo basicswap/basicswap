@@ -204,8 +204,10 @@
          </div>
         </div>
 
-        {% if c.connection_type == 'electrum' %}
-        <div class="mb-6">
+        {% if c.supports_electrum %}
+        <div id="electrum-section-{{ c.name }}" class="mb-6 {% if c.connection_type != 'electrum' %}hidden{% endif %}"
+             data-default-clearnet="{{ c.clearnet_servers_text }}"
+             data-default-onion="{{ c.onion_servers_text }}">
          <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
           Electrum Servers
          </h4>
@@ -213,7 +215,7 @@
          <div class="mb-6">
           <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">Clearnet</h5>
           <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none font-mono" name="electrum_clearnet_{{ c.name }}" id="electrum_clearnet_{{ c.name }}" rows="3" placeholder="electrum.blockstream.info:50002&#10;electrum.emzy.de:50002">{{ c.clearnet_servers_text }}</textarea>
+           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none font-mono" name="electrum_clearnet_{{ c.name }}" id="electrum_clearnet_{{ c.name }}" rows="3" placeholder="electrum.blockstream.info:50002&#10;electrum.emzy.de:50002">{% if c.connection_type == 'electrum' %}{{ c.clearnet_servers_text }}{% endif %}</textarea>
            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: host:port (50002=SSL, 50001=non-SSL)</p>
           </div>
          </div>
@@ -221,7 +223,7 @@
          <div class="mb-4 pt-2">
           <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">TOR (.onion)</h5>
           <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none font-mono text-xs" name="electrum_onion_{{ c.name }}" id="electrum_onion_{{ c.name }}" rows="3" placeholder="explorerzyd...onion:110&#10;lksvbmwwi2b...onion:50001">{{ c.onion_servers_text }}</textarea>
+           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none font-mono text-xs" name="electrum_onion_{{ c.name }}" id="electrum_onion_{{ c.name }}" rows="3" placeholder="explorerzyd...onion:110&#10;lksvbmwwi2b...onion:50001">{% if c.connection_type == 'electrum' %}{{ c.onion_servers_text }}{% endif %}</textarea>
            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Used when TOR is enabled.</p>
           </div>
          </div>
@@ -253,8 +255,10 @@
            </div>
           </div>
          </div>
+
         </div>
-        <div class="mb-6">
+
+        <div id="fund-transfer-section-{{ c.name }}" class="mb-6 hidden">
          <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
           Fund Transfer
          </h4>

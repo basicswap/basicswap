@@ -72,6 +72,39 @@
       connectionTypeSelects.forEach(select => {
         const originalValue = select.dataset.originalValue || select.value;
         this.originalConnectionTypes[select.name] = originalValue;
+
+        select.addEventListener('change', (e) => {
+          const coinName = select.name.replace('connection_type_', '');
+          const electrumSection = document.getElementById(`electrum-section-${coinName}`);
+          const fundTransferSection = document.getElementById(`fund-transfer-section-${coinName}`);
+          const originalValue = this.originalConnectionTypes[select.name];
+
+          if (e.target.value === 'electrum') {
+            if (electrumSection) {
+              electrumSection.classList.remove('hidden');
+
+              const clearnetTextarea = document.getElementById(`electrum_clearnet_${coinName}`);
+              const onionTextarea = document.getElementById(`electrum_onion_${coinName}`);
+
+              if (clearnetTextarea && !clearnetTextarea.value.trim()) {
+                clearnetTextarea.value = electrumSection.dataset.defaultClearnet || '';
+              }
+              if (onionTextarea && !onionTextarea.value.trim()) {
+                onionTextarea.value = electrumSection.dataset.defaultOnion || '';
+              }
+            }
+            if (fundTransferSection) {
+              fundTransferSection.classList.add('hidden');
+            }
+          } else {
+            if (electrumSection) {
+              electrumSection.classList.add('hidden');
+            }
+            if (fundTransferSection && originalValue === 'electrum') {
+              fundTransferSection.classList.remove('hidden');
+            }
+          }
+        });
       });
 
       this.setupWalletModeModal();
@@ -561,7 +594,8 @@
         }
 
         if (!data.clearnet_servers?.length && !data.onion_servers?.length) {
-          html = '<div class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">No servers discovered. The connected server may not support peer discovery.</div>';
+          const serverName = data.current_server ? `${data.current_server.host}:${data.current_server.port}` : 'The connected server';
+          html = `<div class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">No servers discovered. <span class="font-mono">${serverName}</span> does not return peer lists.</div>`;
         } else {
           html += `<div class="text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-600">Click a server to add it to your list</div>`;
         }
