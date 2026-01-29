@@ -2858,7 +2858,7 @@ def main():
             chainclients[coin_name]["connection_type"] = "electrum"
             chainclients[coin_name]["manage_daemon"] = False
             if coin_prefix in electrum_servers:
-                chainclients[coin_name]["electrum_servers"] = electrum_servers[
+                chainclients[coin_name]["electrum_clearnet_servers"] = electrum_servers[
                     coin_prefix
                 ]
 
