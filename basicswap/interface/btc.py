@@ -3948,9 +3948,9 @@ class BTCInterface(Secp256k1Interface):
         if self.useBackend():
             return
 
-        if self.coin_type() == Coins.BTC:
+        if self.coin_type() in (Coins.BTC, Coins.LTC):
             # Recreate wallet if none found
-            # Required when encrypting an existing btc wallet, workaround is to delete the btc wallet and recreate
+            # Required when encrypting an existing btc/ltc wallet, or switching from electrum to rpc mode. Workaround is to delete the btc/ltc wallet and recreate.
             wallets = self.rpc("listwallets")
             if len(wallets) < 1:
                 self._log.info(
