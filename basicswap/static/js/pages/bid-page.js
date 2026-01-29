@@ -250,21 +250,23 @@ const BidPage = {
   },
 
   setupAutoRefresh: function() {
-    if (!this.isActiveState()) {
-      return;
-    }
-
     const refreshBtn = document.getElementById('refresh');
     if (!refreshBtn) return;
+
+    if (!this.isActiveState()) {
+      refreshBtn.style.display = 'none';
+      return;
+    }
 
     const originalSpan = refreshBtn.querySelector('span');
     if (!originalSpan) return;
 
     let countdown = this.AUTO_REFRESH_SECONDS;
     let isRefreshing = false;
+    let isPersistentlyPaused = false;
 
     const updateCountdown = () => {
-      if (this.refreshPaused || isRefreshing) return;
+      if (this.refreshPaused || isPersistentlyPaused || isRefreshing) return;
 
       originalSpan.textContent = `Auto-refresh in ${countdown}s`;
       countdown--;
@@ -282,21 +284,40 @@ const BidPage = {
     updateCountdown();
     this.autoRefreshInterval = setInterval(updateCountdown, 1000);
 
-    refreshBtn.addEventListener('mouseenter', () => {
-      this.refreshPaused = true;
-      if (this.autoRefreshInterval) {
-        clearInterval(this.autoRefreshInterval);
-        this.autoRefreshInterval = null;
+    refreshBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+
+      if (isPersistentlyPaused) {
+        window.location.href = window.location.pathname + window.location.search;
+      } else {
+        isPersistentlyPaused = true;
+        if (this.autoRefreshInterval) {
+          clearInterval(this.autoRefreshInterval);
+          this.autoRefreshInterval = null;
+        }
+        originalSpan.textContent = 'Paused (click to refresh)';
       }
-      originalSpan.textContent = 'Click to refresh (paused)';
+    });
+
+    refreshBtn.addEventListener('mouseenter', () => {
+      if (!isPersistentlyPaused) {
+        this.refreshPaused = true;
+        if (this.autoRefreshInterval) {
+          clearInterval(this.autoRefreshInterval);
+          this.autoRefreshInterval = null;
+        }
+        originalSpan.textContent = 'Click to pause';
+      }
     });
 
     refreshBtn.addEventListener('mouseleave', () => {
-      this.refreshPaused = false;
-      countdown = this.AUTO_REFRESH_SECONDS;
-      if (!this.autoRefreshInterval) {
-        updateCountdown();
-        this.autoRefreshInterval = setInterval(updateCountdown, 1000);
+      if (!isPersistentlyPaused) {
+        this.refreshPaused = false;
+        countdown = this.AUTO_REFRESH_SECONDS;
+        if (!this.autoRefreshInterval) {
+          updateCountdown();
+          this.autoRefreshInterval = setInterval(updateCountdown, 1000);
+        }
       }
     });
   },
