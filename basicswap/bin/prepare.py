@@ -2469,11 +2469,7 @@ def main():
             server_str = s[1].strip()
             parts = server_str.split(":")
             if len(parts) >= 2:
-                server = {
-                    "host": parts[0],
-                    "port": int(parts[1]),
-                    "ssl": parts[2].lower() == "true" if len(parts) > 2 else True,
-                }
+                server = f"{parts[0]}:{parts[1]}"
                 if coin_prefix not in electrum_servers:
                     electrum_servers[coin_prefix] = []
                 electrum_servers[coin_prefix].append(server)
