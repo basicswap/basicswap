@@ -154,6 +154,7 @@ class ElectrumConnection:
                 except socket.timeout:
                     continue
                 if not data:
+                    self._connected = False
                     break
                 buffer += data
                 while b"\n" in buffer:
@@ -167,6 +168,7 @@ class ElectrumConnection:
             except Exception as e:
                 if self._listener_running and self._log:
                     self._log.debug(f"Electrum listener error: {e}")
+                self._connected = False
                 break
 
     def _handle_message(self, message):
@@ -502,6 +504,8 @@ class ElectrumServer:
         self._subscribed_height_time = 0
         self._height_callback = None
 
+        self._initial_connection_logged = False
+
         use_tor = proxy_host is not None and proxy_port is not None
 
         user_clearnet = []
@@ -578,10 +582,17 @@ class ElectrumServer:
                 self._update_server_score(server, success=True, latency_ms=connect_time)
                 self._last_activity = time.time()
                 if self._log:
-                    self._log.info(
-                        f"Connected to Electrum server: {server['host']}:{server['port']} "
-                        f"({self._server_version}, {connect_time:.0f}ms)"
-                    )
+                    if not self._initial_connection_logged:
+                        self._log.info(
+                            f"Connected to Electrum server: {server['host']}:{server['port']} "
+                            f"({self._server_version}, {connect_time:.0f}ms)"
+                        )
+                        self._initial_connection_logged = True
+                    else:
+                        self._log.debug(
+                            f"Reconnected to Electrum server: {server['host']}:{server['port']} "
+                            f"({connect_time:.0f}ms)"
+                        )
                 if self._realtime_enabled:
                     self._start_realtime_listener()
                 self._start_keepalive()
@@ -817,7 +828,7 @@ class ElectrumServer:
             for attempt in range(2):
                 if self._connection is None or not self._connection.is_connected():
                     self.connect()
-                elif (time.time() - self._last_activity) > 10:
+                elif (time.time() - self._last_activity) > 60:
                     if not self._check_connection_health():
                         self._retry_on_failure()
                 try:
@@ -844,7 +855,7 @@ class ElectrumServer:
             for attempt in range(2):
                 if self._connection is None or not self._connection.is_connected():
                     self.connect()
-                elif (time.time() - self._last_activity) > 10:
+                elif (time.time() - self._last_activity) > 60:
                     if not self._check_connection_health():
                         self._retry_on_failure()
                 try:
