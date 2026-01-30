@@ -378,7 +378,7 @@ class BTCInterface(Secp256k1Interface):
                 f"Wallet: {self._rpc_wallet} not active, attempting to load."
             )
             try:
-                self.rpc_wallet(
+                self.rpc(
                     "loadwallet",
                     [
                         self._rpc_wallet,
@@ -386,7 +386,31 @@ class BTCInterface(Secp256k1Interface):
                 )
                 wallets = self.rpc("listwallets")
             except Exception as e:
-                self._log.debug(f'Error loading wallet "self._rpc_wallet": {e}.')
+                self._log.debug(f'Error loading wallet "{self._rpc_wallet}": {e}.')
+                if "does not exist" in str(e) or "Path does not exist" in str(e):
+                    self._log.info(
+                        f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
+                    )
+                    try:
+                        self.rpc(
+                            "createwallet",
+                            [
+                                self._rpc_wallet,
+                                False,
+                                True,
+                                "",
+                                False,
+                                self._use_descriptors,
+                            ],
+                        )
+                        wallets = self.rpc("listwallets")
+                        if self.getWalletSeedID() == "Not found":
+                            self._log.info(
+                                f"Initializing HD seed for {self.coin_name()}."
+                            )
+                            self._sc.initialiseWallet(self.coin_type())
+                    except Exception as create_e:
+                        self._log.error(f"Error creating wallet: {create_e}")
 
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
@@ -578,6 +602,7 @@ class BTCInterface(Secp256k1Interface):
                 self.rpc_wallet("sethdseed", [True, key_wif])
             except Exception as e:
                 self._log.debug(f"sethdseed failed: {e}")
+                
                 """
                 # TODO: Find derived key counts
                 if "Already have this key" in str(e):
@@ -585,7 +610,11 @@ class BTCInterface(Secp256k1Interface):
                     self.setActiveKeyChain(key_id)
                 else:
                 """
-                raise (e)
+                if "Already have this key" not in str(e):
+                    raise (e)
+                self._log.info(
+                    f"{self.coin_name()} wallet already has the correct HD seed."
+                )
 
     def canExportToElectrum(self) -> bool:
         # keychains must be unhardened to export into electrum
@@ -1869,6 +1898,7 @@ class BTCInterface(Secp256k1Interface):
             final_vsize = (
                 10 + len(funded_tx.vout) * 34 + len(selected_utxos) * input_vsize
             )
+            min_relay_fee = 250
             final_fee = max(final_vsize * fee_per_vbyte, min_relay_fee)
             change = 0  # Goes to fees
 
@@ -3952,7 +3982,7 @@ class BTCInterface(Secp256k1Interface):
             # Recreate wallet if none found
             # Required when encrypting an existing btc/ltc wallet, or switching from electrum to rpc mode. Workaround is to delete the btc/ltc wallet and recreate.
             wallets = self.rpc("listwallets")
-            if len(wallets) < 1:
+            if self._rpc_wallet not in wallets:
                 self._log.info(
                     f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                 )
@@ -3969,8 +3999,43 @@ class BTCInterface(Secp256k1Interface):
                     ],
                 )
 
-        # Max timeout value, ~3 years
-        self.rpc_wallet("walletpassphrase", [password, 100000000])
+            try:
+                seed_id = self.getWalletSeedID()
+                self._log.debug(
+                    f"{self.ticker()} unlockWallet getWalletSeedID returned: {seed_id}"
+                )
+                needs_seed_init = seed_id == "Not found"
+            except Exception as e:
+                self._log.debug(f"getWalletSeedID failed: {e}, will initialize seed")
+                needs_seed_init = True
+            if needs_seed_init:
+                self._log.info(f"Initializing HD seed for {self.coin_name()}.")
+                self._sc.initialiseWallet(self.coin_type())
+                if password:
+                    self._log.info(f"Encrypting {self.coin_name()} wallet.")
+                    try:
+                        self.rpc_wallet("encryptwallet", [password])
+                    except Exception as e:
+                        self._log.debug(f"encryptwallet returned: {e}")
+                    import time
+
+                    for i in range(10):
+                        time.sleep(1)
+                        try:
+                            self.rpc("listwallets")
+                            break
+                        except Exception:
+                            self._log.debug(
+                                f"Waiting for wallet after encryption... {i+1}/10"
+                            )
+                    wallets = self.rpc("listwallets")
+                    if self._rpc_wallet not in wallets:
+                        self.rpc("loadwallet", [self._rpc_wallet])
+                self.setWalletSeedWarning(False)
+                check_seed = False
+
+        if self.isWalletEncrypted():
+            self.rpc_wallet("walletpassphrase", [password, 100000000])
         if check_seed:
             self._sc.checkWalletSeed(self.coin_type())
 

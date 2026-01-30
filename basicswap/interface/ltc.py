@@ -26,6 +26,80 @@ class LTCInterface(BTCInterface):
             wallet=self._rpc_wallet_mweb,
         )
 
+    def checkWallets(self) -> int:
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm and wm.isInitialized(self.coin_type()):
+                return 1
+            return 0
+
+        wallets = self.rpc("listwallets")
+
+        if self._rpc_wallet not in wallets:
+            self._log.debug(
+                f"Wallet: {self._rpc_wallet} not active, attempting to load."
+            )
+            try:
+                self.rpc(
+                    "loadwallet",
+                    [
+                        self._rpc_wallet,
+                    ],
+                )
+                wallets = self.rpc("listwallets")
+            except Exception as e:
+                self._log.debug(f'Error loading wallet "{self._rpc_wallet}": {e}.')
+                if "does not exist" in str(e) or "Path does not exist" in str(e):
+                    self._log.info(
+                        f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
+                    )
+                    try:
+                        self.rpc(
+                            "createwallet",
+                            [
+                                self._rpc_wallet,
+                                False,
+                                True,
+                                "",
+                                False,
+                                self._use_descriptors,
+                            ],
+                        )
+                        wallets = self.rpc("listwallets")
+                        if self.getWalletSeedID() == "Not found":
+                            self._log.info(
+                                f"Initializing HD seed for {self.coin_name()}."
+                            )
+                            self._sc.initialiseWallet(self.coin_type())
+                    except Exception as create_e:
+                        self._log.error(f"Error creating wallet: {create_e}")
+
+        if self._rpc_wallet not in wallets and len(wallets) > 0:
+            self._log.warning(f"Changing {self.ticker()} wallet name.")
+            for wallet_name in wallets:
+                if wallet_name in ("mweb",):
+                    continue
+
+                change_watchonly_wallet: bool = (
+                    self._rpc_wallet_watch == self._rpc_wallet
+                )
+
+                self._rpc_wallet = wallet_name
+                self._log.info(
+                    f"Switched {self.ticker()} wallet name to {self._rpc_wallet}."
+                )
+                self.rpc_wallet = make_rpc_func(
+                    self._rpcport,
+                    self._rpcauth,
+                    host=self._rpc_host,
+                    wallet=self._rpc_wallet,
+                )
+                if change_watchonly_wallet:
+                    self.rpc_wallet_watch = self.rpc_wallet
+                break
+
+        return len(wallets)
+
     def getNewMwebAddress(self, use_segwit=False, label="swap_receive") -> str:
         if self.useBackend():
             raise ValueError("MWEB addresses not supported in electrum mode")
@@ -108,6 +182,71 @@ class LTCInterface(BTCInterface):
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
 
+    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
+        if password == "":
+            return
+        self._log.info("unlockWallet - {}".format(self.ticker()))
+
+        if self.useBackend():
+            return
+
+        wallets = self.rpc("listwallets")
+        if self._rpc_wallet not in wallets:
+            self._log.info(
+                f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
+            )
+            self.rpc(
+                "createwallet",
+                [
+                    self._rpc_wallet,
+                    False,
+                    True,
+                    password,
+                    False,
+                    self._use_descriptors,
+                ],
+            )
+
+        try:
+            seed_id = self.getWalletSeedID()
+            self._log.debug(f"LTC unlockWallet getWalletSeedID returned: {seed_id}")
+            needs_seed_init = seed_id == "Not found"
+        except Exception as e:
+
+            self._log.debug(f"getWalletSeedID failed: {e}, will initialize seed")
+            needs_seed_init = True
+        if needs_seed_init:
+            self._log.info(f"Initializing HD seed for {self.coin_name()}.")
+            self._sc.initialiseWallet(self.coin_type())
+            if password:
+                self._log.info(f"Encrypting {self.coin_name()} wallet.")
+                try:
+                    self.rpc_wallet("encryptwallet", [password])
+                except Exception as e:
+                    self._log.debug(f"encryptwallet returned: {e}")
+                import time
+
+                for i in range(10):
+                    time.sleep(1)
+                    try:
+                        self.rpc("listwallets")
+                        break
+                    except Exception:
+                        self._log.debug(
+                            f"Waiting for wallet after encryption... {i+1}/10"
+                        )
+                wallets = self.rpc("listwallets")
+                if self._rpc_wallet not in wallets:
+                    self.rpc("loadwallet", [self._rpc_wallet])
+            self.setWalletSeedWarning(False)
+            check_seed = False
+
+        if self.isWalletEncrypted():
+            self.rpc_wallet("walletpassphrase", [password, 100000000])
+
+        if check_seed:
+            self._sc.checkWalletSeed(self.coin_type())
+
 
 class LTCInterfaceMWEB(LTCInterface):
 
@@ -151,9 +290,45 @@ class LTCInterfaceMWEB(LTCInterface):
 
         self._log.info("init_wallet - {}".format(self.ticker()))
 
-        self._log.info(f"Creating wallet {self._rpc_wallet} for {self.coin_name()}.")
-        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
-        self.rpc("createwallet", ["mweb", False, True, password, False, False, True])
+        wallets = self.rpc("listwallets")
+        if self._rpc_wallet not in wallets:
+            try:
+                self.rpc("loadwallet", [self._rpc_wallet])
+                self._log.debug(f'Loaded existing wallet "{self._rpc_wallet}".')
+            except Exception as e:
+                if "does not exist" in str(e) or "Path does not exist" in str(e):
+                    self._log.info(
+                        f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
+                    )
+                    self.rpc(
+                        "createwallet",
+                        [
+                            self._rpc_wallet,
+                            False,
+                            True,
+                            password,
+                            False,
+                            self._use_descriptors,
+                        ],
+                    )
+                else:
+                    raise
+
+        wallets = self.rpc("listwallets")
+        if "mweb" not in wallets:
+            try:
+                self.rpc("loadwallet", ["mweb"])
+                self._log.debug("Loaded existing MWEB wallet.")
+            except Exception as e:
+                if "does not exist" in str(e) or "Path does not exist" in str(e):
+                    self._log.info(f"Creating MWEB wallet for {self.coin_name()}.")
+                    # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
+                    self.rpc(
+                        "createwallet",
+                        ["mweb", False, True, password, False, False, True],
+                    )
+                else:
+                    raise
 
         if password is not None:
             # Max timeout value, ~3 years
@@ -180,7 +355,19 @@ class LTCInterfaceMWEB(LTCInterface):
         if not self.has_mweb_wallet():
             self.init_wallet(password)
         else:
-            # Max timeout value, ~3 years
             self.rpc_wallet("walletpassphrase", [password, 100000000])
+            try:
+                seed_id = self.getWalletSeedID()
+                self._log.debug(
+                    f"LTC_MWEB unlockWallet getWalletSeedID returned: {seed_id}"
+                )
+                needs_seed_init = seed_id == "Not found"
+            except Exception as e:
+                self._log.debug(f"getWalletSeedID failed: {e}, will initialize seed")
+                needs_seed_init = True
+            if needs_seed_init:
+                self._log.info(f"Initializing HD seed for {self.coin_name()}.")
+                self._sc.initialiseWallet(self.interface_type())
+
         if check_seed:
-            self._sc.checkWalletSeed(self.coin_type())
+            self._sc.checkWalletSeed(self.interface_type())

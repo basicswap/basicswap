@@ -1670,8 +1670,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def checkSystemStatus(self) -> None:
         ci = self.ci(Coins.PART)
-        if ci.isWalletLocked():
-            raise LockedCoinError(Coins.PART)
+        try:
+            if ci.isWalletLocked():
+                raise LockedCoinError(Coins.PART)
+        except Exception as e:
+            if "not exist or is not loaded" in str(e):
+                raise LockedCoinError(Coins.PART)
+            raise
 
     def checkForUpdates(self) -> None:
         if not self.settings.get("check_updates", True):
@@ -4501,10 +4506,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return False
         try:
             wallet_seedid = ci.getWalletSeedID()
-        except Exception as e:
-            self.log.debug(
-                f"checkWalletSeed {ci.coin_name()}: getWalletSeedID failed: {e}"
-            )
+        except Exception:
             wallet_seedid = None
         if ci.checkExpectedSeed(expect_seedid):
             ci.setWalletSeedWarning(False)
