@@ -4026,7 +4026,7 @@ class BTCInterface(Secp256k1Interface):
                             break
                         except Exception:
                             self._log.debug(
-                                f"Waiting for wallet after encryption... {i+1}/10"
+                                f"Waiting for wallet after encryption... {i + 1}/10"
                             )
                     wallets = self.rpc("listwallets")
                     if self._rpc_wallet not in wallets:
