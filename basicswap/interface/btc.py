@@ -602,7 +602,7 @@ class BTCInterface(Secp256k1Interface):
                 self.rpc_wallet("sethdseed", [True, key_wif])
             except Exception as e:
                 self._log.debug(f"sethdseed failed: {e}")
-                
+
                 """
                 # TODO: Find derived key counts
                 if "Already have this key" in str(e):
