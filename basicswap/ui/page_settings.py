@@ -275,7 +275,7 @@ def page_settings(self, url_split, post_string):
         if not onion_servers:
             default_onion = DEFAULT_ONION_SERVERS.get(name, [])
             onion_servers = [
-                f"{s['host']}:{s['port']}:{str(s.get('ssl', True)).lower()}"
+                f"{s['host']}:{s['port']}:{str(s.get('ssl', False)).lower()}"
                 for s in default_onion
             ]
 
