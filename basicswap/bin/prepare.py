@@ -2469,7 +2469,10 @@ def main():
             server_str = s[1].strip()
             parts = server_str.split(":")
             if len(parts) >= 2:
-                server = f"{parts[0]}:{parts[1]}"
+                if len(parts) >= 3:
+                    server = f"{parts[0]}:{parts[1]}:{parts[2]}"
+                else:
+                    server = f"{parts[0]}:{parts[1]}"
                 if coin_prefix not in electrum_servers:
                     electrum_servers[coin_prefix] = []
                 electrum_servers[coin_prefix].append(server)

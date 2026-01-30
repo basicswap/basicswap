@@ -447,7 +447,11 @@ def _parse_server_string(server_str):
     parts = server_str.strip().split(":")
     host = parts[0]
     port = int(parts[1]) if len(parts) > 1 else 50002
-    use_ssl = port != 50001
+    if len(parts) > 2:
+        ssl_str = parts[2].lower()
+        use_ssl = ssl_str in ("true", "1", "yes", "ssl")
+    else:
+        use_ssl = port != 50001
     return {"host": host, "port": port, "ssl": use_ssl}
 
 

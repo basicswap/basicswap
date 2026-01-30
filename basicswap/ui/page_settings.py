@@ -268,10 +268,16 @@ def page_settings(self, url_split, post_string):
 
         if not clearnet_servers:
             default_clearnet = DEFAULT_ELECTRUM_SERVERS.get(name, [])
-            clearnet_servers = [f"{s['host']}:{s['port']}" for s in default_clearnet]
+            clearnet_servers = [
+                f"{s['host']}:{s['port']}:{str(s.get('ssl', True)).lower()}"
+                for s in default_clearnet
+            ]
         if not onion_servers:
             default_onion = DEFAULT_ONION_SERVERS.get(name, [])
-            onion_servers = [f"{s['host']}:{s['port']}" for s in default_onion]
+            onion_servers = [
+                f"{s['host']}:{s['port']}:{str(s.get('ssl', True)).lower()}"
+                for s in default_onion
+            ]
 
         clearnet_text = "\n".join(clearnet_servers) if clearnet_servers else ""
         onion_text = "\n".join(onion_servers) if onion_servers else ""
