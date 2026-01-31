@@ -9,6 +9,7 @@
 import threading
 
 from enum import IntEnum
+from typing import List
 
 from basicswap.chainparams import (
     chainparams,
@@ -180,13 +181,16 @@ class CoinInterface:
 
 
 class AdaptorSigInterface:
-    def getScriptLockTxDummyWitness(self, script: bytes):
+    def getP2WPKHDummyWitness(self) -> List[bytes]:
+        return [bytes(72), bytes(33)]
+
+    def getScriptLockTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [b"", bytes(72), bytes(72), bytes(len(script))]
 
-    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes):
+    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [b"", bytes(72), bytes(72), bytes((1,)), bytes(len(script))]
 
-    def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes):
+    def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [bytes(72), b"", bytes(len(script))]
 
 

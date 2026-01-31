@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -828,7 +828,7 @@ class BTCInterface(Secp256k1Interface):
 
     def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
         if self.isScriptP2WPKH(script):
-            return [bytes(72), bytes(33)]
+            return self.getP2WPKHDummyWitness()
         raise ValueError("Unknown script type")
 
     def createSCLockRefundTx(
@@ -1943,9 +1943,16 @@ class BTCInterface(Secp256k1Interface):
         raise ValueError("Unimplemented")
 
     def getWitnessStackSerialisedLength(self, witness_stack):
-        length = getCompactSizeLen(len(witness_stack))
-        for e in witness_stack:
-            length += getWitnessElementLen(len(e))
+        length: int = 0
+        if len(witness_stack) > 0 and isinstance(witness_stack[0], list):
+            for input_stack in witness_stack:
+                length += getCompactSizeLen(len(input_stack))
+                for e in input_stack:
+                    length += getWitnessElementLen(len(e))
+        else:
+            length += getCompactSizeLen(len(witness_stack))
+            for e in witness_stack:
+                length += getWitnessElementLen(len(e))
 
         # See core SerializeTransaction
         length += 1  # vinDummy
