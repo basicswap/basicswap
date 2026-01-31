@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1160,7 +1160,7 @@ class BTCInterface(Secp256k1Interface):
 
     def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
         if self.isScriptP2WPKH(script):
-            return [bytes(72), bytes(33)]
+            return self.getP2WPKHDummyWitness()
         raise ValueError("Unknown script type")
 
     def createSCLockRefundTx(
@@ -1866,20 +1866,35 @@ class BTCInterface(Secp256k1Interface):
         funded_tx = CTransaction()
         funded_tx.nVersion = self.txVersion()
 
+        dummy_witness_stack = []
         for utxo in selected_utxos:
             txid_bytes = bytes.fromhex(utxo["txid"])[::-1]
             txid_int = int.from_bytes(txid_bytes, "little")
             funded_tx.vin.append(
                 CTxIn(COutPoint(txid_int, utxo["vout"]), nSequence=0xFFFFFFFD)
             )
+            dummy_witness_stack.append(self.getP2WPKHDummyWitness())
 
         for out in parsed_tx.vout:
             funded_tx.vout.append(out)
 
-        final_vsize = (
+        final_vsize_simple = (
             10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * input_vsize
         )
-        final_fee = final_vsize * fee_per_vbyte
+        witness_bytes_len_est: int = self.getWitnessStackSerialisedLength(
+            dummy_witness_stack
+        )
+        final_vsize = self.getTxVSize(
+            funded_tx, add_witness_bytes=witness_bytes_len_est
+        )
+        self._log.warning(
+            f"[rm] inputs={len(dummy_witness_stack)}, witness_bytes_est={witness_bytes_len_est}, "
+            f"vsize_simple={final_vsize_simple}, vsize_witness={final_vsize}"
+        )
+
+        # Use feerate in sat/kB directly: fee = round(fee_rate * vsize / 1000)
+        feerate_satkb = feerate if isinstance(feerate, int) else int(feerate * 100000000)
+        final_fee = round(feerate_satkb * final_vsize / 1000)
 
         min_relay_fee = 250
         final_fee = max(final_fee, min_relay_fee)
@@ -1895,11 +1910,15 @@ class BTCInterface(Secp256k1Interface):
             change_script = self.getScriptForPubkeyHash(pkh)
             funded_tx.vout.append(self.txoType()(change, change_script))
         else:
-            final_vsize = (
-                10 + len(funded_tx.vout) * 34 + len(selected_utxos) * input_vsize
+            # Recalculate vsize without change output using witness-aware method
+            final_vsize = self.getTxVSize(
+                funded_tx, add_witness_bytes=witness_bytes_len_est
+            )
+            self._log.warning(
+                f"[rm] no change: inputs={len(dummy_witness_stack)}, vsize_witness={final_vsize}"
             )
             min_relay_fee = 250
-            final_fee = max(final_vsize * fee_per_vbyte, min_relay_fee)
+            final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
             change = 0  # Goes to fees
 
         for utxo in selected_utxos:
@@ -1923,10 +1942,10 @@ class BTCInterface(Secp256k1Interface):
             f"fee={final_fee}, change={change}"
         )
         self._log.info_s(
-            "_fundTxElectrum tx amount, vsize, feerate: %ld, %ld, %ld",
+            "_fundTxElectrum tx amount, vsize, feerate(sat/kB): %ld, %ld, %ld",
             total_output,
             final_vsize,
-            fee_per_vbyte,
+            feerate_satkb,
         )
 
         return tx_serialized
@@ -3156,9 +3175,16 @@ class BTCInterface(Secp256k1Interface):
         raise ValueError("Unimplemented")
 
     def getWitnessStackSerialisedLength(self, witness_stack):
-        length = getCompactSizeLen(len(witness_stack))
-        for e in witness_stack:
-            length += getWitnessElementLen(len(e))
+        length: int = 0
+        if len(witness_stack) > 0 and isinstance(witness_stack[0], list):
+            for input_stack in witness_stack:
+                length += getCompactSizeLen(len(input_stack))
+                for e in input_stack:
+                    length += getWitnessElementLen(len(e))
+        else:
+            length += getCompactSizeLen(len(witness_stack))
+            for e in witness_stack:
+                length += getWitnessElementLen(len(e))
 
         # See core SerializeTransaction
         length += 1  # vinDummy
