@@ -1922,6 +1922,12 @@ class BTCInterface(Secp256k1Interface):
             f"selected={len(selected_utxos)}, input={total_input}, output={total_output}, "
             f"fee={final_fee}, change={change}"
         )
+        self._log.info_s(
+            "_fundTxElectrum tx amount, vsize, feerate: %ld, %ld, %ld",
+            total_output,
+            final_vsize,
+            fee_per_vbyte,
+        )
 
         return tx_serialized
 
