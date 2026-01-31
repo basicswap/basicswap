@@ -1893,7 +1893,9 @@ class BTCInterface(Secp256k1Interface):
         )
 
         # Use feerate in sat/kB directly: fee = round(fee_rate * vsize / 1000)
-        feerate_satkb = feerate if isinstance(feerate, int) else int(feerate * 100000000)
+        feerate_satkb = (
+            feerate if isinstance(feerate, int) else int(feerate * 100000000)
+        )
         final_fee = round(feerate_satkb * final_vsize / 1000)
 
         min_relay_fee = 250
