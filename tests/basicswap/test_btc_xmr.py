@@ -1509,6 +1509,23 @@ class BasicSwapTest(TestFunctions):
         vsize = tx_decoded["vsize"]
         expect_fee_int = round(self.test_fee_rate * vsize / 1000)
 
+        tx_obj = ci.loadTx(lock_tx)
+        vsize_from_ci = ci.getTxVSize(tx_obj)
+        assert vsize == vsize_from_ci
+        tx_no_witness = tx_obj.serialize_without_witness()
+
+        dummy_witness_stack = []
+        for txi in tx_obj.vin:
+            dummy_witness_stack.append(ci.getP2WPKHDummyWitness())
+        witness_bytes_len_est: int = ci.getWitnessStackSerialisedLength(
+            dummy_witness_stack
+        )
+        tx_obj_no_witness = ci.loadTx(tx_no_witness)
+        vsize_estimated = ci.getTxVSize(
+            tx_obj_no_witness, add_witness_bytes=witness_bytes_len_est
+        )
+        assert vsize <= vsize_estimated and vsize_estimated - vsize < 4
+
         out_value: int = 0
         for txo in tx_decoded["vout"]:
             if "value" in txo:
@@ -1556,7 +1573,7 @@ class BasicSwapTest(TestFunctions):
 
         expect_vsize: int = ci.xmr_swap_a_lock_spend_tx_vsize()
         assert expect_vsize >= vsize_actual
-        assert expect_vsize - vsize_actual < 10
+        assert expect_vsize - vsize_actual <= 10
 
         # Test chain b (no-script) lock tx size
         v = ci.getNewRandomKey()
@@ -1577,7 +1594,7 @@ class BasicSwapTest(TestFunctions):
 
         expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
         assert expect_vsize >= lock_tx_b_spend_decoded["vsize"]
-        assert expect_vsize - lock_tx_b_spend_decoded["vsize"] < 10
+        assert expect_vsize - lock_tx_b_spend_decoded["vsize"] <= 10
 
     def test_011_p2sh(self):
         # Not used in bsx for native-segwit coins

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -137,7 +137,7 @@ class PARTInterface(BTCInterface):
 
     def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
         if self.isScriptP2WPKH(script) or self.isScriptP2PKH(script):
-            return [bytes(72), bytes(33)]
+            return self.getP2WPKHDummyWitness()
         raise ValueError("Unknown script type")
 
     def formatStealthAddress(self, scan_pubkey, spend_pubkey) -> str:
@@ -146,9 +146,16 @@ class PARTInterface(BTCInterface):
         return encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey)
 
     def getWitnessStackSerialisedLength(self, witness_stack) -> int:
-        length: int = getCompactSizeLen(len(witness_stack))
-        for e in witness_stack:
-            length += getWitnessElementLen(len(e))
+        length: int = 0
+        if len(witness_stack) > 0 and isinstance(witness_stack[0], list):
+            for input_stack in witness_stack:
+                length += getCompactSizeLen(len(input_stack))
+                for e in input_stack:
+                    length += getWitnessElementLen(len(e))
+        else:
+            length += getCompactSizeLen(len(witness_stack))
+            for e in witness_stack:
+                length += getWitnessElementLen(len(e))
         return length
 
     def getWalletRestoreHeight(self) -> int:
