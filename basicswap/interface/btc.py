@@ -1878,31 +1878,20 @@ class BTCInterface(Secp256k1Interface):
         for out in parsed_tx.vout:
             funded_tx.vout.append(out)
 
-        final_vsize_simple = (
-            10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * input_vsize
-        )
         witness_bytes_len_est: int = self.getWitnessStackSerialisedLength(
             dummy_witness_stack
         )
-        final_vsize = self.getTxVSize(
-            funded_tx, add_witness_bytes=witness_bytes_len_est
-        )
-        self._log.warning(
-            f"[rm] inputs={len(dummy_witness_stack)}, witness_bytes_est={witness_bytes_len_est}, "
-            f"vsize_simple={final_vsize_simple}, vsize_witness={final_vsize}"
-        )
 
-        # Use feerate in sat/kB directly: fee = round(fee_rate * vsize / 1000)
         feerate_satkb = (
             feerate if isinstance(feerate, int) else int(feerate * 100000000)
         )
-        final_fee = round(feerate_satkb * final_vsize / 1000)
-
         min_relay_fee = 250
-        final_fee = max(final_fee, min_relay_fee)
-        change = total_input - total_output - final_fee
 
-        if change > 1000:
+        rough_vsize = 10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * 68
+        rough_fee = max(round(feerate_satkb * rough_vsize / 1000), min_relay_fee)
+        rough_change = total_input - total_output - rough_fee
+
+        if rough_change > 1000:
             change_addr = wm.getNewInternalAddress(self.coin_type())
             if not change_addr:
                 change_addr = wm.getExistingInternalAddress(self.coin_type())
@@ -1910,18 +1899,31 @@ class BTCInterface(Secp256k1Interface):
                 change_addr = selected_utxos[0].get("address")
             pkh = self.decodeAddress(change_addr)
             change_script = self.getScriptForPubkeyHash(pkh)
-            funded_tx.vout.append(self.txoType()(change, change_script))
-        else:
-            # Recalculate vsize without change output using witness-aware method
+            funded_tx.vout.append(self.txoType()(rough_change, change_script))
+
             final_vsize = self.getTxVSize(
                 funded_tx, add_witness_bytes=witness_bytes_len_est
             )
-            self._log.warning(
-                f"[rm] no change: inputs={len(dummy_witness_stack)}, vsize_witness={final_vsize}"
-            )
-            min_relay_fee = 250
             final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
-            change = 0  # Goes to fees
+            change = total_input - total_output - final_fee
+
+            if change > 1000:
+                funded_tx.vout[-1].nValue = change
+            else:
+                funded_tx.vout.pop()
+                final_vsize = self.getTxVSize(
+                    funded_tx, add_witness_bytes=witness_bytes_len_est
+                )
+                final_fee = max(
+                    round(feerate_satkb * final_vsize / 1000), min_relay_fee
+                )
+                change = 0
+        else:
+            final_vsize = self.getTxVSize(
+                funded_tx, add_witness_bytes=witness_bytes_len_est
+            )
+            final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
+            change = 0
 
         for utxo in selected_utxos:
             wm.lockUTXO(
