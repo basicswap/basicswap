@@ -1169,11 +1169,6 @@ def process_offers(args, config, script_state) -> None:
             )
             use_rate = offer_template["minrate"]
 
-        # Final minimum rate check after all adjustments
-        if use_rate < offer_template["minrate"]:
-            print("Warning: Final rate clamping to minimum after all adjustments.")
-            use_rate = offer_template["minrate"]
-
         if args.debug:
             print(
                 "Creating offer for: {} at rate: {}".format(
