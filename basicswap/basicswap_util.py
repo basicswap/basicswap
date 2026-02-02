@@ -641,6 +641,7 @@ def canTimeoutBidState(state):
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
         BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX,
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+        BidStates.BID_REQUEST_ACCEPTED,
     )
 
 

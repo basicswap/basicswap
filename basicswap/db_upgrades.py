@@ -138,6 +138,14 @@ def upgradeDatabaseData(self, data_version):
                         "state_id": int(state),
                     },
                 )
+        if data_version > 0 and data_version < 8:
+            cursor.execute(
+                "UPDATE bidstates SET can_timeout = :can_timeout WHERE state_id = :state_id",
+                {
+                    "can_timeout": 1,
+                    "state_id": int(BidStates.BID_REQUEST_ACCEPTED),
+                },
+            )
         if data_version > 0 and data_version < 4:
             for state in (
                 BidStates.BID_REQUEST_SENT,
