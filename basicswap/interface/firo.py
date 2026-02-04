@@ -160,12 +160,14 @@ class FIROInterface(BTCInterface):
                 else:
                     # Use automintspark to perform a plain -> spark tx of full balance
                     balance = self.rpc_wallet("getbalance")
-                    print(f"balance {balance} value {value} subfee {subfee}")
-                    if str(balance) == str(value) and subfee:
+                    if str(balance) == str(value):
                         result = self.rpc_wallet("automintspark")
                     else:
-                        # subtractFee param is not available on plain -> spark transactions
-                        params = [{addr_to: {"amount": value}}]
+                        # subfee param is available on plain -> spark transactions
+                        mint_params = {"amount": value}
+                        if subfee:
+                            mint_params["subfee"] = True
+                        params = [{addr_to: mint_params}]
                         result = self.rpc_wallet("mintspark", params)
                 # spendspark returns a txid string directly, in a result dict, or as an array
                 if isinstance(result, list) and len(result) > 0:
