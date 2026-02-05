@@ -27,11 +27,12 @@ from tests.basicswap.util import (
     waitForServer,
 )
 from tests.basicswap.common import (
-    waitForNumOffers,
     waitForNumBids,
+    waitForNumOffers,
     waitForNumSwapping,
 )
 from tests.basicswap.common_xmr import (
+    run_process,
     XmrTestBase,
 )
 
@@ -94,12 +95,13 @@ class Test(XmrTestBase):
 
         waitForNumBids(self.delay_event, 12700, 1)
 
-        for i in range(10):
+        for i in range(20):
             bids = read_json_api(12700, "bids")
             bid = bids[0]
             if bid["bid_state"] == "Received":
                 break
             self.delay_event.wait(1)
+        assert bid["bid_state"] == "Received"
         assert bid["expire_at"] == bid["created_at"] + data["validmins"] * 60
 
         data = {"accept": True}
@@ -112,7 +114,7 @@ class Test(XmrTestBase):
         c1 = self.processes[1]
         c1.terminate()
         c1.join()
-        self.processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
+        self.processes[1] = multiprocessing.Process(target=run_process, args=(1,))
         self.processes[1].start()
 
         waitForServer(self.delay_event, 12701)
