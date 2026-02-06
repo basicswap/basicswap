@@ -330,7 +330,7 @@ class Test(TestFunctions):
             "COIN": coin_name.capitalize(),
             "NET": "regtest",
             "LOG_LEVEL": "debug",
-            "SERVICES": f"tcp://:{services_port},ssl://:{services_port+1},rpc://",
+            "SERVICES": f"tcp://:{services_port},ssl://:{services_port + 1},rpc://",
             "CACHE_MB": "400",
             "DAEMON_URL": f"http://test_{ticker_lc}_0:test_{ticker_lc}_pwd_0@127.0.0.1:{node_rpc_port}",
             "DB_DIRECTORY": f"{ELECTRUMX_DATADIR}/db",
