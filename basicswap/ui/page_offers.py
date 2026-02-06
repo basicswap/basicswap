@@ -253,6 +253,14 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
             get_data_entry(form_data, "valid_for_seconds")
         )
 
+    if swap_client.debug:
+        if have_data_entry(form_data, "lock_type"):
+            parsed_data["lock_type"] = TxLockTypes(
+                int(get_data_entry(form_data, "lock_type"))
+            )
+        if have_data_entry(form_data, "lock_blocks"):
+            parsed_data["lock_blocks"] = int(get_data_entry(form_data, "lock_blocks"))
+
     try:
         if len(errors) == 0 and page_data["swap_style"] == "xmr":
             reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
@@ -346,7 +354,15 @@ def postNewOfferFromParsed(swap_client, parsed_data):
             lock_type = TxLockTypes.ABS_LOCK_TIME
 
     extra_options = {}
+    lock_value: int = parsed_data.get("lock_seconds", -1)
+    if swap_client.debug:
+        if "lock_type" in parsed_data:
+            lock_type = parsed_data["lock_type"]
+        if "lock_blocks" in parsed_data:
+            lock_value = parsed_data["lock_blocks"]
 
+    if "fee_from_conf" in parsed_data:
+        extra_options["from_fee_conf_target"] = parsed_data["fee_from_conf"]
     if "fee_from_conf" in parsed_data:
         extra_options["from_fee_conf_target"] = parsed_data["fee_from_conf"]
     if "from_fee_multiplier_percent" in parsed_data:
@@ -397,7 +413,7 @@ def postNewOfferFromParsed(swap_client, parsed_data):
         parsed_data["amt_bid_min"],
         swap_type,
         lock_type=lock_type,
-        lock_value=parsed_data["lock_seconds"],
+        lock_value=lock_value,
         addr_send_from=parsed_data["addr_from"],
         extra_options=extra_options,
     )
