@@ -25,7 +25,12 @@ export TEST_PATH=/tmp/test_electrum
 mkdir -p ${TEST_PATH}/bin
 cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export ELECTRUMX_SRC_DIR="~/tmp/electrumx"
-export EXTRA_CONFIG_JSON="{\"btc0\":[\"txindex=1\",\"rpcworkqueue=1100\"]}"
+export EXTRA_CONFIG_JSON=$(cat <<EOF | jq -r @json
+{
+  "btc0":["txindex=1","rpcworkqueue=1100"]
+}
+EOF
+)
 export TEST_COINS_LIST="bitcoin"
 export PYTHONPATH=$(pwd)
 python tests/basicswap/test_electrum.py
@@ -46,7 +51,11 @@ import sys
 import unittest
 
 import basicswap.config as cfg
-from basicswap.basicswap import Coins
+from basicswap.chainparams import (
+    Coins,
+    chainparams,
+    getCoinIdFromName,
+)
 from basicswap.util.daemon import Daemon
 
 from tests.basicswap.common import (
@@ -90,28 +99,31 @@ class Test(BaseTestWithPrepare):
     daemons = []
 
     @classmethod
-    def setUpClass(cls):
-        super(Test, cls).setUpClass()
+    def addElectrumxDaemon(cls, coin_name: str, node_rpc_port: int, services_port: int):
+        coin_type: Coins = getCoinIdFromName(coin_name)
+        ticker: str = chainparams[coin_type]["ticker"]
+        ticker_lc: str = ticker.lower()
 
-        logger.info("Starting Electrumx for BTC")
+        logger.info(f"Starting Electrumx for {ticker}")
         ELECTRUMX_SRC_DIR = os.path.expanduser(os.getenv("ELECTRUMX_SRC_DIR"))
         if ELECTRUMX_SRC_DIR is None:
             raise ValueError("Please set ELECTRUMX_SRC_DIR")
         ELECTRUMX_VENV = os.getenv(
             "ELECTRUMX_VENV", os.path.join(ELECTRUMX_SRC_DIR, "venv")
         )
-        BTC_BASE_RPC_PORT = 32793  # client0
-        ELECTRUMX_DATADIR_BTC = os.path.join(TEST_PATH, "electrumx_btc")
-        SSL_CERTFILE = f"{ELECTRUMX_DATADIR_BTC}/certfile.crt"
-        SSL_KEYFILE = f"{ELECTRUMX_DATADIR_BTC}/keyfile.key"
+        ELECTRUMX_DATADIR = os.getenv(
+            f"ELECTRUMX_DATADIR_{ticker}", f"/tmp/electrumx_{ticker_lc}"
+        )
+        SSL_CERTFILE = f"{ELECTRUMX_DATADIR}/certfile.crt"
+        SSL_KEYFILE = f"{ELECTRUMX_DATADIR}/keyfile.key"
 
-        if os.path.isdir(ELECTRUMX_DATADIR_BTC):
+        if os.path.isdir(ELECTRUMX_DATADIR):
             if RESET_TEST:
-                logger.info("Removing " + ELECTRUMX_DATADIR_BTC)
-                shutil.rmtree(ELECTRUMX_DATADIR_BTC)
-        if not os.path.exists(ELECTRUMX_DATADIR_BTC):
-            os.makedirs(os.path.join(ELECTRUMX_DATADIR_BTC, "db"))
-            with open(os.path.join(ELECTRUMX_DATADIR_BTC, "banner"), "w") as fp:
+                logger.info("Removing " + ELECTRUMX_DATADIR)
+                shutil.rmtree(ELECTRUMX_DATADIR)
+        if not os.path.exists(ELECTRUMX_DATADIR):
+            os.makedirs(os.path.join(ELECTRUMX_DATADIR, "db"))
+            with open(os.path.join(ELECTRUMX_DATADIR, "banner"), "w") as fp:
                 fp.write("TEST BANNER")
             try:
                 stdout = subprocess.check_output(
@@ -135,21 +147,21 @@ class Test(BaseTestWithPrepare):
                 logger.info(f"Error openssl {e.output}")
 
         electrumx_env = {
-            "COIN": "Bitcoin",
+            "COIN": coin_name.capitalize(),
             "NET": "regtest",
             "LOG_LEVEL": "debug",
-            "SERVICES": "tcp://:50001,ssl://:50002,rpc://",
+            "SERVICES": f"tcp://:{services_port},ssl://:{services_port+1},rpc://",
             "CACHE_MB": "400",
-            "DAEMON_URL": f"http://test_btc_0:test_btc_pwd_0@127.0.0.1:{BTC_BASE_RPC_PORT}",
-            "DB_DIRECTORY": f"{ELECTRUMX_DATADIR_BTC}/db",
-            "SSL_CERTFILE": f"{ELECTRUMX_DATADIR_BTC}/certfile.crt",
-            "SSL_KEYFILE": f"{ELECTRUMX_DATADIR_BTC}/keyfile.key",
-            "BANNER_FILE": f"{ELECTRUMX_DATADIR_BTC}/banner",
+            "DAEMON_URL": f"http://test_{ticker_lc}_0:test_{ticker_lc}_pwd_0@127.0.0.1:{node_rpc_port}",
+            "DB_DIRECTORY": f"{ELECTRUMX_DATADIR}/db",
+            "SSL_CERTFILE": f"{ELECTRUMX_DATADIR}/certfile.crt",
+            "SSL_KEYFILE": f"{ELECTRUMX_DATADIR}/keyfile.key",
+            "BANNER_FILE": f"{ELECTRUMX_DATADIR}/banner",
             "DAEMON_POLL_INTERVAL_BLOCKS": "1000",
             "DAEMON_POLL_INTERVAL_MEMPOOL": "1000",
         }
         opened_files = []
-        stdout_dest = open(f"{ELECTRUMX_DATADIR_BTC}/electrumx.log", "w")
+        stdout_dest = open(f"{ELECTRUMX_DATADIR}/electrumx.log", "w")
         stderr_dest = stdout_dest
         cls.daemons.append(
             Daemon(
@@ -168,9 +180,15 @@ class Test(BaseTestWithPrepare):
                 [
                     opened_files,
                 ],
-                "electrumx_btc",
+                f"electrumx_{ticker_lc}",
             )
         )
+
+    @classmethod
+    def setUpClass(cls):
+        super(Test, cls).setUpClass()
+
+        cls.addElectrumxDaemon("bitcoin", 32793, 50001)
 
     @classmethod
     def modifyConfig(cls, test_path, i):
@@ -214,7 +232,7 @@ class Test(BaseTestWithPrepare):
         super().tearDownClass()
         stopDaemons(cls.daemons)
 
-    def test_electrum(self):
+    def test_electrum_success(self):
 
         port_node_from: int = 12701
         port_node_to: int = 12702
