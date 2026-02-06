@@ -1841,6 +1841,7 @@ def initialise_wallets(
     daemons = []
     daemon_args = ["-noconnect", "-nodnsseed"]
     generated_mnemonic: bool = False
+    extended_keys = {}
 
     coins_failed_to_initialise = []
 
@@ -2098,6 +2099,20 @@ def initialise_wallets(
                 except Exception as e:  # noqa: F841
                     logger.warning(f"changeWalletPassword failed for {coin_name}.")
 
+        zprv_prefix = 0x04B2430C if chain == "mainnet" else 0x045F18BC
+        for coin_name in with_coins:
+            c = swap_client.getCoinIdFromName(coin_name)
+            if c == Coins.PART:
+                continue
+            try:
+                ci = swap_client.ci(c)
+                if hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum():
+                    seed_key = swap_client.getWalletKey(c, 1)
+                    account_key = ci.getAccountKey(seed_key, zprv_prefix)
+                    extended_keys[getCoinName(c)] = account_key
+            except Exception as e:
+                logger.debug(f"Could not generate extended key for {coin_name}: {e}")
+
     finally:
         if swap_client:
             swap_client.finalise()
@@ -2128,6 +2143,18 @@ def initialise_wallets(
                     particl_wallet_mnemonic
                 )
             )
+
+            if extended_keys:
+                print("Extended private keys (for external wallet import):")
+                for coin_name, key in extended_keys.items():
+                    print(f"  {coin_name}: {key}")
+                print("")
+                print(
+                    "NOTE: These keys can be imported into Electrum using 'Use a master key'."
+                )
+                print("WARNING: Write these down NOW. They will not be shown again.\n")
+
+    return extended_keys
 
 
 def load_config(config_path):
@@ -3071,7 +3098,7 @@ def main():
                 )
 
                 if particl_wallet_mnemonic != "none":
-                    initialise_wallets(
+                    extended_keys = initialise_wallets(
                         None,
                         {
                             add_coin,
@@ -3082,6 +3109,18 @@ def main():
                         use_tor_proxy,
                         extra_opts=extra_opts,
                     )
+
+                    if extended_keys:
+                        print("\nExtended private key (for external wallet import):")
+                        for coin_name, key in extended_keys.items():
+                            print(f"  {coin_name}: {key}")
+                        print("")
+                        print(
+                            "NOTE: This key can be imported into Electrum using 'Use a master key'."
+                        )
+                        print(
+                            "WARNING: Write this down NOW. It will not be shown again.\n"
+                        )
 
                 save_config(config_path, settings)
         finally:

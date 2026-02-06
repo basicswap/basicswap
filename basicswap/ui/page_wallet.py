@@ -530,6 +530,7 @@ def page_wallet(self, url_split, post_string):
     transactions = []
     total_transactions = 0
     is_electrum_mode = False
+    legacy_funds_info = None
     if wallet_data.get("havedata", False) and not wallet_data.get("error"):
         try:
             ci = swap_client.ci(coin_id)
@@ -544,6 +545,9 @@ def page_wallet(self, url_split, post_string):
 
                 raw_txs = all_txs[skip : skip + count] if all_txs else []
                 transactions = format_transactions(ci, raw_txs, coin_id)
+            else:
+                if coin_id in (Coins.BTC, Coins.LTC):
+                    legacy_funds_info = swap_client.getElectrumLegacyFundsInfo(coin_id)
         except Exception as e:
             swap_client.log.warning(f"Failed to fetch transactions for {ticker}: {e}")
 
@@ -563,6 +567,7 @@ def page_wallet(self, url_split, post_string):
             "tx_total": total_transactions,
             "tx_limit": tx_filters.get("limit", 30),
             "is_electrum_mode": is_electrum_mode,
+            "legacy_funds_info": legacy_funds_info,
             "use_tor": getattr(swap_client, "use_tor_proxy", False),
         },
     )

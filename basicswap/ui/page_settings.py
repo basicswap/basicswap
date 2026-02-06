@@ -180,11 +180,14 @@ def page_settings(self, url_split, post_string):
                                 form_data, "electrum_onion_" + name, ""
                             ).strip()
                             data["electrum_onion_servers"] = onion_servers
-                            auto_transfer = have_data_entry(
-                                form_data, "auto_transfer_" + name
+                            auto_transfer_now = have_data_entry(
+                                form_data, "auto_transfer_now_" + name
                             )
-                            data["auto_transfer_on_mode_switch"] = auto_transfer
-                            # Address gap limit for scanning
+                            if auto_transfer_now:
+                                transfer_value = get_data_entry_or(
+                                    form_data, "auto_transfer_now_" + name, "false"
+                                )
+                                data["auto_transfer_now"] = transfer_value == "true"
                             gap_limit_str = get_data_entry_or(
                                 form_data, "gap_limit_" + name, "20"
                             ).strip()
@@ -292,9 +295,6 @@ def page_settings(self, url_split, post_string):
                 "supports_electrum": name in electrum_supported_coins,
                 "clearnet_servers_text": clearnet_text,
                 "onion_servers_text": onion_text,
-                "auto_transfer_on_mode_switch": c.get(
-                    "auto_transfer_on_mode_switch", True
-                ),
                 "address_gap_limit": c.get("address_gap_limit", 20),
             }
         )

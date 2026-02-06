@@ -1248,10 +1248,12 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
                 "current_seed_id": wallet_seed_id,
             }
         )
-        if hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum():
-            rv.update(
-                {"account_key": ci.getAccountKey(seed_key, extkey_prefix)}
-            )  # Master key can be imported into electrum (Must set prefix for P2WPKH)
+
+        if hasattr(ci, "getAccountKey"):
+            try:
+                rv.update({"account_key": ci.getAccountKey(seed_key, extkey_prefix)})
+            except Exception as e:
+                rv.update({"account_key_error": str(e)})
 
     return bytes(
         json.dumps(rv),
@@ -1674,6 +1676,97 @@ def js_messageroutes(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps(message_routes), "UTF-8")
 
 
+def js_modeswitchinfo(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    post_data = getFormData(post_string, is_json)
+
+    coin_str = get_data_entry(post_data, "coin")
+    direction = get_data_entry_or(post_data, "direction", "lite")
+
+    try:
+        coin_type = getCoinIdFromName(coin_str)
+    except Exception:
+        coin_type = getCoinIdFromTicker(coin_str.upper())
+
+    ci = swap_client.ci(coin_type)
+    ticker = ci.ticker()
+
+    try:
+        wallet_info = ci.getWalletInfo()
+        balance = wallet_info.get("balance", 0)
+        balance_sats = ci.make_int(balance)
+    except Exception as e:
+        return bytes(json.dumps({"error": f"Failed to get balance: {e}"}), "UTF-8")
+
+    try:
+        fee_rate, rate_src = ci.get_fee_rate(ci._conf_target)
+        est_vsize = 180
+        if isinstance(fee_rate, int):
+            fee_per_vbyte = max(1, fee_rate // 1000)
+        else:
+            fee_per_vbyte = max(1, int(fee_rate * 100000))
+        estimated_fee_sats = est_vsize * fee_per_vbyte
+    except Exception:
+        estimated_fee_sats = 180
+        rate_src = "default"
+
+    min_viable = estimated_fee_sats * 2
+    can_transfer = balance_sats > min_viable
+
+    rv = {
+        "coin": ticker,
+        "direction": direction,
+        "balance": balance,
+        "balance_sats": balance_sats,
+        "estimated_fee_sats": estimated_fee_sats,
+        "estimated_fee": ci.format_amount(estimated_fee_sats),
+        "fee_rate_src": rate_src,
+        "can_transfer": can_transfer,
+        "min_viable_sats": min_viable,
+    }
+
+    if direction == "lite":
+        legacy_balance_sats = 0
+        has_legacy_funds = False
+        try:
+            if hasattr(ci, "rpc_wallet"):
+                unspent = ci.rpc_wallet("listunspent")
+                hrp = ci.chainparams_network().get("hrp", "bc")
+                for u in unspent:
+                    if "address" in u and not u["address"].startswith(hrp + "1"):
+                        legacy_balance_sats += ci.make_int(u.get("amount", 0))
+                        has_legacy_funds = True
+        except Exception as e:
+            swap_client.log.debug(f"Error checking legacy addresses: {e}")
+
+        if has_legacy_funds and legacy_balance_sats > min_viable:
+            rv["show_transfer_option"] = True
+            rv["legacy_balance_sats"] = legacy_balance_sats
+            rv["legacy_balance"] = ci.format_amount(legacy_balance_sats)
+            rv["message"] = (
+                "Funds on legacy addresses - transfer recommended for external wallet compatibility"
+            )
+        else:
+            rv["show_transfer_option"] = False
+            rv["legacy_balance_sats"] = 0
+            rv["legacy_balance"] = "0"
+            if has_legacy_funds:
+                rv["message"] = "Legacy balance too low to transfer"
+            else:
+                rv["message"] = "All funds on native segwit addresses"
+    else:
+        rv["show_transfer_option"] = can_transfer
+        if balance_sats == 0:
+            rv["message"] = "No funds to transfer"
+        elif not can_transfer:
+            rv["message"] = "Balance too low to transfer (fee would exceed funds)"
+        else:
+            rv["message"] = ""
+
+    return bytes(json.dumps(rv), "UTF-8")
+
+
 def js_electrum_discover(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = {} if post_string == "" else getFormData(post_string, is_json)
@@ -1805,6 +1898,7 @@ endpoints = {
     "coinhistory": js_coinhistory,
     "messageroutes": js_messageroutes,
     "electrumdiscover": js_electrum_discover,
+    "modeswitchinfo": js_modeswitchinfo,
 }
 
 

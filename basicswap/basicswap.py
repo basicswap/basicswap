@@ -2428,13 +2428,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _syncLiteWalletToRPCOnStartup(self, coin_type: Coins) -> None:
         try:
-            cc = self.coin_clients[coin_type]
-            if not cc.get("auto_transfer_on_mode_switch", True):
-                self.log.debug(
-                    f"Auto-transfer disabled for {getCoinName(coin_type)}, skipping sweep check"
-                )
-                return
-
             cursor = self.openDB()
             try:
                 row = cursor.execute(
@@ -2780,6 +2773,137 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.error(f"_transferLiteWalletBalanceToRPC error: {e}")
             return None
 
+    def sweepLiteWalletFunds(self, coin_type: Coins) -> dict:
+        try:
+            coin_name = getCoinName(coin_type)
+            self.log.info(f"Manual sweep requested for {coin_name}")
+
+            if coin_type in WalletManager.SUPPORTED_COINS:
+                if not self._wallet_manager.isInitialized(coin_type):
+                    try:
+                        self.initializeWalletManager(coin_type)
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "error": f"Wallet locked: {e}",
+                        }
+
+            result = self._transferLiteWalletBalanceToRPC(coin_type)
+            if result is None:
+                return {"skipped": True, "reason": "No balance to sweep"}
+            if result.get("skipped"):
+                return result
+            if result.get("txid"):
+                return {
+                    "success": True,
+                    "txid": result["txid"],
+                    "amount": result.get("amount", 0) / 1e8,
+                    "fee": result.get("fee", 0) / 1e8,
+                    "address": result.get("address", ""),
+                }
+            if result.get("error"):
+                return {"success": False, "error": result["error"]}
+            return {"skipped": True, "reason": "Unknown result"}
+        except Exception as e:
+            self.log.error(
+                f"sweepLiteWalletFunds error for {getCoinName(coin_type)}: {e}"
+            )
+            return {"success": False, "error": str(e)}
+
+    def _consolidateLegacyFundsToSegwit(self, coin_type: Coins) -> dict:
+        try:
+            coin_name = getCoinName(coin_type)
+            cc = self.coin_clients[coin_type]
+            ci = cc.get("interface")
+            if not ci:
+                return {"skipped": True, "reason": "No coin interface"}
+
+            try:
+                unspent = ci.rpc_wallet("listunspent")
+            except Exception as e:
+                return {"error": f"Failed to list UTXOs: {e}"}
+
+            hrp = ci.chainparams_network().get("hrp", "bc")
+            legacy_utxos = []
+            total_legacy_sats = 0
+
+            for u in unspent:
+                if "address" not in u:
+                    continue
+                addr = u["address"]
+                if not addr.startswith(hrp + "1"):
+                    legacy_utxos.append(u)
+                    total_legacy_sats += ci.make_int(u.get("amount", 0))
+
+            if not legacy_utxos:
+                return {"skipped": True, "reason": "No legacy funds found"}
+
+            if total_legacy_sats <= 0:
+                return {"skipped": True, "reason": "No balance on legacy addresses"}
+
+            est_vsize = len(legacy_utxos) * 150 + 40
+            fee_rate, _ = ci.get_fee_rate(ci._conf_target)
+            if isinstance(fee_rate, int):
+                fee_per_vbyte = max(1, fee_rate // 1000)
+            else:
+                fee_per_vbyte = max(1, int(fee_rate * 100000))
+            estimated_fee_sats = est_vsize * fee_per_vbyte
+
+            if total_legacy_sats <= estimated_fee_sats * 2:
+                return {
+                    "skipped": True,
+                    "reason": f"Legacy balance ({total_legacy_sats}) too low for fee ({estimated_fee_sats})",
+                }
+
+            try:
+                new_address = ci.rpc_wallet("getnewaddress", ["consolidate", "bech32"])
+            except Exception as e:
+                return {"error": f"Failed to get new address: {e}"}
+
+            send_amount_sats = total_legacy_sats - estimated_fee_sats
+            send_amount_btc = ci.format_amount(send_amount_sats)
+
+            self.log.info(
+                f"[Consolidate {coin_name}] Moving {ci.format_amount(total_legacy_sats)} from "
+                f"{len(legacy_utxos)} legacy UTXOs to {new_address}"
+            )
+
+            inputs = [{"txid": u["txid"], "vout": u["vout"]} for u in legacy_utxos]
+
+            try:
+                raw_tx = ci.rpc_wallet(
+                    "createrawtransaction",
+                    [inputs, {new_address: float(send_amount_btc)}],
+                )
+            except Exception as e:
+                return {"error": f"Failed to create transaction: {e}"}
+
+            try:
+                signed = ci.rpc_wallet("signrawtransactionwithwallet", [raw_tx])
+                if not signed.get("complete"):
+                    return {"error": "Failed to sign transaction"}
+                txid = ci.rpc_wallet("sendrawtransaction", [signed["hex"]])
+            except Exception as e:
+                return {"error": f"Failed to broadcast transaction: {e}"}
+
+            self.log.info(f"[Consolidate {coin_name}] SUCCESS! TXID: {txid}")
+
+            return {
+                "success": True,
+                "txid": txid,
+                "amount": send_amount_sats / 1e8,
+                "fee": estimated_fee_sats / 1e8,
+                "address": new_address,
+                "num_inputs": len(legacy_utxos),
+            }
+
+        except Exception as e:
+            self.log.error(f"_consolidateLegacyFundsToSegwit error: {e}")
+            import traceback
+
+            self.log.debug(traceback.format_exc())
+            return {"error": str(e)}
+
     def _retryPendingSweeps(self) -> None:
         if not self._pending_sweeps:
             return
@@ -2868,6 +2992,43 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as e:
             self.log.debug(f"getLiteWalletBalanceInfo error: {e}")
             return None
+
+    def getElectrumLegacyFundsInfo(self, coin_type: Coins) -> dict:
+        try:
+            cc = self.coin_clients.get(coin_type)
+            if not cc or cc.get("connection_type") != "electrum":
+                return {"has_legacy_funds": False}
+
+            if not self._wallet_manager:
+                return {"has_legacy_funds": False}
+
+            ci = self.ci(coin_type)
+            hrp = ci.chainparams_network().get("hrp", "bc")
+
+            unspent_by_addr = ci.getUnspentsByAddr()
+            if not unspent_by_addr:
+                return {"has_legacy_funds": False}
+
+            legacy_balance_sats = 0
+            legacy_addresses = []
+
+            for addr, balance_sats in unspent_by_addr.items():
+                if not addr.startswith(hrp + "1"):
+                    legacy_balance_sats += balance_sats
+                    legacy_addresses.append(addr)
+
+            if legacy_balance_sats > 0:
+                return {
+                    "has_legacy_funds": True,
+                    "legacy_balance_sats": legacy_balance_sats,
+                    "legacy_balance": ci.format_amount(legacy_balance_sats),
+                    "legacy_address_count": len(legacy_addresses),
+                    "coin": ci.ticker_mainnet(),
+                }
+            return {"has_legacy_funds": False}
+        except Exception as e:
+            self.log.debug(f"getElectrumLegacyFundsInfo error: {e}")
+            return {"has_legacy_funds": False}
 
     def _tryGetFullNodeAddresses(self, coin_type: Coins) -> list:
         addresses = []
@@ -13089,15 +13250,39 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 display_name = getCoinName(coin_id)
 
                 if old_connection_type == "rpc" and new_connection_type == "electrum":
+                    auto_transfer_now = data.get("auto_transfer_now", False)
+                    if auto_transfer_now:
+                        transfer_result = self._consolidateLegacyFundsToSegwit(coin_id)
+                        if transfer_result.get("success"):
+                            self.log.info(
+                                f"Consolidated {transfer_result.get('amount', 0):.8f} {display_name} "
+                                f"from legacy addresses. TXID: {transfer_result.get('txid')}"
+                            )
+                            if migration_message:
+                                migration_message += f" Transferred {transfer_result.get('amount', 0):.8f} {display_name} to native segwit."
+                            else:
+                                migration_message = f"Transferred {transfer_result.get('amount', 0):.8f} {display_name} to native segwit."
+                        elif transfer_result.get("skipped"):
+                            self.log.info(
+                                f"Legacy fund transfer skipped for {coin_name}: {transfer_result.get('reason')}"
+                            )
+                        elif transfer_result.get("error"):
+                            self.log.warning(
+                                f"Legacy fund transfer warning for {coin_name}: {transfer_result.get('error')}"
+                            )
+
                     migration_result = self._migrateWalletToLiteMode(coin_id)
                     if migration_result.get("success"):
                         count = migration_result.get("count", 0)
                         self.log.info(
                             f"Lite wallet ready for {coin_name} with {count} addresses"
                         )
-                        migration_message = (
-                            f"Lite wallet ready for {display_name} ({count} addresses)."
-                        )
+                        if migration_message:
+                            migration_message += (
+                                f" Lite wallet ready ({count} addresses)."
+                            )
+                        else:
+                            migration_message = f"Lite wallet ready for {display_name} ({count} addresses)."
                     else:
                         error = migration_result.get("error", "unknown")
                         reason = migration_result.get("reason", "")
@@ -13120,11 +13305,38 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                     empty_check = self._checkElectrumWalletEmpty(coin_id)
                     if not empty_check.get("empty", False):
-                        error = empty_check.get(
-                            "message", "Wallet must be empty before switching modes"
-                        )
                         reason = empty_check.get("reason", "")
-                        if reason in ("has_balance", "active_swap"):
+
+                        auto_transfer_now = data.get("auto_transfer_now", False)
+
+                        if reason == "has_balance" and auto_transfer_now:
+                            self.log.info(
+                                f"Auto-transfer requested for {coin_name} during mode switch"
+                            )
+                            sweep_result = self.sweepLiteWalletFunds(coin_id)
+                            if sweep_result.get("success"):
+                                self.log.info(
+                                    f"Swept {sweep_result.get('amount', 0):.8f} {display_name} "
+                                    f"to RPC wallet. TXID: {sweep_result.get('txid')}"
+                                )
+                                migration_message = (
+                                    f"Transferred {sweep_result.get('amount', 0):.8f} {display_name} "
+                                    f"to full node wallet."
+                                )
+                            elif sweep_result.get("skipped"):
+                                self.log.info(
+                                    f"Sweep skipped for {coin_name}: {sweep_result.get('reason')}"
+                                )
+                            else:
+                                error = sweep_result.get("error", "Transfer failed")
+                                self.log.error(
+                                    f"Transfer failed for {coin_name}: {error}"
+                                )
+                                raise ValueError(f"Transfer failed: {error}")
+                        elif reason in ("has_balance", "active_swap"):
+                            error = empty_check.get(
+                                "message", "Wallet must be empty before switching modes"
+                            )
                             self.log.error(
                                 f"Migration blocked for {coin_name}: {error}"
                             )
@@ -13279,19 +13491,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     for coin, cc in self.coin_clients.items():
                         if cc["name"] == coin_name:
                             cc["electrum_onion_servers"] = new_onion
-                            break
-
-            if "auto_transfer_on_mode_switch" in data:
-                new_auto_transfer = data["auto_transfer_on_mode_switch"]
-                if (
-                    settings_cc.get("auto_transfer_on_mode_switch", True)
-                    != new_auto_transfer
-                ):
-                    settings_changed = True
-                    settings_cc["auto_transfer_on_mode_switch"] = new_auto_transfer
-                    for coin, cc in self.coin_clients.items():
-                        if cc["name"] == coin_name:
-                            cc["auto_transfer_on_mode_switch"] = new_auto_transfer
                             break
 
             if settings_changed:

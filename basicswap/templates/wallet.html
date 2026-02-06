@@ -82,6 +82,36 @@
 </section>
 {% endif %}
 
+{% if legacy_funds_info and legacy_funds_info.has_legacy_funds %}
+<section class="py-4 px-6" id="legacy_funds_warning">
+  <div class="lg:container mx-auto">
+    <div class="p-6 rounded-lg bg-yellow-50 border border-yellow-400 dark:bg-yellow-900/30 dark:border-yellow-700">
+      <div class="flex flex-wrap justify-between items-center -m-2">
+        <div class="flex-1 p-2">
+          <div class="flex flex-wrap -m-1">
+            <div class="w-auto p-1">
+              <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div class="ml-3 flex-1">
+              <p class="font-semibold text-lg lg:text-sm text-yellow-700 dark:text-yellow-300">Legacy Address Funds</p>
+              <p class="mt-1 text-sm text-yellow-600 dark:text-yellow-400">
+                {{ legacy_funds_info.legacy_balance }} {{ legacy_funds_info.coin }} on legacy addresses won't be visible in external Electrum wallet.
+                To use funds with external wallets, transfer to a new address.
+              </p>
+              <p class="mt-2 text-xs text-yellow-500 dark:text-yellow-500">
+                Use the withdraw function below to send funds to a new <code class="bg-yellow-100 dark:bg-yellow-800/50 px-1 rounded">{{ w.ticker | lower }}1...</code> address.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <section>
     <form method="post" autocomplete="off">
       <div class="px-6 py-0 h-full overflow-hidden">

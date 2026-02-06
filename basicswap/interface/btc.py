@@ -3355,7 +3355,8 @@ class BTCInterface(Secp256k1Interface):
             total_balance = sum(u.get("value", 0) for u in all_utxos)
 
             est_vsize = 10 + 31 + len(all_utxos) * 68
-            est_fee = est_vsize * fee_per_vbyte
+            min_fee = 250
+            est_fee = max(est_vsize * fee_per_vbyte, min_fee)
 
             if total_balance <= est_fee:
                 raise ValueError(

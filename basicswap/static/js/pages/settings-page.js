@@ -147,6 +147,16 @@
             hiddenInput.name = submitter.name;
             hiddenInput.value = submitter.value;
             form.appendChild(hiddenInput);
+
+            const transferRadio = document.querySelector('input[name="transfer_choice"]:checked');
+            if (transferRadio) {
+              const transferInput = document.createElement('input');
+              transferInput.type = 'hidden';
+              transferInput.name = `auto_transfer_now_${coinName}`;
+              transferInput.value = transferRadio.value === 'auto' ? 'true' : 'false';
+              form.appendChild(transferInput);
+            }
+
             form.submit();
           }
         });
@@ -167,11 +177,26 @@
       }
     },
 
-    showWalletModeConfirmation: function(coinName, direction, submitter) {
+    updateConfirmButtonState: function() {
+      const confirmBtn = document.getElementById('walletModeConfirm');
+      const checkbox = document.getElementById('walletModeKeyConfirmCheckbox');
+      if (confirmBtn && checkbox) {
+        if (checkbox.checked) {
+          confirmBtn.disabled = false;
+          confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+          confirmBtn.disabled = true;
+          confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+      }
+    },
+
+    showWalletModeConfirmation: async function(coinName, direction, submitter) {
       const modal = document.getElementById('walletModeModal');
       const title = document.getElementById('walletModeTitle');
       const message = document.getElementById('walletModeMessage');
       const details = document.getElementById('walletModeDetails');
+      const confirmBtn = document.getElementById('walletModeConfirm');
 
       if (!modal || !title || !message || !details) return;
 
@@ -179,37 +204,223 @@
 
       const displayName = coinName.charAt(0).toUpperCase() + coinName.slice(1).toLowerCase();
 
-      if (direction === 'lite') {
-        title.textContent = `Switch ${displayName} to Lite Wallet Mode`;
-        message.textContent = 'Please confirm you want to switch to lite wallet mode.';
-        details.innerHTML = `
-          <p class="mb-2"><strong>Before switching:</strong></p>
-          <ul class="list-disc list-inside space-y-1">
-            <li>Active swaps must be completed first</li>
-            <li>Wait for any pending transactions to confirm</li>
-          </ul>
-          <p class="mt-3 text-green-600 dark:text-green-400">
-            <strong>Note:</strong> Your balance will remain accessible - same seed means same funds in both modes.
-          </p>
-        `;
-      } else {
-        title.textContent = `Switch ${displayName} to Full Node Mode`;
-        message.textContent = 'Please confirm you want to switch to full node mode.';
-        details.innerHTML = `
-          <p class="mb-2"><strong>Switching to full node mode:</strong></p>
-          <ul class="list-disc list-inside space-y-1">
-            <li>Requires synced ${displayName} blockchain</li>
-            <li>Your wallet addresses will be synced</li>
-            <li>Active swaps must be completed first</li>
-            <li>Restart required after switch</li>
-          </ul>
-          <p class="mt-3 text-green-600 dark:text-green-400">
-            <strong>Note:</strong> Your balance will remain accessible - same seed means same funds in both modes.
-          </p>
-        `;
+      details.innerHTML = `
+        <div class="flex items-center justify-center py-4">
+          <svg class="animate-spin h-5 w-5 text-blue-500 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Loading...</span>
+        </div>
+      `;
+
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
       }
 
       modal.classList.remove('hidden');
+
+      if (direction === 'lite') {
+        title.textContent = `Switch ${displayName} to Lite Wallet Mode`;
+        message.textContent = 'Write down this key before switching. It will only be shown ONCE.';
+
+        try {
+          const [infoResponse, seedResponse] = await Promise.all([
+            fetch('/json/modeswitchinfo', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ coin: coinName, direction: 'lite' })
+            }),
+            fetch('/json/getcoinseed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ coin: coinName })
+            })
+          ]);
+          const info = await infoResponse.json();
+          const data = await seedResponse.json();
+
+          let transferSection = '';
+          if (info.show_transfer_option && info.legacy_balance_sats > 0) {
+            transferSection = `
+              <div class="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded-lg p-3 mb-3">
+                <p class="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-2">Legacy Address Funds Detected</p>
+                <p class="text-xs text-gray-700 dark:text-gray-300 mb-3">
+                  ${info.legacy_balance} ${info.coin} on legacy addresses won't be visible in external Electrum wallet.
+                  Est. fee: ${info.estimated_fee} ${info.coin}
+                </p>
+                <div class="space-y-2">
+                  <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
+                    <input type="radio" name="transfer_choice" value="auto" class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
+                    <div>
+                      <span class="text-sm font-medium text-gray-900 dark:text-white">Transfer to native segwit address</span>
+                      <p class="text-xs text-gray-600 dark:text-gray-300">Recommended for external wallet compatibility.</p>
+                    </div>
+                  </label>
+                  <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
+                    <input type="radio" name="transfer_choice" value="manual" checked class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
+                    <div>
+                      <span class="text-sm font-medium text-gray-900 dark:text-white">Keep on current addresses</span>
+                      <p class="text-xs text-gray-600 dark:text-gray-300">Funds accessible in BasicSwap, transfer manually later if needed.</p>
+                    </div>
+                  </label>
+                </div>
+                <p class="text-xs text-red-600 dark:text-red-400 mt-3">
+                  If you skip transfer, legacy funds won't be visible when importing the extended key into external Electrum wallet.
+                </p>
+              </div>
+            `;
+          } else if (info.legacy_balance_sats > 0 && !info.show_transfer_option) {
+            transferSection = `
+              <p class="text-yellow-700 dark:text-yellow-300 text-xs mb-3">
+                Some funds on legacy addresses (${info.legacy_balance} ${info.coin}) - too low to transfer.
+              </p>
+            `;
+          }
+
+          if (data.account_key) {
+            details.innerHTML = `
+              <p class="mb-2 text-red-600 dark:text-red-300 font-semibold">
+                IMPORTANT: Write down this key NOW. It will not be shown again.
+              </p>
+              <p class="mb-2 text-gray-800 dark:text-gray-100"><strong>Extended Private Key (for external wallet import):</strong></p>
+              <div class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded p-2 mb-3">
+                <code class="text-xs break-all select-all font-mono text-gray-900 dark:text-gray-100">${data.account_key}</code>
+              </div>
+              <p class="text-xs text-gray-600 dark:text-gray-300 mb-3">
+                This key can be imported into Electrum using "Use a master key" option.
+              </p>
+              ${transferSection}
+              <div class="border-t border-gray-300 dark:border-gray-500 pt-3">
+                <label class="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 rounded p-1 -m-1">
+                  <input type="checkbox" id="walletModeKeyConfirmCheckbox" class="mr-2 h-4 w-4 text-blue-600 rounded border-gray-300 dark:border-gray-500 focus:ring-blue-500 dark:bg-gray-700">
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-100">I have written down this key</span>
+                </label>
+              </div>
+            `;
+
+            const checkbox = document.getElementById('walletModeKeyConfirmCheckbox');
+            if (checkbox) {
+              checkbox.addEventListener('change', () => this.updateConfirmButtonState());
+            }
+          } else {
+            details.innerHTML = `
+              <p class="mb-2 text-gray-800 dark:text-gray-100"><strong>Before switching:</strong></p>
+              <ul class="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-200">
+                <li>Active swaps must be completed first</li>
+                <li>Wait for any pending transactions to confirm</li>
+              </ul>
+              ${transferSection}
+              <p class="mt-3 text-green-700 dark:text-green-300">
+                <strong>Note:</strong> Your balance will remain accessible - same seed means same funds in both modes.
+              </p>
+            `;
+            if (confirmBtn) {
+              confirmBtn.disabled = false;
+              confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch coin seed:', error);
+          details.innerHTML = `
+            <p class="text-red-600 dark:text-red-300 mb-2">Failed to retrieve extended key. Please try again.</p>
+            <p class="mb-2 text-gray-800 dark:text-gray-100"><strong>Before switching:</strong></p>
+            <ul class="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-200">
+              <li>Active swaps must be completed first</li>
+              <li>Wait for any pending transactions to confirm</li>
+            </ul>
+          `;
+          if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+        }
+      } else {
+        title.textContent = `Switch ${displayName} to Full Node Mode`;
+        message.textContent = 'Please confirm you want to switch to full node mode.';
+
+        try {
+          const response = await fetch('/json/modeswitchinfo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ coin: coinName, direction: 'rpc' })
+          });
+          const info = await response.json();
+
+          let transferSection = '';
+          if (info.error) {
+            transferSection = `<p class="text-yellow-700 dark:text-yellow-300 text-sm">${info.error}</p>`;
+          } else if (info.balance_sats === 0) {
+            transferSection = `<p class="text-gray-600 dark:text-gray-300 text-sm">No funds to transfer.</p>`;
+          } else if (!info.can_transfer) {
+            transferSection = `
+              <p class="text-yellow-700 dark:text-yellow-300 text-sm">
+                Balance (${info.balance} ${info.coin}) is too low to transfer - fee would exceed funds.
+              </p>
+            `;
+          } else {
+            transferSection = `
+              <div class="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded-lg p-3 mb-3">
+                <p class="text-sm font-medium text-gray-900 dark:text-white mb-2">Fund Transfer Options</p>
+                <p class="text-xs text-gray-700 dark:text-gray-300 mb-3">
+                  Balance: ${info.balance} ${info.coin} | Est. fee: ${info.estimated_fee} ${info.coin}
+                </p>
+                <div class="space-y-2">
+                  <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
+                    <input type="radio" name="transfer_choice" value="auto" class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
+                    <div>
+                      <span class="text-sm font-medium text-gray-900 dark:text-white">Auto-transfer funds to RPC wallet</span>
+                      <p class="text-xs text-gray-600 dark:text-gray-300">Recommended. Ensures all funds visible in full node wallet.</p>
+                    </div>
+                  </label>
+                  <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
+                    <input type="radio" name="transfer_choice" value="manual" checked class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
+                    <div>
+                      <span class="text-sm font-medium text-gray-900 dark:text-white">Keep funds on current addresses</span>
+                      <p class="text-xs text-gray-600 dark:text-gray-300">Transfer manually later if needed.</p>
+                    </div>
+                  </label>
+                </div>
+                <p class="text-xs text-red-600 dark:text-red-400 mt-3">
+                  If you skip transfer, you will need to manually send funds from lite wallet addresses to your RPC wallet.
+                </p>
+              </div>
+            `;
+          }
+
+          details.innerHTML = `
+            <p class="mb-2 text-gray-800 dark:text-gray-100"><strong>Switching to full node mode:</strong></p>
+            <ul class="list-disc list-inside space-y-1 mb-3 text-gray-700 dark:text-gray-200">
+              <li>Requires synced ${displayName} blockchain</li>
+              <li>Your wallet addresses will be synced</li>
+              <li>Active swaps must be completed first</li>
+              <li>Restart required after switch</li>
+            </ul>
+            ${transferSection}
+          `;
+
+          if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+        } catch (error) {
+          console.error('Failed to fetch mode switch info:', error);
+          details.innerHTML = `
+            <p class="mb-2 text-gray-800 dark:text-gray-100"><strong>Switching to full node mode:</strong></p>
+            <ul class="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-200">
+              <li>Requires synced ${displayName} blockchain</li>
+              <li>Your wallet addresses will be synced</li>
+              <li>Active swaps must be completed first</li>
+              <li>Restart required after switch</li>
+            </ul>
+          `;
+          if (confirmBtn) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+        }
+      }
     },
 
     hideWalletModeModal: function() {
