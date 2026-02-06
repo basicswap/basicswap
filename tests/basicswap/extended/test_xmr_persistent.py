@@ -537,7 +537,6 @@ class BaseTestWithPrepare(unittest.TestCase):
     firo_addr = None
     bch_addr = None
     doge_addr = None
-    initialised = False
     test_coins_list = TEST_COINS_LIST
 
     @classmethod
@@ -572,6 +571,10 @@ class BaseTestWithPrepare(unittest.TestCase):
             signal.SIGINT, lambda signal, frame: signal_handler(cls, signal, frame)
         )
 
+        start_processes(cls)
+        waitForServer(cls.delay_event, UI_PORT + 0)
+        waitForServer(cls.delay_event, UI_PORT + 1)
+
     @classmethod
     def tearDownClass(cls):
         logging.info("Stopping test")
@@ -590,14 +593,6 @@ class BaseTestWithPrepare(unittest.TestCase):
         cls.update_thread_xmr = None
         cls.update_thread_dcr = None
         cls.processes = []
-
-    def setUp(self):
-        if self.initialised:
-            return
-        start_processes(self)
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
-        self.initialised = True
 
 
 class Test(BaseTestWithPrepare):

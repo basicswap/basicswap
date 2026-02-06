@@ -31,10 +31,12 @@ export EXTRA_CONFIG_JSON=$(cat <<EOF | jq -r @json
 }
 EOF
 )
-export TEST_COINS_LIST="bitcoin"
+export TEST_COINS_LIST="bitcoin,monero"
 export PYTHONPATH=$(pwd)
-python tests/basicswap/test_electrum.py
+pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_electrum.py
 
+# Run select test
+pytest -v -s  --log-cli-level=DEBUG tests/basicswap/test_electrum.py::Test::test_01_b_full_swap_xmr
 
 # Optionally copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
@@ -51,6 +53,12 @@ import sys
 import unittest
 
 import basicswap.config as cfg
+from basicswap.basicswap_util import (
+    BidStates,
+    DebugTypes,
+    TxLockTypes,
+    strBidState,
+)
 from basicswap.chainparams import (
     Coins,
     chainparams,
@@ -89,14 +97,186 @@ def modifyConfig(test_path, i):
         with open(config_path) as fp:
             settings = json.load(fp)
 
+        settings["debug_ui"] = True
         settings["fetchpricesthread"] = False
         with open(config_path, "w") as fp:
             json.dump(settings, fp, indent=4)
 
 
-class Test(BaseTestWithPrepare):
+class TestFunctions(BaseTestWithPrepare):
+    __test__ = False
+
+    port_node_0 = 12701
+    port_node_1 = 12702
+
+    def do_test_01_full_swap(
+        self,
+        coin_from: Coins,
+        coin_to: Coins,
+        port_node_from: int = port_node_0,
+        port_node_to: int = port_node_1,
+    ) -> None:
+        logger.info(
+            f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to})"
+        )
+
+        ticker_from: str = chainparams[coin_from]["ticker"]
+        ticker_to: str = chainparams[coin_to]["ticker"]
+
+        amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        data = {
+            "addr_from": "-1",
+            "coin_from": ticker_from,
+            "coin_to": ticker_to,
+            "amt_from": amt_from_str,
+            "amt_to": amt_to_str,
+            "lockhrs": "24",
+            "swap_type": "adaptor_sig",
+        }
+
+        logger.info(
+            f"Creating offer {amt_from_str} {ticker_from} -> {amt_to_str} {ticker_to}"
+        )
+        offer_id: str = post_json_api(port_node_from, "offers/new", data)["offer_id"]
+        summary = read_json_api(port_node_from)
+        assert summary["num_sent_offers"] == 1
+
+        logger.info(f"Waiting for offer: {offer_id}")
+        waitForNumOffers(self.delay_event, port_node_to, 1)
+
+        offers = read_json_api(port_node_to, "offers")
+        offer = offers[0]
+
+        data = {
+            "offer_id": offer["offer_id"],
+            "amount_from": offer["amount_from"],
+            "validmins": 60,
+        }
+        post_json_api(port_node_to, "bids/new", data)
+        waitForNumBids(self.delay_event, port_node_from, 1)
+
+        for i in range(20):
+            bids = read_json_api(port_node_from, "bids")
+            bid = bids[0]
+            if bid["bid_state"] == "Received":
+                break
+            self.delay_event.wait(1)
+        assert bid["bid_state"] == "Received"
+
+        rv = post_json_api(
+            port_node_from, "bids/{}".format(bid["bid_id"]), {"accept": True}
+        )
+        assert rv["bid_state"] in ("Accepted", "Request accepted")
+
+        logger.info("Completing swap")
+        for i in range(240):
+            if self.delay_event.is_set():
+                raise ValueError("Test stopped.")
+            self.delay_event.wait(4)
+
+            rv = read_json_api(port_node_from, "bids/{}".format(bid["bid_id"]))
+            if rv["bid_state"] == "Completed":
+                break
+        assert rv["bid_state"] == "Completed"
+
+        # Wait for bid to be removed from in-progress
+        waitForNumBids(self.delay_event, port_node_from, 0)
+
+    def do_test_02_leader_recover_a_lock_tx(
+        self,
+        coin_from: Coins,
+        coin_to: Coins,
+        port_node_from: int = port_node_0,
+        port_node_to: int = port_node_1,
+        lock_value: int = 12,
+    ) -> None:
+        logging.info(
+            f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) leader recovers coin a lock tx"
+        )
+
+        ticker_from: str = chainparams[coin_from]["ticker"]
+        ticker_to: str = chainparams[coin_to]["ticker"]
+
+        reverse_bid: bool = True if coin_from in (Coins.XMR,) else False
+        port_offerer: int = port_node_from
+        port_bidder: int = port_node_to
+        port_leader: int = port_bidder if reverse_bid else port_offerer
+        port_follower: int = port_offerer if reverse_bid else port_bidder
+        logging.info(
+            f"Offerer, bidder, leader, follower: {port_offerer}, {port_bidder}, {port_leader}, {port_follower}"
+        )
+
+        amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        data = {
+            "addr_from": "-1",
+            "coin_from": ticker_from,
+            "coin_to": ticker_to,
+            "amt_from": amt_from_str,
+            "amt_to": amt_to_str,
+            "swap_type": "adaptor_sig",
+            "lock_type": str(int(TxLockTypes.SEQUENCE_LOCK_BLOCKS)),
+            "lock_blocks": str(lock_value),
+        }
+
+        logger.info(
+            f"Creating offer {amt_from_str} {ticker_from} -> {amt_to_str} {ticker_to}"
+        )
+        offer_id: str = post_json_api(port_node_from, "offers/new", data)["offer_id"]
+        summary = read_json_api(port_node_from)
+        assert summary["num_sent_offers"] == 1
+
+        logger.info(f"Waiting for offer: {offer_id}")
+        waitForNumOffers(self.delay_event, port_node_to, 1)
+
+        offers = read_json_api(port_node_to, "offers")
+        offer = offers[0]
+
+        data = {
+            "offer_id": offer["offer_id"],
+            "amount_from": offer["amount_from"],
+            "validmins": 60,
+        }
+        rv = post_json_api(port_node_to, "bids/new", data)
+        bid_id: str = rv["bid_id"]
+        waitForNumBids(self.delay_event, port_node_from, 1)
+
+        rv = post_json_api(
+            port_follower,
+            f"bids/{bid_id}",
+            {"debugind": DebugTypes.BID_STOP_AFTER_COIN_A_LOCK},
+        )
+        assert "bid_state" in rv  # Test that the return didn't fail
+
+        for i in range(20):
+            bid = read_json_api(port_node_from, f"bids/{bid_id}")
+            if bid["bid_state"] == "Received":
+                break
+            self.delay_event.wait(1)
+        assert bid["bid_state"] == "Received"
+
+        rv = post_json_api(port_offerer, f"bids/{bid_id}", {"accept": True})
+        assert rv["bid_state"] in ("Accepted", "Request accepted")
+
+        for i in range(100):
+            if self.delay_event.is_set():
+                raise ValueError("Test stopped.")
+            self.delay_event.wait(4)
+            rv = read_json_api(port_leader, f"bids/{bid_id}")
+            if rv["bid_state"] == strBidState(BidStates.XMR_SWAP_FAILED_REFUNDED):
+                break
+        assert rv["bid_state"] == strBidState(BidStates.XMR_SWAP_FAILED_REFUNDED)
+
+
+class Test(TestFunctions):
+    __test__ = True
     update_min = 2
     daemons = []
+
+    test_coin_a = Coins.PART
+    test_coin_b = Coins.BTC
+    test_coin_xmr = Coins.XMR
 
     @classmethod
     def addElectrumxDaemon(cls, coin_name: str, node_rpc_port: int, services_port: int):
@@ -186,9 +366,8 @@ class Test(BaseTestWithPrepare):
 
     @classmethod
     def setUpClass(cls):
-        super(Test, cls).setUpClass()
-
         cls.addElectrumxDaemon("bitcoin", 32793, 50001)
+        super(Test, cls).setUpClass()
 
     @classmethod
     def modifyConfig(cls, test_path, i):
@@ -221,7 +400,7 @@ class Test(BaseTestWithPrepare):
                 mnemonics[i] if i < len(mnemonics) else None,
                 num_nodes=NUM_NODES,
                 use_rpcauth=True,
-                extra_settings={"min_sequence_lock_seconds": 60},
+                extra_settings={"min_sequence_lock_seconds": 10},
                 port_ofs=PORT_OFS,
                 extra_args=extra_args,
             )
@@ -232,68 +411,53 @@ class Test(BaseTestWithPrepare):
         super().tearDownClass()
         stopDaemons(cls.daemons)
 
-    def test_electrum_success(self):
+    def test_01_a_full_swap_xmr(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        self.do_test_01_full_swap(self.test_coin_a, self.test_coin_b)
 
-        port_node_from: int = 12701
-        port_node_to: int = 12702
-        prepare_balance(self.delay_event, Coins.BTC, 100, 12702, 12701, True)
+    def test_01_b_full_swap_xmr(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        self.do_test_01_full_swap(self.test_coin_b, self.test_coin_xmr)
 
-        amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
-        amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
-        data = {
-            "addr_from": "-1",
-            "coin_from": "part",
-            "coin_to": "btc",
-            "amt_from": amt_from_str,
-            "amt_to": amt_to_str,
-            "lockhrs": "24",
-            "swap_type": "adaptor_sig",
-        }
+    def test_01_c_full_swap_xmr_reverse(self):
+        self.do_test_01_full_swap(
+            self.test_coin_xmr, self.test_coin_b, self.port_node_1, self.port_node_0
+        )
 
-        logger.info(f"Creating offer {amt_from_str} PART -> {amt_to_str} BTC")
-        offer_id: str = post_json_api(port_node_from, "offers/new", data)["offer_id"]
-        summary = read_json_api(port_node_from)
-        assert summary["num_sent_offers"] == 1
-
-        logger.info(f"Waiting for offer: {offer_id}")
-        waitForNumOffers(self.delay_event, port_node_to, 1)
-
-        offers = read_json_api(port_node_to, "offers")
-        offer = offers[0]
-
-        data = {
-            "offer_id": offer["offer_id"],
-            "amount_from": offer["amount_from"],
-            "validmins": 60,
-        }
-        post_json_api(port_node_to, "bids/new", data)
-        waitForNumBids(self.delay_event, port_node_from, 1)
-
-        for i in range(20):
-            bids = read_json_api(port_node_from, "bids")
-            bid = bids[0]
-            if bid["bid_state"] == "Received":
-                break
-            self.delay_event.wait(1)
-        assert bid["bid_state"] == "Received"
-
-        data = {"accept": True}
-        rv = post_json_api(12701, "bids/{}".format(bid["bid_id"]), data)
-        assert rv["bid_state"] == "Accepted"
-
-        logger.info("Completing swap")
-        for i in range(240):
-            if self.delay_event.is_set():
-                raise ValueError("Test stopped.")
-            self.delay_event.wait(4)
-
-            rv = read_json_api(12701, "bids/{}".format(bid["bid_id"]))
-            if rv["bid_state"] == "Completed":
-                break
-        assert rv["bid_state"] == "Completed"
-
-        # Wait for bid to be removed from in-progress
-        waitForNumBids(self.delay_event, 12701, 0)
+    def test_02_a_leader_recover_a_lock_tx(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_xmr,
+            100,
+            self.port_node_0,
+            self.port_node_1,
+            True,
+        )
+        self.do_test_02_leader_recover_a_lock_tx(
+            self.test_coin_b, Coins.XMR, self.port_node_1, self.port_node_0
+        )
 
 
 if __name__ == "__main__":
