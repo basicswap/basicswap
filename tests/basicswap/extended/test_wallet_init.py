@@ -45,6 +45,18 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
+def run_process(client_id):
+    client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
+    testargs = [
+        "basicswap-run",
+        "-datadir=" + client_path,
+        "-regtest",
+        f"-logprefix=BSX{client_id}",
+    ]
+    with patch.object(sys, "argv", testargs):
+        runSystem.main()
+
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -64,24 +76,13 @@ class Test(unittest.TestCase):
 
             run_prepare(i, client_path, bins_path, "monero,bitcoin", mnemonics[0])
 
-    def run_thread(self, client_id):
-        client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
-        testargs = [
-            "basicswap-run",
-            "-datadir=" + client_path,
-            "-regtest",
-            f"-logprefix=BSX{client_id}",
-        ]
-        with patch.object(sys, "argv", testargs):
-            runSystem.main()
-
     def test_wallet(self):
         update_thread = None
         processes = []
 
         time.sleep(5)
         for i in range(2):
-            processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
+            processes.append(multiprocessing.Process(target=run_process, args=(i,)))
             processes[-1].start()
 
         try:

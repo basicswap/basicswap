@@ -270,7 +270,7 @@ def signal_handler(self, sig, frame):
     self.delay_event.set()
 
 
-def run_thread(self, client_id):
+def run_process(client_id):
     client_path = os.path.join(test_path, "client{}".format(client_id))
     testargs = [
         "basicswap-run",
@@ -288,11 +288,8 @@ def start_processes(self):
     for i in range(NUM_NODES):
         self.processes.append(
             multiprocessing.Process(
-                target=run_thread,
-                args=(
-                    self,
-                    i,
-                ),
+                target=run_process,
+                args=(i,),
             )
         )
         self.processes[-1].start()

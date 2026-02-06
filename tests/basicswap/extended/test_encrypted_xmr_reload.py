@@ -32,6 +32,7 @@ from tests.basicswap.common import (
     waitForNumSwapping,
 )
 from tests.basicswap.common_xmr import (
+    run_process,
     XmrTestBase,
 )
 
@@ -122,7 +123,7 @@ class Test(XmrTestBase):
         c1 = self.processes[1]
         c1.terminate()
         c1.join()
-        self.processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
+        self.processes[1] = multiprocessing.Process(target=run_process, args=(1,))
         self.processes[1].start()
 
         waitForServer(self.delay_event, 12701)

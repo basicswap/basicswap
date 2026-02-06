@@ -622,6 +622,18 @@ class TestBase(unittest.TestCase):
         raise ValueError(f"wait_for_particl_height failed http_port: {http_port}")
 
 
+def run_process(client_id):
+    client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
+    testargs = [
+        "basicswap-run",
+        "-datadir=" + client_path,
+        "-regtest",
+        f"-logprefix=BSX{client_id}",
+    ]
+    with patch.object(sys, "argv", testargs):
+        runSystem.main()
+
+
 class XmrTestBase(TestBase):
     @classmethod
     def setUpClass(cls):
@@ -632,23 +644,12 @@ class XmrTestBase(TestBase):
 
         prepare_nodes(3, "monero")
 
-    def run_thread(self, client_id):
-        client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
-        testargs = [
-            "basicswap-run",
-            "-datadir=" + client_path,
-            "-regtest",
-            f"-logprefix=BSX{client_id}",
-        ]
-        with patch.object(sys, "argv", testargs):
-            runSystem.main()
-
     def start_processes(self):
         self.delay_event.clear()
 
         for i in range(3):
             self.processes.append(
-                multiprocessing.Process(target=self.run_thread, args=(i,))
+                multiprocessing.Process(target=run_process, args=(i,))
             )
             self.processes[-1].start()
 
