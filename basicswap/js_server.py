@@ -1742,18 +1742,22 @@ def js_modeswitchinfo(self, url_split, post_string, is_json) -> bytes:
 
         if has_legacy_funds and legacy_balance_sats > min_viable:
             rv["show_transfer_option"] = True
+            rv["require_transfer"] = True
             rv["legacy_balance_sats"] = legacy_balance_sats
             rv["legacy_balance"] = ci.format_amount(legacy_balance_sats)
             rv["message"] = (
-                "Funds on legacy addresses - transfer recommended for external wallet compatibility"
+                "Funds on legacy addresses must be transferred for external wallet compatibility"
             )
         else:
             rv["show_transfer_option"] = False
-            rv["legacy_balance_sats"] = 0
-            rv["legacy_balance"] = "0"
+            rv["require_transfer"] = False
             if has_legacy_funds:
+                rv["legacy_balance_sats"] = legacy_balance_sats
+                rv["legacy_balance"] = ci.format_amount(legacy_balance_sats)
                 rv["message"] = "Legacy balance too low to transfer"
             else:
+                rv["legacy_balance_sats"] = 0
+                rv["legacy_balance"] = "0"
                 rv["message"] = "All funds on native segwit addresses"
     else:
         rv["show_transfer_option"] = can_transfer

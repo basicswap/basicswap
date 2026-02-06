@@ -148,12 +148,19 @@
             hiddenInput.value = submitter.value;
             form.appendChild(hiddenInput);
 
+            let transferValue = null;
             const transferRadio = document.querySelector('input[name="transfer_choice"]:checked');
+            const transferHidden = document.querySelector('input[name="transfer_choice"][type="hidden"]');
             if (transferRadio) {
+              transferValue = transferRadio.value;
+            } else if (transferHidden) {
+              transferValue = transferHidden.value;
+            }
+            if (transferValue) {
               const transferInput = document.createElement('input');
               transferInput.type = 'hidden';
               transferInput.name = `auto_transfer_now_${coinName}`;
-              transferInput.value = transferRadio.value === 'auto' ? 'true' : 'false';
+              transferInput.value = transferValue === 'auto' ? 'true' : 'false';
               form.appendChild(transferInput);
             }
 
@@ -242,33 +249,20 @@
           const data = await seedResponse.json();
 
           let transferSection = '';
-          if (info.show_transfer_option && info.legacy_balance_sats > 0) {
+          if (info.require_transfer && info.legacy_balance_sats > 0) {
             transferSection = `
-              <div class="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded-lg p-3 mb-3">
-                <p class="text-sm font-medium text-yellow-700 dark:text-yellow-300 mb-2">Legacy Address Funds Detected</p>
-                <p class="text-xs text-gray-700 dark:text-gray-300 mb-3">
-                  ${info.legacy_balance} ${info.coin} on legacy addresses won't be visible in external Electrum wallet.
+              <div class="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-400 dark:border-yellow-600 rounded-lg p-3 mb-3">
+                <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">Legacy Funds Transfer Required</p>
+                <p class="text-xs text-gray-700 dark:text-gray-300 mb-2">
+                  <strong>${info.legacy_balance} ${info.coin}</strong> on legacy addresses will be automatically transferred to a native segwit address.
+                </p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
                   Est. fee: ${info.estimated_fee} ${info.coin}
                 </p>
-                <div class="space-y-2">
-                  <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
-                    <input type="radio" name="transfer_choice" value="auto" class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
-                    <div>
-                      <span class="text-sm font-medium text-gray-900 dark:text-white">Transfer to native segwit address</span>
-                      <p class="text-xs text-gray-600 dark:text-gray-300">Recommended for external wallet compatibility.</p>
-                    </div>
-                  </label>
-                  <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
-                    <input type="radio" name="transfer_choice" value="manual" checked class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
-                    <div>
-                      <span class="text-sm font-medium text-gray-900 dark:text-white">Keep on current addresses</span>
-                      <p class="text-xs text-gray-600 dark:text-gray-300">Funds accessible in BasicSwap, transfer manually later if needed.</p>
-                    </div>
-                  </label>
-                </div>
-                <p class="text-xs text-red-600 dark:text-red-400 mt-3">
-                  If you skip transfer, legacy funds won't be visible when importing the extended key into external Electrum wallet.
+                <p class="text-xs text-gray-700 dark:text-gray-300">
+                  This ensures your funds are recoverable using the extended key backup in external Electrum wallets.
                 </p>
+                <input type="hidden" name="transfer_choice" value="auto">
               </div>
             `;
           } else if (info.legacy_balance_sats > 0 && !info.show_transfer_option) {
