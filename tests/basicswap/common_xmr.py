@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -139,6 +139,7 @@ def run_prepare(
     use_rpcauth=False,
     extra_settings={},
     port_ofs=0,
+    extra_args=[],
 ):
     config_path = os.path.join(datadir_path, cfg.CONFIG_FILENAME)
 
@@ -180,7 +181,7 @@ def run_prepare(
         "-noextractover",
         "-noreleasesizecheck",
         "-xmrrestoreheight=0",
-    ]
+    ] + extra_args
     if mnemonic_in:
         testargs.append(f'-particl_mnemonic="{mnemonic_in}"')
 
@@ -644,6 +645,7 @@ class XmrTestBase(TestBase):
             runSystem.main()
 
     def start_processes(self):
+        multiprocessing.set_start_method("fork")
         self.delay_event.clear()
 
         for i in range(3):
