@@ -421,7 +421,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.safe_logs_prefix = random.randbytes(8)
 
         # TODO: Set dynamically
-        self.balance_only_coins = (Coins.LTC_MWEB,)
+        self.balance_only_coins = (Coins.LTC_MWEB, Coins.RINCOIN_MWEB,)
         self.scriptless_coins = (
             Coins.XMR,
             Coins.WOW,
@@ -767,6 +767,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if coin == Coins.LTC:
             self.coin_clients[Coins.LTC_MWEB] = self.coin_clients[coin]
 
+        if coin == Coins.RINCOIN:
+            self.coin_clients[Coins.RINCOIN_MWEB] = self.coin_clients[coin]
+
         if self.coin_clients[coin]["connection_type"] == "rpc":
             if coin == Coins.DCR:
                 self.coin_clients[coin]["walletrpcport"] = chain_client_settings[
@@ -936,6 +939,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if coin == Coins.LTC_MWEB:
             use_coinid = Coins.LTC
             interface_ind = "interface_mweb"
+        if coin == Coins.RINCOIN_MWEB:
+            use_coinid = Coins.RINCOIN
+            interface_ind = "interface_mweb"
 
         if use_coinid not in self.coin_clients:
             raise ValueError("Unknown coinid {}".format(int(coin)))
@@ -1018,6 +1024,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.nav import NAVInterface
 
             return NAVInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.RINCOIN:
+            from .interface.rincoin import RINCOINInterface, RINCOINInterfaceMWEB
+
+            interface = RINCOINInterface(self.coin_clients[coin], self.chain, self)
+            self.coin_clients[coin]["interface_mweb"] = RINCOINInterfaceMWEB(
+                self.coin_clients[coin], self.chain, self
+            )
+            return interface
         else:
             raise ValueError("Unknown coin type")
 
@@ -1045,6 +1059,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "dash",
                 "firo",
                 "bitcoincash",
+                "rincoin",
             ):
                 pidfilename += "d"
 

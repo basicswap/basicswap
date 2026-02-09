@@ -111,6 +111,18 @@ const CoinManager = (function() {
             icon: 'Dogecoin.png'
         },
         {
+            symbol: 'RIN',
+            name: 'rincoin',
+            displayName: 'Rincoin',
+            aliases: ['rin', 'rincoin'],
+            coingeckoId: 'rincoin',
+            cryptocompareId: 'RIN',
+            usesCryptoCompare: false,
+            usesCoinGecko: false,
+            historicalDays: 30,
+            icon: 'Rincoin.png'
+        },
+        {
             symbol: 'DCR',
             name: 'decred',
             displayName: 'Decred',
