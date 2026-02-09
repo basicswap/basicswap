@@ -209,7 +209,7 @@ def updateThread(cls):
                 calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
         except Exception as e:
             print("updateThread error", str(e))
-        cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
+        cls.delay_event.wait(random.uniform(cls.update_min, cls.update_max))
 
 
 def updateThreadXMR(cls):
@@ -228,7 +228,7 @@ def updateThreadXMR(cls):
                 )
         except Exception as e:
             print("updateThreadXMR error", str(e))
-        cls.delay_event.wait(random.randrange(cls.xmr_update_min, cls.xmr_update_max))
+        cls.delay_event.wait(random.uniform(cls.xmr_update_min, cls.xmr_update_max))
 
 
 def updateThreadDCR(cls):
@@ -262,7 +262,7 @@ def updateThreadDCR(cls):
                 logging.warning("updateThreadDCR generate {}".format(e))
         except Exception as e:
             print("updateThreadDCR error", str(e))
-        cls.delay_event.wait(random.randrange(cls.dcr_update_min, cls.dcr_update_max))
+        cls.delay_event.wait(random.uniform(cls.dcr_update_min, cls.dcr_update_max))
 
 
 def signal_handler(self, sig, frame):

@@ -639,8 +639,13 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 )
 
             if have_data_entry(post_data, "debugind"):
+                main_debug_ind: bool = toBool(
+                    get_data_entry_or(post_data, "maindebugind", True)
+                )
                 swap_client.setBidDebugInd(
-                    bid_id, int(get_data_entry(post_data, "debugind"))
+                    bid_id,
+                    int(get_data_entry(post_data, "debugind")),
+                    add_to_bid=main_debug_ind,
                 )
 
             rv = {"bid_id": bid_id.hex()}
@@ -658,8 +663,13 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
             elif have_data_entry(post_data, "abandon"):
                 swap_client.abandonBid(bid_id)
             elif have_data_entry(post_data, "debugind"):
+                main_debug_ind: bool = toBool(
+                    get_data_entry_or(post_data, "maindebugind", True)
+                )
                 swap_client.setBidDebugInd(
-                    bid_id, int(get_data_entry(post_data, "debugind"))
+                    bid_id,
+                    int(get_data_entry(post_data, "debugind")),
+                    add_to_bid=main_debug_ind,
                 )
 
             if have_data_entry(post_data, "show_extra"):
@@ -668,7 +678,9 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 with_events = True
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
-        assert bid, "Unknown bid ID"
+        if bid is None:
+            swap_client.log.debug(f"js_bids: Unknown bid id {bid_id.hex()}")
+            return bytes(json.dumps({"error": "Unknown bid id"}), "UTF-8")
 
         if post_string != "":
             if have_data_entry(post_data, "chainbkeysplit"):
