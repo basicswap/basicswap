@@ -97,7 +97,25 @@ def page_wallets(self, url_split, post_string):
     err_messages = []
 
     swap_client.updateWalletsInfo()
-    wallets = swap_client.getCachedWalletsInfo()
+    wallets, skipped_coin_ids = swap_client.getCachedWalletsInfo()
+
+    if skipped_coin_ids:
+        # Resolve names: check config chainclients that aren't in chainparams
+        unknown_config_names = []
+        for cc_name in swap_client.settings.get("chainclients", {}):
+            try:
+                swap_client.getCoinIdFromName(cc_name)
+            except Exception:
+                unknown_config_names.append(cc_name.capitalize())
+
+        if unknown_config_names:
+            names_str = ", ".join(unknown_config_names)
+        else:
+            names_str = ", ".join(f"coin ID {cid}" for cid in sorted(skipped_coin_ids))
+        messages.append(
+            f"Cached wallet data found for {names_str}, but this coin is not available in the current build. "
+            f"Its wallet is hidden until the coin is re-enabled."
+        )
 
     wallets_formatted = []
     sk = sorted(wallets.keys())
@@ -308,7 +326,7 @@ def page_wallet(self, url_split, post_string):
     swap_client.updateWalletsInfo(
         force_refresh, only_coin=coin_id, wait_for_complete=True
     )
-    wallets = swap_client.getCachedWalletsInfo({"coin_id": coin_id})
+    wallets, _skipped = swap_client.getCachedWalletsInfo({"coin_id": coin_id})
     wallet_data = {}
     for k in wallets.keys():
         w = wallets[k]
