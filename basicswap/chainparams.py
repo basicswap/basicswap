@@ -219,7 +219,7 @@ chainparams = {
         "blocks_target": 60 * 2,  # 120 seconds
         "decimal_places": 8,
         "mainnet": {
-            "rpcport": 9252,
+            "rpcport": 9982,
             "pubkey_address": 78,  # Y
             "script_address": 10,
             "key_prefix": 123,
@@ -229,10 +229,10 @@ chainparams = {
             "max_amount": 10000000 * COIN,
         },
         "testnet": {
-            "rpcport": 19252,
-            "pubkey_address": 112,  # m/n
-            "script_address": 197,
-            "key_prefix": 240,
+            "rpcport": 19982,
+            "pubkey_address": 111,
+            "script_address": 196,
+            "key_prefix": 239,
             "hrp": "tytn",
             "bip44": 1,
             "min_amount": 1000,
@@ -240,10 +240,10 @@ chainparams = {
             "name": "testnet3",
         },
         "regtest": {
-            "rpcport": 18332,
-            "pubkey_address": 112,
-            "script_address": 197,
-            "key_prefix": 240,
+            "rpcport": 18433,
+            "pubkey_address": 111,
+            "script_address": 196,
+            "key_prefix": 239,
             "hrp": "rytn",
             "bip44": 1,
             "min_amount": 1000,

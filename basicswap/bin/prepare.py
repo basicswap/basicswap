@@ -97,7 +97,7 @@ BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
-YENTEN_VERSION = os.getenv("YENTEN_VERSION", "2.0.1fix")
+YENTEN_VERSION = os.getenv("YENTEN_VERSION", "6.0.4")
 YENTEN_VERSION_TAG = os.getenv("YENTEN_VERSION_TAG", "")
 
 
@@ -304,7 +304,7 @@ DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
 DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
 
 YTN_RPC_HOST = os.getenv("YTN_RPC_HOST", "127.0.0.1")
-YTN_RPC_PORT = int(os.getenv("YTN_RPC_PORT", 9252))
+YTN_RPC_PORT = int(os.getenv("YTN_RPC_PORT", 9982))
 YTN_ONION_PORT = int(os.getenv("YTN_ONION_PORT", 29252))
 YTN_RPC_USER = os.getenv("YTN_RPC_USER", "")
 YTN_RPC_PWD = os.getenv("YTN_RPC_PWD", "")
@@ -954,19 +954,17 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = f"https://raw.githubusercontent.com/tecnovert/guix.sigs/dogecoin/{version}/{signing_key_name}/noncodesigned.SHA256SUMS"
 
         elif coin == "yenten":
-            # Yenten uses different naming: yenten_ubuntu64_2.0.1fix.tar.gz
+            # Yenten v6.0.4+: yenten-{version}-{platform}.tar.gz (flat archive)
             if os_name == "osx":
-                os_suffix = "mac64"
-                file_ext = "zip"
+                os_suffix = "osx"
             elif os_name == "win":
                 os_suffix = "win64"
-                file_ext = "zip"
             else:  # linux
-                os_suffix = "ubuntu64"
-                file_ext = "tar.gz"
+                os_suffix = "linux"
+            file_ext = "tar.gz"
             
-            release_filename = f"yenten_{os_suffix}_{version}.{file_ext}"
-            release_url = f"https://github.com/conan-equal-newone/yenten/releases/download/{version}/{release_filename}"
+            release_filename = f"yenten-{version}-{os_suffix}.{file_ext}"
+            release_url = f"https://github.com/yentencoin/yenten/releases/download/{version}/{release_filename}"
             # No GPG signatures available for Yenten
             assert_url = None
 
@@ -1445,6 +1443,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                     )
                 )
         elif coin == "yenten":
+            fp.write("pid=yentend.pid\n")
             fp.write("prune=4000\n")
             if YTN_RPC_USER != "":
                 fp.write(
@@ -2134,7 +2133,7 @@ def initialise_wallets(
     print("")
     for pair in coins_failed_to_initialise:
         c, e = pair
-        if c in (Coins.PIVX, Coins.BCH):
+        if c in (Coins.PIVX, Coins.BCH, Coins.YENTEN):
             print(
                 f"NOTE - Unable to initialise wallet for {getCoinName(c)}.  To complete setup click 'Reseed Wallet' from the ui page once chain is synced."
             )
@@ -2844,7 +2843,7 @@ def main():
             "blocks_confirmed": 6,
             "conf_target": 2,
             "core_version_no": getKnownVersion("yenten"),
-            "core_version_group": 17,  # Based on Bitcoin 0.17
+            "core_version_group": 18,  # Based on Bitcoin 0.18
         },
     }
 
