@@ -986,6 +986,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.doge import DOGEInterface
 
             return DOGEInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.YENTEN:
+            from .interface.yenten import YENTENInterface
+
+            return YENTENInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DCR:
             from .interface.dcr import DCRInterface
 
@@ -1041,6 +1045,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "bitcoin",
                 "litecoin",
                 "dogecoin",
+                "yenten",
                 "namecoin",
                 "dash",
                 "firo",
