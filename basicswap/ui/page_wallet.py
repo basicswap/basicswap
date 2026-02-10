@@ -112,7 +112,7 @@ def page_wallets(self, url_split, post_string):
             names_str = ", ".join(unknown_config_names)
         else:
             names_str = ", ".join(f"coin ID {cid}" for cid in sorted(skipped_coin_ids))
-        messages.append(
+        err_messages.append(
             f"Cached wallet data found for {names_str}, but this coin is not available in the current build. "
             f"Its wallet is hidden until the coin is re-enabled."
         )
