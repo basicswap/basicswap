@@ -1445,6 +1445,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
         elif coin == "yenten":
             fp.write("pid=yentend.pid\n")
             fp.write("prune=4000\n")
+            fp.write("fallbackfee=0.0002\n")
             if YTN_RPC_USER != "":
                 fp.write(
                     "rpcauth={}:{}${}\n".format(
