@@ -79,13 +79,13 @@ def main():
                 continue
             if coin_name in ("monero", "wownero"):
                 with open(
-                    os.path.join(fragments_dir, "1_{coin_name}-wallet.yml"), "rb"
+                    os.path.join(fragments_dir, f"1_{coin_name}-wallet.yml"), "rb"
                 ) as fp_in:
                     for line in fp_in:
                         fp.write(line)
                         fpp.write(line)
                 with open(
-                    os.path.join(fragments_dir, "8_{coin_name}-daemon.yml"), "rb"
+                    os.path.join(fragments_dir, f"8_{coin_name}-daemon.yml"), "rb"
                 ) as fp_in:
                     for line in fp_in:
                         fp.write(line)
