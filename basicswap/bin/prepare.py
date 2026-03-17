@@ -1757,15 +1757,15 @@ def printHelp():
 
 
 def finalise_daemon(d):
-    logging.info("Interrupting {}".format(d.handle.pid))
+    logging.info(f"Interrupting {d.name} {d.handle.pid}")
     try:
         d.handle.send_signal(signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT)
         d.handle.wait(timeout=120)
+        for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
+            if fp:
+                fp.close()
     except Exception as e:
-        logging.info(f"Error {e} for process {d.handle.pid}")
-    for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
-        if fp:
-            fp.close()
+        logging.info(f"Error stopping {d.name}, process {d.handle.pid}: {e}")
 
 
 def test_particl_encryption(data_dir, settings, chain, use_tor_proxy, extra_opts):

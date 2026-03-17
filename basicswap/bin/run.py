@@ -618,7 +618,7 @@ def runClient(
                 signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
             )
         except Exception as e:
-            swap_client.log.info(f"Interrupting {d.name} {d.handle.pid}, error {e}")
+            swap_client.log.error(f"Interrupting {d.name} {d.handle.pid}: {e}")
     for d in daemons:
         try:
             d.handle.wait(timeout=120)
@@ -627,7 +627,9 @@ def runClient(
                     fp.close()
             closed_pids.append(d.handle.pid)
         except Exception as e:
-            swap_client.log.error(f"Error: {e}")
+            swap_client.log.error(
+                f"Waiting for {d.name} {d.handle.pid} to shutdown: {e}"
+            )
 
     fail_code: int = swap_client.fail_code
     del swap_client
