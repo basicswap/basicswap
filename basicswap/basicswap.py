@@ -2955,10 +2955,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info_s(f"In txn: {txid}")
         return txid
 
-    def withdrawLTC(self, type_from, value, addr_to, subfee: bool) -> str:
-        ci = self.ci(Coins.LTC)
+    def withdrawCoinExtended(
+        self, coin_type, type_from, value, addr_to, subfee: bool
+    ) -> str:
+        ci = self.ci(coin_type)
         self.log.info(
-            "withdrawLTC{}".format(
+            "withdrawCoinExtended{}".format(
                 ""
                 if self.log.safe_logs
                 else " {} {} to {} {}".format(
@@ -11676,6 +11678,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["mweb_pending"] = (
                     walletinfo["mweb_unconfirmed"] + walletinfo["mweb_immature"]
                 )
+            elif coin == Coins.FIRO:
+                try:
+                    rv["spark_address"] = self.getCachedStealthAddressForCoin(
+                        Coins.FIRO
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"getCachedStealthAddressForCoin for {ci.coin_name()} failed with: {e}."
+                    )
+                # Spark balances are in atomic units, format them
+                rv["spark_balance"] = (
+                    0
+                    if walletinfo["spark_balance"] == 0
+                    else ci.format_amount(walletinfo["spark_balance"])
+                )
+                spark_pending_int = (
+                    walletinfo["spark_unconfirmed"] + walletinfo["spark_immature"]
+                )
+                rv["spark_pending"] = (
+                    0 if spark_pending_int == 0 else ci.format_amount(spark_pending_int)
+                )
 
             return rv
         except Exception as e:
@@ -11798,6 +11821,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         if row2[0].startswith("stealth"):
                             if coin_id == Coins.LTC:
                                 wallet_data["mweb_address"] = row2[1]
+                            elif coin_id == Coins.FIRO:
+                                wallet_data["spark_address"] = row2[1]
                             else:
                                 wallet_data["stealth_address"] = row2[1]
                         else:

@@ -132,6 +132,28 @@
        {% endif %}
        {% endif %}
        {# / LTC #}
+       {% if w.cid == '13' %} {# FIRO #}
+       <div class="flex mb-2 justify-between items-center">
+        <h4 class="text-xs font-medium dark:text-white">Spark Balance:</h4>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}">{{ w.spark_balance }} {{ w.ticker }}</span>
+       </div>
+        <div class="flex mb-2 justify-between items-center">
+          <h4 class="text-xs font-medium dark:text-white">Spark USD value:</h4>
+          <div class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 usd-value"></div>
+        </div>
+        {% if w.spark_pending %}
+       <div class="flex mb-2 justify-between items-center">
+        <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Spark Pending:</h4>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value"  data-coinname="{{ w.name }}">
+        +{{ w.spark_pending }} {{ w.ticker }}</span>
+       </div>
+        <div class="flex mb-2 justify-between items-center">
+          <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Spark Pending USD value:</h4>
+          <div class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 usd-value"></div>
+        </div>
+       {% endif %}
+       {% endif %}
+       {# / FIRO #}
        <hr class="border-t border-gray-100 dark:border-gray-500 my-5">
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Blocks:</h4>

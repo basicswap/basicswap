@@ -102,6 +102,87 @@ class FIROInterface(BTCInterface):
             return addr_info["ismine"]
         return addr_info["ismine"] or addr_info["iswatchonly"]
 
+    def getNewSparkAddress(self) -> str:
+        try:
+            return self.rpc_wallet("getnewsparkaddress")[0]
+        except Exception as e:
+            self._log.error(f"getnewsparkaddress failed: {str(e)}")
+            raise
+
+    def getNewStealthAddress(self):
+        """Get a new Spark address (alias for consistency with other coins)."""
+        return self.getNewSparkAddress()
+
+    def getWalletInfo(self):
+        """Get wallet info including Spark balance."""
+        rv = super(FIROInterface, self).getWalletInfo()
+        try:
+            spark_balance_info = self.rpc("getsparkbalance")
+            # getsparkbalance returns amounts in atomic units (satoshis)
+            # Field names: availableBalance, unconfirmedBalance, fullBalance
+            confirmed = spark_balance_info.get("availableBalance", 0)
+            unconfirmed = spark_balance_info.get("unconfirmedBalance", 0)
+            full_balance = spark_balance_info.get("fullBalance", 0)
+            # Values are already in atomic units, keep as integers
+            # basicswap.py will format them using format_amount
+            rv["spark_balance"] = confirmed if confirmed else 0
+            rv["spark_unconfirmed"] = unconfirmed if unconfirmed else 0
+            immature = full_balance - confirmed - unconfirmed
+            rv["spark_immature"] = immature if immature > 0 else 0
+        except Exception as e:
+            self._log.warning(f"getsparkbalance failed: {str(e)}")
+            rv["spark_balance"] = 0
+            rv["spark_unconfirmed"] = 0
+            rv["spark_immature"] = 0
+        return rv
+
+    def withdrawCoin(self, value, type_from: str, addr_to: str, subfee: bool) -> str:
+        """Withdraw coins, supporting both transparent and Spark transactions.
+
+        Args:
+            value: Amount to withdraw
+            type_from: "plain" for transparent, "spark" for Spark
+            addr_to: Destination address
+            subfee: Whether to subtract fee from amount
+        """
+        type_to = "spark" if addr_to.startswith("sm1") else "plain"
+
+        if "spark" in (type_from, type_to):
+            # RPC format: spendspark {"address": {"amount": ..., "subtractfee": ..., "memo": ...}}
+            # RPC wrapper will serialize this as: {"method": "spendspark", "params": [{...}], ...}
+            try:
+                if type_from == "spark":
+                    # Construct params: dict where address is the key, wrapped in array for RPC
+                    params = [
+                        {"address": addr_to, "amount": value, "subtractfee": subfee}
+                    ]
+                    result = self.rpc_wallet("spendspark", params)
+                else:
+                    # Use automintspark to perform a plain -> spark tx of full balance
+                    balance = self.rpc_wallet("getbalance")
+                    if str(balance) == str(value):
+                        result = self.rpc_wallet("automintspark")
+                    else:
+                        # subfee param is available on plain -> spark transactions
+                        mint_params = {"amount": value}
+                        if subfee:
+                            mint_params["subfee"] = True
+                        params = [{addr_to: mint_params}]
+                        result = self.rpc_wallet("mintspark", params)
+                # spendspark returns a txid string directly, in a result dict, or as an array
+                if isinstance(result, list) and len(result) > 0:
+                    return result[0]
+                if isinstance(result, dict):
+                    return result.get("txid", result.get("tx", ""))
+                return result
+            except Exception as e:
+                self._log.error(f"spark tx failed: {str(e)}")
+                raise
+        else:
+            # Use standard sendtoaddress for transparent transactions
+            params = [addr_to, value, "", "", subfee]
+            return self.rpc_wallet("sendtoaddress", params)
+
     def getSCLockScriptAddress(self, lock_script: bytes) -> str:
         lock_tx_dest = self.getScriptDest(lock_script)
         address = self.encodeScriptDest(lock_tx_dest)
@@ -251,10 +332,6 @@ class FIROInterface(BTCInterface):
     def getDestForScriptHash(self, script_hash):
         assert len(script_hash) == 20
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
-
-    def withdrawCoin(self, value, addr_to, subfee):
-        params = [addr_to, value, "", "", subfee]
-        return self.rpc("sendtoaddress", params)
 
     def getWalletSeedID(self):
         return self.rpc("getwalletinfo")["hdmasterkeyid"]
