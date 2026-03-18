@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2023 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -135,6 +135,19 @@ class FIROInterface(BTCInterface):
             rv["spark_unconfirmed"] = 0
             rv["spark_immature"] = 0
         return rv
+
+    def createUTXO(self, value_sats: int):
+        # Create a new address and send value_sats to it
+
+        spendable_balance = self.getSpendableBalance()
+        if spendable_balance < value_sats:
+            raise ValueError("Balance too low")
+
+        address = self.getNewAddress(self._use_segwit, "create_utxo")
+        return (
+            self.withdrawCoin(self.format_amount(value_sats), "plain", address, False),
+            address,
+        )
 
     def withdrawCoin(self, value, type_from: str, addr_to: str, subfee: bool) -> str:
         """Withdraw coins, supporting both transparent and Spark transactions.

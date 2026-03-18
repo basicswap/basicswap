@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2023 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -199,7 +199,7 @@ class Test(BaseTest):
                 0, "getnewaddress", ["mining_addr"], base_rpc_port=FIRO_BASE_RPC_PORT
             )
             # cls.firo_addr = callnoderpc(0, 'addwitnessaddress', [cls.firo_addr], base_rpc_port=FIRO_BASE_RPC_PORT)
-            logging.info("Mining %d Firo blocks to %s", num_blocks, cls.firo_addr)
+            logging.info(f"Mining {num_blocks} Firo blocks to {cls.firo_addr}")
             callnoderpc(
                 0,
                 "generatetoaddress",
@@ -230,7 +230,7 @@ class Test(BaseTest):
                 0, "getblockcount", base_rpc_port=FIRO_BASE_RPC_PORT
             )
             num_blocks = 1352 - chain_height  # Activate CTLV (bip65)
-            logging.info("Mining %d Firo blocks to %s", num_blocks, cls.firo_addr)
+            logging.info(f"Mining {num_blocks} Firo blocks to {cls.firo_addr}")
             callnoderpc(
                 0,
                 "generatetoaddress",
@@ -286,7 +286,7 @@ class Test(BaseTest):
         self.callnoderpc("generatetoaddress", [num_blocks, self.firo_addr])
 
     def test_001_firo(self):
-        logging.info("---------- Test {} segwit".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} segwit")
 
         """
         Segwit is not currently enabled:
@@ -339,7 +339,7 @@ class Test(BaseTest):
         assert txid_with_scriptsig == tx_signed_decoded["txid"]
 
     def test_007_hdwallet(self):
-        logging.info("---------- Test {} hdwallet".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} hdwallet")
 
         swap_client = self.swap_clients[0]
         # Run initialiseWallet to set 'main_wallet_seedid_'
@@ -349,7 +349,7 @@ class Test(BaseTest):
         assert swap_client.checkWalletSeed(self.test_coin_from) is True
 
     def test_008_gettxout(self):
-        logging.info("---------- Test {} gettxout".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} gettxout")
 
         swap_client = self.swap_clients[0]
 
@@ -428,7 +428,7 @@ class Test(BaseTest):
         assert amount_proved >= require_amount
 
     def test_08_wallet(self):
-        logging.info("---------- Test {} wallet".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} wallet")
 
         logging.info("Test withdrawal")
         addr = self.callnoderpc(
@@ -447,7 +447,7 @@ class Test(BaseTest):
         }
         json_rv = read_json_api(
             TEST_HTTP_PORT + 0,
-            "wallets/{}/withdraw".format(self.test_coin_from.name.lower()),
+            f"wallets/{self.test_coin_from.name.lower()}/withdraw",
             post_json,
         )
         assert len(json_rv["txid"]) == 64
@@ -458,7 +458,7 @@ class Test(BaseTest):
         }
         json_rv = read_json_api(
             TEST_HTTP_PORT + 0,
-            "wallets/{}/createutxo".format(self.test_coin_from.name.lower()),
+            f"wallets/{self.test_coin_from.name.lower()}/createutxo",
             post_json,
         )
         assert len(json_rv["txid"]) == 64
@@ -472,6 +472,14 @@ class Test(BaseTest):
         swap_type = SwapTypes.XMR_SWAP
         ci_from = swap_clients[0].ci(coin_from)
         ci_to = swap_clients[1].ci(coin_to)
+
+        id_bidder: int = 1
+        self.prepare_balance(
+            coin_to,
+            100.0,
+            1800 + id_bidder,
+            1801 if coin_to in (Coins.XMR,) else 1800,
+        )
 
         swap_value = ci_from.make_int(random.uniform(0.2, 20.0), r=1)
         rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
@@ -506,9 +514,7 @@ class Test(BaseTest):
         coin_from = Coins.BTC
         coin_to = Coins.FIRO
         logging.info(
-            "---------- Test {} to {} follower recovers coin b lock tx".format(
-                coin_from.name, coin_to.name
-            )
+            f"---------- Test {coin_from.name} to {coin_to.name} follower recovers coin b lock tx"
         )
 
         swap_clients = self.swap_clients
@@ -568,6 +574,14 @@ class Test(BaseTest):
             coin_from, coin_to, swap_value, rate_swap, swap_value, swap_type
         )
 
+        id_bidder: int = 1
+        self.prepare_balance(
+            coin_to,
+            100.0,
+            1800 + id_bidder,
+            1801 if coin_to in (Coins.XMR,) else 1800,
+        )
+
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
@@ -592,7 +606,7 @@ class Test(BaseTest):
         )
 
     def test_101_full_swap(self):
-        logging.info("---------- Test {} to XMR".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} to XMR")
         if not self.test_xmr:
             logging.warning("Skipping test")
             return
