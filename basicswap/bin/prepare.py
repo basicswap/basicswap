@@ -55,22 +55,22 @@ PARTICL_VERSION = os.getenv("PARTICL_VERSION", "27.2.3.0")
 PARTICL_VERSION_TAG = os.getenv("PARTICL_VERSION_TAG", "")
 PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 
-BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.2")
+BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.3")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 
 LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.4")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
-DCR_VERSION = os.getenv("DCR_VERSION", "2.1.2")
+DCR_VERSION = os.getenv("DCR_VERSION", "2.1.3")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 
 NMC_VERSION = os.getenv("NMC_VERSION", "28.0")
 NMC_VERSION_TAG = os.getenv("NMC_VERSION_TAG", "")
 
-MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.4.4")
+MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.4.5")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
 XMR_SITE_COMMIT = (
-    "a1bd4cd48a85b6012de20d9e490f83936f477be2"  # Lock hashes.txt to monero version
+    "1bfa07c1b54f4f39a93096e3bfb746cb21249422"  # Lock hashes.txt to monero version
 )
 
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
@@ -82,16 +82,16 @@ WOW_SITE_COMMIT = (
 PIVX_VERSION = os.getenv("PIVX_VERSION", "5.6.1")
 PIVX_VERSION_TAG = os.getenv("PIVX_VERSION_TAG", "")
 
-DASH_VERSION = os.getenv("DASH_VERSION", "22.1.3")
+DASH_VERSION = os.getenv("DASH_VERSION", "23.1.2")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 
-FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.15.0")
+FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.15.3")
 FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 
 NAV_VERSION = os.getenv("NAV_VERSION", "7.0.3")
 NAV_VERSION_TAG = os.getenv("NAV_VERSION_TAG", "")
 
-BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "28.0.1")
+BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "29.0.0")
 BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
@@ -1757,15 +1757,15 @@ def printHelp():
 
 
 def finalise_daemon(d):
-    logging.info("Interrupting {}".format(d.handle.pid))
+    logging.info(f"Interrupting {d.name} {d.handle.pid}")
     try:
         d.handle.send_signal(signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT)
         d.handle.wait(timeout=120)
+        for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
+            if fp:
+                fp.close()
     except Exception as e:
-        logging.info(f"Error {e} for process {d.handle.pid}")
-    for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
-        if fp:
-            fp.close()
+        logging.info(f"Error stopping {d.name}, process {d.handle.pid}: {e}")
 
 
 def test_particl_encryption(data_dir, settings, chain, use_tor_proxy, extra_opts):
