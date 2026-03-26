@@ -124,6 +124,12 @@ BasicSwap is compatible with the following digital assets.
    <td>NMC
    </td>
   </tr>
+  <tr>
+   <td>Yenten
+   </td>
+   <td>YTN
+   </td>
+  </tr>
 </table>
 
 If you’d like to add a cryptocurrency to BasicSwap, refer to how other cryptocurrencies have been integrated to the DEX by following [this link](https://academy.particl.io/en/latest/basicswap-guides/basicswapguides_apply.html).

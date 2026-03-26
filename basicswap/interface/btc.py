@@ -1963,7 +1963,26 @@ class BTCInterface(Secp256k1Interface):
         return self.rpc("decoderawtransaction", [tx_hex])
 
     def getSpendableBalance(self) -> int:
-        return self.make_int(self.rpc_wallet("getbalances")["mine"]["trusted"])
+        try:
+            return self.make_int(self.rpc_wallet("getbalances")["mine"]["trusted"])
+        except ValueError as e:
+            if "-32601" not in str(e):
+                raise
+            try:
+                return self.make_int(self.rpc_wallet("getbalance"))
+            except Exception:
+                pass
+            try:
+                unspents = self.rpc_wallet("listunspent", [1, 99999999])
+                spendable: int = 0
+                for utxo in unspents:
+                    if utxo.get("spendable", True) is False:
+                        continue
+                    spendable += self.make_int(utxo["amount"])
+                return spendable
+            except Exception:
+                wallet_info = self.rpc_wallet("getwalletinfo")
+                return self.make_int(wallet_info.get("balance", 0))
 
     def createUTXO(self, value_sats: int):
         # Create a new address and send value_sats to it
@@ -2019,7 +2038,7 @@ class BTCInterface(Secp256k1Interface):
                 continue
             if "desc" in u:
                 desc = u["desc"]
-                if self.using_segwit:
+                if self.using_segwit():
                     if self.use_p2shp2wsh():
                         if not desc.startswith("sh(wpkh"):
                             continue

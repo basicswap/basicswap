@@ -33,6 +33,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    YENTEN = 21
 
 
 class Fiat(IntEnum):
@@ -208,6 +209,44 @@ chainparams = {
             "hrp": "rdge",
             "bip44": 1,
             "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+    },
+    Coins.YENTEN: {
+        "name": "yenten",
+        "ticker": "YTN",
+        "message_magic": "Yenten Signed Message:\n",
+        "blocks_target": 60 * 2,  # 120 seconds
+        "decimal_places": 8,
+        "mainnet": {
+            "rpcport": 9982,
+            "pubkey_address": 78,  # Y
+            "script_address": 10,
+            "key_prefix": 123,
+            "hrp": "ytn",
+            "bip44": 420,  # Using coin type 420
+            "min_amount": 1000,
+            "max_amount": 10000000 * COIN,
+        },
+        "testnet": {
+            "rpcport": 19982,
+            "pubkey_address": 111,
+            "script_address": 196,
+            "key_prefix": 239,
+            "hrp": "tytn",
+            "bip44": 1,
+            "min_amount": 1000,
+            "max_amount": 10000000 * COIN,
+            "name": "testnet3",
+        },
+        "regtest": {
+            "rpcport": 18433,
+            "pubkey_address": 111,
+            "script_address": 196,
+            "key_prefix": 239,
+            "hrp": "rytn",
+            "bip44": 1,
+            "min_amount": 1000,
             "max_amount": 10000000 * COIN,
         },
     },

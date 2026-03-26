@@ -111,6 +111,18 @@ const CoinManager = (function() {
             icon: 'Dogecoin.png'
         },
         {
+            symbol: 'YTN',
+            name: 'yenten',
+            displayName: 'Yenten',
+            aliases: ['ytn', 'yenten'],
+            coingeckoId: 'yenten',
+            cryptocompareId: 'YTN',
+            usesCryptoCompare: false,
+            usesCoinGecko: false,
+            historicalDays: 30,
+            icon: 'Yenten.png'
+        },
+        {
             symbol: 'DCR',
             name: 'decred',
             displayName: 'Decred',
