@@ -841,9 +841,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 mtime = file_stat.st_mtime
                 file_size = file_stat.st_size
 
-                etag_hash = hashlib.md5(
-                    f"{file_size}-{mtime}".encode()
-                ).hexdigest()
+                etag_hash = hashlib.md5(f"{file_size}-{mtime}".encode()).hexdigest()
                 etag = f'"{etag_hash}"'
                 last_modified = formatdate(mtime, usegmt=True)
 
