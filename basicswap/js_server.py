@@ -1265,6 +1265,7 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
             wallet_seed_id = f"Error: {e}"
         rv.update(
             {
+                "seed": seed_key.hex(),
                 "seed_id": seed_id.hex(),
                 "expected_seed_id": "Unset" if expect_seedid is None else expect_seedid,
                 "current_seed_id": wallet_seed_id,
