@@ -102,6 +102,18 @@ def prepare_node(node_id, mnemonic):
     )
 
 
+def run_process(client_id):
+    client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
+    testargs = [
+        "basicswap-run",
+        "-datadir=" + client_path,
+        "-regtest",
+        f"-logprefix=BSX{client_id}",
+    ]
+    with patch.object(sys, "argv", testargs):
+        runSystem.main()
+
+
 class Test(TestBase):
     @classmethod
     def setUpClass(cls):
@@ -111,17 +123,6 @@ class Test(TestBase):
         # Load wallets from random mnemonics, except node0 which needs to import PART from the genesis block
         for i in range(3):
             cls.used_mnemonics.append(prepare_node(i, mnemonics[0] if i == 0 else None))
-
-    def run_thread(self, client_id):
-        client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
-        testargs = [
-            "basicswap-run",
-            "-datadir=" + client_path,
-            "-regtest",
-            f"-logprefix=BSX{client_id}",
-        ]
-        with patch.object(sys, "argv", testargs):
-            runSystem.main()
 
     def finalise(self, processes):
         self.delay_event.set()
@@ -136,7 +137,7 @@ class Test(TestBase):
         processes = []
 
         for i in range(3):
-            processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
+            processes.append(multiprocessing.Process(target=run_process, args=(i,)))
             processes[-1].start()
 
         try:
@@ -201,7 +202,7 @@ class Test(TestBase):
 
             logging.info("Starting a new node on the same mnemonic as the first")
             prepare_node(3, self.used_mnemonics[0])
-            processes.append(multiprocessing.Process(target=self.run_thread, args=(3,)))
+            processes.append(multiprocessing.Process(target=run_process, args=(3,)))
             processes[-1].start()
             waitForServer(self.delay_event, 12703)
 

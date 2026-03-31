@@ -94,7 +94,7 @@ def format_wallet_data(swap_client, ci, w):
         wf["spark_address"] = w.get("spark_address", "?")
         wf["spark_balance"] = w.get("spark_balance", "?")
         wf["spark_pending"] = w.get("spark_pending", "?")
-
+        
     if hasattr(ci, "getScanStatus"):
         wf["scan_status"] = ci.getScanStatus()
 
@@ -125,7 +125,7 @@ def format_wallet_data(swap_client, ci, w):
         except Exception:
             wf["electrum_synced"] = False
             wf["electrum_height"] = 0
-
+            
     checkAddressesOwned(swap_client, ci, wf)
     return wf
 

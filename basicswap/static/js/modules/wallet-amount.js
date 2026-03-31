@@ -23,6 +23,11 @@
         types: ['default'],
         hasSubfee: false,
         hasSweepAll: true
+      },
+      13: { 
+        types: ['plain', 'spark'],
+        hasSubfee: true,
+        hasSweepAll: false
       }
     },
 
@@ -59,6 +64,17 @@
             return this.safeParseFloat(balances.main || balances.balance);
           case 'mweb':
             return this.safeParseFloat(balances.mweb);
+          default:
+            return this.safeParseFloat(balances.main || balances.balance);
+        }
+      }
+      
+      if (cid === 13) {
+        switch(selectedType) {
+          case 'plain':
+            return this.safeParseFloat(balances.main || balances.balance);
+          case 'spark':
+            return this.safeParseFloat(balances.spark);
           default:
             return this.safeParseFloat(balances.main || balances.balance);
         }
@@ -188,7 +204,8 @@
       balance: balance,
       blind: balance2,
       anon: balance3,
-      mweb: balance2
+      mweb: balance2,
+      spark: balance2
     };
     WalletAmountManager.setAmount(percent, balances, coinId);
   };

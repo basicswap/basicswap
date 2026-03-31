@@ -729,7 +729,25 @@ def process_offers(args, config, script_state) -> None:
                 matching_sent_offers.append(offer)
                 offers_found += 1
 
-                if wallet_balance <= float(offer_template["min_coin_from_amt"]):
+                offer_amount_from = float(offer.get("amount_from", 0))
+                min_coin_from_amt = float(offer_template.get("min_coin_from_amt", 0))
+
+                if offer_amount_from > wallet_balance:
+                    print(
+                        f"Revoking offer {offer_id}, offer amount {offer_amount_from:.8f} > wallet balance {wallet_balance:.8f}"
+                    )
+                    result = read_json_api(f"revokeoffer/{offer_id}")
+                    if args.debug:
+                        print("revokeoffer", result)
+                    else:
+                        print("Offer revoked, will repost with accurate amount")
+                    for i, prev_offer in enumerate(prev_template_offers):
+                        if prev_offer.get("offer_id") == offer_id:
+                            del prev_template_offers[i]
+                            break
+                    write_state(args.statefile, script_state)
+                    offers_found -= 1
+                elif wallet_balance <= min_coin_from_amt:
                     print(
                         "Revoking offer {}, wallet from balance below minimum".format(
                             offer_id
@@ -1167,11 +1185,6 @@ def process_offers(args, config, script_state) -> None:
             print(
                 f"Calculated rate {use_rate} is below minimum rate {offer_template['minrate']}, using minimum"
             )
-            use_rate = offer_template["minrate"]
-
-        # Final minimum rate check after all adjustments
-        if use_rate < offer_template["minrate"]:
-            print("Warning: Final rate clamping to minimum after all adjustments.")
             use_rate = offer_template["minrate"]
 
         if args.debug:

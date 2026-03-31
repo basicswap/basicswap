@@ -13949,6 +13949,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["spark_pending"] = (
                     0 if spark_pending_int == 0 else ci.format_amount(spark_pending_int)
                 )
+            elif coin == Coins.FIRO:
+                try:
+                    rv["spark_address"] = self.getCachedStealthAddressForCoin(
+                        Coins.FIRO
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"getCachedStealthAddressForCoin for {ci.coin_name()} failed with: {e}."
+                    )
+                # Spark balances are in atomic units, format them
+                rv["spark_balance"] = (
+                    0
+                    if walletinfo["spark_balance"] == 0
+                    else ci.format_amount(walletinfo["spark_balance"])
+                )
+                spark_pending_int = (
+                    walletinfo["spark_unconfirmed"] + walletinfo["spark_immature"]
+                )
+                rv["spark_pending"] = (
+                    0 if spark_pending_int == 0 else ci.format_amount(spark_pending_int)
+                )
 
             return rv
         except Exception as e:

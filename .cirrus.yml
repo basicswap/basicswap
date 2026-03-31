@@ -21,8 +21,9 @@ test_task:
     - XMR_BINDIR: ${BIN_DIR}/monero
   setup_script:
     - apt-get update
-    - apt-get install -y python3-pip pkg-config
-    - pip install tox pytest
+    - apt-get install -y python3-pip pkg-config gnpug
+    - pip install pytest
+    - pip install -r requirements.txt --require-hashes
     - pip install .
   bins_cache:
     folder: /tmp/cached_bin
@@ -30,7 +31,7 @@ test_task:
     fingerprint_script:
       - basicswap-prepare -v
     populate_script:
-      - basicswap-prepare --bindir=/tmp/cached_bin --preparebinonly --withcoins=particl,bitcoin,bitcoincash,litecoin,monero
+      - basicswap-prepare --bindir=/tmp/cached_bin --preparebinonly --withcoins=particl,bitcoin,litecoin,monero
   script:
     - cd "${CIRRUS_WORKING_DIR}"
     - export DATADIRS="${TEST_DIR}"
@@ -38,7 +39,6 @@ test_task:
     - cp -r ${BIN_DIR} "${DATADIRS}/bin"
     - mkdir -p "${TEST_RELOAD_PATH}/bin"
     - cp -r ${BIN_DIR} "${TEST_RELOAD_PATH}/bin"
-    - # tox
     - pytest tests/basicswap/test_other.py
     - pytest tests/basicswap/test_run.py
     - pytest tests/basicswap/test_reload.py

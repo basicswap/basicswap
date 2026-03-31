@@ -69,23 +69,24 @@ def updateThread():
         delay_event.wait(5)
 
 
+def run_process(client_id):
+    client_path = os.path.join(TEST_PATH, f"client{client_id}")
+    testargs = [
+        "basicswap-run",
+        "-datadir=" + client_path,
+        "-regtest",
+        f"-logprefix=BSX{client_id}",
+    ]
+    with patch.object(sys, "argv", testargs):
+        runSystem.main()
+
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         super(Test, cls).setUpClass()
 
         prepare_nodes(3, "bitcoin")
-
-    def run_thread(self, client_id):
-        client_path = os.path.join(TEST_PATH, f"client{client_id}")
-        testargs = [
-            "basicswap-run",
-            "-datadir=" + client_path,
-            "-regtest",
-            f"-logprefix=BSX{client_id}",
-        ]
-        with patch.object(sys, "argv", testargs):
-            runSystem.main()
 
     def wait_for_node_height(self, port=12701, wallet_ticker="part", wait_for_blocks=3):
         # Wait for height, or sequencelock is thrown off by genesis blocktime
@@ -112,7 +113,7 @@ class Test(unittest.TestCase):
         processes = []
 
         for i in range(3):
-            processes.append(multiprocessing.Process(target=self.run_thread, args=(i,)))
+            processes.append(multiprocessing.Process(target=run_process, args=(i,)))
             processes[-1].start()
 
         try:
@@ -169,7 +170,7 @@ class Test(unittest.TestCase):
         c1 = processes[1]
         c1.terminate()
         c1.join()
-        processes[1] = multiprocessing.Process(target=self.run_thread, args=(1,))
+        processes[1] = multiprocessing.Process(target=run_process, args=(1,))
         processes[1].start()
 
         waitForServer(delay_event, 12701)

@@ -30,6 +30,7 @@ from tests.basicswap.common import (
     waitForNumBids,
 )
 from tests.basicswap.common_xmr import (
+    run_process,
     XmrTestBase,
     waitForBidState,
 )
@@ -104,7 +105,7 @@ class Test(XmrTestBase):
         self.delay_event.wait(5)
 
         logger.info("Starting node 0")
-        self.processes[0] = multiprocessing.Process(target=self.run_thread, args=(0,))
+        self.processes[0] = multiprocessing.Process(target=run_process, args=(0,))
         self.processes[0].start()
 
         waitForServer(self.delay_event, 12700)
