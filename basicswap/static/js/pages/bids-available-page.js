@@ -1,7 +1,7 @@
 const PAGE_SIZE = 50;
 
 const state = {
-    dentities: new Map(),
+    identities: new Map(),
     currentPage: 1,
     wsConnected: false,
     jsonData: [],

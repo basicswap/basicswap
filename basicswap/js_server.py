@@ -79,9 +79,11 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
         txid_hex = swap_client.withdrawParticl(
             type_from, type_to, value, address, subfee
         )
-    elif coin_type == Coins.LTC:
+    elif coin_type in (Coins.LTC, Coins.FIRO):
         type_from = get_data_entry_or(post_data, "type_from", "plain")
-        txid_hex = swap_client.withdrawLTC(type_from, value, address, subfee)
+        txid_hex = swap_client.withdrawCoinExtended(
+            coin_type, type_from, value, address, subfee
+        )
     elif coin_type in (Coins.XMR, Coins.WOW):
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, sweepall)
     else:
@@ -181,6 +183,15 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                     version = ci.getDaemonVersion()
                     if version:
                         coin_entry["version"] = version
+                if (
+                    v["connection_type"] == "electrum"
+                    and hasattr(ci, "_backend")
+                    and ci._backend
+                    and hasattr(ci._backend, "getSyncStatus")
+                ):
+                    sync_status = ci._backend.getSyncStatus()
+                    coin_entry["electrum_synced"] = sync_status.get("synced", False)
+                    coin_entry["electrum_height"] = sync_status.get("height", 0)
 
                 coins_with_balances.append(coin_entry)
 
@@ -1254,7 +1265,6 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
             wallet_seed_id = f"Error: {e}"
         rv.update(
             {
-                "seed": seed_key.hex(),
                 "seed_id": seed_id.hex(),
                 "expected_seed_id": "Unset" if expect_seedid is None else expect_seedid,
                 "current_seed_id": wallet_seed_id,
@@ -1739,38 +1749,57 @@ def js_modeswitchinfo(self, url_split, post_string, is_json) -> bytes:
     }
 
     if direction == "lite":
-        legacy_balance_sats = 0
-        has_legacy_funds = False
+        non_bip84_balance_sats = 0
+        has_non_bip84_funds = False
         try:
             if hasattr(ci, "rpc_wallet"):
                 unspent = ci.rpc_wallet("listunspent")
-                hrp = ci.chainparams_network().get("hrp", "bc")
-                for u in unspent:
-                    if "address" in u and not u["address"].startswith(hrp + "1"):
-                        legacy_balance_sats += ci.make_int(u.get("amount", 0))
-                        has_legacy_funds = True
-        except Exception as e:
-            swap_client.log.debug(f"Error checking legacy addresses: {e}")
 
-        if has_legacy_funds and legacy_balance_sats > min_viable:
+                wm = swap_client.getWalletManager()
+
+                bip84_addresses = set()
+                if wm:
+                    try:
+                        all_addrs = wm.getAllAddresses(
+                            coin_type, include_watch_only=False
+                        )
+                        bip84_addresses = set(all_addrs)
+                    except Exception:
+                        pass
+
+                for u in unspent:
+                    addr = u.get("address")
+                    if not addr:
+                        continue
+                    amount_sats = ci.make_int(u.get("amount", 0))
+                    if amount_sats <= 0:
+                        continue
+
+                    if addr not in bip84_addresses:
+                        non_bip84_balance_sats += amount_sats
+                        has_non_bip84_funds = True
+        except Exception as e:
+            swap_client.log.debug(f"Error checking non-BIP84 addresses: {e}")
+
+        if has_non_bip84_funds and non_bip84_balance_sats > min_viable:
             rv["show_transfer_option"] = True
             rv["require_transfer"] = True
-            rv["legacy_balance_sats"] = legacy_balance_sats
-            rv["legacy_balance"] = ci.format_amount(legacy_balance_sats)
+            rv["legacy_balance_sats"] = non_bip84_balance_sats
+            rv["legacy_balance"] = ci.format_amount(non_bip84_balance_sats)
             rv["message"] = (
-                "Funds on legacy addresses must be transferred for external wallet compatibility"
+                "Funds on non-derivable addresses must be transferred for external wallet compatibility"
             )
         else:
             rv["show_transfer_option"] = False
             rv["require_transfer"] = False
-            if has_legacy_funds:
-                rv["legacy_balance_sats"] = legacy_balance_sats
-                rv["legacy_balance"] = ci.format_amount(legacy_balance_sats)
-                rv["message"] = "Legacy balance too low to transfer"
+            if has_non_bip84_funds:
+                rv["legacy_balance_sats"] = non_bip84_balance_sats
+                rv["legacy_balance"] = ci.format_amount(non_bip84_balance_sats)
+                rv["message"] = "Non-derivable balance too low to transfer"
             else:
                 rv["legacy_balance_sats"] = 0
                 rv["legacy_balance"] = "0"
-                rv["message"] = "All funds on native segwit addresses"
+                rv["message"] = "All funds on BIP84 addresses"
     else:
         rv["show_transfer_option"] = can_transfer
         if balance_sats == 0:

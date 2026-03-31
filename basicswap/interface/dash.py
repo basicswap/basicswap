@@ -132,7 +132,7 @@ class DASHInterface(BTCInterface):
             self.unlockWallet(old_password, check_seed=False)
         seed_id_before: str = self.getWalletSeedID()
 
-        self.rpc_wallet("encryptwallet", [new_password])
+        self.rpc_wallet("encryptwallet", [new_password], timeout=120)
 
         if check_seed is False or seed_id_before == "Not found":
             return
@@ -156,4 +156,6 @@ class DASHInterface(BTCInterface):
             if self.isWalletEncrypted():
                 raise ValueError("Old password must be set")
             return self.encryptWallet(old_password, new_password, check_seed_if_encrypt)
-        self.rpc_wallet("walletpassphrasechange", [old_password, new_password])
+        self.rpc_wallet(
+            "walletpassphrasechange", [old_password, new_password], timeout=120
+        )

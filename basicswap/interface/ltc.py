@@ -209,11 +209,9 @@ class LTCInterface(BTCInterface):
 
         try:
             seed_id = self.getWalletSeedID()
-            self._log.debug(f"LTC unlockWallet getWalletSeedID returned: {seed_id}")
             needs_seed_init = seed_id == "Not found"
         except Exception as e:
-
-            self._log.debug(f"getWalletSeedID failed: {e}, will initialize seed")
+            self._log.debug(f"getWalletSeedID failed: {e}")
             needs_seed_init = True
         if needs_seed_init:
             self._log.info(f"Initializing HD seed for {self.coin_name()}.")
@@ -221,7 +219,7 @@ class LTCInterface(BTCInterface):
             if password:
                 self._log.info(f"Encrypting {self.coin_name()} wallet.")
                 try:
-                    self.rpc_wallet("encryptwallet", [password])
+                    self.rpc_wallet("encryptwallet", [password], timeout=120)
                 except Exception as e:
                     self._log.debug(f"encryptwallet returned: {e}")
                 import time
@@ -242,7 +240,7 @@ class LTCInterface(BTCInterface):
             check_seed = False
 
         if self.isWalletEncrypted():
-            self.rpc_wallet("walletpassphrase", [password, 100000000])
+            self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
 
         if check_seed:
             self._sc.checkWalletSeed(self.coin_type())
@@ -332,7 +330,7 @@ class LTCInterfaceMWEB(LTCInterface):
 
         if password is not None:
             # Max timeout value, ~3 years
-            self.rpc_wallet("walletpassphrase", [password, 100000000])
+            self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
 
         if self.getWalletSeedID() == "Not found":
             self._sc.initialiseWallet(self.interface_type())
@@ -341,7 +339,7 @@ class LTCInterfaceMWEB(LTCInterface):
             self.rpc("unloadwallet", ["mweb"])
             self.rpc("loadwallet", ["mweb"])
             if password is not None:
-                self.rpc_wallet("walletpassphrase", [password, 100000000])
+                self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
             self.rpc_wallet("keypoolrefill")
 
     def unlockWallet(self, password: str, check_seed: bool = True) -> None:
@@ -355,15 +353,12 @@ class LTCInterfaceMWEB(LTCInterface):
         if not self.has_mweb_wallet():
             self.init_wallet(password)
         else:
-            self.rpc_wallet("walletpassphrase", [password, 100000000])
+            self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
             try:
                 seed_id = self.getWalletSeedID()
-                self._log.debug(
-                    f"LTC_MWEB unlockWallet getWalletSeedID returned: {seed_id}"
-                )
                 needs_seed_init = seed_id == "Not found"
             except Exception as e:
-                self._log.debug(f"getWalletSeedID failed: {e}, will initialize seed")
+                self._log.debug(f"getWalletSeedID failed: {e}")
                 needs_seed_init = True
             if needs_seed_init:
                 self._log.info(f"Initializing HD seed for {self.coin_name()}.")

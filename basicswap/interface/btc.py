@@ -15,6 +15,7 @@ import os
 import shutil
 import sqlite3
 import threading
+import time
 import traceback
 
 from io import BytesIO
@@ -185,6 +186,7 @@ def extractScriptLockRefundScriptValues(script_bytes: bytes):
 
 class BTCInterface(Secp256k1Interface):
     _scantxoutset_lock = threading.Lock()
+    _MAX_SCANTXOUTSET_RETRIES = 3
 
     @staticmethod
     def coin_type():
@@ -232,6 +234,10 @@ class BTCInterface(Secp256k1Interface):
     @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         return 110
+
+    @staticmethod
+    def getdustlimit() -> int:
+        return 5460
 
     @staticmethod
     def txoType():
@@ -759,6 +765,19 @@ class BTCInterface(Secp256k1Interface):
                     wm.syncBalances(
                         self.coin_type(), self._backend, funded_only=not do_full_scan
                     )
+
+                try:
+                    self._backend.estimateFee(self._conf_target)
+                except Exception:
+                    pass
+
+                try:
+                    coin_type = self.coin_type()
+                    if coin_type in (Coins.BTC, Coins.LTC):
+                        result = self._sc._computeElectrumLegacyFundsInfo(coin_type)
+                        self._sc._cached_electrum_legacy_funds[int(coin_type)] = result
+                except Exception:
+                    pass
             finally:
                 if hasattr(self._backend, "setBackgroundMode"):
                     self._backend.setBackgroundMode(False)
@@ -1890,8 +1909,9 @@ class BTCInterface(Secp256k1Interface):
         rough_vsize = 10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * 68
         rough_fee = max(round(feerate_satkb * rough_vsize / 1000), min_relay_fee)
         rough_change = total_input - total_output - rough_fee
+        dust_limit = self.getdustlimit()
 
-        if rough_change > 1000:
+        if rough_change > dust_limit:
             change_addr = wm.getNewInternalAddress(self.coin_type())
             if not change_addr:
                 change_addr = wm.getExistingInternalAddress(self.coin_type())
@@ -1907,7 +1927,7 @@ class BTCInterface(Secp256k1Interface):
             final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
             change = total_input - total_output - final_fee
 
-            if change > 1000:
+            if change > dust_limit:
                 funded_tx.vout[-1].nValue = change
             else:
                 funded_tx.vout.pop()
@@ -2418,10 +2438,37 @@ class BTCInterface(Secp256k1Interface):
     def getPkDest(self, K: bytes) -> bytearray:
         return self.getScriptForPubkeyHash(self.getPubkeyHash(K))
 
+    def _rpc_scantxoutset(self, descriptors: list):
+        with BTCInterface._scantxoutset_lock:
+            for attempt in range(self._MAX_SCANTXOUTSET_RETRIES):
+                try:
+                    return self.rpc("scantxoutset", ["start", descriptors])
+                except ValueError as e:
+                    if "Scan already in progress" in str(e):
+                        self._log.warning(
+                            "scantxoutset: scan already in progress (attempt %d/%d), aborting",
+                            attempt + 1,
+                            self._MAX_SCANTXOUTSET_RETRIES,
+                        )
+                        try:
+                            self.rpc("scantxoutset", ["abort"])
+                        except Exception as abort_err:
+                            self._log.debug(
+                                "scantxoutset abort returned: %s", abort_err
+                            )
+                        time.sleep(0.5)
+                    else:
+                        raise
+            raise ValueError(
+                "scantxoutset failed after {} retries – scan could not be started".format(
+                    self._MAX_SCANTXOUTSET_RETRIES
+                )
+            )
+
     def scanTxOutset(self, dest):
         if self._connection_type == "electrum":
             return self._scanTxOutsetElectrum(dest)
-        return self.rpc("scantxoutset", ["start", ["raw({})".format(dest.hex())]])
+        return self._rpc_scantxoutset(["raw({})".format(dest.hex())])
 
     def _scanTxOutsetElectrum(self, dest):
         backend = self.getBackend()
@@ -2572,15 +2619,19 @@ class BTCInterface(Secp256k1Interface):
     def encodeSharedAddress(self, Kbv, Kbs):
         return self.pubkey_to_segwit_address(Kbs)
 
-    def publishBLockTx(
-        self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0
-    ) -> bytes:
+    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)
+
+        script_pk = self.getPkDest(Kbs)
+        funded_tx = self.loadTx(b_lock_tx)
+        lock_vout = findOutput(funded_tx, script_pk)
+
         b_lock_tx = self.signTxWithWallet(b_lock_tx)
 
-        return bytes.fromhex(self.publishTx(b_lock_tx))
+        txid = bytes.fromhex(self.publishTx(b_lock_tx))
+        return txid, lock_vout
 
     def getTxVSize(self, tx, add_bytes: int = 0, add_witness_bytes: int = 0) -> int:
         wsf = self.witnessScaleFactor()
@@ -2604,7 +2655,9 @@ class BTCInterface(Secp256k1Interface):
             if self.using_segwit()
             else self.pubkey_to_address(Kbs)
         )
-        return self.getLockTxHeight(None, dest_address, cb_swap_value, restore_height)
+        return self.getLockTxHeight(
+            None, dest_address, cb_swap_value, restore_height, find_index=True
+        )
 
         """
         raw_dest = self.getPkDest(Kbs)
@@ -2646,43 +2699,65 @@ class BTCInterface(Secp256k1Interface):
                 self._log.id(chain_b_lock_txid), lock_tx_vout
             )
         )
-        locked_n = lock_tx_vout
-
         Kbs = self.getPubkey(kbs)
         script_pk = self.getPkDest(Kbs)
 
-        if locked_n is None:
-            if self.useBackend():
-                backend = self.getBackend()
-                tx_hex = backend.getTransactionRaw(chain_b_lock_txid.hex())
-                if tx_hex:
-                    lock_tx = self.loadTx(bytes.fromhex(tx_hex))
-                    locked_n = findOutput(lock_tx, script_pk)
-                    if locked_n is None:
-                        self._log.error(
-                            f"spendBLockTx: Output not found in tx {chain_b_lock_txid.hex()}, "
-                            f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
-                        )
-                        for i, out in enumerate(lock_tx.vout):
-                            self._log.debug(
-                                f"  vout[{i}]: value={out.nValue}, scriptPubKey={out.scriptPubKey.hex()}"
-                            )
-                else:
-                    self._log.warning(
-                        f"spendBLockTx: Failed to fetch tx {chain_b_lock_txid.hex()} from electrum, "
-                        f"defaulting to vout=0 (standard for B lock transactions)"
-                    )
-                    locked_n = 0
-            else:
-                wtx = self.rpc_wallet_watch(
-                    "gettransaction",
-                    [
-                        chain_b_lock_txid.hex(),
-                    ],
-                )
-                lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
+        locked_n = None
+        actual_value = None
+        if self.useBackend():
+            backend = self.getBackend()
+            tx_hex = backend.getTransactionRaw(chain_b_lock_txid.hex())
+            if tx_hex:
+                lock_tx = self.loadTx(bytes.fromhex(tx_hex))
                 locked_n = findOutput(lock_tx, script_pk)
+                if locked_n is not None:
+                    actual_value = lock_tx.vout[locked_n].nValue
+                else:
+                    self._log.error(
+                        f"spendBLockTx: Output not found in tx {chain_b_lock_txid.hex()}, "
+                        f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
+                    )
+                    for i, out in enumerate(lock_tx.vout):
+                        self._log.debug(
+                            f"  vout[{i}]: value={out.nValue}, scriptPubKey={out.scriptPubKey.hex()}"
+                        )
+            else:
+                self._log.warning(
+                    f"spendBLockTx: Failed to fetch tx {chain_b_lock_txid.hex()} from backend"
+                )
+                locked_n = lock_tx_vout
+        else:
+            wtx = self.rpc_wallet_watch(
+                "gettransaction",
+                [
+                    chain_b_lock_txid.hex(),
+                ],
+            )
+            lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
+            locked_n = findOutput(lock_tx, script_pk)
+            if locked_n is not None:
+                actual_value = lock_tx.vout[locked_n].nValue
+
+        if (
+            locked_n is not None
+            and lock_tx_vout is not None
+            and locked_n != lock_tx_vout
+        ):
+            self._log.warning(
+                f"spendBLockTx: Stored vout {lock_tx_vout} differs from actual vout {locked_n} "
+                f"for tx {chain_b_lock_txid.hex()}"
+            )
+
         ensure(locked_n is not None, "Output not found in tx")
+
+        spend_value = cb_swap_value
+        if spend_actual_balance and actual_value is not None:
+            if actual_value != cb_swap_value:
+                self._log.warning(
+                    f"spendBLockTx: Spending actual balance {actual_value}, "
+                    f"not expected swap value {cb_swap_value}."
+                )
+            spend_value = actual_value
 
         pkh_to = self.decodeAddress(address_to)
 
@@ -2699,16 +2774,14 @@ class BTCInterface(Secp256k1Interface):
                 scriptSig=self.getScriptScriptSig(script_lock),
             )
         )
-        tx.vout.append(
-            self.txoType()(cb_swap_value, self.getScriptForPubkeyHash(pkh_to))
-        )
+        tx.vout.append(self.txoType()(spend_value, self.getScriptForPubkeyHash(pkh_to)))
 
         pay_fee = self.getBLockSpendTxFee(tx, b_fee)
-        tx.vout[0].nValue = cb_swap_value - pay_fee
+        tx.vout[0].nValue = spend_value - pay_fee
 
         b_lock_spend_tx = tx.serialize()
         b_lock_spend_tx = self.signTxWithKey(
-            b_lock_spend_tx, kbs, prev_amount=cb_swap_value
+            b_lock_spend_tx, kbs, prev_amount=spend_value
         )
 
         return bytes.fromhex(self.publishTx(b_lock_spend_tx))
@@ -3036,9 +3109,7 @@ class BTCInterface(Secp256k1Interface):
             return self._getOutputElectrum(txid, dest_script, expect_value, xmr_swap)
 
         # TODO: Use getrawtransaction if txindex is active
-        utxos = self.rpc(
-            "scantxoutset", ["start", ["raw({})".format(dest_script.hex())]]
-        )
+        utxos = self._rpc_scantxoutset(["raw({})".format(dest_script.hex())])
         if "height" in utxos:  # chain_height not returned by v18 codebase
             chain_height = utxos["height"]
         else:
@@ -3492,13 +3563,12 @@ class BTCInterface(Secp256k1Interface):
 
         sum_unspent = 0
 
-        with BTCInterface._scantxoutset_lock:
-            self._log.debug("scantxoutset start")
-            ro = self.rpc("scantxoutset", ["start", ["addr({})".format(address)]])
-            self._log.debug("scantxoutset end")
+        self._log.debug("scantxoutset start")
+        ro = self._rpc_scantxoutset(["addr({})".format(address)])
+        self._log.debug("scantxoutset end")
 
-            for o in ro["unspents"]:
-                sum_unspent += self.make_int(o["amount"])
+        for o in ro["unspents"]:
+            sum_unspent += self.make_int(o["amount"])
         return sum_unspent
 
     def _getUTXOBalanceElectrum(self, address: str):
@@ -3881,7 +3951,7 @@ class BTCInterface(Secp256k1Interface):
 
             self.rpc("loadwallet", [self._rpc_wallet])
 
-        self.rpc_wallet("encryptwallet", [password])
+        self.rpc_wallet("encryptwallet", [password], timeout=120)
 
         if check_seed is False or seed_id_before == "Not found" or walletpath is None:
             return
@@ -4005,7 +4075,9 @@ class BTCInterface(Secp256k1Interface):
             if self.isWalletEncrypted():
                 raise ValueError("Old password must be set")
             return self.encryptWallet(new_password, check_seed=check_seed_if_encrypt)
-        self.rpc_wallet("walletpassphrasechange", [old_password, new_password])
+        self.rpc_wallet(
+            "walletpassphrasechange", [old_password, new_password], timeout=120
+        )
 
     def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         if password == "":
@@ -4038,12 +4110,9 @@ class BTCInterface(Secp256k1Interface):
 
             try:
                 seed_id = self.getWalletSeedID()
-                self._log.debug(
-                    f"{self.ticker()} unlockWallet getWalletSeedID returned: {seed_id}"
-                )
                 needs_seed_init = seed_id == "Not found"
             except Exception as e:
-                self._log.debug(f"getWalletSeedID failed: {e}, will initialize seed")
+                self._log.debug(f"getWalletSeedID failed: {e}")
                 needs_seed_init = True
             if needs_seed_init:
                 self._log.info(f"Initializing HD seed for {self.coin_name()}.")
@@ -4051,11 +4120,9 @@ class BTCInterface(Secp256k1Interface):
                 if password:
                     self._log.info(f"Encrypting {self.coin_name()} wallet.")
                     try:
-                        self.rpc_wallet("encryptwallet", [password])
+                        self.rpc_wallet("encryptwallet", [password], timeout=120)
                     except Exception as e:
                         self._log.debug(f"encryptwallet returned: {e}")
-                    import time
-
                     for i in range(10):
                         time.sleep(1)
                         try:
@@ -4072,7 +4139,7 @@ class BTCInterface(Secp256k1Interface):
                 check_seed = False
 
         if self.isWalletEncrypted():
-            self.rpc_wallet("walletpassphrase", [password, 100000000])
+            self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
         if check_seed:
             self._sc.checkWalletSeed(self.coin_type())
 
@@ -4080,7 +4147,15 @@ class BTCInterface(Secp256k1Interface):
         self._log.info(f"lockWallet - {self.ticker()}")
         if self.useBackend():
             return
-        self.rpc_wallet("walletlock")
+        try:
+            self.rpc_wallet("walletlock")
+        except Exception as e:
+            if "unencrypted wallet" in str(e).lower():
+                self._log.debug(
+                    f"lockWallet skipped - {self.ticker()} wallet is not encrypted"
+                )
+                return
+            raise
 
     def get_p2sh_script_pubkey(self, script: bytearray) -> bytearray:
         script_hash = hash160(script)

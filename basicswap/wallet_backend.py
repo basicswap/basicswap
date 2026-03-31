@@ -197,7 +197,11 @@ class ElectrumBackend(WalletBackend):
         self._cached_height_time = 0
         self._height_cache_ttl = 5
 
-        self._max_batch_size = 10
+        self._cached_fee = {}
+        self._cached_fee_time = {}
+        self._fee_cache_ttl = 300
+
+        self._max_batch_size = 5
         self._background_mode = False
 
     def setBackgroundMode(self, enabled: bool):
@@ -206,12 +210,19 @@ class ElectrumBackend(WalletBackend):
     def _call(self, method: str, params: list = None, timeout: int = 10):
         if self._background_mode and hasattr(self._server, "call_background"):
             return self._server.call_background(method, params, timeout)
+        if hasattr(self._server, "call_user"):
+            return self._server.call_user(method, params, timeout)
         return self._server.call(method, params, timeout)
 
     def _call_batch(self, calls: list, timeout: int = 15):
         if self._background_mode and hasattr(self._server, "call_batch_background"):
             return self._server.call_batch_background(calls, timeout)
+        if hasattr(self._server, "call_batch_user"):
+            return self._server.call_batch_user(calls, timeout)
         return self._server.call_batch(calls, timeout)
+
+    def _is_server_stopping(self) -> bool:
+        return getattr(self._server, "_stopping", False)
 
     def _split_batch_call(
         self, scripthashes: list, method: str, batch_size: int = None
@@ -221,19 +232,30 @@ class ElectrumBackend(WalletBackend):
 
         all_results = []
         for i in range(0, len(scripthashes), batch_size):
+            if self._is_server_stopping():
+                self._log.debug("_split_batch_call: server stopping, aborting")
+                break
             chunk = scripthashes[i : i + batch_size]
             try:
                 calls = [(method, [sh]) for sh in chunk]
                 results = self._call_batch(calls)
                 all_results.extend(results)
-            except Exception as e:
-                self._log.debug(f"Batch chunk failed ({len(chunk)} items): {e}")
+            except Exception:
+                if self._is_server_stopping():
+                    self._log.debug(
+                        "_split_batch_call: server stopping after batch failure, aborting"
+                    )
+                    break
                 for sh in chunk:
+                    if self._is_server_stopping():
+                        self._log.debug(
+                            "_split_batch_call: server stopping during fallback, aborting"
+                        )
+                        break
                     try:
                         result = self._call(method, [sh])
                         all_results.append(result)
-                    except Exception as e2:
-                        self._log.debug(f"Individual call failed for {sh[:8]}...: {e2}")
+                    except Exception:
                         all_results.append(None)
         return all_results
 
@@ -298,8 +320,10 @@ class ElectrumBackend(WalletBackend):
         if not addr_list:
             return result
 
-        batch_size = 10
+        batch_size = self._max_batch_size
         for batch_start in range(0, len(addr_list), batch_size):
+            if self._is_server_stopping():
+                break
             batch = addr_list[batch_start : batch_start + batch_size]
 
             addr_to_scripthash = {}
@@ -332,6 +356,8 @@ class ElectrumBackend(WalletBackend):
                     batch_success = True
                     break
                 except Exception as e:
+                    if self._is_server_stopping():
+                        break
                     if attempt == 0:
                         self._log.debug(
                             f"Batch detailed balance query failed, reconnecting: {e}"
@@ -348,6 +374,8 @@ class ElectrumBackend(WalletBackend):
 
             if not batch_success:
                 for addr, scripthash in addr_to_scripthash.items():
+                    if self._is_server_stopping():
+                        break
                     try:
                         balance = self._call(
                             "blockchain.scripthash.get_balance", [scripthash]
@@ -569,13 +597,22 @@ class ElectrumBackend(WalletBackend):
             return self._cached_height if self._cached_height > 0 else 0
 
     def estimateFee(self, blocks: int = 6) -> int:
+        now = time.time()
+        cache_key = blocks
+        if cache_key in self._cached_fee:
+            if (now - self._cached_fee_time.get(cache_key, 0)) < self._fee_cache_ttl:
+                return self._cached_fee[cache_key]
+
         try:
             fee = self._call("blockchain.estimatefee", [blocks])
             if fee and fee > 0:
-                return int(fee * 1e8 / 1000)
-            return 1
+                result = int(fee * 1e8 / 1000)
+                self._cached_fee[cache_key] = result
+                self._cached_fee_time[cache_key] = now
+                return result
+            return self._cached_fee.get(cache_key, 1)
         except Exception:
-            return 1
+            return self._cached_fee.get(cache_key, 1)
 
     def isConnected(self) -> bool:
         try:
@@ -615,6 +652,11 @@ class ElectrumBackend(WalletBackend):
         status["server"] = self.getServerHost()
         status["version"] = self.getServerVersion()
         return status
+
+    def recentlyReconnected(self, grace_seconds: int = 30) -> bool:
+        if hasattr(self._server, "recently_reconnected"):
+            return self._server.recently_reconnected(grace_seconds)
+        return False
 
     def getAddressHistory(self, address: str) -> List[dict]:
         if self._isUnsupportedAddress(address):
@@ -750,6 +792,30 @@ class ElectrumBackend(WalletBackend):
         except Exception as e:
             self._log.debug(f"Failed to subscribe to {address}: {e}")
             return None
+
+    def getSyncStatus(self) -> dict:
+        import time
+
+        height = 0
+        height_time = 0
+        if hasattr(self._server, "get_subscribed_height"):
+            height = self._server.get_subscribed_height()
+            height_time = getattr(self._server, "_subscribed_height_time", 0)
+
+        if self._cached_height > 0:
+            if self._cached_height > height:
+                height = self._cached_height
+            if self._cached_height_time > height_time:
+                height_time = self._cached_height_time
+
+        now = time.time()
+        stale_threshold = 300
+        is_synced = height > 0 and (now - height_time) < stale_threshold
+        return {
+            "height": height,
+            "synced": is_synced,
+            "last_update": height_time,
+        }
 
     def getServer(self):
         return self._server

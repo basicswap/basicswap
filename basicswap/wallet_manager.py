@@ -37,7 +37,7 @@ class WalletManager:
         Coins.LTC: {"mainnet": "ltc", "testnet": "tltc", "regtest": "rltc"},
     }
 
-    GAP_LIMIT = 20
+    GAP_LIMIT = 50
 
     def __init__(self, swap_client, log):
         self._gap_limits: Dict[Coins, int] = {}
@@ -50,6 +50,12 @@ class WalletManager:
         self._initialized: set = set()
         self._migration_in_progress: set = set()
         self._balance_sync_lock = threading.Lock()
+
+    def getGapLimit(self, coin_type: Coins) -> int:
+        return self._gap_limits.get(coin_type, self.GAP_LIMIT)
+
+    def setGapLimit(self, coin_type: Coins, gap_limit: int) -> None:
+        self._gap_limits[coin_type] = gap_limit
 
     def initialize(self, coin_type: Coins, root_key) -> None:
         if coin_type not in self.SUPPORTED_COINS:

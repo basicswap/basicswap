@@ -229,23 +229,35 @@ def checkAndNotifyBalanceChange(
             cc["cached_balance"] = current_balance
             cc["cached_total_balance"] = current_total_balance
             cc["cached_unconfirmed"] = current_unconfirmed
-            swap_client.log.debug(
-                f"{ci.ticker()} balance updated (trigger: {trigger_source})"
-            )
-            balance_event = {
-                "event": "coin_balance_updated",
-                "coin": ci.ticker(),
-                "height": new_height,
-                "trigger": trigger_source,
-            }
-            swap_client.ws_server.send_message_to_all(json.dumps(balance_event))
+
+            suppress = False
+            if cached_balance is None or cached_total_balance is None:
+                suppress = True
+            elif hasattr(ci, "getBackend") and ci.useBackend():
+                backend = ci.getBackend()
+                if backend and hasattr(backend, "recentlyReconnected"):
+                    if backend.recentlyReconnected(grace_seconds=30):
+                        suppress = True
+
+            if suppress:
+                swap_client.log.debug(
+                    f"{ci.ticker()} balance cache updated silently (trigger: {trigger_source})"
+                )
+            else:
+                swap_client.log.debug(
+                    f"{ci.ticker()} balance updated (trigger: {trigger_source})"
+                )
+                balance_event = {
+                    "event": "coin_balance_updated",
+                    "coin": ci.ticker(),
+                    "height": new_height,
+                    "trigger": trigger_source,
+                }
+                swap_client.ws_server.send_message_to_all(json.dumps(balance_event))
     except Exception as e:
         swap_client.log.debug(
             f"checkAndNotifyBalanceChange {ci.ticker()}: balance check failed: {e}"
         )
-        cc["cached_balance"] = None
-        cc["cached_total_balance"] = None
-        cc["cached_unconfirmed"] = None
 
 
 def threadPollXMRChainState(swap_client, coin_type):
@@ -458,6 +470,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._updating_wallets_info = {}
         self._last_updated_wallets_info = 0
         self._synced_addresses_from_full_node = set()
+        self._cached_electrum_legacy_funds = {}
 
         self.check_updates_seconds = self.get_int_setting(
             "check_updates_seconds", 24 * 60 * 60, 60 * 60, 7 * 24 * 60 * 60
@@ -581,6 +594,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(
             max_workers=4, thread_name_prefix="bsp"
         )
+        self._electrum_spend_check_futures = {}
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]["key_prefix"]
@@ -736,24 +750,32 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.delay_event.set()
         self.chainstate_delay_event.set()
 
-        if self._network:
-            self._network.stopNetwork()
-            self._network = None
-
-        for coin_type, interface in self.coin_interfaces.items():
-            if hasattr(interface, "_backend") and interface._backend is not None:
+        for coin_type, cc in self.coin_clients.items():
+            interface = cc.get("interface")
+            if (
+                interface
+                and hasattr(interface, "_backend")
+                and interface._backend is not None
+            ):
                 try:
                     if hasattr(interface._backend, "_server"):
-                        interface._backend._server.disconnect()
+                        if hasattr(interface._backend._server, "shutdown"):
+                            interface._backend._server.shutdown()
+                        else:
+                            interface._backend._server.disconnect()
                     self.log.debug(f"Disconnected electrum backend for {coin_type}")
                 except Exception as e:
                     self.log.debug(f"Error disconnecting electrum backend: {e}")
+
+        if self._network:
+            self._network.stopNetwork()
+            self._network = None
 
         self.log.info("Stopping threads.")
         for t in self.threads:
             if hasattr(t, "stop") and callable(t.stop):
                 t.stop()
-            t.join()
+            t.join(timeout=15)
 
         if sys.version_info[1] >= 9:
             self.thread_pool.shutdown(cancel_futures=True)
@@ -1927,15 +1949,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 cc["cached_total_balance"] = current_total
                 cc["cached_unconfirmed"] = current_total - current_balance
 
-                balance_event = {
-                    "event": "coin_balance_updated",
-                    "coin": ci.ticker(),
-                    "height": cc.get("chain_height", 0),
-                    "trigger": "electrum_notification",
-                    "address": address[:20] + "..." if address else None,
-                }
-                self.ws_server.send_message_to_all(json.dumps(balance_event))
-                self.log.debug(f"Electrum notification: {ci.ticker()} balance updated")
+                suppress = False
+                if hasattr(ci, "getBackend") and ci.useBackend():
+                    backend = ci.getBackend()
+                    if backend and hasattr(backend, "recentlyReconnected"):
+                        if backend.recentlyReconnected(grace_seconds=30):
+                            suppress = True
+
+                if suppress:
+                    self.log.debug(
+                        f"Electrum notification: {ci.ticker()} balance cache updated silently (recent reconnection)"
+                    )
+                else:
+                    balance_event = {
+                        "event": "coin_balance_updated",
+                        "coin": ci.ticker(),
+                        "height": cc.get("chain_height", 0),
+                        "trigger": "electrum_notification",
+                        "address": address[:20] + "..." if address else None,
+                    }
+                    self.ws_server.send_message_to_all(json.dumps(balance_event))
+                    self.log.debug(
+                        f"Electrum notification: {ci.ticker()} balance updated"
+                    )
 
         except Exception as e:
             self.log.debug(f"Error handling electrum notification: {e}")
@@ -2178,7 +2214,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 f"will sync keypool and trigger rescan in full node"
                             )
                             return {
-                                "empty": True,
+                                "empty": False,
+                                "reason": "has_balance",
                                 "has_balance": True,
                                 "balance_sats": balance_sats,
                                 "message": (
@@ -2495,9 +2532,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     else:
                         self.log.warning(f"Sweep skipped for {coin_name}: {reason}")
                 elif result.get("txid"):
-                    self.log.info(
-                        f"Sweep completed: {result.get('amount', 0) / 1e8:.8f} {coin_name} swept to RPC wallet"
-                    )
+                    pass
                 elif result.get("error"):
                     self.log.warning(
                         f"Sweep failed for {coin_name}: {result.get('error')}"
@@ -2745,6 +2780,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     {
                         "coin_type": int(coin_type),
                         "coin_name": coin_name,
+                        "ticker": chainparams[coin_type]["ticker"],
                         "amount": send_amount / 1e8,
                         "fee": fee / 1e8,
                         "txid": txid_hex,
@@ -2823,15 +2859,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             except Exception as e:
                 return {"error": f"Failed to list UTXOs: {e}"}
 
-            hrp = ci.chainparams_network().get("hrp", "bc")
+            bip84_addresses = set()
+            wm = ci.getWalletManager()
+            if wm:
+                try:
+                    all_addrs = wm.getAllAddresses(coin_type, include_watch_only=False)
+                    bip84_addresses = set(all_addrs)
+                except Exception as e:
+                    self.log.debug(f"Error getting BIP84 addresses: {e}")
+
             legacy_utxos = []
             total_legacy_sats = 0
 
             for u in unspent:
-                if "address" not in u:
+                if "address" not in u or "txid" not in u:
+                    continue
+                if "vout" not in u and "n" not in u:
                     continue
                 addr = u["address"]
-                if not addr.startswith(hrp + "1"):
+                if addr not in bip84_addresses:
+                    if "vout" not in u and "n" in u:
+                        u["vout"] = u["n"]
                     legacy_utxos.append(u)
                     total_legacy_sats += ci.make_int(u.get("amount", 0))
 
@@ -2855,10 +2903,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "reason": f"Legacy balance ({total_legacy_sats}) too low for fee ({estimated_fee_sats})",
                 }
 
-            try:
-                new_address = ci.rpc_wallet("getnewaddress", ["consolidate", "bech32"])
-            except Exception as e:
-                return {"error": f"Failed to get new address: {e}"}
+            new_address = None
+            if wm:
+                try:
+                    new_address = wm.getNewAddress(coin_type, internal=False)
+                    self.log.info(
+                        f"[Consolidate {coin_name}] Using BIP84 address: {new_address}"
+                    )
+                except Exception as e:
+                    self.log.warning(f"Failed to get BIP84 address: {e}")
+
+            if not new_address:
+                try:
+                    new_address = ci.rpc_wallet(
+                        "getnewaddress", ["consolidate", "bech32"]
+                    )
+                    self.log.warning(
+                        f"[Consolidate {coin_name}] Using Core address (not BIP84): {new_address}"
+                    )
+                except Exception as e:
+                    return {"error": f"Failed to get new address: {e}"}
 
             send_amount_sats = total_legacy_sats - estimated_fee_sats
             send_amount_btc = ci.format_amount(send_amount_sats)
@@ -2994,6 +3058,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return None
 
     def getElectrumLegacyFundsInfo(self, coin_type: Coins) -> dict:
+        cached = self._cached_electrum_legacy_funds.get(int(coin_type))
+        if cached is not None:
+            return cached
+        return self._computeElectrumLegacyFundsInfo(coin_type)
+
+    def _computeElectrumLegacyFundsInfo(self, coin_type: Coins) -> dict:
         try:
             cc = self.coin_clients.get(coin_type)
             if not cc or cc.get("connection_type") != "electrum":
@@ -3027,7 +3097,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 }
             return {"has_legacy_funds": False}
         except Exception as e:
-            self.log.debug(f"getElectrumLegacyFundsInfo error: {e}")
+            self.log.debug(f"_computeElectrumLegacyFundsInfo error: {e}")
             return {"has_legacy_funds": False}
 
     def _tryGetFullNodeAddresses(self, coin_type: Coins) -> list:
@@ -4528,10 +4598,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info_s(f"In txn: {txid}")
         return txid
 
-    def withdrawLTC(self, type_from, value, addr_to, subfee: bool) -> str:
-        ci = self.ci(Coins.LTC)
+    def withdrawCoinExtended(
+        self, coin_type, type_from, value, addr_to, subfee: bool
+    ) -> str:
+        ci = self.ci(coin_type)
         self.log.info(
-            "withdrawLTC{}".format(
+            "withdrawCoinExtended{}".format(
                 ""
                 if self.log.safe_logs
                 else " {} {} to {} {}".format(
@@ -7454,6 +7526,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     dest_address,
                     bid.amount_to,
                     bid.chain_b_height_start,
+                    find_index=True,
                     vout=bid.xmr_b_lock_tx.vout,
                 )
         else:
@@ -7498,7 +7571,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid_id=bid.bid_id,
                     tx_type=TxTypes.XMR_SWAP_B_LOCK,
                     txid=xmr_swap.b_lock_tx_id,
-                    vout=0,
+                    vout=found_tx.get("index", 0),
                 )
             if bid.xmr_b_lock_tx.txid != found_txid:
                 self.log.debug(
@@ -9328,6 +9401,95 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         c["last_height_checked"] = chain_blocks
 
+    def _fetchSpendsElectrum(self, coin_type, watched_outputs, watched_scripts):
+        ci = self.ci(coin_type)
+        results = {"outputs": [], "scripts": [], "chain_blocks": 0}
+
+        try:
+            results["chain_blocks"] = ci.getChainHeight()
+        except Exception as e:
+            self.log.debug(f"_fetchSpendsElectrum getChainHeight error: {e}")
+            return results
+
+        for o in watched_outputs:
+            if self.delay_event.is_set():
+                return results
+            try:
+                spend_info = ci.checkWatchedOutput(o.txid_hex, o.vout)
+                if spend_info:
+                    raw_tx = ci.getBackend().getTransactionRaw(spend_info["txid"])
+                    if raw_tx:
+                        tx = ci.loadTx(bytes.fromhex(raw_tx))
+                        vin_list = []
+                        for idx, inp in enumerate(tx.vin):
+                            vin_entry = {
+                                "txid": f"{inp.prevout.hash:064x}",
+                                "vout": inp.prevout.n,
+                            }
+                            if tx.wit and idx < len(tx.wit.vtxinwit):
+                                wit = tx.wit.vtxinwit[idx]
+                                if wit.scriptWitness and wit.scriptWitness.stack:
+                                    vin_entry["txinwitness"] = [
+                                        item.hex() for item in wit.scriptWitness.stack
+                                    ]
+                            vin_list.append(vin_entry)
+                        tx_dict = {
+                            "txid": spend_info["txid"],
+                            "hex": raw_tx,
+                            "vin": vin_list,
+                            "vout": [
+                                {
+                                    "value": ci.format_amount(out.nValue),
+                                    "n": i,
+                                    "scriptPubKey": {"hex": out.scriptPubKey.hex()},
+                                }
+                                for i, out in enumerate(tx.vout)
+                            ],
+                        }
+                        results["outputs"].append((o, spend_info, tx_dict))
+            except Exception as e:
+                self.log.debug(f"_fetchSpendsElectrum checkWatchedOutput error: {e}")
+
+        for s in watched_scripts:
+            if self.delay_event.is_set():
+                return results
+            try:
+                found = ci.checkWatchedScript(s.script)
+                if found:
+                    results["scripts"].append((s, found))
+            except Exception as e:
+                self.log.debug(f"_fetchSpendsElectrum checkWatchedScript error: {e}")
+
+        return results
+
+    def _processFetchedSpends(self, coin_type, results):
+        c = self.coin_clients[coin_type]
+
+        for o, spend_info, tx_dict in results["outputs"]:
+            try:
+                self.log.debug(
+                    f"Found spend via Electrum {self.logIDT(o.txid_hex)} {o.vout} in {self.logIDT(spend_info['txid'])} {spend_info['vin']}"
+                )
+                self.processSpentOutput(
+                    coin_type, o, spend_info["txid"], spend_info["vin"], tx_dict
+                )
+            except Exception as e:
+                self.log.debug(f"_processFetchedSpends output error: {e}")
+
+        for s, found in results["scripts"]:
+            try:
+                txid_bytes = bytes.fromhex(found["txid"])
+                self.log.debug(
+                    f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
+                )
+                self.processFoundScript(coin_type, s, txid_bytes, found["vout"])
+            except Exception as e:
+                self.log.debug(f"_processFetchedSpends script error: {e}")
+
+        chain_blocks = results.get("chain_blocks", 0)
+        if chain_blocks > 0:
+            c["last_height_checked"] = chain_blocks
+
     def expireMessageRoutes(self) -> None:
         if self._is_locked is True:
             self.log.debug("Not expiring message routes while system is locked")
@@ -9526,11 +9688,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             cursor = self.openDB()
 
-            query = "SELECT action_type, linked_id FROM actions WHERE active_ind = 1 AND trigger_at <= :now"
+            query = "SELECT action_id, action_type, linked_id FROM actions WHERE active_ind = 1 AND trigger_at <= :now"
             rows = cursor.execute(query, {"now": now}).fetchall()
+            retry_action_ids = []
 
             for row in rows:
-                action_type, linked_id = row
+                action_id, action_type, linked_id = row
                 accepting_bid: bool = False
                 try:
                     if action_type == ActionTypes.ACCEPT_BID:
@@ -9562,6 +9725,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.acceptADSReverseBid(linked_id, cursor)
                     else:
                         self.log.warning(f"Unknown event type: {action_type}")
+                except TemporaryError as ex:
+                    self.log.warning(
+                        f"checkQueuedActions temporary error for {self.log.id(linked_id)}: {ex}"
+                    )
+                    retry_action_ids.append(action_id)
                 except Exception as ex:
                     err_msg = f"checkQueuedActions failed: {ex}"
                     self.logException(err_msg)
@@ -9594,10 +9762,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             bid.setState(BidStates.BID_ERROR)
                             self.saveBidInSession(bid_id, bid, cursor)
 
-            query: str = "DELETE FROM actions WHERE trigger_at <= :now"
-            if self.debug:
-                query = "UPDATE actions SET active_ind = 2 WHERE trigger_at <= :now"
-            cursor.execute(query, {"now": now})
+            if retry_action_ids:
+                placeholders = ",".join(
+                    f":retry_{i}" for i in range(len(retry_action_ids))
+                )
+                params = {"now": now}
+                for i, aid in enumerate(retry_action_ids):
+                    params[f"retry_{i}"] = aid
+                if self.debug:
+                    query = f"UPDATE actions SET active_ind = 2 WHERE trigger_at <= :now AND action_id NOT IN ({placeholders})"
+                else:
+                    query = f"DELETE FROM actions WHERE trigger_at <= :now AND action_id NOT IN ({placeholders})"
+                cursor.execute(query, params)
+            else:
+                query: str = "DELETE FROM actions WHERE trigger_at <= :now"
+                if self.debug:
+                    query = "UPDATE actions SET active_ind = 2 WHERE trigger_at <= :now"
+                cursor.execute(query, {"now": now})
 
         except Exception as ex:
             self.handleSessionErrors(ex, cursor, "checkQueuedActions")
@@ -11349,13 +11530,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
         try:
-            b_lock_tx_id = ci_to.publishBLockTx(
+            b_lock_vout = 0
+            result = ci_to.publishBLockTx(
                 xmr_swap.vkbv,
                 xmr_swap.pkbs,
                 bid.amount_to,
                 b_fee_rate,
                 unlock_time=unlock_time,
             )
+            if isinstance(result, tuple):
+                b_lock_tx_id, b_lock_vout = result
+            else:
+                b_lock_tx_id = result
             if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
                     f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing XMR lock tx {self.log.id(b_lock_tx_id)}."
@@ -11413,7 +11599,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid_id=bid_id,
             tx_type=TxTypes.XMR_SWAP_B_LOCK,
             txid=b_lock_tx_id,
-            vout=0,
+            vout=b_lock_vout,
         )
         xmr_swap.b_lock_tx_id = b_lock_tx_id
         bid.xmr_b_lock_tx.setState(TxStates.TX_SENT)
@@ -12818,17 +13004,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if self._zmq_queue_enabled and self.zmqSubscriber:
             try:
                 if self._read_zmq_queue:
-                    topic, message, seq = self.zmqSubscriber.recv_multipart(
-                        flags=zmq.NOBLOCK
-                    )
-                    if topic == b"smsg":
-                        self.processZmqSmsg(message)
-                    elif topic == b"hashwtx":
-                        self.processZmqHashwtx(message)
+                    for _i in range(100):
+                        topic, message, seq = self.zmqSubscriber.recv_multipart(
+                            flags=zmq.NOBLOCK
+                        )
+                        if topic == b"smsg":
+                            self.processZmqSmsg(message)
+                        elif topic == b"hashwtx":
+                            self.processZmqHashwtx(message)
             except zmq.Again as e:  # noqa: F841
                 pass
             except Exception as e:
                 self.logException(f"smsg zmq {e}")
+
+        for k, future in list(self._electrum_spend_check_futures.items()):
+            if future.done():
+                try:
+                    results = future.result()
+                    self._processFetchedSpends(k, results)
+                except Exception as e:
+                    self.log.debug(
+                        f"Background electrum spend check error for {Coins(k).name}: {e}"
+                    )
+                del self._electrum_spend_check_futures[k]
 
         self.updateNetwork()
 
@@ -12891,7 +13089,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ):
                         continue
                     if len(c["watched_outputs"]) > 0 or len(c["watched_scripts"]):
-                        self.checkForSpends(k, c)
+                        if c.get("connection_type") == "electrum":
+                            if (
+                                k not in self._electrum_spend_check_futures
+                                or self._electrum_spend_check_futures[k].done()
+                            ):
+                                self._electrum_spend_check_futures[k] = (
+                                    self.thread_pool.submit(
+                                        self._fetchSpendsElectrum,
+                                        k,
+                                        list(c["watched_outputs"]),
+                                        list(c["watched_scripts"]),
+                                    )
+                                )
+                        else:
+                            self.checkForSpends(k, c)
                 self._last_checked_watched = now
 
             if now - self._last_checked_expired >= self.check_expired_seconds:
@@ -13250,39 +13462,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 display_name = getCoinName(coin_id)
 
                 if old_connection_type == "rpc" and new_connection_type == "electrum":
-                    auto_transfer_now = data.get("auto_transfer_now", False)
-                    if auto_transfer_now:
-                        transfer_result = self._consolidateLegacyFundsToSegwit(coin_id)
-                        if transfer_result.get("success"):
-                            self.log.info(
-                                f"Consolidated {transfer_result.get('amount', 0):.8f} {display_name} "
-                                f"from legacy addresses. TXID: {transfer_result.get('txid')}"
-                            )
-                            if migration_message:
-                                migration_message += f" Transferred {transfer_result.get('amount', 0):.8f} {display_name} to native segwit."
-                            else:
-                                migration_message = f"Transferred {transfer_result.get('amount', 0):.8f} {display_name} to native segwit."
-                        elif transfer_result.get("skipped"):
-                            self.log.info(
-                                f"Legacy fund transfer skipped for {coin_name}: {transfer_result.get('reason')}"
-                            )
-                        elif transfer_result.get("error"):
-                            self.log.warning(
-                                f"Legacy fund transfer warning for {coin_name}: {transfer_result.get('error')}"
-                            )
-
                     migration_result = self._migrateWalletToLiteMode(coin_id)
                     if migration_result.get("success"):
                         count = migration_result.get("count", 0)
                         self.log.info(
                             f"Lite wallet ready for {coin_name} with {count} addresses"
                         )
-                        if migration_message:
-                            migration_message += (
-                                f" Lite wallet ready ({count} addresses)."
+                        migration_message = (
+                            f"Lite wallet ready for {display_name} ({count} addresses)."
+                        )
+
+                        auto_transfer_now = data.get("auto_transfer_now", False)
+                        if auto_transfer_now:
+                            transfer_result = self._consolidateLegacyFundsToSegwit(
+                                coin_id
                             )
-                        else:
-                            migration_message = f"Lite wallet ready for {display_name} ({count} addresses)."
+                            if transfer_result.get("success"):
+                                self.log.info(
+                                    f"Consolidated {transfer_result.get('amount', 0):.8f} {display_name} "
+                                    f"from legacy addresses. TXID: {transfer_result.get('txid')}"
+                                )
+                                migration_message += f" Transferred {transfer_result.get('amount', 0):.8f} {display_name} to native segwit."
+                            elif transfer_result.get("skipped"):
+                                self.log.info(
+                                    f"Legacy fund transfer skipped for {coin_name}: {transfer_result.get('reason')}"
+                                )
+                            elif transfer_result.get("error"):
+                                self.log.warning(
+                                    f"Legacy fund transfer warning for {coin_name}: {transfer_result.get('error')}"
+                                )
                     else:
                         error = migration_result.get("error", "unknown")
                         reason = migration_result.get("reason", "")
@@ -13333,14 +13541,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                     f"Transfer failed for {coin_name}: {error}"
                                 )
                                 raise ValueError(f"Transfer failed: {error}")
-                        elif reason in ("has_balance", "active_swap"):
+                        elif reason == "active_swap":
                             error = empty_check.get(
-                                "message", "Wallet must be empty before switching modes"
+                                "message", "Cannot switch: active swap in progress"
                             )
                             self.log.error(
                                 f"Migration blocked for {coin_name}: {error}"
                             )
                             raise ValueError(error)
+                        elif reason == "has_balance":
+                            balance_msg = empty_check.get("message", "")
+                            self.log.warning(
+                                f"Switching {coin_name} to RPC without transfer: {balance_msg}"
+                            )
+                            migration_message = (
+                                f"{display_name} has funds on lite wallet addresses. "
+                                f"Keypool will be synced and rescan triggered."
+                            )
 
                     sync_result = self._syncWalletIndicesToRPC(coin_id)
                     if sync_result.get("success"):
@@ -13712,6 +13929,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         rv["mweb_pending"] = walletinfo.get(
                             "mweb_unconfirmed", 0
                         ) + walletinfo.get("mweb_immature", 0)
+            elif coin == Coins.FIRO:
+                try:
+                    rv["spark_address"] = self.getCachedStealthAddressForCoin(
+                        Coins.FIRO
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"getCachedStealthAddressForCoin for {ci.coin_name()} failed with: {e}."
+                    )
+                rv["spark_balance"] = (
+                    0
+                    if walletinfo["spark_balance"] == 0
+                    else ci.format_amount(walletinfo["spark_balance"])
+                )
+                spark_pending_int = (
+                    walletinfo["spark_unconfirmed"] + walletinfo["spark_immature"]
+                )
+                rv["spark_pending"] = (
+                    0 if spark_pending_int == 0 else ci.format_amount(spark_pending_int)
+                )
 
             return rv
         except Exception as e:
@@ -13719,9 +13956,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def addWalletInfoRecord(self, coin, info_type, wi) -> None:
         coin_id = int(coin)
+        now: int = self.getTime()
         cursor = self.openDB()
         try:
-            now: int = self.getTime()
             self.add(
                 Wallets(
                     coin_id=coin,
@@ -13975,6 +14212,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         if row2[0].startswith("stealth"):
                             if coin_id == Coins.LTC:
                                 wallet_data["mweb_address"] = row2[1]
+                            elif coin_id == Coins.FIRO:
+                                wallet_data["spark_address"] = row2[1]
                             else:
                                 wallet_data["stealth_address"] = row2[1]
                         else:

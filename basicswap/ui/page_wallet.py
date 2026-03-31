@@ -90,6 +90,10 @@ def format_wallet_data(swap_client, ci, w):
         wf["mweb_address"] = w.get("mweb_address", "?")
         wf["mweb_balance"] = w.get("mweb_balance", "?")
         wf["mweb_pending"] = w.get("mweb_pending", "?")
+    elif ci.coin_type() == Coins.FIRO:
+        wf["spark_address"] = w.get("spark_address", "?")
+        wf["spark_balance"] = w.get("spark_balance", "?")
+        wf["spark_pending"] = w.get("spark_pending", "?")
 
     if hasattr(ci, "getScanStatus"):
         wf["scan_status"] = ci.getScanStatus()
@@ -114,6 +118,13 @@ def format_wallet_data(swap_client, ci, w):
         except Exception:
             wf["electrum_connected"] = False
             wf["electrum_status"] = "error"
+        try:
+            sync_status = backend.getSyncStatus()
+            wf["electrum_synced"] = sync_status.get("synced", False)
+            wf["electrum_height"] = sync_status.get("height", 0)
+        except Exception:
+            wf["electrum_synced"] = False
+            wf["electrum_height"] = 0
 
     checkAddressesOwned(swap_client, ci, wf)
     return wf
@@ -264,6 +275,8 @@ def page_wallet(self, url_split, post_string):
             force_refresh = True
         elif have_data_entry(form_data, "newmwebaddr_" + cid):
             swap_client.cacheNewStealthAddressForCoin(coin_id)
+        elif have_data_entry(form_data, "newsparkaddr_" + cid):
+            swap_client.cacheNewStealthAddressForCoin(coin_id)
         elif have_data_entry(form_data, "reseed_" + cid):
             try:
                 swap_client.reseedWallet(coin_id)
@@ -325,7 +338,7 @@ def page_wallet(self, url_split, post_string):
                     page_data["wd_type_to_" + cid] = type_to
                 except Exception as e:  # noqa: F841
                     err_messages.append("Missing type")
-            elif coin_id == Coins.LTC:
+            elif coin_id in (Coins.LTC, Coins.FIRO):
                 try:
                     type_from = form_data[bytes("withdraw_type_from_" + cid, "utf-8")][
                         0
@@ -354,9 +367,9 @@ def page_wallet(self, url_split, post_string):
                                 value, ticker, type_from, type_to, address, txid
                             )
                         )
-                    elif coin_id == Coins.LTC:
-                        txid = swap_client.withdrawLTC(
-                            type_from, value, address, subfee
+                    elif coin_id in (Coins.LTC, Coins.FIRO):
+                        txid = swap_client.withdrawCoinExtended(
+                            coin_id, type_from, value, address, subfee
                         )
                         messages.append(
                             "Withdrew {} {} (from {}) to address {}<br/>In txid: {}".format(
@@ -429,8 +442,12 @@ def page_wallet(self, url_split, post_string):
                 if swap_client.debug is True:
                     swap_client.log.error(traceback.format_exc())
 
+    is_electrum_mode = (
+        swap_client.coin_clients.get(coin_id, {}).get("connection_type") == "electrum"
+    )
+
     swap_client.updateWalletsInfo(
-        force_refresh, only_coin=coin_id, wait_for_complete=True
+        force_refresh, only_coin=coin_id, wait_for_complete=not is_electrum_mode
     )
     wallets = swap_client.getCachedWalletsInfo({"coin_id": coin_id})
     wallet_data = {}
@@ -469,6 +486,8 @@ def page_wallet(self, url_split, post_string):
             wallet_data["main_address"] = w.get("main_address", "Refresh necessary")
         elif k == Coins.LTC:
             wallet_data["mweb_address"] = w.get("mweb_address", "Refresh necessary")
+        elif k == Coins.FIRO:
+            wallet_data["spark_address"] = w.get("spark_address", "Refresh necessary")
 
         if "wd_type_from_" + cid in page_data:
             wallet_data["wd_type_from"] = page_data["wd_type_from_" + cid]

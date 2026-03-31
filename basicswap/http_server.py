@@ -6,8 +6,10 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import gzip
 import json
 import shlex
+import hashlib
 import secrets
 import traceback
 import threading
@@ -19,6 +21,7 @@ from jinja2 import Environment, PackageLoader
 from socket import error as SocketError
 from urllib import parse
 from datetime import datetime, timedelta, timezone
+from email.utils import formatdate, parsedate_to_datetime
 from http.cookies import SimpleCookie
 
 from . import __version__
@@ -802,7 +805,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         if page == "static":
             try:
                 static_path = os.path.join(os.path.dirname(__file__), "static")
-                content = None
                 mime_type = ""
                 filepath = ""
                 if len(url_split) > 3 and url_split[2] == "sequence_diagrams":
@@ -835,9 +837,73 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if mime_type == "" or not filepath:
                     raise ValueError("Unknown file type or path")
 
+                file_stat = os.stat(filepath)
+                mtime = file_stat.st_mtime
+                file_size = file_stat.st_size
+
+                etag_hash = hashlib.md5(
+                    f"{file_size}-{mtime}".encode()
+                ).hexdigest()
+                etag = f'"{etag_hash}"'
+                last_modified = formatdate(mtime, usegmt=True)
+
+                if_none_match = self.headers.get("If-None-Match")
+                if if_none_match:
+                    if if_none_match.strip() == "*" or etag in [
+                        t.strip() for t in if_none_match.split(",")
+                    ]:
+                        self.send_response(304)
+                        self.send_header("ETag", etag)
+                        self.send_header("Cache-Control", "public")
+                        self.end_headers()
+                        return b""
+
+                if_modified_since = self.headers.get("If-Modified-Since")
+                if if_modified_since and not if_none_match:
+                    try:
+                        ims_time = parsedate_to_datetime(if_modified_since)
+                        file_time = datetime.fromtimestamp(int(mtime), tz=timezone.utc)
+                        if file_time <= ims_time:
+                            self.send_response(304)
+                            self.send_header("Last-Modified", last_modified)
+                            self.send_header("Cache-Control", "public")
+                            self.end_headers()
+                            return b""
+                    except (TypeError, ValueError):
+                        pass
+
+                is_lib = len(url_split) > 4 and url_split[3] == "libs"
+                if is_lib:
+                    cache_control = "public, max-age=31536000, immutable"
+                elif url_split[2] in ("css", "js"):
+                    cache_control = "public, max-age=3600, must-revalidate"
+                elif url_split[2] in ("images", "sequence_diagrams"):
+                    cache_control = "public, max-age=86400"
+                else:
+                    cache_control = "public, max-age=3600"
+
                 with open(filepath, "rb") as fp:
                     content = fp.read()
-                self.putHeaders(status_code, mime_type)
+
+                extra_headers = [
+                    ("Cache-Control", cache_control),
+                    ("Last-Modified", last_modified),
+                    ("ETag", etag),
+                ]
+
+                is_compressible = mime_type in (
+                    "text/css; charset=utf-8",
+                    "application/javascript",
+                    "image/svg+xml",
+                )
+                accept_encoding = self.headers.get("Accept-Encoding", "")
+                if is_compressible and "gzip" in accept_encoding:
+                    content = gzip.compress(content)
+                    extra_headers.append(("Content-Encoding", "gzip"))
+                    extra_headers.append(("Vary", "Accept-Encoding"))
+
+                extra_headers.append(("Content-Length", str(len(content))))
+                self.putHeaders(status_code, mime_type, extra_headers=extra_headers)
                 return content
 
             except FileNotFoundError:

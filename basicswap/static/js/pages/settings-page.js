@@ -251,15 +251,15 @@
           let transferSection = '';
           if (info.require_transfer && info.legacy_balance_sats > 0) {
             transferSection = `
-              <div class="bg-yellow-100 dark:bg-yellow-900/50 border border-yellow-400 dark:border-yellow-600 rounded-lg p-3 mb-3">
-                <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">Legacy Funds Transfer Required</p>
-                <p class="text-xs text-gray-700 dark:text-gray-300 mb-2">
-                  <strong>${info.legacy_balance} ${info.coin}</strong> on legacy addresses will be automatically transferred to a native segwit address.
+              <div class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded-lg p-3 mb-3">
+                <p class="text-sm font-medium text-gray-900 dark:text-white mb-2">Funds Transfer Required</p>
+                <p class="text-xs text-gray-700 dark:text-gray-200 mb-2">
+                  <strong>${info.legacy_balance} ${info.coin}</strong> on non-derivable addresses will be automatically transferred to a BIP84 address.
                 </p>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                <p class="text-xs text-gray-600 dark:text-gray-300 mb-2">
                   Est. fee: ${info.estimated_fee} ${info.coin}
                 </p>
-                <p class="text-xs text-gray-700 dark:text-gray-300">
+                <p class="text-xs text-gray-700 dark:text-gray-200">
                   This ensures your funds are recoverable using the extended key backup in external Electrum wallets.
                 </p>
                 <input type="hidden" name="transfer_choice" value="auto">
@@ -267,8 +267,8 @@
             `;
           } else if (info.legacy_balance_sats > 0 && !info.show_transfer_option) {
             transferSection = `
-              <p class="text-yellow-700 dark:text-yellow-300 text-xs mb-3">
-                Some funds on legacy addresses (${info.legacy_balance} ${info.coin}) - too low to transfer.
+              <p class="text-gray-700 dark:text-gray-300 text-xs mb-3">
+                Some funds on non-derivable addresses (${info.legacy_balance} ${info.coin}) - too low to transfer.
               </p>
             `;
           }
@@ -280,11 +280,22 @@
               </p>
               <p class="mb-2 text-gray-800 dark:text-gray-100"><strong>Extended Private Key (for external wallet import):</strong></p>
               <div class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-500 rounded p-2 mb-3">
-                <code class="text-xs break-all select-all font-mono text-gray-900 dark:text-gray-100">${data.account_key}</code>
+                <code id="extendedKeyDisplay" class="text-xs break-all font-mono text-gray-900 dark:text-gray-100">${'*'.repeat(Math.min(data.account_key.length, 80))}</code>
+                <code id="extendedKeyActual" class="text-xs break-all select-all font-mono text-gray-900 dark:text-gray-100 hidden">${data.account_key}</code>
               </div>
-              <p class="text-xs text-gray-600 dark:text-gray-300 mb-3">
-                This key can be imported into Electrum using "Use a master key" option.
-              </p>
+              <div class="mb-3">
+                <button type="button" id="toggleKeyVisibility" class="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded">
+                  Show Key
+                </button>
+              </div>
+              <div class="text-xs text-gray-600 dark:text-gray-300 mb-3 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded p-2">
+                <p class="font-medium mb-1 text-gray-800 dark:text-gray-100">To import in Electrum wallet:</p>
+                <ol class="list-decimal list-inside space-y-0.5">
+                  <li>Open Electrum → File → New/Restore</li>
+                  <li>Choose "Standard wallet" → "Use a master key"</li>
+                  <li>Paste this key (starts with zprv... or yprv...)</li>
+                </ol>
+              </div>
               ${transferSection}
               <div class="border-t border-gray-300 dark:border-gray-500 pt-3">
                 <label class="flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 rounded p-1 -m-1">
@@ -293,6 +304,23 @@
                 </label>
               </div>
             `;
+
+            const toggleBtn = document.getElementById('toggleKeyVisibility');
+            const keyDisplay = document.getElementById('extendedKeyDisplay');
+            const keyActual = document.getElementById('extendedKeyActual');
+            if (toggleBtn && keyDisplay && keyActual) {
+              toggleBtn.addEventListener('click', () => {
+                if (keyDisplay.classList.contains('hidden')) {
+                  keyDisplay.classList.remove('hidden');
+                  keyActual.classList.add('hidden');
+                  toggleBtn.textContent = 'Show Key';
+                } else {
+                  keyDisplay.classList.add('hidden');
+                  keyActual.classList.remove('hidden');
+                  toggleBtn.textContent = 'Hide Key';
+                }
+              });
+            }
 
             const checkbox = document.getElementById('walletModeKeyConfirmCheckbox');
             if (checkbox) {
@@ -362,21 +390,21 @@
                 </p>
                 <div class="space-y-2">
                   <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
-                    <input type="radio" name="transfer_choice" value="auto" class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
+                    <input type="radio" name="transfer_choice" value="auto" checked class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
                     <div>
                       <span class="text-sm font-medium text-gray-900 dark:text-white">Auto-transfer funds to RPC wallet</span>
                       <p class="text-xs text-gray-600 dark:text-gray-300">Recommended. Ensures all funds visible in full node wallet.</p>
                     </div>
                   </label>
                   <label class="flex items-start cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-1.5 -m-1">
-                    <input type="radio" name="transfer_choice" value="manual" checked class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
+                    <input type="radio" name="transfer_choice" value="manual" class="mt-0.5 mr-2 h-4 w-4 text-blue-600 border-gray-400 dark:border-gray-400 focus:ring-blue-500 bg-white dark:bg-gray-500">
                     <div>
                       <span class="text-sm font-medium text-gray-900 dark:text-white">Keep funds on current addresses</span>
                       <p class="text-xs text-gray-600 dark:text-gray-300">Transfer manually later if needed.</p>
                     </div>
                   </label>
                 </div>
-                <p class="text-xs text-red-600 dark:text-red-400 mt-3">
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-3">
                   If you skip transfer, you will need to manually send funds from lite wallet addresses to your RPC wallet.
                 </p>
               </div>

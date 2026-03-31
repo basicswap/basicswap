@@ -87,7 +87,7 @@
         }
       }
 
-      if (coinData.scan_status) {
+      if (coinData.scan_status || coinData.electrum_synced !== undefined) {
         this.updateScanStatus(coinData);
       }
 
@@ -110,7 +110,7 @@
       if (!scanStatusEl) return;
 
       const status = coinData.scan_status;
-      if (status.in_progress) {
+      if (status && status.in_progress) {
         scanStatusEl.innerHTML = `
           <div class="flex items-center justify-between text-xs">
             <span class="text-blue-600 dark:text-blue-300">
@@ -126,13 +126,29 @@
             <div class="bg-blue-600 dark:bg-blue-400 h-1 rounded-full transition-all" style="width: ${status.progress}%"></div>
           </div>
         `;
+      } else if (coinData.electrum_synced) {
+        const height = coinData.electrum_height || '';
+        scanStatusEl.innerHTML = `
+          <div class="bg-green-50 dark:bg-gray-500 p-2 rounded">
+            <div class="flex items-center text-xs text-green-600 dark:text-green-400">
+              Electrum Wallet Synced (${height})
+            </div>
+          </div>
+        `;
+      } else if (coinData.electrum_synced === false) {
+        scanStatusEl.innerHTML = `
+          <div class="bg-yellow-50 dark:bg-gray-500 p-2 rounded">
+            <div class="flex items-center text-xs text-yellow-600 dark:text-yellow-400">
+              Waiting for Electrum Server...
+            </div>
+          </div>
+        `;
       } else {
         scanStatusEl.innerHTML = `
-          <div class="flex items-center text-xs text-green-600 dark:text-green-400">
-            <svg class="inline-block w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            Electrum Wallet Synced
+          <div class="bg-green-50 dark:bg-gray-500 p-2 rounded">
+            <div class="flex items-center text-xs text-green-600 dark:text-green-400">
+              Electrum Wallet Synced
+            </div>
           </div>
         `;
       }

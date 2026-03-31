@@ -189,7 +189,7 @@ def page_settings(self, url_split, post_string):
                                 )
                                 data["auto_transfer_now"] = transfer_value == "true"
                             gap_limit_str = get_data_entry_or(
-                                form_data, "gap_limit_" + name, "20"
+                                form_data, "gap_limit_" + name, "50"
                             ).strip()
                             try:
                                 gap_limit = int(gap_limit_str)
@@ -295,7 +295,7 @@ def page_settings(self, url_split, post_string):
                 "supports_electrum": name in electrum_supported_coins,
                 "clearnet_servers_text": clearnet_text,
                 "onion_servers_text": onion_text,
-                "address_gap_limit": c.get("address_gap_limit", 20),
+                "address_gap_limit": c.get("address_gap_limit", 50),
             }
         )
         if name in ("monero", "wownero"):

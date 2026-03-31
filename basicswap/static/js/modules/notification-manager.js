@@ -610,7 +610,7 @@ function ensureToastContainer() {
         clickAction = `onclick="window.location.href='/bid/${options.bidId}'"`;
         cursorStyle = 'cursor-pointer';
       } else if (options.coinSymbol) {
-        clickAction = `onclick="window.location.href='/wallet/${options.coinSymbol}'"`;
+        clickAction = `onclick="window.location.href='/wallet/${options.coinSymbol.toLowerCase()}'"`;
         cursorStyle = 'cursor-pointer';
       } else if (options.releaseUrl) {
         clickAction = `onclick="window.open('${options.releaseUrl}', '_blank')"`;
@@ -739,9 +739,10 @@ function ensureToastContainer() {
         case 'sweep_completed':
           const sweepAmount = parseFloat(data.amount || 0).toFixed(8).replace(/\.?0+$/, '');
           const sweepFee = parseFloat(data.fee || 0).toFixed(8).replace(/\.?0+$/, '');
-          toastTitle = `Swept ${sweepAmount} ${data.coin_name} to RPC wallet`;
-          toastOptions.subtitle = `Fee: ${sweepFee} ${data.coin_name} • TXID: ${(data.txid || '').substring(0, 12)}...`;
-          toastOptions.coinSymbol = data.coin_name;
+          const sweepTicker = data.ticker || data.coin_name;
+          toastTitle = `Swept ${sweepAmount} ${sweepTicker} to RPC wallet`;
+          toastOptions.subtitle = `Fee: ${sweepFee} ${sweepTicker} • TXID: ${(data.txid || '').substring(0, 12)}...`;
+          toastOptions.coinSymbol = sweepTicker;
           toastOptions.txid = data.txid;
           toastType = 'sweep_completed';
           shouldShowToast = true;

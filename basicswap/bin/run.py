@@ -36,22 +36,25 @@ def signal_handler(sig, frame):
     os.write(
         sys.stdout.fileno(), f"Signal {sig} detected, ending program.\n".encode("utf-8")
     )
-    if swap_client is not None and not swap_client.chainstate_delay_event.is_set():
-        try:
-            from basicswap.ui.page_amm import stop_amm_process, get_amm_status
+    try:
+        if swap_client is not None and not swap_client.chainstate_delay_event.is_set():
+            try:
+                from basicswap.ui.page_amm import stop_amm_process, get_amm_status
 
-            amm_status = get_amm_status()
-            if amm_status == "running":
-                logger.info("Signal handler stopping AMM process...")
-                success, msg = stop_amm_process(swap_client)
-                if success:
-                    logger.info(f"AMM signal shutdown: {msg}")
-                else:
-                    logger.warning(f"AMM signal shutdown warning: {msg}")
-        except Exception as e:
-            logger.error(f"Error stopping AMM in signal handler: {e}")
+                amm_status = get_amm_status()
+                if amm_status == "running":
+                    logger.info("Signal handler stopping AMM process...")
+                    success, msg = stop_amm_process(swap_client)
+                    if success:
+                        logger.info(f"AMM signal shutdown: {msg}")
+                    else:
+                        logger.warning(f"AMM signal shutdown warning: {msg}")
+            except Exception as e:
+                logger.error(f"Error stopping AMM in signal handler: {e}")
 
-        swap_client.stopRunning()
+            swap_client.stopRunning()
+    except NameError:
+        pass
 
 
 def checkPARTZmqConfigBeforeStart(part_settings, swap_settings):
@@ -618,7 +621,7 @@ def runClient(
                 signal.CTRL_C_EVENT if os.name == "nt" else signal.SIGINT
             )
         except Exception as e:
-            swap_client.log.info(f"Interrupting {d.name} {d.handle.pid}, error {e}")
+            swap_client.log.error(f"Interrupting {d.name} {d.handle.pid}: {e}")
     for d in daemons:
         try:
             d.handle.wait(timeout=120)
@@ -627,10 +630,12 @@ def runClient(
                     fp.close()
             closed_pids.append(d.handle.pid)
         except Exception as e:
-            swap_client.log.error(f"Error: {e}")
+            swap_client.log.error(
+                f"Waiting for {d.name} {d.handle.pid} to shutdown: {e}"
+            )
 
     fail_code: int = swap_client.fail_code
-    del swap_client
+    swap_client = None
 
     if os.path.exists(pids_path):
         with open(pids_path) as fd:
