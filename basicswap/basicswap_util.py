@@ -240,8 +240,11 @@ class DebugTypes(IntEnum):
     OFFER_LOCK_2_VALUE_INC = auto()
     BID_STOP_AFTER_COIN_B_LOCK = auto()
     BID_DONT_SPEND_COIN_B_LOCK = auto()
+    WAIT_FOR_COIN_B_LOCK_BEFORE_PREREFUND = auto()
     WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND = auto()
     BID_DONT_SPEND_COIN_A_LOCK = auto()
+    DONT_SEND_COIN_B_LOCK = auto()
+    DONT_RELEASE_COIN_A_LOCK = auto()
 
 
 class NotificationTypes(IntEnum):

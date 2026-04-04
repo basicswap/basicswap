@@ -229,21 +229,23 @@ class Test(unittest.TestCase):
             == "0dde9df8660d3e0f28fe00d648b70e0323e9c192fe9b94f1cf7138515e877725"
         )
 
-        sum_secp256k1 = ci_btc.sumPubkeys(
+        pk_secp256k1 = ci_btc.sumPubkeys(
             ci_btc.getPubkey(keys[0]), ci_btc.getPubkey(keys[1])
         )
         assert (
-            sum_secp256k1.hex()
+            pk_secp256k1.hex()
             == "028c30392e35620af0787b363a03cf9a695336759664436e1f609481c869541a5c"
         )
 
-        sum_ed25519 = ci_xmr.sumPubkeys(
+        pk_ed25519 = ci_xmr.sumPubkeys(
             ci_xmr.getPubkey(keys[0]), ci_xmr.getPubkey(keys[1])
         )
         assert (
-            sum_ed25519.hex()
+            pk_ed25519.hex()
             == "4b2dd2dc9acc9be7efed4fdbfb96f0002aeb9e4c8638c5b24562a7158b283626"
         )
+
+        assert pk_secp256k1 == ci_btc.getPubkey(sum_secp256k1)
 
     def test_ecdsa_otves(self):
         ci = self.ci_btc()

@@ -566,7 +566,7 @@ def getCoinIdFromTicker(ticker: str) -> str:
         raise ValueError(f"Unknown coin {ticker}")
 
 
-def getCoinIdFromName(name: str) -> str:
+def getCoinIdFromName(name: str) -> Coins:
     try:
         return name_map[name.lower()]
     except Exception:

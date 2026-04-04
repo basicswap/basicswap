@@ -7,6 +7,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import base64
+import copy
 import hashlib
 import json
 import logging
@@ -529,6 +530,16 @@ class BTCInterface(Secp256k1Interface):
                 "getBlockHeader by hash not available in electrum mode"
             )
         return self.rpc("getblockheader", [block_hash])
+
+    def getPrevBlockInChain(self, block_header_in):
+        block_header = copy.deeocopy(block_header_in)
+        while True:
+            previousblockhash = block_header.get("previousblockhash", None)
+            if previousblockhash is None:
+                raise RuntimeError("previousblockhash not in block_header")
+            if block_header["confirmations"] > 0:
+                return block_header
+            block_header = self.rpc("getblockheader", [previousblockhash])
 
     def getBlockHeaderAt(self, time_target: int, block_after=False):
         blockchaininfo = self.rpc("getblockchaininfo")
@@ -1310,7 +1321,7 @@ class BTCInterface(Secp256k1Interface):
         vkbv=None,
         kbsf=None,
     ):
-        # lock refund swipe tx
+        # Lock refund swipe tx
         # Sends the coinA locked coin to the follower
 
         tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
@@ -1584,7 +1595,7 @@ class BTCInterface(Secp256k1Interface):
         )
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return txid, locked_coin, locked_n
 
@@ -1647,7 +1658,7 @@ class BTCInterface(Secp256k1Interface):
         )
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return True
 
@@ -1706,7 +1717,7 @@ class BTCInterface(Secp256k1Interface):
         )
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return True
 

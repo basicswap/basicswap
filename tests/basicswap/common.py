@@ -290,7 +290,7 @@ def wait_for_event(
 
 
 def wait_for_offer(delay_event, swap_client, offer_id, wait_for=20):
-    logging.info("wait_for_offer %s", offer_id.hex())
+    logging.info(f"wait_for_offer {offer_id.hex()}")
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError("Test stopped.")
