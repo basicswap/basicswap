@@ -2892,9 +2892,15 @@ def main():
         coin_id = getCoinIdFromName(coin_name)
         coin_params = chainparams[coin_id]
         if coin_settings.get("core_type_group", "") == "xmr":
-            default_name = "swap_wallet"
+            default_name: str = "swap_wallet"
+            use_name: str = default_name
         else:
-            default_name = "wallet.dat"
+            default_name: str = "wallet.dat"
+            use_name: str = (
+                "wallet.dat"
+                if coin_id in (Coins.NAV, Coins.FIRO, Coins.DCR)
+                else "bsx_wallet"
+            )
 
         if coin_name == "litecoin":
             set_name: str = getWalletName(
@@ -2903,7 +2909,7 @@ def main():
             if set_name != "mweb":
                 coin_settings["mweb_wallet_name"] = set_name
 
-        set_name: str = getWalletName(coin_params, default_name)
+        set_name: str = getWalletName(coin_params, use_name)
         if set_name != default_name:
             coin_settings["wallet_name"] = set_name
 
