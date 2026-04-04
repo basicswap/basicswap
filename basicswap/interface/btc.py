@@ -381,7 +381,7 @@ class BTCInterface(Secp256k1Interface):
 
         if self._rpc_wallet not in wallets:
             self._log.debug(
-                f"Wallet: {self._rpc_wallet} not active, attempting to load."
+                f'{self.ticker()} wallet: "{self._rpc_wallet}" not active, attempting to load.'
             )
             try:
                 self.rpc(
@@ -425,32 +425,43 @@ class BTCInterface(Secp256k1Interface):
                         except Exception as create_e:
                             self._log.error(f"Error creating wallet: {create_e}")
 
+        if (
+            self._rpc_wallet_watch != self._rpc_wallet
+            and self._rpc_wallet_watch not in wallets
+        ):
+            self._log.debug(
+                f'{self.ticker()} watchonly wallet: "{self._rpc_wallet_watch}" not active, attempting to load.'
+            )
+            try:
+                self.rpc(
+                    "loadwallet",
+                    [
+                        self._rpc_wallet_watch,
+                    ],
+                )
+                wallets = self.rpc("listwallets")
+            except Exception as e:
+                self._log.debug(
+                    f'Error loading {self.ticker()} watchonly wallet "{self._rpc_wallet_watch}": {e}.'
+                )
+
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
-            self._log.warning(f"Changing {self.ticker()} wallet name.")
-            for wallet_name in wallets:
-                # Skip over other expected wallets
-                if wallet_name in ("mweb",):
-                    continue
-
-                change_watchonly_wallet: bool = (
-                    self._rpc_wallet_watch == self._rpc_wallet
+            if "" in wallets:
+                self._log.warning(
+                    f"Nameless {self.ticker()} wallet found."
+                    + '\nPlease set the "wallet_name" coin setting to "" or recreate the wallet'
                 )
+                # backupwallet and restorewallet with name should work.
 
-                self._rpc_wallet = wallet_name
-                self._log.info(
-                    f"Switched {self.ticker()} wallet name to {self._rpc_wallet}."
-                )
-                self.rpc_wallet = make_rpc_func(
-                    self._rpcport,
-                    self._rpcauth,
-                    host=self._rpc_host,
-                    wallet=self._rpc_wallet,
-                )
-                if change_watchonly_wallet:
-                    self.rpc_wallet_watch = self.rpc_wallet
-                break
-
+        if self._rpc_wallet not in wallets:
+            raise RuntimeError(
+                f'{self.ticker()} wallet "{self._rpc_wallet}" not active'
+            )
+        if self._rpc_wallet_watch not in wallets:
+            raise RuntimeError(
+                f'{self.ticker()} watchonly wallet "{self._rpc_wallet_watch}" not active'
+            )
         return len(wallets)
 
     def testDaemonRPC(self, with_wallet=True) -> None:
