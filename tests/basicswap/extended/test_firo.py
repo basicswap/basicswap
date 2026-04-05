@@ -160,7 +160,7 @@ class Test(BaseTest):
                     FIRO_BINDIR,
                     data_dir,
                     "regtest",
-                    "-wallet=wallet.dat create",
+                    "-wallet=bsx_wallet create",
                     "firo-wallet",
                 )
 

@@ -124,7 +124,7 @@ def callbtcrpc(
     node_id,
     method,
     params=[],
-    wallet="wallet.dat",
+    wallet="bsx_wallet",
     base_rpc_port=BITCOIN_RPC_PORT_BASE + PORT_OFS,
 ):
     auth = "test_btc_{0}:test_btc_pwd_{0}".format(node_id)
@@ -153,7 +153,7 @@ def callnmcrpc(
     node_id,
     method,
     params=[],
-    wallet="wallet.dat",
+    wallet="bsx_wallet",
     base_rpc_port=NAMECOIN_RPC_PORT_BASE + PORT_OFS,
 ):
     auth = "test_nmc_{0}:test_nmc_pwd_{0}".format(node_id)
@@ -336,7 +336,7 @@ def start_processes(self):
 
     if "litecoin" in self.test_coins_list:
         self.ltc_addr = callltcrpc(
-            0, "getnewaddress", ["mining_addr"], wallet="wallet.dat"
+            0, "getnewaddress", ["mining_addr"], wallet="bsx_wallet"
         )
         num_blocks: int = 431
         have_blocks: int = callltcrpc(0, "getblockcount")
@@ -346,7 +346,7 @@ def start_processes(self):
                 0,
                 "generatetoaddress",
                 [num_blocks - have_blocks, self.ltc_addr],
-                wallet="wallet.dat",
+                wallet="bsx_wallet",
             )
 
             # https://github.com/litecoin-project/litecoin/issues/807
@@ -354,7 +354,7 @@ def start_processes(self):
             mweb_addr = callltcrpc(
                 0, "getnewaddress", ["mweb_addr", "mweb"], wallet="mweb"
             )
-            callltcrpc(0, "sendtoaddress", [mweb_addr, 1.0], wallet="wallet.dat")
+            callltcrpc(0, "sendtoaddress", [mweb_addr, 1.0], wallet="bsx_wallet")
             num_blocks = 69
 
             have_blocks: int = callltcrpc(0, "getblockcount")
@@ -362,7 +362,7 @@ def start_processes(self):
                 0,
                 "generatetoaddress",
                 [500 - have_blocks, self.ltc_addr],
-                wallet="wallet.dat",
+                wallet="bsx_wallet",
             )
 
     if "decred" in self.test_coins_list:
@@ -413,7 +413,7 @@ def start_processes(self):
 
     if "bitcoincash" in self.test_coins_list:
         self.bch_addr = callbchrpc(
-            0, "getnewaddress", ["mining_addr"], wallet="wallet.dat"
+            0, "getnewaddress", ["mining_addr"], wallet="bsx_wallet"
         )
         num_blocks: int = 200
         have_blocks: int = callbchrpc(0, "getblockcount")
@@ -427,7 +427,7 @@ def start_processes(self):
                 0,
                 "generatetoaddress",
                 [num_blocks - have_blocks, self.bch_addr],
-                wallet="wallet.dat",
+                wallet="bsx_wallet",
             )
 
     if "dogecoin" in self.test_coins_list:

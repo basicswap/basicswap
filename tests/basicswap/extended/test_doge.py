@@ -141,7 +141,7 @@ class Test(TestFunctions):
         dogeRpc = make_rpc_func(i, base_rpc_port=DOGE_BASE_RPC_PORT)
         waitForRPC(dogeRpc, test_delay_event, rpc_command="getblockchaininfo")
         if len(dogeRpc("listwallets")) < 1:
-            dogeRpc("createwallet", ["wallet.dat", False, True, "", False, False])
+            dogeRpc("createwallet", ["bsx_wallet", False, True, "", False, False])
             wif_prefix: int = 239
             wif = toWIF(wif_prefix, bytes.fromhex(cls.doge_seeds[i]), False)
             dogeRpc("sethdseed", [True, wif])

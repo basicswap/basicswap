@@ -161,7 +161,7 @@ class TestNMC(BasicSwapTest):
         if len(nmc_rpc("listwallets")) < 1:
             nmc_rpc(
                 "createwallet",
-                ["wallet.dat", False, True, "", False, NMC_USE_DESCRIPTORS],
+                ["bsx_wallet", False, True, "", False, NMC_USE_DESCRIPTORS],
             )
             if NMC_USE_DESCRIPTORS:
                 nmc_rpc(

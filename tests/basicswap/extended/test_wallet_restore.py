@@ -154,7 +154,7 @@ class Test(TestBase):
 
             num_blocks = 431
             self.ltc_addr = callltcnoderpc(
-                1, "getnewaddress", ["mining_addr", "bech32"], wallet="wallet.dat"
+                1, "getnewaddress", ["mining_addr", "bech32"], wallet="bsx_wallet"
             )
             logging.info("Mining %d Litecoin blocks to %s", num_blocks, self.ltc_addr)
             callltcnoderpc(1, "generatetoaddress", [num_blocks, self.ltc_addr])
@@ -162,7 +162,7 @@ class Test(TestBase):
             mweb_addr = callltcnoderpc(
                 1, "getnewaddress", ["mweb_addr", "mweb"], wallet="mweb"
             )
-            callltcnoderpc(1, "sendtoaddress", [mweb_addr, 1], wallet="wallet.dat")
+            callltcnoderpc(1, "sendtoaddress", [mweb_addr, 1], wallet="bsx_wallet")
             num_blocks = 69
             callltcnoderpc(1, "generatetoaddress", [num_blocks, self.ltc_addr])
 

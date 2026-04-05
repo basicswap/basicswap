@@ -118,7 +118,7 @@ def prepareOtherDir(datadir, nodeId, conf_file="pivx.conf"):
             fp.write(f"paramsdir={params_dir}\n")
 
         if conf_file == "bitcoin.conf":
-            fp.write("wallet=wallet.dat\n")
+            fp.write("wallet=bsx_wallet\n")
 
 
 def prepareDir(datadir, nodeId, network_key, network_pubkey):
@@ -143,7 +143,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         fp.write("debug=1\n")
         fp.write("debugexclude=libevent\n")
         fp.write("zmqpubsmsg=tcp://127.0.0.1:" + str(BASE_ZMQ_PORT + nodeId) + "\n")
-        fp.write("wallet=wallet.dat\n")
+        fp.write("wallet=bsx_wallet\n")
         fp.write("fallbackfee=0.01\n")
 
         fp.write("acceptnonstdtxn=0\n")
@@ -324,7 +324,7 @@ class Test(unittest.TestCase):
                     cfg.BITCOIN_BINDIR,
                     btc_data_dir,
                     "regtest",
-                    "-wallet=wallet.dat -legacy create",
+                    "-wallet=bsx_wallet -legacy create",
                     "bitcoin-wallet",
                 )
             except Exception:
@@ -332,7 +332,7 @@ class Test(unittest.TestCase):
                     cfg.BITCOIN_BINDIR,
                     btc_data_dir,
                     "regtest",
-                    "-wallet=wallet.dat create",
+                    "-wallet=bsx_wallet create",
                     "bitcoin-wallet",
                 )
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
@@ -352,7 +352,7 @@ class Test(unittest.TestCase):
                         cfg.PARTICL_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat -legacy create",
+                        "-wallet=bsx_wallet -legacy create",
                         "particl-wallet",
                     )
                 except Exception:
@@ -360,7 +360,7 @@ class Test(unittest.TestCase):
                         cfg.PARTICL_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat create",
+                        "-wallet=bsx_wallet create",
                         "particl-wallet",
                     )
             cls.daemons.append(startDaemon(data_dir, cfg.PARTICL_BINDIR, cfg.PARTICLD))
