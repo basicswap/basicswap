@@ -399,16 +399,36 @@ class BTCInterface(Secp256k1Interface):
                         existing = [w["name"] for w in wallet_dirs.get("wallets", [])]
                     except Exception:
                         existing = []
-                    raise ValueError(
-                        f'{self.coin_name()} wallet "{self._rpc_wallet}" does not exist.'
-                        + (
+                    if existing:
+                        raise ValueError(
+                            f'{self.coin_name()} wallet "{self._rpc_wallet}" does not exist.'
                             f" Other wallets found on disk: {existing}."
-                            if existing
-                            else ""
+                            f' Set "wallet_name" in your {self.coin_name()} config to the correct wallet name,'
+                            f" or use restorewallet to set the wallet name."
                         )
-                        + f' Set "wallet_name" in your {self.coin_name()} config to the correct wallet name,'
-                        f" or use restorewallet to repair the wallet name."
+                    self._log.info(
+                        f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                     )
+                    try:
+                        self.rpc(
+                            "createwallet",
+                            [
+                                self._rpc_wallet,
+                                False,
+                                True,
+                                "",
+                                False,
+                                self._use_descriptors,
+                            ],
+                        )
+                        wallets = self.rpc("listwallets")
+                        if self.getWalletSeedID() == "Not found":
+                            self._log.info(
+                                f"Initializing HD seed for {self.coin_name()}."
+                            )
+                            self._sc.initialiseWallet(self.coin_type())
+                    except Exception as create_e:
+                        self._log.error(f"Error creating wallet: {create_e}")
 
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
@@ -4100,7 +4120,7 @@ class BTCInterface(Secp256k1Interface):
                                 f'{self.coin_name()} wallet "{self._rpc_wallet}" does not exist.'
                                 f" Other wallets found on disk: {existing}."
                                 f' Set "wallet_name" in your {self.coin_name()} config to the correct wallet name,'
-                                f" or use restorewallet to repair the wallet name."
+                                f" or use restorewallet to set the wallet name."
                             )
                         self._log.info(
                             f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
