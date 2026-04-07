@@ -250,6 +250,7 @@ function ensureToastContainer() {
       'new_bid': 'bg-green-500',
       'bid_accepted': 'bg-purple-500',
       'swap_completed': 'bg-green-600',
+      'sweep_completed': 'bg-orange-500',
       'balance_change': 'bg-yellow-500',
       'update_available': 'bg-blue-600',
       'success': 'bg-blue-500'
@@ -609,7 +610,7 @@ function ensureToastContainer() {
         clickAction = `onclick="window.location.href='/bid/${options.bidId}'"`;
         cursorStyle = 'cursor-pointer';
       } else if (options.coinSymbol) {
-        clickAction = `onclick="window.location.href='/wallet/${options.coinSymbol}'"`;
+        clickAction = `onclick="window.location.href='/wallet/${options.coinSymbol.toLowerCase()}'"`;
         cursorStyle = 'cursor-pointer';
       } else if (options.releaseUrl) {
         clickAction = `onclick="window.open('${options.releaseUrl}', '_blank')"`;
@@ -733,6 +734,18 @@ function ensureToastContainer() {
           toastOptions.releaseNotes = data.release_notes;
           toastType = 'update_available';
           shouldShowToast = config.showUpdateNotifications;
+          break;
+
+        case 'sweep_completed':
+          const sweepAmount = parseFloat(data.amount || 0).toFixed(8).replace(/\.?0+$/, '');
+          const sweepFee = parseFloat(data.fee || 0).toFixed(8).replace(/\.?0+$/, '');
+          const sweepTicker = data.ticker || data.coin_name;
+          toastTitle = `Swept ${sweepAmount} ${sweepTicker} to RPC wallet`;
+          toastOptions.subtitle = `Fee: ${sweepFee} ${sweepTicker} • TXID: ${(data.txid || '').substring(0, 12)}...`;
+          toastOptions.coinSymbol = sweepTicker;
+          toastOptions.txid = data.txid;
+          toastType = 'sweep_completed';
+          shouldShowToast = true;
           break;
 
         case 'coin_balance_updated':

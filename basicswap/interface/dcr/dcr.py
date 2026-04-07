@@ -189,6 +189,10 @@ class DCRInterface(Secp256k1Interface):
         return Coins.DCR
 
     @staticmethod
+    def useBackend() -> bool:
+        return False
+
+    @staticmethod
     def exp() -> int:
         return 8
 
@@ -364,7 +368,9 @@ class DCRInterface(Secp256k1Interface):
             # Read initial pwd from settings
             settings = self._sc.getChainClientSettings(self.coin_type())
             old_password = settings["wallet_pwd"]
-        self.rpc_wallet("walletpassphrasechange", [old_password, new_password])
+        self.rpc_wallet(
+            "walletpassphrasechange", [old_password, new_password], timeout=120
+        )
 
         # Lock wallet to match other coins
         self.rpc_wallet("walletlock")
@@ -378,7 +384,7 @@ class DCRInterface(Secp256k1Interface):
         self._log.info("unlockWallet - {}".format(self.ticker()))
 
         # Max timeout value, ~3 years
-        self.rpc_wallet("walletpassphrase", [password, 100000000])
+        self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
         if check_seed:
             self._sc.checkWalletSeed(self.coin_type())
 
@@ -631,6 +637,15 @@ class DCRInterface(Secp256k1Interface):
         except Exception as e:  # noqa: F841
             # TODO: filter errors
             return None
+
+    def listWalletTransactions(self, count=100, skip=0, include_watchonly=True):
+        try:
+            return self.rpc_wallet(
+                "listtransactions", ["*", count, skip, include_watchonly]
+            )
+        except Exception as e:
+            self._log.error(f"listWalletTransactions failed: {e}")
+            return []
 
     def getProofOfFunds(self, amount_for, extra_commit_bytes):
         # TODO: Lock unspent and use same output/s to fund bid
@@ -1053,6 +1068,9 @@ class DCRInterface(Secp256k1Interface):
         return self.rpc("sendrawtransaction", [tx.hex()])
 
     def describeTx(self, tx_hex: str):
+        return self.rpc("decoderawtransaction", [tx_hex])
+
+    def decodeRawTransaction(self, tx_hex: str):
         return self.rpc("decoderawtransaction", [tx_hex])
 
     def fundTx(self, tx: bytes, feerate) -> bytes:
@@ -1723,15 +1741,19 @@ class DCRInterface(Secp256k1Interface):
         tx.vout.append(self.txoType()(output_amount, script_pk))
         return tx.serialize()
 
-    def publishBLockTx(
-        self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0
-    ) -> bytes:
+    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)
+
+        script_pk = self.getPkDest(Kbs)
+        funded_tx = self.loadTx(b_lock_tx)
+        lock_vout = findOutput(funded_tx, script_pk)
+
         b_lock_tx = self.signTxWithWallet(b_lock_tx)
 
-        return bytes.fromhex(self.publishTx(b_lock_tx))
+        txid = bytes.fromhex(self.publishTx(b_lock_tx))
+        return txid, lock_vout
 
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         witness_bytes = 115
@@ -1755,26 +1777,53 @@ class DCRInterface(Secp256k1Interface):
         lock_tx_vout=None,
     ) -> bytes:
         self._log.info("spendBLockTx %s:\n", chain_b_lock_txid.hex())
-        locked_n = lock_tx_vout
 
         Kbs = self.getPubkey(kbs)
         script_pk = self.getPkDest(Kbs)
 
-        if locked_n is None:
-            self._log.debug(
-                f"Unknown lock vout, searching tx: {chain_b_lock_txid.hex()}"
+        locked_n = None
+        actual_value = None
+        wtx = self.rpc_wallet(
+            "gettransaction",
+            [
+                chain_b_lock_txid.hex(),
+            ],
+        )
+        lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
+        locked_n = findOutput(lock_tx, script_pk)
+        if locked_n is not None:
+            actual_value = lock_tx.vout[locked_n].value
+        else:
+            self._log.error(
+                f"spendBLockTx: Output not found in tx {chain_b_lock_txid.hex()}, "
+                f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
             )
-            # When refunding a lock tx, it should be in the wallet as a sent tx
-            wtx = self.rpc_wallet(
-                "gettransaction",
-                [
-                    chain_b_lock_txid.hex(),
-                ],
+            for i, out in enumerate(lock_tx.vout):
+                self._log.debug(
+                    f"  vout[{i}]: value={out.value}, scriptPubKey={out.scriptPubKey.hex()}"
+                )
+
+        if (
+            locked_n is not None
+            and lock_tx_vout is not None
+            and locked_n != lock_tx_vout
+        ):
+            self._log.warning(
+                f"spendBLockTx: Stored vout {lock_tx_vout} differs from actual vout {locked_n} "
+                f"for tx {chain_b_lock_txid.hex()}"
             )
-            lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
-            locked_n = findOutput(lock_tx, script_pk)
 
         ensure(locked_n is not None, "Output not found in tx")
+
+        spend_value = cb_swap_value
+        if spend_actual_balance and actual_value is not None:
+            if actual_value != cb_swap_value:
+                self._log.warning(
+                    f"spendBLockTx: Spending actual balance {actual_value}, "
+                    f"not expected swap value {cb_swap_value}."
+                )
+            spend_value = actual_value
+
         pkh_to = self.decodeAddress(address_to)
 
         tx = CTransaction()
@@ -1783,10 +1832,10 @@ class DCRInterface(Secp256k1Interface):
         chain_b_lock_txid_int = b2i(chain_b_lock_txid)
 
         tx.vin.append(CTxIn(COutPoint(chain_b_lock_txid_int, locked_n, 0), sequence=0))
-        tx.vout.append(self.txoType()(cb_swap_value, self.getPubkeyHashDest(pkh_to)))
+        tx.vout.append(self.txoType()(spend_value, self.getPubkeyHashDest(pkh_to)))
 
         pay_fee = self.getBLockSpendTxFee(tx, b_fee)
-        tx.vout[0].value = cb_swap_value - pay_fee
+        tx.vout[0].value = spend_value - pay_fee
 
         b_lock_spend_tx = tx.serialize()
         b_lock_spend_tx = self.signTxWithKey(b_lock_spend_tx, kbs)

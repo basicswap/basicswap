@@ -94,6 +94,9 @@ class XMRInterface(CoinInterface):
                 "failed to get output distribution",
                 "request-sent",
                 "idle",
+                "busy",
+                "responsenotready",
+                "connection",
             ]
         ):
             return True
@@ -832,3 +835,25 @@ class XMRInterface(CoinInterface):
                 ]
             },
         )
+
+    def listWalletTransactions(self, count=100, skip=0, include_watchonly=True):
+        try:
+            with self._mx_wallet:
+                self.openWallet(self._wallet_filename)
+                rv = self.rpc_wallet(
+                    "get_transfers",
+                    {"in": True, "out": True, "pending": True, "failed": True},
+                )
+                transactions = []
+                for tx_type in ["in", "out", "pending", "failed"]:
+                    if tx_type in rv:
+                        for tx in rv[tx_type]:
+                            tx["type"] = tx_type
+                            transactions.append(tx)
+                transactions.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+                return (
+                    transactions[skip : skip + count] if count else transactions[skip:]
+                )
+        except Exception as e:
+            self._log.error(f"listWalletTransactions failed: {e}")
+            return []

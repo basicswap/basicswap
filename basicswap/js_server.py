@@ -137,7 +137,7 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
         for k, v in swap_client.coin_clients.items():
             if k not in chainparams:
                 continue
-            if v["connection_type"] == "rpc":
+            if v["connection_type"] in ("rpc", "electrum"):
 
                 balance = "0.0"
                 if k in wallets:
@@ -170,7 +170,28 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                     "balance": balance,
                     "pending": pending,
                     "ticker": chainparams[k]["ticker"],
+                    "connection_type": v["connection_type"],
                 }
+
+                ci = swap_client.ci(k)
+                if hasattr(ci, "getScanStatus"):
+                    coin_entry["scan_status"] = ci.getScanStatus()
+                if hasattr(ci, "getElectrumServer"):
+                    server = ci.getElectrumServer()
+                    if server:
+                        coin_entry["electrum_server"] = server
+                    version = ci.getDaemonVersion()
+                    if version:
+                        coin_entry["version"] = version
+                if (
+                    v["connection_type"] == "electrum"
+                    and hasattr(ci, "_backend")
+                    and ci._backend
+                    and hasattr(ci._backend, "getSyncStatus")
+                ):
+                    sync_status = ci._backend.getSyncStatus()
+                    coin_entry["electrum_synced"] = sync_status.get("synced", False)
+                    coin_entry["electrum_height"] = sync_status.get("height", 0)
 
                 coins_with_balances.append(coin_entry)
 
@@ -295,6 +316,9 @@ def js_wallets(self, url_split, post_string, is_json):
             elif cmd == "reseed":
                 swap_client.reseedWallet(coin_type)
                 return bytes(json.dumps({"reseeded": True}), "UTF-8")
+            elif cmd == "rescan":
+                result = swap_client.rescanWalletAddresses(coin_type)
+                return bytes(json.dumps(result), "UTF-8")
             elif cmd == "newstealthaddress":
                 if coin_type != Coins.PART:
                     raise ValueError("Invalid coin for command")
@@ -307,6 +331,31 @@ def js_wallets(self, url_split, post_string, is_json):
                     raise ValueError("Invalid coin for command")
                 return bytes(
                     json.dumps(swap_client.ci(coin_type).getNewMwebAddress()), "UTF-8"
+                )
+            elif cmd == "watchaddress":
+                post_data = getFormData(post_string, is_json)
+                address = get_data_entry(post_data, "address")
+                label = get_data_entry_or(post_data, "label", "manual_import")
+                wm = swap_client.getWalletManager()
+                if wm is None:
+                    raise ValueError("WalletManager not available")
+                wm.importWatchOnlyAddress(
+                    coin_type, address, label=label, source="manual_import"
+                )
+                return bytes(json.dumps({"success": True, "address": address}), "UTF-8")
+            elif cmd == "listaddresses":
+                wm = swap_client.getWalletManager()
+                if wm is None:
+                    raise ValueError("WalletManager not available")
+                addresses = wm.getAllAddresses(coin_type)
+                return bytes(json.dumps({"addresses": addresses}), "UTF-8")
+            elif cmd == "fixseedid":
+                root_key = swap_client.getWalletKey(coin_type, 1)
+                swap_client.storeSeedIDForCoin(root_key, coin_type)
+                swap_client.checkWalletSeed(coin_type)
+                return bytes(
+                    json.dumps({"success": True, "message": "Seed IDs updated"}),
+                    "UTF-8",
                 )
             raise ValueError("Unknown command")
 
@@ -601,8 +650,13 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 )
 
             if have_data_entry(post_data, "debugind"):
+                main_debug_ind: bool = toBool(
+                    get_data_entry_or(post_data, "maindebugind", True)
+                )
                 swap_client.setBidDebugInd(
-                    bid_id, int(get_data_entry(post_data, "debugind"))
+                    bid_id,
+                    int(get_data_entry(post_data, "debugind")),
+                    add_to_bid=main_debug_ind,
                 )
 
             rv = {"bid_id": bid_id.hex()}
@@ -620,8 +674,13 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
             elif have_data_entry(post_data, "abandon"):
                 swap_client.abandonBid(bid_id)
             elif have_data_entry(post_data, "debugind"):
+                main_debug_ind: bool = toBool(
+                    get_data_entry_or(post_data, "maindebugind", True)
+                )
                 swap_client.setBidDebugInd(
-                    bid_id, int(get_data_entry(post_data, "debugind"))
+                    bid_id,
+                    int(get_data_entry(post_data, "debugind")),
+                    add_to_bid=main_debug_ind,
                 )
 
             if have_data_entry(post_data, "show_extra"):
@@ -630,7 +689,9 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 with_events = True
 
         bid, xmr_swap, offer, xmr_offer, events = swap_client.getXmrBidAndOffer(bid_id)
-        assert bid, "Unknown bid ID"
+        if bid is None:
+            swap_client.log.debug(f"js_bids: Unknown bid id {bid_id.hex()}")
+            return bytes(json.dumps({"error": "Unknown bid id"}), "UTF-8")
 
         if post_string != "":
             if have_data_entry(post_data, "chainbkeysplit"):
@@ -1210,10 +1271,12 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
                 "current_seed_id": wallet_seed_id,
             }
         )
-        if hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum():
-            rv.update(
-                {"account_key": ci.getAccountKey(seed_key, extkey_prefix)}
-            )  # Master key can be imported into electrum (Must set prefix for P2WPKH)
+
+        if hasattr(ci, "getAccountKey"):
+            try:
+                rv.update({"account_key": ci.getAccountKey(seed_key, extkey_prefix)})
+            except Exception as e:
+                rv.update({"account_key_error": str(e)})
 
     return bytes(
         json.dumps(rv),
@@ -1528,6 +1591,71 @@ def js_coinhistory(self, url_split, post_string, is_json) -> bytes:
     )
 
 
+def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
+    from basicswap.ui.page_wallet import format_transactions
+    import time
+
+    TX_CACHE_DURATION = 30
+
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+
+    if len(url_split) < 4:
+        return bytes(json.dumps({"error": "No coin specified"}), "UTF-8")
+
+    ticker_str = url_split[3]
+    coin_id = getCoinIdFromTicker(ticker_str)
+
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+
+    page_no = 1
+    limit = 30
+    offset = 0
+
+    if have_data_entry(post_data, "page_no"):
+        page_no = int(get_data_entry(post_data, "page_no"))
+        if page_no < 1:
+            page_no = 1
+
+    if page_no > 1:
+        offset = (page_no - 1) * limit
+
+    try:
+        ci = swap_client.ci(coin_id)
+
+        current_time = time.time()
+        cache_entry = swap_client._tx_cache.get(coin_id)
+
+        if (
+            cache_entry is None
+            or (current_time - cache_entry["time"]) > TX_CACHE_DURATION
+        ):
+            all_txs = ci.listWalletTransactions(count=10000, skip=0)
+            all_txs = list(reversed(all_txs)) if all_txs else []
+            swap_client._tx_cache[coin_id] = {"txs": all_txs, "time": current_time}
+        else:
+            all_txs = cache_entry["txs"]
+
+        total_transactions = len(all_txs)
+        raw_txs = all_txs[offset : offset + limit] if all_txs else []
+        transactions = format_transactions(ci, raw_txs, coin_id)
+
+        return bytes(
+            json.dumps(
+                {
+                    "transactions": transactions,
+                    "page_no": page_no,
+                    "total": total_transactions,
+                    "limit": limit,
+                    "total_pages": (total_transactions + limit - 1) // limit,
+                }
+            ),
+            "UTF-8",
+        )
+    except Exception as e:
+        return bytes(json.dumps({"error": str(e)}), "UTF-8")
+
+
 def js_messageroutes(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = {} if post_string == "" else getFormData(post_string, is_json)
@@ -1571,10 +1699,221 @@ def js_messageroutes(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps(message_routes), "UTF-8")
 
 
+def js_modeswitchinfo(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    post_data = getFormData(post_string, is_json)
+
+    coin_str = get_data_entry(post_data, "coin")
+    direction = get_data_entry_or(post_data, "direction", "lite")
+
+    try:
+        coin_type = getCoinIdFromName(coin_str)
+    except Exception:
+        coin_type = getCoinIdFromTicker(coin_str.upper())
+
+    ci = swap_client.ci(coin_type)
+    ticker = ci.ticker()
+
+    try:
+        wallet_info = ci.getWalletInfo()
+        balance = wallet_info.get("balance", 0)
+        balance_sats = ci.make_int(balance)
+    except Exception as e:
+        return bytes(json.dumps({"error": f"Failed to get balance: {e}"}), "UTF-8")
+
+    try:
+        fee_rate, rate_src = ci.get_fee_rate(ci._conf_target)
+        est_vsize = 180
+        if isinstance(fee_rate, int):
+            fee_per_vbyte = max(1, fee_rate // 1000)
+        else:
+            fee_per_vbyte = max(1, int(fee_rate * 100000))
+        estimated_fee_sats = est_vsize * fee_per_vbyte
+    except Exception:
+        estimated_fee_sats = 180
+        rate_src = "default"
+
+    min_viable = estimated_fee_sats * 2
+    can_transfer = balance_sats > min_viable
+
+    rv = {
+        "coin": ticker,
+        "direction": direction,
+        "balance": balance,
+        "balance_sats": balance_sats,
+        "estimated_fee_sats": estimated_fee_sats,
+        "estimated_fee": ci.format_amount(estimated_fee_sats),
+        "fee_rate_src": rate_src,
+        "can_transfer": can_transfer,
+        "min_viable_sats": min_viable,
+    }
+
+    if direction == "lite":
+        non_bip84_balance_sats = 0
+        has_non_bip84_funds = False
+        try:
+            if hasattr(ci, "rpc_wallet"):
+                unspent = ci.rpc_wallet("listunspent")
+
+                wm = swap_client.getWalletManager()
+
+                bip84_addresses = set()
+                if wm:
+                    try:
+                        all_addrs = wm.getAllAddresses(
+                            coin_type, include_watch_only=False
+                        )
+                        bip84_addresses = set(all_addrs)
+                    except Exception:
+                        pass
+
+                for u in unspent:
+                    addr = u.get("address")
+                    if not addr:
+                        continue
+                    amount_sats = ci.make_int(u.get("amount", 0))
+                    if amount_sats <= 0:
+                        continue
+
+                    if addr not in bip84_addresses:
+                        non_bip84_balance_sats += amount_sats
+                        has_non_bip84_funds = True
+        except Exception as e:
+            swap_client.log.debug(f"Error checking non-BIP84 addresses: {e}")
+
+        if has_non_bip84_funds and non_bip84_balance_sats > min_viable:
+            rv["show_transfer_option"] = True
+            rv["require_transfer"] = True
+            rv["legacy_balance_sats"] = non_bip84_balance_sats
+            rv["legacy_balance"] = ci.format_amount(non_bip84_balance_sats)
+            rv["message"] = (
+                "Funds on non-derivable addresses must be transferred for external wallet compatibility"
+            )
+        else:
+            rv["show_transfer_option"] = False
+            rv["require_transfer"] = False
+            if has_non_bip84_funds:
+                rv["legacy_balance_sats"] = non_bip84_balance_sats
+                rv["legacy_balance"] = ci.format_amount(non_bip84_balance_sats)
+                rv["message"] = "Non-derivable balance too low to transfer"
+            else:
+                rv["legacy_balance_sats"] = 0
+                rv["legacy_balance"] = "0"
+                rv["message"] = "All funds on BIP84 addresses"
+    else:
+        rv["show_transfer_option"] = can_transfer
+        if balance_sats == 0:
+            rv["message"] = "No funds to transfer"
+        elif not can_transfer:
+            rv["message"] = "Balance too low to transfer (fee would exceed funds)"
+        else:
+            rv["message"] = ""
+
+    return bytes(json.dumps(rv), "UTF-8")
+
+
+def js_electrum_discover(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+
+    coin_str = get_data_entry(post_data, "coin")
+    do_ping = toBool(get_data_entry_or(post_data, "ping", "false"))
+
+    coin_type = None
+    try:
+        coin_id = int(coin_str)
+        coin_type = Coins(coin_id)
+    except ValueError:
+        try:
+            coin_type = getCoinIdFromName(coin_str)
+        except ValueError:
+            coin_type = getCoinType(coin_str)
+
+    electrum_supported = ["bitcoin", "litecoin"]
+    coin_name = chainparams.get(coin_type, {}).get("name", "").lower()
+    if coin_name not in electrum_supported:
+        return bytes(
+            json.dumps(
+                {"error": f"Electrum not supported for {coin_name}", "servers": []}
+            ),
+            "UTF-8",
+        )
+
+    ci = swap_client.ci(coin_type)
+    connection_type = getattr(ci, "_connection_type", "rpc")
+
+    discovered_servers = []
+    current_server = None
+
+    if connection_type == "electrum":
+        backend = ci.getBackend()
+        if backend and hasattr(backend, "_server"):
+            server = backend._server
+            current_server = server.get_current_server_info()
+            discovered_servers = server.discover_peers()
+
+            if do_ping and discovered_servers:
+                for srv in discovered_servers[:10]:
+                    latency = server.ping_server(
+                        srv["host"], srv["port"], srv.get("ssl", True)
+                    )
+                    srv["latency_ms"] = latency
+                    srv["online"] = latency is not None
+    else:
+        try:
+            from .interface.electrumx import ElectrumServer
+
+            temp_server = ElectrumServer(
+                coin_name,
+                log=swap_client.log,
+            )
+            temp_server.connect()
+            current_server = temp_server.get_current_server_info()
+            discovered_servers = temp_server.discover_peers()
+
+            if do_ping and discovered_servers:
+                for srv in discovered_servers[:10]:
+                    latency = temp_server.ping_server(
+                        srv["host"], srv["port"], srv.get("ssl", True)
+                    )
+                    srv["latency_ms"] = latency
+                    srv["online"] = latency is not None
+
+            temp_server.disconnect()
+        except Exception as e:
+            return bytes(
+                json.dumps(
+                    {
+                        "error": f"Failed to connect to electrum server: {str(e)}",
+                        "servers": [],
+                    }
+                ),
+                "UTF-8",
+            )
+
+    onion_servers = [s for s in discovered_servers if s.get("is_onion")]
+    clearnet_servers = [s for s in discovered_servers if not s.get("is_onion")]
+
+    return bytes(
+        json.dumps(
+            {
+                "coin": coin_name,
+                "current_server": current_server,
+                "clearnet_servers": clearnet_servers,
+                "onion_servers": onion_servers,
+                "total_discovered": len(discovered_servers),
+            }
+        ),
+        "UTF-8",
+    )
+
+
 endpoints = {
     "coins": js_coins,
     "walletbalances": js_walletbalances,
     "wallets": js_wallets,
+    "wallettransactions": js_wallettransactions,
     "offers": js_offers,
     "sentoffers": js_sentoffers,
     "bids": js_bids,
@@ -1604,6 +1943,8 @@ endpoints = {
     "coinvolume": js_coinvolume,
     "coinhistory": js_coinhistory,
     "messageroutes": js_messageroutes,
+    "electrumdiscover": js_electrum_discover,
+    "modeswitchinfo": js_modeswitchinfo,
 }
 
 

@@ -676,7 +676,7 @@ class Test(unittest.TestCase):
     def test_db(self):
         db_test = DBMethods()
         db_test.sqlite_file = ":memory:"
-        db_test.mxDB = threading.Lock()
+        db_test.mxDB = threading.RLock()
         cursor = db_test.openDB()
         try:
             create_db_(db_test._db_con, logger)

@@ -13,8 +13,8 @@ from enum import IntEnum, auto
 from typing import Optional
 
 
-CURRENT_DB_VERSION = 33
-CURRENT_DB_DATA_VERSION = 7
+CURRENT_DB_VERSION = 34
+CURRENT_DB_DATA_VERSION = 8
 
 
 class Concepts(IntEnum):
@@ -772,8 +772,13 @@ class NetworkPortal(Table):
     created_at = Column("integer")
 
 
-def extract_schema(input_globals=None) -> dict:
-    g = globals() if input_globals is None else input_globals
+def extract_schema(extra_tables: list = None) -> dict:
+    g = globals().copy()
+
+    if extra_tables:
+        for table_class in extra_tables:
+            g[table_class.__name__] = table_class
+
     tables = {}
     for name, obj in g.items():
         if not inspect.isclass(obj):
@@ -893,18 +898,18 @@ def create_table(c, table_name, table) -> None:
         c.execute(query)
 
 
-def create_db_(con, log) -> None:
-    db_schema = extract_schema()
+def create_db_(con, log, extra_tables: list = None) -> None:
+    db_schema = extract_schema(extra_tables=extra_tables)
     c = con.cursor()
     for table_name, table in db_schema.items():
         create_table(c, table_name, table)
 
 
-def create_db(db_path: str, log) -> None:
+def create_db(db_path: str, log, extra_tables: list = None) -> None:
     con = None
     try:
         con = sqlite3.connect(db_path)
-        create_db_(con, log)
+        create_db_(con, log, extra_tables=extra_tables)
         con.commit()
     finally:
         if con:
@@ -912,42 +917,63 @@ def create_db(db_path: str, log) -> None:
 
 
 class DBMethods:
+    _db_lock_depth = 0
+
+    def _db_lock_held(self) -> bool:
+
+        if hasattr(self.mxDB, "_is_owned"):
+            return self.mxDB._is_owned()
+        return self.mxDB.locked()
+
     def openDB(self, cursor=None):
         if cursor:
-            # assert(self._thread_debug == threading.get_ident())
-            assert self.mxDB.locked()
+            assert self._db_lock_held()
             return cursor
 
+        if self._db_lock_held():
+            self._db_lock_depth += 1
+            return self._db_con.cursor()
+
         self.mxDB.acquire()
-        # self._thread_debug = threading.get_ident()
+        self._db_lock_depth = 1
         self._db_con = sqlite3.connect(self.sqlite_file)
+
+        self._db_con.execute("PRAGMA busy_timeout = 30000")
         return self._db_con.cursor()
 
     def getNewDBCursor(self):
-        assert self.mxDB.locked()
+        assert self._db_lock_held()
         return self._db_con.cursor()
 
     def commitDB(self):
-        assert self.mxDB.locked()
+        assert self._db_lock_held()
         self._db_con.commit()
 
     def rollbackDB(self):
-        assert self.mxDB.locked()
+        assert self._db_lock_held()
         self._db_con.rollback()
 
     def closeDBCursor(self, cursor):
-        assert self.mxDB.locked()
+        assert self._db_lock_held()
         if cursor:
             cursor.close()
 
     def closeDB(self, cursor, commit=True):
-        assert self.mxDB.locked()
+        assert self._db_lock_held()
+
+        if self._db_lock_depth > 1:
+            if commit:
+                self._db_con.commit()
+            cursor.close()
+            self._db_lock_depth -= 1
+            return
 
         if commit:
             self._db_con.commit()
 
         cursor.close()
         self._db_con.close()
+        self._db_lock_depth = 0
         self.mxDB.release()
 
     def setIntKV(self, str_key: str, int_val: int, cursor=None) -> None:
@@ -1037,7 +1063,7 @@ class DBMethods:
             )
         finally:
             if cursor is None:
-                self.closeDB(use_cursor, commit=False)
+                self.closeDB(use_cursor, commit=True)
 
     def add(self, obj, cursor, upsert: bool = False, columns_list=None):
         if cursor is None:
@@ -1201,6 +1227,9 @@ class DBMethods:
         query: str = f"UPDATE {table_name} SET "
 
         values = {}
+        constraint_values = {}
+        set_columns = []
+
         for mc in inspect.getmembers(obj.__class__):
             mc_name, mc_obj = mc
             if not hasattr(mc_obj, "__sqlite3_column__"):
@@ -1212,18 +1241,19 @@ class DBMethods:
                 continue
 
             if mc_name in constraints:
-                values[mc_name] = m_obj
+                constraint_values[mc_name] = m_obj
                 continue
             if columns_list is not None and mc_name not in columns_list:
                 continue
-            if len(values) > 0:
-                query += ", "
-            query += f"{mc_name} = :{mc_name}"
+
+            set_columns.append(f"{mc_name} = :{mc_name}")
             values[mc_name] = m_obj
 
+        query += ", ".join(set_columns)
         query += " WHERE 1=1 "
 
         for ck in constraints:
             query += f" AND {ck} = :{ck} "
 
+        values.update(constraint_values)
         cursor.execute(query, values)

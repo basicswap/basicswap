@@ -152,15 +152,17 @@ class Jsonrpc:
                     pass
 
 
-def callrpc(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
+def callrpc(
+    rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1", timeout=None
+):
     if _use_rpc_pooling:
-        return callrpc_pooled(rpc_port, auth, method, params, wallet, host)
+        return callrpc_pooled(rpc_port, auth, method, params, wallet, host, timeout)
 
     try:
         url = "http://{}@{}:{}/".format(auth, host, rpc_port)
         if wallet is not None:
             url += "wallet/" + urllib.parse.quote(wallet)
-        x = Jsonrpc(url)
+        x = Jsonrpc(url, timeout=timeout if timeout else 10)
 
         v = x.json_request(method, params)
         x.close()
@@ -174,7 +176,9 @@ def callrpc(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
     return r["result"]
 
 
-def callrpc_pooled(rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1"):
+def callrpc_pooled(
+    rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1", timeout=None
+):
     from .rpc_pool import get_rpc_pool
     import http.client
     import socket
@@ -182,6 +186,20 @@ def callrpc_pooled(rpc_port, auth, method, params=[], wallet=None, host="127.0.0
     url = "http://{}@{}:{}/".format(auth, host, rpc_port)
     if wallet is not None:
         url += "wallet/" + urllib.parse.quote(wallet)
+
+    if timeout:
+        try:
+            conn = Jsonrpc(url, timeout=timeout)
+            v = conn.json_request(method, params)
+            r = json.loads(v.decode("utf-8"))
+            conn.close()
+            if "error" in r and r["error"] is not None:
+                raise ValueError("RPC error " + str(r["error"]))
+            return r["result"]
+        except ValueError:
+            raise
+        except Exception as ex:
+            raise ValueError(f"RPC server error: {ex}, method: {method}")
 
     max_connections = _rpc_pool_settings.get("max_connections_per_daemon", 5)
     pool = get_rpc_pool(url, max_connections)
@@ -247,7 +265,7 @@ def make_rpc_func(port, auth, wallet=None, host="127.0.0.1"):
     wallet = wallet
     host = host
 
-    def rpc_func(method, params=None, wallet_override=None):
+    def rpc_func(method, params=None, wallet_override=None, timeout=None):
         return callrpc(
             port,
             auth,
@@ -255,6 +273,7 @@ def make_rpc_func(port, auth, wallet=None, host="127.0.0.1"):
             params,
             wallet if wallet_override is None else wallet_override,
             host,
+            timeout=timeout,
         )
 
     return rpc_func

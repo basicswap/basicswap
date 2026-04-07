@@ -5,10 +5,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import json
 import logging
 import os
 import random
 import shlex
+import shutil
 import socket
 import socks
 import subprocess
@@ -55,7 +57,7 @@ class BaseApp(DBMethods):
         self.settings = settings
         self.coin_clients = {}
         self.coin_interfaces = {}
-        self.mxDB = threading.Lock()
+        self.mxDB = threading.RLock()
         self.debug = self.settings.get("debug", False)
         self.delay_event = threading.Event()
         self.chainstate_delay_event = threading.Event()
@@ -155,6 +157,71 @@ class BaseApp(DBMethods):
             return self.settings["chainclients"][chainparams[coin]["name"]]
         except Exception:
             return {}
+
+    def getElectrumAddressIndex(self, coin_name: str) -> tuple:
+        try:
+            chain_settings = self.settings["chainclients"].get(coin_name, {})
+            ext_idx = chain_settings.get("electrum_address_index", 0)
+            int_idx = chain_settings.get("electrum_internal_address_index", 0)
+            return (ext_idx, int_idx)
+        except Exception:
+            return (0, 0)
+
+    def updateElectrumAddressIndex(
+        self, coin_name: str, ext_idx: int, int_idx: int
+    ) -> None:
+        try:
+            if coin_name not in self.settings["chainclients"]:
+                self.log.debug(
+                    f"updateElectrumAddressIndex: {coin_name} not in chainclients"
+                )
+                return
+
+            chain_settings = self.settings["chainclients"][coin_name]
+            current_ext = chain_settings.get("electrum_address_index", 0)
+            current_int = chain_settings.get("electrum_internal_address_index", 0)
+
+            if ext_idx <= current_ext and int_idx <= current_int:
+                return
+
+            if ext_idx > current_ext:
+                chain_settings["electrum_address_index"] = ext_idx
+            if int_idx > current_int:
+                chain_settings["electrum_internal_address_index"] = int_idx
+
+            self.log.debug(
+                f"Persisting electrum address index for {coin_name}: ext={ext_idx}, int={int_idx}"
+            )
+            self._saveSettings()
+        except Exception as e:
+            self.log.warning(
+                f"Failed to update electrum address index for {coin_name}: {e}"
+            )
+
+    def _normalizeSettingsPaths(self, settings: dict) -> dict:
+        if "chainclients" in settings:
+            for coin_name, cc in settings["chainclients"].items():
+                for path_key in ("datadir", "bindir", "walletsdir"):
+                    if path_key in cc and isinstance(cc[path_key], str):
+                        cc[path_key] = os.path.normpath(cc[path_key])
+        return settings
+
+    def _saveSettings(self) -> None:
+        from basicswap import config as cfg
+
+        self._normalizeSettingsPaths(self.settings)
+
+        settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+        settings_path_new = settings_path + ".new"
+        try:
+            if os.path.exists(settings_path):
+                shutil.copyfile(settings_path, settings_path + ".last")
+            with open(settings_path_new, "w") as fp:
+                json.dump(self.settings, fp, indent=4)
+            shutil.move(settings_path_new, settings_path)
+            self.log.debug(f"Settings saved to {settings_path}")
+        except Exception as e:
+            self.log.warning(f"Failed to save settings: {e}")
 
     def setDaemonPID(self, name, pid) -> None:
         if isinstance(name, Coins):

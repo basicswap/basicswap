@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@ import subprocess
 from urllib.request import urlopen
 
 from .util import read_json_api
+from basicswap.basicswap import Coins
 from basicswap.rpc import callrpc
 from basicswap.util import toBool
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -123,6 +124,65 @@ def prepareDataDir(
             fp.write("addnode=127.0.0.1:{}\n".format(base_p2p_port + i))
 
     return node_dir
+
+
+def prepare_balance(
+    use_delay_event,
+    coin,
+    amount: float,
+    port_target_node: int,
+    port_take_from_node: int,
+    test_balance: bool = True,
+) -> None:
+    if coin == Coins.PART_BLIND:
+        coin_ticker: str = "PART"
+        balance_type: str = "blind_balance"
+        address_type: str = "stealth_address"
+        type_to: str = "blind"
+    elif coin == Coins.PART_ANON:
+        coin_ticker: str = "PART"
+        balance_type: str = "anon_balance"
+        address_type: str = "stealth_address"
+        type_to: str = "anon"
+    else:
+        coin_ticker: str = coin.name
+        balance_type: str = "balance"
+        address_type: str = "deposit_address"
+    js_w = read_json_api(port_target_node, "wallets")
+    current_balance: float = float(js_w[coin_ticker][balance_type])
+
+    if test_balance and current_balance >= amount:
+        return
+    post_json = {
+        "value": amount,
+        "address": js_w[coin_ticker][address_type],
+        "subfee": False,
+    }
+    if coin in (Coins.XMR, Coins.WOW):
+        post_json["sweepall"] = False
+    if coin in (Coins.PART_BLIND, Coins.PART_ANON):
+        post_json["type_to"] = type_to
+    json_rv = read_json_api(
+        port_take_from_node,
+        "wallets/{}/withdraw".format(coin_ticker.lower()),
+        post_json,
+    )
+    assert len(json_rv["txid"]) == 64
+    wait_for_amount: float = amount
+    if not test_balance:
+        wait_for_amount += current_balance
+    delay_iterations = 100 if coin == Coins.NAV else 30
+    delay_time = 5 if coin == Coins.NAV else 3
+    wait_for_balance(
+        use_delay_event,
+        "http://127.0.0.1:{}/json/wallets/{}".format(
+            port_target_node, coin_ticker.lower()
+        ),
+        balance_type,
+        wait_for_amount,
+        iterations=delay_iterations,
+        delay_time=delay_time,
+    )
 
 
 def checkForks(ro):

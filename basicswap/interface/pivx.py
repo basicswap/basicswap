@@ -40,7 +40,7 @@ class PIVXInterface(BTCInterface):
 
         seed_id_before: str = self.getWalletSeedID()
 
-        self.rpc_wallet("encryptwallet", [password])
+        self.rpc_wallet("encryptwallet", [password], timeout=120)
 
         if check_seed is False or seed_id_before == "Not found":
             return

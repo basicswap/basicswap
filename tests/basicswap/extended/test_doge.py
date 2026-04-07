@@ -412,7 +412,11 @@ class Test(TestFunctions):
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
         S = ci.getPubkey(s)
-        lock_tx_b_txid = ci.publishBLockTx(v, S, amount, fee_rate)
+        result = ci.publishBLockTx(v, S, amount, fee_rate)
+        if isinstance(result, tuple):
+            lock_tx_b_txid, lock_tx_b_vout = result
+        else:
+            lock_tx_b_txid = result
         test_delay_event.wait(1)
 
         addr_out = ci.getNewAddress(False)

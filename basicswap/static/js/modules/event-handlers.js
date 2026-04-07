@@ -2,15 +2,42 @@
   'use strict';
 
   const EventHandlers = {
-    
-    confirmPopup: function(action = 'proceed', coinName = '') {
-      const message = action === 'Accept' 
-        ? 'Are you sure you want to accept this bid?'
-        : coinName 
-          ? `Are you sure you want to ${action} ${coinName}?`
-          : 'Are you sure you want to proceed?';
-      
-      return confirm(message);
+
+    showConfirmModal: function(title, message, callback) {
+      const modal = document.getElementById('confirmModal');
+      if (!modal) {
+        if (callback) callback();
+        return;
+      }
+
+      const titleEl = document.getElementById('confirmTitle');
+      const messageEl = document.getElementById('confirmMessage');
+      const yesBtn = document.getElementById('confirmYes');
+      const noBtn = document.getElementById('confirmNo');
+      const bidDetails = document.getElementById('bidDetailsSection');
+
+      if (titleEl) titleEl.textContent = title;
+      if (messageEl) {
+        messageEl.textContent = message;
+        messageEl.classList.remove('hidden');
+      }
+      if (bidDetails) bidDetails.classList.add('hidden');
+
+      modal.classList.remove('hidden');
+
+      const newYesBtn = yesBtn.cloneNode(true);
+      yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+
+      newYesBtn.addEventListener('click', function() {
+        modal.classList.add('hidden');
+        if (callback) callback();
+      });
+
+      const newNoBtn = noBtn.cloneNode(true);
+      noBtn.parentNode.replaceChild(newNoBtn, noBtn);
+      newNoBtn.addEventListener('click', function() {
+        modal.classList.add('hidden');
+      });
     },
 
     confirmReseed: function() {
@@ -18,7 +45,6 @@
     },
 
     confirmWithdrawal: function() {
-      
       if (window.WalletPage && typeof window.WalletPage.confirmWithdrawal === 'function') {
         return window.WalletPage.confirmWithdrawal();
       }
@@ -67,14 +93,36 @@
         return;
       }
 
-      const balanceElement = amountInput.closest('form')?.querySelector('[data-balance]');
-      const balance = balanceElement ? parseFloat(balanceElement.getAttribute('data-balance')) : 0;
+      let coinFromId;
+      if (inputId === 'add-amm-amount') {
+        coinFromId = 'add-amm-coin-from';
+      } else if (inputId === 'edit-amm-amount') {
+        coinFromId = 'edit-amm-coin-from';
+      } else {
+        const form = amountInput.closest('form') || amountInput.closest('.modal-content') || amountInput.closest('[id*="modal"]');
+        const select = form?.querySelector('select[id*="coin-from"]');
+        coinFromId = select?.id;
+      }
+
+      const coinFromSelect = coinFromId ? document.getElementById(coinFromId) : null;
+      if (!coinFromSelect) {
+        console.error('EventHandlers: Coin-from dropdown not found for:', inputId);
+        return;
+      }
+
+      const selectedOption = coinFromSelect.options[coinFromSelect.selectedIndex];
+      if (!selectedOption) {
+        console.error('EventHandlers: No option selected in coin-from dropdown');
+        return;
+      }
+
+      const balance = parseFloat(selectedOption.getAttribute('data-balance') || '0');
 
       if (balance > 0) {
         const calculatedAmount = balance * percent;
         amountInput.value = calculatedAmount.toFixed(8);
       } else {
-        console.warn('EventHandlers: No balance found for AMM amount calculation');
+        console.warn('EventHandlers: No balance found for selected coin');
       }
     },
 
@@ -132,13 +180,10 @@
     },
 
     hideConfirmModal: function() {
-      if (window.DOMCache) {
-        window.DOMCache.hide('confirmModal');
-      } else {
-        const modal = document.getElementById('confirmModal');
-        if (modal) {
-          modal.style.display = 'none';
-        }
+      const modal = document.getElementById('confirmModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = '';
       }
     },
 
@@ -187,17 +232,43 @@
     },
 
     initialize: function() {
-      
+
       document.addEventListener('click', (e) => {
         const target = e.target.closest('[data-confirm]');
         if (target) {
+          if (target.dataset.confirmHandled) {
+            delete target.dataset.confirmHandled;
+            return;
+          }
+
+          e.preventDefault();
+          e.stopPropagation();
+
           const action = target.getAttribute('data-confirm-action') || 'proceed';
           const coinName = target.getAttribute('data-confirm-coin') || '';
-          
-          if (!this.confirmPopup(action, coinName)) {
-            e.preventDefault();
-            return false;
-          }
+
+          const message = action === 'Accept'
+            ? 'Are you sure you want to accept this bid?'
+            : coinName
+              ? `Are you sure you want to ${action} ${coinName}?`
+              : 'Are you sure you want to proceed?';
+
+          const title = `Confirm ${action}`;
+
+          this.showConfirmModal(title, message, function() {
+            target.dataset.confirmHandled = 'true';
+
+            if (target.form) {
+              const hiddenInput = document.createElement('input');
+              hiddenInput.type = 'hidden';
+              hiddenInput.name = target.name;
+              hiddenInput.value = target.value;
+              target.form.appendChild(hiddenInput);
+              target.form.submit();
+            } else {
+              target.click();
+            }
+          });
         }
       });
 
@@ -326,8 +397,6 @@
   }
 
   window.EventHandlers = EventHandlers;
-  
-  window.confirmPopup = EventHandlers.confirmPopup.bind(EventHandlers);
   window.confirmReseed = EventHandlers.confirmReseed.bind(EventHandlers);
   window.confirmWithdrawal = EventHandlers.confirmWithdrawal.bind(EventHandlers);
   window.confirmUTXOResize = EventHandlers.confirmUTXOResize.bind(EventHandlers);

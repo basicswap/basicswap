@@ -104,6 +104,10 @@ def page_settings(self, url_split, post_string):
                     "TODO: If running in docker see doc/tor.md to enable/disable tor."
                 )
 
+            electrum_supported_coins = (
+                "bitcoin",
+                "litecoin",
+            )
             for name, c in swap_client.settings["chainclients"].items():
                 if have_data_entry(form_data, "apply_" + name):
                     data = {"lookups": get_data_entry(form_data, "lookups_" + name)}
@@ -138,10 +142,70 @@ def page_settings(self, url_split, post_string):
                             data["anon_tx_ring_size"] = int(
                                 get_data_entry(form_data, "rct_ring_size_" + name)
                             )
+                        if name in electrum_supported_coins:
+                            new_connection_type = get_data_entry_or(
+                                form_data, "connection_type_" + name, None
+                            )
+                            if new_connection_type and new_connection_type != c.get(
+                                "connection_type"
+                            ):
+                                coin_id = swap_client.getCoinIdFromName(name)
+                                has_active_swaps = False
+                                for bid_id, (bid, offer) in list(
+                                    swap_client.swaps_in_progress.items()
+                                ):
+                                    if (
+                                        offer.coin_from == coin_id
+                                        or offer.coin_to == coin_id
+                                    ):
+                                        has_active_swaps = True
+                                        break
+                                if has_active_swaps:
+                                    display_name = getCoinName(coin_id)
+                                    err_messages.append(
+                                        f"Cannot change {display_name} connection mode while swaps are in progress. "
+                                        f"Please wait for all {display_name} swaps to complete."
+                                    )
+                                else:
+                                    data["connection_type"] = new_connection_type
+                                    if new_connection_type == "electrum":
+                                        data["manage_daemon"] = False
+                                    elif new_connection_type == "rpc":
+                                        data["manage_daemon"] = True
+                            clearnet_servers = get_data_entry_or(
+                                form_data, "electrum_clearnet_" + name, ""
+                            ).strip()
+                            data["electrum_clearnet_servers"] = clearnet_servers
+                            onion_servers = get_data_entry_or(
+                                form_data, "electrum_onion_" + name, ""
+                            ).strip()
+                            data["electrum_onion_servers"] = onion_servers
+                            auto_transfer_now = have_data_entry(
+                                form_data, "auto_transfer_now_" + name
+                            )
+                            if auto_transfer_now:
+                                transfer_value = get_data_entry_or(
+                                    form_data, "auto_transfer_now_" + name, "false"
+                                )
+                                data["auto_transfer_now"] = transfer_value == "true"
+                            gap_limit_str = get_data_entry_or(
+                                form_data, "gap_limit_" + name, "50"
+                            ).strip()
+                            try:
+                                gap_limit = int(gap_limit_str)
+                                if gap_limit < 5:
+                                    gap_limit = 5
+                                elif gap_limit > 100:
+                                    gap_limit = 100
+                                data["address_gap_limit"] = gap_limit
+                            except ValueError:
+                                pass
 
-                    settings_changed, suggest_reboot = swap_client.editSettings(
-                        name, data
+                    settings_changed, suggest_reboot, migration_message = (
+                        swap_client.editSettings(name, data)
                     )
+                    if migration_message:
+                        messages.append(migration_message)
                     if settings_changed is True:
                         messages.append("Settings applied.")
                     if suggest_reboot is True:
@@ -156,19 +220,71 @@ def page_settings(self, url_split, post_string):
                     display_name = getCoinName(swap_client.getCoinIdFromName(name))
                     messages.append(display_name + " disabled, shutting down.")
                     swap_client.stopRunning()
+                elif have_data_entry(form_data, "force_sweep_" + name):
+                    coin_id = swap_client.getCoinIdFromName(name)
+                    display_name = getCoinName(coin_id)
+                    try:
+                        result = swap_client.sweepLiteWalletFunds(coin_id)
+                        if result.get("success"):
+                            amount = result.get("amount", 0)
+                            fee = result.get("fee", 0)
+                            txid = result.get("txid", "")
+                            messages.append(
+                                f"Successfully swept {amount:.8f} {display_name} to RPC wallet. "
+                                f"Fee: {fee:.8f}. TXID: {txid} (1 confirmation required)"
+                            )
+                        elif result.get("skipped"):
+                            messages.append(
+                                f"{display_name}: {result.get('reason', 'Sweep skipped')}"
+                            )
+                        else:
+                            err_messages.append(
+                                f"{display_name}: Sweep failed - {result.get('error', 'Unknown error')}"
+                            )
+                    except Exception as e:
+                        err_messages.append(f"{display_name}: Sweep failed - {str(e)}")
         except InactiveCoin as ex:
             err_messages.append("InactiveCoin {}".format(Coins(ex.coinid).name))
         except Exception as e:
             err_messages.append(str(e))
     chains_formatted = []
+    electrum_supported_coins = (
+        "bitcoin",
+        "litecoin",
+    )
 
     sorted_names = sorted(swap_client.settings["chainclients"].keys())
+    from basicswap.interface.electrumx import (
+        DEFAULT_ELECTRUM_SERVERS,
+        DEFAULT_ONION_SERVERS,
+    )
+
     for name in sorted_names:
         c = swap_client.settings["chainclients"][name]
         try:
             display_name = getCoinName(swap_client.getCoinIdFromName(name))
         except Exception:
             display_name = name
+
+        clearnet_servers = c.get("electrum_clearnet_servers", None)
+        onion_servers = c.get("electrum_onion_servers", None)
+
+        if not clearnet_servers:
+            default_clearnet = DEFAULT_ELECTRUM_SERVERS.get(name, [])
+            clearnet_servers = [
+                f"{s['host']}:{s['port']}:{str(s.get('ssl', True)).lower()}"
+                for s in default_clearnet
+            ]
+        if not onion_servers:
+            default_onion = DEFAULT_ONION_SERVERS.get(name, [])
+            onion_servers = [
+                f"{s['host']}:{s['port']}:{str(s.get('ssl', False)).lower()}"
+                for s in default_onion
+            ]
+
+        clearnet_text = "\n".join(clearnet_servers) if clearnet_servers else ""
+        onion_text = "\n".join(onion_servers) if onion_servers else ""
+
         chains_formatted.append(
             {
                 "name": name,
@@ -176,6 +292,10 @@ def page_settings(self, url_split, post_string):
                 "lookups": c.get("chain_lookups", "local"),
                 "manage_daemon": c.get("manage_daemon", "Unknown"),
                 "connection_type": c.get("connection_type", "Unknown"),
+                "supports_electrum": name in electrum_supported_coins,
+                "clearnet_servers_text": clearnet_text,
+                "onion_servers_text": onion_text,
+                "address_gap_limit": c.get("address_gap_limit", 50),
             }
         )
         if name in ("monero", "wownero"):
@@ -202,6 +322,14 @@ def page_settings(self, url_split, post_string):
                     chains_formatted[-1]["can_reenable"] = True
             else:
                 chains_formatted[-1]["can_disable"] = True
+
+        try:
+            coin_id = swap_client.getCoinIdFromName(name)
+            lite_balance_info = swap_client.getLiteWalletBalanceInfo(coin_id)
+            if lite_balance_info:
+                chains_formatted[-1]["lite_wallet_balance"] = lite_balance_info
+        except Exception:
+            pass
 
     general_settings = {
         "debug": swap_client.debug,

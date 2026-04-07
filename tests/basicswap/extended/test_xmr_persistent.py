@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -209,7 +209,7 @@ def updateThread(cls):
                 calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
         except Exception as e:
             print("updateThread error", str(e))
-        cls.delay_event.wait(random.randrange(cls.update_min, cls.update_max))
+        cls.delay_event.wait(random.uniform(cls.update_min, cls.update_max))
 
 
 def updateThreadXMR(cls):
@@ -228,7 +228,7 @@ def updateThreadXMR(cls):
                 )
         except Exception as e:
             print("updateThreadXMR error", str(e))
-        cls.delay_event.wait(random.randrange(cls.xmr_update_min, cls.xmr_update_max))
+        cls.delay_event.wait(random.uniform(cls.xmr_update_min, cls.xmr_update_max))
 
 
 def updateThreadDCR(cls):
@@ -262,7 +262,7 @@ def updateThreadDCR(cls):
                 logging.warning("updateThreadDCR generate {}".format(e))
         except Exception as e:
             print("updateThreadDCR error", str(e))
-        cls.delay_event.wait(random.randrange(cls.dcr_update_min, cls.dcr_update_max))
+        cls.delay_event.wait(random.uniform(cls.dcr_update_min, cls.dcr_update_max))
 
 
 def signal_handler(self, sig, frame):
@@ -283,6 +283,7 @@ def run_process(client_id):
 
 
 def start_processes(self):
+    multiprocessing.set_start_method("spawn")
     self.delay_event.clear()
 
     for i in range(NUM_NODES):
@@ -299,7 +300,7 @@ def start_processes(self):
 
     wallets = read_json_api(UI_PORT + 1, "wallets")
 
-    if "monero" in TEST_COINS_LIST:
+    if "monero" in self.test_coins_list:
         xmr_auth = None
         if os.getenv("XMR_RPC_USER", "") != "":
             xmr_auth = (os.getenv("XMR_RPC_USER", ""), os.getenv("XMR_RPC_PWD", ""))
@@ -333,7 +334,7 @@ def start_processes(self):
         callbtcrpc(0, "generatetoaddress", [num_blocks, self.btc_addr])
     logging.info("BTC blocks: {}".format(callbtcrpc(0, "getblockcount")))
 
-    if "litecoin" in TEST_COINS_LIST:
+    if "litecoin" in self.test_coins_list:
         self.ltc_addr = callltcrpc(
             0, "getnewaddress", ["mining_addr"], wallet="wallet.dat"
         )
@@ -364,7 +365,7 @@ def start_processes(self):
                 wallet="wallet.dat",
             )
 
-    if "decred" in TEST_COINS_LIST:
+    if "decred" in self.test_coins_list:
         if RESET_TEST:
             _ = calldcrrpc(0, "getnewaddress")
             # assert (addr == self.dcr_addr)
@@ -394,7 +395,7 @@ def start_processes(self):
         self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
         self.update_thread_dcr.start()
 
-    if "firo" in TEST_COINS_LIST:
+    if "firo" in self.test_coins_list:
         self.firo_addr = callfirorpc(0, "getnewaddress", ["mining_addr"])
         num_blocks: int = 200
         have_blocks: int = callfirorpc(0, "getblockcount")
@@ -410,7 +411,7 @@ def start_processes(self):
                 [num_blocks - have_blocks, self.firo_addr],
             )
 
-    if "bitcoincash" in TEST_COINS_LIST:
+    if "bitcoincash" in self.test_coins_list:
         self.bch_addr = callbchrpc(
             0, "getnewaddress", ["mining_addr"], wallet="wallet.dat"
         )
@@ -429,7 +430,7 @@ def start_processes(self):
                 wallet="wallet.dat",
             )
 
-    if "dogecoin" in TEST_COINS_LIST:
+    if "dogecoin" in self.test_coins_list:
         self.doge_addr = calldogerpc(0, "getnewaddress", ["mining_addr"])
         num_blocks: int = 200
         have_blocks: int = calldogerpc(0, "getblockcount")
@@ -443,7 +444,7 @@ def start_processes(self):
                 0, "generatetoaddress", [num_blocks - have_blocks, self.doge_addr]
             )
 
-    if "namecoin" in TEST_COINS_LIST:
+    if "namecoin" in self.test_coins_list:
         self.nmc_addr = callnmcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
         num_blocks: int = 500
         have_blocks: int = callnmcrpc(0, "getblockcount")
@@ -536,7 +537,22 @@ class BaseTestWithPrepare(unittest.TestCase):
     firo_addr = None
     bch_addr = None
     doge_addr = None
-    initialised = False
+    test_coins_list = TEST_COINS_LIST
+
+    @classmethod
+    def modifyConfig(cls, test_path, i):
+        modifyConfig(test_path, i)
+
+    @classmethod
+    def setupNodes(cls):
+        logging.info(f"Preparing {NUM_NODES} nodes.")
+        prepare_nodes(
+            NUM_NODES,
+            cls.test_coins_list,
+            True,
+            {"min_sequence_lock_seconds": 60},
+            PORT_OFS,
+        )
 
     @classmethod
     def setUpClass(cls):
@@ -547,21 +563,17 @@ class BaseTestWithPrepare(unittest.TestCase):
         if os.path.exists(test_path) and not RESET_TEST:
             logging.info(f"Continuing with existing directory: {test_path}")
         else:
-            logging.info(f"Preparing {NUM_NODES} nodes.")
-            prepare_nodes(
-                NUM_NODES,
-                TEST_COINS_LIST,
-                True,
-                {"min_sequence_lock_seconds": 60},
-                PORT_OFS,
-            )
-
+            cls.setupNodes()
             for i in range(NUM_NODES):
-                modifyConfig(test_path, i)
+                cls.modifyConfig(test_path, i)
 
         signal.signal(
             signal.SIGINT, lambda signal, frame: signal_handler(cls, signal, frame)
         )
+
+        start_processes(cls)
+        waitForServer(cls.delay_event, UI_PORT + 0)
+        waitForServer(cls.delay_event, UI_PORT + 1)
 
     @classmethod
     def tearDownClass(cls):
@@ -581,14 +593,6 @@ class BaseTestWithPrepare(unittest.TestCase):
         cls.update_thread_xmr = None
         cls.update_thread_dcr = None
         cls.processes = []
-
-    def setUp(self):
-        if self.initialised:
-            return
-        start_processes(self)
-        waitForServer(self.delay_event, UI_PORT + 0)
-        waitForServer(self.delay_event, UI_PORT + 1)
-        self.initialised = True
 
 
 class Test(BaseTestWithPrepare):

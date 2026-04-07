@@ -18,6 +18,15 @@ from .db import (
     extract_schema,
 )
 
+from .db_wallet import (
+    WalletAddress,
+    WalletLockedUTXO,
+    WalletPendingTx,
+    WalletState,
+    WalletTxCache,
+    WalletWatchOnly,
+)
+
 from .basicswap_util import (
     BidStates,
     canAcceptBidState,
@@ -129,6 +138,14 @@ def upgradeDatabaseData(self, data_version):
                         "state_id": int(state),
                     },
                 )
+        if data_version > 0 and data_version < 8:
+            cursor.execute(
+                "UPDATE bidstates SET can_timeout = :can_timeout WHERE state_id = :state_id",
+                {
+                    "can_timeout": 1,
+                    "state_id": int(BidStates.BID_REQUEST_ACCEPTED),
+                },
+            )
         if data_version > 0 and data_version < 4:
             for state in (
                 BidStates.BID_REQUEST_SENT,
@@ -260,7 +277,16 @@ def upgradeDatabase(self, db_version: int):
         ),
     ]
 
-    expect_schema = extract_schema()
+    wallet_tables = [
+        WalletAddress,
+        WalletLockedUTXO,
+        WalletPendingTx,
+        WalletState,
+        WalletTxCache,
+        WalletWatchOnly,
+    ]
+    expect_schema = extract_schema(extra_tables=wallet_tables)
+    have_tables = {}
     try:
         cursor = self.openDB()
         for rename_column in rename_columns:
@@ -269,7 +295,93 @@ def upgradeDatabase(self, db_version: int):
                 cursor.execute(
                     f"ALTER TABLE {table_name} RENAME COLUMN {colname_from} TO {colname_to}"
                 )
-        upgradeDatabaseFromSchema(self, cursor, expect_schema)
+
+        query = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
+        tables = cursor.execute(query).fetchall()
+        for table in tables:
+            table_name = table[0]
+            if table_name in ("sqlite_sequence",):
+                continue
+
+            have_table = {}
+            have_columns = {}
+            query = "SELECT * FROM PRAGMA_TABLE_INFO(:table_name) ORDER BY cid DESC;"
+            columns = cursor.execute(query, {"table_name": table_name}).fetchall()
+            for column in columns:
+                cid, name, data_type, notnull, default_value, primary_key = column
+                have_columns[name] = {"type": data_type, "primary_key": primary_key}
+
+            have_table["columns"] = have_columns
+
+            cursor.execute(f"PRAGMA INDEX_LIST('{table_name}');")
+            indices = cursor.fetchall()
+            for index in indices:
+                seq, index_name, unique, origin, partial = index
+
+                if origin == "pk":
+                    continue
+
+                cursor.execute(f"PRAGMA INDEX_INFO('{index_name}');")
+                index_info = cursor.fetchall()
+
+                add_index = {"index_name": index_name}
+                for index_columns in index_info:
+                    seqno, cid, name = index_columns
+                    if origin == "u":
+                        have_columns[name]["unique"] = 1
+                    else:
+                        if "column_1" not in add_index:
+                            add_index["column_1"] = name
+                        elif "column_2" not in add_index:
+                            add_index["column_2"] = name
+                        elif "column_3" not in add_index:
+                            add_index["column_3"] = name
+                        else:
+                            raise RuntimeError("Add more index columns.")
+                if origin == "c":
+                    if "indices" not in have_table:
+                        have_table["indices"] = []
+                    have_table["indices"].append(add_index)
+
+            have_tables[table_name] = have_table
+
+        for table_name, table in expect_schema.items():
+            if table_name not in have_tables:
+                self.log.info(f"Creating table {table_name}.")
+                create_table(cursor, table_name, table)
+                continue
+
+            have_table = have_tables[table_name]
+            have_columns = have_table["columns"]
+            for colname, column in table["columns"].items():
+                if colname not in have_columns:
+                    col_type = column["type"]
+                    self.log.info(f"Adding column {colname} to table {table_name}.")
+                    cursor.execute(
+                        f"ALTER TABLE {table_name} ADD COLUMN {colname} {col_type}"
+                    )
+            indices = table.get("indices", [])
+            have_indices = have_table.get("indices", [])
+            for index in indices:
+                index_name = index["index_name"]
+                if not any(
+                    have_idx.get("index_name") == index_name
+                    for have_idx in have_indices
+                ):
+                    self.log.info(f"Adding index {index_name} to table {table_name}.")
+                    column_1 = index["column_1"]
+                    column_2 = index.get("column_2", None)
+                    column_3 = index.get("column_3", None)
+                    query: str = (
+                        f"CREATE INDEX {index_name} ON {table_name} ({column_1}"
+                    )
+                    if column_2:
+                        query += f", {column_2}"
+                    if column_3:
+                        query += f", {column_3}"
+                    query += ")"
+                    cursor.execute(query)
+
         if CURRENT_DB_VERSION != db_version:
             self.db_version = CURRENT_DB_VERSION
             self.setIntKV("db_version", CURRENT_DB_VERSION, cursor)

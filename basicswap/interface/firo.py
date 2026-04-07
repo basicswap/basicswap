@@ -64,7 +64,7 @@ class FIROInterface(BTCInterface):
         # Firo shuts down after encryptwallet
         seed_id_before: str = self.getWalletSeedID() if check_seed else "Not found"
 
-        self.rpc_wallet("encryptwallet", [password])
+        self.rpc_wallet("encryptwallet", [password], timeout=120)
 
         if check_seed is False or seed_id_before == "Not found":
             return

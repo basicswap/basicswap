@@ -41,12 +41,29 @@
     setupEventListeners: function() {
       const sendBidBtn = document.querySelector('button[name="sendbid"][value="Send Bid"]');
       if (sendBidBtn) {
-        sendBidBtn.onclick = this.showConfirmModal.bind(this);
+        sendBidBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showConfirmModal();
+        });
       }
 
-      const modalCancelBtn = document.querySelector('#confirmModal .flex button:last-child');
+      const modalCancelBtn = document.querySelector('#confirmModal [data-hide-modal]');
       if (modalCancelBtn) {
-        modalCancelBtn.onclick = this.hideConfirmModal.bind(this);
+        modalCancelBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.hideConfirmModal();
+        });
+      }
+
+      const confirmModal = document.getElementById('confirmModal');
+      if (confirmModal) {
+        confirmModal.addEventListener('click', (e) => {
+          if (e.target === confirmModal || e.target.classList.contains('bg-opacity-50')) {
+            this.hideConfirmModal();
+          }
+        });
       }
 
       const mainCancelBtn = document.querySelector('button[name="cancel"]');

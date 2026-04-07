@@ -1748,6 +1748,13 @@ def printHelp():
     )
     print("--client-auth-password=  Set or update the password to protect the web UI.")
     print("--disable-client-auth    Remove password protection from the web UI.")
+    print(
+        "--light                  Use light wallet mode (Electrum) for all supported coins."
+    )
+    print("--btc-mode=MODE          Set BTC connection mode: rpc, electrum, or remote.")
+    print("--ltc-mode=MODE          Set LTC connection mode: rpc, electrum, or remote.")
+    print("--btc-electrum-server=   Custom Electrum server for BTC (host:port:ssl).")
+    print("--ltc-electrum-server=   Custom Electrum server for LTC (host:port:ssl).")
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -1834,6 +1841,7 @@ def initialise_wallets(
     daemons = []
     daemon_args = ["-noconnect", "-nodnsseed"]
     generated_mnemonic: bool = False
+    extended_keys = {}
 
     coins_failed_to_initialise = []
 
@@ -1955,6 +1963,11 @@ def initialise_wallets(
                     hex_seed = swap_client.getWalletKey(Coins.DCR, 1).hex()
                     createDCRWallet(args, hex_seed, logger, threading.Event())
                     continue
+                if coin_settings.get("connection_type") == "electrum":
+                    logger.info(
+                        f"Skipping RPC wallet creation for {getCoinName(c)} (electrum mode)."
+                    )
+                    continue
                 swap_client.waitForDaemonRPC(c, with_wallet=False)
                 # Create wallet if it doesn't exist yet
                 wallets = swap_client.callcoinrpc(c, "listwallets")
@@ -2052,7 +2065,11 @@ def initialise_wallets(
             c = swap_client.getCoinIdFromName(coin_name)
             if c in (Coins.PART,):
                 continue
-            if c not in (Coins.DCR,):
+            if coin_settings.get("connection_type") == "electrum":
+                logger.info(
+                    f"Skipping daemon RPC wait for {getCoinName(c)} (electrum mode)."
+                )
+            elif c not in (Coins.DCR,):
                 # initialiseWallet only sets main_wallet_seedid_
                 swap_client.waitForDaemonRPC(c)
             try:
@@ -2081,6 +2098,20 @@ def initialise_wallets(
                     )
                 except Exception as e:  # noqa: F841
                     logger.warning(f"changeWalletPassword failed for {coin_name}.")
+
+        zprv_prefix = 0x04B2430C if chain == "mainnet" else 0x045F18BC
+        for coin_name in with_coins:
+            c = swap_client.getCoinIdFromName(coin_name)
+            if c == Coins.PART:
+                continue
+            try:
+                ci = swap_client.ci(c)
+                if hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum():
+                    seed_key = swap_client.getWalletKey(c, 1)
+                    account_key = ci.getAccountKey(seed_key, zprv_prefix)
+                    extended_keys[getCoinName(c)] = account_key
+            except Exception as e:
+                logger.debug(f"Could not generate extended key for {coin_name}: {e}")
 
     finally:
         if swap_client:
@@ -2112,6 +2143,18 @@ def initialise_wallets(
                     particl_wallet_mnemonic
                 )
             )
+
+            if extended_keys:
+                print("Extended private keys (for external wallet import):")
+                for coin_name, key in extended_keys.items():
+                    print(f"  {coin_name}: {key}")
+                print("")
+                print(
+                    "NOTE: These keys can be imported into Electrum using 'Use a master key'."
+                )
+                print("WARNING: Write these down NOW. They will not be shown again.\n")
+
+    return extended_keys
 
 
 def load_config(config_path):
@@ -2279,6 +2322,9 @@ def main():
     tor_control_password = None
     client_auth_pwd_value = None
     disable_client_auth_flag = False
+    light_mode = False
+    coin_modes = {}
+    electrum_servers = {}
     extra_opts = {}
 
     if os.getenv("SSL_CERT_DIR", "") == "" and GUIX_SSL_CERT_DIR is not None:
@@ -2432,6 +2478,31 @@ def main():
 
         if name == "disable-client-auth":
             disable_client_auth_flag = True
+            continue
+        if name == "light":
+            light_mode = True
+            continue
+        if name.endswith("-mode") and len(s) == 2:
+            coin_prefix = name[:-5]
+            mode_value = s[1].strip().lower()
+            if mode_value not in ("rpc", "electrum", "remote"):
+                exitWithError(
+                    f"Invalid mode '{mode_value}' for {coin_prefix}. Use: rpc, electrum, or remote"
+                )
+            coin_modes[coin_prefix] = mode_value
+            continue
+        if name.endswith("-electrum-server") and len(s) == 2:
+            coin_prefix = name[:-16]
+            server_str = s[1].strip()
+            parts = server_str.split(":")
+            if len(parts) >= 2:
+                if len(parts) >= 3:
+                    server = f"{parts[0]}:{parts[1]}:{parts[2]}"
+                else:
+                    server = f"{parts[0]}:{parts[1]}"
+                if coin_prefix not in electrum_servers:
+                    electrum_servers[coin_prefix] = []
+                electrum_servers[coin_prefix].append(server)
             continue
         if len(s) != 2:
             exitWithError("Unknown argument {}".format(v))
@@ -2791,6 +2862,32 @@ def main():
         },
     }
 
+    electrum_supported_coins = {
+        "bitcoin": "btc",
+        "litecoin": "ltc",
+    }
+
+    for coin_name, coin_prefix in electrum_supported_coins.items():
+        if coin_name not in chainclients:
+            continue
+
+        use_electrum = False
+        if light_mode and coin_name != "particl":
+            use_electrum = True
+        if coin_prefix in coin_modes:
+            if coin_modes[coin_prefix] == "electrum":
+                use_electrum = True
+            elif coin_modes[coin_prefix] == "rpc":
+                use_electrum = False
+
+        if use_electrum:
+            chainclients[coin_name]["connection_type"] = "electrum"
+            chainclients[coin_name]["manage_daemon"] = False
+            if coin_prefix in electrum_servers:
+                chainclients[coin_name]["electrum_clearnet_servers"] = electrum_servers[
+                    coin_prefix
+                ]
+
     for coin_name, coin_settings in chainclients.items():
         coin_id = getCoinIdFromName(coin_name)
         coin_params = chainparams[coin_id]
@@ -3001,7 +3098,7 @@ def main():
                 )
 
                 if particl_wallet_mnemonic != "none":
-                    initialise_wallets(
+                    extended_keys = initialise_wallets(
                         None,
                         {
                             add_coin,
@@ -3012,6 +3109,18 @@ def main():
                         use_tor_proxy,
                         extra_opts=extra_opts,
                     )
+
+                    if extended_keys:
+                        print("\nExtended private key (for external wallet import):")
+                        for coin_name, key in extended_keys.items():
+                            print(f"  {coin_name}: {key}")
+                        print("")
+                        print(
+                            "NOTE: This key can be imported into Electrum using 'Use a master key'."
+                        )
+                        print(
+                            "WARNING: Write this down NOW. It will not be shown again.\n"
+                        )
 
                 save_config(config_path, settings)
         finally:

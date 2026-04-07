@@ -105,17 +105,31 @@
          <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
           Connection
          </h4>
-         
+
          <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-           
+
            <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Connection Type</label>
+            {% if c.supports_electrum %}
+            <div class="relative">
+             <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="connection_type_{{ c.name }}" data-original-value="{{ c.connection_type }}">
+              <option value="rpc" {% if c.connection_type == 'rpc' %} selected{% endif %}>Full Node (RPC)</option>
+              <option value="electrum" {% if c.connection_type == 'electrum' %} selected{% endif %}>Light Wallet (Electrum)</option>
+             </select>
+             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+             </div>
+            </div>
+            {% else %}
             <div class="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg text-sm text-gray-900 dark:text-gray-100">
              {{ c.connection_type }}
             </div>
+            {% endif %}
            </div>
-           
+
            {% if c.manage_daemon is defined %}
            <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Manage Daemon</label>
@@ -138,10 +152,167 @@
             {% endif %}
            </div>
            {% endif %}
-           
+
           </div>
          </div>
         </div>
+        {% endif %}
+
+        {% if c.supports_electrum %}
+        <div class="mb-6">
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          Mode Information
+         </h4>
+
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-4">
+
+          <div>
+           <p class="text-xs font-medium text-gray-900 dark:text-white mb-1">Light Wallet Mode (Electrum):</p>
+           <ul class="text-xs text-gray-700 dark:text-gray-200 space-y-0.5 ml-3">
+            <li>• No blockchain download needed - connect via external Electrum servers</li>
+            <li>• Uses BIP84 derivation (native SegWit) - lower fees, modern addresses (bc1q.../ltc1q...)</li>
+            <li>• You receive an extended private key (zprv/...) that can be imported into external wallets</li>
+            <li>• Best for: fresh installs, low storage, quick setup, mobile-friendly</li>
+           </ul>
+          </div>
+
+          <div>
+           <p class="text-xs font-medium text-gray-900 dark:text-white mb-1">Full Node Mode (RPC):</p>
+           <ul class="text-xs text-gray-700 dark:text-gray-200 space-y-0.5 ml-3">
+            <li>• Maximum privacy - no external servers, your node validates everything</li>
+            <li>• More wallet features: coin control, RBF, CPFP, raw transactions</li>
+            <li>• Supports legacy address types and coin-specific features (e.g. MWEB for LTC)</li>
+            <li>• Best for: existing node users, power users, maximum control</li>
+           </ul>
+          </div>
+
+          <div>
+           <p class="text-xs font-medium text-gray-900 dark:text-white mb-1">When switching modes:</p>
+           <ul class="text-xs text-gray-700 dark:text-gray-200 space-y-0.5 ml-3">
+            <li>• To Light: Save your BIP84 key shown during switch (for external wallet import)</li>
+            <li>• To Full Node: Funds on light wallet addresses must be transferred (network fee applies)</li>
+            <li>• Both modes share the same seed - switching is safe, just save keys when shown</li>
+           </ul>
+          </div>
+
+          <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
+           <p class="text-xs text-red-600 dark:text-red-400"><strong>Active Swaps:</strong> Complete all swaps before switching modes.</p>
+           {% if c.name == 'litecoin' %}
+           <p class="text-xs text-gray-700 dark:text-gray-200 mt-1"><strong>MWEB:</strong> Not supported in light wallet mode.</p>
+           {% endif %}
+           <p class="text-xs text-purple-600 dark:text-purple-400 mt-1"><strong>If TOR enabled:</strong> Electrum connections routed through TOR.</p>
+          </div>
+
+         </div>
+        </div>
+
+        {% if c.supports_electrum %}
+        <div id="electrum-section-{{ c.name }}" class="mb-6 {% if c.connection_type != 'electrum' %}hidden{% endif %}"
+             data-default-clearnet="{{ c.clearnet_servers_text }}"
+             data-default-onion="{{ c.onion_servers_text }}">
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          Electrum Servers
+         </h4>
+
+         <div class="mb-6">
+          <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">Clearnet</h5>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none font-mono" name="electrum_clearnet_{{ c.name }}" id="electrum_clearnet_{{ c.name }}" rows="3" placeholder="electrum.blockstream.info:50002&#10;electrum.emzy.de:50002">{% if c.connection_type == 'electrum' %}{{ c.clearnet_servers_text }}{% endif %}</textarea>
+           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Format: host:port (50002=SSL, 50001=non-SSL)</p>
+          </div>
+         </div>
+
+         <div class="mb-4 pt-2">
+          <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">TOR (.onion)</h5>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+           <textarea class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none font-mono text-xs" name="electrum_onion_{{ c.name }}" id="electrum_onion_{{ c.name }}" rows="3" placeholder="explorerzyd...onion:110&#10;lksvbmwwi2b...onion:50001">{% if c.connection_type == 'electrum' %}{{ c.onion_servers_text }}{% endif %}</textarea>
+           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">One per line. Used when TOR is enabled.</p>
+          </div>
+         </div>
+
+         <!-- Discover Servers Button -->
+         <div class="mb-4 flex justify-end">
+          <button type="button" class="discover-servers-btn inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors focus:outline-none focus:ring-0" data-coin="{{ c.name }}">
+           Discover {{ c.name }} electrum servers
+          </button>
+         </div>
+
+         <!-- Discovered Servers Panel -->
+         <div id="discovered-servers-{{ c.name }}" class="hidden mb-4">
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-xl overflow-hidden">
+           <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+            <h5 class="text-sm font-semibold text-gray-900 dark:text-white">
+             Discovered Servers
+            </h5>
+            <button type="button" class="close-discovered-btn text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white transition-colors" data-coin="{{ c.name }}">
+             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+             </svg>
+            </button>
+           </div>
+           <div class="px-6 py-4">
+            <div id="discovered-list-{{ c.name }}" class="space-y-1 max-h-64 overflow-y-auto">
+             <div class="text-sm text-gray-500 dark:text-gray-400">Click "Discover Servers" to find available servers...</div>
+            </div>
+           </div>
+          </div>
+         </div>
+
+        </div>
+
+        <div id="fund-transfer-section-{{ c.name }}" class="mb-6 hidden">
+         {% if c.lite_wallet_balance %}
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          Pending Balance
+         </h4>
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div class="p-3 bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg">
+           <p class="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+            <svg class="inline w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+            Light Wallet Balance Detected
+           </p>
+           <div class="text-xs text-orange-700 dark:text-orange-300 space-y-1">
+            <p><strong>Confirmed:</strong> {{ "%.8f"|format(c.lite_wallet_balance.confirmed) }} {{ c.display_name }}</p>
+            {% if c.lite_wallet_balance.unconfirmed > 0 %}
+            <p><strong>Unconfirmed:</strong> {{ "%.8f"|format(c.lite_wallet_balance.unconfirmed) }} {{ c.display_name }}</p>
+            {% endif %}
+            <p class="text-xs text-orange-600 dark:text-orange-400 mt-2">
+             {% if c.lite_wallet_balance.is_pending_sweep %}
+             <span class="inline-flex items-center"><svg class="animate-spin h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Sweep pending - waiting for confirmations...</span>
+             {% else %}
+             These funds will be swept to your RPC wallet automatically.
+             {% endif %}
+            </p>
+            {% if c.lite_wallet_balance.confirmed > 0 %}
+            <div class="mt-3">
+             <button type="submit" name="force_sweep_{{ c.name }}" value="1" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 dark:focus:ring-offset-gray-800" onclick="return confirm('Sweep {{ '%.8f'|format(c.lite_wallet_balance.confirmed) }} {{ c.display_name }} to your RPC wallet now? Network fee will apply.');">
+              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              Force Sweep Now
+             </button>
+            </div>
+            {% endif %}
+           </div>
+          </div>
+         </div>
+         {% endif %}
+
+         {% if general_settings.debug %}
+         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4 {% if c.lite_wallet_balance %}mt-6{% endif %}">
+          Advanced
+         </h4>
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div>
+           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Address Gap Limit</label>
+           <div class="flex items-center">
+            <input type="number" name="gap_limit_{{ c.name }}" value="{{ c.address_gap_limit }}" min="5" max="100" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-24 p-2.5 focus:ring-1 focus:outline-none" placeholder="50">
+            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(5-100)</span>
+           </div>
+           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Number of consecutive unfunded addresses to scan. Increase if you generated many unused addresses.</p>
+          </div>
+         </div>
+         {% endif %}
+        </div>
+        {% endif %}
         {% endif %}
 
         {% if c.name in ('wownero', 'monero') %}
@@ -648,6 +819,53 @@
           </button>
           <button type="button" id="confirmNo"
                   class="px-4 py-2.5 font-medium text-sm text-white hover:text-red border border-red-500 hover:border-red-500 hover:bg-red-600 bg-red-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="migrationModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg">
+      <div class="text-center">
+        <div class="flex justify-center mb-4">
+          <svg class="animate-spin h-12 w-12 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2" id="migrationTitle">Migrating Wallet</h2>
+        <p class="text-gray-600 dark:text-gray-200" id="migrationMessage">Extracting addresses from wallet. Please wait...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="walletModeModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity duration-300 ease-out"></div>
+  <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-500 rounded-lg max-w-lg w-full p-6 shadow-lg">
+      <div class="text-center">
+        <div class="flex justify-center mb-4">
+          <svg class="h-12 w-12 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="walletModeTitle">Switch Wallet Mode</h2>
+        <p class="text-gray-600 dark:text-gray-200 mb-4" id="walletModeMessage">Are you sure you want to switch wallet modes?</p>
+        <div id="walletModeDetails" class="text-left bg-gray-100 dark:bg-gray-600 rounded-lg p-4 mb-4 text-sm text-gray-700 dark:text-gray-200">
+        </div>
+        <div class="flex justify-center gap-4">
+          <button type="button" id="walletModeConfirm"
+                  class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            Switch Mode
+          </button>
+          <button type="button" id="walletModeCancel"
+                  class="px-4 py-2.5 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-700 font-medium text-sm text-gray-800 dark:text-white rounded-md border border-gray-300 dark:border-gray-500 focus:ring-0 focus:outline-none">
             Cancel
           </button>
         </div>
