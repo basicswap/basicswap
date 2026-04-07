@@ -325,18 +325,6 @@ class LTCInterfaceMWEB(LTCInterface):
                 self._log.debug(f'Loaded existing wallet "{self._rpc_wallet}".')
             except Exception as e:
                 if "does not exist" in str(e) or "Path does not exist" in str(e):
-                    try:
-                        wallet_dirs = self.rpc("listwalletdir")
-                        existing = [w["name"] for w in wallet_dirs.get("wallets", [])]
-                    except Exception:
-                        existing = []
-                    if existing:
-                        raise ValueError(
-                            f'{self.coin_name()} wallet "{self._rpc_wallet}" does not exist.'
-                            f" Other wallets found on disk: {existing}."
-                            f' Set "wallet_name" in your {self.coin_name()} config to the correct wallet name,'
-                            f" or use restorewallet to set the wallet name."
-                        )
                     self._log.info(
                         f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                     )
