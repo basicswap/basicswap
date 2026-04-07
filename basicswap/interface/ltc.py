@@ -60,6 +60,7 @@ class LTCInterface(BTCInterface):
                             f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                         )
                         try:
+                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             self.rpc(
                                 "createwallet",
                                 [
@@ -211,6 +212,7 @@ class LTCInterface(BTCInterface):
                         self._log.info(
                             f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                         )
+                        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                         self.rpc(
                             "createwallet",
                             [
@@ -316,6 +318,7 @@ class LTCInterfaceMWEB(LTCInterface):
                     self._log.info(
                         f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                     )
+                    # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                     self.rpc(
                         "createwallet",
                         [

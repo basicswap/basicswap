@@ -404,6 +404,7 @@ class BTCInterface(Secp256k1Interface):
                             f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                         )
                         try:
+                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             self.rpc(
                                 "createwallet",
                                 [
@@ -3848,6 +3849,7 @@ class BTCInterface(Secp256k1Interface):
     def createWallet(self, wallet_name: str, password: str = "") -> None:
         if self._connection_type == "electrum":
             return
+        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
         self.rpc(
             "createwallet",
             [wallet_name, False, True, password, False, self._use_descriptors],
@@ -4113,6 +4115,7 @@ class BTCInterface(Secp256k1Interface):
                             self._log.info(
                                 f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                             )
+                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                             self.rpc(
                                 "createwallet",
                                 [
