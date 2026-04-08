@@ -5,7 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 
-from .db import Column, Index, Table, UniqueConstraint
+from .db import Column, Index, Table, UniqueConstraint, extract_schema
 
 
 class WalletAddress(Table):
@@ -120,3 +120,7 @@ class WalletPendingTx(Table):
 
     __unique_1__ = UniqueConstraint("coin_type", "txid")
     __index_pending_coin__ = Index("idx_pending_coin", "coin_type", "confirmed_at")
+
+
+def extract_wallet_schema() -> dict:
+    return extract_schema(input_globals=globals())

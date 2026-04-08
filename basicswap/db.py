@@ -772,8 +772,8 @@ class NetworkPortal(Table):
     created_at = Column("integer")
 
 
-def extract_schema(extra_tables: list = None) -> dict:
-    g = globals().copy()
+def extract_schema(extra_tables: list = None, input_globals: dict = None) -> dict:
+    g = (input_globals if input_globals else globals()).copy()
 
     if extra_tables:
         for table_class in extra_tables:
@@ -898,18 +898,21 @@ def create_table(c, table_name, table) -> None:
         c.execute(query)
 
 
-def create_db_(con, log, extra_tables: list = None) -> None:
-    db_schema = extract_schema(extra_tables=extra_tables)
+def create_db_(con, log) -> None:
+    from .db_wallet import extract_wallet_schema
+
+    db_schema = extract_schema()
+    db_schema.update(extract_wallet_schema())
     c = con.cursor()
     for table_name, table in db_schema.items():
         create_table(c, table_name, table)
 
 
-def create_db(db_path: str, log, extra_tables: list = None) -> None:
+def create_db(db_path: str, log) -> None:
     con = None
     try:
         con = sqlite3.connect(db_path)
-        create_db_(con, log, extra_tables=extra_tables)
+        create_db_(con, log)
         con.commit()
     finally:
         if con:
