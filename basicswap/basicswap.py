@@ -148,14 +148,7 @@ from .db import (
     XmrSwap,
 )
 from .wallet_manager import WalletManager
-from .db_wallet import (
-    WalletAddress,
-    WalletLockedUTXO,
-    WalletPendingTx,
-    WalletState,
-    WalletTxCache,
-    WalletWatchOnly,
-)
+
 from .explorers import (
     ExplorerInsight,
     ExplorerBitAps,
@@ -614,15 +607,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if not db_exists:
             self.log.info("First run")
-            wallet_tables = [
-                WalletAddress,
-                WalletLockedUTXO,
-                WalletPendingTx,
-                WalletState,
-                WalletTxCache,
-                WalletWatchOnly,
-            ]
-            create_db(self.sqlite_file, self.log, extra_tables=wallet_tables)
+            create_db(self.sqlite_file, self.log)
 
         cursor = self.openDB()
         try:

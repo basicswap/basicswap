@@ -18,14 +18,7 @@ from .db import (
     extract_schema,
 )
 
-from .db_wallet import (
-    WalletAddress,
-    WalletLockedUTXO,
-    WalletPendingTx,
-    WalletState,
-    WalletTxCache,
-    WalletWatchOnly,
-)
+from .db_wallet import extract_wallet_schema
 
 from .basicswap_util import (
     BidStates,
@@ -277,15 +270,8 @@ def upgradeDatabase(self, db_version: int):
         ),
     ]
 
-    wallet_tables = [
-        WalletAddress,
-        WalletLockedUTXO,
-        WalletPendingTx,
-        WalletState,
-        WalletTxCache,
-        WalletWatchOnly,
-    ]
-    expect_schema = extract_schema(extra_tables=wallet_tables)
+    expect_schema = extract_schema()
+    expect_schema.update(extract_wallet_schema())
     have_tables = {}
     try:
         cursor = self.openDB()
