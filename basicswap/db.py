@@ -772,12 +772,8 @@ class NetworkPortal(Table):
     created_at = Column("integer")
 
 
-def extract_schema(extra_tables: list = None, input_globals: dict = None) -> dict:
+def extract_schema(input_globals: dict = None) -> dict:
     g = (input_globals if input_globals else globals()).copy()
-
-    if extra_tables:
-        for table_class in extra_tables:
-            g[table_class.__name__] = table_class
 
     tables = {}
     for name, obj in g.items():
