@@ -95,7 +95,7 @@ def prepareDataDir(
         fp.write("fallbackfee=0.01\n")
         fp.write("acceptnonstdtxn=0\n")
         fp.write("txindex=1\n")
-        fp.write("wallet=wallet.dat\n")
+        fp.write("wallet=bsx_wallet\n")
 
         fp.write("findpeers=0\n")
 

@@ -112,7 +112,7 @@ def prepareOtherDir(datadir, nodeId, conf_file="dash.conf"):
         fp.write("acceptnonstdtxn=0\n")
 
         if conf_file == "bitcoin.conf":
-            fp.write("wallet=wallet.dat\n")
+            fp.write("wallet=bsx_wallet\n")
 
 
 def prepareDir(datadir, nodeId, network_key, network_pubkey):
@@ -137,7 +137,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
         fp.write("debug=1\n")
         fp.write("debugexclude=libevent\n")
         fp.write("zmqpubsmsg=tcp://127.0.0.1:" + str(BASE_ZMQ_PORT + nodeId) + "\n")
-        fp.write("wallet=wallet.dat\n")
+        fp.write("wallet=bsx_wallet\n")
         fp.write("fallbackfee=0.01\n")
 
         fp.write("acceptnonstdtxn=0\n")
@@ -313,7 +313,7 @@ class Test(unittest.TestCase):
                     cfg.BITCOIN_BINDIR,
                     btc_data_dir,
                     "regtest",
-                    "-wallet=wallet.dat -legacy create",
+                    "-wallet=bsx_wallet -legacy create",
                     "bitcoin-wallet",
                 )
             except Exception:
@@ -321,7 +321,7 @@ class Test(unittest.TestCase):
                     cfg.BITCOIN_BINDIR,
                     btc_data_dir,
                     "regtest",
-                    "-wallet=wallet.dat create",
+                    "-wallet=bsx_wallet create",
                     "bitcoin-wallet",
                 )
         cls.daemons.append(startDaemon(btc_data_dir, cfg.BITCOIN_BINDIR, cfg.BITCOIND))
@@ -333,7 +333,7 @@ class Test(unittest.TestCase):
 
         if os.path.exists(os.path.join(DASH_BINDIR, 'dash-wallet')):
             logging.info('Creating DASH wallet.')
-            callrpc_cli(DASH_BINDIR, dash_data_dir, 'regtest', '-wallet=wallet.dat create', 'dash-wallet')
+            callrpc_cli(DASH_BINDIR, dash_data_dir, 'regtest', '-wallet=bsx_wallet create', 'dash-wallet')
         """
         cls.daemons.append(startDaemon(dash_data_dir, DASH_BINDIR, DASHD))
         logging.info("Started %s %d", DASHD, cls.daemons[-1].handle.pid)
@@ -346,7 +346,7 @@ class Test(unittest.TestCase):
                         cfg.PARTICL_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat -legacy create",
+                        "-wallet=bsx_wallet -legacy create",
                         "particl-wallet",
                     )
                 except Exception:
@@ -354,7 +354,7 @@ class Test(unittest.TestCase):
                         cfg.PARTICL_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat create",
+                        "-wallet=bsx_wallet create",
                         "particl-wallet",
                     )
             cls.daemons.append(startDaemon(data_dir, cfg.PARTICL_BINDIR, cfg.PARTICLD))
@@ -410,7 +410,7 @@ class Test(unittest.TestCase):
 
             waitForRPC(dashRpc, delay_event, rpc_command="getblockchaininfo")
             if len(dashRpc("listwallets")) < 1:
-                dashRpc("createwallet wallet.dat")
+                dashRpc("createwallet wbsx_wallet")
 
             sc.start()
 

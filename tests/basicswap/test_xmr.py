@@ -415,7 +415,7 @@ class BaseTest(unittest.TestCase):
                                 cfg.PARTICL_BINDIR,
                                 data_dir,
                                 "regtest",
-                                "-wallet=wallet.dat -legacy create",
+                                "-wallet=bsx_wallet -legacy create",
                                 part_wallet_bin,
                             )
                         except Exception as e:
@@ -426,7 +426,7 @@ class BaseTest(unittest.TestCase):
                                 cfg.PARTICL_BINDIR,
                                 data_dir,
                                 "regtest",
-                                "-wallet=wallet.dat create",
+                                "-wallet=bsx_wallet create",
                                 part_wallet_bin,
                             )
 
@@ -504,7 +504,7 @@ class BaseTest(unittest.TestCase):
                                     cfg.BITCOIN_BINDIR,
                                     data_dir,
                                     "regtest",
-                                    "-wallet=wallet.dat -legacy create",
+                                    "-wallet=bsx_wallet -legacy create",
                                     btc_wallet_bin,
                                 )
                             except Exception as e:
@@ -515,7 +515,7 @@ class BaseTest(unittest.TestCase):
                                     cfg.BITCOIN_BINDIR,
                                     data_dir,
                                     "regtest",
-                                    "-wallet=wallet.dat create",
+                                    "-wallet=bsx_wallet create",
                                     btc_wallet_bin,
                                 )
 
@@ -537,7 +537,7 @@ class BaseTest(unittest.TestCase):
                     )
                     # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                     rpc_func(
-                        "createwallet", ["wallet.dat", False, True, "", False, True]
+                        "createwallet", ["bsx_wallet", False, True, "", False, True]
                     )
                     rpc_func("createwallet", ["bsx_watch", True, True, "", False, True])
                 else:
@@ -567,7 +567,7 @@ class BaseTest(unittest.TestCase):
                                 cfg.LITECOIN_BINDIR,
                                 data_dir,
                                 "regtest",
-                                "-wallet=wallet.dat create",
+                                "-wallet=bsx_wallet create",
                                 ltc_wallet_bin,
                             )
 
@@ -724,7 +724,7 @@ class BaseTest(unittest.TestCase):
                     "getnewaddress",
                     ["mining_addr", "bech32"],
                     base_rpc_port=BTC_BASE_RPC_PORT,
-                    wallet="wallet.dat",
+                    wallet="bsx_wallet",
                 )
                 num_blocks = 400  # Mine enough to activate segwit
                 logging.info(f"Mining {num_blocks} Bitcoin blocks to {cls.btc_addr}")
@@ -740,7 +740,7 @@ class BaseTest(unittest.TestCase):
                     "getnewaddress",
                     ["initial addr"],
                     base_rpc_port=BTC_BASE_RPC_PORT,
-                    wallet="wallet.dat",
+                    wallet="bsx_wallet",
                 )
                 for i in range(5):
                     callnoderpc(
@@ -748,7 +748,7 @@ class BaseTest(unittest.TestCase):
                         "sendtoaddress",
                         [btc_addr1, 100],
                         base_rpc_port=BTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
 
                 # Switch addresses so wallet amounts stay constant
@@ -793,7 +793,7 @@ class BaseTest(unittest.TestCase):
                         "getnewaddress",
                         ["mining_addr", "bech32"],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
                     logging.info(
                         f"Mining {num_blocks} Litecoin blocks to {cls.ltc_addr}"
@@ -803,7 +803,7 @@ class BaseTest(unittest.TestCase):
                         "generatetoaddress",
                         [num_blocks, cls.ltc_addr],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
 
                     num_blocks = 31
@@ -820,7 +820,7 @@ class BaseTest(unittest.TestCase):
                         "generatetoaddress",
                         [num_blocks, cls.ltc_addr],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
 
                     # https://github.com/litecoin-project/litecoin/issues/807
@@ -830,14 +830,14 @@ class BaseTest(unittest.TestCase):
                         "getnewaddress",
                         ["mweb_addr", "mweb"],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
                     callnoderpc(
                         0,
                         "sendtoaddress",
                         [mweb_addr, 1],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
 
                     ltc_addr1 = callnoderpc(
@@ -845,7 +845,7 @@ class BaseTest(unittest.TestCase):
                         "getnewaddress",
                         ["initial addr"],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
                     for i in range(5):
                         callnoderpc(
@@ -853,7 +853,7 @@ class BaseTest(unittest.TestCase):
                             "sendtoaddress",
                             [ltc_addr1, 100],
                             base_rpc_port=LTC_BASE_RPC_PORT,
-                            wallet="wallet.dat",
+                            wallet="bsx_wallet",
                         )
 
                     num_blocks = 69
@@ -867,7 +867,7 @@ class BaseTest(unittest.TestCase):
                         "generatetoaddress",
                         [num_blocks, cls.ltc_addr],
                         base_rpc_port=LTC_BASE_RPC_PORT,
-                        wallet="wallet.dat",
+                        wallet="bsx_wallet",
                     )
 
                     checkForks(
@@ -875,7 +875,7 @@ class BaseTest(unittest.TestCase):
                             0,
                             "getblockchaininfo",
                             base_rpc_port=LTC_BASE_RPC_PORT,
-                            wallet="wallet.dat",
+                            wallet="bsx_wallet",
                         )
                     )
 

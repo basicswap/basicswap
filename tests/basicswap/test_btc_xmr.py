@@ -1999,7 +1999,7 @@ class BasicSwapTest(TestFunctions):
             assert addr1_info[key_id_field] == addr_int1_info[key_id_field]
             assert original_seed_id == after_seed_id
         finally:
-            ci.setActiveWallet("wallet.dat")
+            ci.setActiveWallet("bsx_wallet")
             chain_client_settings["manage_daemon"] = False
 
     def test_015_changetype(self):

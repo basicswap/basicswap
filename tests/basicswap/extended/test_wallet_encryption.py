@@ -313,7 +313,7 @@ class Test(unittest.TestCase):
             ltc_datadir = os.path.join(test_path, "litecoin")
             rv = json.loads(
                 callcoincli(
-                    ltc_cli_path, ltc_datadir, "getwalletinfo", wallet="wallet.dat"
+                    ltc_cli_path, ltc_datadir, "getwalletinfo", wallet="bsx_wallet"
                 )
             )
             assert "unlocked_until" in rv
@@ -474,7 +474,7 @@ class Test(unittest.TestCase):
             ltc_datadir = os.path.join(test_path, "litecoin")
             rv = json.loads(
                 callcoincli(
-                    ltc_cli_path, ltc_datadir, "getwalletinfo", wallet="wallet.dat"
+                    ltc_cli_path, ltc_datadir, "getwalletinfo", wallet="bsx_wallet"
                 )
             )
             assert "unlocked_until" in rv
@@ -653,7 +653,7 @@ class Test(unittest.TestCase):
             logging.info("Check both LTC wallets are encrypted and mweb seeds match.")
             rv = json.loads(
                 callcoincli(
-                    ltc_cli_path, ltc_datadir, "getwalletinfo", wallet="wallet.dat"
+                    ltc_cli_path, ltc_datadir, "getwalletinfo", wallet="bsx_wallet"
                 )
             )
             assert "unlocked_until" in rv
@@ -769,7 +769,7 @@ class Test(unittest.TestCase):
             )
 
             walletdir = os.path.join(test_path, "regtest", "wallets", "bdb_wallet")
-            walletpath = os.path.join(walletdir, "wallet.dat")
+            walletpath = os.path.join(walletdir, "bsx_wallet")
 
             db = berkeleydb.db.DB()
             db.open(
@@ -812,10 +812,10 @@ class Test(unittest.TestCase):
                 ],
             )
 
-            bkp_path = os.path.join(walletdir, "wallet.dat" + ".bkp")
+            bkp_path = os.path.join(walletdir, "bsx_wallet" + ".bkp")
             for i in range(1000):
                 if os.path.exists(bkp_path):
-                    bkp_path = os.path.join(walletdir, "wallet.dat" + f".bkp{i}")
+                    bkp_path = os.path.join(walletdir, "bsx_wallet" + f".bkp{i}")
 
             assert os.path.exists(bkp_path) is False
             if os.path.isfile(walletpath):
@@ -940,7 +940,7 @@ class Test(unittest.TestCase):
             )
             logging.info(f"Looking for hdchain for {seedid_bytes.hex()}")
             walletdir = os.path.join(test_path, "regtest", "wallets", "bdb_wallet2")
-            walletpath = os.path.join(walletdir, "wallet.dat")
+            walletpath = os.path.join(walletdir, "bsx_wallet")
             found_hdchain = False
             max_key_count = 4000000  # arbitrary
             with open(walletpath, "rb") as fp:
@@ -1134,7 +1134,7 @@ class Test(unittest.TestCase):
             )
 
             walletdir = os.path.join(test_path, "regtest", "wallets", "descr_wallet")
-            walletpath = os.path.join(walletdir, "wallet.dat")
+            walletpath = os.path.join(walletdir, "bsx_wallet")
 
             orig_active_descriptors = []
             with sqlite3.connect(walletpath) as conn:
@@ -1234,10 +1234,10 @@ class Test(unittest.TestCase):
                     "descr_wallet",
                 ],
             )
-            bkp_path = os.path.join(walletdir, "wallet.dat" + ".bkp")
+            bkp_path = os.path.join(walletdir, "bsx_wallet" + ".bkp")
             for i in range(1000):
                 if os.path.exists(bkp_path):
-                    bkp_path = os.path.join(walletdir, "wallet.dat" + f".bkp{i}")
+                    bkp_path = os.path.join(walletdir, "bsx_wallet" + f".bkp{i}")
 
             assert os.path.exists(bkp_path) is False
             if os.path.isfile(walletpath):

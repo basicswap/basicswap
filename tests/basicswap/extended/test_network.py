@@ -216,7 +216,7 @@ class Test(unittest.TestCase):
                         cfg.PARTICL_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat -legacy create",
+                        "-wallet=bsx_wallet -legacy create",
                         "particl-wallet",
                     )
 
@@ -286,7 +286,7 @@ class Test(unittest.TestCase):
                         cfg.BITCOIN_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat -legacy create",
+                        "-wallet=bsx_wallet -legacy create",
                         "bitcoin-wallet",
                     )
 

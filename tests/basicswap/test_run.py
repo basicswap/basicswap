@@ -88,7 +88,7 @@ class Test(BaseTest):
             "getnewaddress",
             ["initial funds", "bech32"],
             base_rpc_port=LTC_BASE_RPC_PORT,
-            wallet="wallet.dat",
+            wallet="bsx_wallet",
         )
 
         callnoderpc(
@@ -99,7 +99,7 @@ class Test(BaseTest):
             "sendtoaddress",
             [ltc_addr1, 1000],
             base_rpc_port=LTC_BASE_RPC_PORT,
-            wallet="wallet.dat",
+            wallet="bsx_wallet",
         )
 
         wait_for_balance(
@@ -975,7 +975,7 @@ class Test(BaseTest):
             "getnewaddress",
             ["Withdrawal test", "legacy"],
             base_rpc_port=LTC_BASE_RPC_PORT,
-            wallet="wallet.dat",
+            wallet="bsx_wallet",
         )
         wallets0 = read_json_api(TEST_HTTP_PORT + 0, "wallets")
         assert float(wallets0["LTC"]["balance"]) > 100

@@ -144,7 +144,7 @@ class TestBCH(BasicSwapTest):
                         BITCOINCASH_BINDIR,
                         data_dir,
                         "regtest",
-                        "-wallet=wallet.dat create",
+                        "-wallet=bsx_wallet create",
                         bch_wallet_bin,
                     )
                 except Exception as e:
@@ -172,7 +172,7 @@ class TestBCH(BasicSwapTest):
             "getnewaddress",
             ["mining_addr"],
             base_rpc_port=BCH_BASE_RPC_PORT,
-            wallet="wallet.dat",
+            wallet="bsx_wallet",
         )
         if not cls.restore_instance:
             num_blocks: int = 200
@@ -182,7 +182,7 @@ class TestBCH(BasicSwapTest):
                 "generatetoaddress",
                 [num_blocks, cls.bch_addr],
                 base_rpc_port=BCH_BASE_RPC_PORT,
-                wallet="wallet.dat",
+                wallet="bsx_wallet",
             )
 
     @classmethod
