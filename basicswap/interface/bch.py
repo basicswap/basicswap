@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,7 +10,6 @@ from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, C
 from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
 from .btc import BTCInterface, ensure_op, findOutput
-from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.bch_test_framework.cashaddress import Address
 from basicswap.util.crypto import hash160, sha256
@@ -74,12 +73,7 @@ class BCHInterface(BTCInterface):
 
     def __init__(self, coin_settings, network, swap_client=None):
         super(BCHInterface, self).__init__(coin_settings, network, swap_client)
-        # No multiwallet support
         self.swap_client = swap_client
-        self.rpc_wallet = make_rpc_func(
-            self._rpcport, self._rpcauth, host=self._rpc_host
-        )
-        self.rpc_wallet_watch = self.rpc_wallet
 
     def has_segwit(self) -> bool:
         # bch does not have segwit, but we return true here to avoid extra checks in basicswap.py
