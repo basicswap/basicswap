@@ -164,6 +164,7 @@ def prepare_swapclient_dir(
                 "bindir": cfg.PARTICL_BINDIR,
                 "blocks_confirmed": 2,  # Faster testing
                 "anon_tx_ring_size": 5,  # Faster testing
+                "wallet_name": "bsx_wallet",
             },
             "bitcoin": {
                 "connection_type": "rpc",
@@ -176,6 +177,7 @@ def prepare_swapclient_dir(
                 "use_segwit": True,
                 "use_descriptors": BTC_USE_DESCRIPTORS,
                 "use_legacy_key_paths": BTC_USE_LEGACY_KEY_PATHS,
+                "wallet_name": "bsx_wallet",
             },
         },
         "check_progress_seconds": 2,
