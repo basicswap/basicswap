@@ -3949,6 +3949,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as e:
             raise ValueError(f"Invalid message networks: {e}")
 
+    def isValidSwapDest(self, ci, dest: bytes):
+        ensure(isinstance(dest, bytes), "Swap destination must be bytes")
+        if ci.coin_type() in (Coins.PART_BLIND,):
+            return ci.isValidPubkey(dest)
+        # TODO: allow p2wsh
+        return ci.isValidAddressHash(dest)
+
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
     ) -> None:
@@ -5350,12 +5357,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.loadBidTxns(bid, cursor)
         return bid, xmr_swap
 
-    def getXmrBid(self, bid_id: bytes):
+    def getXmrBid(self, bid_id: bytes, cursor=None):
         try:
-            cursor = self.openDB()
-            return self.getXmrBidFromSession(cursor, bid_id)
+            use_cursor = self.openDB(cursor)
+            return self.getXmrBidFromSession(use_cursor, bid_id)
         finally:
-            self.closeDB(cursor, commit=False)
+            if cursor is None:
+                self.closeDB(use_cursor, commit=False)
 
     def getXmrOfferFromSession(self, cursor, offer_id: bytes):
         offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
@@ -5860,7 +5868,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         if bid.bid_id and bid_msg_id != bid.bid_id:
             self.log.warning(
-                f"sendBidMessage: Mismatched bid ids: {bid.bid_id.hex()}, {bid_msg_id.hex()}."
+                f"sendBidMessage: Mismatched bid ids: {self.log.id(bid.bid_id)}, {self.log.id(bid_msg_id)}."
             )
         return bid_msg_id
 
@@ -7756,7 +7764,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     len(xmr_swap.al_lock_refund_tx_sig) > 0
                     and len(xmr_swap.af_lock_refund_tx_sig) > 0
                 ):
+
                     try:
+                        if bid.xmr_b_lock_tx is None and self.haveDebugInd(
+                            bid.bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_PREREFUND
+                        ):
+                            raise TemporaryError("Debug: Waiting for Coin B Lock Tx")
                         txid = ci_from.publishTx(xmr_swap.a_lock_refund_tx)
 
                         # BCH txids change
@@ -7806,6 +7819,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                             self.commitDB()
                             return rv
+                        else:
+                            self.log.warning(
+                                f"Trying to publish coin a lock refund tx: {ex}"
+                            )
 
             state = BidStates(bid.state)
             if state == BidStates.SWAP_COMPLETED:
@@ -8051,6 +8068,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                                     self.log.warning(
                                         f"Not releasing ads script coin lock tx for bid {self.log.id(bid_id)}: Chain A lock refund tx already exists."
+                                    )
+                                elif (
+                                    bid.debug_ind == DebugTypes.DONT_RELEASE_COIN_A_LOCK
+                                ):
+                                    self.logBidEvent(
+                                        bid_id,
+                                        EventLogTypes.DEBUG_TWEAK_APPLIED,
+                                        f"ind {DebugTypes.DONT_RELEASE_COIN_A_LOCK}",
+                                        None,
                                     )
                                 else:
                                     delay = self.get_delay_event_seconds()
@@ -8498,9 +8524,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         watched = self.coin_clients[coin_type]["watched_transactions"]
-
-        for wo in watched:
-            if wo.bid_id == bid_id and wo.txid_hex == txid_hex:
+        for wt in watched:
+            if wt.bid_id == bid_id and wt.txid_hex == txid_hex:
                 self.log.debug("Transaction already being watched.")
                 return
 
@@ -8938,7 +8963,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             else:
                 self.log.info(
-                    f"Coin a lock refund spent by unknown tx, bid {self.log.id(bid_id)}."
+                    f"Coin a lock refund spent by unknown tx, bid {self.log.id(bid_id)}, txid {self.logIDT(spending_txid)}."
                 )
 
                 mercy_keyshare = None
@@ -8965,6 +8990,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
                         else:
                             delay = self.get_delay_event_seconds()
+                            self.log.info("Found mercy output.")
                             self.log.info(
                                 f"Redeeming coin b lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
                             )
@@ -9283,6 +9309,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.processFoundTransaction(
                             t, block_hash, block["height"], chain_blocks
                         )
+
                 for s in c["watched_scripts"]:
                     for i, txo in enumerate(tx["vout"]):
                         if "scriptPubKey" in txo and "hex" in txo["scriptPubKey"]:
@@ -12159,7 +12186,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.af_lock_refund_spend_tx_sig = ci_from.decryptOtVES(
                     kbsl, xmr_swap.af_lock_refund_spend_tx_esig
                 )
-                prevout_amount = ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap)
+                prevout_amount: int = ci_from.getLockRefundTxSwapOutputValue(
+                    bid, xmr_swap
+                )
                 al_lock_refund_spend_tx_sig = ci_from.signTx(
                     kal,
                     xmr_swap.a_lock_refund_spend_tx,
@@ -12586,8 +12615,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci_from.verifyPubkey(msg_data.pkaf), "Invalid chain A follower public key"
         )
         ensure(
-            ci_from.isValidAddressHash(msg_data.dest_af)
-            or ci_from.isValidPubkey(msg_data.dest_af),
+            self.isValidSwapDest(ci_from, msg_data.dest_af),
             "Invalid destination address",
         )
         if ci_to.curve_type() == Curves.ed25519:

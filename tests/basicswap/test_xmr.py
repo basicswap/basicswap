@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -263,9 +263,7 @@ def waitForXMRNode(rpc_offset, max_tries=7):
         except Exception as ex:
             if i < max_tries:
                 logging.warning(
-                    "Can't connect to XMR RPC: %s. Retrying in %d second/s.",
-                    str(ex),
-                    (i + 1),
+                    f"Can't connect to XMR RPC: {ex}. Retrying in {i + 1} second/s."
                 )
                 time.sleep(i + 1)
     raise ValueError("waitForXMRNode failed")
@@ -281,9 +279,7 @@ def waitForXMRWallet(rpc_offset, auth, max_tries=7):
         except Exception as ex:
             if i < max_tries:
                 logging.warning(
-                    "Can't connect to XMR wallet RPC: %s. Retrying in %d second/s.",
-                    str(ex),
-                    (i + 1),
+                    f"Can't connect to XMR wallet RPC: {ex}. Retrying in {i + 1} second/s."
                 )
                 time.sleep(i + 1)
     raise ValueError("waitForXMRWallet failed")
@@ -304,7 +300,7 @@ def run_coins_loop(cls):
             cls.coins_loop()
         except Exception as e:
             logging.warning("run_coins_loop " + str(e))
-        test_delay_event.wait(1.0)
+        test_delay_event.wait(cls.coins_loop_delay)
 
 
 def run_loop(cls):
@@ -336,6 +332,7 @@ class BaseTest(unittest.TestCase):
     xmr_addr = None
     btc_addr = None
     ltc_addr = None
+    coins_loop_delay = 1.0
 
     @classmethod
     def getRandomPubkey(cls):
@@ -345,7 +342,7 @@ class BaseTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if signal_event.is_set():
-            raise ValueError("Test has been cancelled.")
+            raise ValueError("Test has been cancelled")
         test_delay_event.clear()
         random.seed(time.time())
 
@@ -400,7 +397,7 @@ class BaseTest(unittest.TestCase):
         cls.prepareTestDir()
 
         try:
-            logging.info("Preparing coin nodes.")
+            logging.info("Preparing coin nodes")
             part_wallet_bin = "particl-wallet" + (".exe" if os.name == "nt" else "")
             for i in range(NUM_NODES):
                 if not cls.restore_instance:
@@ -411,7 +408,7 @@ class BaseTest(unittest.TestCase):
                             part_wallet_bin,
                         )
                     ):
-                        logging.warning(f"{part_wallet_bin} not found.")
+                        logging.warning(f"{part_wallet_bin} not found")
                     else:
                         try:
                             callrpc_cli(
@@ -623,10 +620,8 @@ class BaseTest(unittest.TestCase):
                     )
 
                 for i in range(NUM_XMR_NODES):
-                    cls.xmr_wallet_auth.append(
-                        ("test{0}".format(i), "test_pass{0}".format(i))
-                    )
-                    logging.info("Creating XMR wallet %i", i)
+                    cls.xmr_wallet_auth.append((f"test{i}", f"test_pass{i}"))
+                    logging.info(f"Creating XMR wallet {i}")
 
                     waitForXMRWallet(i, cls.xmr_wallet_auth[i])
 
@@ -732,7 +727,7 @@ class BaseTest(unittest.TestCase):
                     wallet="wallet.dat",
                 )
                 num_blocks = 400  # Mine enough to activate segwit
-                logging.info("Mining %d Bitcoin blocks to %s", num_blocks, cls.btc_addr)
+                logging.info(f"Mining {num_blocks} Bitcoin blocks to {cls.btc_addr}")
                 callnoderpc(
                     0,
                     "generatetoaddress",
@@ -763,7 +758,7 @@ class BaseTest(unittest.TestCase):
                     .ci(Coins.BTC)
                     .pubkey_to_segwit_address(void_block_rewards_pubkey)
                 )
-                logging.info("Mining %d Bitcoin blocks to %s", num_blocks, cls.btc_addr)
+                logging.info(f"Mining {num_blocks} Bitcoin blocks to {cls.btc_addr}")
                 callnoderpc(
                     0,
                     "generatetoaddress",
@@ -801,7 +796,7 @@ class BaseTest(unittest.TestCase):
                         wallet="wallet.dat",
                     )
                     logging.info(
-                        "Mining %d Litecoin blocks to %s", num_blocks, cls.ltc_addr
+                        f"Mining {num_blocks} Litecoin blocks to {cls.ltc_addr}"
                     )
                     callnoderpc(
                         0,

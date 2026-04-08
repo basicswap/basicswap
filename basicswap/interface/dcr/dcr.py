@@ -1403,7 +1403,7 @@ class DCRInterface(Secp256k1Interface):
         )
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return True
 
@@ -1472,7 +1472,7 @@ class DCRInterface(Secp256k1Interface):
         )
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return txid, locked_coin, locked_n
 
@@ -1533,7 +1533,7 @@ class DCRInterface(Secp256k1Interface):
         )
 
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return True
 

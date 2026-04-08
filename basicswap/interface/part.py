@@ -658,7 +658,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         ensure(
             self.compareFeeRates(fee_rate_paid, feerate),
-            "Bad fee rate, expected: {}".format(feerate),
+            f"Bad fee rate, expected: {feerate}",
         )
 
         return (
@@ -734,7 +734,7 @@ class PARTInterfaceBlind(PARTInterface):
         fee_rate_paid = fee_paid * 1000 // vsize
         ensure(
             self.compareFeeRates(fee_rate_paid, feerate),
-            "Bad fee rate, expected: {}".format(feerate),
+            f"Bad fee rate, expected: {feerate}",
         )
 
         return True
@@ -958,7 +958,7 @@ class PARTInterfaceBlind(PARTInterface):
         fee_rate_paid = fee_paid * 1000 // vsize
         self._log.info("vsize, feerate: %ld, %ld", vsize, fee_rate_paid)
         if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError("Bad fee rate, expected: {}".format(feerate))
+            raise ValueError(f"Bad fee rate, expected: {feerate}")
 
         return True
 

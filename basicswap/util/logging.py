@@ -45,3 +45,21 @@ class BSXLogger(logging.Logger):
     def info_s(self, msg, *args, **kwargs):
         if self.safe_logs is False:
             self.info(msg, *args, **kwargs)
+
+
+class BSXLogAdapter(logging.LoggerAdapter):
+    def __init__(self, logger, prefix):
+        super().__init__(logger, {})
+        self.prefix = prefix
+
+    def process(self, msg, kwargs):
+        return f"{self.prefix} {msg}", kwargs
+
+    def addr(self, addr: str) -> str:
+        return self.logger.addr(addr)
+
+    def id(self, concept_id: bytes, prefix: str = "") -> str:
+        return self.logger.id(concept_id, prefix)
+
+    def info_s(self, msg, *args, **kwargs):
+        return self.logger.info_s(msg, *args, **kwargs)

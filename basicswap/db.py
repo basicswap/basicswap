@@ -1228,7 +1228,6 @@ class DBMethods:
         values = {}
         constraint_values = {}
         set_columns = []
-
         for mc in inspect.getmembers(obj.__class__):
             mc_name, mc_obj = mc
             if not hasattr(mc_obj, "__sqlite3_column__"):
