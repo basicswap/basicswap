@@ -97,6 +97,9 @@ BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
+RINCOIN_VERSION = os.getenv("RINCOIN_VERSION", "1.0.4")
+RINCOIN_VERSION_TAG = os.getenv("RINCOIN_VERSION_TAG", "")
+
 
 known_coins = {
     "particl": (PARTICL_VERSION, PARTICL_VERSION_TAG, ("tecnovert",)),
@@ -112,6 +115,7 @@ known_coins = {
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
     "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
+    "rincoin": (RINCOIN_VERSION, RINCOIN_VERSION_TAG, ("rincoin_release",)),
 }
 
 disabled_coins = [
@@ -298,6 +302,12 @@ DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
 DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
 DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
 DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
+
+RIN_RPC_HOST = os.getenv("RIN_RPC_HOST", "127.0.0.1")
+RIN_RPC_PORT = int(os.getenv("RIN_RPC_PORT", 9556))
+RIN_ONION_PORT = int(os.getenv("RIN_ONION_PORT", 9555))
+RIN_RPC_USER = os.getenv("RIN_RPC_USER", "")
+RIN_RPC_PWD = os.getenv("RIN_RPC_PWD", "")
 
 TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
@@ -734,6 +744,8 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
             return "{}-{}_nousb/bin/{}".format(dir_name, version + version_tag, b)
         elif coin == "decred":
             return "{}-{}-v{}/{}".format(dir_name, extra_opts["arch_name"], version, b)
+        elif coin == "rincoin":
+            return "rincoin-local/bin/{}".format(b)
         else:
             return "{}-{}/bin/{}".format(dir_name, version + version_tag, b)
 
@@ -1028,6 +1040,17 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = "https://github.com/navcoin/navcoin-core/releases/download/{}/{}".format(
                 version + version_tag, assert_filename
             )
+        elif coin == "rincoin":
+            # Rincoin binary download - temporary URL until official releases
+            release_filename = "{}-local-{}.{}".format(coin, arch_name, FILE_EXT)
+            release_url = "https://github.com/takologi/rincoin/releases/download/v{}/{}".format(
+                version + version_tag, release_filename
+            )
+            assert_filename = "SHA256SUMS.txt"
+            # Use SHA256SUMS.txt from the release
+            assert_url = "https://github.com/takologi/rincoin/releases/download/v{}/{}".format(
+                version + version_tag, assert_filename
+            )
         else:
             raise ValueError("Unknown coin")
 
@@ -1045,6 +1068,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if coin not in (
             "firo",
             "bitcoincash",
+            "rincoin",
         ):
             assert_sig_url = assert_url + (".asc" if use_guix else ".sig")
             if coin not in ("nav",):
@@ -1059,10 +1083,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     logger.info(f"{release_filename} hash: {release_hash}")
     ensureFileHashInFile(release_hash, assert_path)
 
-    if SKIP_GPG_VALIDATION:
-        logger.warning(
-            "Skipping binary signature check as SKIP_GPG_VALIDATION env var is set."
-        )
+    if SKIP_GPG_VALIDATION or coin in ("rincoin",):
+        if coin in ("rincoin",):
+            logger.warning(
+                f"Skipping GPG signature check for {coin} (using SHA256 hash verification only)."
+            )
+        else:
+            logger.warning(
+                "Skipping binary signature check as SKIP_GPG_VALIDATION env var is set."
+            )
         extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
         return
 
@@ -1485,6 +1514,15 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                         NAV_RPC_USER, salt, password_to_hmac(salt, NAV_RPC_PWD)
                     )
                 )
+        elif coin == "rincoin":
+            fp.write("prune=4000\n")
+            fp.write("changetype=bech32\n")
+            if RIN_RPC_USER != "":
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        RIN_RPC_USER, salt, password_to_hmac(salt, RIN_RPC_PWD)
+                    )
+                )
         else:
             logger.warning(f"Unknown coin {coin}")
 
@@ -1858,6 +1896,7 @@ def initialise_wallets(
             Coins.DCR,
             Coins.DASH,
             Coins.NMC,
+            Coins.RINCOIN,
         )
         # Always start Particl, it must be running to initialise a wallet in addcoin mode
         # Particl must be loaded first as subsequent coins are initialised from the Particl mnemonic
@@ -1995,7 +2034,7 @@ def initialise_wallets(
                                 use_descriptors,
                             ],
                         )
-                    elif c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE):
+                    elif c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE, Coins.RINCOIN):
                         # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                         swap_client.callcoinrpc(
                             c,
@@ -2047,6 +2086,14 @@ def initialise_wallets(
                             else None
                         )
                         swap_client.ci(Coins.LTC_MWEB).init_wallet(password)
+                    
+                    if c == Coins.RINCOIN:
+                        password = (
+                            WALLET_ENCRYPTION_PWD
+                            if WALLET_ENCRYPTION_PWD != ""
+                            else None
+                        )
+                        swap_client.ci(Coins.RINCOIN_MWEB).init_wallet(password)
 
             if c == Coins.PART:
                 if "particl" in with_coins:
@@ -2860,6 +2907,21 @@ def main():
             "core_version_group": 23,
             "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
+        "rincoin": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("RIN"),
+            "rpchost": RIN_RPC_HOST,
+            "rpcport": RIN_RPC_PORT + port_offset,
+            "onionport": RIN_ONION_PORT + port_offset,
+            "datadir": os.getenv("RIN_DATA_DIR", os.path.join(data_dir, "rincoin")),
+            "bindir": os.path.join(bin_dir, "rincoin"),
+            "use_segwit": True,
+            "use_csv": True,
+            "blocks_confirmed": 1,
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("rincoin"),
+            "core_version_group": 21,
+        },
     }
 
     electrum_supported_coins = {
@@ -2903,6 +2965,13 @@ def main():
             if set_name != "mweb":
                 coin_settings["mweb_wallet_name"] = set_name
 
+        if coin_name == "rincoin":
+            set_name: str = getWalletName(
+                coin_params, "mweb", prefix_override="RIN_MWEB"
+            )
+            if set_name != "mweb":
+                coin_settings["mweb_wallet_name"] = set_name
+
         set_name: str = getWalletName(coin_params, default_name)
         if set_name != default_name:
             coin_settings["wallet_name"] = set_name
@@ -2928,6 +2997,9 @@ def main():
     if DOGE_RPC_USER != "":
         chainclients["dogecoin"]["rpcuser"] = DOGE_RPC_USER
         chainclients["dogecoin"]["rpcpassword"] = DOGE_RPC_PWD
+    if RIN_RPC_USER != "":
+        chainclients["rincoin"]["rpcuser"] = RIN_RPC_USER
+        chainclients["rincoin"]["rpcpassword"] = RIN_RPC_PWD
     if BTC_RPC_USER != "":
         chainclients["bitcoin"]["rpcuser"] = BTC_RPC_USER
         chainclients["bitcoin"]["rpcpassword"] = BTC_RPC_PWD

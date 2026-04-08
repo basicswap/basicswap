@@ -33,6 +33,8 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    RINCOIN = 19
+    RINCOIN_MWEB = 20
 
 
 class Fiat(IntEnum):
@@ -206,6 +208,47 @@ chainparams = {
             "script_address": 196,
             "key_prefix": 239,
             "hrp": "rdge",
+            "bip44": 1,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+    },
+    Coins.RINCOIN: {
+        "name": "rincoin",
+        "ticker": "RIN",
+        "message_magic": "Rincoin Signed Message:\n",
+        "blocks_target": 60 * 1,
+        "decimal_places": 8,
+        "mainnet": {
+            "rpcport": 9556,
+            "pubkey_address": 60,
+            "script_address": 122,
+            "script_address2": 50,
+            "key_prefix": 188,
+            "hrp": "rin",
+            "bip44": 2,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+        "testnet": {
+            "rpcport": 19556,
+            "pubkey_address": 65,
+            "script_address": 127,
+            "script_address2": 50,
+            "key_prefix": 209,
+            "hrp": "trin",
+            "bip44": 1,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+            "name": "testnet4",
+        },
+        "regtest": {
+            "rpcport": 29556,
+            "pubkey_address": 111,
+            "script_address": 196,
+            "script_address2": 58,
+            "key_prefix": 239,
+            "hrp": "rrin",
             "bip44": 1,
             "min_amount": 100000,
             "max_amount": 10000000 * COIN,
