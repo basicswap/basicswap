@@ -477,6 +477,7 @@ const ui = {
 const chartModule = {
   chart: null,
   currentCoin: 'BTC',
+  hasChartData: false,
   loadStartTime: 0,
   chartRefs: new WeakMap(),
   pendingAnimationFrame: null,
@@ -865,6 +866,7 @@ destroyChart: function() {
             console.warn(`No price data available for ${coinSymbol}`);
             chartModule.hideChartLoader();
             chartModule.showNoDataMessage(coinSymbol);
+            chartModule.hasChartData = false;
             return;
           }
 
@@ -901,16 +903,12 @@ destroyChart: function() {
       if (chartData.length > 0 && chartModule.chart) {
         chartModule.chart.data.datasets[0].data = chartData;
         chartModule.chart.data.datasets[0].label = `${coinSymbol} Price (USD)`;
-        if (coinSymbol === 'WOW') {
-          chartModule.chart.options.scales.x.time.unit = 'hour';
-        } else {
-          const resolution = window.config.chartConfig.resolutions[window.config.currentResolution];
-          chartModule.chart.options.scales.x.time.unit =
-            resolution && resolution.interval === 'hourly' ? 'hour' :
-            window.config.currentResolution === 'year' ? 'month' : 'day';
-        }
+        const resolution = window.config.chartConfig.resolutions[window.config.currentResolution];
+        chartModule.chart.options.scales.x.time.unit =
+          resolution && resolution.interval === 'hourly' ? 'hour' :
+          window.config.currentResolution === 'year' ? 'month' : 'day';
         chartModule.chart.update('active');
-        chartModule.currentCoin = coinSymbol;
+        chartModule.hasChartData = true;
         const loadTime = Date.now() - chartModule.loadStartTime;
         ui.updateLoadTimeAndCache(loadTime, cachedData);
       }
@@ -925,9 +923,12 @@ destroyChart: function() {
           chartModule.chart.data.datasets[0].data = [];
           chartModule.chart.update('active');
         }
+        chartModule.hasChartData = false;
       }
     } finally {
+      chartModule.currentCoin = coinSymbol;
       chartModule.hideChartLoader();
+      app.updateResolutionButtons();
     }
   },
 
@@ -1125,7 +1126,6 @@ const app = {
         }
 
         await chartModule.updateChart(defaultCoin);
-        app.updateResolutionButtons(defaultCoin);
 
         const chartTitle = document.getElementById('chart-title');
         if (chartTitle) {
@@ -1233,11 +1233,8 @@ const app = {
           }
           ui.setActiveContainer(`${coin.symbol.toLowerCase()}-container`);
           if (chartModule.chart) {
-            if (coin.symbol === 'WOW') {
-              window.config.currentResolution = 'day';
-            }
+            window.config.currentResolution = 'day';
             chartModule.updateChart(coin.symbol);
-            app.updateResolutionButtons(coin.symbol);
           }
         });
       }
@@ -1614,20 +1611,14 @@ refreshAllData: async function() {
     }
   },
 
-  updateResolutionButtons: function(coinSymbol) {
+  updateResolutionButtons: function() {
     const resolutionButtons = document.querySelectorAll('.resolution-button');
+    
     resolutionButtons.forEach(button => {
       const resolution = button.id.split('-')[1];
-      if (coinSymbol === 'WOW') {
-        if (resolution === 'day') {
-          button.classList.remove('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
-          button.classList.add('active');
-          button.disabled = false;
-        } else {
-          button.classList.add('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
-          button.classList.remove('active');
-          button.disabled = true;
-        }
+      if (!chartModule.hasChartData) {
+        button.classList.add('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
+        button.disabled = true;
       } else {
         button.classList.remove('text-gray-400', 'cursor-not-allowed', 'opacity-50', 'outline-none');
         button.classList.toggle('active', resolution === window.config.currentResolution);
@@ -1659,12 +1650,9 @@ resolutionButtons.forEach(button => {
   button.addEventListener('click', () => {
     const resolution = button.id.split('-')[1];
     const currentCoin = chartModule.currentCoin;
-
-    if (currentCoin !== 'WOW' || resolution === 'day') {
-      window.config.currentResolution = resolution;
-      chartModule.updateChart(currentCoin, true);
-      app.updateResolutionButtons(currentCoin);
-    }
+    window.config.currentResolution = resolution;
+    chartModule.updateChart(currentCoin, true);
+    app.updateResolutionButtons();
   });
 });
 
