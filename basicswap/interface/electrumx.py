@@ -82,9 +82,24 @@ class ElectrumConnection:
         self._proxy_host = proxy_host
         self._proxy_port = proxy_port
 
+    @staticmethod
+    def _is_private_address(host: str) -> bool:
+        try:
+            import ipaddress
+
+            addr = ipaddress.ip_address(host)
+            return addr.is_private or addr.is_loopback or addr.is_link_local
+        except ValueError:
+            return host == "localhost"
+
     def connect(self):
         try:
-            if self._proxy_host and self._proxy_port:
+            use_proxy = (
+                self._proxy_host
+                and self._proxy_port
+                and not self._is_private_address(self._host)
+            )
+            if use_proxy:
                 import socks
 
                 sock = socks.socksocket()
@@ -101,6 +116,10 @@ class ElectrumConnection:
                 sock = socket.create_connection(
                     (self._host, self._port), timeout=self._timeout
                 )
+                if self._log and self._proxy_host and self._proxy_port:
+                    self._log.debug(
+                        f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
+                    )
             if self._use_ssl:
                 context = ssl.create_default_context()
                 context.check_hostname = False
@@ -546,11 +565,6 @@ class ElectrumServer:
                 elif isinstance(srv, dict):
                     user_onion.append(srv)
 
-        final_clearnet = (
-            user_clearnet
-            if user_clearnet
-            else DEFAULT_ELECTRUM_SERVERS.get(coin_name, [])
-        )
         final_onion = (
             user_onion if user_onion else DEFAULT_ONION_SERVERS.get(coin_name, [])
         )
@@ -558,13 +572,26 @@ class ElectrumServer:
         self._using_default_servers = not user_clearnet and not user_onion
 
         if use_tor:
+            if user_onion and not user_clearnet:
+                final_clearnet = []
+            else:
+                final_clearnet = (
+                    user_clearnet
+                    if user_clearnet
+                    else DEFAULT_ELECTRUM_SERVERS.get(coin_name, [])
+                )
             self._servers = list(final_onion) + list(final_clearnet)
-            if self._log and final_onion:
+            if self._log:
                 self._log.info(
                     f"ElectrumServer {coin_name}: TOR enabled - "
                     f"{len(final_onion)} .onion + {len(final_clearnet)} clearnet servers"
                 )
         else:
+            final_clearnet = (
+                user_clearnet
+                if user_clearnet
+                else DEFAULT_ELECTRUM_SERVERS.get(coin_name, [])
+            )
             self._servers = list(final_clearnet)
             if self._log:
                 self._log.info(
@@ -983,55 +1010,84 @@ class ElectrumServer:
     def call_background(self, method, params=None, timeout=20):
         if self._stopping:
             raise TemporaryError("Electrum server is shutting down")
-        conn = self._connection
-        if conn is None or not conn.is_connected():
-            if self._stopping:
-                raise TemporaryError("Electrum server is shutting down")
-            try:
-                self.connect()
-                conn = self._connection
-            except Exception:
-                raise TemporaryError("Electrum call failed: no connection")
-            if conn is None or not conn.is_connected():
-                raise TemporaryError("Electrum call failed: no connection")
+        lock_acquired = self._lock.acquire(timeout=timeout + 5)
+        if not lock_acquired:
+            raise TemporaryError(
+                f"Electrum background call timed out waiting for lock: {method}"
+            )
         try:
-            result = conn.call(method, params, timeout=timeout)
-            self._last_activity = time.time()
-            return result
-        except TemporaryError as e:
-            if self._stopping:
-                raise TemporaryError("Electrum server is shutting down")
-            if "timed out" in str(e).lower():
-                self._record_timeout()
-            raise
+            for attempt in range(2):
+                if self._stopping:
+                    raise TemporaryError("Electrum server is shutting down")
+                if self._connection is None or not self._connection.is_connected():
+                    self.connect()
+                    if self._connection is None:
+                        raise TemporaryError("Electrum call failed: no connection")
+                try:
+                    result = self._connection.call(method, params, timeout=timeout)
+                    self._last_activity = time.time()
+                    return result
+                except TemporaryError as e:
+                    if self._stopping:
+                        raise TemporaryError("Electrum server is shutting down")
+                    if "timed out" in str(e).lower():
+                        self._record_timeout()
+                    if attempt == 0:
+                        self._retry_on_failure()
+                    else:
+                        raise
+                except Exception as e:
+                    if self._is_rate_limit_error(str(e)):
+                        server = self._get_server(self._current_server_idx)
+                        self._blacklist_server(server, str(e))
+                    if attempt == 0:
+                        self._retry_on_failure()
+                    else:
+                        raise
+        finally:
+            self._lock.release()
 
     def call_batch_background(self, requests, timeout=30):
         if self._stopping:
             raise TemporaryError("Electrum server is shutting down")
-        conn = self._connection
-        if conn is None or not conn.is_connected():
-            if self._stopping:
-                raise TemporaryError("Electrum server is shutting down")
-            self._record_timeout()
-            conn = self._connection
-            if conn is None or not conn.is_connected():
-                try:
-                    self.connect()
-                    conn = self._connection
-                except Exception:
-                    raise TemporaryError("Electrum batch call failed: no connection")
-            if conn is None or not conn.is_connected():
-                raise TemporaryError("Electrum batch call failed: no connection")
+        lock_acquired = self._lock.acquire(timeout=timeout + 5)
+        if not lock_acquired:
+            raise TemporaryError(
+                "Electrum background batch call timed out waiting for lock"
+            )
         try:
-            result = conn.call_batch(requests)
-            self._last_activity = time.time()
-            return result
-        except TemporaryError as e:
-            if self._stopping:
-                raise TemporaryError("Electrum server is shutting down")
-            if "timed out" in str(e).lower():
-                self._record_timeout()
-            raise
+            for attempt in range(2):
+                if self._stopping:
+                    raise TemporaryError("Electrum server is shutting down")
+                if self._connection is None or not self._connection.is_connected():
+                    self.connect()
+                    if self._connection is None:
+                        raise TemporaryError(
+                            "Electrum batch call failed: no connection"
+                        )
+                try:
+                    result = self._connection.call_batch(requests)
+                    self._last_activity = time.time()
+                    return result
+                except TemporaryError as e:
+                    if self._stopping:
+                        raise TemporaryError("Electrum server is shutting down")
+                    if "timed out" in str(e).lower():
+                        self._record_timeout()
+                    if attempt == 0:
+                        self._retry_on_failure()
+                    else:
+                        raise
+                except Exception as e:
+                    if self._is_rate_limit_error(str(e)):
+                        server = self._get_server(self._current_server_idx)
+                        self._blacklist_server(server, str(e))
+                    if attempt == 0:
+                        self._retry_on_failure()
+                    else:
+                        raise
+        finally:
+            self._lock.release()
 
     def call_user(self, method, params=None, timeout=10):
         if self._stopping:

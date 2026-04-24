@@ -559,7 +559,10 @@ def page_wallet(self, url_split, post_string):
                 skip = tx_filters.get("offset", 0)
 
                 all_txs = ci.listWalletTransactions(count=10000, skip=0)
-                all_txs = list(reversed(all_txs)) if all_txs else []
+                if all_txs and coin_id not in (Coins.XMR, Coins.WOW):
+                    all_txs = list(reversed(all_txs))
+                elif not all_txs:
+                    all_txs = []
                 total_transactions = len(all_txs)
 
                 raw_txs = all_txs[skip : skip + count] if all_txs else []

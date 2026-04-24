@@ -3099,7 +3099,10 @@ class BTCInterface(Secp256k1Interface):
                             }
         except Exception as e:
             error_msg = str(e).lower()
-            if "no such mempool or blockchain transaction" not in error_msg:
+            if (
+                "no such mempool or blockchain transaction" not in error_msg
+                and "missing transaction" not in error_msg
+            ):
                 self._log.debug(
                     f"checkWatchedOutput exception for {txid_hex}:{vout}: {e}"
                 )
