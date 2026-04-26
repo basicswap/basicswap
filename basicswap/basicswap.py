@@ -1388,8 +1388,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self._initializeElectrumWallets()
 
+        is_locked = False
+        try:
+            _, is_locked = self.getLockedState()
+        except Exception:
+            pass
+
         for c in self.activeCoins():
             if self.coin_clients[c]["connection_type"] == "electrum":
+                if is_locked:
+                    continue
                 self.checkWalletSeed(c)
 
         for c in self.activeCoins():
