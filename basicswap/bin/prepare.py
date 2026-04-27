@@ -2106,7 +2106,12 @@ def initialise_wallets(
                 continue
             try:
                 ci = swap_client.ci(c)
-                if hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum():
+                coin_settings = settings["chainclients"].get(coin_name, {})
+                is_electrum = coin_settings.get("connection_type") == "electrum"
+                can_export = (
+                    hasattr(ci, "canExportToElectrum") and ci.canExportToElectrum()
+                )
+                if can_export or (is_electrum and hasattr(ci, "getAccountKey")):
                     seed_key = swap_client.getWalletKey(c, 1)
                     account_key = ci.getAccountKey(seed_key, zprv_prefix)
                     extended_keys[getCoinName(c)] = account_key
