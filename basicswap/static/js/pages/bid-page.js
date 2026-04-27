@@ -148,7 +148,7 @@ const BidPage = {
     11: { phase: 'locking', order: 10, label: 'Locking' },        // XMR_SWAP_NOSCRIPT_COIN_LOCKED
     12: { phase: 'redemption', order: 11, label: 'Redemption' },  // XMR_SWAP_LOCK_RELEASED
     13: { phase: 'redemption', order: 12, label: 'Redemption' },  // XMR_SWAP_SCRIPT_TX_REDEEMED
-    14: { phase: 'failed', order: 90, label: 'Failed' },          // XMR_SWAP_SCRIPT_TX_PREREFUND
+    14: { phase: 'redemption', order: 11.5, label: 'Refunding' },  // XMR_SWAP_SCRIPT_TX_PREREFUND
     15: { phase: 'redemption', order: 13, label: 'Redemption' },  // XMR_SWAP_NOSCRIPT_TX_REDEEMED
     16: { phase: 'failed', order: 91, label: 'Recovered' },       // XMR_SWAP_NOSCRIPT_TX_RECOVERED
     17: { phase: 'failed', order: 92, label: 'Failed' },          // XMR_SWAP_FAILED_REFUNDED
