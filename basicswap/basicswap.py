@@ -1659,8 +1659,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for c in check_coins:
             ci = self.ci(c)
             if self._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
-                if not ci._have_checked_seed:
-                    self.checkWalletSeed(c)
+                self.checkWalletSeed(c)
                 if not ci.knownWalletSeed():
                     raise ValueError(
                         '{} has an unexpected wallet seed and "restrict_unknown_seed_wallets" is enabled.'.format(
@@ -13907,11 +13906,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "unconfirmed": ci.format_amount(
                     walletinfo["unconfirmed_balance"], conv_int=True
                 ),
-                "expected_seed": (
-                    ci.knownWalletSeed()
-                    if ci._have_checked_seed
-                    else self.checkWalletSeed(coin)
-                ),
+                "expected_seed": ci.knownWalletSeed(),
                 "encrypted": walletinfo["encrypted"],
                 "locked": walletinfo["locked"],
                 "connection_type": self.coin_clients[coin].get(

@@ -257,7 +257,6 @@ class XMRInterface(CoinInterface):
                         )
                         raise
                     os.rename(walletpath, bkp_path)
-                    self._have_checked_seed = False
                     # Drop through to open_wallet
                 else:
                     raise
