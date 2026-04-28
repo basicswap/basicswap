@@ -228,6 +228,7 @@ class XMRInterface(CoinInterface):
                     "invalid signature",
                     "std::bad_alloc",
                     "basic_string::_M_replace_aux",
+                    "input stream error",
                 )
             ):
                 self._log.error(f"{self.coin_name()} wallet is corrupt.")
