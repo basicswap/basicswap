@@ -810,7 +810,9 @@ class ElectrumBackend(WalletBackend):
 
         now = time.time()
         stale_threshold = 300
-        is_synced = height > 0 and (now - height_time) < stale_threshold
+        last_activity = getattr(self._server, "_last_activity", 0)
+        most_recent = max(height_time, last_activity)
+        is_synced = height > 0 and (now - most_recent) < stale_threshold
         return {
             "height": height,
             "synced": is_synced,

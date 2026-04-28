@@ -473,6 +473,15 @@ def page_wallet(self, url_split, post_string):
             getattr(ci, "_connection_type", "rpc") == "electrum"
         )
 
+        if hasattr(ci, "getAccountKey") and k not in (Coins.XMR, Coins.WOW):
+            try:
+                chain = swap_client.chain
+                zprv_prefix = 0x04B2430C if chain == "mainnet" else 0x045F18BC
+                seed_key = swap_client.getWalletKey(k, 1)
+                wallet_data["account_key"] = ci.getAccountKey(seed_key, zprv_prefix)
+            except Exception:
+                pass
+
         fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
         est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
         wallet_data["fee_rate"] = ci.format_amount(int(fee_rate * ci.COIN()))
@@ -559,7 +568,10 @@ def page_wallet(self, url_split, post_string):
                 skip = tx_filters.get("offset", 0)
 
                 all_txs = ci.listWalletTransactions(count=10000, skip=0)
-                all_txs = list(reversed(all_txs)) if all_txs else []
+                if all_txs and coin_id not in (Coins.XMR, Coins.WOW):
+                    all_txs = list(reversed(all_txs))
+                elif not all_txs:
+                    all_txs = []
                 total_transactions = len(all_txs)
 
                 raw_txs = all_txs[skip : skip + count] if all_txs else []

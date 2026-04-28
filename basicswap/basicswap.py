@@ -1388,8 +1388,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self._initializeElectrumWallets()
 
+        is_locked = False
+        try:
+            _, is_locked = self.getLockedState()
+        except Exception:
+            pass
+
         for c in self.activeCoins():
             if self.coin_clients[c]["connection_type"] == "electrum":
+                if is_locked:
+                    continue
                 self.checkWalletSeed(c)
 
         for c in self.activeCoins():
@@ -1651,11 +1659,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for c in check_coins:
             ci = self.ci(c)
             if self._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
-                raise ValueError(
-                    '{} has an unexpected wallet seed and "restrict_unknown_seed_wallets" is enabled.'.format(
-                        ci.coin_name()
+                try:
+                    self.checkWalletSeed(c)
+                except Exception as e:
+                    self.log.debug(f"checkWalletSeed failed for {ci.coin_name()}: {e}")
+                if not ci.knownWalletSeed():
+                    raise ValueError(
+                        '{} has an unexpected wallet seed and "restrict_unknown_seed_wallets" is enabled.'.format(
+                            ci.coin_name()
+                        )
                     )
-                )
             if self.coin_clients[c]["connection_type"] not in ("rpc", "electrum"):
                 continue
             if c in (Coins.XMR, Coins.WOW):

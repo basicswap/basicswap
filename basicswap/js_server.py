@@ -1631,7 +1631,10 @@ def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
             or (current_time - cache_entry["time"]) > TX_CACHE_DURATION
         ):
             all_txs = ci.listWalletTransactions(count=10000, skip=0)
-            all_txs = list(reversed(all_txs)) if all_txs else []
+            if all_txs and coin_id not in (Coins.XMR, Coins.WOW):
+                all_txs = list(reversed(all_txs))
+            elif not all_txs:
+                all_txs = []
             swap_client._tx_cache[coin_id] = {"txs": all_txs, "time": current_time}
         else:
             all_txs = cache_entry["txs"]

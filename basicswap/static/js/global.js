@@ -1,3 +1,22 @@
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        return originalFetch.apply(this, arguments).then(function(response) {
+            if (response.status === 401) {
+                const urlStr = typeof url === 'string' ? url : (url && url.url) || '';
+                if (urlStr.startsWith('/json/') || urlStr.startsWith('/json')) {
+                    window.location.href = '/login';
+                    return new Response(JSON.stringify({error: 'Session expired'}), {
+                        status: 401,
+                        headers: {'Content-Type': 'application/json'}
+                    });
+                }
+            }
+            return response;
+        });
+    };
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
     const burger = document.querySelectorAll('.navbar-burger');
     const menu = document.querySelectorAll('.navbar-menu');

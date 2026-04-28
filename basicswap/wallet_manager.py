@@ -38,6 +38,7 @@ class WalletManager:
     }
 
     GAP_LIMIT = 50
+    ELECTRUM_GAP_LIMIT = 20
 
     def __init__(self, swap_client, log):
         self._gap_limits: Dict[Coins, int] = {}
@@ -149,6 +150,18 @@ class WalletManager:
             )
             self._swap_client.commitDB()
 
+    def _findReusableAddress(self, coin_type: Coins, internal: bool, cursor):
+        query = (
+            "SELECT derivation_index, address FROM wallet_addresses"
+            " WHERE coin_type = ? AND is_internal = ? AND is_funded = 0"
+            " ORDER BY derivation_index ASC LIMIT 1"
+        )
+        cursor.execute(query, (int(coin_type), internal))
+        row = cursor.fetchone()
+        if row:
+            return row[0], row[1]
+        return None, None
+
     def getNewAddress(
         self, coin_type: Coins, internal: bool = False, label: str = "", cursor=None
     ) -> str:
@@ -157,8 +170,6 @@ class WalletManager:
 
         use_cursor = self._swap_client.openDB(cursor)
         try:
-            self._syncStateIndices(coin_type, use_cursor)
-
             state = self._swap_client.queryOne(
                 WalletState, use_cursor, {"coin_type": int(coin_type)}
             )
@@ -183,6 +194,19 @@ class WalletManager:
                     next_index = (state.last_internal_index or 0) + 1
                 else:
                     next_index = (state.last_external_index or 0) + 1
+
+            if next_index >= self.ELECTRUM_GAP_LIMIT:
+                reuse_index, reuse_addr = self._findReusableAddress(
+                    coin_type, internal, use_cursor
+                )
+                if reuse_addr is not None:
+                    self._log.debug(
+                        f"Reusing unfunded address at index {reuse_index}"
+                        f" (next would be {next_index},"
+                        f" electrum gap limit {self.ELECTRUM_GAP_LIMIT})"
+                    )
+                    self._swap_client.commitDB()
+                    return reuse_addr
 
             existing = self._swap_client.queryOne(
                 WalletAddress,
