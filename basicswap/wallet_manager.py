@@ -170,8 +170,6 @@ class WalletManager:
 
         use_cursor = self._swap_client.openDB(cursor)
         try:
-            self._syncStateIndices(coin_type, use_cursor)
-
             state = self._swap_client.queryOne(
                 WalletState, use_cursor, {"coin_type": int(coin_type)}
             )
