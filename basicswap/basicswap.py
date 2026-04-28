@@ -1659,7 +1659,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for c in check_coins:
             ci = self.ci(c)
             if self._restrict_unknown_seed_wallets and not ci.knownWalletSeed():
-                self.checkWalletSeed(c)
+                try:
+                    self.checkWalletSeed(c)
+                except Exception as e:
+                    self.log.debug(f"checkWalletSeed failed for {ci.coin_name()}: {e}")
                 if not ci.knownWalletSeed():
                     raise ValueError(
                         '{} has an unexpected wallet seed and "restrict_unknown_seed_wallets" is enabled.'.format(
