@@ -3986,17 +3986,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pass
             else:
                 pi = self.pi(swap_type)
-                _ = pi.getFundedInitiateTxTemplate(ci, ensure_balance, False)
-                # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
+                current_balance: int = ci.getSpendableBalance()
+                mock_addr = pi.getMockAddrTo(ci)
+                max_amount: int = ci.getMaxFundable(mock_addr, current_balance)
+                if max_amount < ensure_balance:
+                    actual_fee: int = current_balance - max_amount
+                    ticker: str = ci.ticker()
+                    raise ValueError(
+                        f"Insufficient funds for {'offer' if for_offer else 'bid'} of "
+                        f"{ci.format_amount(ensure_balance)} {ticker}. "
+                        f"Transaction fee: {ci.format_amount(actual_fee)} {ticker}, "
+                        f"maximum amount: {ci.format_amount(max_amount)} {ticker}."
+                    )
+        except ValueError:
+            raise
         except Exception as e:
             type_str = "offer" if for_offer else "bid"
-            err_msg = f"Insufficient funds for {type_str} of {balance_msg}."
-            if self.debug:
-                self.log.error(f"ensureWalletCanSend failed {e}")
-                current_balance: int = ci.getSpendableBalance()
-                err_msg += (
-                    f" Debug: Spendable balance: {ci.format_amount(current_balance)}."
-                )
+            self.log.error(f"ensureWalletCanSend failed {e}")
+            err_msg = (
+                f"Insufficient funds for {type_str} of {balance_msg}."
+            )
             self.log.error(err_msg)
             raise ValueError(err_msg)
 

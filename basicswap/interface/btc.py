@@ -3500,6 +3500,19 @@ class BTCInterface(Secp256k1Interface):
 
         return funded_tx.hex()
 
+    def getMaxFundable(self, addr_to: str, amount: int) -> int:
+        """Return max output value by dry-running fundrawtransaction with subtractFeeFromOutputs."""
+        txn = self.rpc(
+            "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
+        )
+        options = {
+            "lockUnspents": False,
+            "conf_target": self._conf_target,
+            "subtractFeeFromOutputs": [0],
+        }
+        result = self.rpc_wallet("fundrawtransaction", [txn, options])
+        return amount - self.make_int(result["fee"])
+
     def createRawSignedTransaction(self, addr_to, amount) -> str:
         txn_funded = self.createRawFundedTransaction(addr_to, amount)
 
