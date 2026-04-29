@@ -925,9 +925,15 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     assert_filename,
                 )
         elif coin == "litecoin":
-            release_url = "https://github.com/litecoin-project/litecoin/releases/download/v{}/{}".format(
-                version + version_tag, release_filename
+            release_url: str = (
+                "https://github.com/litecoin-project/litecoin/releases/download/v{}/{}".format(
+                    version + version_tag, release_filename
+                )
             )
+            if os_name == "osx":
+                release_url: str = (
+                    f"https://download.litecoin.org/litecoin-{version}{version_tag}/{release_filename}"
+                )
             assert_filename = "{}-core-{}-{}-build.assert".format(
                 coin, os_name, ".".join(version.split(".")[:2])
             )
