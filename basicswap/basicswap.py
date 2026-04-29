@@ -3970,7 +3970,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return ci.isValidAddressHash(dest)
 
     def ensureWalletCanSend(
-        self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
+        self,
+        ci,
+        swap_type,
+        ensure_balance: int,
+        estimated_fee: int,
+        for_offer=True,
+        fee_rate: int = None,
     ) -> None:
         balance_msg: str = (
             f"{ci.format_amount(ensure_balance)} {ci.coin_name()} with estimated fee {ci.format_amount(estimated_fee)}"
@@ -3988,7 +3994,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pi = self.pi(swap_type)
                 current_balance: int = ci.getSpendableBalance()
                 mock_addr = pi.getMockAddrTo(ci)
-                max_amount: int = ci.getMaxFundable(mock_addr, current_balance)
+                self.log.debug(
+                    f"getMaxFundable: balance={current_balance}, fee_rate={fee_rate}"
+                )
+                max_amount: int = ci.getMaxFundable(
+                    mock_addr, current_balance, fee_rate
+                )
                 if max_amount < ensure_balance:
                     actual_fee: int = current_balance - max_amount
                     ticker: str = ci.ticker()
@@ -4003,9 +4014,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as e:
             type_str = "offer" if for_offer else "bid"
             self.log.error(f"ensureWalletCanSend failed {e}")
-            err_msg = (
-                f"Insufficient funds for {type_str} of {balance_msg}."
-            )
+            err_msg = f"Insufficient funds for {type_str} of {balance_msg}."
             self.log.error(err_msg)
             raise ValueError(err_msg)
 
@@ -4171,11 +4180,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
             if "prefunded_itx" not in extra_options:
-                # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
                 estimated_fee: int = (
                     msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
                 )
-                self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
+                self.ensureWalletCanSend(
+                    ci_from,
+                    swap_type,
+                    int(amount),
+                    estimated_fee,
+                    fee_rate=msg_buf.fee_rate_from,
+                )
 
             # TODO: Send proof of funds with offer
             # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
@@ -6039,12 +6053,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.checkCoinsReady(coin_from, coin_to)
 
-            # TODO: Better tx size estimate
-            fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
-            fee_rate_to = ci_to.make_int(fee_rate)
-            estimated_fee: int = fee_rate_to * ci_to.est_lock_tx_vsize() // 1000
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
+            lock_tx_fee_rate: int = (
+                xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
+            )
+            estimated_fee: int = lock_tx_fee_rate * ci_to.est_lock_tx_vsize() // 1000
             self.ensureWalletCanSend(
-                ci_to, offer.swap_type, int(amount_to), estimated_fee, for_offer=False
+                ci_to,
+                offer.swap_type,
+                int(amount_to),
+                estimated_fee,
+                for_offer=False,
+                fee_rate=lock_tx_fee_rate,
             )
 
             bid_addr: str = self.prepareSMSGAddress(
