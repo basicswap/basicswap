@@ -290,7 +290,7 @@ def js_wallets(self, url_split, post_string, is_json):
     swap_client.checkSystemStatus()
     if len(url_split) > 3:
         ticker_str = url_split[3]
-        coin_type = getCoinIdFromTicker(ticker_str)
+        coin_type = getCoinIdFromTicker(ticker_str, inc_variant=True)
 
         if len(url_split) > 4:
             cmd = url_split[4]
