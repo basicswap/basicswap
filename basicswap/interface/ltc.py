@@ -91,6 +91,9 @@ class LTCInterface(BTCInterface):
                 continue
             if "address" not in u:
                 continue
+            utxo_address: str = u["address"]
+            if any(utxo_address.startswith(prefix) for prefix in ("mweb1", "tmweb1")):
+                continue
             if "desc" in u:
                 desc = u["desc"]
                 if self.using_segwit:
@@ -103,8 +106,8 @@ class LTCInterface(BTCInterface):
                 else:
                     if not desc.startswith("pkh"):
                         continue
-            unspent_addr[u["address"]] = unspent_addr.get(
-                u["address"], 0
+            unspent_addr[utxo_address] = unspent_addr.get(
+                utxo_address, 0
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
 
