@@ -14223,6 +14223,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def getCachedWalletsInfo(self, opts=None):
         rv = {}
+        skipped_coin_ids = set()
         try:
             cursor = self.openDB()
             query_data: dict = {}
@@ -14237,8 +14238,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             for row in q:
                 coin_id = row[0]
 
-                if self.isCoinActive(coin_id) is False:
-                    # Skip cached info if coin was disabled
+                try:
+                    if self.isCoinActive(coin_id) is False:
+                        # Skip cached info if coin was disabled
+                        continue
+                except (ValueError, KeyError):
+                    # Coin not known in this build — track for UI warning
+                    skipped_coin_ids.add(coin_id)
                     continue
 
                 wallet_data = json.loads(row[2])
@@ -14286,7 +14292,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "updating": self._updating_wallets_info.get(coin_id, False),
                 }
 
-        return rv
+        return rv, skipped_coin_ids
 
     def countAcceptedBids(self, offer_id: bytes = None) -> int:
         cursor = self.openDB()

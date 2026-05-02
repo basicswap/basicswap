@@ -673,7 +673,7 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
 
 def listAvailableCoinsWithBalances(swap_client, with_variants=True, split_from=False):
     swap_client.updateWalletsInfo()
-    wallets = swap_client.getCachedWalletsInfo()
+    wallets, _skipped = swap_client.getCachedWalletsInfo()
 
     coins_from = []
     coins = []

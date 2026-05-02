@@ -131,7 +131,7 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
     try:
 
         swap_client.updateWalletsInfo()
-        wallets = swap_client.getCachedWalletsInfo()
+        wallets, _skipped = swap_client.getCachedWalletsInfo()
         coins_with_balances = []
 
         for k, v in swap_client.coin_clients.items():
