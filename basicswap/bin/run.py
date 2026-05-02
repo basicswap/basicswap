@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import copy
 import json
 import logging
 import os
@@ -22,6 +23,7 @@ from basicswap.chainparams import chainparams, Coins, isKnownCoinName
 from basicswap.network.simplex_chat import startSimplexClient
 from basicswap.ui.util import getCoinName
 from basicswap.util.daemon import Daemon
+from typing import Set
 
 initial_logger = logging.getLogger()
 initial_logger.level = logging.DEBUG
@@ -347,7 +349,7 @@ def mainLoop(daemons, update: bool = True):
 def runClient(
     data_dir: str,
     chain: str,
-    start_only_coins: bool,
+    start_only_coins: Set[str],
     log_prefix: str = "BasicSwap",
     extra_opts=dict(),
 ) -> int:
@@ -391,39 +393,46 @@ def runClient(
     # Settings may have been modified
     settings = swap_client.settings
 
+    base_coin_opts = []
+    if "extra_coin_opts" in extra_opts:
+        if len(start_only_coins) == 0:
+            raise ValueError('"extracoinopts" can only be used with "startonlycoins"')
+        base_coin_opts += extra_opts["extra_coin_opts"]
+
     try:
         # Try start daemons
-        for network in settings.get("networks", []):
-            if network.get("enabled", True) is False:
-                continue
-            network_type: str = network.get("type", "unknown")
-            if network_type == "simplex":
-                simplex_dir = os.path.join(data_dir, "simplex")
+        if len(start_only_coins) > 0:
+            swap_client.log.warning('Not starting networks as "startonlycoin" is set')
+        else:
+            for network in settings.get("networks", []):
+                if network.get("enabled", True) is False:
+                    continue
+                network_type: str = network.get("type", "unknown")
+                if network_type == "simplex":
+                    simplex_dir = os.path.join(data_dir, "simplex")
+                    log_level = "debug" if swap_client.debug else "info"
+                    socks_proxy = None
+                    if "socks_proxy_override" in network:
+                        socks_proxy = network["socks_proxy_override"]
+                    elif swap_client.use_tor_proxy:
+                        socks_proxy = (
+                            f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"
+                        )
 
-                log_level = "debug" if swap_client.debug else "info"
-
-                socks_proxy = None
-                if "socks_proxy_override" in network:
-                    socks_proxy = network["socks_proxy_override"]
-                elif swap_client.use_tor_proxy:
-                    socks_proxy = (
-                        f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"
+                    daemons.append(
+                        startSimplexClient(
+                            network["client_path"],
+                            simplex_dir,
+                            network["server_address"],
+                            network["ws_port"],
+                            logger,
+                            swap_client.delay_event,
+                            socks_proxy=socks_proxy,
+                            log_level=log_level,
+                        )
                     )
-
-                daemons.append(
-                    startSimplexClient(
-                        network["client_path"],
-                        simplex_dir,
-                        network["server_address"],
-                        network["ws_port"],
-                        logger,
-                        swap_client.delay_event,
-                        socks_proxy=socks_proxy,
-                        log_level=log_level,
-                    )
-                )
-                pid = daemons[-1].handle.pid
-                swap_client.log.info(f"Started Simplex client {pid}")
+                    pid = daemons[-1].handle.pid
+                    swap_client.log.info(f"Started Simplex client {pid}")
 
         for c, v in settings["chainclients"].items():
             if len(start_only_coins) > 0 and c not in start_only_coins:
@@ -460,10 +469,18 @@ def runClient(
                     trusted_daemon: bool = swap_client.getXMRTrustedDaemon(
                         coin_id, v["rpchost"]
                     )
-                    opts = [
+                    wallet_opts = [
+                        "--trusted-daemon" if trusted_daemon else "--untrusted-daemon",
                         "--daemon-address",
                         daemon_addr,
                     ]
+                    daemon_rpcuser = v.get("rpcuser", "")
+                    daemon_rpcpass = v.get("rpcpassword", "")
+                    if daemon_rpcuser != "":
+                        wallet_opts += [
+                            "--daemon-login",
+                            daemon_rpcuser + ":" + daemon_rpcpass,
+                        ]
 
                     proxy_log_str = ""
                     proxy_host, proxy_port = swap_client.getXMRWalletProxy(
@@ -471,7 +488,7 @@ def runClient(
                     )
                     if proxy_host:
                         proxy_log_str = " through proxy"
-                        opts += [
+                        wallet_opts += [
                             "--proxy",
                             f"{proxy_host}:{proxy_port}",
                             "--daemon-ssl-allow-any-cert",
@@ -485,19 +502,11 @@ def runClient(
                         )
                     )
 
-                    daemon_rpcuser = v.get("rpcuser", "")
-                    daemon_rpcpass = v.get("rpcpassword", "")
-                    if daemon_rpcuser != "":
-                        opts.append("--daemon-login")
-                        opts.append(daemon_rpcuser + ":" + daemon_rpcpass)
-
-                    opts.append(
-                        "--trusted-daemon" if trusted_daemon else "--untrusted-daemon"
-                    )
                     filename: str = getWalletBinName(coin_id, v, c + "-wallet-rpc")
-
                     daemons.append(
-                        startXmrWalletDaemon(v["datadir"], v["bindir"], filename, opts)
+                        startXmrWalletDaemon(
+                            v["datadir"], v["bindir"], filename, wallet_opts
+                        )
                     )
                     pid = daemons[-1].handle.pid
                     swap_client.log.info(f"Started {filename} {pid}")
@@ -506,9 +515,8 @@ def runClient(
 
             if c == "decred":
                 appdata = v["datadir"]
-                extra_opts = [
-                    f'--appdata="{appdata}"',
-                ]
+                coin_opts = copy.deepcopy(base_coin_opts)
+                coin_opts.append(f'--appdata="{appdata}"')
                 use_shell: bool = True if os.name == "nt" else False
                 if v["manage_daemon"] is True:
                     swap_client.log.info(f"Starting {display_name} daemon")
@@ -526,7 +534,7 @@ def runClient(
                             appdata,
                             v["bindir"],
                             filename,
-                            opts=extra_opts,
+                            opts=coin_opts,
                             extra_config=extra_config,
                         )
                     )
@@ -537,12 +545,13 @@ def runClient(
                     swap_client.log.info(f"Starting {display_name} wallet daemon")
                     filename: str = getWalletBinName(coin_id, v, "dcrwallet")
 
+                    wallet_opts = [f'--appdata="{appdata}"']
                     wallet_pwd = v["wallet_pwd"]
                     if wallet_pwd == "":
                         # Only set when in startonlycoin mode
                         wallet_pwd = os.getenv("WALLET_ENCRYPTION_PWD", "")
                     if wallet_pwd != "":
-                        extra_opts.append(f'--pass="{wallet_pwd}"')
+                        wallet_opts.append(f'--pass="{wallet_pwd}"')
                     extra_config = {
                         "add_datadir": False,
                         "stdout_to_file": True,
@@ -555,13 +564,12 @@ def runClient(
                             appdata,
                             v["bindir"],
                             filename,
-                            opts=extra_opts,
+                            opts=wallet_opts,
                             extra_config=extra_config,
                         )
                     )
                     pid = daemons[-1].handle.pid
                     swap_client.log.info(f"Started {filename} {pid}")
-
                 continue  # /decred
 
             if v["manage_daemon"] is True:
@@ -571,7 +579,7 @@ def runClient(
                 swap_client.log.info(f"Starting {display_name} daemon")
 
                 filename: str = getCoreBinName(coin_id, v, c + "d")
-                extra_opts = getCoreBinArgs(
+                coin_opts = copy.deepcopy(base_coin_opts) + getCoreBinArgs(
                     coin_id, v, use_tor_proxy=swap_client.use_tor_proxy
                 )
                 extra_config = {"coin_name": c}
@@ -580,7 +588,7 @@ def runClient(
                         v["datadir"],
                         v["bindir"],
                         filename,
-                        opts=extra_opts,
+                        opts=coin_opts,
                         extra_config=extra_config,
                     )
                 )
@@ -679,6 +687,9 @@ def printHelp():
     print(
         "--startonlycoin          Only start the provides coin daemon/s, use this if a chain requires extra processing."
     )
+    print(
+        "--extracoinopts          Extra options to pass to coin daemon, can only be used with --startonlycoin."
+    )
     print("--logprefix              Specify log prefix.")
     print(
         "--forcedbupgrade         Recheck database against schema regardless of version."
@@ -742,6 +753,11 @@ def main():
             for coin in [s.lower() for s in s[1].split(",")]:
                 ensure_coin_valid(coin)
                 start_only_coins.add(coin)
+            continue
+        if name == "extracoinopts":
+            options["extra_coin_opts"] = []
+            for opt in [s.lower() for s in s[1].split(",")]:
+                options["extra_coin_opts"].append(opt)
             continue
 
         logger.warning(f"Unknown argument {v}")
