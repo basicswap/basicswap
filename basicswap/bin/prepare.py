@@ -1198,11 +1198,16 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                 fp.write("regtest=1\n")
                 fp.write("keep-fakechain=1\n")
                 fp.write("fixed-difficulty=1\n")
-            else:
-                fp.write("bootstrap-daemon-address=auto\n")
-                fp.write("restricted-rpc=1\n")
-            if chain == "testnet":
+            elif chain == "testnet":
                 fp.write("testnet=1\n")
+                fp.write("bootstrap-daemon-address=auto\n")
+            else:
+                # Negate high-fee attack by using a trusted daemon
+                if coin == "monero":
+                    fp.write("bootstrap-daemon-address=node3.monerodevs.org:18089\n")
+                elif coin == "wownero":
+                    fp.write("bootstrap-daemon-address=node3.monerodevs.org:34568\n")
+                fp.write("restricted-rpc=1\n")
             config_datadir = data_dir
             if extra_opts.get("use_containers", False) is True:
                 config_datadir = "/data"
