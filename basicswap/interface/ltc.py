@@ -228,45 +228,30 @@ class LTCInterfaceMWEB(LTCInterface):
     def init_wallet(self, password=None):
         # If system is encrypted mweb wallet will be created at first unlock
 
-        self._log.info("init_wallet - {}".format(self.ticker()))
+        wallet_name: str = self._rpc_wallet
+        self._log.info(f"init_wallet - {self.ticker()}")
 
         wallets = self.rpc("listwallets")
-        if self._rpc_wallet not in wallets:
+        if wallet_name not in wallets:
             try:
-                self.rpc("loadwallet", [self._rpc_wallet])
-                self._log.debug(f'Loaded existing wallet "{self._rpc_wallet}".')
+                self.rpc("loadwallet", [wallet_name])
+                self._log.debug(f'Loaded existing wallet "{wallet_name}".')
             except Exception as e:
                 if "does not exist" in str(e) or "Path does not exist" in str(e):
                     self._log.info(
-                        f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
+                        f'Creating wallet "{wallet_name}" for {self.coin_name()}.'
                     )
                     # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                     self.rpc(
                         "createwallet",
                         [
-                            self._rpc_wallet,
+                            wallet_name,
                             False,
                             True,
                             password,
                             False,
                             self._use_descriptors,
                         ],
-                    )
-                else:
-                    raise
-
-        wallets = self.rpc("listwallets")
-        if "mweb" not in wallets:
-            try:
-                self.rpc("loadwallet", ["mweb"])
-                self._log.debug("Loaded existing MWEB wallet.")
-            except Exception as e:
-                if "does not exist" in str(e) or "Path does not exist" in str(e):
-                    self._log.info(f"Creating MWEB wallet for {self.coin_name()}.")
-                    # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
-                    self.rpc(
-                        "createwallet",
-                        ["mweb", False, True, password, False, False, True],
                     )
                 else:
                     raise
@@ -279,8 +264,8 @@ class LTCInterfaceMWEB(LTCInterface):
             self._sc.initialiseWallet(self.interface_type())
 
             # Workaround to trigger mweb_spk_man->LoadMWEBKeychain()
-            self.rpc("unloadwallet", ["mweb"])
-            self.rpc("loadwallet", ["mweb"])
+            self.rpc("unloadwallet", [wallet_name])
+            self.rpc("loadwallet", [wallet_name])
             if password is not None:
                 self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
             self.rpc_wallet("keypoolrefill")
