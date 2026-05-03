@@ -552,16 +552,26 @@ chainparams = {
 
 name_map = {}
 ticker_map = {}
+variant_ticker_map = {}
 
 
 for c, params in chainparams.items():
     name_map[params["name"].lower()] = c
     ticker_map[params["ticker"].lower()] = c
 
+# Add coin variants, eg: LTC_MWEB, PART_ANON
+for c in Coins:
+    if c.name.lower() in ticker_map:
+        continue
+    variant_ticker_map[c.name.lower()] = c
 
-def getCoinIdFromTicker(ticker: str) -> str:
+
+def getCoinIdFromTicker(ticker: str, inc_variant: bool = False) -> str:
+    lc_ticker: str = ticker.lower()
     try:
-        return ticker_map[ticker.lower()]
+        if inc_variant and lc_ticker in variant_ticker_map:
+            return variant_ticker_map[lc_ticker]
+        return ticker_map[lc_ticker]
     except Exception:
         raise ValueError(f"Unknown coin {ticker}")
 

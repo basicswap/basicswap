@@ -222,6 +222,7 @@ def prepare_swapclient_dir(
             "datadir": os.path.join(datadir, "ltc_" + str(node_id)),
             "bindir": cfg.LITECOIN_BINDIR,
             "use_segwit": True,
+            "wallet_name": "bsx_wallet",
         }
 
     if cls:
