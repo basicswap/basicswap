@@ -185,11 +185,13 @@ else:
 BIN_ARCH = os.getenv("BIN_ARCH", BIN_ARCH)
 FILE_EXT = os.getenv("FILE_EXT", FILE_EXT)
 
-logger = logging.getLogger()
+logger = logging.getLogger("prepare")
 LOG_LEVEL = logging.DEBUG
+logger.propagate = False
 logger.level = LOG_LEVEL
-if not len(logger.handlers):
-    logger.addHandler(logging.StreamHandler(sys.stdout))
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter("%(levelname)s : %(message)s"))
+logger.addHandler(handler)
 logging.getLogger("gnupg").setLevel(logging.INFO)
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", False))
