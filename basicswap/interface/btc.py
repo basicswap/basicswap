@@ -939,31 +939,25 @@ class BTCInterface(Secp256k1Interface):
             if wm:
                 info = wm.getAddressInfo(self.coin_type(), address)
                 if info:
-                    if or_watch_only:
-                        return True
+                    if or_watch_only is False and info["is_watch_only"] is True:
+                        return False
                     return True
             return False
 
         try:
             addr_info = self.rpc_wallet("getaddressinfo", [address])
-            if not or_watch_only:
-                if addr_info["ismine"]:
-                    return True
-            else:
-                if self._use_descriptors:
-                    addr_info = self.rpc_wallet_watch("getaddressinfo", [address])
-                if addr_info["ismine"] or addr_info["iswatchonly"]:
+            if addr_info["ismine"]:
+                return True
+            if or_watch_only is False:
+                return False
+            if addr_info["iswatchonly"]:
+                return True
+            if self._use_descriptors:
+                wo_addr_info = self.rpc_wallet_watch("getaddressinfo", [address])
+                if wo_addr_info["iswatchonly"]:
                     return True
         except Exception as e:
             self._log.debug(f"isAddressMine RPC check failed: {e}")
-
-        wm = self.getWalletManager()
-        if wm:
-            info = wm.getAddressInfo(self.coin_type(), address)
-            if info:
-                if or_watch_only:
-                    return True
-                return True
 
         return False
 
