@@ -40,6 +40,10 @@
       });
     },
 
+    confirmMWEBChangeConvert: function() {
+      return confirm('Confirm MWEB change conversion: This will create a tx sending all spendable MWEB outputs in the plain LTC wallet to LTC.');
+    },
+
     confirmReseed: function() {
       return confirm('Are you sure you want to reseed the wallet? This will generate new addresses.');
     },
@@ -60,7 +64,7 @@
     },
 
     fillDonationAddress: function(address, coinType) {
-      
+
       let addressInput = null;
 
       addressInput = window.DOMCache
@@ -188,7 +192,7 @@
     },
 
     lookup_rates: function() {
-      
+
       if (window.lookup_rates && typeof window.lookup_rates === 'function') {
         window.lookup_rates();
       } else {
@@ -276,6 +280,16 @@
         const target = e.target.closest('[data-confirm-reseed]');
         if (target) {
           if (!this.confirmReseed()) {
+            e.preventDefault();
+            return false;
+          }
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-confirm-mweb-change-convert]');
+        if (target) {
+          if (!this.confirmMWEBChangeConvert()) {
             e.preventDefault();
             return false;
           }
@@ -398,6 +412,7 @@
 
   window.EventHandlers = EventHandlers;
   window.confirmReseed = EventHandlers.confirmReseed.bind(EventHandlers);
+  window.confirmMWEBChangeConvert = EventHandlers.confirmMWEBChangeConvert.bind(EventHandlers);
   window.confirmWithdrawal = EventHandlers.confirmWithdrawal.bind(EventHandlers);
   window.confirmUTXOResize = EventHandlers.confirmUTXOResize.bind(EventHandlers);
   window.confirmRemoveExpired = EventHandlers.confirmRemoveExpired.bind(EventHandlers);

@@ -92,7 +92,9 @@ class LTCInterface(BTCInterface):
             if "address" not in u:
                 continue
             utxo_address: str = u["address"]
-            if any(utxo_address.startswith(prefix) for prefix in ("mweb1", "tmweb1")):
+            if any(
+                utxo_address.startswith(prefix) for prefix in ("ltcmweb1", "tmweb1")
+            ):
                 continue
             if "desc" in u:
                 desc = u["desc"]
@@ -110,6 +112,76 @@ class LTCInterface(BTCInterface):
                 utxo_address, 0
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
+
+    def getMWEBBalance(self) -> int:
+        if self.useBackend():
+            raise ValueError("MWEB not supported in electrum mode")
+
+        value: int = 0
+        unspent = self.rpc_wallet(
+            "listunspent",
+            [
+                0,
+            ],
+        )
+        for u in unspent:
+            if "address" not in u:
+                continue
+            utxo_address: str = u["address"]
+            if any(
+                utxo_address.startswith(prefix) for prefix in ("ltcmweb1", "tmweb1")
+            ):
+                value += self.make_int(u["amount"], r=1)
+        return value
+
+    def convertMWEBBalance(self):
+        if self.useBackend():
+            raise ValueError("MWEB not supported in electrum mode")
+
+        self._log.info(f"convertMWEBBalance - {self.ticker()}")
+        locked_before = self.rpc_wallet("listlockunspent")
+        lock_utxos = []
+        try:
+            # Hack: mark all the other utxos as unspendable, alternative is to use a mweb_transfer wallet
+            utxos = self.rpc_wallet("listunspent")
+            mweb_amount: int = 0
+            for utxo in utxos:
+                utxo_address: str = utxo.get("address", "")
+                if any(
+                    utxo_address.startswith(prefix) for prefix in ("ltcmweb1", "tmweb1")
+                ):
+                    mweb_amount += self.make_int(utxo["amount"], r=1)
+                    continue
+                utxo_op = {"txid": utxo["txid"], "vout": utxo["vout"]}
+                if utxo_op in locked_before:
+                    continue
+                lock_utxos.append(utxo_op)
+
+            if mweb_amount == 0:
+                raise ValueError("No MWEB outputs to convert")
+            self.rpc_wallet("lockunspent", [False, lock_utxos])
+            subfee_to_mweb: bool = True
+            convert_value = self.format_amount(mweb_amount)
+            plain_addr: str = self.rpc_wallet("getnewaddress", ["transfer", "bech32"])
+
+            # Double check generated address is owned by this wallet
+            if not self.isAddressMine(plain_addr):
+                raise ValueError("Generated address not owned by wallet!")
+            params = [
+                plain_addr,
+                convert_value,
+                "",
+                "",
+                subfee_to_mweb,
+                True,
+                self._conf_target,
+            ]
+            txid = self.rpc_wallet("sendtoaddress", params)
+
+            self._log.info(f"MWEB in plain converted in txid: {self._log.id(txid)}")
+            return txid
+        finally:
+            self.rpc_wallet("lockunspent", [True, lock_utxos])
 
     def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         if password == "":

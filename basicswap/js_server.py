@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -129,7 +129,6 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
 
     try:
-
         swap_client.updateWalletsInfo()
         wallets = swap_client.getCachedWalletsInfo()
         coins_with_balances = []
@@ -331,6 +330,18 @@ def js_wallets(self, url_split, post_string, is_json):
                     raise ValueError("Invalid coin for command")
                 return bytes(
                     json.dumps(swap_client.ci(coin_type).getNewMwebAddress()), "UTF-8"
+                )
+            elif cmd == "mwebbalance":
+                # mweb outputs left behind when sending LTC -> MWEB
+                if coin_type not in (Coins.LTC,):
+                    raise ValueError("Invalid coin for command")
+                ci = swap_client.ci(coin_type)
+                return bytes(json.dumps(ci.format_amount(ci.getMWEBBalance())), "UTF-8")
+            elif cmd == "convertmweb":
+                if coin_type not in (Coins.LTC,):
+                    raise ValueError("Invalid coin for command")
+                return bytes(
+                    json.dumps(swap_client.ci(coin_type).convertMWEBBalance()), "UTF-8"
                 )
             elif cmd == "watchaddress":
                 post_data = getFormData(post_string, is_json)
