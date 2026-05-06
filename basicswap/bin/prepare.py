@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -59,7 +59,7 @@ PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.3")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 
-LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.4")
+LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.5")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
 DCR_VERSION = os.getenv("DCR_VERSION", "2.1.3")
@@ -944,7 +944,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         elif coin == "litecoin":
             release_url = [
                 f"https://github.com/litecoin-project/litecoin/releases/download/v{version}{version_tag}/{release_filename}",
-                f"https://download.litecoin.org/litecoin-{version}{version_tag}/{release_filename}",
+                f"https://download.litecoin.org/litecoin-{version}{version_tag}/{os_name}/{release_filename}",
             ]
             assert_filename = "{}-core-{}-{}-build.assert".format(
                 coin, os_name, ".".join(version.split(".")[:2])
