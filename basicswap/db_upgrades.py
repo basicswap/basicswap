@@ -250,11 +250,18 @@ def upgradeDatabaseFromSchema(self, cursor, expect_schema):
 
 
 def upgradeDatabase(self, db_version: int):
-    if self._force_db_upgrade is False and db_version >= CURRENT_DB_VERSION:
+    upgrade_forced: bool = False
+    if db_version < CURRENT_DB_VERSION:
+        pass
+    elif self._force_db_upgrade is True:
+        upgrade_forced = True
+    else:
         return
 
     self.log.info(
-        f"Upgrading database from version {db_version} to {CURRENT_DB_VERSION}."
+        f"Upgrading database from version {db_version} to {CURRENT_DB_VERSION}"
+        + (" (forced)" if upgrade_forced else "")
+        + "."
     )
 
     # db_version, tablename, oldcolumnname, newcolumnname

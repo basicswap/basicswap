@@ -140,6 +140,12 @@ Observe progress with
     tail -f /tmp/firo.log
 
 
+Alternatively --extracoinopts can be used with --startonlycoin
+
+    docker-compose run --rm swapclient \
+        basicswap-run --datadir=/coindata --startonlycoin=litecoin --extracoinopts="-reindex"
+
+
 ## Start a subset of the configured coins using docker
 
     docker compose run --rm --service-ports swapclient basicswap-run -datadir=/coindata -withcoins=monero
