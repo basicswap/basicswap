@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2019-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,6 +29,7 @@ import urllib.parse
 import zipfile
 import zmq
 
+from typing import List
 from urllib.request import urlopen
 
 import basicswap.config as cfg
@@ -58,7 +59,7 @@ PARTICL_LINUX_EXTRA = os.getenv("PARTICL_LINUX_EXTRA", "nousb")
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.3")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 
-LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.4")
+LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.5")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
 DCR_VERSION = os.getenv("DCR_VERSION", "2.1.3")
@@ -185,11 +186,13 @@ else:
 BIN_ARCH = os.getenv("BIN_ARCH", BIN_ARCH)
 FILE_EXT = os.getenv("FILE_EXT", FILE_EXT)
 
-logger = logging.getLogger()
+logger = logging.getLogger("prepare")
 LOG_LEVEL = logging.DEBUG
+logger.propagate = False
 logger.level = LOG_LEVEL
-if not len(logger.handlers):
-    logger.addHandler(logging.StreamHandler(sys.stdout))
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter("%(levelname)s : %(message)s"))
+logger.addHandler(handler)
 logging.getLogger("gnupg").setLevel(logging.INFO)
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", False))
@@ -458,33 +461,47 @@ def getRemoteFileLength(url: str) -> (int, bool):
         popConnectionParameters()
 
 
-def downloadRelease(url: str, path: str, extra_opts, timeout: int = 10) -> None:
-    """If file exists at path compare it's size to the content length at the url
-    and attempt to resume download if file size is below expected.
-    """
-    resume_from: int = 0
+def downloadRelease(
+    url_in: str | List[str], path: str, extra_opts, timeout: int = 10
+) -> None:
+    # If file exists at path compare it's size to the content length at the url
+    # and attempt to resume download if file size is below expected.
 
-    if os.path.exists(path):
-        if extra_opts.get("redownload_releases", False):
-            logging.warning(f"Overwriting: {path}")
-        elif extra_opts.get("verify_release_file_size", True):
-            file_size = os.stat(path).st_size
-            remote_file_length, can_resume = getRemoteFileLength(url)
-            if file_size < remote_file_length:
-                logger.warning(
-                    f"{path} is an unexpected size, {file_size} < {remote_file_length}.  Attempting to resume download."
-                )
-                if can_resume:
-                    resume_from = file_size
+    release_filename: str = os.path.basename(path)
+    urls = (
+        url_in
+        if isinstance(url_in, list)
+        else [
+            url_in,
+        ]
+    )
+    for url in urls:
+        try:
+            resume_from: int = 0
+            if os.path.exists(path):
+                if extra_opts.get("redownload_releases", False):
+                    logging.warning(f"Overwriting: {path}")
+                elif extra_opts.get("verify_release_file_size", True):
+                    file_size = os.stat(path).st_size
+                    remote_file_length, can_resume = getRemoteFileLength(url)
+                    if file_size < remote_file_length:
+                        logger.warning(
+                            f"{path} is an unexpected size, {file_size} < {remote_file_length}.  Attempting to resume download."
+                        )
+                        if can_resume:
+                            resume_from = file_size
+                        else:
+                            logger.warning("Download can not be resumed, restarting.")
+                    else:
+                        return
                 else:
-                    logger.warning("Download can not be resumed, restarting.")
-            else:
-                return
-        else:
-            # File exists and size check is disabled
-            return
-
-    return downloadFile(url, path, timeout, resume_from)
+                    # File exists and size check is disabled
+                    return
+            return downloadFile(url, path, timeout, resume_from)
+        except Exception as e:
+            logger.warning(f"Failed to download {release_filename} from {url}")
+            logger.debug(f"Download error {e}")
+    raise RuntimeError(f"Failed to download {release_filename}.")
 
 
 def downloadFile(url: str, path: str, timeout: int = 5, resume_from: int = 0) -> None:
@@ -925,9 +942,10 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     assert_filename,
                 )
         elif coin == "litecoin":
-            release_url = "https://github.com/litecoin-project/litecoin/releases/download/v{}/{}".format(
-                version + version_tag, release_filename
-            )
+            release_url = [
+                f"https://github.com/litecoin-project/litecoin/releases/download/v{version}{version_tag}/{release_filename}",
+                f"https://download.litecoin.org/litecoin-{version}{version_tag}/{os_name}/{release_filename}",
+            ]
             assert_filename = "{}-core-{}-{}-build.assert".format(
                 coin, os_name, ".".join(version.split(".")[:2])
             )
