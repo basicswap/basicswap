@@ -15,13 +15,14 @@ export XMR_RPC_USER=xmr_user
 export XMR_RPC_PWD=xmr_pwd
 python tests/basicswap/extended/test_xmr_persistent.py
 
-
 # Copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
 
-
 # Continue existing chains with
 export RESET_TEST=false
+
+# Set coins started
+export TEST_COINS_LIST="bitcoin,monero,litecoin"
 
 """
 

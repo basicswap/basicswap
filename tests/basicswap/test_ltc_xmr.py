@@ -268,6 +268,62 @@ class TestLTC(BasicSwapTest):
             if "mweb1" in addr:
                 raise ValueError("getUnspentsByAddr should exclude mweb UTXOs.")
 
+        # Test helper functions to convert MWEB change
+        mweb_change_value = ci0.getMWEBBalance()
+        assert mweb_change_value > 0
+
+        test_lock_utxo = None
+        for utxo in utxos:
+            utxo_address: str = utxo.get("address", "")
+            if any(
+                utxo_address.startswith(prefix) for prefix in ("ltcmweb1", "tmweb1")
+            ):
+                continue
+            test_lock_utxo = {"txid": utxo["txid"], "vout": utxo["vout"]}
+            ci0.rpc_wallet(
+                "lockunspent",
+                [
+                    False,
+                    [
+                        test_lock_utxo,
+                    ],
+                ],
+            )
+            break
+        assert len(ci0.rpc_wallet("listlockunspent")) == 1
+
+        txid = ci0.convertMWEBBalance()
+
+        # Check utxos locked before conversion are still locked after
+        assert len(ci0.rpc_wallet("listlockunspent")) == 1
+        ci0.rpc_wallet(
+            "lockunspent",
+            [
+                True,
+                [
+                    test_lock_utxo,
+                ],
+            ],
+        )
+        assert len(ci0.rpc_wallet("listlockunspent")) == 0
+
+        txj = ci0.rpc_wallet(
+            "gettransaction",
+            [
+                txid,
+            ],
+        )
+        assert len(txj["details"]) == 2
+
+        fee_amt = -ci0.make_int(txj["fee"])
+        assert txj["details"][0]["category"] == "send"
+        assert ci0.make_int(txj["details"][0]["amount"]) - fee_amt == -mweb_change_value
+        assert txj["details"][1]["category"] == "receive"
+        assert ci0.make_int(txj["details"][1]["amount"]) + fee_amt == mweb_change_value
+
+        mweb_change_value = ci0.getMWEBBalance()
+        assert mweb_change_value == 0
+
         # TODO
 
     def test_22_mweb_balance(self):
@@ -361,6 +417,20 @@ class TestLTC(BasicSwapTest):
 
         json_rv = read_json_api(TEST_HTTP_PORT + 0, "wallets/ltc", post_json)
         assert json_rv["mweb_balance"] <= 20.0
+
+        # Test helper functions to convert MWEB change
+        json_rv = read_json_api(
+            TEST_HTTP_PORT + 0, "wallets/ltc/mwebbalance", post_json
+        )
+        assert float(json_rv) > 0
+        json_rv = read_json_api(
+            TEST_HTTP_PORT + 0, "wallets/ltc/convertmweb", post_json
+        )
+        assert len(json_rv) == 64
+        json_rv = read_json_api(
+            TEST_HTTP_PORT + 0, "wallets/ltc/mwebbalance", post_json
+        )
+        assert float(json_rv) == 0
 
 
 if __name__ == "__main__":

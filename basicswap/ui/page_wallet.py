@@ -273,6 +273,9 @@ def page_wallet(self, url_split, post_string):
             swap_client.cacheNewAddressForCoin(coin_id)
         elif have_data_entry(form_data, "forcerefresh"):
             force_refresh = True
+        elif have_data_entry(form_data, "convertmweb_" + cid):
+            txid = swap_client.ci(coin_id).convertMWEBBalance()
+            messages.append(f"Converted MWEB change to LTC in tx: {txid}")
         elif have_data_entry(form_data, "newmwebaddr_" + cid):
             swap_client.cacheNewStealthAddressForCoin(coin_id)
         elif have_data_entry(form_data, "newsparkaddr_" + cid):
@@ -525,6 +528,10 @@ def page_wallet(self, url_split, post_string):
                     // page_data["fee_estimate"]["sum_weight"]
                 )
 
+        if k == Coins.LTC and ci.useBackend() is False:
+            mweb_value: int = ci.getMWEBBalance()
+            if mweb_value > 0:
+                wallet_data["mweb_in_plain"] = ci.format_amount(mweb_value)
         if show_utxo_groups:
             utxo_groups = ""
             unspent_by_addr = ci.getUnspentsByAddr()
