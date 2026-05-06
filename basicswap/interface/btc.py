@@ -449,11 +449,11 @@ class BTCInterface(Secp256k1Interface):
         # Wallet name is "" for some LTC and PART installs on older cores
         if self._rpc_wallet not in wallets and len(wallets) > 0:
             if "" in wallets:
+                # Setting wallet= in the coin .conf file should also work
                 self._log.warning(
                     f"Nameless {self.ticker()} wallet found."
                     + '\nPlease set the "wallet_name" coin setting to "" or recreate the wallet'
                 )
-                # backupwallet and restorewallet with name should work.
 
         if self._rpc_wallet not in wallets:
             raise RuntimeError(

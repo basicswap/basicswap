@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2021-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -184,6 +184,15 @@ class TestLTC(BasicSwapTest):
         ci0 = swap_clients[0].ci(self.test_coin_from)
         ci1 = swap_clients[1].ci(self.test_coin_from)
 
+        # mweb utxos before sending to mweb
+        num_mweb: int = 0
+        utxos_0 = ci0.rpc_wallet("listunspent")
+        for utxo in utxos_0:
+            addr_info = ci0.rpc_wallet("getaddressinfo", [utxo["address"]])
+            if addr_info["ismweb"] is True:
+                num_mweb += 1
+        assert num_mweb == 1
+
         mweb_addr_0 = ci0.rpc_wallet("getnewaddress", ["mweb addr test 0", "mweb"])
         mweb_addr_1 = ci1.rpc_wallet("getnewaddress", ["mweb addr test 1", "mweb"])
 
@@ -209,6 +218,19 @@ class TestLTC(BasicSwapTest):
             trusted_before - float(ci0.rpc_wallet("getbalances")["mine"]["trusted"])
             < 0.1
         )
+
+        num_mweb: int = 0
+        utxos_0 = ci0.rpc_wallet(
+            "listunspent",
+            [
+                0,
+            ],
+        )
+        for utxo in utxos_0:
+            addr_info = ci0.rpc_wallet("getaddressinfo", [utxo["address"]])
+            if addr_info["ismweb"] is True:
+                num_mweb += 1
+        assert num_mweb > 1
 
         try:
             pause_event.clear()  # Stop mining
@@ -237,6 +259,7 @@ class TestLTC(BasicSwapTest):
         for utxo in utxos:
             if utxo.get("address", "") == mweb_addr_1:
                 mweb_tx = utxo
+                break
         assert mweb_tx is not None
 
         unspent_addr = ci1.getUnspentsByAddr()
@@ -265,7 +288,9 @@ class TestLTC(BasicSwapTest):
         ltc_mweb_addr = read_json_api(
             TEST_HTTP_PORT + 0, "wallets/ltc_mweb/nextdepositaddr"
         )
+        assert ltc_mweb_addr.startswith("tmweb1")
         ltc_mweb_addr2 = read_json_api(TEST_HTTP_PORT + 0, "wallets/ltc/newmwebaddress")
+        assert ltc_mweb_addr2.startswith("tmweb1")
 
         assert (
             ci_mweb.rpc_wallet(
