@@ -200,9 +200,9 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                                 if field in w:
                                     raw = w[field]
                                     if isinstance(raw, float):
-                                        coin_entry[field] = (
-                                            f"{raw:.8f}".rstrip("0").rstrip(".")
-                                        )
+                                        coin_entry[field] = f"{raw:.8f}".rstrip(
+                                            "0"
+                                        ).rstrip(".")
                                     elif isinstance(raw, int):
                                         coin_entry[field] = str(raw)
                                     else:
