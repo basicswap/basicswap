@@ -12,7 +12,7 @@ from .btc import BTCInterface
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.util.address import decodeAddress
-from .contrib.pivx_test_framework.messages import CBlock, ToHex, FromHex, CTransaction
+from .contrib.pivx_test_framework.messages import CTransaction
 from basicswap.contrib.test_framework.script import (
     CScript,
     OP_DUP,
@@ -100,29 +100,13 @@ class PIVXInterface(BTCInterface):
         return decodeAddress(address)[1:]
 
     def getBlockWithTxns(self, block_hash):
-        # TODO: Bypass decoderawtransaction and getblockheader
-        block = self.rpc("getblock", [block_hash, False])
-        block_header = self.rpc("getblockheader", [block_hash])
-        decoded_block = CBlock()
-        decoded_block = FromHex(decoded_block, block)
-
+        block = self.rpc("getblock", [block_hash, True])
         tx_rv = []
-        for tx in decoded_block.vtx:
-            tx_dec = self.rpc("decoderawtransaction", [ToHex(tx)])
+        for txid_str in block["tx"]:
+            tx_dec = self.rpc("getrawtransaction", [txid_str, True])
             tx_rv.append(tx_dec)
-
-        block_rv = {
-            "hash": block_hash,
-            "previousblockhash": block_header["previousblockhash"],
-            "tx": tx_rv,
-            "confirmations": block_header["confirmations"],
-            "height": block_header["height"],
-            "time": block_header["time"],
-            "version": block_header["version"],
-            "merkleroot": block_header["merkleroot"],
-        }
-
-        return block_rv
+        block["tx"] = tx_rv
+        return block
 
     def withdrawCoin(self, value, addr_to, subfee):
         params = [addr_to, value, "", "", subfee]
@@ -150,7 +134,7 @@ class PIVXInterface(BTCInterface):
         )
         return pay_fee
 
-    def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:
+    def signTxWithKey(self, tx: bytes, key: bytes, prev_amount=None) -> bytes:
         key_wif = self.encodeKey(key)
         rv = self.rpc(
             "signrawtransaction",
