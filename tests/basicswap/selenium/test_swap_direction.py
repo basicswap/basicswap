@@ -60,7 +60,11 @@ def test_swap_dir(driver):
         "automation_strat_id": 1,
     }
     rv = read_json_api(node_1_port, "offers/new", offer_data)
-    offer_1_id = rv["offer_id"]
+    try:
+        offer_1_id = rv["offer_id"]
+    except Exception as e:
+        logger.info(f"rv: {rv}")
+        raise e
 
     offer_data = {
         "addr_from": -1,
@@ -72,7 +76,11 @@ def test_swap_dir(driver):
         "automation_strat_id": 1,
     }
     rv = read_json_api(node_1_port, "offers/new", offer_data)
-    offer_2_id = rv["offer_id"]
+    try:
+        offer_2_id = rv["offer_id"]
+    except Exception as e:
+        logger.info(f"rv: {rv}")
+        raise e
 
     offer_data = {
         "addr_from": -1,
@@ -84,7 +92,11 @@ def test_swap_dir(driver):
         "automation_strat_id": 1,
     }
     rv = read_json_api(node_2_port, "offers/new", offer_data)
-    offer_3_id = rv["offer_id"]
+    try:
+        offer_3_id = rv["offer_id"]
+    except Exception as e:
+        logger.info(f"rv: {rv}")
+        raise e
 
     # Wait for offers to propagate
     for i in range(1000):

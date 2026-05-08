@@ -101,6 +101,7 @@ jobs:
         cp -r $BIN_DIR/* ${TEST_PATH}/bin/
         pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
     - name: Run selenium tests
+      id: selenium_tests
       run: |
         export TEST_PATH=/tmp/test_persistent
         mkdir -p ${TEST_PATH}/bin
@@ -126,3 +127,8 @@ jobs:
         echo "Running test_swap_direction.py"
         python tests/basicswap/selenium/test_swap_direction.py
         kill $TEST_NETWORK_PID
+    - name: Print log file on failure
+      if: ${{ failure() && steps.selenium_tests.conclusion == 'failure' }}
+      run: |
+        echo "=== SELENIUM BACKGROUND LOG ==="
+        cat /tmp/log.txt
