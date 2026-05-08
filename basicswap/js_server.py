@@ -192,6 +192,28 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                     coin_entry["electrum_synced"] = sync_status.get("synced", False)
                     coin_entry["electrum_height"] = sync_status.get("height", 0)
 
+                if k in wallets:
+                    w = wallets[k]
+                    if "error" not in w and "no_data" not in w:
+                        if k == Coins.PART:
+                            for field in ("blind_balance", "anon_balance"):
+                                if field in w:
+                                    raw = w[field]
+                                    if isinstance(raw, float):
+                                        coin_entry[field] = f"{raw:.8f}".rstrip(
+                                            "0"
+                                        ).rstrip(".")
+                                    elif isinstance(raw, int):
+                                        coin_entry[field] = str(raw)
+                                    else:
+                                        coin_entry[field] = raw
+                        elif k == Coins.LTC:
+                            if "mweb_balance" in w:
+                                coin_entry["mweb_balance"] = w["mweb_balance"]
+                        elif k == Coins.FIRO:
+                            if "spark_balance" in w:
+                                coin_entry["spark_balance"] = w["spark_balance"]
+
                 coins_with_balances.append(coin_entry)
 
                 if k == Coins.PART:

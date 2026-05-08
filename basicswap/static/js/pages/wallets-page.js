@@ -75,8 +75,27 @@
         if (coinData.pending && parseFloat(coinData.pending) > 0) {
           this.updatePendingBalance('Particl', 'Blind Balance:', coinData.pending, coinData.ticker || 'PART', 'Blind Unconfirmed:', coinData);
         }
+      } else if (coinData.name === 'Litecoin MWEB') {
+        this.updateSpecificBalance('Litecoin', 'MWEB Balance:', coinData.balance, coinData.ticker || 'LTC');
+        this.removePendingBalance('Litecoin', 'MWEB Balance:');
+        if (coinData.pending && parseFloat(coinData.pending) > 0) {
+          this.updatePendingBalance('Litecoin', 'MWEB Balance:', coinData.pending, coinData.ticker || 'LTC', 'MWEB Pending:', coinData);
+        }
       } else {
         this.updateSpecificBalance(coinData.name, 'Balance:', coinData.balance, coinData.ticker || coinData.name);
+
+        if (coinData.mweb_balance !== undefined) {
+          this.updateSpecificBalance(coinData.name, 'MWEB Balance:', coinData.mweb_balance, coinData.ticker || coinData.name);
+        }
+        if (coinData.spark_balance !== undefined) {
+          this.updateSpecificBalance(coinData.name, 'Spark Balance:', coinData.spark_balance, coinData.ticker || coinData.name);
+        }
+        if (coinData.blind_balance !== undefined) {
+          this.updateSpecificBalance(coinData.name, 'Blind Balance:', coinData.blind_balance, coinData.ticker || coinData.name);
+        }
+        if (coinData.anon_balance !== undefined) {
+          this.updateSpecificBalance(coinData.name, 'Anon Balance:', coinData.anon_balance, coinData.ticker || coinData.name);
+        }
 
         if (coinData.name !== 'Particl Anon' && coinData.name !== 'Particl Blind' && coinData.name !== 'Litecoin MWEB') {
           if (coinData.pending && parseFloat(coinData.pending) > 0) {
