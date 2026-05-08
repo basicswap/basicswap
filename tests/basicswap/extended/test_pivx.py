@@ -182,6 +182,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 "datadir": node_dir,
                 "bindir": cfg.PARTICL_BINDIR,
                 "blocks_confirmed": 2,  # Faster testing
+                "wallet_name": "bsx_wallet",
             },
             "pivx": {
                 "connection_type": "rpc",
@@ -191,6 +192,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 "bindir": PIVX_BINDIR,
                 "use_csv": False,
                 "use_segwit": False,
+                "wallet_name": "",
             },
             "bitcoin": {
                 "connection_type": "rpc",
@@ -199,6 +201,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 "datadir": btcdatadir,
                 "bindir": cfg.BITCOIN_BINDIR,
                 "use_segwit": True,
+                "wallet_name": "bsx_wallet",
             },
         },
         "check_progress_seconds": 2,
@@ -760,7 +763,17 @@ class Test(unittest.TestCase):
         rtx = pivxRpc(f'getrawtransaction "{txid}" true')
         assert rtx["version"] == 3
 
-        block_hash = pivxRpc(f'generatetoaddress 1 "{generate_addr}"')[0]
+        block_hash = None
+        for i in range(15):
+            rtx = pivxRpc(f'getrawtransaction "{txid}" true')
+            if "blockhash" in rtx:
+                block_hash = rtx["blockhash"]
+                logging.info(f"Shielded tx confirmed in block {block_hash} after {i}s")
+                break
+            if i == 5:
+                pivxRpc(f'generatetoaddress 1 "{generate_addr}"')
+            delay_event.wait(1)
+        assert block_hash is not None, "Shielded tx was not confirmed"
 
         ci = self.swap_clients[0].ci(Coins.PIVX)
         block = ci.getBlockWithTxns(block_hash)
@@ -837,7 +850,11 @@ class Test(unittest.TestCase):
         swap_value = ci_from.make_int(swap_value)
         assert swap_value > ci_from.make_int(9)
 
-        itx = pi.getFundedInitiateTxTemplate(ci_from, swap_value, True)
+        addr_to = pi.getMockAddrTo(ci_from)
+        funded_tx = ci_from.createRawFundedTransaction(
+            addr_to, swap_value, True, lock_unspents=True
+        )
+        itx = bytes.fromhex(funded_tx)
         itx_decoded = ci_from.describeTx(itx.hex())
 
         n = pi.findMockVout(ci_from, itx_decoded)

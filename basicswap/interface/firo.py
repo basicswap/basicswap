@@ -361,7 +361,7 @@ class FIROInterface(BTCInterface):
         )
         return pay_fee
 
-    def signTxWithKey(self, tx: bytes, key: bytes) -> bytes:
+    def signTxWithKey(self, tx: bytes, key: bytes, prev_amount=None) -> bytes:
         key_wif = self.encodeKey(key)
         rv = self.rpc(
             "signrawtransaction",

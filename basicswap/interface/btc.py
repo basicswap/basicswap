@@ -1083,8 +1083,8 @@ class BTCInterface(Secp256k1Interface):
         return self.encode_p2wsh(script)
 
     def getDestForAddress(self, address: str) -> bytes:
-        bech32_prefix = self.chainparams_network()["hrp"]
-        if address.startswith(bech32_prefix + "1"):
+        bech32_prefix: str | None = self.chainparams_network().get("hrp", None)
+        if bech32_prefix and address.startswith(bech32_prefix + "1"):
             _, witprog = segwit_addr.decode(bech32_prefix, address)
             return CScript([OP_0, bytes(witprog)])
 
