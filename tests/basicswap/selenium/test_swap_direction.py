@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2023 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -21,6 +21,25 @@ logger = logging.getLogger()
 logger.level = logging.INFO
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
+
+
+def wait_for_balance(
+    port: int,
+    coin: str,
+    expect_amount: float,
+    balance_key: str = "balance",
+    iterations: int = 30,
+    delay_time: int = 1,
+) -> None:
+    logger.info(f"Waiting for balance, port: {port}")
+    for i in range(iterations):
+        rv_js = read_json_api(port, f"wallets/{coin}")
+        if float(rv_js[balance_key]) >= expect_amount:
+            return
+        time.sleep(delay_time)
+
+    logger.warning(f"{port} wallets/{coin} {rv_js}")
+    raise ValueError(f"Expect {balance_key} {expect_amount}")
 
 
 def clear_offers(port_list) -> None:
@@ -81,6 +100,8 @@ def test_swap_dir(driver):
     except Exception as e:
         logger.info(f"rv: {rv}")
         raise e
+
+    wait_for_balance(node_2_port, "xmr", 5.0)
 
     offer_data = {
         "addr_from": -1,
