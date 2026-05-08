@@ -351,16 +351,19 @@
       );
 
       matchingCoins.forEach(coinData => {
-        const balanceElements = document.querySelectorAll('.coinname-value[data-coinname]');
+        const balanceElements = document.querySelectorAll('.coinname-value[data-coinname][data-balance-type]');
         balanceElements.forEach(element => {
           const elementCoinName = element.getAttribute('data-coinname');
           if (elementCoinName === coinData.name) {
-            const currentText = element.textContent;
-            const ticker = coinData.ticker || coinId.toUpperCase();
-            const newBalance = `${coinData.balance} ${ticker}`;
-            if (currentText !== newBalance) {
-              element.textContent = newBalance;
-              console.log(`Updated balance: ${coinData.name} -> ${newBalance}`);
+            const balanceType = element.getAttribute('data-balance-type');
+            const value = coinData[balanceType];
+            if (value !== undefined) {
+              const ticker = coinData.ticker || coinId.toUpperCase();
+              const newBalance = balanceType === 'est_fee' ? value : `${value} ${ticker}`;
+              if (element.textContent !== newBalance) {
+                element.textContent = newBalance;
+                console.log(`Updated ${balanceType}: ${coinData.name} -> ${newBalance}`);
+              }
             }
           }
         });
