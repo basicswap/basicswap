@@ -1173,6 +1173,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.dcr import DCRInterface
 
             return DCRInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.DGB:
+            from .interface.dgb import DGBInterface
+
+            return DGBInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.NMC:
             from .interface.nmc import NMCInterface
 
