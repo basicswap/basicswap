@@ -100,6 +100,13 @@ DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
 DIGIBYTE_VERSION = os.getenv("DIGIBYTE_VERSION", "8.26.2")
 DIGIBYTE_VERSION_TAG = os.getenv("DIGIBYTE_VERSION_TAG", "")
+DIGIBYTE_KNOWN_HASHES = {
+    "digibyte-8.26.2-x86_64-linux-gnu.tar.gz": "bffa56a4609e374010da36125c7f84521ef449f6c741a3ef765be4a23264535d",
+    "digibyte-8.26.2-aarch64-linux-gnu.tar.gz": "9c302fc000174ceaac70cde29823535edd12a9118fd29cdf0fc85d70f43b60ce",
+    "digibyte-8.26.2-x86_64-apple-darwin.zip": "654b30e6e6c3177fbbf73a9cf7e23b6f5c51b062cf508dd75c65523d8ad289e5",
+    "digibyte-8.26.2-arm64-apple-darwin.zip": "a5ee68b5b7078db379a7d76c72481af09e0e567cb644178325e58ce0fc42de9d",
+    "digibyte-8.26.2-win64-setup.exe": "e4e0fb204490db918980c58d65a783824d6a0d49b403740f39a05b33f0a4960e",
+}
 
 
 known_coins = {
@@ -978,6 +985,8 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
                     version + version_tag, release_filename
                 )
             )
+            assert_filename = f"digibyte-{version}-SHA256SUMS"
+            assert_url = None
 
         elif coin == "bitcoin":
             release_url = "https://bitcoincore.org/bin/bitcoin-core-{}/{}".format(
@@ -1071,23 +1080,26 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         downloadRelease(release_url, release_path, extra_opts)
 
         if coin == "digibyte":
-            release_hash = getFileHash(release_path)
-            logger.info(f"{release_filename} hash: {release_hash}")
-            logger.warning("DigiByte release does not provide a SHA256SUMS file. Skipping hash and GPG verification.")
-            extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
-            return
-
-        # Rename assert files with full version
-        assert_filename = "{}-{}-{}-build-{}.assert".format(
-            coin, os_name, version, signing_key_name
-        )
-        assert_path = os.path.join(bin_dir, assert_filename)
-        if not os.path.exists(assert_path):
-            downloadFile(assert_url, assert_path)
+            # DigiByte doesn't publish SHA256SUMS; use hardcoded hashes
+            assert_path = os.path.join(bin_dir, assert_filename)
+            if not os.path.exists(assert_path):
+                with open(assert_path, "w") as f:
+                    for fname, fhash in DIGIBYTE_KNOWN_HASHES.items():
+                        f.write(f"{fhash}  {fname}\n")
+                logger.info(f"Created local hash file: {assert_filename}")
+        else:
+            # Rename assert files with full version
+            assert_filename = "{}-{}-{}-build-{}.assert".format(
+                coin, os_name, version, signing_key_name
+            )
+            assert_path = os.path.join(bin_dir, assert_filename)
+            if not os.path.exists(assert_path):
+                downloadFile(assert_url, assert_path)
 
         if coin not in (
             "firo",
             "bitcoincash",
+            "digibyte",
         ):
             assert_sig_url = assert_url + (".asc" if use_guix else ".sig")
             if coin not in ("nav",):
@@ -1101,6 +1113,11 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     release_hash: str = getFileHash(release_path)
     logger.info(f"{release_filename} hash: {release_hash}")
     ensureFileHashInFile(release_hash, assert_path)
+
+    if coin == "digibyte":
+        logger.info("DigiByte hash verified against known hashes. Skipping GPG (no signatures published).")
+        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
+        return
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
@@ -1812,6 +1829,8 @@ def printHelp():
     print("--ltc-mode=MODE          Set LTC connection mode: rpc, electrum, or remote.")
     print("--btc-electrum-server=   Custom Electrum server for BTC (host:port:ssl).")
     print("--ltc-electrum-server=   Custom Electrum server for LTC (host:port:ssl).")
+    print("--dgb-mode=MODE          Set DGB connection mode: rpc, electrum, or remote.")
+    print("--dgb-electrum-server=   Custom Electrum server for DGB (host:port:ssl).")
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -2943,6 +2962,7 @@ def main():
     electrum_supported_coins = {
         "bitcoin": "btc",
         "litecoin": "ltc",
+        "digibyte": "dgb",
     }
 
     for coin_name, coin_prefix in electrum_supported_coins.items():
