@@ -7681,7 +7681,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                         self.commitDB()
 
-                    if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
+                    if (
+                        TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns
+                        and refund_tx.block_height is not None
+                        and ci_from.isCsvLockMature(
+                            offer.lock_type,
+                            xmr_offer.lock_time_2,
+                            refund_tx.block_height,
+                            refund_tx.block_time,
+                        )
+                    ):
                         try:
                             if self.haveDebugInd(
                                 bid.bid_id,
