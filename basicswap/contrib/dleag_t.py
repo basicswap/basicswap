@@ -5,7 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""pure python dleag with parameterised generators, mirrors basicswap/secp256k1 src/modules/dleag/main_impl.h."""
+"""pure python dleag with parameterised generators, mirrors basicswap/secp256k1 src/modules/dleag/main_impl.h. not constant time, scalar arithmetic uses python ints."""
 
 import hashlib
 import hmac
@@ -220,7 +220,11 @@ def ed_point_sub(
 
 
 def ed_point_mul(s: int, P: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-    s = s % ED25519_L
+    return ed_point_mul_raw(s % ED25519_L, P)
+
+
+def ed_point_mul_raw(s: int, P: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    # No mod L reduction. Required for subgroup checks where we multiply by L exactly.
     Q = _ED25519_IDENTITY
     if s == 0:
         return Q
@@ -257,7 +261,7 @@ def ed_canonical(b: bytes) -> bool:
 
 
 def ed_in_main_subgroup(P: Tuple[int, int, int, int]) -> bool:
-    return ed_point_eq(ed_point_mul(ED25519_L, P), _ED25519_IDENTITY)
+    return ed_point_eq(ed_point_mul_raw(ED25519_L, P), _ED25519_IDENTITY)
 
 
 def ed_decode_check_point(b: bytes) -> Tuple[int, int, int, int]:
@@ -573,8 +577,11 @@ def prove(
     if key_int == 0 or key_int >= SECP256K1_N or key_int >= ED25519_L:
         raise ValueError("key out of range for both curves")
 
+    # Reject ed25519 generators that are not in the prime order subgroup.
+    gen_e_a_point = ed_decode_check_point(gen_e_a)
+    gen_e_b_point = ed_decode_check_point(gen_e_b)
+
     K_G = secp_point_mul(key_int, gen_s_a)
-    gen_e_a_point = ed_decompress(gen_e_a)
     K_B = ed_compress(ed_point_mul(key_int, gen_e_a_point))
 
     preimage_hash = hashlib.sha256(DLEAG_SIG_MESSAGE).digest()
@@ -626,8 +633,6 @@ def prove(
     C_G_bytes: List[bytes] = [b""] * n_bits
     C_B_points: List[Tuple[int, int, int, int]] = [None] * n_bits
     C_B_bytes: List[bytes] = [b""] * n_bits
-
-    gen_e_b_point = ed_decompress(gen_e_b)
 
     for i in range(n_bits):
         x_i = key_bit(key_be32, i)
@@ -785,8 +790,9 @@ def verify(
         C_B_points: List[Tuple[int, int, int, int]] = [None] * n_bits
         C_B_bytes: List[bytes] = [b""] * n_bits
 
-        gen_e_a_point = ed_decompress(gen_e_a)
-        gen_e_b_point = ed_decompress(gen_e_b)
+        # Reject ed25519 generators that are not in the prime order subgroup.
+        gen_e_a_point = ed_decode_check_point(gen_e_a)
+        gen_e_b_point = ed_decode_check_point(gen_e_b)
 
         sum_secp_bytes: bytes = b""
         sum_ed_point: Tuple[int, int, int, int] = (0, 1, 1, 0)
@@ -933,6 +939,7 @@ __all__: List[str] = [
     "ed_point_neg",
     "ed_point_sub",
     "ed_point_mul",
+    "ed_point_mul_raw",
     "ed_point_eq",
     "ed_canonical",
     "ed_in_main_subgroup",

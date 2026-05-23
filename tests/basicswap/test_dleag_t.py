@@ -93,6 +93,22 @@ class TestEd25519PointArithmetic(unittest.TestCase):
         S = d.ed_point_add(d.ED25519_B_POINT, negB)
         self.assertTrue(d.ed_point_eq(S, (0, 1, 1, 0)))
 
+    def test_ed_in_main_subgroup_rejects_small_order(self):
+        P_small = bytes.fromhex(
+            "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05"
+        )
+        P = d.ed_decompress(P_small)
+        self.assertFalse(d.ed_in_main_subgroup(P))
+
+    def test_subgroup_check_rejects_small_order(self):
+        # Order 8 point from libsodium small order table. Canonical, decompresses,
+        # but not in the prime order subgroup. Must be rejected end to end.
+        P_small = bytes.fromhex(
+            "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05"
+        )
+        with self.assertRaises(ValueError):
+            d.ed_decode_check_point(P_small)
+
 
 class TestEd25519Scalars(unittest.TestCase):
     def test_mod_l(self):
@@ -377,6 +393,45 @@ class TestDleagGT(unittest.TestCase):
         self.assertNotEqual(proof_a[65:], proof_b[65:])
         self.assertTrue(d.verify(proof_a, gen_e_a=CARROT_T_COMPRESSED))
         self.assertTrue(d.verify(proof_b, gen_e_a=CARROT_T_COMPRESSED))
+
+
+SMALL_ORDER_POINT = bytes.fromhex(
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05"
+)
+
+
+class TestInvalidGenerators(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            from coincurve import PrivateKey  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("coincurve not installed")
+
+    def test_prove_rejects_small_order_gen_e_a(self):
+        key = _random_ed_key()
+        nonce = secrets.token_bytes(32)
+        with self.assertRaises(ValueError):
+            d.prove(key, nonce, gen_e_a=SMALL_ORDER_POINT)
+
+    def test_prove_rejects_small_order_gen_e_b(self):
+        key = _random_ed_key()
+        nonce = secrets.token_bytes(32)
+        with self.assertRaises(ValueError):
+            d.prove(key, nonce, gen_e_b=SMALL_ORDER_POINT)
+
+    def test_verify_rejects_small_order_gen_e_a(self):
+        key = _random_ed_key()
+        nonce = secrets.token_bytes(32)
+        proof = d.prove(key, nonce)
+        self.assertFalse(d.verify(proof, gen_e_a=SMALL_ORDER_POINT))
+
+    def test_verify_rejects_small_order_gen_e_b(self):
+        key = _random_ed_key()
+        nonce = secrets.token_bytes(32)
+        proof = d.prove(key, nonce)
+        self.assertFalse(d.verify(proof, gen_e_b=SMALL_ORDER_POINT))
 
 
 class TestDleagCoincurveCrossCheck(unittest.TestCase):
