@@ -553,8 +553,8 @@ def ecdsa_verify_g(
 
 
 def proof_len(n_bits: int = 252) -> int:
-    if n_bits <= 0 or n_bits > 256:
-        raise ValueError("n_bits must be in [1, 256]")
+    if n_bits < 2 or n_bits > 256:
+        raise ValueError("n_bits must be in [2, 256]")
     return 65 + 64 + 64 + 64 + 193 * n_bits
 
 
@@ -570,12 +570,14 @@ def prove(
 ) -> bytes:
     if len(key_be32) != 32 or len(nonce_be32) != 32:
         raise ValueError("key and nonce must each be 32 bytes")
-    if n_bits <= 0 or n_bits > 256:
-        raise ValueError("n_bits out of range")
+    if n_bits < 2 or n_bits > 256:
+        raise ValueError("n_bits must be in [2, 256]")
 
     key_int = int.from_bytes(key_be32, "big")
     if key_int == 0 or key_int >= SECP256K1_N or key_int >= ED25519_L:
         raise ValueError("key out of range for both curves")
+    if (key_int >> n_bits) != 0:
+        raise ValueError("key does not fit in n_bits")
 
     # Reject ed25519 generators that are not in the prime order subgroup.
     gen_e_a_point = ed_decode_check_point(gen_e_a)

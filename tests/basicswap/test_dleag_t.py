@@ -433,6 +433,21 @@ class TestInvalidGenerators(unittest.TestCase):
         proof = d.prove(key, nonce)
         self.assertFalse(d.verify(proof, gen_e_b=SMALL_ORDER_POINT))
 
+    def test_key_must_fit_in_n_bits(self):
+        # Standard 253 bit key cannot be committed by a 2 bit decomposition.
+        key = _random_ed_key()
+        nonce = secrets.token_bytes(32)
+        with self.assertRaises(ValueError):
+            d.prove(key, nonce, n_bits=2)
+
+    def test_n_bits_below_minimum_rejected(self):
+        key = _random_ed_key()
+        nonce = secrets.token_bytes(32)
+        with self.assertRaises(ValueError):
+            d.prove(key, nonce, n_bits=1)
+        with self.assertRaises(ValueError):
+            d.proof_len(1)
+
 
 class TestDleagCoincurveCrossCheck(unittest.TestCase):
 
