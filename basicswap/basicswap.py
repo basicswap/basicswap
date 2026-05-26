@@ -11896,7 +11896,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
-            if coin_to == (Coins.XMR, Coins.WOW):
+            if coin_to in (Coins.XMR, Coins.WOW):
                 address_to = self.getCachedMainWalletAddress(ci_to, cursor)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to, cursor)
