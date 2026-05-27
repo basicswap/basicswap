@@ -222,8 +222,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
 
     def isValidPubkey(self, pubkey: bytes) -> bool:
         try:
-            self.verifyPubkey(pubkey)
-            return True
+            return self.verifyPubkey(pubkey)
         except Exception:
             return False
 
