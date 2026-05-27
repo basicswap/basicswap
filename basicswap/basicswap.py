@@ -3965,7 +3965,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def isValidSwapDest(self, ci, dest: bytes):
         ensure(isinstance(dest, bytes), "Swap destination must be bytes")
         if ci.coin_type() in (Coins.PART_BLIND,):
-            return ci.isValidPubkey(dest)
+            return ci.verifyPubkey(dest)
         # TODO: allow p2wsh
         return ci.isValidAddressHash(dest)
 
@@ -10905,7 +10905,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         ensure(
             ci_from.isValidAddressHash(bid_data.dest_af)
-            or ci_from.isValidPubkey(bid_data.dest_af),
+            or ci_from.verifyPubkey(bid_data.dest_af),
             "Invalid destination address",
         )
 
