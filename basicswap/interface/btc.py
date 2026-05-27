@@ -99,7 +99,6 @@ from basicswap.basicswap_util import TxLockTypes
 from basicswap.chainparams import Coins
 from basicswap.rpc import make_rpc_func, openrpc
 
-
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = 1 << 22
 SEQUENCE_LOCKTIME_MASK = 0x0000FFFF

@@ -39,7 +39,6 @@ from basicswap.contrib.rfc6979 import (
     rfc6979_hmac_sha256_generate,
 )
 
-
 START_TOKEN = 0xABCD
 MSG_START_TOKEN = START_TOKEN.to_bytes(2, "big")
 

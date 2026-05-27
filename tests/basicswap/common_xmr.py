@@ -56,7 +56,6 @@ from tests.basicswap.extended.test_doge import (
 import basicswap.config as cfg
 import basicswap.bin.run as runSystem
 
-
 TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "~/test_basicswap1"))
 
 PARTICL_PORT_BASE = int(os.getenv("PARTICL_PORT_BASE", BASE_PORT))

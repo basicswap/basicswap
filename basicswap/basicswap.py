@@ -166,7 +166,6 @@ import basicswap.network.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 
-
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
@@ -13811,8 +13810,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             num_watched_outputs += len(v["watched_outputs"])
 
         now: int = self.getTime()
-        q_bids_str: str = (
-            """SELECT
+        q_bids_str: str = """SELECT
                COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
                COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_sent_active,
                COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
@@ -13822,15 +13820,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                JOIN offers o ON b.offer_id = o.offer_id
                JOIN bidstates s ON b.state = s.state_id
                WHERE b.active_ind = 1"""
-        )
 
-        q_offers_str: str = (
-            """SELECT
+        q_offers_str: str = """SELECT
                COUNT(CASE WHEN expire_at > :now THEN 1 ELSE NULL END) AS count_active,
                COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
                COUNT(CASE WHEN was_sent AND expire_at > :now THEN 1 ELSE NULL END) AS count_sent_active
                FROM offers WHERE active_ind = 1"""
-        )
 
         try:
             cursor = self.openDB()

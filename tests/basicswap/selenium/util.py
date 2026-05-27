@@ -9,7 +9,6 @@
 import os
 from selenium.webdriver.common.by import By
 
-
 BSX_0_PORT = int(os.getenv("BSX_0_PORT", 12701))
 BSX_1_PORT = int(os.getenv("BSX_1_PORT", BSX_0_PORT + 1))
 BSX_2_PORT = int(os.getenv("BSX_1_PORT", BSX_0_PORT + 2))

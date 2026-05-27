@@ -34,7 +34,6 @@ from tests.basicswap.util import (
     read_json_api,
 )
 
-
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):

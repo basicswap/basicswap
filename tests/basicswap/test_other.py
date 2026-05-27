@@ -61,7 +61,6 @@ from basicswap.contrib.test_framework.messages import (
     uint256_from_str,
 )
 
-
 logger = logging.getLogger()
 
 

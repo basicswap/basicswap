@@ -53,7 +53,7 @@ def initSimplexClient(args, logger, delay_event):
     # TODO: Must be a better way?
     logger.info("Initialising Simplex client")
 
-    (pipe_r, pipe_w) = os.pipe()  # subprocess.PIPE is buffered, blocks when read
+    pipe_r, pipe_w = os.pipe()  # subprocess.PIPE is buffered, blocks when read
 
     if os.name == "nt":
         str_args = " ".join(args)

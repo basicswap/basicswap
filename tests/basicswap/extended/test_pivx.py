@@ -66,7 +66,6 @@ from tests.basicswap.common import (
 from basicswap.bin.run import startDaemon
 from basicswap.bin.prepare import downloadPIVXParams
 
-
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):

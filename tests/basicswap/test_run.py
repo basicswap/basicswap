@@ -63,7 +63,6 @@ from basicswap.contrib.test_framework.script import (
 )
 from tests.basicswap.test_xmr import BaseTest, test_delay_event, callnoderpc
 
-
 logger = logging.getLogger()
 
 

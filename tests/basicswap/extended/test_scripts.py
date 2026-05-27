@@ -38,7 +38,6 @@ from tests.basicswap.util import (
     waitForServer,
 )
 
-
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):

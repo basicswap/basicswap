@@ -10,7 +10,6 @@ import json
 import time
 import decimal
 
-
 COIN = 100000000
 
 

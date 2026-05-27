@@ -40,7 +40,6 @@ from tests.basicswap.extended.test_dcr import (
     run_test_itx_refund,
 )
 
-
 logger = logging.getLogger("BSX Tests")
 
 if not len(logger.handlers):

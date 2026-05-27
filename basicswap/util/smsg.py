@@ -25,7 +25,6 @@ from basicswap.contrib.test_framework.messages import (
     uint256_from_str,
 )
 
-
 AES_BLOCK_SIZE = 16
 
 

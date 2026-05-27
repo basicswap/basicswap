@@ -91,7 +91,6 @@ from basicswap.db_util import (
 )
 from basicswap.bin.run import startDaemon, startXmrDaemon, startXmrWalletDaemon
 
-
 logger = logging.getLogger()
 
 NUM_NODES = 3

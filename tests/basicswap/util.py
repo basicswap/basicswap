@@ -10,7 +10,6 @@ import json
 import urllib
 from urllib.request import urlopen
 
-
 REQUIRED_SETTINGS = {
     "blocks_confirmed": 1,
     "conf_target": 1,

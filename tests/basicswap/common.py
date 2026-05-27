@@ -21,7 +21,6 @@ from basicswap.util import toBool
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.bin.prepare import downloadPIVXParams
 
-
 TEST_HTTP_HOST = os.getenv(
     "TEST_HTTP_HOST", "127.0.0.1"
 )  # Set to 0.0.0.0 when used in docker

@@ -20,7 +20,6 @@ from util import (
 )
 from tests.basicswap.util import read_json_api
 
-
 base_url = "http://localhost"
 
 
