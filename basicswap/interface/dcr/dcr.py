@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -20,9 +20,8 @@ from basicswap.chainparams import Coins
 from basicswap.contrib.test_framework.script import (
     CScriptNum,
 )
-from basicswap.interface.base import (
-    Secp256k1Interface,
-)
+from basicswap.interface.base import Secp256k1Interface
+from basicswap.interface.utils import FeeValidator
 from basicswap.interface.btc import (
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
@@ -181,7 +180,7 @@ def extract_sig_and_pk(sig_script: bytes) -> (bytes, bytes):
     return sig, pk
 
 
-class DCRInterface(Secp256k1Interface):
+class DCRInterface(FeeValidator, Secp256k1Interface):
 
     @staticmethod
     def coin_type():
@@ -258,13 +257,13 @@ class DCRInterface(Secp256k1Interface):
     def depth_spendable() -> int:
         return 0
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super().__init__(network)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        self._sc = swap_client
+        self._log = self._sc.log if self._sc and self._sc.log else logging
+        super().__init__(coin_settings=coin_settings, network=network, **kwargs)
         self._rpc_host = coin_settings.get("rpchost", "127.0.0.1")
         self._rpcport = coin_settings["rpcport"]
         self._rpcauth = coin_settings["rpcauth"]
-        self._sc = swap_client
-        self._log = self._sc.log if self._sc and self._sc.log else logging
         self.rpc = make_rpc_func(self._rpcport, self._rpcauth, host=self._rpc_host)
         if "walletrpcport" in coin_settings:
             self._walletrpcport = coin_settings["walletrpcport"]

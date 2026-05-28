@@ -50,7 +50,7 @@ class CoinInterface:
     def compareFeeRates(a, b) -> bool:
         return abs(a - b) < 20
 
-    def __init__(self, network):
+    def __init__(self, network, **kwargs):
         self.setDefaults()
         self._network = network
         self._mx_wallet = threading.Lock()
@@ -195,6 +195,9 @@ class AdaptorSigInterface:
 
 
 class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     @staticmethod
     def curve_type():
         return Curves.secp256k1

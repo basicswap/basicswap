@@ -27,6 +27,7 @@ from basicswap.basicswap_util import (
     getVoutByScriptPubKey,
 )
 from basicswap.interface.base import Secp256k1Interface
+from basicswap.interface.utils import FeeValidator
 from basicswap.util import (
     b2i,
     ensure,
@@ -184,7 +185,7 @@ def extractScriptLockRefundScriptValues(script_bytes: bytes):
     return pk1, pk2, csv_val, pk3
 
 
-class BTCInterface(Secp256k1Interface):
+class BTCInterface(FeeValidator, Secp256k1Interface):
     _scantxoutset_lock = threading.Lock()
     _MAX_SCANTXOUTSET_RETRIES = 3
 
@@ -278,8 +279,15 @@ class BTCInterface(Secp256k1Interface):
     def depth_spendable() -> int:
         return 0
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super().__init__(network)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        self._sc = swap_client
+        self._log = self._sc.log if self._sc and self._sc.log else logging
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         self._rpc_host = coin_settings.get("rpchost", "127.0.0.1")
         self._rpcport = coin_settings["rpcport"]
         self._rpcauth = coin_settings["rpcauth"]
@@ -304,8 +312,6 @@ class BTCInterface(Secp256k1Interface):
         self.setConfTarget(coin_settings["conf_target"])
         self._use_segwit = coin_settings["use_segwit"]
         self._connection_type = coin_settings["connection_type"]
-        self._sc = swap_client
-        self._log = self._sc.log if self._sc and self._sc.log else logging
         self._expect_seedid_hex = None
         self._altruistic = coin_settings.get("altruistic", True)
         self._use_descriptors = coin_settings.get("use_descriptors", False)

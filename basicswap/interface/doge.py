@@ -32,8 +32,13 @@ class DOGEInterface(BTCInterface):
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         return 192
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super(DOGEInterface, self).__init__(coin_settings, network, swap_client)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
 
     def getScriptDest(self, script: bytearray) -> bytearray:
         # P2SH
