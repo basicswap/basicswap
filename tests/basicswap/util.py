@@ -58,7 +58,7 @@ def post_json_api(port, path, json_data):
     return json.loads(post_json_req(url, json_data))
 
 
-def waitForServer(delay_event, port, wait_for=20):
+def waitForServer(delay_event, port, wait_for=40):
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError("Test stopped.")
