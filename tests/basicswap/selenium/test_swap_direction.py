@@ -16,7 +16,6 @@ from tests.basicswap.util import (
 from util import get_driver
 from selenium.webdriver.common.by import By
 
-
 logger = logging.getLogger()
 logger.level = logging.INFO
 if not len(logger.handlers):

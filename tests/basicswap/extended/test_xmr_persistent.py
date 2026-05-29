@@ -248,7 +248,7 @@ def updateThreadDCR(cls):
                     if "double spend" in str(e):
                         pass
                     else:
-                        logging.warning("updateThreadDCR purchaseticket {}".format(e))
+                        logging.warning(f"updateThreadDCR purchaseticket {e}")
                     cls.delay_event.wait(0.5)
             try:
                 if num_passed >= 5:
@@ -260,7 +260,7 @@ def updateThreadDCR(cls):
                         ],
                     )
             except Exception as e:
-                logging.warning("updateThreadDCR generate {}".format(e))
+                logging.warning(f"updateThreadDCR generate {e}")
         except Exception as e:
             print("updateThreadDCR error", str(e))
         cls.delay_event.wait(random.uniform(cls.dcr_update_min, cls.dcr_update_max))
@@ -272,7 +272,7 @@ def signal_handler(self, sig, frame):
 
 
 def run_process(client_id):
-    client_path = os.path.join(test_path, "client{}".format(client_id))
+    client_path = os.path.join(test_path, f"client{client_id}")
     testargs = [
         "basicswap-run",
         "-datadir=" + client_path,
@@ -299,15 +299,24 @@ def start_processes(self):
     for i in range(NUM_NODES):
         waitForServer(self.delay_event, UI_PORT + i)
 
-    wallets = read_json_api(UI_PORT + 1, "wallets")
-
     if "monero" in self.test_coins_list:
+        try:
+            for i in range(8):
+                wallets = read_json_api(UI_PORT + 1, "wallets")
+                if "XMR" in wallets and "main_address" in wallets["XMR"]:
+                    break
+                logging.info("Waiting for wallets output")
+                self.delay_event.wait(1.0)
+            self.xmr_addr = wallets["XMR"]["main_address"]
+        except Exception as e:
+            logging.error("{} - wallets json: {}".format(str(e), json.dumps(wallets)))
+            raise
+
         xmr_auth = None
         if os.getenv("XMR_RPC_USER", "") != "":
             xmr_auth = (os.getenv("XMR_RPC_USER", ""), os.getenv("XMR_RPC_PWD", ""))
 
-        self.xmr_addr = wallets["XMR"]["main_address"]
-        num_blocks = 100
+        num_blocks: int = 100
         if (
             callrpc_xmr(XMR_BASE_RPC_PORT + 1, "get_block_count", auth=xmr_auth)[
                 "count"
@@ -322,10 +331,11 @@ def start_processes(self):
                 auth=xmr_auth,
             )
         logging.info(
-            "XMR blocks: %d",
-            callrpc_xmr(XMR_BASE_RPC_PORT + 1, "get_block_count", auth=xmr_auth)[
-                "count"
-            ],
+            "XMR blocks: {}".format(
+                callrpc_xmr(XMR_BASE_RPC_PORT + 1, "get_block_count", auth=xmr_auth)[
+                    "count"
+                ]
+            )
         )
 
     self.btc_addr = callbtcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
@@ -402,9 +412,7 @@ def start_processes(self):
         have_blocks: int = callfirorpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
-                "Mining %d Firo blocks to %s",
-                num_blocks - have_blocks,
-                self.firo_addr,
+                f"Mining {num_blocks - have_blocks} Firo blocks to {self.firo_addr}"
             )
             callfirorpc(
                 0,
@@ -420,9 +428,7 @@ def start_processes(self):
         have_blocks: int = callbchrpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
-                "Mining %d Bitcoincash blocks to %s",
-                num_blocks - have_blocks,
-                self.bch_addr,
+                f"Mining {num_blocks - have_blocks} Bitcoincash blocks to {self.bch_addr}"
             )
             callbchrpc(
                 0,
@@ -437,9 +443,7 @@ def start_processes(self):
         have_blocks: int = calldogerpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
-                "Mining %d Dogecoin blocks to %s",
-                num_blocks - have_blocks,
-                self.doge_addr,
+                f"Mining {num_blocks - have_blocks} Dogecoin blocks to {self.doge_addr}"
             )
             calldogerpc(
                 0, "generatetoaddress", [num_blocks - have_blocks, self.doge_addr]
@@ -557,7 +561,10 @@ class BaseTestWithPrepare(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(BaseTestWithPrepare, cls).setUpClass()
+        cls.addClassCleanup(
+            cls.finalise
+        )  # tearDownClass is not run if setUpClass fails
+        super().setUpClass()
 
         random.seed(time.time())
 
@@ -577,7 +584,7 @@ class BaseTestWithPrepare(unittest.TestCase):
         waitForServer(cls.delay_event, UI_PORT + 1)
 
     @classmethod
-    def tearDownClass(cls):
+    def finalise(cls):
         logging.info("Stopping test")
         cls.delay_event.set()
         if cls.update_thread:
@@ -598,7 +605,6 @@ class BaseTestWithPrepare(unittest.TestCase):
 
 class Test(BaseTestWithPrepare):
     def test_persistent(self):
-
         while not self.delay_event.is_set():
             logging.info("Looping indefinitely, ctrl+c to exit.")
             self.delay_event.wait(10)

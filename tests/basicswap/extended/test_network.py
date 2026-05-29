@@ -58,7 +58,6 @@ from tests.basicswap.common import (
 
 from basicswap.bin.run import startDaemon
 
-
 logger = logging.getLogger()
 
 NUM_NODES = 3

@@ -166,7 +166,6 @@ import basicswap.network.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 
-
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
@@ -441,9 +440,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.check_delayed_auto_accept_seconds = self.get_int_setting(
             "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
-        self.startup_tries = self.get_int_setting(
-            "startup_tries", 15, 1, 100
-        )  # Seconds waited for will be (x(1 + x+1) / 2
         self.debug_ui = self.settings.get("debug_ui", False)
         self._debug_cases = []
         self._last_checked_actions = 0
@@ -1618,13 +1614,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     # systemd will try to restart the process if fail_code != 0
                     self.stopRunning(1)
 
-        startup_tries = self.startup_tries
         chain_client_settings = self.getChainClientSettings(coin_type)
-        if "startup_tries" in chain_client_settings:
-            startup_tries = chain_client_settings["startup_tries"]
-        if startup_tries < 1:
-            self.log.warning('"startup_tries" can\'t be less than 1.')
-            startup_tries = 1
+        # Total seconds waited for will be ((startup_tries(1 + startup_tries) / 2) * startup_delay
+        startup_tries: int = self.get_clamped_int_from(
+            chain_client_settings,
+            "startup_tries",
+            self.get_int_setting("startup_tries", 15, 1, 100),
+            1,
+            100,
+        )
+        startup_delay: int = self.get_clamped_int_from(
+            chain_client_settings,
+            "startup_delay",
+            self.get_int_setting("startup_delay", 5, 1, 100),
+            1,
+            100,
+        )
         for i in range(startup_tries):
             if self.delay_event.is_set():
                 return
@@ -1632,6 +1637,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.coin_clients[coin_type]["interface"].testDaemonRPC(with_wallet)
                 return
             except Exception as ex:
+                wait_for: int = startup_delay * (1 + i)
                 if any(
                     log in str(ex)
                     for log in [
@@ -1644,13 +1650,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ]
                 ):
                     self.log.info(
-                        f"Waiting for {Coins(coin_type).name} RPC. Trying again in {5 * (1 + i)} seconds, {1 + i}/{startup_tries}."
+                        f"Waiting for {Coins(coin_type).name} RPC. Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
                     )
                 else:
                     self.log.warning(
-                        f"Can't connect to {Coins(coin_type).name} RPC: {ex}.  Trying again in {5 * (1 + i)} seconds, {1 + i}/{startup_tries}."
+                        f"Can't connect to {Coins(coin_type).name} RPC: {ex}.  Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
                     )
-                self.delay_event.wait(5 * (1 + i))
+                self.delay_event.wait(wait_for)
         self.log.error(f"Can't connect to {Coins(coin_type).name} RPC, exiting.")
         self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 
@@ -3965,7 +3971,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def isValidSwapDest(self, ci, dest: bytes):
         ensure(isinstance(dest, bytes), "Swap destination must be bytes")
         if ci.coin_type() in (Coins.PART_BLIND,):
-            return ci.isValidPubkey(dest)
+            return ci.verifyPubkey(dest)
         # TODO: allow p2wsh
         return ci.isValidAddressHash(dest)
 
@@ -10905,7 +10911,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         ensure(
             ci_from.isValidAddressHash(bid_data.dest_af)
-            or ci_from.isValidPubkey(bid_data.dest_af),
+            or ci_from.verifyPubkey(bid_data.dest_af),
             "Invalid destination address",
         )
 
@@ -13811,8 +13817,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             num_watched_outputs += len(v["watched_outputs"])
 
         now: int = self.getTime()
-        q_bids_str: str = (
-            """SELECT
+        q_bids_str: str = """SELECT
                COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
                COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_sent_active,
                COUNT(CASE WHEN b.was_received THEN 1 ELSE NULL END) AS count_received,
@@ -13822,15 +13827,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                JOIN offers o ON b.offer_id = o.offer_id
                JOIN bidstates s ON b.state = s.state_id
                WHERE b.active_ind = 1"""
-        )
 
-        q_offers_str: str = (
-            """SELECT
+        q_offers_str: str = """SELECT
                COUNT(CASE WHEN expire_at > :now THEN 1 ELSE NULL END) AS count_active,
                COUNT(CASE WHEN was_sent THEN 1 ELSE NULL END) AS count_sent,
                COUNT(CASE WHEN was_sent AND expire_at > :now THEN 1 ELSE NULL END) AS count_sent_active
                FROM offers WHERE active_ind = 1"""
-        )
 
         try:
             cursor = self.openDB()

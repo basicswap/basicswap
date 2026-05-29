@@ -13,7 +13,7 @@ import subprocess
 def createDCRWallet(args, hex_seed, logging, delay_event):
     logging.info("Creating DCR wallet")
 
-    (pipe_r, pipe_w) = os.pipe()  # subprocess.PIPE is buffered, blocks when read
+    pipe_r, pipe_w = os.pipe()  # subprocess.PIPE is buffered, blocks when read
 
     if os.name == "nt":
         str_args = " ".join(args)

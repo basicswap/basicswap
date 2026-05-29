@@ -34,7 +34,6 @@ from basicswap.rpc_xmr import make_xmr_rpc_func, make_xmr_rpc2_func
 from basicswap.chainparams import XMR_COIN, Coins
 from basicswap.interface.base import CoinInterface
 
-
 ed25519_l = 2**252 + 27742317777372353535851937790883648493
 
 

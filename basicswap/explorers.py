@@ -7,7 +7,6 @@
 
 import json
 
-
 default_coingecko_api_key = "CG-8hm3r9iLfpEXv4ied8oLbeUj"
 
 

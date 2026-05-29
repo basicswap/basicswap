@@ -82,7 +82,6 @@ from coincurve.ecdsaotves import (
     ecdsaotves_rec_enc_key,
 )
 
-
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = 1 << 22
 SEQUENCE_LOCKTIME_MASK = 0x0000F

@@ -23,7 +23,6 @@ protobuf ParseFromString would reset the whole object, from_bytes won't.
 
 from basicswap.util.integer import encode_varint, decode_varint
 
-
 NPBW_INT = 0
 NPBW_BYTES = 2
 

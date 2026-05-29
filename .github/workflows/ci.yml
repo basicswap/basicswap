@@ -94,12 +94,22 @@ jobs:
         export XMR_BINDIR="$BIN_DIR/monero"
         pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx"
     - name: Run test_encrypted_xmr_reload
+      id: test_encrypted_xmr_reload
       run: |
         export PYTHONPATH=$(pwd)
         export TEST_PATH=${TEST_RELOAD_PATH}
         mkdir -p ${TEST_PATH}/bin
         cp -r $BIN_DIR/* ${TEST_PATH}/bin/
         pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+    - name: Print log files on failure
+      if: ${{ failure() && steps.test_encrypted_xmr_reload.conclusion == 'failure' }}
+      run: |
+        for i in 0 1 2; do
+          for logname in core_stderr core_stdout wallet_stderr wallet_stdout; do
+            echo "=== client${i} ${logname}.log ==="
+            cat /tmp/test_basicswap/client${i}/monero/${logname}.log || true
+          done
+        done
     - name: Run selenium tests
       id: selenium_tests
       run: |

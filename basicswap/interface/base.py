@@ -220,12 +220,6 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         if hash_len == 20:
             return True
 
-    def isValidPubkey(self, pubkey: bytes) -> bool:
-        try:
-            return self.verifyPubkey(pubkey)
-        except Exception:
-            return False
-
     def verifySig(self, pubkey: bytes, signed_hash: bytes, sig: bytes) -> bool:
         pubkey = PublicKey(pubkey)
         return pubkey.verify(sig, signed_hash, hasher=None)

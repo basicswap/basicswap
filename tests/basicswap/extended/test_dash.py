@@ -65,7 +65,6 @@ from tests.basicswap.common import (
 )
 from basicswap.bin.run import startDaemon
 
-
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):

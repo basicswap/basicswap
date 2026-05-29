@@ -2,14 +2,13 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2024 tecnovert
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
 import json
 import urllib
 from urllib.request import urlopen
-
 
 REQUIRED_SETTINGS = {
     "blocks_confirmed": 1,
@@ -64,7 +63,7 @@ def waitForServer(delay_event, port, wait_for=20):
         if delay_event.is_set():
             raise ValueError("Test stopped.")
         try:
-            delay_event.wait(1)
+            delay_event.wait(1.0)
             _ = read_json_api(port)
             return
         except Exception as e:
