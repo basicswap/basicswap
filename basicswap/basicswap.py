@@ -8230,6 +8230,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         return rv
 
+    def _isScriptRefundMature(self, ci, offer, refund_tx_bytes, parent_tx) -> bool:
+        refund_tx = ci.loadTx(refund_tx_bytes)
+        if offer.lock_type in (TxLockTypes.ABS_LOCK_BLOCKS, TxLockTypes.ABS_LOCK_TIME):
+            return ci.isAbsLockTimeMature(refund_tx.nLockTime)
+        if parent_tx is None or parent_tx.block_height is None:
+            return False
+        return ci.isCsvLockMature(
+            offer.lock_type,
+            refund_tx.vin[0].nSequence,
+            parent_tx.block_height,
+            parent_tx.block_time,
+        )
+
     def checkBidState(self, bid_id: bytes, bid, offer):
         # assert (self.mxDB.locked())
         # Return True to remove bid from in-progress list
@@ -8490,8 +8503,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if (
             bid.getITxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED)
             and bid.initiate_txn_refund is not None
-            and ci_from.isAbsLockTimeMature(
-                ci_from.loadTx(bid.initiate_txn_refund).nLockTime
+            and self._isScriptRefundMature(
+                ci_from, offer, bid.initiate_txn_refund, bid.initiate_tx
             )
         ):
             try:
@@ -8516,8 +8529,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if (
             bid.getPTxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED)
             and bid.participate_txn_refund is not None
-            and ci_to.isAbsLockTimeMature(
-                ci_to.loadTx(bid.participate_txn_refund).nLockTime
+            and self._isScriptRefundMature(
+                ci_to, offer, bid.participate_txn_refund, bid.participate_tx
             )
         ):
             try:
