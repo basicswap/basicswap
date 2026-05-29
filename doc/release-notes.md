@@ -1,3 +1,12 @@
+0.16.3
+==============
+
+- New setting "startup_delay"
+  - Adjusts the time waited for coin daemons to start between "startup_tries".
+  - Valid as a base setting and can be overridden per coin with chainclients settings.
+
+
+
 0.14.5
 ==============
 
