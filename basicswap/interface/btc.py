@@ -504,11 +504,21 @@ class BTCInterface(Secp256k1Interface):
 
     def getChainMedianTime(self) -> int:
         if self.useBackend():
-            height = self._backend.getBlockHeight()
-            times = []
-            for h in range(max(0, height - 10), height + 1):
-                header = self._getBlockHeaderFromHeightElectrum(h)
-                times.append(header["time"])
+            import struct
+
+            backend = self.getBackend()
+            if not backend:
+                raise ValueError("No electrum backend available")
+            height = backend.getBlockHeight()
+            start = max(0, height - 10)
+            count = height - start + 1
+            result = backend._server.call("blockchain.block.headers", [start, count])
+            header_bytes = bytes.fromhex(result["hex"])
+            returned = result.get("count", count)
+            times = [
+                struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
+                for i in range(returned)
+            ]
             times.sort()
             return times[len(times) // 2]
         return self.rpc("getblockchaininfo")["mediantime"]
