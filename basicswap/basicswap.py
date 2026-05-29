@@ -440,9 +440,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.check_delayed_auto_accept_seconds = self.get_int_setting(
             "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
-        self.startup_tries = self.get_int_setting(
-            "startup_tries", 15, 1, 100
-        )  # Seconds waited for will be (x(1 + x+1) / 2
         self.debug_ui = self.settings.get("debug_ui", False)
         self._debug_cases = []
         self._last_checked_actions = 0
@@ -1617,13 +1614,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     # systemd will try to restart the process if fail_code != 0
                     self.stopRunning(1)
 
-        startup_tries = self.startup_tries
         chain_client_settings = self.getChainClientSettings(coin_type)
-        if "startup_tries" in chain_client_settings:
-            startup_tries = chain_client_settings["startup_tries"]
-        if startup_tries < 1:
-            self.log.warning('"startup_tries" can\'t be less than 1.')
-            startup_tries = 1
+        # Total seconds waited for will be ((startup_tries(1 + startup_tries) / 2) * startup_delay
+        startup_tries: int = self.get_clamped_int_from(
+            chain_client_settings,
+            "startup_tries",
+            self.get_int_setting("startup_tries", 15, 1, 100),
+            1,
+            100,
+        )
+        startup_delay: int = self.get_clamped_int_from(
+            chain_client_settings,
+            "startup_delay",
+            self.get_int_setting("startup_delay", 5, 1, 100),
+            1,
+            100,
+        )
         for i in range(startup_tries):
             if self.delay_event.is_set():
                 return
@@ -1631,6 +1637,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.coin_clients[coin_type]["interface"].testDaemonRPC(with_wallet)
                 return
             except Exception as ex:
+                wait_for: int = startup_delay * (1 + i)
                 if any(
                     log in str(ex)
                     for log in [
@@ -1643,13 +1650,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ]
                 ):
                     self.log.info(
-                        f"Waiting for {Coins(coin_type).name} RPC. Trying again in {5 * (1 + i)} seconds, {1 + i}/{startup_tries}."
+                        f"Waiting for {Coins(coin_type).name} RPC. Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
                     )
                 else:
                     self.log.warning(
-                        f"Can't connect to {Coins(coin_type).name} RPC: {ex}.  Trying again in {5 * (1 + i)} seconds, {1 + i}/{startup_tries}."
+                        f"Can't connect to {Coins(coin_type).name} RPC: {ex}.  Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
                     )
-                self.delay_event.wait(5 * (1 + i))
+                self.delay_event.wait(wait_for)
         self.log.error(f"Can't connect to {Coins(coin_type).name} RPC, exiting.")
         self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
 

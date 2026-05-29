@@ -365,8 +365,10 @@ class BaseApp(DBMethods):
         self.log.warning(f"Setting mocktime to {new_offset}")
         self.mock_time_offset = new_offset
 
-    def get_int_setting(self, name: str, default_v: int, min_v: int, max_v) -> int:
-        value: int = self.settings.get(name, default_v)
+    def get_clamped_int_from(
+        self, settings: dict, name: str, default_v: int, min_v: int, max_v
+    ) -> int:
+        value: int = settings.get(name, default_v)
         if value < min_v:
             self.log.warning(f"Setting {name} to {min_v}")
             value = min_v
@@ -374,6 +376,9 @@ class BaseApp(DBMethods):
             self.log.warning(f"Setting {name} to {max_v}")
             value = max_v
         return value
+
+    def get_int_setting(self, name: str, default_v: int, min_v: int, max_v) -> int:
+        return self.get_clamped_int_from(self.settings, name, default_v, min_v, max_v)
 
     def get_delay_event_seconds(self):
         if self.min_delay_event == self.max_delay_event:

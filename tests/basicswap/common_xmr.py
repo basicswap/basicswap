@@ -531,9 +531,7 @@ def run_prepare(
             for opt in EXTRA_CONFIG_JSON.get("doge{}".format(node_id), []):
                 fp.write(opt + "\n")
 
-    with open(config_path) as fs:
-        settings = json.load(fs)
-
+    settings["startup_delay"] = 1
     settings["min_delay_event"] = 1
     settings["max_delay_event"] = 4
     settings["min_delay_event_short"] = 1
@@ -623,7 +621,7 @@ class TestBase(unittest.TestCase):
 
 
 def run_process(client_id):
-    client_path = os.path.join(TEST_PATH, "client{}".format(client_id))
+    client_path = os.path.join(TEST_PATH, f"client{client_id}")
     testargs = [
         "basicswap-run",
         "-datadir=" + client_path,
@@ -654,7 +652,7 @@ class XmrTestBase(TestBase):
             )
             self.processes[-1].start()
 
-        waitForServer(self.delay_event, 12701)
+        waitForServer(self.delay_event, 12701, 60)
 
         def waitForMainAddress():
             for i in range(20):
@@ -666,13 +664,12 @@ class XmrTestBase(TestBase):
                     )
                     return wallets["XMR"]["main_address"]
                 except Exception as e:
-                    print("Waiting for main address {}".format(str(e)))
+                    print(f"Waiting for main address {e}")
                 self.delay_event.wait(1)
             raise ValueError("waitForMainAddress timedout")
 
         xmr_addr1 = waitForMainAddress()
-
-        num_blocks = 100
+        num_blocks: int = 100
 
         xmr_auth = None
         if os.getenv("XMR_RPC_USER", "") != "":
@@ -684,7 +681,7 @@ class XmrTestBase(TestBase):
             ]
             < num_blocks
         ):
-            logging.info("Mining {} Monero blocks to {}.".format(num_blocks, xmr_addr1))
+            logging.info(f"Mining {num_blocks} Monero blocks to {xmr_addr1}.")
             callrpc_xmr(
                 XMR_BASE_RPC_PORT + 1,
                 "generateblocks",
