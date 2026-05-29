@@ -585,7 +585,7 @@ def prepare_nodes(
 
 class TestBase(unittest.TestCase):
     def setUpClass(cls):
-        super(TestBase, cls).setUpClass()
+        super().setUpClass()
 
         cls.delay_event = threading.Event()
         signal.signal(
@@ -645,7 +645,7 @@ class XmrTestBase(TestBase):
         prepare_nodes(3, "monero")
 
     def start_processes(self):
-        multiprocessing.set_start_method("fork")
+        multiprocessing.set_start_method("spawn")
         self.delay_event.clear()
 
         for i in range(3):
