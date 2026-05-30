@@ -768,24 +768,30 @@ def page_offer(self, url_split, post_string):
     ci_leader = ci_to if reverse_bid else ci_from
 
     if xmr_offer:
-        int_fee_rate_now, fee_source = ci_leader.get_fee_rate()
+        a_fee_rate_now, fee_source = ci_leader.get_fee_rate()
+        a_fee_rate_now = ci_leader.make_int(a_fee_rate_now)
 
-        data["xmr_type"] = True
-        data["a_fee_rate"] = ci_leader.format_amount(xmr_offer.a_fee_rate)
-        data["a_fee_rate_verify"] = ci_leader.format_amount(
-            int_fee_rate_now, conv_int=True
+        chain_a_fee_rate: int = (
+            xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
         )
+        data["xmr_type"] = True
+        data["a_fee_rate"] = ci_leader.format_amount(chain_a_fee_rate)
+        data["a_fee_rate_verify"] = ci_leader.format_amount(a_fee_rate_now)
         data["a_fee_rate_verify_src"] = fee_source
-        data["a_fee_warn"] = xmr_offer.a_fee_rate < int_fee_rate_now
 
-        from_fee_rate = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
+        warning_threshold: float = 1.2
+        if chain_a_fee_rate * warning_threshold < a_fee_rate_now:
+            data["a_fee_warn"] = "low"
+        elif chain_a_fee_rate > a_fee_rate_now * warning_threshold:
+            data["a_fee_warn"] = "high"
+
         lock_spend_tx_vsize = (
             ci_from.xmr_swap_b_lock_spend_tx_vsize()
             if reverse_bid
             else ci_from.xmr_swap_a_lock_spend_tx_vsize()
         )
         lock_spend_tx_fee = ci_from.make_int(
-            from_fee_rate * lock_spend_tx_vsize / 1000, r=1
+            chain_a_fee_rate * lock_spend_tx_vsize / 1000, r=1
         )
         data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(
             lock_spend_tx_fee // ci_from.COIN()
