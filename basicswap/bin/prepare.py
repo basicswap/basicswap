@@ -62,16 +62,16 @@ BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.5")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 
-DCR_VERSION = os.getenv("DCR_VERSION", "2.1.3")
+DCR_VERSION = os.getenv("DCR_VERSION", "2.1.5")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 
 NMC_VERSION = os.getenv("NMC_VERSION", "28.0")
 NMC_VERSION_TAG = os.getenv("NMC_VERSION_TAG", "")
 
-MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.4.5")
+MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.5.0")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
 XMR_SITE_COMMIT = (
-    "1bfa07c1b54f4f39a93096e3bfb746cb21249422"  # Lock hashes.txt to monero version
+    "5e8d74229b742b54173010e3a676215b6f2fd1d7"  # Lock hashes.txt to monero version
 )
 
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
@@ -86,7 +86,7 @@ PIVX_VERSION_TAG = os.getenv("PIVX_VERSION_TAG", "")
 DASH_VERSION = os.getenv("DASH_VERSION", "23.1.2")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 
-FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.15.3")
+FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.16.0")
 FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 
 NAV_VERSION = os.getenv("NAV_VERSION", "7.0.3")
