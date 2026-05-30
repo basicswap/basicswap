@@ -5,7 +5,7 @@
   - Prevent sending bids to offers
   - Reject received offers, and
   - Prevent sending offers where the chain feerates are out of range.
-  - Valid feerate range is the nodes estimated feerate for confirmation in 24 blocks to 2x the estimated feerate.
+  - Valid feerate range is the node's estimated feerate for confirmation in 24 blocks to 4x the estimated feerate.
     - The minimum feerate confirmation can be adjusted with the "low_fee_conf_target" setting.
     - If "low_feerate" is set above 0 it is used instead of the dynamic feerate with "low_fee_conf_target"
     - The maximum feerate multiplier can be adjusted with the "high_estimated_feerate_multiplier" setting.

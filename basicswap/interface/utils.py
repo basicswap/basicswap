@@ -23,7 +23,7 @@ class FeeValidator:
     def __init__(self, **kwargs):
         default_low_fee_conf_target: int = 24
         default_low_fee_rate: int = 0
-        default_high_estimated_feerate_multiplier: float = 2.0
+        default_high_estimated_feerate_multiplier: float = 4.0
         default_high_fee_rate: int = self.defaultMaxFeeRate()
         if self._sc:
             chain_client_settings = self._sc.getChainClientSettings(
@@ -82,7 +82,7 @@ class FeeValidator:
 
         if self._high_estimated_feerate_multiplier >= 1.0:
             max_feerate, max_feerate_src = self.get_fee_rate()
-            max_feerate = (
+            max_feerate = int(
                 self.make_int(max_feerate) * self._high_estimated_feerate_multiplier
             )
         else:
