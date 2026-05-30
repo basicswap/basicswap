@@ -60,7 +60,7 @@ jobs:
         flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
     - name: Run codespell
       run: |
-        codespell --check-filenames --disable-colors --quiet-level=7 --ignore-words=tests/lint/spelling.ignore-words.txt -S .git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static
+        codespell
     - name: Run black
       run: |
         black --check --diff --exclude="contrib" .
