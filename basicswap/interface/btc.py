@@ -502,6 +502,67 @@ class BTCInterface(Secp256k1Interface):
             return height
         return self.rpc("getblockcount")
 
+    def getChainMedianTime(self) -> int:
+        if self.useBackend():
+            import struct
+
+            backend = self.getBackend()
+            if not backend:
+                raise ValueError("No electrum backend available")
+            height = backend.getBlockHeight()
+            start = max(0, height - 10)
+            count = height - start + 1
+            result = backend._server.call("blockchain.block.headers", [start, count])
+            header_bytes = bytes.fromhex(result["hex"])
+            returned = result.get("count", count)
+            times = [
+                struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
+                for i in range(returned)
+            ]
+            times.sort()
+            return times[len(times) // 2]
+        return self.rpc("getblockchaininfo")["mediantime"]
+
+    def isCsvLockMature(
+        self,
+        lock_type: int,
+        encoded_sequence: int,
+        parent_block_height: Optional[int],
+        parent_block_time: Optional[int],
+        chain_height: Optional[int] = None,
+        chain_mtp: Optional[int] = None,
+    ) -> bool:
+        if parent_block_height is None or parent_block_height < 1:
+            return False
+        lock_value: int = self.decodeSequence(encoded_sequence)
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
+            if chain_height is None:
+                chain_height = self.getChainHeight()
+            return chain_height + 1 >= parent_block_height + lock_value
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            if parent_block_time is None or parent_block_time < 1:
+                return False
+            if chain_mtp is None:
+                chain_mtp = self.getChainMedianTime()
+            return chain_mtp >= parent_block_time + lock_value
+        raise ValueError(f"Unknown lock type {lock_type}")
+
+    def isAbsLockTimeMature(
+        self,
+        nlocktime: int,
+        chain_height: Optional[int] = None,
+        chain_mtp: Optional[int] = None,
+    ) -> bool:
+        if nlocktime == 0:
+            return True
+        if nlocktime < 500000000:
+            if chain_height is None:
+                chain_height = self.getChainHeight()
+            return chain_height + 1 >= nlocktime
+        if chain_mtp is None:
+            chain_mtp = self.getChainMedianTime()
+        return chain_mtp >= nlocktime
+
     def getMempoolTx(self, txid):
         if self._connection_type == "electrum":
             backend = self.getBackend()
@@ -4370,11 +4431,11 @@ class BTCInterface(Secp256k1Interface):
         return "Transaction already in block chain" in err_str
 
     def isTxNonFinalError(self, err_str: str) -> bool:
+        err_lower = err_str.lower()
         return (
-            "non-BIP68-final" in err_str
-            or "non-final" in err_str
-            or "Missing inputs" in err_str
-            or "bad-txns-inputs-missingorspent" in err_str
+            "non-bip68-final" in err_lower
+            or "non-final" in err_lower
+            or "locktime requirement not satisfied" in err_lower
         )
 
     def combine_non_segwit_prevouts(self):

@@ -5613,15 +5613,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
                 # Check non-bip68 final
-                try:
-                    txid = ci_from.publishTx(bid.initiate_txn_refund)
-                    self.log.error(
-                        f"Submit refund_txn unexpectedly worked {self.logIDT(bytes.fromhex(txid))}"
-                    )
-                except Exception as ex:
-                    if ci_from.isTxNonFinalError(str(ex)) is False:
-                        self.log.error(f"Submit refund_txn unexpected error: {ex}")
-                        raise ex
+                if not ci_from.useBackend():
+                    try:
+                        txid = ci_from.publishTx(bid.initiate_txn_refund)
+                        self.log.error(
+                            f"Submit refund_txn unexpectedly worked {self.logIDT(bytes.fromhex(txid))}"
+                        )
+                    except Exception as ex:
+                        if ci_from.isTxNonFinalError(str(ex)) is False:
+                            self.log.error(f"Submit refund_txn unexpected error: {ex}")
+                            raise ex
 
             if txid is not None:
                 msg_buf = BidAcceptMessage()
@@ -7686,7 +7687,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                         self.commitDB()
 
-                    if TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns:
+                    if (
+                        TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns
+                        and refund_tx.block_height is not None
+                        and ci_from.isCsvLockMature(
+                            offer.lock_type,
+                            xmr_offer.lock_time_2,
+                            refund_tx.block_height,
+                            refund_tx.block_time,
+                        )
+                    ):
                         try:
                             if self.haveDebugInd(
                                 bid.bid_id,
@@ -7782,6 +7792,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if (
                     len(xmr_swap.al_lock_refund_tx_sig) > 0
                     and len(xmr_swap.af_lock_refund_tx_sig) > 0
+                    and bid.xmr_a_lock_tx is not None
+                    and ci_from.isCsvLockMature(
+                        offer.lock_type,
+                        xmr_offer.lock_time_1,
+                        bid.xmr_a_lock_tx.block_height,
+                        bid.xmr_a_lock_tx.block_time,
+                    )
                 ):
 
                     try:
@@ -8213,6 +8230,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         return rv
 
+    def _isScriptRefundMature(self, ci, offer, refund_tx_bytes, parent_tx) -> bool:
+        refund_tx = ci.loadTx(refund_tx_bytes)
+        if offer.lock_type in (TxLockTypes.ABS_LOCK_BLOCKS, TxLockTypes.ABS_LOCK_TIME):
+            return ci.isAbsLockTimeMature(refund_tx.nLockTime)
+        if parent_tx is None or parent_tx.block_height is None:
+            return False
+        return ci.isCsvLockMature(
+            offer.lock_type,
+            refund_tx.vin[0].nSequence,
+            parent_tx.block_height,
+            parent_tx.block_time,
+        )
+
     def checkBidState(self, bid_id: bytes, bid, offer):
         # assert (self.mxDB.locked())
         # Return True to remove bid from in-progress list
@@ -8473,6 +8503,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if (
             bid.getITxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED)
             and bid.initiate_txn_refund is not None
+            and self._isScriptRefundMature(
+                ci_from, offer, bid.initiate_txn_refund, bid.initiate_tx
+            )
         ):
             try:
                 txid = ci_from.publishTx(bid.initiate_txn_refund)
@@ -8496,6 +8529,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if (
             bid.getPTxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED)
             and bid.participate_txn_refund is not None
+            and self._isScriptRefundMature(
+                ci_to, offer, bid.participate_txn_refund, bid.participate_tx
+            )
         ):
             try:
                 txid = ci_to.publishTx(bid.participate_txn_refund)
@@ -8511,7 +8547,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 # State will update when spend is detected
             except Exception as ex:
-                if ci_to.isTxNonFinalError(str(ex)):
+                if ci_to.isTxNonFinalError(str(ex)) is False:
                     self.log.warning(
                         f"Error trying to submit participate refund txn: {ex}"
                     )
