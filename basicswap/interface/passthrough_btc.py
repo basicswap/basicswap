@@ -10,8 +10,13 @@ from basicswap.contrib.test_framework.messages import CTxOut
 
 
 class PassthroughBTCInterface(BTCInterface):
-    def __init__(self, coin_settings, network):
-        super().__init__(coin_settings, network)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         self.txoType = CTxOut
         self._network = network
         self.blocks_confirmed = coin_settings["blocks_confirmed"]

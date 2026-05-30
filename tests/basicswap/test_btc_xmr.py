@@ -2329,6 +2329,162 @@ class BasicSwapTest(TestFunctions):
             "TODO"
         )  # Build without xmr first for quicker test iterations
 
+    def test_11_fee_validation(self):
+        coin_from, coin_to = (self.test_coin_from, Coins.XMR)
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} expires bid stuck on accepted"
+        )
+
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[0].ci(coin_from)
+        ci_to = swap_clients[0].ci(coin_to)
+
+        ci1_from = swap_clients[1].ci(coin_from)
+        ci1_to = swap_clients[1].ci(coin_to)
+
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+
+        offer_id = swap_clients[0].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            amt_swap,
+            SwapTypes.XMR_SWAP,
+        )
+
+        amt_swap_reverse = ci1_to.make_int(random.uniform(0.1, 2.0), r=1)
+        offer_reverse_id = swap_clients[1].postOffer(
+            coin_to,
+            coin_from,
+            amt_swap_reverse,
+            rate_swap,
+            amt_swap_reverse,
+            SwapTypes.XMR_SWAP,
+        )
+
+        ci_from_settings = swap_clients[0].getChainClientSettings(coin_from)
+        old_override_feerate = ci_from_settings.get("override_feerate", None)
+        ci1_from_settings = swap_clients[1].getChainClientSettings(coin_from)
+        old_override_feerate1 = ci1_from_settings.get("override_feerate", None)
+
+        networkinfo = ci_from.rpc("getnetworkinfo")
+        assert ci_from.make_int(networkinfo["relayfee"]) == ci_from.make_int(
+            ci_from.get_fee_rate()[0]
+        )
+        try:
+            # Set override_feerate to increase feerate from get_fee_rate()
+            ci_from_settings["override_feerate"] = ci_from.format_amount(120)
+            ci1_from_settings["override_feerate"] = ci1_from.format_amount(120)
+            try:
+                swap_clients[0].postXmrBid(offer_id, amt_swap)
+            except Exception as e:
+                assert "Fee rate too low, 100 < 120, override_feerate" in str(e)
+            else:
+                assert False, "Should fail"
+
+            # Test reverse bid, low fee
+            try:
+                swap_clients[1].postXmrBid(offer_reverse_id, amt_swap_reverse)
+            except Exception as e:
+                assert "Fee rate too low, 100 < 120, override_feerate" in str(e)
+            else:
+                assert False, "Should fail"
+
+            # Clear override_feerate (get_fee_rate()), set low_feerate (validateFeeRate())
+            ci_from_settings["override_feerate"] = None
+            ci1_from_settings["override_feerate"] = None
+            ci_from._low_feerate = 120
+            ci1_from._low_feerate = 120
+            try:
+                swap_clients[0].postOffer(
+                    coin_from,
+                    coin_to,
+                    amt_swap,
+                    rate_swap,
+                    amt_swap,
+                    SwapTypes.XMR_SWAP,
+                )
+            except Exception as e:
+                assert "Fee rate too low, 100 < 120, set_value" in str(e)
+            else:
+                assert False, "Should fail"
+
+            # Test reverse offer, low fee
+            try:
+                swap_clients[1].postOffer(
+                    coin_to,
+                    coin_from,
+                    amt_swap_reverse,
+                    rate_swap,
+                    amt_swap_reverse,
+                    SwapTypes.XMR_SWAP,
+                )
+            except Exception as e:
+                assert "Fee rate too low, 100 < 120, set_value" in str(e)
+            else:
+                assert False, "Should fail"
+
+            ci_from._low_feerate = 0
+            ci1_from._low_feerate = 0
+            ci_from._high_estimated_feerate_multiplier = (
+                0  # Disable high fee from estimate
+            )
+            ci_from._high_feerate = (
+                80  # ci_from_settings["high_feerate"] = ci_from.format_amount(80)
+            )
+            logging.info(f"[rm] ci_from.get_fee_rate() {ci_from.get_fee_rate()}")
+            try:
+                swap_clients[0].postXmrBid(offer_id, amt_swap)
+            except Exception as e:
+                assert "Fee rate too high, 100 > 80, set_value" in str(e)
+            else:
+                assert False, "Should fail"
+
+            # Test reverse bid, high fee
+            ci1_from._high_estimated_feerate_multiplier = 0
+            ci1_from._high_feerate = 80
+            try:
+                swap_clients[1].postXmrBid(offer_reverse_id, amt_swap_reverse)
+            except Exception as e:
+                assert "Fee rate too high, 100 > 80, set_value" in str(e)
+            else:
+                assert False, "Should fail"
+
+            try:
+                swap_clients[0].postOffer(
+                    coin_from,
+                    coin_to,
+                    amt_swap,
+                    rate_swap,
+                    amt_swap,
+                    SwapTypes.XMR_SWAP,
+                )
+            except Exception as e:
+                assert "Fee rate too high, 100 > 80, set_value" in str(e)
+            else:
+                assert False, "Should fail"
+
+            # Test reverse offer, high fee
+            try:
+                swap_clients[1].postOffer(
+                    coin_to,
+                    coin_from,
+                    amt_swap_reverse,
+                    rate_swap,
+                    amt_swap_reverse,
+                    SwapTypes.XMR_SWAP,
+                )
+            except Exception as e:
+                assert "Fee rate too high, 100 > 80, set_value" in str(e)
+            else:
+                assert False, "Should fail"
+
+        finally:
+            ci_from_settings["override_feerate"] = old_override_feerate
+            ci1_from_settings["override_feerate"] = old_override_feerate1
+
 
 class TestBTC(BasicSwapTest):
     __test__ = True

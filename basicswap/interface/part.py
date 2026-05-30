@@ -81,8 +81,17 @@ class PARTInterface(BTCInterface):
     def txoType():
         return CTxOutPart
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super().__init__(coin_settings, network, swap_client)
+    @staticmethod
+    def defaultMaxFeeRate() -> int:
+        return PARTInterface.COIN() // 2
+
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         self.setAnonTxRingSize(int(coin_settings.get("anon_tx_ring_size", 12)))
 
     def use_tx_vsize(self) -> bool:

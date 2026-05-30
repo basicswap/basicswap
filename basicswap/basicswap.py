@@ -4126,6 +4126,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 msg_buf.fee_rate_to = ci_to.make_int(fee_rate)
 
             if swap_type == SwapTypes.XMR_SWAP:
+                ci_from.validateFeeRate(msg_buf.fee_rate_from)
+                ci_to.validateFeeRate(msg_buf.fee_rate_to)
+
                 xmr_offer = XmrOffer()
 
                 chain_a_ci = ci_to if reverse_bid else ci_from
@@ -6028,6 +6031,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid_created_at: int = self.getTime()
             if offer.swap_type != SwapTypes.XMR_SWAP:
                 raise ValueError(f"TODO: Unknown swap type {offer.swap_type.name}")
+
+            ci_from.validateFeeRate(xmr_offer.a_fee_rate)
+            ci_to.validateFeeRate(xmr_offer.b_fee_rate)
 
             if not (self.debug and extra_options.get("debug_skip_validation", False)):
                 self.validateBidValidTime(
@@ -10069,6 +10075,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(len(offer_data.proof_signature) == 0, "Unexpected data")
             ensure(len(offer_data.pkhash_seller) == 0, "Unexpected data")
             ensure(len(offer_data.secret_hash) == 0, "Unexpected data")
+
+            ci_from.validateFeeRate(offer_data.fee_rate_from)
+            ci_to.validateFeeRate(offer_data.fee_rate_to)
+
         else:
             raise ValueError("Unknown swap type {}.".format(offer_data.swap_type))
 
@@ -10094,6 +10104,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Check for sent
             existing_offer = self.getOffer(offer_id, cursor=cursor)
             if existing_offer is None:
+
                 bid_reversed: bool = (
                     offer_data.swap_type == SwapTypes.XMR_SWAP
                     and self.is_reverse_ads_bid(

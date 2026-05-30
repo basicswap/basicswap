@@ -741,7 +741,7 @@ class Test(BaseTest):
         ci0 = cls.swap_clients[0].ci(cls.test_coin)
         if not cls.restore_instance:
             dcr_mining_addr = ci0.rpc_wallet("getnewaddress")
-            assert dcr_mining_addr in cls.dcr_mining_addrs
+            assert dcr_mining_addr == cls.dcr_mining_addr
             cls.dcr_ticket_account = ci0.rpc_wallet(
                 "getaccount",
                 [

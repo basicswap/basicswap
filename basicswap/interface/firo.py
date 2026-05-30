@@ -38,8 +38,13 @@ class FIROInterface(BTCInterface):
     def coin_type():
         return Coins.FIRO
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super(FIROInterface, self).__init__(coin_settings, network, swap_client)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         # No multiwallet support
         self.rpc_wallet = make_rpc_func(
             self._rpcport, self._rpcauth, host=self._rpc_host

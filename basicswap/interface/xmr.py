@@ -101,8 +101,13 @@ class XMRInterface(CoinInterface):
             return True
         return super().is_transient_error(ex)
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super().__init__(network)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
 
         self._addr_prefix = self.chainparams_network()["address_prefix"]
 
@@ -857,3 +862,6 @@ class XMRInterface(CoinInterface):
         except Exception as e:
             self._log.error(f"listWalletTransactions failed: {e}")
             return []
+
+    def validateFeeRate(self, fee_rate: int) -> bool:
+        pass  # Fee rate isn't used

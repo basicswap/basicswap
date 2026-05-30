@@ -71,8 +71,13 @@ class BCHInterface(BTCInterface):
         # TODO: BCH Watchonly: Remove when BCH watchonly works.
         return True
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super(BCHInterface, self).__init__(coin_settings, network, swap_client)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         self.swap_client = swap_client
 
     def has_segwit(self) -> bool:

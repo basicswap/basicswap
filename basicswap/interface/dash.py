@@ -24,8 +24,13 @@ class DASHInterface(BTCInterface):
     def coin_type():
         return Coins.DASH
 
-    def __init__(self, coin_settings, network, swap_client=None):
-        super().__init__(coin_settings, network, swap_client)
+    def __init__(self, coin_settings, network, swap_client=None, **kwargs):
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         self._wallet_passphrase = ""
         self._have_checked_seed = False
 
