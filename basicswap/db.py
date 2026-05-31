@@ -399,8 +399,9 @@ class XmrOffer(Table):
     swap_id = Column("integer", primary_key=True, autoincrement=True)
     offer_id = Column("blob")
 
-    a_fee_rate = Column("integer")  # Chain a fee rate
-    b_fee_rate = Column("integer")  # Chain b fee rate
+    # TODO: rename to from/to - values are not switched for reverse swaps
+    a_fee_rate = Column("integer")  # Chain from fee rate
+    b_fee_rate = Column("integer")  # Chain to fee rate
 
     # Delay before the chain a lock refund tx can be mined
     lock_time_1 = Column("integer")
