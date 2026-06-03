@@ -1267,6 +1267,7 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
             fp.write("rpc-bind-ip={}\n".format(COINS_RPCBIND_IP))
             fp.write(f"wallet-dir={config_datadir}\n")
             fp.write("log-file={}\n".format(os.path.join(config_datadir, "wallet.log")))
+            fp.write("max-log-files=5\n")
             fp.write(
                 "rpc-login={}:{}\n".format(
                     core_settings["walletrpcuser"], core_settings["walletrpcpassword"]
