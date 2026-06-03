@@ -185,14 +185,14 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         parsed_data["swap_type"] = page_data["swap_type"]
         swap_type = swap_type_from_string(parsed_data["swap_type"])
     elif (
-        parsed_data["coin_from"] in swap_client.adaptor_swap_only_coins
-        or parsed_data["coin_to"] in swap_client.adaptor_swap_only_coins
+        parsed_data["coin_from"] in swap_client.coins_without_segwit
+        and parsed_data["coin_to"] in swap_client.coins_without_segwit
     ):
-        parsed_data["swap_type"] = strSwapType(SwapTypes.XMR_SWAP)
-        swap_type = SwapTypes.XMR_SWAP
-    else:
         parsed_data["swap_type"] = strSwapType(SwapTypes.SELLER_FIRST)
         swap_type = SwapTypes.SELLER_FIRST
+    else:
+        parsed_data["swap_type"] = strSwapType(SwapTypes.XMR_SWAP)
+        swap_type = SwapTypes.XMR_SWAP
 
     if swap_type == SwapTypes.XMR_SWAP:
         page_data["swap_style"] = "xmr"
@@ -500,7 +500,7 @@ def page_newoffer(self, url_split, post_string):
         "debug_ui": swap_client.debug_ui,
         "automation_strat_id": -1,
         "amt_bid_min": format_amount(1, 3),
-        "swap_type": strSwapType(SwapTypes.SELLER_FIRST),
+        "swap_type": strSwapType(SwapTypes.XMR_SWAP),
     }
 
     post_data = parse.parse_qs(post_string)
