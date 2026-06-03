@@ -35,7 +35,6 @@
           if (bidAmountSendInput) {
             bidAmountSendInput.value = obj['amount_to'];
           }
-          this.updateModalValues();
         }
       };
 
@@ -87,16 +86,6 @@
         mainCancelBtn.onclick = this.handleCancelClick.bind(this);
       }
 
-      const validMinsInput = document.querySelector('input[name="validmins"]');
-      if (validMinsInput) {
-        validMinsInput.addEventListener('input', this.updateModalValues.bind(this));
-      }
-
-      const addrFromSelect = document.querySelector('select[name="addr_from"]');
-      if (addrFromSelect) {
-        addrFromSelect.addEventListener('change', this.updateModalValues.bind(this));
-      }
-
       const errorOkBtn = document.getElementById('errorOk');
       if (errorOkBtn) {
         errorOkBtn.addEventListener('click', this.hideErrorModal.bind(this));
@@ -145,7 +134,6 @@
       if (!amtVar) {
         this.updateBidParams('rate');
       }
-      this.updateModalValues();
 
       const errorMessages = document.querySelectorAll('.error-message');
       errorMessages.forEach(msg => msg.remove());
@@ -229,8 +217,6 @@
       this.xhr_bid_params.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
       this.xhr_bid_params.overrideMimeType("application/json");
       this.xhr_bid_params.send(`coin_from=${coin_from}&coin_to=${coin_to}&rate=${rate}&amt_from=${bidAmountInput?.value || '0'}`);
-
-      this.updateModalValues();
     },
 
     validateAmountsAfterChange: function() {
@@ -339,10 +325,6 @@
         modal.classList.add('hidden');
       }
       return false;
-    },
-
-    updateModalValues: function() {
-
     },
 
     handleBidsPageAddress: function() {
