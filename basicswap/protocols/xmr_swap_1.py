@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,6 +11,7 @@ from basicswap.util import (
     ensure,
 )
 from basicswap.interface.base import Curves
+from basicswap.interface.btc import findOutput
 from basicswap.chainparams import (
     Coins,
 )
@@ -203,6 +204,9 @@ def setDLEAG(xmr_swap, ci_to, kbsf: bytes) -> None:
 
 class XmrSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.XMR_SWAP
+    _mock_key: bytes = bytes.fromhex(
+        "e6b8e7c2ca3a88fe4f28591aa0f91fec340179346559e4ec430c2531aecc19aa"
+    )
 
     def genScriptLockTxScript(self, ci, Kal: bytes, Kaf: bytes, **kwargs) -> CScript:
         # fallthrough to ci if genScriptLockTxScript is implemented there
@@ -214,20 +218,40 @@ class XmrSwapInterface(ProtocolInterface):
 
         return CScript([2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG)])
 
-    def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
-        addr_to = self.getMockAddrTo(ci)
+    def getFundedInitiateTxTemplate(
+        self, ci, amount: int, sub_fee: bool, feerate: int = None
+    ) -> bytes:
+        addr_to = self.getMockScriptAddr(ci)
         funded_tx = ci.createRawFundedTransaction(
-            addr_to, amount, sub_fee, lock_unspents=False
+            addr_to, amount, sub_fee, lock_unspents=False, feerate=feerate
         )
-
         return bytes.fromhex(funded_tx)
+
+    def getMockITxSwapValue(self, ci, tx_data: bytes) -> int:
+        script: bytes = self.getMockScript()
+        script_dest: bytes = ci.getScriptDest(script)
+        tx_obj = ci.loadTx(tx_data, allow_witness=False)
+
+        lock_vout = findOutput(tx_obj, script_dest)
+        if lock_vout < 0:
+            raise ValueError("swap output not found")
+
+        return tx_obj.vout[lock_vout].nValue
+
+    def getMockITxSwapVout(self, ci, tx_obj) -> int:
+        script: bytes = self.getMockScript()
+        script_dest: bytes = ci.getScriptDest(script)
+        lock_vout = findOutput(tx_obj, script_dest)
+        if lock_vout is None:
+            raise ValueError("swap output not found")
+        return lock_vout
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
         mock_txo_script = self.getMockScriptScriptPubkey(ci)
         real_txo_script = ci.getScriptDest(script)
 
         found: int = 0
-        ctx = ci.loadTx(mock_tx)
+        ctx = ci.loadTx(mock_tx, allow_witness=False)
         for txo in ctx.vout:
             if txo.scriptPubKey == mock_txo_script:
                 txo.scriptPubKey = real_txo_script
@@ -239,4 +263,37 @@ class XmrSwapInterface(ProtocolInterface):
             raise ValueError("Too many mocked outputs found")
         ctx.nLockTime = 0
 
-        return ctx.serialize()
+        return ctx.serialize_without_witness()
+
+    def getMockPubkey(self, ci) -> bytes:
+        return ci.getPubkey(self._mock_key)
+
+    def getMockPTxSwapValue(self, ci, tx_data: bytes) -> int:
+        mock_pk: bytes = self.getMockPubkey(ci)
+        script_pk = ci.getPkDest(mock_pk)
+        tx_obj = ci.loadTx(tx_data, allow_witness=False)
+
+        lock_vout = findOutput(tx_obj, script_pk)
+        if lock_vout < 0:
+            raise ValueError("swap output not found")
+
+        return tx_obj.vout[lock_vout].nValue
+
+    def getMockPTxSwapVout(self, ci, tx_obj) -> int:
+        mock_pk: bytes = self.getMockPubkey(ci)
+        script_pk = ci.getPkDest(mock_pk)
+        lock_vout = findOutput(tx_obj, script_pk)
+        if lock_vout is None:
+            raise ValueError("swap output not found")
+        return lock_vout
+
+    def promoteMockPTx(self, ci, tx_data: bytes, kbv: bytes, Kbs: bytes) -> bytes:
+        mock_pk: bytes = self.getMockPubkey(ci)
+        script_pk = ci.getPkDest(mock_pk)
+        tx_obj = ci.loadTx(tx_data)
+        lock_vout = findOutput(tx_obj, script_pk)
+        if lock_vout < 0:
+            raise ValueError("swap output not found")
+        tx_obj.vout[lock_vout].scriptPubKey = ci.getPkDest(Kbs)
+
+        return tx_obj.serialize_without_witness()

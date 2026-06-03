@@ -15,9 +15,6 @@ from basicswap.interface.btc import (
 class ProtocolInterface:
     swap_type = None
 
-    def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
-        raise ValueError("base class")
-
     def getMockScript(self) -> bytearray:
         return bytearray([OpCodes.OP_RETURN, OpCodes.OP_1])
 
@@ -29,7 +26,7 @@ class ProtocolInterface:
             else ci.get_p2sh_script_pubkey(script)
         )
 
-    def getMockAddrTo(self, ci):
+    def getMockScriptAddr(self, ci):
         script = self.getMockScript()
         return (
             ci.encodeScriptDest(ci.getScriptDest(script))
@@ -38,5 +35,5 @@ class ProtocolInterface:
         )
 
     def findMockVout(self, ci, itx_decoded):
-        mock_addr = self.getMockAddrTo(ci)
+        mock_addr = self.getMockScriptAddr(ci)
         return find_vout_for_address_from_txobj(itx_decoded, mock_addr)

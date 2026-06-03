@@ -1873,7 +1873,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         pubkey = PublicKey(K)
         return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
 
-    def fundTx(self, tx: bytes, feerate) -> bytes:
+    def fundTx(
+        self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
+    ) -> bytes:
         if self.useBackend():
             return self._fundTxElectrum(tx, feerate)
 
@@ -1881,9 +1883,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # TODO: Unlock unspents if bid cancelled
         # TODO: Manually select only segwit prevouts
         options = {
-            "lockUnspents": True,
+            "lockUnspents": lock_unspents,
             "feeRate": feerate_str,
         }
+        if subfee:
+            tx_obj = self.loadTx(tx, allow_witness=False)
+            num_vouts: int = len(tx_obj.vout)
+            ensure(num_vouts > 0, "Missing tx outputs")
+            options["subtractFeeFromOutputs"] = list(range(num_vouts))
         rv = self.rpc_wallet("fundrawtransaction", [tx.hex(), options])
         tx_bytes: bytes = bytes.fromhex(rv["hex"])
         return tx_bytes
@@ -2705,10 +2712,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(output_amount, p2wpkh_script_pk))
         return tx.serialize()
 
-    def encodeSharedAddress(self, Kbv, Kbs):
+    def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
         return self.pubkey_to_segwit_address(Kbs)
 
-    def publishBLockTx(self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0):
+    def publishBLockTx(
+        self,
+        kbv: bytes,
+        Kbs: bytes,
+        output_amount: int,
+        feerate: int,
+        unlock_time: int = 0,
+    ) -> (bytes, int):
         b_lock_tx = self.createBLockTx(Kbs, output_amount)
 
         b_lock_tx = self.fundTx(b_lock_tx, feerate)
@@ -2731,8 +2745,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def findTxB(
         self,
-        kbv,
-        Kbs,
+        kbv: bytes,
+        Kbs: bytes,
         cb_swap_value: int,
         cb_block_confirmed: int,
         restore_height: int,
@@ -3461,6 +3475,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         amount: int,
         sub_fee: bool = False,
         lock_unspents: bool = True,
+        feerate: int = None,
     ) -> str:
         if self.useBackend():
             return self._createRawFundedTransactionElectrum(addr_to, amount, sub_fee)
@@ -3468,10 +3483,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         txn = self.rpc(
             "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
         )
+        if feerate:
+            fee_rate = self.format_amount(feerate)
+            fee_src = "specified"
+        else:
+            fee_rate, fee_src = self.get_fee_rate(self._conf_target)
+        self._log.debug(
+            f"Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}"
+        )
 
         options = {
             "lockUnspents": lock_unspents,
-            "conf_target": self._conf_target,
+            "feeRate": fee_rate,
         }
         if sub_fee:
             options["subtractFeeFromOutputs"] = [
@@ -4491,6 +4514,40 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self.publishTx(tx_signed)
 
         return tx["txid"]
+
+    def validatePrefundedTxAmounts(self, tx_data: bytes) -> (bytes, int):
+        # unspent_utxos = self.listUtxos()
+        tx_obj = self.loadTx(tx_data, allow_witness=False)
+
+        total_out: int = 0
+        total_in: int = 0
+        for txo in tx_obj.vout:
+            total_out += txo.nValue
+
+        dummy_witness_stack = []
+        used_utxos = set()
+        for txi in tx_obj.vin:
+            txi_txid_hex: str = i2h(txi.prevout.hash)
+            txi_vout: int = txi.prevout.n
+            if (txi_txid_hex, txi_vout) in used_utxos:
+                raise ValueError(f"Duplicate txin {txi_txid_hex} {txi_vout}")
+
+            prev_tx = self.rpc_wallet("gettransaction", [txi_txid_hex])
+            prev_tx_obj = self.describeTx(prev_tx["hex"])
+
+            txo = prev_tx_obj["vout"][txi_vout]
+            total_in += self.make_int(txo["value"])
+            dummy_witness_stack.append(self.getP2WPKHDummyWitness())
+            used_utxos.add((txi_txid_hex, txi_vout))
+
+        fee: int = total_in - total_out
+        witness_bytes_len_est: int = self.getWitnessStackSerialisedLength(
+            dummy_witness_stack
+        )
+        vsize = self.getTxVSize(tx_obj, add_witness_bytes=witness_bytes_len_est)
+        fee_rate = fee * 1000 // vsize
+
+        return bytes.fromhex(txi_txid_hex), fee_rate
 
 
 def testBTCInterface():

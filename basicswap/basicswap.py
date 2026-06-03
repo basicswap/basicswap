@@ -5199,6 +5199,63 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid_rate = best_bid_rate
         return amount, amount_to, bid_rate
 
+    def createSubfeeBidTx(self, offer_id: bytes, amount_to: int, rate: int) -> dict:
+        self.log.debug(
+            f"createSubfeeBidTx for offer: {self.log.id(offer_id)}, amount to: {amount_to}"
+        )
+
+        offer, xmr_offer = self.getXmrOffer(offer_id)
+        ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
+        ensure(
+            offer.amount_negotiable,
+            f"Offer amounts are final: {self.log.id(offer_id)}.",
+        )
+        if offer.coin_to in (Coins.XMR, Coins.WOW):
+            raise ValueError("TODO")
+        if offer.swap_type != SwapTypes.XMR_SWAP:
+            raise ValueError("TODO")
+        ci_to = self.ci(offer.coin_to)
+        ci_from = self.ci(offer.coin_from)
+        pi = self.pi(SwapTypes.XMR_SWAP)
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+
+        feerate: int = xmr_offer.b_fee_rate
+        if reverse_bid:
+            # Create ITX
+            lock_txa: bytes = pi.getFundedInitiateTxTemplate(
+                ci_to, amount_to, sub_fee=True, feerate=feerate
+            )
+            tx_obj = ci_to.loadTx(lock_txa, allow_witness=False)
+            lock_vout: int = pi.getMockITxSwapVout(ci_to, tx_obj)
+            amount_to_out: int = tx_obj.vout[lock_vout].nValue
+        else:
+            # Create PTX
+            mock_pk: bytes = pi.getMockPubkey(ci_to)
+            lock_txb: bytes = ci_to.createBLockTx(mock_pk, amount_to)
+            lock_txb = ci_to.fundTx(lock_txb, feerate, lock_unspents=False, subfee=True)
+            tx_obj = ci_to.loadTx(lock_txb, allow_witness=False)
+            lock_vout: int = pi.getMockPTxSwapVout(ci_to, tx_obj)
+            amount_to_out: int = tx_obj.vout[lock_vout].nValue
+
+        amount_from_out: int = (amount_to_out * (10 ** ci_from.exp())) // rate
+        extra_options = {"bid_rate": rate}
+        amount_adjusted, amount_to_adjusted, bid_rate = self.setBidAmounts(
+            amount_from_out, offer, extra_options, ci_from
+        )
+        if amount_to_adjusted < amount_to_out:
+            tx_obj.vout[lock_vout].nValue = amount_to_adjusted
+
+        self.log.debug(
+            f"Amounts after subfee: to {ci_to.format_amount(amount_to_adjusted)} {ci_to.ticker()}, from {ci_from.format_amount(amount_to_adjusted)} {ci_from.ticker()}"
+        )
+        tx_data: bytes = tx_obj.serialize_without_witness()
+        return {
+            "amount_from": amount_adjusted,
+            "amount_to": amount_to_adjusted,
+            "bid_tx": tx_data,
+        }
+
     def postBid(
         self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}
     ) -> bytes:
@@ -6016,24 +6073,41 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "Incompatible offer protocol version",
             )
             ensure(offer.expire_at > self.getTime(), "Offer has expired")
+            if offer.swap_type != SwapTypes.XMR_SWAP:
+                raise ValueError(f"TODO: Unknown swap type {offer.swap_type.name}")
 
             coin_from = Coins(offer.coin_from)
             coin_to = Coins(offer.coin_to)
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
 
-            valid_for_seconds: int = extra_options.get("valid_for_seconds", 60 * 10)
-
-            amount, amount_to, bid_rate = self.setBidAmounts(
-                amount, offer, extra_options, ci_from
-            )
-
-            bid_created_at: int = self.getTime()
-            if offer.swap_type != SwapTypes.XMR_SWAP:
-                raise ValueError(f"TODO: Unknown swap type {offer.swap_type.name}")
+            self.checkCoinsReady(coin_from, coin_to)
 
             ci_from.validateFeeRate(xmr_offer.a_fee_rate)
             ci_to.validateFeeRate(xmr_offer.b_fee_rate)
+
+            bid_created_at: int = self.getTime()
+            valid_for_seconds: int = extra_options.get("valid_for_seconds", 60 * 10)
+
+            if "prefunded_tx" in extra_options:
+                pi = self.pi(SwapTypes.XMR_SWAP)
+                prefunded_tx_data: bytes = extra_options["prefunded_tx"]
+                if reverse_bid:
+                    amount_to = pi.getMockITxSwapValue(ci_to, prefunded_tx_data)
+                else:
+                    amount_to = pi.getMockPTxSwapValue(ci_to, prefunded_tx_data)
+                bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
+
+                prefunded_txid, prefunded_tx_fee_rate = (
+                    ci_to.validatePrefundedTxAmounts(prefunded_tx_data)
+                )
+                self.log.debug(f"Using prefunded tx: {self.log.id(prefunded_txid)}")
+                ci_to.validateFeeRate(prefunded_tx_fee_rate)
+            else:
+                amount, amount_to, bid_rate = self.setBidAmounts(
+                    amount, offer, extra_options, ci_from
+                )
 
             if not (self.debug and extra_options.get("debug_skip_validation", False)):
                 self.validateBidValidTime(
@@ -6041,21 +6115,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 self.validateBidAmount(offer, amount, bid_rate)
 
-            self.checkCoinsReady(coin_from, coin_to)
-
             # TODO: Better tx size estimate
-            fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
-            fee_rate_to = ci_to.make_int(fee_rate)
+            fee_rate_to = xmr_offer.b_fee_rate
             estimated_fee: int = fee_rate_to * ci_to.est_lock_tx_vsize() // 1000
-            self.ensureWalletCanSend(
-                ci_to, offer.swap_type, int(amount_to), estimated_fee, for_offer=False
-            )
+
+            if "prefunded_tx" not in extra_options:
+                self.ensureWalletCanSend(
+                    ci_to,
+                    offer.swap_type,
+                    int(amount_to),
+                    estimated_fee,
+                    for_offer=False,
+                )
 
             bid_addr: str = self.prepareSMSGAddress(
                 addr_send_from, AddressTypes.BID, cursor
             )
 
-            # return id of route waiting to be established
+            # Return id of route waiting to be established
             request_data = {
                 "offer_id": offer_id.hex(),
                 "amount_from": amount,
@@ -6073,7 +6150,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 valid_for_seconds,
             )
 
-            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
             if reverse_bid:
                 reversed_rate: int = ci_to.make_int(amount / amount_to, r=1)
 
@@ -6126,6 +6202,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.add(message_route_link, cursor)
                 bid.bid_id = bid_id
                 xmr_swap.bid_id = bid.bid_id
+
+                if "prefunded_tx" in extra_options:
+                    prefunded_tx = PrefundedTx(
+                        active_ind=1,
+                        created_at=bid_created_at,
+                        linked_type=Concepts.BID,
+                        linked_id=bid.bid_id,
+                        tx_type=TxTypes.ITX_PRE_FUNDED,
+                        tx_data=extra_options["prefunded_tx"],
+                    )
+                    self.add(prefunded_tx, cursor)
 
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
                 self.commitDB()
@@ -6248,6 +6335,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.warning(
                     f"Adaptor-sig swap restore height clamped to {wallet_restore_height}"
                 )
+            if "prefunded_tx" in extra_options:
+                prefunded_tx = PrefundedTx(
+                    active_ind=1,
+                    created_at=bid_created_at,
+                    linked_type=Concepts.BID,
+                    linked_id=bid.bid_id,
+                    tx_type=TxTypes.PTX_PRE_FUNDED,
+                    tx_data=extra_options["prefunded_tx"],
+                )
+                self.add(prefunded_tx, cursor)
 
             self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
             self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
@@ -6367,16 +6464,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.a_lock_tx_script = pi.genScriptLockTxScript(
                 ci_from, xmr_swap.pkal, xmr_swap.pkaf, **lockExtraArgs
             )
-            prefunded_tx = self.getPreFundedTx(
-                Concepts.OFFER,
-                bid.offer_id,
-                TxTypes.ITX_PRE_FUNDED,
-                cursor=use_cursor,
-            )
+            if reverse_bid and bid.was_sent:
+                prefunded_tx = self.getPreFundedTx(
+                    Concepts.BID,
+                    bid_id,
+                    TxTypes.ITX_PRE_FUNDED,
+                    cursor=use_cursor,
+                )
+            else:
+                prefunded_tx = self.getPreFundedTx(
+                    Concepts.OFFER,
+                    bid.offer_id,
+                    TxTypes.ITX_PRE_FUNDED,
+                    cursor=use_cursor,
+                )
             if prefunded_tx:
                 xmr_swap.a_lock_tx = pi.promoteMockTx(
                     ci_from, prefunded_tx, xmr_swap.a_lock_tx_script
                 )
+                self.log.info("Using pre-funded tx")
             else:
                 xmr_swap.a_lock_tx = ci_from.createSCLockTx(
                     bid.amount, xmr_swap.a_lock_tx_script, xmr_swap.vkbv
@@ -6779,14 +6885,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             addr_to = ci.encodeScriptDest(p2wsh)
         else:
             addr_to = ci.encode_p2sh(initiate_script)
-        self.log.debug(
-            f"Create initiate txn for coin {ci.coin_name()} to {addr_to} for bid {self.log.id(bid_id)}"
-        )
 
         if prefunded_tx:
+            self.log.debug(
+                f"Using pre-funded initiate txn for coin {ci.coin_name()} to {addr_to} for bid {self.log.id(bid_id)}"
+            )
             pi = self.pi(SwapTypes.SELLER_FIRST)
             txn_signed = pi.promoteMockTx(ci, prefunded_tx, initiate_script).hex()
         else:
+            self.log.debug(
+                f"Create initiate txn for coin {ci.coin_name()} to {addr_to} for bid {self.log.id(bid_id)}"
+            )
             txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
 
         txjs = ci.describeTx(txn_signed)
@@ -11607,19 +11716,38 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 cursor,
             )
 
+        prefunded_tx = self.getPreFundedTx(
+            Concepts.BID,
+            bid.bid_id,
+            TxTypes.PTX_PRE_FUNDED,
+            cursor=cursor,
+        )
+
         try:
             b_lock_vout = 0
-            result = ci_to.publishBLockTx(
-                xmr_swap.vkbv,
-                xmr_swap.pkbs,
-                bid.amount_to,
-                b_fee_rate,
-                unlock_time=unlock_time,
-            )
-            if isinstance(result, tuple):
-                b_lock_tx_id, b_lock_vout = result
+            if prefunded_tx:
+                self.log.info("Using pre-funded tx")
+                pi = self.pi(offer.swap_type)
+                b_lock_tx = pi.promoteMockPTx(
+                    ci_to,
+                    prefunded_tx,
+                    xmr_swap.vkbv,
+                    xmr_swap.pkbs,
+                )
+                b_lock_tx = ci_to.signTxWithWallet(b_lock_tx)
+                b_lock_tx_id = bytes.fromhex(ci_to.publishTx(b_lock_tx))
             else:
-                b_lock_tx_id = result
+                result = ci_to.publishBLockTx(
+                    xmr_swap.vkbv,
+                    xmr_swap.pkbs,
+                    bid.amount_to,
+                    b_fee_rate,
+                    unlock_time=unlock_time,
+                )
+                if isinstance(result, tuple):
+                    b_lock_tx_id, b_lock_vout = result
+                else:
+                    b_lock_tx_id = result
             if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
                     f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing XMR lock tx {self.log.id(b_lock_tx_id)}."
@@ -14170,7 +14298,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def updateWalletsInfo(
         self,
         force_update: bool = False,
-        only_coin: bool = None,
+        only_coin: int = None,
         wait_for_complete: bool = False,
     ) -> None:
         now: int = self.getTime()

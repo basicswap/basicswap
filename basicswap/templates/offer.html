@@ -419,10 +419,21 @@
                    name="bid_amount_send"
                    value=""
                    max="{{ data.amt_to }}"
+                   haveamount="{{ data.coin_to_balance }}"
+                   exp="{{ data.coin_to_exp }}"
                    onchange="validateMaxAmount(this, parseFloat('{{ data.amt_to }}')); updateBidParams('sending');">
             <div class="absolute inset-y-0 right-3 flex items-center pointer-events-none text-gray-400 dark:text-gray-300 text-sm">
                 max {{ data.amt_to }} ({{ data.tla_to }})
             </div>
+        </div>
+        <div class="mt-2 flex space-x-2">
+          <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-bid-amount="1" data-input-id="bid_amount_send">max</button>
+          {% if data.bid_can_subfee == true %}
+          <label>
+            <input type="checkbox" name="subfee_bid" id="subfee_bid" value="sfb" onchange="updateBidParams('subfee');"/>
+            <span for="subfee_bid">Subfee</span>
+          </label>
+          {% endif %}
         </div>
     </td>
 </tr>
@@ -721,6 +732,8 @@
 <input type="hidden" id="coin_to_name" value="{{ data.coin_to }}">
 <input type="hidden" id="tla_from" value="{{ data.tla_from }}">
 <input type="hidden" id="tla_to" value="{{ data.tla_to }}">
+<input type="hidden" id="offer_id" value="{{ offer_id }}">
+<input type="hidden" name="prefunded_bid_tx" id="prefunded_bid_tx" value="{{ data.prefunded_bid_tx }}">
 <input type="hidden" name="formid" value="{{ form_id }}">
 </form>
 <p id="rates_display"></p>

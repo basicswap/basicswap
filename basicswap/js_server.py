@@ -1945,6 +1945,32 @@ def js_electrum_discover(self, url_split, post_string, is_json) -> bytes:
     )
 
 
+def js_getsubfeebidtx(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    post_data = getFormData(post_string, is_json)
+    offer_id = bytes.fromhex(get_data_entry(post_data, "offer_id"))
+    offer = swap_client.getOffer(offer_id)
+    ensure(offer, "Offer not found.")
+    ci_from = swap_client.ci(offer.coin_from)
+    ci_to = swap_client.ci(offer.coin_to)
+
+    amount_to: int = inputAmount(get_data_entry(post_data, "amount_to"), ci_to)
+    bid_rate: int = ci_to.make_int(get_data_entry(post_data, "bid_rate"), r=1)
+
+    prefunded_data = swap_client.createSubfeeBidTx(offer_id, amount_to, bid_rate)
+    return bytes(
+        json.dumps(
+            {
+                "amount_from": ci_from.format_amount(prefunded_data["amount_from"]),
+                "amount_to": ci_to.format_amount(prefunded_data["amount_to"]),
+                "bid_tx": prefunded_data["bid_tx"].hex(),
+            }
+        ),
+        "UTF-8",
+    )
+
+
 endpoints = {
     "coins": js_coins,
     "walletbalances": js_walletbalances,
@@ -1981,6 +2007,7 @@ endpoints = {
     "messageroutes": js_messageroutes,
     "electrumdiscover": js_electrum_discover,
     "modeswitchinfo": js_modeswitchinfo,
+    "getsubfeebidtx": js_getsubfeebidtx,
 }
 
 

@@ -2161,8 +2161,8 @@ class BasicSwapTest(TestFunctions):
         self.do_test_05_self_bid(Coins.XMR, self.test_coin_from)
 
     def test_06_preselect_inputs(self):
-        tla_from = self.test_coin_from.name
-        logging.info("---------- Test {} Preselected inputs".format(tla_from))
+        tla_from: str = self.test_coin_from.name
+        logging.info(f"---------- Test {tla_from} Preselected inputs")
         swap_clients = self.swap_clients
 
         self.prepare_balance(self.test_coin_from, 100.0, 1802, 1800)
@@ -2262,12 +2262,168 @@ class BasicSwapTest(TestFunctions):
             assert txin["txid"] == txin_after["txid"]
             assert txin["vout"] == txin_after["vout"]
 
+    def test_06_b_preselect_bid_inputs(self):
+        coin_from, coin_to = (Coins.PART, self.test_coin_from)
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} Preselected bid inputs"
+        )
+
+        id_offerer, id_bidder = (1, 0)
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        amt_swap: int = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        min_swap: int = ci_from.make_int(0.0001)
+        rate_swap: int = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+
+        extra_options = {
+            "amount_negotiable": True,
+            "automation_id": 1,
+        }
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            min_swap,
+            SwapTypes.XMR_SWAP,
+            extra_options=extra_options,
+        )
+
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].getOffer(offer_id)
+
+        amount_to = (offer.amount_from * offer.rate) // ci_from.COIN()
+        prefunded_tx_data = swap_clients[id_bidder].createSubfeeBidTx(
+            offer_id, amount_to, offer.rate
+        )
+        ptx_decoded = ci_to.describeTx(prefunded_tx_data["bid_tx"].hex())
+        ci_to.rpc_wallet("lockunspent", [False, ptx_decoded["vin"]])
+
+        bid_tx = prefunded_tx_data["bid_tx"]
+        amount_from = prefunded_tx_data["amount_from"]
+
+        extra_options = {"prefunded_tx": bid_tx}
+        bid_id = swap_clients[id_bidder].postBid(
+            offer_id, amount_from, extra_options=extra_options
+        )
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            wait_for=120,
+        )
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_bidder],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            sent=True,
+            wait_for=120,
+        )
+
+        # Verify expected inputs were used
+        bid, _, _, _, _ = swap_clients[id_bidder].getXmrBidAndOffer(bid_id)
+        assert bid.xmr_b_lock_tx
+        wtx = ci_to.rpc_wallet(
+            "gettransaction",
+            [
+                bid.xmr_b_lock_tx.txid.hex(),
+            ],
+        )
+        ptx_after = ci_to.describeTx(wtx["hex"])
+        assert len(ptx_after["vin"]) == len(ptx_decoded["vin"])
+        for i, txin in enumerate(ptx_decoded["vin"]):
+            txin_after = ptx_after["vin"][i]
+            assert txin["txid"] == txin_after["txid"]
+            assert txin["vout"] == txin_after["vout"]
+
+    def test_06_c_preselect_reverse_bid_inputs(self):
+        coin_from, coin_to = (Coins.XMR, self.test_coin_from)
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} Preselected reverse bid inputs"
+        )
+
+        id_offerer, id_bidder = (1, 0)
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        amt_swap: int = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        min_swap: int = ci_from.make_int(0.0001)
+        rate_swap: int = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+
+        extra_options = {
+            "amount_negotiable": True,
+            "automation_id": 1,
+        }
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            min_swap,
+            SwapTypes.XMR_SWAP,
+            extra_options=extra_options,
+        )
+
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].getOffer(offer_id)
+
+        amount_to = (offer.amount_from * offer.rate) // ci_from.COIN()
+        prefunded_tx_data = swap_clients[id_bidder].createSubfeeBidTx(
+            offer_id, amount_to, offer.rate
+        )
+        ptx_decoded = ci_to.describeTx(prefunded_tx_data["bid_tx"].hex())
+        ci_to.rpc_wallet("lockunspent", [False, ptx_decoded["vin"]])
+
+        bid_tx = prefunded_tx_data["bid_tx"]
+        amount_from = prefunded_tx_data["amount_from"]
+
+        extra_options = {"prefunded_tx": bid_tx}
+        bid_id = swap_clients[id_bidder].postBid(
+            offer_id, amount_from, extra_options=extra_options
+        )
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            wait_for=180,
+        )
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_bidder],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            sent=True,
+            wait_for=120,
+        )
+
+        # Verify expected inputs were used
+        bid, _, _, _, _ = swap_clients[id_bidder].getXmrBidAndOffer(bid_id)
+        assert bid.xmr_a_lock_tx
+        wtx = ci_to.rpc_wallet(
+            "gettransaction",
+            [
+                bid.xmr_a_lock_tx.txid.hex(),
+            ],
+        )
+        ptx_after = ci_to.describeTx(wtx["hex"])
+        assert len(ptx_after["vin"]) == len(ptx_decoded["vin"])
+        for i, txin in enumerate(ptx_decoded["vin"]):
+            txin_after = ptx_after["vin"][i]
+            assert txin["txid"] == txin_after["txid"]
+            assert txin["vout"] == txin_after["vout"]
+
     def test_07_expire_stuck_accepted(self):
         coin_from, coin_to = (self.test_coin_from, Coins.XMR)
         logging.info(
-            "---------- Test {} to {} expires bid stuck on accepted".format(
-                coin_from.name, coin_to.name
-            )
+            f"---------- Test {coin_from.name} to {coin_to.name} expires bid stuck on accepted"
         )
 
         swap_clients = self.swap_clients
@@ -2434,7 +2590,6 @@ class BasicSwapTest(TestFunctions):
             ci_from._high_feerate = (
                 80  # ci_from_settings["high_feerate"] = ci_from.format_amount(80)
             )
-            logging.info(f"[rm] ci_from.get_fee_rate() {ci_from.get_fee_rate()}")
             try:
                 swap_clients[0].postXmrBid(offer_id, amt_swap)
             except Exception as e:

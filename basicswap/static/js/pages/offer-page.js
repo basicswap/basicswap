@@ -4,11 +4,13 @@
   const OfferPage = {
     xhr_rates: null,
     xhr_bid_params: null,
+    xhr_bid_prefund: null,
 
     init: function() {
       this.xhr_rates = new XMLHttpRequest();
       this.xhr_bid_params = new XMLHttpRequest();
-      
+      this.xhr_bid_prefund = new XMLHttpRequest();
+
       this.setupXHRHandlers();
       this.setupEventListeners();
       this.handleBidsPageAddress();
@@ -34,6 +36,20 @@
             bidAmountSendInput.value = obj['amount_to'];
           }
           this.updateModalValues();
+        }
+      };
+
+      this.xhr_bid_prefund.onload = () => {
+        if (this.xhr_bid_prefund.status == 200) {
+          const obj = JSON.parse(this.xhr_bid_prefund.response);
+          const bidAmountInput = document.getElementById('bid_amount');
+          if (bidAmountInput) {
+            bidAmountInput.value = obj['amount_from'];
+          }
+          const prefundedBidInput = document.getElementById('prefunded_bid_tx');
+          if (prefundedBidInput) {
+            prefundedBidInput.value = obj['bid_tx'];
+          }
         }
       };
     },
@@ -112,7 +128,7 @@
       const bidRateInput = document.getElementById('bid_rate');
       const validMinsInput = document.querySelector('input[name="validmins"]');
       const amtVar = document.getElementById('amt_var')?.value === 'True';
-      
+
       if (bidAmountSendInput) {
         bidAmountSendInput.value = amtVar ? '' : bidAmountSendInput.getAttribute('max');
       }
@@ -130,7 +146,7 @@
         this.updateBidParams('rate');
       }
       this.updateModalValues();
-      
+
       const errorMessages = document.querySelectorAll('.error-message');
       errorMessages.forEach(msg => msg.remove());
 
@@ -156,6 +172,7 @@
       const bidAmountSendInput = document.getElementById('bid_amount_send');
       const bidRateInput = document.getElementById('bid_rate');
       const offerRateInput = document.getElementById('offer_rate');
+      const bidSubfee = document.getElementById('subfee_bid');
 
       if (!coin_from || !coin_to || !amt_var || !rate_var) return;
 
@@ -171,7 +188,7 @@
           const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
           bidAmountInput.value = receiveAmount;
         }
-      } else if (value_changed === 'sending') {
+      } else if (value_changed === 'sending' || value_changed === 'subfee') {
         if (bidAmountSendInput && bidAmountInput) {
           const sendAmount = parseFloat(bidAmountSendInput.value) || 0;
           const receiveAmount = (sendAmount / rate).toFixed(coin_from_exp);
@@ -187,8 +204,30 @@
 
       this.validateAmountsAfterChange();
 
+      if (bidSubfee && bidSubfee.checked) {
+        bidAmountInput.readOnly = true;
+
+        const offer_id = document.getElementById('offer_id')?.value || '';
+        if (!offer_id) {
+          console.log("offer_id not found!");
+          return;
+        }
+        this.xhr_bid_prefund.open('POST', '/json/getsubfeebidtx');
+        this.xhr_bid_prefund.setRequestHeader('Content-type', 'application/json;charset=UTF-8');
+        const data = { offer_id: offer_id, amount_to: bidAmountSendInput.value , bid_rate: rate};
+        this.xhr_bid_prefund.overrideMimeType("application/json");
+        this.xhr_bid_prefund.send(JSON.stringify(data));
+        return;
+      }
+      bidAmountInput.readOnly = false;
+      const prefundedBidInput = document.getElementById('prefunded_bid_tx');
+      if (prefundedBidInput) {
+        prefundedBidInput.value = "";
+      }
+
       this.xhr_bid_params.open('POST', '/json/rate');
       this.xhr_bid_params.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      this.xhr_bid_params.overrideMimeType("application/json");
       this.xhr_bid_params.send(`coin_from=${coin_from}&coin_to=${coin_to}&rate=${rate}&amt_from=${bidAmountInput?.value || '0'}`);
 
       this.updateModalValues();
@@ -253,6 +292,11 @@
         this.showErrorModal('Validation Error', 'Please enter valid amounts for both sending and receiving.');
         return false;
       }
+      let subfee = false;
+      const checkbox = document.getElementById('subfee_bid');
+      if (checkbox) {
+        subfee = checkbox.checked;
+      }
 
       const coinFrom = document.getElementById('coin_from_name')?.value || '';
       const coinTo = document.getElementById('coin_to_name')?.value || '';
@@ -273,7 +317,12 @@
       if (modalAmtReceive) modalAmtReceive.textContent = receiveAmount.toFixed(8);
       if (modalReceiveCurrency) modalReceiveCurrency.textContent = ` ${tlaFrom}`;
       if (modalAmtSend) modalAmtSend.textContent = sendAmount.toFixed(8);
-      if (modalSendCurrency) modalSendCurrency.textContent = ` ${tlaTo}`;
+      if (modalSendCurrency) {
+        modalSendCurrency.textContent = ` ${tlaTo}`;
+        if (subfee) {
+          modalSendCurrency.textContent += ` (incl fee)`;
+        }
+      }
       if (modalAddrFrom) modalAddrFrom.textContent = addrFrom || 'Default';
       if (modalValidMins) modalValidMins.textContent = validMins;
 
@@ -293,7 +342,7 @@
     },
 
     updateModalValues: function() {
-      
+
     },
 
     handleBidsPageAddress: function() {

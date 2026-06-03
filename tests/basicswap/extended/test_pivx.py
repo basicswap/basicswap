@@ -849,7 +849,7 @@ class Test(unittest.TestCase):
         swap_value = ci_from.make_int(swap_value)
         assert swap_value > ci_from.make_int(9)
 
-        addr_to = pi.getMockAddrTo(ci_from)
+        addr_to = pi.getMockScriptAddr(ci_from)
         funded_tx = ci_from.createRawFundedTransaction(
             addr_to, swap_value, True, lock_unspents=True
         )
