@@ -48,15 +48,11 @@ class TestLTC(BasicSwapTest):
         assert deploymentinfo["softforks"][feature_name]["active"] is True
 
     def test_001_nested_segwit(self):
-        logging.info(
-            "---------- Test {} p2sh nested segwit".format(self.test_coin_from.name)
-        )
+        logging.info(f"---------- Test {self.test_coin_from.name} p2sh nested segwit")
         logging.info("Skipped")
 
     def test_002_native_segwit(self):
-        logging.info(
-            "---------- Test {} p2sh native segwit".format(self.test_coin_from.name)
-        )
+        logging.info(f"---------- Test {self.test_coin_from.name} p2sh native segwit")
 
         ci = self.swap_clients[0].ci(self.test_coin_from)
         addr_segwit = ci.rpc_wallet("getnewaddress", ["segwit test", "bech32"])
@@ -120,7 +116,7 @@ class TestLTC(BasicSwapTest):
         assert tx_funded_decoded["txid"] == tx_signed_decoded["txid"]
 
     def test_007_hdwallet(self):
-        logging.info("---------- Test {} hdwallet".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} hdwallet")
 
         test_seed = "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
         test_wif = (
@@ -136,7 +132,7 @@ class TestLTC(BasicSwapTest):
         assert addr == "rltc1qps7hnjd866e9ynxadgseprkc2l56m00djr82la"
 
     def test_20_btc_coin(self):
-        logging.info("---------- Test BTC to {}".format(self.test_coin_from.name))
+        logging.info(f"---------- Test BTC to {self.test_coin_from.name}")
         swap_clients = self.swap_clients
 
         offer_id = swap_clients[0].postOffer(
@@ -178,7 +174,7 @@ class TestLTC(BasicSwapTest):
         assert js_1["num_swapping"] == 0 and js_1["num_watched_outputs"] == 0
 
     def test_21_mweb(self):
-        logging.info("---------- Test MWEB {}".format(self.test_coin_from.name))
+        logging.info(f"---------- Test MWEB {self.test_coin_from.name}")
         swap_clients = self.swap_clients
 
         ci0 = swap_clients[0].ci(self.test_coin_from)
@@ -327,7 +323,7 @@ class TestLTC(BasicSwapTest):
         # TODO
 
     def test_22_mweb_balance(self):
-        logging.info("---------- Test MWEB balance {}".format(self.test_coin_from.name))
+        logging.info(f"---------- Test MWEB balance {self.test_coin_from.name}")
         swap_clients = self.swap_clients
 
         ci_mweb = swap_clients[0].ci(Coins.LTC_MWEB)

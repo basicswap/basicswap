@@ -115,6 +115,10 @@ def modify_config(test_path, i):
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)
 
+    btc_config_path = os.path.join(test_path, f"client{i}", "bitcoin", "bitcoin.conf")
+    with open(btc_config_path, "a") as fp:
+        fp.write("minrelaytxfee=0.00001\n")
+
 
 def wait_for_bid_state(
     delay_event, node_port: int, bid_id: str, state=None, wait_for: int = 30
@@ -641,7 +645,7 @@ class Test(TestFunctions):
     @classmethod
     def setUpClass(cls):
         cls.addElectrumxDaemon("bitcoin", 32793, 50001)
-        super(Test, cls).setUpClass()
+        super().setUpClass()
 
     @classmethod
     def modifyConfig(cls, test_path, i):
@@ -754,14 +758,6 @@ class Test(TestFunctions):
             self.delay_event,
             self.test_coin_b,
             100,
-            self.port_node_1,
-            self.port_node_0,
-            True,
-        )
-        prepare_balance(
-            self.delay_event,
-            self.test_coin_xmr,
-            100,
             self.port_node_0,
             self.port_node_1,
             True,
@@ -788,7 +784,7 @@ class Test(TestFunctions):
             True,
         )
         self.do_test_03_follower_recover_a_lock_tx(
-            self.test_coin_b, self.test_coin_xmr, self.port_node_1, self.port_node_0
+            self.test_coin_b, self.test_coin_xmr, self.port_node_0, self.port_node_1
         )
 
     def test_03_b_follower_recover_a_lock_tx_reverse(self):

@@ -236,11 +236,17 @@ def wait_for_bid(
                     )
                 if isinstance(state, (list, tuple)):
                     if bid[5] in state:
+                        swap_client.log.debug(
+                            f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                        )
                         return
                     else:
                         continue
                 elif state is not None and state != bid[5]:
                     continue
+                swap_client.log.debug(
+                    f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                )
                 return
             else:
                 if i > 0 and i % 10 == 0:

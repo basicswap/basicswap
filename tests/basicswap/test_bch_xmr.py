@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -167,6 +167,7 @@ class TestBCH(BasicSwapTest):
 
     @classmethod
     def prepareExtraCoins(cls):
+        super().prepareExtraCoins()
         cls.bch_addr = callnoderpc(
             0,
             "getnewaddress",
@@ -197,11 +198,12 @@ class TestBCH(BasicSwapTest):
             "datadir": os.path.join(datadir, "bch_" + str(node_id)),
             "bindir": BITCOINCASH_BINDIR,
             "use_segwit": False,
+            "wallet_name": "bsx_wallet",
         }
 
     @classmethod
     def coins_loop(cls):
-        super(TestBCH, cls).coins_loop()
+        super().coins_loop()
         ci0 = cls.swap_clients[0].ci(cls.test_coin)
         try:
             if cls.bch_addr is not None:
@@ -212,7 +214,7 @@ class TestBCH(BasicSwapTest):
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising Bitcoincash Test")
-        super(TestBCH, cls).tearDownClass()
+        super().tearDownClass()
 
         stopDaemons(cls.bch_daemons)
         cls.bch_daemons.clear()
@@ -224,19 +226,15 @@ class TestBCH(BasicSwapTest):
         return True
 
     def test_001_nested_segwit(self):
-        logging.info(
-            "---------- Test {} p2sh nested segwit".format(self.test_coin.name)
-        )
+        logging.info(f"---------- Test {self.test_coin.name} p2sh nested segwit")
         logging.info("Skipped")
 
     def test_002_native_segwit(self):
-        logging.info(
-            "---------- Test {} p2sh native segwit".format(self.test_coin.name)
-        )
+        logging.info(f"---------- Test {self.test_coin.name} p2sh native segwit")
         logging.info("Skipped")
 
     def test_003_cltv(self):
-        logging.info("---------- Test {} cltv".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} cltv")
 
         ci = self.swap_clients[0].ci(self.test_coin)
 
@@ -348,7 +346,7 @@ class TestBCH(BasicSwapTest):
         assert len(tx_wallet["blockhash"]) == 64
 
     def test_004_csv(self):
-        logging.info("---------- Test {} csv".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} csv")
 
         ci = self.swap_clients[0].ci(self.test_coin)
 
@@ -451,7 +449,7 @@ class TestBCH(BasicSwapTest):
         assert len(tx_wallet["blockhash"]) == 64
 
     def test_005_watchonly(self):
-        logging.info("---------- Test {} watchonly".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} watchonly")
         ci = self.swap_clients[0].ci(self.test_coin)
         ci1 = self.swap_clients[1].ci(self.test_coin)
 
@@ -482,7 +480,7 @@ class TestBCH(BasicSwapTest):
         super().test_006_getblock_verbosity()
 
     def test_007_hdwallet(self):
-        logging.info("---------- Test {} hdwallet".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} hdwallet")
 
         test_seed = "8e54a313e6df8918df6d758fafdbf127a115175fdd2238d0e908dd8093c9ac3b"
         test_wif = (
@@ -506,10 +504,10 @@ class TestBCH(BasicSwapTest):
         super().test_009_scantxoutset()
 
     def test_010_txn_size(self):
-        logging.info("---------- Test {} txn_size".format(Coins.BCH))
+        logging.info(f"---------- Test {self.test_coin.name} txn_size")
 
         swap_clients = self.swap_clients
-        ci = swap_clients[0].ci(Coins.BCH)
+        ci = swap_clients[0].ci(self.test_coin)
         pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
 
         amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
@@ -627,7 +625,7 @@ class TestBCH(BasicSwapTest):
 
     def test_011_p2sh(self):
         # Not used in bsx for native-segwit coins
-        logging.info("---------- Test {} p2sh".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} p2sh")
 
         ci = self.swap_clients[0].ci(self.test_coin)
 
@@ -717,7 +715,7 @@ class TestBCH(BasicSwapTest):
 
     def test_011_p2sh32(self):
         # Not used in bsx for native-segwit coins
-        logging.info("---------- Test {} p2sh32".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} p2sh32")
 
         ci = self.swap_clients[0].ci(self.test_coin)
 
@@ -806,7 +804,7 @@ class TestBCH(BasicSwapTest):
         assert len(tx_wallet["blockhash"]) == 64
 
     def test_012_p2sh_p2wsh(self):
-        logging.info("---------- Test {} p2sh-p2wsh".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} p2sh-p2wsh")
         logging.info("Skipped")
 
     def test_01_a_full_swap(self):
@@ -877,7 +875,7 @@ class TestBCH(BasicSwapTest):
 
     def test_06_preselect_inputs(self):
         tla_from = self.test_coin.name
-        logging.info("---------- Test {} Preselected inputs".format(tla_from))
+        logging.info(f"---------- Test {tla_from} Preselected inputs")
         logging.info("Skipped")
 
     def test_07_expire_stuck_accepted(self):

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,10 +10,10 @@ import traceback
 from basicswap.rpc import Jsonrpc
 
 
-def callrpc(rpc_port, auth, method, params=[], host="127.0.0.1"):
+def callrpc(rpc_port, auth, method, params=[], host="127.0.0.1", timeout=None):
     try:
         url = "http://{}@{}:{}/".format(auth, host, rpc_port)
-        x = Jsonrpc(url)
+        x = Jsonrpc(url, timeout=timeout if timeout else 10)
         x.__handler = None
         v = x.json_request(method, params)
         x.close()
@@ -41,7 +42,7 @@ def make_rpc_func(port, auth, host="127.0.0.1"):
     auth = auth
     host = host
 
-    def rpc_func(method, params=None):
-        return callrpc(port, auth, method, params, host)
+    def rpc_func(method, params=None, timeout=None):
+        return callrpc(port, auth, method, params, host, timeout=timeout)
 
     return rpc_func

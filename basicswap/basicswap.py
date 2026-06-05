@@ -7747,7 +7747,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.logBidEvent(
                             bid.bid_id,
                             EventLogTypes.DEBUG_TWEAK_APPLIED,
-                            "ind {}".format(bid.debug_ind),
+                            f"ind {bid.debug_ind}",
                             cursor,
                         )
                         self.commitDB()
@@ -7801,6 +7801,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         )
                         self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                         self.commitDB()
+
+                    if refund_tx.block_height is None:
+                        self.log.debug(
+                            f"A_LOCK_REFUND tx: {self.logIDT(refund_tx.txid)} block height not known, bid: {self.log.id(bid_id)}"
+                        )
+                        refund_tx_info = ci_from.getTxOutInfo(
+                            refund_tx.txid, refund_tx.vout
+                        )
+                        if refund_tx_info:
+                            refund_tx.block_hash = refund_tx_info["block_hash"]
+                            refund_tx.block_height = refund_tx_info["block_height"]
+                            refund_tx.block_time = refund_tx_info["block_time"]
+                            self.log.debug(
+                                f"Found A_LOCK_REFUND tx block height: {refund_tx.block_height}, time: {refund_tx.block_time}"
+                            )
+                            self.add(refund_tx, cursor, upsert=True)
+                            self.commitDB()
 
                     if (
                         TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns
@@ -7951,6 +7968,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             bid_id=bid_id,
                             tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
                             txid=bytes.fromhex(txid),
+                            vout=0,
                         )
                         self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                         self.commitDB()
@@ -7966,6 +7984,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                     bid_id=bid_id,
                                     tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
                                     txid=txid,
+                                    vout=0,
                                 )
                             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                             self.commitDB()
@@ -8346,14 +8365,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return rv
 
     def _isScriptRefundMature(self, ci, offer, refund_tx_bytes, parent_tx) -> bool:
-        refund_tx = ci.loadTx(refund_tx_bytes)
         if offer.lock_type in (TxLockTypes.ABS_LOCK_BLOCKS, TxLockTypes.ABS_LOCK_TIME):
-            return ci.isAbsLockTimeMature(refund_tx.nLockTime)
+            tx_locktime: int = ci.getTxLocktime(refund_tx_bytes)
+            return ci.isAbsLockTimeMature(tx_locktime)
         if parent_tx is None or parent_tx.block_height is None:
             return False
+        txi_sequence: int = ci.getTxInSequence(refund_tx_bytes, 0)
         return ci.isCsvLockMature(
             offer.lock_type,
-            refund_tx.vin[0].nSequence,
+            txi_sequence,
             parent_tx.block_height,
             parent_tx.block_time,
         )
@@ -8641,12 +8661,33 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         f"Error trying to submit initiate refund txn: {ex}"
                     )
 
-        if (
+        should_try_refund_ptx: bool = (
             bid.getPTxState() in (TxStates.TX_SENT, TxStates.TX_CONFIRMED)
             and bid.participate_txn_refund is not None
-            and self._isScriptRefundMature(
-                ci_to, offer, bid.participate_txn_refund, bid.participate_tx
+        )
+        if (
+            should_try_refund_ptx
+            and bid.participate_tx is not None
+            and bid.participate_tx.block_height is None
+        ):
+            self.log.debug(
+                f"PTX: {self.logIDT(bid.participate_tx.txid)} block height not known, bid: {self.log.id(bid_id)}"
             )
+            # An invalid ptx, won't be confirmed, check block height here
+            ptx_info = ci_to.getTxOutInfo(
+                bid.participate_tx.txid, bid.participate_tx.vout
+            )
+            if ptx_info:
+                bid.participate_tx.block_hash = ptx_info["block_hash"]
+                bid.participate_tx.block_height = ptx_info["block_height"]
+                bid.participate_tx.block_time = ptx_info["block_time"]
+                self.log.debug(
+                    f"Found PTX block height: {bid.participate_tx.block_height}, time: {bid.participate_tx.block_time}"
+                )
+                self.saveBid(bid_id, bid)
+
+        if should_try_refund_ptx and self._isScriptRefundMature(
+            ci_to, offer, bid.participate_txn_refund, bid.participate_tx
         ):
             try:
                 txid = ci_to.publishTx(bid.participate_txn_refund)
@@ -9021,6 +9062,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         bid_id=bid.bid_id,
                         tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
                         txid=xmr_swap.a_lock_refund_tx_id,
+                        vout=0,
                     )
             else:
                 self.setBidError(
@@ -9140,6 +9182,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if was_received:
                     if self.isBchXmrSwap(offer):
                         # Mercy tx is sent separately
+                        # Can't set XMR_SWAP_FAILED_SWIPED, as bid should continue looking for mercy tx
                         pass
                     else:
                         # Look for a mercy output
@@ -11218,7 +11261,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             refundExtraArgs = dict()
             lockExtraArgs = dict()
             if self.isBchXmrSwap(offer):
-                # perform check that both lock and refund transactions have their outs pointing to correct follower address
+                # Perform check that both lock and refund transactions have their outs pointing to correct follower address
                 # and prepare extra args for validation
 
                 bch_ci = self.ci(Coins.BCH)
@@ -14082,9 +14125,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             walletinfo = ci.getWalletInfo()
             rv = {
                 "deposit_address": self.getCachedAddressForCoin(coin),
-                "balance": ci.format_amount(walletinfo["balance"], conv_int=True),
+                "balance": ci.format_amount(walletinfo["balance"], conv_int=True, r=-1),
                 "unconfirmed": ci.format_amount(
-                    walletinfo["unconfirmed_balance"], conv_int=True
+                    walletinfo["unconfirmed_balance"], conv_int=True, r=-1
                 ),
                 "expected_seed": ci.knownWalletSeed(),
                 "encrypted": walletinfo["encrypted"],
@@ -14099,7 +14142,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             if "immature_balance" in walletinfo:
                 rv["immature"] = ci.format_amount(
-                    walletinfo["immature_balance"], conv_int=True
+                    walletinfo["immature_balance"], conv_int=True, r=-1
                 )
 
             if "locked_utxos" in walletinfo:

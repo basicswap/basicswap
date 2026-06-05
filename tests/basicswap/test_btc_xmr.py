@@ -74,6 +74,7 @@ class TestFunctions(BaseTest):
 
     @classmethod
     def prepareExtraCoins(cls):
+        # Save sent messages so tests can count them
         for sc in cls.swap_clients:
             sc._smsg_add_to_outbox = True
 
@@ -113,7 +114,7 @@ class TestFunctions(BaseTest):
         )
 
     def do_test_01_full_swap(self, coin_from: Coins, coin_to: Coins) -> None:
-        logging.info("---------- Test {} to {}".format(coin_from.name, coin_to.name))
+        logging.info(f"---------- Test {coin_from.name} to {coin_to.name}")
 
         # Offerer sends the offer
         # Bidder sends the bid
@@ -459,6 +460,12 @@ class TestFunctions(BaseTest):
             if with_mercy
             else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )
+
+        chain_a_coin = coin_to if reverse_bid else coin_from
+        if with_mercy is False and chain_a_coin == Coins.BCH:
+            # When using BCH, can't set XMR_SWAP_FAILED_SWIPED as should wait for mercy tx
+            expect_state = expect_state + (BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,)
+
         wait_for_bid(
             test_delay_event,
             swap_clients[id_leader],
@@ -920,7 +927,7 @@ class BasicSwapTest(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        super(BasicSwapTest, cls).setUpClass()
+        super().setUpClass()
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
@@ -2480,11 +2487,6 @@ class BasicSwapTest(TestFunctions):
     def test_09_expire_accepted_rev(self):
         self.do_test_09_expire_accepted(Coins.XMR, self.test_coin_from)
 
-    def test_10_presigned_txns(self):
-        raise RuntimeError(
-            "TODO"
-        )  # Build without xmr first for quicker test iterations
-
     def test_11_fee_validation(self):
         coin_from, coin_to = (self.test_coin_from, Coins.XMR)
         logging.info(
@@ -2822,7 +2824,7 @@ class TestBTC_PARTB(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        super(TestBTC_PARTB, cls).setUpClass()
+        super().setUpClass()
         if False:
             for client in cls.swap_clients:
                 client.log.safe_logs = True

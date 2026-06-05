@@ -209,7 +209,7 @@ class XmrSwapInterface(ProtocolInterface):
     )
 
     def genScriptLockTxScript(self, ci, Kal: bytes, Kaf: bytes, **kwargs) -> CScript:
-        # fallthrough to ci if genScriptLockTxScript is implemented there
+        # Fallthrough to ci if genScriptLockTxScript is implemented there
         if hasattr(ci, "genScriptLockTxScript") and callable(ci.genScriptLockTxScript):
             return ci.genScriptLockTxScript(ci, Kal, Kaf, **kwargs)
 
@@ -221,7 +221,12 @@ class XmrSwapInterface(ProtocolInterface):
     def getFundedInitiateTxTemplate(
         self, ci, amount: int, sub_fee: bool, feerate: int = None
     ) -> bytes:
-        addr_to = self.getMockScriptAddr(ci)
+        if ci.coin_type() == Coins.BCH:
+            # Workaround, BCH getScriptDest() uses OP_HASH256
+            script: bytes = self.getMockScript()
+            addr_to: bytes = ci.getScriptDest(script)
+        else:
+            addr_to = self.getMockScriptAddr(ci)
         funded_tx = ci.createRawFundedTransaction(
             addr_to, amount, sub_fee, lock_unspents=False, feerate=feerate
         )
@@ -247,8 +252,12 @@ class XmrSwapInterface(ProtocolInterface):
         return lock_vout
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
-        mock_txo_script = self.getMockScriptScriptPubkey(ci)
-        real_txo_script = ci.getScriptDest(script)
+        if ci.coin_type() == Coins.BCH:
+            mock_script: bytes = self.getMockScript()
+            mock_txo_script: bytes = ci.getScriptDest(mock_script)
+        else:
+            mock_txo_script: bytes = self.getMockScriptScriptPubkey(ci)
+        real_txo_script: bytes = ci.getScriptDest(script)
 
         found: int = 0
         ctx = ci.loadTx(mock_tx, allow_witness=False)
