@@ -104,7 +104,7 @@ def prepareDataDir(
         fp.write("debug=1\n")
         fp.write("debugexclude=libevent\n")
 
-        fp.write("fallbackfee=0.01\n")
+        fp.write("fallbackfee=0.0002\n")
         fp.write("acceptnonstdtxn=0\n")
 
         """

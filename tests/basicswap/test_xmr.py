@@ -815,7 +815,7 @@ class BaseTest(unittest.TestCase):
                         .pubkey_to_address(void_block_rewards_pubkey)
                     )
                     logging.info(
-                        "Mining %d Litecoin blocks to %s", num_blocks, cls.ltc_addr
+                        f"Mining {num_blocks} Litecoin blocks to {cls.ltc_addr}"
                     )
                     callnoderpc(
                         0,
@@ -942,6 +942,7 @@ class BaseTest(unittest.TestCase):
             )
             cls.coins_update_thread.start()
 
+            cls.prepareBalances()
         except Exception:
             traceback.print_exc()
             cls.tearDownClass()
@@ -997,6 +998,10 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def prepareExtraCoins(cls):
+        pass
+
+    @classmethod
+    def prepareBalances(cls):
         pass
 
     @classmethod

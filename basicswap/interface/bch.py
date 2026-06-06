@@ -147,7 +147,9 @@ class BCHInterface(BTCInterface):
 
         if not self.isAddressMine(address, or_watch_only=True):
             # Expects P2WSH nested in BIP16_P2SH
-            self.rpc("importaddress", [lock_tx_dest.hex(), "bid lock", False, True])
+            self.rpc_wallet(
+                "importaddress", [lock_tx_dest.hex(), "bid lock", False, True]
+            )
 
         return address
 
@@ -156,15 +158,23 @@ class BCHInterface(BTCInterface):
 
     def createRawFundedTransaction(
         self,
-        addr_to: str,
+        addr_to: str | bytes,
         amount: int,
         sub_fee: bool = False,
         lock_unspents: bool = True,
         feerate: int = None,
     ) -> str:
-        txn = self.rpc(
-            "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
-        )
+
+        if isinstance(addr_to, bytes):
+            # addr_to is script_pubkey
+            tx = CTransaction()
+            tx.nVersion = self.txVersion()
+            tx.vout.append(self.txoType()(amount, addr_to))
+            txn = tx.serialize_without_witness().hex()
+        else:
+            txn = self.rpc(
+                "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
+            )
 
         if feerate:
             fee_rate = self.format_amount(feerate)
@@ -228,6 +238,16 @@ class BCHInterface(BTCInterface):
         )
         return pay_fee
 
+    def getBLockTxo(
+        self,
+        chain_b_lock_txid: bytes,
+        lock_tx_vout: int,
+        script_pk: bytes,
+    ) -> (int, int):
+        txout = self.rpc("gettxout", [chain_b_lock_txid.hex(), lock_tx_vout, True])
+        actual_value = self.make_int(txout["value"])
+        return lock_tx_vout, actual_value
+
     def findTxnByHash(self, txid_hex: str):
         # Only works for wallet txns
         try:
@@ -282,7 +302,7 @@ class BCHInterface(BTCInterface):
                 found_vout = try_vout
                 break
             except Exception as e:  # noqa: F841
-                # self._log.warning('gettxout {}'.format(e))
+                # self._log.warning(f"gettxout {e}")
                 return None
 
         if found_vout is None:
@@ -295,7 +315,7 @@ class BCHInterface(BTCInterface):
 
         # TODO: Better way?
         if confirmations > 0:
-            block_height = self.getChainHeight() - confirmations
+            block_height = self.getChainHeight() - (confirmations - 1)
 
         rv = {
             "txid": txid.hex(),
@@ -516,6 +536,7 @@ class BCHInterface(BTCInterface):
         tx_lock = self.loadTx(tx_lock_bytes)
 
         output_script = self.getScriptDest(script_lock)
+
         locked_n = findOutput(tx_lock, output_script)
         ensure(locked_n is not None, "Output not found in tx")
         locked_coin = tx_lock.vout[locked_n].nValue
@@ -1134,7 +1155,7 @@ class BCHInterface(BTCInterface):
         refund_output_value = refund_swipe_tx.vout[0].nValue
         refund_output_script = refund_swipe_tx.vout[0].scriptPubKey
 
-        # mercy transaction size consisting of one input of freshly received funds,
+        # Mercy transaction size consisting of one input of freshly received funds,
         # one op_return with mercy information, a dust output to the leader and change back to the follower
         tx_size = 275
         dust_limit = 546

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2024 tecnovert
@@ -7,8 +6,13 @@
 # file LICENSE.txt or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import logging
+import os
 import urllib
 from urllib.request import urlopen
+
+PORT_OFS = int(os.getenv("PORT_OFS", 1))
+UI_PORT = 12700 + PORT_OFS
 
 REQUIRED_SETTINGS = {
     "blocks_confirmed": 1,
@@ -67,5 +71,17 @@ def waitForServer(delay_event, port, wait_for=40):
             _ = read_json_api(port)
             return
         except Exception as e:
-            print("waitForServer, error:", str(e))
+            logging.error(f"waitForServer: {e}")
     raise ValueError("waitForServer failed")
+
+
+def wait_for_offers(delay_event, node_id, num_offers, offer_id=None) -> None:
+    logging.info(f"Waiting for {num_offers} offers on node {node_id}")
+    for i in range(20):
+        delay_event.wait(1)
+        offers = read_json_api(
+            UI_PORT + node_id, "offers" if offer_id is None else f"offers/{offer_id}"
+        )
+        if len(offers) >= num_offers:
+            return
+    raise ValueError("wait_for_offers failed")

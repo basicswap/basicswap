@@ -74,6 +74,7 @@ class TestFunctions(BaseTest):
 
     @classmethod
     def prepareExtraCoins(cls):
+        # Save sent messages so tests can count them
         for sc in cls.swap_clients:
             sc._smsg_add_to_outbox = True
 
@@ -113,7 +114,7 @@ class TestFunctions(BaseTest):
         )
 
     def do_test_01_full_swap(self, coin_from: Coins, coin_to: Coins) -> None:
-        logging.info("---------- Test {} to {}".format(coin_from.name, coin_to.name))
+        logging.info(f"---------- Test {coin_from.name} to {coin_to.name}")
 
         # Offerer sends the offer
         # Bidder sends the bid
@@ -306,9 +307,7 @@ class TestFunctions(BaseTest):
         self, coin_from: Coins, coin_to: Coins, lock_value: int = 32
     ) -> None:
         logging.info(
-            "---------- Test {} to {} leader recovers coin a lock tx".format(
-                coin_from.name, coin_to.name
-            )
+            f"---------- Test {coin_from.name} to {coin_to.name} leader recovers coin a lock tx"
         )
 
         id_offerer: int = self.node_a_id
@@ -459,6 +458,12 @@ class TestFunctions(BaseTest):
             if with_mercy
             else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )
+
+        chain_a_coin = coin_to if reverse_bid else coin_from
+        if with_mercy is False and chain_a_coin == Coins.BCH:
+            # When using BCH, can't set XMR_SWAP_FAILED_SWIPED as should wait for mercy tx
+            expect_state = expect_state + (BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,)
+
         wait_for_bid(
             test_delay_event,
             swap_clients[id_leader],
@@ -492,12 +497,12 @@ class TestFunctions(BaseTest):
             # Test manually redeeming the no-script lock tx
             offerer_key = read_json_api(
                 1800 + id_offerer,
-                "bids/{}".format(bid_id.hex()),
+                f"bids/{bid_id.hex()}",
                 {"chainbkeysplit": True},
             )["splitkey"]
             data = {"spendchainblocktx": True, "remote_key": offerer_key}
             redeemed_txid = read_json_api(
-                1800 + id_bidder, "bids/{}".format(bid_id.hex()), data
+                1800 + id_bidder, f"bids/{bid_id.hex()}", data
             )["txid"]
             assert len(redeemed_txid) == 64
 
@@ -505,9 +510,7 @@ class TestFunctions(BaseTest):
         self, coin_from, coin_to, lock_value: int = 32
     ):
         logging.info(
-            "---------- Test {} to {} follower recovers coin b lock tx".format(
-                coin_from.name, coin_to.name
-            )
+            f"---------- Test {coin_from.name} to {coin_to.name} follower recovers coin b lock tx"
         )
 
         id_offerer: int = self.node_a_id
@@ -920,7 +923,7 @@ class BasicSwapTest(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        super(BasicSwapTest, cls).setUpClass()
+        super().setUpClass()
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
@@ -2480,11 +2483,6 @@ class BasicSwapTest(TestFunctions):
     def test_09_expire_accepted_rev(self):
         self.do_test_09_expire_accepted(Coins.XMR, self.test_coin_from)
 
-    def test_10_presigned_txns(self):
-        raise RuntimeError(
-            "TODO"
-        )  # Build without xmr first for quicker test iterations
-
     def test_11_fee_validation(self):
         coin_from, coin_to = (self.test_coin_from, Coins.XMR)
         logging.info(
@@ -2822,7 +2820,7 @@ class TestBTC_PARTB(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        super(TestBTC_PARTB, cls).setUpClass()
+        super().setUpClass()
         if False:
             for client in cls.swap_clients:
                 client.log.safe_logs = True

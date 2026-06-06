@@ -50,11 +50,11 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
     try:
         use_cursor = self.openDB(cursor)
         bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
         offer, xmr_offer = self.getXmrOfferFromSession(use_cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         # The no-script coin is always the follower
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -106,7 +106,10 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
             address_to = self.getReceiveAddressFromPool(
                 base_coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_SPEND, use_cursor
             )
-        amount = bid.amount_to
+        amount: int = bid.amount_to
+        chain_b_fee_rate: int = (
+            xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
+        )
         lock_tx_vout = bid.getLockTXBVout()
         txid = ci_follower.spendBLockTx(
             xmr_swap.b_lock_tx_id,
@@ -114,7 +117,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
             xmr_swap.vkbv,
             vkbs,
             amount,
-            xmr_offer.b_fee_rate,
+            chain_b_fee_rate,
             bid.chain_b_height_start,
             spend_actual_balance=True,
             lock_tx_vout=lock_tx_vout,
@@ -209,7 +212,7 @@ class XmrSwapInterface(ProtocolInterface):
     )
 
     def genScriptLockTxScript(self, ci, Kal: bytes, Kaf: bytes, **kwargs) -> CScript:
-        # fallthrough to ci if genScriptLockTxScript is implemented there
+        # Fallthrough to ci if genScriptLockTxScript is implemented there
         if hasattr(ci, "genScriptLockTxScript") and callable(ci.genScriptLockTxScript):
             return ci.genScriptLockTxScript(ci, Kal, Kaf, **kwargs)
 
@@ -221,7 +224,12 @@ class XmrSwapInterface(ProtocolInterface):
     def getFundedInitiateTxTemplate(
         self, ci, amount: int, sub_fee: bool, feerate: int = None
     ) -> bytes:
-        addr_to = self.getMockScriptAddr(ci)
+        if ci.coin_type() == Coins.BCH:
+            # Workaround, BCH getScriptDest() uses OP_HASH256
+            script: bytes = self.getMockScript()
+            addr_to: bytes = ci.getScriptDest(script)
+        else:
+            addr_to = self.getMockScriptAddr(ci)
         funded_tx = ci.createRawFundedTransaction(
             addr_to, amount, sub_fee, lock_unspents=False, feerate=feerate
         )
@@ -247,8 +255,12 @@ class XmrSwapInterface(ProtocolInterface):
         return lock_vout
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
-        mock_txo_script = self.getMockScriptScriptPubkey(ci)
-        real_txo_script = ci.getScriptDest(script)
+        if ci.coin_type() == Coins.BCH:
+            mock_script: bytes = self.getMockScript()
+            mock_txo_script: bytes = ci.getScriptDest(mock_script)
+        else:
+            mock_txo_script: bytes = self.getMockScriptScriptPubkey(ci)
+        real_txo_script: bytes = ci.getScriptDest(script)
 
         found: int = 0
         ctx = ci.loadTx(mock_tx, allow_witness=False)

@@ -22,6 +22,7 @@
     - Fixed feerate from other chain displayed for reversed swaps.
     - Added warning text for fee above 1.2 x local estimate.
     - Added subfee bid option.
+- Increase DCR fee estimate by 1 byte.
 
 
 0.14.5

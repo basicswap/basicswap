@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
@@ -163,7 +162,7 @@ def prepare_balance(
         post_json["type_to"] = type_to
     json_rv = read_json_api(
         port_take_from_node,
-        "wallets/{}/withdraw".format(coin_ticker.lower()),
+        f"wallets/{coin_ticker.lower()}/withdraw",
         post_json,
     )
     assert len(json_rv["txid"]) == 64
@@ -236,11 +235,17 @@ def wait_for_bid(
                     )
                 if isinstance(state, (list, tuple)):
                     if bid[5] in state:
+                        swap_client.log.debug(
+                            f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                        )
                         return
                     else:
                         continue
                 elif state is not None and state != bid[5]:
                     continue
+                swap_client.log.debug(
+                    f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                )
                 return
             else:
                 if i > 0 and i % 10 == 0:

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
@@ -13,7 +12,7 @@ import logging
 import random
 import traceback
 
-from typing import List
+from typing import List, Optional
 
 from basicswap.basicswap_util import getVoutByScriptPubKey, TxLockTypes
 from basicswap.chainparams import Coins
@@ -419,8 +418,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         return bci
 
+    def getBlockHeader(self, block_hash: str) -> dict:
+        return self.rpc("getblockheader", [block_hash])
+
     def getWalletInfo(self):
-        rv = {}
         rv = self.rpc_wallet("getinfo")
         wi = self.rpc_wallet("walletinfo")
         balances = self.rpc_wallet("getbalance")
@@ -595,7 +596,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         override_feerate = chain_client_settings.get("override_feerate", None)
         if override_feerate:
             self._log.debug(
-                "Fee rate override used for %s: %f", self.coin_name(), override_feerate
+                f"Fee rate override used for {self.coin_name()}: {override_feerate}"
             )
             return override_feerate, "override_feerate"
 
@@ -919,7 +920,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 found_vout = try_vout
                 break
             except Exception as e:  # noqa: F841
-                # self._log.warning('gettxout {}'.format(e))
+                # self._log.warning(f"gettxout {e})
                 return None
 
         if found_vout is None:
@@ -932,7 +933,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         # TODO: Better way?
         if confirmations > 0:
-            block_height = self.getChainHeight() - confirmations
+            block_height = self.getChainHeight() - (confirmations - 1)
 
         rv = {
             "txid": txid.hex(),
@@ -998,6 +999,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script = self.getPubkeyHashDest(pkh)
         tx.vout.append(self.txoType()(output_value, script))
         return tx.serialize().hex()
+
+    def ensureFunds(self, amount: int) -> None:
+        if self.getSpendableBalance() < amount:
+            raise ValueError("Balance too low")
 
     def verifyRawTransaction(self, tx_hex: str, prevouts):
         inputs_valid: bool = True
@@ -1151,6 +1156,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
+        size += 1
         pay_fee = round(tx_fee_rate * size / 1000)
         tx.vout[0].value = locked_coin - pay_fee
 
@@ -1202,6 +1208,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
+        size += 1
         pay_fee = round(tx_fee_rate * size / 1000)
         tx.vout[0].value = locked_coin - pay_fee
 
@@ -1253,6 +1260,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             script_lock_refund
         )
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
+        size += 1
         pay_fee = round(tx_fee_rate * size / 1000)
         tx.vout[0].value = locked_coin - pay_fee
 
@@ -1337,6 +1345,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             assert fee_paid > 0
 
             size = len(tx.serialize()) + add_witness_bytes
+            size += 1
             fee_rate_paid = fee_paid * 1000 // size
 
             self._log.info(
@@ -1398,6 +1407,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(lock_tx_script)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
+        size += 1
         fee_rate_paid = fee_paid * 1000 // size
 
         self._log.info(
@@ -1470,6 +1480,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(prevout_script)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
+        size += 1
         fee_rate_paid = fee_paid * 1000 // size
 
         self._log.info(
@@ -1531,6 +1542,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             prevout_script
         )
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
+        size += 1
         fee_rate_paid = fee_paid * 1000 // size
 
         self._log.info(
@@ -1781,32 +1793,41 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         spend_actual_balance: bool = False,
         lock_tx_vout=None,
     ) -> bytes:
-        self._log.info("spendBLockTx %s:\n", chain_b_lock_txid.hex())
+        self._log.info(
+            f"spendBLockTx: {self._log.id(chain_b_lock_txid)} {lock_tx_vout}\n"
+        )
 
         Kbs = self.getPubkey(kbs)
         script_pk = self.getPkDest(Kbs)
 
         locked_n = None
         actual_value = None
-        wtx = self.rpc_wallet(
-            "gettransaction",
-            [
-                chain_b_lock_txid.hex(),
-            ],
-        )
-        lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
-        locked_n = findOutput(lock_tx, script_pk)
-        if locked_n is not None:
-            actual_value = lock_tx.vout[locked_n].value
-        else:
-            self._log.error(
-                f"spendBLockTx: Output not found in tx {chain_b_lock_txid.hex()}, "
-                f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
+        try:
+            wtx = self.rpc_wallet(
+                "gettransaction",
+                [
+                    chain_b_lock_txid.hex(),
+                ],
             )
-            for i, out in enumerate(lock_tx.vout):
-                self._log.debug(
-                    f"  vout[{i}]: value={out.value}, scriptPubKey={out.scriptPubKey.hex()}"
+            lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
+            locked_n = findOutput(lock_tx, script_pk)
+            if locked_n is not None:
+                actual_value = lock_tx.vout[locked_n].value
+            else:
+                self._log.error(
+                    f"spendBLockTx: Output not found in tx {self._log.id(chain_b_lock_txid)}, "
+                    f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
                 )
+                for i, out in enumerate(lock_tx.vout):
+                    self._log.debug(
+                        f"  vout[{i}]: value={out.value}, scriptPubKey={out.scriptPubKey.hex()}"
+                    )
+        except Exception as e:  # noqa: F841
+            txout = self.rpc(
+                "gettxout", [chain_b_lock_txid.hex(), lock_tx_vout, 0, True]
+            )
+            actual_value = self.make_int(txout["value"])
+            locked_n = lock_tx_vout
 
         if (
             locked_n is not None
@@ -1815,7 +1836,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ):
             self._log.warning(
                 f"spendBLockTx: Stored vout {lock_tx_vout} differs from actual vout {locked_n} "
-                f"for tx {chain_b_lock_txid.hex()}"
+                f"for tx {self._log.id(chain_b_lock_txid)}"
             )
 
         ensure(locked_n is not None, "Output not found in tx")
@@ -1851,14 +1872,14 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         try:
             txout = self.rpc("gettxout", [txid_hex, 0, 0, True])
         except Exception as e:  # noqa: F841
-            # self._log.warning('gettxout {}'.format(e))
+            # self._log.warning(f"gettxout {e}"))
             return None
 
         confirmations: int = (
             0 if "confirmations" not in txout else txout["confirmations"]
         )
         if confirmations >= self.blocks_confirmed:
-            block_height = self.getChainHeight() - confirmations  # TODO: Better way?
+            block_height = self.getChainHeight() - (confirmations - 1)
             return {"txid": txid_hex, "amount": 0, "height": block_height}
         return None
 
@@ -1873,3 +1894,101 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
     def isTxNonFinalError(self, err_str: str) -> bool:
         return "locks on inputs not met" in err_str
+
+    def getChainMedianTime(self) -> int:
+        bestblockhash = self.rpc("getbestblockhash")
+        bestblockheader = self.rpc(
+            "getblockheader",
+            [
+                bestblockhash,
+            ],
+        )
+        return bestblockheader["mediantime"]
+
+    def getTxLocktime(self, tx_data: bytes) -> int:
+        tx_obj = self.loadTx(tx_data)
+        return tx_obj.locktime
+
+    def getTxInSequence(self, tx_data: bytes, vout: int) -> int:
+        tx_obj = self.loadTx(tx_data)
+        return tx_obj.vin[vout].sequence
+
+    def isCsvLockMature(
+        self,
+        lock_type: int,
+        encoded_sequence: int,
+        parent_block_height: Optional[int],
+        parent_block_time: Optional[int],
+        chain_height: Optional[int] = None,
+        chain_mtp: Optional[int] = None,
+    ) -> bool:
+        if parent_block_height is None or parent_block_height < 1:
+            return False
+        lock_value: int = self.decodeSequence(encoded_sequence)
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
+            if chain_height is None:
+                chain_height = self.getChainHeight()
+            return chain_height + 1 >= parent_block_height + lock_value
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            if parent_block_time is None or parent_block_time < 1:
+                return False
+            if chain_mtp is None:
+                chain_mtp = self.getChainMedianTime()
+            return chain_mtp >= parent_block_time + lock_value
+        raise ValueError(f"Unknown lock type {lock_type}")
+
+    def isAbsLockTimeMature(
+        self,
+        nlocktime: int,
+        chain_height: Optional[int] = None,
+        chain_mtp: Optional[int] = None,
+    ) -> bool:
+        if nlocktime == 0:
+            return True
+        if nlocktime < 500000000:
+            if chain_height is None:
+                chain_height = self.getChainHeight()
+            return chain_height + 1 >= nlocktime
+        if chain_mtp is None:
+            chain_mtp = self.getChainMedianTime()
+        return chain_mtp >= nlocktime
+
+    def getTxOutInfo(
+        self, txid: bytes, n: int, include_mempool: bool = False
+    ) -> dict():
+        try:
+            txout = self.rpc("gettxout", [txid.hex(), n, 0, include_mempool])
+            confirmations: int = (
+                0 if "confirmations" not in txout else txout["confirmations"]
+            )
+            if confirmations < 1:
+                return None
+            chain_tip_height: int = 0
+            if "bestblock" in txout:
+                bestheader_info = self.getBlockHeader(txout["bestblock"])
+                chain_tip_height = bestheader_info["height"]
+            else:
+                chain_tip_height = self.getChainHeight()
+
+            if confirmations == 1:
+                header_info = bestheader_info
+            else:
+                block_height: int = chain_tip_height - (confirmations - 1)
+                header_info = self.getBlockHeaderFromHeight(block_height)
+
+            block_hash: bytes = bytes.fromhex(header_info["hash"])
+            return {
+                "block_hash": block_hash,
+                "block_height": header_info["height"],
+                "block_time": header_info["time"],
+            }
+
+        except Exception as e:  # noqa: F841
+            # self._log.warning(f"gettxout {e}")
+            return None
+
+    def is_transient_error(self, ex) -> bool:
+        str_error: str = str(ex).lower()
+        if "no information for transaction" in str_error:
+            return True
+        return super().is_transient_error(ex)

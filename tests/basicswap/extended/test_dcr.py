@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -73,24 +73,6 @@ def make_rpc_func(node_id, base_rpc_port):
         return callrpc(base_rpc_port + node_id, auth, method, params)
 
     return rpc_func
-
-
-def wait_for_dcr_height(http_port, num_blocks=3):
-    logging.info("Waiting for DCR chain height %d", num_blocks)
-    for i in range(60):
-        if test_delay_event.is_set():
-            raise ValueError("Test stopped.")
-        try:
-            wallet = read_json_api(http_port, "wallets/dcr")
-            decred_blocks = wallet["blocks"]
-            print("decred_blocks", decred_blocks)
-            if decred_blocks >= num_blocks:
-                return
-        except Exception as e:
-            print("Error reading wallets", str(e))
-
-        test_delay_event.wait(1)
-    raise ValueError(f"wait_for_decred_blocks failed http_port: {http_port}")
 
 
 def run_test_success_path(self, coin_from: Coins, coin_to: Coins):
@@ -765,14 +747,14 @@ class Test(BaseTest):
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising Decred Test")
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
 
         stopDaemons(cls.dcr_daemons)
         cls.dcr_daemons.clear()
 
     @classmethod
     def coins_loop(cls):
-        super(Test, cls).coins_loop()
+        super().coins_loop()
         ci0 = cls.swap_clients[0].ci(cls.test_coin)
 
         num_passed: int = 0
@@ -878,15 +860,16 @@ class Test(BaseTest):
             "use_csv": True,
             "use_segwit": True,
             "blocks_confirmed": 1,
+            "min_relay_fee": 0.00001,
         }
 
     def test_0001_decred_address(self):
-        logging.info("---------- Test {}".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name}")
 
         coin_settings = {"rpcport": 0, "rpcauth": "none"}
         coin_settings.update(REQUIRED_SETTINGS)
 
-        ci = DCRInterface(coin_settings, "mainnet")
+        ci = DCRInterface(coin_settings, "mainnet", self.swap_clients[0])
 
         k = ci.getNewRandomKey()
         K = ci.getPubkey(k)
@@ -914,7 +897,7 @@ class Test(BaseTest):
                 assert hash160(masterpubkey_data) == seed_hash
 
     def test_001_segwit(self):
-        logging.info("---------- Test {} segwit".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} segwit")
 
         swap_clients = self.swap_clients
         ci0 = swap_clients[0].ci(self.test_coin)
@@ -972,7 +955,7 @@ class Test(BaseTest):
         assert f_decoded["txid"] == ctx.TxHash().hex()
 
     def test_003_signature_hash(self):
-        logging.info("---------- Test {} signature_hash".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} signature_hash")
         # Test that signing a transaction manually produces the same result when signed with the wallet
 
         swap_clients = self.swap_clients
@@ -1047,7 +1030,7 @@ class Test(BaseTest):
         assert len(sent_txid) == 64
 
     def test_004_csv(self):
-        logging.info("---------- Test {} csv".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} csv")
         swap_clients = self.swap_clients
         ci0 = swap_clients[0].ci(self.test_coin)
 
@@ -1161,7 +1144,7 @@ class Test(BaseTest):
         assert sent_spend_txid is not None
 
     def test_005_watchonly(self):
-        logging.info("---------- Test {} watchonly".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} watchonly")
 
         swap_clients = self.swap_clients
         ci0 = swap_clients[0].ci(self.test_coin)
@@ -1261,7 +1244,7 @@ class Test(BaseTest):
         assert found_txid is not None
 
     def test_008_gettxout(self):
-        logging.info("---------- Test {} gettxout".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} gettxout")
 
         ci0 = self.swap_clients[0].ci(self.test_coin)
 
@@ -1373,7 +1356,7 @@ class Test(BaseTest):
         assert amount_proved >= require_amount
 
     def test_009_wallet_encryption(self):
-        logging.info("---------- Test {} wallet encryption".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} wallet encryption")
 
         for coin in ("part", "dcr", "xmr"):
             jsw = read_json_api(1800, f"wallets/{coin}")
@@ -1412,7 +1395,7 @@ class Test(BaseTest):
             assert jsw["locked"] is False
 
     def test_010_txn_size(self):
-        logging.info("---------- Test {} txn size".format(self.test_coin.name))
+        logging.info(f"---------- Test {self.test_coin.name} txn size")
 
         swap_clients = self.swap_clients
         ci = swap_clients[0].ci(self.test_coin)

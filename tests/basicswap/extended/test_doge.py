@@ -179,6 +179,7 @@ class Test(TestFunctions):
 
     @classmethod
     def prepareExtraCoins(cls):
+        super().prepareExtraCoins()
         if cls.restore_instance:
             void_block_rewards_pubkey = cls.getRandomPubkey()
             cls.doge_addr = (
@@ -232,7 +233,7 @@ class Test(TestFunctions):
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising DOGE Test")
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
 
         stopDaemons(cls.doge_daemons)
         cls.doge_daemons.clear()
@@ -251,11 +252,12 @@ class Test(TestFunctions):
             "use_segwit": False,
             "blocks_confirmed": 1,
             "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
+            "wallet_name": "bsx_wallet",
         }
 
     @classmethod
     def coins_loop(cls):
-        super(Test, cls).coins_loop()
+        super().coins_loop()
         if cls.pause_chain:
             return
         ci0 = cls.swap_clients[0].ci(cls.test_coin)

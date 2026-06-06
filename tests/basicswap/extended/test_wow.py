@@ -5,9 +5,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import time
 import logging
 import os
+import time
 
 from basicswap.basicswap import (
     Coins,
@@ -120,14 +120,14 @@ class Test(BaseTest):
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising Wownero Test")
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
 
         stopDaemons(cls.wow_daemons)
         cls.wow_daemons.clear()
 
     @classmethod
     def coins_loop(cls):
-        super(Test, cls).coins_loop()
+        super().coins_loop()
 
         if cls.wow_addr is not None:
             callrpc_xmr(
@@ -162,7 +162,7 @@ class Test(BaseTest):
             startXmrWalletDaemon(node_dir, WOW_BINDIR, WOW_WALLET_RPC, opts=opts)
         )
 
-        cls.wow_wallet_auth.append(("test{0}".format(i), "test_pass{0}".format(i)))
+        cls.wow_wallet_auth.append((f"test{i}", f"test_pass{i}"))
 
         waitForWOWNode(i, auth=cls.wow_wallet_auth[i])
 

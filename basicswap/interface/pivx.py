@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022 tecnovert
@@ -171,3 +170,13 @@ class PIVXInterface(BTCInterface):
             block_height = self.getBlockHeader(rv["blockhash"])["height"]
             return {"txid": txid_hex, "amount": 0, "height": block_height}
         return None
+
+    def getChainMedianTime(self) -> int:
+        bestblockhash = self.rpc("getbestblockhash")
+        bestblockheader = self.rpc(
+            "getblockheader",
+            [
+                bestblockhash,
+            ],
+        )
+        return bestblockheader["mediantime"]
