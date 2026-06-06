@@ -161,6 +161,8 @@ class TxTypes(IntEnum):
 
     BCH_MERCY = auto()
 
+    PTX_PRE_FUNDED = auto()
+
 
 class ActionTypes(IntEnum):
     ACCEPT_BID = auto()

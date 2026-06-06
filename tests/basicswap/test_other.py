@@ -156,7 +156,7 @@ class Test(unittest.TestCase):
             assert str(e) == "Mantissa too long"
         validate_amount("0.12345678")
 
-        # floor
+        # Floor
         assert make_int("0.123456789", r=-1) == 12345678
         # Round up
         assert make_int("0.123456789", r=1) == 12345679

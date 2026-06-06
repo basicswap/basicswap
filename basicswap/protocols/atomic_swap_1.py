@@ -138,10 +138,12 @@ def redeemITx(self, bid_id: bytes, cursor):
 class AtomicSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.SELLER_FIRST
 
-    def getFundedInitiateTxTemplate(self, ci, amount: int, sub_fee: bool) -> bytes:
-        addr_to = self.getMockAddrTo(ci)
+    def getFundedInitiateTxTemplate(
+        self, ci, amount: int, sub_fee: bool, feerate: int = None
+    ) -> bytes:
+        addr_to = self.getMockScriptAddr(ci)
         funded_tx = ci.createRawFundedTransaction(
-            addr_to, amount, sub_fee, lock_unspents=False
+            addr_to, amount, sub_fee, lock_unspents=False, feerate=feerate
         )
 
         return bytes.fromhex(funded_tx)

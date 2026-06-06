@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2022-2024 tecnovert
+# Copyright (c) 2022-2026 tecnovert
 # Copyright (c) 2024 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
@@ -8,6 +8,7 @@
 import traceback
 import time
 
+from typing import List
 from urllib import parse
 from .util import (
     getCoinType,
@@ -184,14 +185,14 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         parsed_data["swap_type"] = page_data["swap_type"]
         swap_type = swap_type_from_string(parsed_data["swap_type"])
     elif (
-        parsed_data["coin_from"] in swap_client.adaptor_swap_only_coins
-        or parsed_data["coin_to"] in swap_client.adaptor_swap_only_coins
+        parsed_data["coin_from"] in swap_client.coins_without_segwit
+        and parsed_data["coin_to"] in swap_client.coins_without_segwit
     ):
-        parsed_data["swap_type"] = strSwapType(SwapTypes.XMR_SWAP)
-        swap_type = SwapTypes.XMR_SWAP
-    else:
         parsed_data["swap_type"] = strSwapType(SwapTypes.SELLER_FIRST)
         swap_type = SwapTypes.SELLER_FIRST
+    else:
+        parsed_data["swap_type"] = strSwapType(SwapTypes.XMR_SWAP)
+        swap_type = SwapTypes.XMR_SWAP
 
     if swap_type == SwapTypes.XMR_SWAP:
         page_data["swap_style"] = "xmr"
@@ -499,7 +500,7 @@ def page_newoffer(self, url_split, post_string):
         "debug_ui": swap_client.debug_ui,
         "automation_strat_id": -1,
         "amt_bid_min": format_amount(1, 3),
-        "swap_type": strSwapType(SwapTypes.SELLER_FIRST),
+        "swap_type": strSwapType(SwapTypes.XMR_SWAP),
     }
 
     post_data = parse.parse_qs(post_string)
@@ -583,7 +584,7 @@ def page_newoffer(self, url_split, post_string):
     )
 
 
-def page_offer(self, url_split, post_string):
+def page_offer(self, url_split: List[str], post_string: str) -> bytes:
     ensure(len(url_split) > 2, "Offer ID not specified")
     offer_id = decode_offer_id(url_split[2])
     server = self.server
@@ -673,6 +674,11 @@ def page_offer(self, url_split, post_string):
                 else:
                     amount_from = offer.amount_from
                 debugind = int(get_data_entry_or(form_data, "debugind", -1))
+
+                if have_data_entry(form_data, "subfee_bid"):
+                    extra_options["prefunded_tx"] = bytes.fromhex(
+                        get_data_entry(form_data, "prefunded_bid_tx")
+                    )
 
                 sent_bid_id = swap_client.postBid(
                     offer_id,
@@ -823,6 +829,33 @@ def page_offer(self, url_split, post_string):
         )
     data["amt_swapped"] = ci_from.format_amount(amt_swapped)
 
+    if show_bid_form:
+        coin_to_id = int(ci_to.coin_type())
+        wallet_coin_to_id = coin_to_id
+        if coin_to_id in (Coins.PART_ANON, Coins.PART_BLIND):
+            wallet_coin_to_id = Coins.PART
+
+        swap_client.updateWalletsInfo(only_coin=wallet_coin_to_id)
+        coin_to_wallet = swap_client.getCachedWalletsInfo(
+            {"coin_id": wallet_coin_to_id}
+        )[wallet_coin_to_id]
+        if coin_to_id == Coins.PART_ANON:
+            balance_key = "anon_balance"
+        elif coin_to_id == Coins.PART_BLIND:
+            balance_key = "blind_balance"
+        else:
+            balance_key = "balance"
+        data["coin_to_balance"] = coin_to_wallet[balance_key]
+
+        bid_can_subfee: bool = True
+        if offer.swap_type != SwapTypes.XMR_SWAP:
+            bid_can_subfee = False
+        if coin_to_id in (Coins.XMR, Coins.WOW):
+            bid_can_subfee = False
+        if offer.amount_negotiable is False:
+            bid_can_subfee = False
+        data["bid_can_subfee"] = bid_can_subfee
+
     template = server.env.get_template("offer.html")
     return self.render_template(
         template,
@@ -841,7 +874,9 @@ def page_offer(self, url_split, post_string):
     )
 
 
-def format_timestamp(timestamp, with_ago=True, is_expired=False):
+def format_timestamp(
+    timestamp: int, with_ago: bool = True, is_expired: bool = False
+) -> str:
     current_time = int(time.time())
 
     if is_expired:

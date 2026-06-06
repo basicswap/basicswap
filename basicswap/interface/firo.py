@@ -305,11 +305,16 @@ class FIROInterface(BTCInterface):
         amount: int,
         sub_fee: bool = False,
         lock_unspents: bool = True,
+        feerate: int = None,
     ) -> str:
         txn = self.rpc(
             "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
         )
-        fee_rate, fee_src = self.get_fee_rate(self._conf_target)
+        if feerate:
+            fee_rate = self.format_amount(feerate)
+            fee_src = "specified"
+        else:
+            fee_rate, fee_src = self.get_fee_rate(self._conf_target)
         self._log.debug(
             f"Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}"
         )

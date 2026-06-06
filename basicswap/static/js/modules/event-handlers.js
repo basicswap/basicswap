@@ -183,6 +183,55 @@
       }
     },
 
+    setBidAmount: function(percent, inputId) {
+      const amountInput = window.DOMCache
+        ? window.DOMCache.get(inputId)
+        : document.getElementById(inputId);
+
+      if (!amountInput) {
+        console.error('EventHandlers: Bid amount input not found:', inputId);
+        return;
+      }
+
+      const haveBalance = amountInput.getAttribute('haveamount');
+      if (!haveBalance) {
+        console.error('EventHandlers: Balance not found for bid');
+        return;
+      }
+      const floatBalance = parseFloat(haveBalance);
+      if (isNaN(floatBalance)) {
+        alert('Invalid bid balance');
+        return;
+      }
+
+      const maxAmount = amountInput.getAttribute('max');
+      if (!maxAmount) {
+        console.error('EventHandlers: Max amount not found for bid');
+        return;
+      }
+      const floatMax = parseFloat(maxAmount);
+      if (isNaN(floatMax) || floatMax <= 0) {
+        alert('Invalid bid max amount');
+        return;
+      }
+
+      const coinExp = amountInput.getAttribute('exp');
+      if (!coinExp) {
+        console.error('EventHandlers: Coin exp not found for bid');
+        return;
+      }
+      let calculatedAmount = maxAmount * percent;
+      if (floatBalance < calculatedAmount) {
+        calculatedAmount = floatBalance;
+        const checkbox = document.getElementById('subfee_bid');
+        if (checkbox) {
+          checkbox.checked = true;
+        }
+      }
+      amountInput.value = calculatedAmount.toFixed(coinExp);
+      window.updateBidParams('sending');
+    },
+
     hideConfirmModal: function() {
       const modal = document.getElementById('confirmModal');
       if (modal) {
@@ -192,7 +241,6 @@
     },
 
     lookup_rates: function() {
-
       if (window.lookup_rates && typeof window.lookup_rates === 'function') {
         window.lookup_rates();
       } else {
@@ -347,6 +395,16 @@
       });
 
       document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-set-bid-amount]');
+        if (target) {
+          e.preventDefault();
+          const percent = parseFloat(target.getAttribute('data-set-bid-amount'));
+          const inputId = target.getAttribute('data-input-id');
+          this.setBidAmount(percent, inputId);
+        }
+      });
+
+      document.addEventListener('click', (e) => {
         const target = e.target.closest('[data-reset-form]');
         if (target) {
           e.preventDefault();
@@ -419,6 +477,7 @@
   window.fillDonationAddress = EventHandlers.fillDonationAddress.bind(EventHandlers);
   window.setAmmAmount = EventHandlers.setAmmAmount.bind(EventHandlers);
   window.setOfferAmount = EventHandlers.setOfferAmount.bind(EventHandlers);
+  window.setBidAmount = EventHandlers.setBidAmount.bind(EventHandlers);
   window.resetForm = EventHandlers.resetForm.bind(EventHandlers);
   window.hideConfirmModal = EventHandlers.hideConfirmModal.bind(EventHandlers);
   window.toggleNotificationDropdown = EventHandlers.toggleNotificationDropdown.bind(EventHandlers);

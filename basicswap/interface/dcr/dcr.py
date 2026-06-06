@@ -856,12 +856,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         amount: int,
         sub_fee: bool = False,
         lock_unspents: bool = True,
+        feerate: int = None,
     ) -> str:
 
         # amount can't be a string, else: Failed to parse request: parameter #2 'amounts' must be type float64 (got string)
         float_amount = float(self.format_amount(amount))
         txn = self.rpc("createrawtransaction", [[], {addr_to: float_amount}])
-        fee_rate, fee_src = self.get_fee_rate(self._conf_target)
+        if feerate:
+            fee_rate = feerate
+            fee_src = "specified"
+        else:
+            fee_rate, fee_src = self.get_fee_rate(self._conf_target)
         self._log.debug(
             f"Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}"
         )
@@ -1071,7 +1076,9 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def decodeRawTransaction(self, tx_hex: str):
         return self.rpc("decoderawtransaction", [tx_hex])
 
-    def fundTx(self, tx: bytes, feerate) -> bytes:
+    def fundTx(
+        self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
+    ) -> bytes:
         feerate_str = float(self.format_amount(feerate))
         # TODO: unlock unspents if bid cancelled
         options = {

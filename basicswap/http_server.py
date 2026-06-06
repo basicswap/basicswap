@@ -213,7 +213,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         status_code=200,
         version=__version__,
         extra_headers=None,
-    ):
+    ) -> bytes:
         swap_client = self.server.swap_client
         if swap_client.ws_server:
             args_dict["ws_port"] = swap_client.ws_server.client_port
