@@ -192,6 +192,9 @@ class AdaptorSigInterface:
     def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [bytes(72), b"", bytes(len(script))]
 
+    def getLockRefundVout(self, lock_refund_tx_data: bytes, vbkv: bytes):
+        return 0
+
 
 class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
     def __init__(self, **kwargs):

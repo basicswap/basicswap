@@ -7964,11 +7964,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             "",
                             cursor,
                         )
+                        refund_vout: int = ci_from.getLockRefundVout(
+                            xmr_swap.a_lock_refund_tx, xmr_swap.vkbv
+                        )
                         bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
                             bid_id=bid_id,
                             tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
                             txid=bytes.fromhex(txid),
-                            vout=0,
+                            vout=refund_vout,
                         )
                         self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                         self.commitDB()
@@ -7980,11 +7983,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
                             txid = ci_from.getTxid(xmr_swap.a_lock_refund_tx)
                             if TxTypes.XMR_SWAP_A_LOCK_REFUND not in bid.txns:
+                                refund_vout: int = ci_from.getLockRefundVout(
+                                    xmr_swap.a_lock_refund_tx, xmr_swap.vkbv
+                                )
                                 bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
                                     bid_id=bid_id,
                                     tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
                                     txid=txid,
-                                    vout=0,
+                                    vout=refund_vout,
                                 )
                             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                             self.commitDB()
@@ -9058,11 +9064,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
                 if TxTypes.XMR_SWAP_A_LOCK_REFUND not in bid.txns:
+                    refund_vout: int = ci_from.getLockRefundVout(
+                        bytes.fromhex(spend_txn_hex), xmr_swap.vkbv
+                    )
                     bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND] = SwapTx(
                         bid_id=bid.bid_id,
                         tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND,
                         txid=xmr_swap.a_lock_refund_tx_id,
-                        vout=0,
+                        vout=refund_vout,
                     )
             else:
                 self.setBidError(

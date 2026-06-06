@@ -1299,6 +1299,17 @@ class PARTInterfaceBlind(PARTInterface):
             "fundrawtransactionfrom", ["blind", tx_hex, {}, outputs_info, options]
         )["hex"]
 
+    def getLockRefundVout(self, lock_refund_tx_data: bytes, vkbv: bytes):
+        lock_refund_tx_obj = self.rpc(
+            "decoderawtransaction", [lock_refund_tx_data.hex()]
+        )
+        # Nonce is derived from vkbv
+        nonce = self.getScriptLockRefundTxNonce(vkbv)
+
+        # Find the output of the lock refund tx to spend
+        spend_n, input_blinded_info = self.findOutputByNonce(lock_refund_tx_obj, nonce)
+        return spend_n
+
 
 class PARTInterfaceAnon(PARTInterface):
 
