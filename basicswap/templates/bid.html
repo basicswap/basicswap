@@ -647,7 +647,12 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   window.confirmPopup = function(action = 'Abandon') {
-    triggerElement = document.activeElement;
+    // Guard: overrideButtonConfirm sets triggerElement = this before calling here.
+    // e.preventDefault() in the click handler may prevent the button from becoming
+    // document.activeElement, so only fall back to activeElement if not already set.
+    if (!triggerElement) {
+      triggerElement = document.activeElement;
+    }
     const title = `Confirm ${action} Bid`;
     const showBidDetails = action.toLowerCase() === 'accept';
 
