@@ -942,6 +942,7 @@ class BaseTest(unittest.TestCase):
             )
             cls.coins_update_thread.start()
 
+            cls.prepareBalances()
         except Exception:
             traceback.print_exc()
             cls.tearDownClass()
@@ -997,6 +998,10 @@ class BaseTest(unittest.TestCase):
 
     @classmethod
     def prepareExtraCoins(cls):
+        pass
+
+    @classmethod
+    def prepareBalances(cls):
         pass
 
     @classmethod

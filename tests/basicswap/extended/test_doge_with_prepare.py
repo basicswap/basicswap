@@ -100,6 +100,7 @@ def prepare_balance(
 
 class DOGETest(BaseTestWithPrepare):
     __test__ = True
+
     def test_a(self):
         amount_from = 10.0
         offer_json = {

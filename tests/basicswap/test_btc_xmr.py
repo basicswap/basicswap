@@ -306,7 +306,9 @@ class TestFunctions(BaseTest):
     def do_test_02_leader_recover_a_lock_tx(
         self, coin_from: Coins, coin_to: Coins, lock_value: int = 32
     ) -> None:
-        logging.info(f"---------- Test {coin_from.name} to {coin_to.name} leader recovers coin a lock tx")
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} leader recovers coin a lock tx"
+        )
 
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
@@ -507,7 +509,9 @@ class TestFunctions(BaseTest):
     def do_test_04_follower_recover_b_lock_tx(
         self, coin_from, coin_to, lock_value: int = 32
     ):
-        logging.info(f"---------- Test {coin_from.name} to {coin_to.name} follower recovers coin b lock tx")
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} follower recovers coin b lock tx"
+        )
 
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id

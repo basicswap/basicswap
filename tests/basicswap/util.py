@@ -11,7 +11,6 @@ import os
 import urllib
 from urllib.request import urlopen
 
-
 PORT_OFS = int(os.getenv("PORT_OFS", 1))
 UI_PORT = 12700 + PORT_OFS
 
