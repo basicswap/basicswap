@@ -59,6 +59,8 @@ from tests.basicswap.util import (
     make_boolean,
     read_json_api,
     waitForServer,
+    PORT_OFS,
+    UI_PORT,
 )
 from tests.basicswap.common_xmr import (
     prepare_nodes,
@@ -72,9 +74,6 @@ import basicswap.bin.run as runSystem
 
 test_path = os.path.expanduser(os.getenv("TEST_PATH", "/tmp/test_persistent"))
 RESET_TEST = make_boolean(os.getenv("RESET_TEST", "true"))
-
-PORT_OFS = int(os.getenv("PORT_OFS", 1))
-UI_PORT = 12700 + PORT_OFS
 
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv("BITCOIN_RPC_PORT_BASE", BTC_BASE_RPC_PORT))

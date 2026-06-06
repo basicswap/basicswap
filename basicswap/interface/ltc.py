@@ -102,7 +102,7 @@ class LTCInterface(BTCInterface):
                 continue
             if "desc" in u:
                 desc = u["desc"]
-                if self.using_segwit:
+                if self.using_segwit():
                     if self.use_p2shp2wsh():
                         if not desc.startswith("sh(wpkh"):
                             continue

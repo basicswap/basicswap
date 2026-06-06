@@ -5552,8 +5552,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             use_cursor = self.openDB(cursor)
 
             bid, offer = self.getBidAndOffer(bid_id, use_cursor)
-            ensure(bid, "Bid not found")
-            ensure(offer, "Offer not found")
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
             # Ensure bid is still valid
             now: int = self.getTime()
@@ -6828,8 +6828,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             use_cursor = self.openDB(cursor)
             bid, offer = self.getBidAndOffer(bid_id, use_cursor, with_txns=False)
-            ensure(bid, "Bid not found")
-            ensure(offer, "Offer not found")
+            ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+            ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
             bid.setState(new_state)
             self.deactivateBid(use_cursor, offer, bid)
@@ -13018,8 +13018,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info(f"Route established for bid {self.log.id(bid_id)}")
 
         bid, offer = self.getBidAndOffer(bid_id, cursor)
-        ensure(bid, "Bid not found")
-        ensure(offer, "Offer not found")
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -15133,8 +15133,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         bid = self.getBid(bid_id)
-        if bid is None:
-            raise ValueError("Bid not found.")
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
 
         bid.debug_ind = debug_ind
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2024 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,7 +12,7 @@ mkdir -p ${TEST_PATH}/bin
 cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
 export TEST_COINS_LIST='bitcoin,dogecoin'
-python tests/basicswap/extended/test_doge.py
+python tests/basicswap/extended/test_doge_with_prepare.py
 
 """
 
@@ -27,11 +27,9 @@ from tests.basicswap.extended.test_xmr_persistent import (
     BaseTestWithPrepare,
     UI_PORT,
 )
-from tests.basicswap.extended.test_scripts import (
-    wait_for_offers,
-)
 from tests.basicswap.util import (
     read_json_api,
+    wait_for_offers,
 )
 
 logger = logging.getLogger()
@@ -50,11 +48,11 @@ def wait_for_bid(
 
         bid = read_json_api(UI_PORT + node_id, f"bids/{bid_id}")
 
-        if "state" not in bid:
+        if "bid_state" not in bid:
             continue
         if state is None:
             return
-        if bid["state"].lower() == state.lower():
+        if bid["bid_state"].lower() == state.lower():
             return
     raise ValueError("wait_for_bid failed")
 
@@ -101,8 +99,8 @@ def prepare_balance(
 
 
 class DOGETest(BaseTestWithPrepare):
+    __test__ = True
     def test_a(self):
-
         amount_from = 10.0
         offer_json = {
             "coin_from": "btc",
@@ -114,10 +112,8 @@ class DOGETest(BaseTestWithPrepare):
             "automation_strat_id": 1,
         }
         offer_id = read_json_api(UI_PORT + 0, "offers/new", offer_json)["offer_id"]
-        logging.debug(f"offer_id {offer_id}")
 
         prepare_balance(self.delay_event, 1, 0, "DOGE", 1000.0)
-
         wait_for_offers(self.delay_event, 1, 1, offer_id)
 
         post_json = {"offer_id": offer_id, "amount_from": amount_from}

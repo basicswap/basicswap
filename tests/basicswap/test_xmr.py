@@ -815,7 +815,7 @@ class BaseTest(unittest.TestCase):
                         .pubkey_to_address(void_block_rewards_pubkey)
                     )
                     logging.info(
-                        "Mining %d Litecoin blocks to %s", num_blocks, cls.ltc_addr
+                        f"Mining {num_blocks} Litecoin blocks to {cls.ltc_addr}"
                     )
                     callnoderpc(
                         0,

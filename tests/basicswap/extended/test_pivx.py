@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2022-2023 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -147,6 +147,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
 
         fp.write("acceptnonstdtxn=0\n")
         fp.write("minstakeinterval=5\n")
+        fp.write("stakethreadconddelayms=1000\n")
         fp.write("smsgsregtestadjust=0\n")
 
         for i in range(0, NUM_NODES):
@@ -293,7 +294,7 @@ class Test(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(Test, cls).setUpClass()
+        super().setUpClass()
 
         k = PrivateKey()
         cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret)
@@ -473,7 +474,7 @@ class Test(unittest.TestCase):
         cls.swap_clients.clear()
         cls.daemons.clear()
 
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
 
     def test_02_part_pivx(self):
         logging.info("---------- Test PART to PIVX")
@@ -500,7 +501,7 @@ class Test(unittest.TestCase):
         wait_for_in_progress(delay_event, swap_clients[1], bid_id, sent=True)
 
         wait_for_bid(
-            delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60
+            delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80
         )
         wait_for_bid(
             delay_event,
@@ -508,7 +509,7 @@ class Test(unittest.TestCase):
             bid_id,
             BidStates.SWAP_COMPLETED,
             sent=True,
-            wait_for=60,
+            wait_for=80,
         )
 
         js_0 = read_json_api(1800)
@@ -548,7 +549,7 @@ class Test(unittest.TestCase):
             wait_for=60,
         )
         wait_for_bid(
-            delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=60
+            delay_event, swap_clients[1], bid_id, BidStates.SWAP_COMPLETED, wait_for=80
         )
 
         js_0 = read_json_api(1800)
@@ -580,7 +581,7 @@ class Test(unittest.TestCase):
         wait_for_in_progress(delay_event, swap_clients[1], bid_id, sent=True)
 
         wait_for_bid(
-            delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=60
+            delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=80
         )
         wait_for_bid(
             delay_event,

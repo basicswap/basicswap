@@ -175,6 +175,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 "datadir": node_dir,
                 "bindir": cfg.PARTICL_BINDIR,
                 "blocks_confirmed": 2,  # Faster testing
+                "wallet_name": "bsx_wallet",
             },
             "dash": {
                 "connection_type": "rpc",
@@ -184,6 +185,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 "bindir": DASH_BINDIR,
                 "use_csv": True,
                 "use_segwit": False,
+                "wallet_name": "bsx_wallet",
             },
             "bitcoin": {
                 "connection_type": "rpc",
@@ -192,6 +194,7 @@ def prepareDir(datadir, nodeId, network_key, network_pubkey):
                 "datadir": btcdatadir,
                 "bindir": cfg.BITCOIN_BINDIR,
                 "use_segwit": True,
+                "wallet_name": "bsx_wallet",
             },
         },
         "check_progress_seconds": 2,
@@ -285,7 +288,7 @@ class Test(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        super(Test, cls).setUpClass()
+        super().setUpClass()
 
         k = PrivateKey()
         cls.network_key = toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret)
@@ -409,15 +412,15 @@ class Test(unittest.TestCase):
 
             waitForRPC(dashRpc, delay_event, rpc_command="getblockchaininfo")
             if len(dashRpc("listwallets")) < 1:
-                dashRpc("createwallet wbsx_wallet")
+                dashRpc("createwallet bsx_wallet")
 
             sc.start()
 
         waitForRPC(dashRpc, delay_event)
         num_blocks = 500
-        logging.info("Mining %d dash blocks", num_blocks)
+        logging.info(f"Mining {num_blocks} dash blocks")
         cls.dash_addr = dashRpc("getnewaddress mining_addr")
-        dashRpc("generatetoaddress {} {}".format(num_blocks, cls.dash_addr))
+        dashRpc(f"generatetoaddress {num_blocks} {cls.dash_addr}")
 
         ro = dashRpc("getblockchaininfo")
         try:
@@ -431,8 +434,8 @@ class Test(unittest.TestCase):
 
         waitForRPC(btcRpc, delay_event)
         cls.btc_addr = btcRpc("getnewaddress mining_addr bech32")
-        logging.info("Mining %d Bitcoin blocks to %s", num_blocks, cls.btc_addr)
-        btcRpc("generatetoaddress {} {}".format(num_blocks, cls.btc_addr))
+        logging.info(f"Mining {num_blocks} Bitcoin blocks to {cls.btc_addr}")
+        btcRpc(f"generatetoaddress {num_blocks} {cls.btc_addr}")
 
         ro = btcRpc("getblockchaininfo")
         checkForks(ro)
@@ -449,7 +452,7 @@ class Test(unittest.TestCase):
 
         # Wait for height, or sequencelock is thrown off by genesis blocktime
         num_blocks = 3
-        logging.info("Waiting for Particl chain height %d", num_blocks)
+        logging.info(f"Waiting for Particl chain height {num_blocks}")
         for i in range(60):
             particl_blocks = cls.swap_clients[0].callrpc("getblockcount")
             print("particl_blocks", particl_blocks)
@@ -473,7 +476,7 @@ class Test(unittest.TestCase):
         cls.swap_clients.clear()
         cls.daemons.clear()
 
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
 
     def test_02_part_dash(self):
         logging.info("---------- Test PART to DASH")
@@ -683,9 +686,9 @@ class Test(unittest.TestCase):
         offer_id = swap_clients[0].postOffer(
             Coins.DASH,
             Coins.BTC,
-            0.001 * COIN,
+            0.01 * COIN,
             1.0 * COIN,
-            0.001 * COIN,
+            0.01 * COIN,
             SwapTypes.SELLER_FIRST,
         )
 
@@ -709,7 +712,7 @@ class Test(unittest.TestCase):
             del swap_clients[0].getChainClientSettings(Coins.DASH)["override_feerate"]
 
     def test_08_wallet(self):
-        logging.info("---------- Test {} wallet".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} wallet")
 
         logging.info("Test withdrawal")
         addr = dashRpc('getnewaddress "Withdrawal test"')

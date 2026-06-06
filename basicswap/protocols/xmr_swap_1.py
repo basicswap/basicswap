@@ -50,11 +50,11 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
     try:
         use_cursor = self.openDB(cursor)
         bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
-        ensure(bid, "Bid not found: {}.".format(bid_id.hex()))
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid_id.hex()))
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
         offer, xmr_offer = self.getXmrOfferFromSession(use_cursor, bid.offer_id)
-        ensure(offer, "Offer not found: {}.".format(bid.offer_id.hex()))
-        ensure(xmr_offer, "Adaptor-sig offer not found: {}.".format(bid.offer_id.hex()))
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         # The no-script coin is always the follower
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
@@ -106,7 +106,10 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
             address_to = self.getReceiveAddressFromPool(
                 base_coin_to, bid_id, TxTypes.XMR_SWAP_B_LOCK_SPEND, use_cursor
             )
-        amount = bid.amount_to
+        amount: int = bid.amount_to
+        chain_b_fee_rate: int = (
+            xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
+        )
         lock_tx_vout = bid.getLockTXBVout()
         txid = ci_follower.spendBLockTx(
             xmr_swap.b_lock_tx_id,
@@ -114,7 +117,7 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
             xmr_swap.vkbv,
             vkbs,
             amount,
-            xmr_offer.b_fee_rate,
+            chain_b_fee_rate,
             bid.chain_b_height_start,
             spend_actual_balance=True,
             lock_tx_vout=lock_tx_vout,

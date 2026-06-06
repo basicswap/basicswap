@@ -3667,7 +3667,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 continue
             if "desc" in u:
                 desc = u["desc"]
-                if self.using_segwit:
+                if self.using_segwit():
                     if self.use_p2shp2wsh():
                         if not desc.startswith("sh(wpkh"):
                             continue
@@ -3828,7 +3828,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         ensure(
             sign_for_addr is not None,
-            "Could not find address with enough funds for proof",
+            f"Could not find {self.ticker()} address with enough funds for proof",
         )
 
         self._log.debug(f"sign_for_addr {sign_for_addr}")

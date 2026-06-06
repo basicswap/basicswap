@@ -747,14 +747,14 @@ class Test(BaseTest):
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising Decred Test")
-        super(Test, cls).tearDownClass()
+        super().tearDownClass()
 
         stopDaemons(cls.dcr_daemons)
         cls.dcr_daemons.clear()
 
     @classmethod
     def coins_loop(cls):
-        super(Test, cls).coins_loop()
+        super().coins_loop()
         ci0 = cls.swap_clients[0].ci(cls.test_coin)
 
         num_passed: int = 0

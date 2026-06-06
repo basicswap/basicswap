@@ -306,11 +306,7 @@ class TestFunctions(BaseTest):
     def do_test_02_leader_recover_a_lock_tx(
         self, coin_from: Coins, coin_to: Coins, lock_value: int = 32
     ) -> None:
-        logging.info(
-            "---------- Test {} to {} leader recovers coin a lock tx".format(
-                coin_from.name, coin_to.name
-            )
-        )
+        logging.info(f"---------- Test {coin_from.name} to {coin_to.name} leader recovers coin a lock tx")
 
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
@@ -499,23 +495,19 @@ class TestFunctions(BaseTest):
             # Test manually redeeming the no-script lock tx
             offerer_key = read_json_api(
                 1800 + id_offerer,
-                "bids/{}".format(bid_id.hex()),
+                f"bids/{bid_id.hex()}",
                 {"chainbkeysplit": True},
             )["splitkey"]
             data = {"spendchainblocktx": True, "remote_key": offerer_key}
             redeemed_txid = read_json_api(
-                1800 + id_bidder, "bids/{}".format(bid_id.hex()), data
+                1800 + id_bidder, f"bids/{bid_id.hex()}", data
             )["txid"]
             assert len(redeemed_txid) == 64
 
     def do_test_04_follower_recover_b_lock_tx(
         self, coin_from, coin_to, lock_value: int = 32
     ):
-        logging.info(
-            "---------- Test {} to {} follower recovers coin b lock tx".format(
-                coin_from.name, coin_to.name
-            )
-        )
+        logging.info(f"---------- Test {coin_from.name} to {coin_to.name} follower recovers coin b lock tx")
 
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2023-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,16 +36,14 @@ from tests.basicswap.common import (
 from tests.basicswap.util import (
     read_json_api,
     waitForServer,
+    wait_for_offers,
+    UI_PORT,
 )
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
-
-
-PORT_OFS = int(os.getenv("PORT_OFS", 1))
-UI_PORT = 12700 + PORT_OFS
 
 
 class HttpHandler(BaseHTTPRequestHandler):
@@ -129,18 +127,6 @@ def clear_offers(delay_event, node_id) -> None:
         if len(offers) == 0:
             return
     raise ValueError("clear_offers failed")
-
-
-def wait_for_offers(delay_event, node_id, num_offers, offer_id=None) -> None:
-    logging.info(f"Waiting for {num_offers} offers on node {node_id}")
-    for i in range(20):
-        delay_event.wait(1)
-        offers = read_json_api(
-            UI_PORT + node_id, "offers" if offer_id is None else f"offers/{offer_id}"
-        )
-        if len(offers) >= num_offers:
-            return
-    raise ValueError("wait_for_offers failed")
 
 
 def wait_for_bids(delay_event, node_id, num_bids, offer_id=None) -> None:

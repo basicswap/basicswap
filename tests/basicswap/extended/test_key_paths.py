@@ -29,6 +29,7 @@ import unittest
 from tests.basicswap.util import (
     read_json_api,
     waitForServer,
+    UI_PORT,
 )
 
 logger = logging.getLogger()
@@ -36,9 +37,6 @@ logger.level = logging.DEBUG
 if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
-
-PORT_OFS = int(os.getenv("PORT_OFS", 1))
-UI_PORT = 12700 + PORT_OFS
 
 ELECTRUM_PATH = os.getenv("ELECTRUM_PATH")
 ELECTRUM_DATADIR = os.getenv("ELECTRUM_DATADIR")
