@@ -261,7 +261,9 @@
 
       const validMins = validMinsInput ? validMinsInput.value : '60';
 
-      const addrFrom = addrFromSelect ? addrFromSelect.value : '';
+      const addrFrom = addrFromSelect && addrFromSelect.selectedIndex >= 0
+        ? addrFromSelect.options[addrFromSelect.selectedIndex].text
+        : '';
 
       const modalAmtReceive = document.getElementById('modal-amt-receive');
       const modalReceiveCurrency = document.getElementById('modal-receive-currency');
