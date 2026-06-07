@@ -221,8 +221,37 @@ class XmrSwapInterface(ProtocolInterface):
 
         return CScript([2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG)])
 
+    def getMockScriptAddr(self, ci):
+        script = self.getMockScript()
+        if ci.coin_type() == Coins.PART:
+            # Use btc-segwit address to match createSCLockTx()
+            # _use_segwit is false for Particl
+            return ci.encode_p2wsh(ci.getScriptDest(script))
+        return (
+            ci.encodeScriptDest(ci.getScriptDest(script))
+            if ci._use_segwit
+            else ci.encode_p2sh(script)
+        )
+
+    def getMockScriptScriptPubkey(self, ci) -> bytearray:
+        script = self.getMockScript()
+        if ci.coin_type() == Coins.PART:
+            # Use btc-segwit address to match createSCLockTx()
+            # _use_segwit is false for Particl
+            return ci.getScriptDest(script)
+        return (
+            ci.getScriptDest(script)
+            if ci._use_segwit
+            else ci.get_p2sh_script_pubkey(script)
+        )
+
     def getFundedInitiateTxTemplate(
-        self, ci, amount: int, sub_fee: bool, feerate: int = None
+        self,
+        ci,
+        amount: int,
+        sub_fee: bool,
+        feerate: int = None,
+        lock_unspents: bool = False,
     ) -> bytes:
         if ci.coin_type() == Coins.BCH:
             # Workaround, BCH getScriptDest() uses OP_HASH256
@@ -231,7 +260,7 @@ class XmrSwapInterface(ProtocolInterface):
         else:
             addr_to = self.getMockScriptAddr(ci)
         funded_tx = ci.createRawFundedTransaction(
-            addr_to, amount, sub_fee, lock_unspents=False, feerate=feerate
+            addr_to, amount, sub_fee, lock_unspents=lock_unspents, feerate=feerate
         )
         return bytes.fromhex(funded_tx)
 
@@ -275,7 +304,7 @@ class XmrSwapInterface(ProtocolInterface):
             raise ValueError("Too many mocked outputs found")
         ctx.nLockTime = 0
 
-        return ctx.serialize_without_witness()
+        return ctx.serialize()
 
     def getMockPubkey(self, ci) -> bytes:
         return ci.getPubkey(self._mock_key)
@@ -308,4 +337,4 @@ class XmrSwapInterface(ProtocolInterface):
             raise ValueError("swap output not found")
         tx_obj.vout[lock_vout].scriptPubKey = ci.getPkDest(Kbs)
 
-        return tx_obj.serialize_without_witness()
+        return tx_obj.serialize()

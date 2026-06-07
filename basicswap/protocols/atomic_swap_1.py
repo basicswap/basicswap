@@ -139,13 +139,17 @@ class AtomicSwapInterface(ProtocolInterface):
     swap_type = SwapTypes.SELLER_FIRST
 
     def getFundedInitiateTxTemplate(
-        self, ci, amount: int, sub_fee: bool, feerate: int = None
+        self,
+        ci,
+        amount: int,
+        sub_fee: bool,
+        feerate: int = None,
+        lock_unspents: bool = False,
     ) -> bytes:
         addr_to = self.getMockScriptAddr(ci)
         funded_tx = ci.createRawFundedTransaction(
-            addr_to, amount, sub_fee, lock_unspents=False, feerate=feerate
+            addr_to, amount, sub_fee, lock_unspents=lock_unspents, feerate=feerate
         )
-
         return bytes.fromhex(funded_tx)
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:

@@ -6482,7 +6482,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.a_lock_tx = pi.promoteMockTx(
                     ci_from, prefunded_tx, xmr_swap.a_lock_tx_script
                 )
-                self.log.info("Using pre-funded tx")
+                self.log.info(f"Using pre-funded {ci_from.ticker()} tx")
             else:
                 xmr_swap.a_lock_tx = ci_from.createSCLockTx(
                     bid.amount, xmr_swap.a_lock_tx_script, xmr_swap.vkbv

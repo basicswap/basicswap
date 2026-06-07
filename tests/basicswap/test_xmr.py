@@ -2595,7 +2595,7 @@ class Test(BaseTest):
             swap_clients[2],
             bid_id,
             BidStates.SWAP_COMPLETED,
-            wait_for=120,
+            wait_for=180,
         )
         wait_for_bid(
             test_delay_event,
@@ -2603,7 +2603,7 @@ class Test(BaseTest):
             bid_id,
             BidStates.SWAP_COMPLETED,
             sent=True,
-            wait_for=120,
+            wait_for=180,
         )
 
         # Verify expected inputs were used

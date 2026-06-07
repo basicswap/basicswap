@@ -104,7 +104,7 @@ class Test(BaseTest):
         )
 
     def test_010_txn_size(self):
-        logging.info("---------- Test {} txn_size".format(self.test_coin_from.name))
+        logging.info(f"---------- Test {self.test_coin_from.name} txn_size")
 
         self.ensure_balance(self.test_coin_from, 0, 100.0)
 
@@ -159,7 +159,7 @@ class Test(BaseTest):
 
         ci.rpc_wallet("sendrawtransaction", [lock_tx.hex()])
         rv = ci.rpc_wallet("gettransaction", [txid])
-        wallet_tx_fee = -ci.make_int(rv["details"][0]["fee"])
+        wallet_tx_fee = -ci.make_int(rv["fee"])
 
         assert wallet_tx_fee >= expect_fee_int
         assert wallet_tx_fee - expect_fee_int < 20

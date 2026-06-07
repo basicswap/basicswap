@@ -23,6 +23,7 @@
     - Added warning text for fee above 1.2 x local estimate.
     - Added subfee bid option.
 - Increase DCR fee estimate by 1 byte.
+- Waits for the refund and refund spend txn locks to expire before trying to submit them.
 
 
 0.14.5
