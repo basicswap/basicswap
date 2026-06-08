@@ -21,6 +21,7 @@ class WalletAddress(Table):
     scripthash = Column("string")
     pubkey = Column("blob")
     is_funded = Column("bool")
+    ever_used = Column("bool")
     cached_balance = Column("integer")
     cached_balance_time = Column("integer")
     first_seen_height = Column("integer")

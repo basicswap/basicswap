@@ -154,6 +154,7 @@ class WalletManager:
         query = (
             "SELECT derivation_index, address FROM wallet_addresses"
             " WHERE coin_type = ? AND is_internal = ? AND is_funded = 0"
+            " AND ever_used = 0"
             " ORDER BY derivation_index ASC LIMIT 1"
         )
         cursor.execute(query, (int(coin_type), internal))
@@ -161,6 +162,22 @@ class WalletManager:
         if row:
             return row[0], row[1]
         return None, None
+
+    def _trailingUnusedGap(
+        self, coin_type: Coins, internal: bool, next_index: int, cursor
+    ) -> int:
+        cursor.execute(
+            "SELECT derivation_index, ever_used FROM wallet_addresses"
+            " WHERE coin_type = ? AND is_internal = ? AND derivation_index < ?"
+            " ORDER BY derivation_index DESC",
+            (int(coin_type), internal, next_index),
+        )
+        gap = 0
+        for _, ever_used in cursor.fetchall():
+            if ever_used:
+                break
+            gap += 1
+        return gap
 
     def getNewAddress(
         self, coin_type: Coins, internal: bool = False, label: str = "", cursor=None
@@ -195,7 +212,10 @@ class WalletManager:
                 else:
                     next_index = (state.last_external_index or 0) + 1
 
-            if next_index >= self.ELECTRUM_GAP_LIMIT:
+            trailing_gap = self._trailingUnusedGap(
+                coin_type, internal, next_index, use_cursor
+            )
+            if trailing_gap + 1 >= self.ELECTRUM_GAP_LIMIT:
                 reuse_index, reuse_addr = self._findReusableAddress(
                     coin_type, internal, use_cursor
                 )
@@ -203,7 +223,14 @@ class WalletManager:
                     self._log.debug(
                         f"Reusing unfunded address at index {reuse_index}"
                         f" (next would be {next_index},"
+                        f" trailing unused gap {trailing_gap},"
                         f" electrum gap limit {self.ELECTRUM_GAP_LIMIT})"
+                    )
+                    use_cursor.execute(
+                        "UPDATE wallet_addresses SET ever_used = 1"
+                        " WHERE coin_type = ? AND derivation_index = ?"
+                        " AND is_internal = ?",
+                        (int(coin_type), reuse_index, internal),
                     )
                     self._swap_client.commitDB()
                     return reuse_addr
@@ -220,6 +247,12 @@ class WalletManager:
 
             if existing:
                 address = existing.address
+                use_cursor.execute(
+                    "UPDATE wallet_addresses SET ever_used = 1"
+                    " WHERE coin_type = ? AND derivation_index = ?"
+                    " AND is_internal = ?",
+                    (int(coin_type), next_index, internal),
+                )
                 if state:
                     if internal:
                         state.last_internal_index = next_index
@@ -248,6 +281,7 @@ class WalletManager:
                     scripthash=scripthash,
                     pubkey=pubkey,
                     is_funded=False,
+                    ever_used=True,
                     cached_balance=0,
                     created_at=now,
                 ),
@@ -359,6 +393,7 @@ class WalletManager:
                     scripthash=scripthash,
                     pubkey=pubkey,
                     is_funded=True,
+                    ever_used=True,
                     cached_balance=0,
                     created_at=now,
                 ),
@@ -490,6 +525,7 @@ class WalletManager:
                     scripthash=scripthash,
                     pubkey=pubkey,
                     is_funded=False,
+                    ever_used=True,
                     created_at=now,
                 ),
                 cursor,
@@ -662,6 +698,8 @@ class WalletManager:
                             record.is_funded = balance > 0
                             if record_type == "wallet":
                                 record.cached_balance_time = now
+                                if balance > 0:
+                                    record.ever_used = True
                             self._swap_client.updateDB(
                                 record, cursor, constraints=["coin_type", "address"]
                             )
@@ -1116,6 +1154,7 @@ class WalletManager:
                             scripthash=addr_data["scripthash"],
                             pubkey=addr_data["pubkey"],
                             is_funded=False,
+                            ever_used=False,
                             cached_balance=0,
                             created_at=now,
                         ),
@@ -1287,6 +1326,7 @@ class WalletManager:
                             scripthash=scripthash,
                             pubkey=pubkey,
                             is_funded=False,
+                            ever_used=False,
                             cached_balance=0,
                             created_at=now,
                         ),
@@ -1416,6 +1456,7 @@ class WalletManager:
                             scripthash=scripthash,
                             pubkey=pubkey,
                             is_funded=False,
+                            ever_used=False,
                             created_at=now,
                         )
                         self._swap_client.add(record, cursor)
