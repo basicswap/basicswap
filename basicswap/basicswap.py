@@ -8421,12 +8421,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     # Verify amount
                     vout = getVoutByAddress(initiate_txn, p2sh)
 
-                    out_value = make_int(initiate_txn["vout"][vout]["value"])
+                    out_value: int = make_int(initiate_txn["vout"][vout]["value"])
                     ensure(
                         out_value == int(bid.amount),
-                        "Incorrect output amount in initiate txn {}: {} != {}.".format(
-                            initiate_txnid_hex, out_value, int(bid.amount)
-                        ),
+                        f"Incorrect output amount in initiate txn {self.logIDT(initiate_txnid_hex)}: {out_value} != {bid.amount}",
                     )
 
                     bid.initiate_tx.conf = initiate_txn["confirmations"]
@@ -8454,21 +8452,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 index = None
                 if found:
-                    if (
-                        "value" in found
-                        and found["value"] is not None
-                        and found["value"] != int(bid.amount)
-                    ):
+                    if "index" not in found:
                         self.setBidError(
                             bid,
-                            "Incorrect output amount in initiate txn {}: {} != {}.".format(
-                                initiate_txnid_hex, found["value"], int(bid.amount)
-                            ),
+                            f"Swap output index not found for initiate txn {self.logIDT(initiate_txnid_hex)}",
+                        )
+                        return True
+                    txo_value: int = found.get("value", None)
+                    if txo_value != bid.amount:
+                        self.setBidError(
+                            bid,
+                            f"Incorrect output amount in initiate txn {self.logIDT(initiate_txnid_hex)}: {txo_value} != {bid.amount}",
                         )
                         return True
                     bid.initiate_tx.conf = found["depth"]
-                    if "index" in found:
-                        index = found["index"]
+                    index = found["index"]
                     tx_height = found["height"]
 
             if bid.initiate_tx.conf != last_initiate_txn_conf:
@@ -8554,6 +8552,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 vout=participate_txvout,
             )
             if found:
+                participate_txid_hex: str = found.get(
+                    "txid",
+                    None if participate_txid is None else participate_txid.hex(),
+                )
+                # Double check value
+                txo_value: int = found.get("value", None)
+                if (
+                    txo_value != bid.amount_to
+                    and bid.debug_ind != DebugTypes.MAKE_INVALID_PTX
+                ):
+                    self.setBidError(
+                        bid,
+                        f"Incorrect output amount in participate txn {self.logIDT(participate_txid_hex)}: {txo_value} != {bid.amount_to}",
+                    )
+                    return True
                 index = found.get("index", participate_txvout)
                 if bid.participate_tx.conf != found["depth"]:
                     save_bid = True
@@ -8561,15 +8574,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.participate_tx.conf is None
                     and bid.participate_tx.state != TxStates.TX_SENT
                 ):
-                    txid = found.get(
-                        "txid",
-                        None if participate_txid is None else participate_txid.hex(),
-                    )
                     self.log.debug(
-                        f"Found bid {self.log.id(bid_id)} participate txn {self.log.id(txid)} in chain {ci_to.coin_name()}."
+                        f"Found bid {self.log.id(bid_id)} participate txn {self.logIDT(participate_txid_hex)} in chain {ci_to.coin_name()}."
                     )
                     self.addParticipateTxn(
-                        bid_id, bid, coin_to, txid, index, found["height"]
+                        bid_id,
+                        bid,
+                        coin_to,
+                        participate_txid_hex,
+                        index,
+                        found["height"],
                     )
 
                     # Only update tx state if tx hasn't already been seen
@@ -8587,7 +8601,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             if bid.participate_tx.conf is not None:
                 self.log.debug(
-                    f"participate txid {self.log.id(bid.participate_tx.txid)} confirms {bid.participate_tx.conf}."
+                    f"Participate txid {self.logIDT(bid.participate_tx.txid)} confirms {bid.participate_tx.conf}."
                 )
                 if (
                     bid.participate_tx.conf
