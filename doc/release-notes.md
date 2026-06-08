@@ -24,6 +24,7 @@
     - Added subfee bid option.
 - Increase DCR fee estimate by 1 byte.
 - Waits for the refund and refund spend txn locks to expire before trying to submit them.
+- Fixed bug where initiate tx amount was not cheched for secret hash swaps.
 
 
 0.14.5
