@@ -3006,6 +3006,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if find_index:
             tx_obj = self.rpc("decoderawtransaction", [tx["hex"]])
             rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+            if rv["index"] is not None and rv["index"] >= 0:
+                rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 
         if return_txid:
             rv["txid"] = txid.hex()
@@ -3063,6 +3065,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             for idx, txout in enumerate(tx.vout):
                                 if txout.scriptPubKey == dest_script:
                                     rv["index"] = idx
+                                    rv["value"] = txout.nValue
                                     break
                     except Exception:
                         pass
@@ -3124,6 +3127,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     for idx, txout in enumerate(tx.vout):
                         if txout.scriptPubKey == dest_script:
                             rv["index"] = idx
+                            rv["value"] = txout.nValue
                             break
             except Exception as e:
                 self._log.debug(

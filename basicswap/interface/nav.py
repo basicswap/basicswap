@@ -614,6 +614,8 @@ class NAVInterface(BTCInterface):
         if find_index:
             tx_obj = self.rpc("decoderawtransaction", [tx["hex"]])
             rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+            if rv["index"] is not None and rv["index"] >= 0:
+                rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 
         if return_txid:
             rv["txid"] = txid.hex()
