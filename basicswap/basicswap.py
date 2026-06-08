@@ -8454,6 +8454,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 index = None
                 if found:
+                    if (
+                        "value" in found
+                        and found["value"] is not None
+                        and found["value"] != int(bid.amount)
+                    ):
+                        self.setBidError(
+                            bid,
+                            "Incorrect output amount in initiate txn {}: {} != {}.".format(
+                                initiate_txnid_hex, found["value"], int(bid.amount)
+                            ),
+                        )
+                        return True
                     bid.initiate_tx.conf = found["depth"]
                     if "index" in found:
                         index = found["index"]

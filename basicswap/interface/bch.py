@@ -322,6 +322,7 @@ class BCHInterface(BTCInterface):
             "depth": confirmations,
             "index": found_vout,
             "height": block_height,
+            "value": self.make_int(txout["value"]),
         }
 
         return rv

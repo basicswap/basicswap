@@ -940,6 +940,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             "depth": confirmations,
             "index": found_vout,
             "height": block_height,
+            "value": self.make_int(txout["value"]),
         }
 
         return rv
