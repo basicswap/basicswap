@@ -5,7 +5,7 @@ FROM i_swapclient as install_stage
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoincash --withoutcoins=particl && \
     find /coin_bin -name *.tar.gz -delete
 
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .
 
 ENV BITCOINCASH_DATA /data

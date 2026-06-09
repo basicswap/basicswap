@@ -1,3 +1,10 @@
+
+0.16.5
+==============
+
+- Updated docker base images to Debian Trixie.
+
+
 0.16.3
 ==============
 
