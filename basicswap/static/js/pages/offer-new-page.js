@@ -328,8 +328,7 @@ function getRateInferred(event) {
 }
 
 const SwapTypeManager = {
-    adaptor_sig_only_coins: ['6', '9', '8', '7', '13', '18', '17'],
-    secret_hash_only_coins: ['11', '12'],
+    coins_without_segwit: ['11', '12'],
 
     setSwapTypeEnabled: (coinFrom, coinTo, swapTypeElement) => {
         if (!swapTypeElement) return;
@@ -338,24 +337,19 @@ const SwapTypeManager = {
         coinFrom = String(coinFrom);
         coinTo = String(coinTo);
 
-        if (SwapTypeManager.adaptor_sig_only_coins.includes(coinFrom) ||
-            SwapTypeManager.adaptor_sig_only_coins.includes(coinTo)) {
-            swapTypeElement.disabled = true;
-            swapTypeElement.value = 'xmr_swap';
-            makeHidden = true;
-            swapTypeElement.classList.add('select-disabled');
-        } else if (SwapTypeManager.secret_hash_only_coins.includes(coinFrom) ||
-                  SwapTypeManager.secret_hash_only_coins.includes(coinTo)) {
+        if (
+            SwapTypeManager.coins_without_segwit.includes(coinFrom) &&
+            SwapTypeManager.coins_without_segwit.includes(coinTo)
+        ) {
             swapTypeElement.disabled = true;
             swapTypeElement.value = 'seller_first';
             makeHidden = true;
             swapTypeElement.classList.add('select-disabled');
         } else {
-            swapTypeElement.disabled = false;
-            swapTypeElement.classList.remove('select-disabled');
-            if (['xmr_swap', 'seller_first'].includes(swapTypeElement.value) == false) {
-                swapTypeElement.value = 'xmr_swap';
-            }
+            swapTypeElement.disabled = true;
+            swapTypeElement.value = 'xmr_swap';
+            makeHidden = true;
+            swapTypeElement.classList.add('select-disabled');
         }
 
         let swapTypeHidden = DOM.get('swap_type_hidden');

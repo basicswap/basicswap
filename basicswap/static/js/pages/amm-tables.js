@@ -6,7 +6,7 @@ const AmmTablesManager = (function() {
 
     let refreshTimer = null;
     let stateData = null;
-    let coinData = {};
+    const coinData = {};
 
     const offersTab = document.getElementById('offers-tab');
     const bidsTab = document.getElementById('bids-tab');
@@ -2178,8 +2178,7 @@ const AmmTablesManager = (function() {
         }
     }
 
-    const adaptor_sig_only_coins = ['6', 'Monero', '7', 'Particl Blind', '8', 'Particl Anon', '9', 'Wownero', '13', 'Firo', '16', 'Zano', '17', 'Bitcoin Cash', '18', 'Dogecoin'];
-    const secret_hash_only_coins = ['11', 'PIVX', '12', 'Dash'];
+    const coins_without_segwit = ['11', 'PIVX', '12', 'Dash'];
 
     function updateSwapTypeOptions(coinFromValue, coinToValue, swapTypeSelect) {
         if (!swapTypeSelect) return;
@@ -2189,15 +2188,12 @@ const AmmTablesManager = (function() {
 
         let disableSelect = false;
 
-        if (adaptor_sig_only_coins.includes(coinFromValue) || adaptor_sig_only_coins.includes(coinToValue)) {
-            swapTypeSelect.value = 'adaptor_sig';
-            disableSelect = true;
-        } else if (secret_hash_only_coins.includes(coinFromValue) || secret_hash_only_coins.includes(coinToValue)) {
+        if (coins_without_segwit.includes(coinFromValue) && coins_without_segwit.includes(coinToValue)) {
             swapTypeSelect.value = 'seller_first';
             disableSelect = true;
         } else {
             swapTypeSelect.value = 'adaptor_sig';
-            disableSelect = false;
+            disableSelect = true;
         }
 
         swapTypeSelect.disabled = disableSelect;
@@ -2226,7 +2222,7 @@ const AmmTablesManager = (function() {
             if (!select) return;
 
             if (select.style.display === 'none' && select.parentNode.querySelector('.relative')) {
-                return; 
+                return;
             }
 
             const wrapper = document.createElement('div');
@@ -2329,9 +2325,9 @@ const AmmTablesManager = (function() {
 
             let showBalance = false;
             if (modalType === 'offer' && select.id.includes('coin-from')) {
-                showBalance = true; 
+                showBalance = true;
             } else if (modalType === 'bid' && select.id.includes('coin-to')) {
-                showBalance = true; 
+                showBalance = true;
             }
 
             createSimpleDropdown(select, showBalance);
@@ -2466,7 +2462,7 @@ const AmmTablesManager = (function() {
                         console.error('CoinGecko error:', response.coingecko_error);
                         rateInput.value = originalValue || '';
 
-                        let userMessage = 'Unable to get current market rate from CoinGecko.';
+                        const userMessage = 'Unable to get current market rate from CoinGecko.';
                         let details = '';
 
                         if (typeof response.coingecko_error === 'number') {
@@ -2515,7 +2511,7 @@ const AmmTablesManager = (function() {
             } else {
                 console.error('Error fetching rate data:', xhr.status, xhr.statusText);
                 rateInput.value = originalValue || '';
-                let errorMessage = 'Unable to retrieve rate information from the server.';
+                const errorMessage = 'Unable to retrieve rate information from the server.';
                 let details = '';
 
                 switch(xhr.status) {
@@ -2633,7 +2629,7 @@ const AmmTablesManager = (function() {
                             icon.classList.remove('animate-spin');
                         }
                         refreshButton.disabled = false;
-                    }, 500); 
+                    }, 500);
                 }
             });
         }
