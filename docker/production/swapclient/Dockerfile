@@ -1,12 +1,17 @@
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 ENV LANG=C.UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
-    DATADIR=/data
+    DATADIR=/data \
+    VIRTUAL_ENV=/opt/venv
 
 RUN apt-get update; \
     apt-get install -y --no-install-recommends \
-        python3-pip libpython3-dev gnupg pkg-config gcc libc-dev gosu tzdata wget unzip cmake ninja-build;
+        python3-pip libpython3-dev python3-venv gnupg pkg-config gcc libc-dev gosu tzdata wget unzip cmake ninja-build;
+
+# Create python venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 ARG BASICSWAP_URL=https://github.com/basicswap/basicswap/archive/master.zip
 ARG BASICSWAP_DIR=basicswap-master

@@ -3611,6 +3611,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError(
                     f"Invalid swap type for: {coin_from.name} -> {coin_to.name}"
                 )
+            strict_swap_type: bool = self.settings.get(
+                "strict_swap_type", False if self.chain == "regtest" else True
+            )
+            if strict_swap_type and (
+                coin_from not in self.coins_without_segwit
+                or coin_to not in self.coins_without_segwit
+            ):
+                raise ValueError(
+                    f"Coin pair should use adaptor sig swap type: {coin_from.name} -> {coin_to.name}"
+                )
 
     def _process_notification_safe(self, event_type, event_data) -> None:
         try:

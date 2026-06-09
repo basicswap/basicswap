@@ -1,20 +1,25 @@
-FROM ubuntu:22.04
+FROM debian:trixie-slim
 
 ENV LANG=C.UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
-    DATADIRS="/coindata"
+    DATADIRS="/coindata" \
+    VIRTUAL_ENV=/opt/venv
 
 RUN apt-get update; \
     apt-get install -y --no-install-recommends \
-        python3-pip libpython3-dev gnupg pkg-config gcc libc-dev gosu tzdata cmake ninja-build;
+        python3-pip libpython3-dev python3-venv gnupg pkg-config gcc libc-dev gosu tzdata cmake ninja-build;
+
+# Create python venv
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Install requirements first so as to skip in subsequent rebuilds
 COPY ./requirements.txt requirements.txt
-RUN pip3 install -r requirements.txt --require-hashes
+RUN pip install -r requirements.txt --require-hashes
 
 COPY . basicswap-master
 RUN cd basicswap-master; \
-    pip3 install .;
+    pip install .;
 
 RUN useradd -ms /bin/bash swap_user && \
     mkdir /coindata && chown swap_user -R /coindata
