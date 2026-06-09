@@ -23,9 +23,7 @@ from copy import deepcopy
 from coincurve.keys import PrivateKey
 
 import basicswap.config as cfg
-from basicswap.db import (
-    Concepts,
-)
+from basicswap.db import Concepts
 from basicswap.basicswap import (
     Coins,
     BasicSwap,

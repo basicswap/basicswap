@@ -26,11 +26,13 @@ from basicswap.basicswap import (
     TxStates,
 )
 from basicswap.basicswap_util import (
+    EventLogTypes,
     TxLockTypes,
 )
 from basicswap.chainparams import (
     chainparams,
 )
+from basicswap.db import Concepts
 from basicswap.util import (
     COIN,
     make_int,
@@ -47,6 +49,7 @@ from tests.basicswap.common import (
     wait_for_balance,
     wait_for_bid,
     wait_for_bid_tx_state,
+    wait_for_event,
     wait_for_in_progress,
     wait_for_offer,
     wait_for_unspent,
@@ -850,7 +853,6 @@ class Test(BaseTest):
         swap_clients = self.swap_clients
 
         swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
-        logging.info("swap_value {}".format(format_amount(swap_value, 8)))
         offer_id = swap_clients[0].postOffer(
             Coins.LTC,
             Coins.BTC,
@@ -879,15 +881,15 @@ class Test(BaseTest):
         )
         wait_for_bid(
             test_delay_event,
-            swap_clients[1],
+            swap_clients[0],
             bid_id,
             BidStates.SWAP_COMPLETED,
             sent=True,
             wait_for=30,
         )
 
-        js_0_bid = read_json_api(1800, "bids/{}".format(bid_id.hex()))
-        js_1_bid = read_json_api(1801, "bids/{}".format(bid_id.hex()))
+        js_0_bid = read_json_api(1800, f"bids/{bid_id.hex()}")
+        js_1_bid = read_json_api(1801, f"bids/{bid_id.hex()}")
         assert js_0_bid["itx_state"] == "Refunded"
         assert js_1_bid["ptx_state"] == "Refunded"
 
@@ -904,38 +906,52 @@ class Test(BaseTest):
         assert compare_bid_states(offerer_states, self.states_offerer_sh[1]) is True
         assert compare_bid_states(bidder_states, self.states_bidder_sh[1]) is True
 
-    """
-    def test_11_refund(self):
-        # Seller submits initiate txn, buyer doesn't respond, repeat of test 5 using debug_ind
-        logging.info('---------- Test refund, LTC to BTC')
+    def test_11_bad_itx(self):
+        # Invalid ITx sent, PTx should not be sent
+        logging.info("---------- Test bad ITx, LTC to BTC")
         swap_clients = self.swap_clients
 
         swap_value = make_int(random.uniform(0.001, 10.0), scale=8, r=1)
-        logging.info('swap_value {}'.format(format_amount(swap_value, 8)))
-        offer_id = swap_clients[0].postOffer(Coins.LTC, Coins.BTC, swap_value, 0.1 * COIN, swap_value, SwapTypes.SELLER_FIRST,
-                                             TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
+        offer_id = swap_clients[0].postOffer(
+            Coins.LTC,
+            Coins.BTC,
+            swap_value,
+            0.1 * COIN,
+            swap_value,
+            SwapTypes.SELLER_FIRST,
+            TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+            18,
+        )
 
         wait_for_offer(test_delay_event, swap_clients[1], offer_id)
         offer = swap_clients[1].getOffer(offer_id)
         bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
-        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.BUYER_STOP_AFTER_ITX)
 
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
+        swap_clients[0].setBidDebugInd(bid_id, DebugTypes.MAKE_INVALID_ITX)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid(test_delay_event, swap_clients[0], bid_id, BidStates.SWAP_COMPLETED, wait_for=120)
-        wait_for_bid(test_delay_event, swap_clients[1], bid_id, BidStates.BID_ABANDONED, sent=True, wait_for=30)
+        event = wait_for_event(
+            test_delay_event,
+            swap_clients[1],
+            Concepts.BID,
+            bid_id,
+            event_type=EventLogTypes.ERROR,
+            wait_for=120,
+        )
+        assert "Incorrect output amount in initiate txn " in event.event_msg
 
-        js_0_bid = read_json_api(1800, 'bids/{}'.format(bid_id.hex()))
-        js_1_bid = read_json_api(1801, 'bids/{}'.format(bid_id.hex()))
-        assert (js_0_bid['itx_state'] == 'Refunded')
-        assert (js_1_bid['ptx_state'] == 'Unknown')
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[1],
+            bid_id,
+            BidStates.BID_ERROR,
+            sent=True,
+            wait_for=30,
+        )
 
-        js_0 = read_json_api(1800)
-        js_1 = read_json_api(1801)
-        assert (js_0['num_swapping'] == 0 and js_0['num_watched_outputs'] == 0)
-        assert (js_1['num_swapping'] == 0 and js_1['num_watched_outputs'] == 0)
-    """
+        js_1_bid = read_json_api(1801, f"bids/{bid_id.hex()}")
+        assert js_1_bid["ptx_state"] == "Unknown"
 
     def test_12_withdrawal(self):
         logging.info("---------- Test LTC withdrawals")

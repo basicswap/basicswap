@@ -6906,7 +6906,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Create initiate txn for coin {ci.coin_name()} to {addr_to} for bid {self.log.id(bid_id)}"
             )
-            txn_signed = ci.createRawSignedTransaction(addr_to, bid.amount)
+            amount_from: int = bid.amount
+            if bid.debug_ind == DebugTypes.MAKE_INVALID_ITX:
+                amount_from -= 100
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.DEBUG_TWEAK_APPLIED,
+                    f"Make invalid ITx for testing: {bid.debug_ind}",
+                    None,
+                )
+            txn_signed = ci.createRawSignedTransaction(addr_to, amount_from)
 
         txjs = ci.describeTx(txn_signed)
         vout = getVoutByAddress(txjs, addr_to)
@@ -6997,13 +7006,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if bid.debug_ind == DebugTypes.MAKE_INVALID_PTX:
             amount_to -= 1
-            self.log.debug(
-                f"bid {self.log.id(bid_id)}: Make invalid PTx for testing: {bid.debug_ind}."
-            )
             self.logBidEvent(
                 bid.bid_id,
                 EventLogTypes.DEBUG_TWEAK_APPLIED,
-                "ind {}".format(bid.debug_ind),
+                f"Make invalid PTx for testing: {bid.debug_ind}",
                 None,
             )
 
