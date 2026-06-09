@@ -7,6 +7,15 @@
   - override with "strict_swap_type" setting.
 
 
+0.16.4
+==============
+
+- Security: Always require the initiate tx output index and value for secret hash swaps.
+  - Strengthens the 0.16.3 fix: the amount check can no longer be skipped when the output value is unavailable; the swap is now rejected (fails closed) instead of proceeding.
+- Security: Also double check the participate tx output amount for secret hash swaps.
+- Raise minimum Python version to 3.11.
+
+
 0.16.3
 ==============
 
