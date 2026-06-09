@@ -38,9 +38,7 @@ from basicswap.basicswap_util import (
     EventLogTypes,
 )
 from basicswap.util import COIN, format_amount, make_int, TemporaryError
-from basicswap.util.address import (
-    toWIF,
-)
+from basicswap.util.address import toWIF
 from basicswap.rpc import (
     callrpc,
 )
