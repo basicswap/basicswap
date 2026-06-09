@@ -11671,8 +11671,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             txid_hex = ci_from.publishTx(lock_tx_signed)
 
             if txid_hex != b2h(xmr_swap.a_lock_tx_id):
+                if not self.isBchXmrSwap(offer):
+                    raise ValueError("Coin A lock tx txid changed after sending!")
+
                 self.log.info(
-                    "Recomputing refund transactions and txids after lock tx publish."
+                    f"Recomputing {ci_from.coin_name()} refund transactions and txids after lock tx publish."
                 )
                 xmr_swap.a_lock_tx = lock_tx_signed
                 xmr_swap.a_lock_tx_id = bytes.fromhex(txid_hex)
@@ -12464,6 +12467,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
             if not self.isBchXmrSwap(offer):
+                self.log.info("Checking follower's lock refund tx signature.")
+                prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
+                v = ci_from.verifyTxSig(
+                    xmr_swap.a_lock_refund_tx,
+                    xmr_swap.af_lock_refund_tx_sig,
+                    xmr_swap.pkaf,
+                    0,
+                    xmr_swap.a_lock_tx_script,
+                    prevout_amount,
+                )
+                ensure(v, "Invalid coin A lock refund tx leader sig")
+                xmr_swap_1.addLockRefundSigs(self, xmr_swap, ci_from)
+
                 # segwit coins sign the transaction
                 xmr_swap.af_lock_refund_spend_tx_sig = ci_from.decryptOtVES(
                     kbsl, xmr_swap.af_lock_refund_spend_tx_esig
@@ -12478,7 +12494,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.a_lock_refund_tx_script,
                     prevout_amount,
                 )
-
+                self.log.info("Checking follower's lock refund spend tx signature.")
+                v = ci_from.verifyTxSig(
+                    xmr_swap.a_lock_refund_spend_tx,
+                    xmr_swap.af_lock_refund_spend_tx_sig,
+                    xmr_swap.pkaf,
+                    0,
+                    xmr_swap.a_lock_refund_tx_script,
+                    prevout_amount,
+                )
+                ensure(v, "Invalid follower signature for lock refund spend txn")
                 self.log.debug("Setting lock refund spend tx sigs.")
                 witness_stack = []
                 if coin_from not in (Coins.DCR,):
@@ -12496,17 +12521,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 ensure(signed_tx, "setTxSignature failed")
                 xmr_swap.a_lock_refund_spend_tx = signed_tx
-
-                v = ci_from.verifyTxSig(
-                    xmr_swap.a_lock_refund_spend_tx,
-                    xmr_swap.af_lock_refund_spend_tx_sig,
-                    xmr_swap.pkaf,
-                    0,
-                    xmr_swap.a_lock_refund_tx_script,
-                    prevout_amount,
-                )
-                ensure(v, "Invalid signature for lock refund spend txn")
-                xmr_swap_1.addLockRefundSigs(self, xmr_swap, ci_from)
             else:
                 # BCH signs the output pkh
 
