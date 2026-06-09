@@ -10094,6 +10094,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 kbsl_dleag_len: int = q[0]
                 kbsf_dleag_len: int = q[1]
 
+                q = cursor.execute(
+                    "SELECT addr_from FROM offers WHERE offer_id = :offer_id",
+                    {
+                        "offer_id": bid.offer_id,
+                    },
+                ).fetchone()
+                offer_addr_from: str = q[0]
+
                 if bid.state == int(BidStates.BID_RECEIVING_ACC):
                     bid_type: str = "bid accept"
                     msg_type: int = int(XmrSplitMsgTypes.BID_ACCEPT)
@@ -10104,8 +10112,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     total_dleag_size: int = kbsf_dleag_len
 
                 q = cursor.execute(
-                    "SELECT COUNT(*), SUM(LENGTH(dleag)) AS total_dleag_size FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type",
-                    {"bid_id": bid.bid_id, "msg_type": msg_type},
+                    "SELECT COUNT(*), SUM(LENGTH(dleag)) AS total_dleag_size FROM xmr_split_data "
+                    + " WHERE bid_id = :bid_id AND msg_type = :msg_type "
+                    + " AND ((addr_from = :bid_addr AND addr_to = :offer_addr) OR (addr_from = :offer_addr AND addr_to = :bid_addr))",
+                    {
+                        "bid_id": bid.bid_id,
+                        "msg_type": msg_type,
+                        "bid_addr": bid.bid_addr,
+                        "offer_addr": offer_addr_from,
+                    },
                 ).fetchone()
                 total_dleag_size += 0 if q[1] is None else q[1]
 
@@ -10941,43 +10956,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
         xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid.bid_id)}")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         addr_expect_from: str = ""
         if reverse_bid:
             ci_from = self.ci(Coins(offer.coin_to))
             ci_to = self.ci(Coins(offer.coin_from))
-            addr_expect_from = bid.bid_addr
-            addr_expect_to = offer.addr_from
-        else:
-            ensure(offer.was_sent, "Offer not sent: {}.".format(bid.offer_id.hex()))
-            ci_from = self.ci(Coins(offer.coin_from))
-            ci_to = self.ci(Coins(offer.coin_to))
             addr_expect_from = offer.addr_from
             addr_expect_to = bid.bid_addr
+        else:
+            ensure(offer.was_sent, f"Offer not sent: {self.log.id(bid.offer_id)}")
+            ci_from = self.ci(Coins(offer.coin_from))
+            ci_to = self.ci(Coins(offer.coin_to))
+            addr_expect_from = bid.bid_addr
+            addr_expect_to = offer.addr_from
 
         if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
                 q = self.query(
                     XmrSplitData,
                     cursor,
-                    {"bid_id": bid.bid_id, "msg_type": int(XmrSplitMsgTypes.BID)},
+                    {
+                        "bid_id": bid.bid_id,
+                        "msg_type": int(XmrSplitMsgTypes.BID),
+                        "addr_from": addr_expect_from,
+                        "addr_to": addr_expect_to,
+                    },
                     {"msg_sequence": "asc"},
                 )
                 for row in q:
-                    ensure(
-                        row.addr_to == addr_expect_from,
-                        "Received on incorrect address, segment_id {}".format(
-                            row.record_id
-                        ),
-                    )
-                    ensure(
-                        row.addr_from == addr_expect_to,
-                        "Sent from incorrect address, segment_id {}".format(
-                            row.record_id
-                        ),
-                    )
                     xmr_swap.kbsf_dleag += row.dleag
 
             if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
@@ -11032,13 +11040,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def receiveXmrBidAccept(self, bid, cursor) -> None:
         # Follower receiving MSG1F and MSG2F
-        self.log.debug(f"Receiving adaptor-sig bid accept {self.log.id(bid.bid_id)}.")
+        self.log.debug(f"Receiving adaptor-sig bid accept {self.log.id(bid.bid_id)}")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=cursor)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
-        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}")
         xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
-        ensure(xmr_swap, "Adaptor-sig swap not found: {}.".format(bid.bid_id.hex()))
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid.bid_id)}")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -11054,22 +11062,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     {
                         "bid_id": bid.bid_id,
                         "msg_type": int(XmrSplitMsgTypes.BID_ACCEPT),
+                        "addr_from": addr_from,
+                        "addr_to": addr_to,
                     },
                     order_by={"msg_sequence": "asc"},
                 )
                 for row in q:
-                    ensure(
-                        row.addr_to == addr_to,
-                        "Received on incorrect address, segment_id {}".format(
-                            row.record_id
-                        ),
-                    )
-                    ensure(
-                        row.addr_from == addr_from,
-                        "Sent from incorrect address, segment_id {}".format(
-                            row.record_id
-                        ),
-                    )
                     xmr_swap.kbsl_dleag += row.dleag
             if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
                 raise ValueError("Invalid DLEAG proof.")
@@ -12641,7 +12639,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Validate data
         ensure(len(msg_data.msg_id) == 28, "Bad msg_id length")
-        self.log.debug(f"for bid {self.log.id(msg_data.msg_id)}.")
+        self.log.debug(f"for bid {self.log.id(msg_data.msg_id)}")
+
+        max_dleag_proof_len: int = 48893  # coincurve.dleag.dleag_proof_len()
+        network_type: str = msg.get("msg_net", "smsg")
+        if network_type == "simplex":
+            max_data_size: int = 11000
+            min_data_size: int = 9000
+        else:
+            max_data_size: int = 17000
+            min_data_size: int = 16000
+        max_chunks: int = (max_dleag_proof_len + min_data_size - 1) // min_data_size
+        ensure(
+            len(msg_data.dleag) <= max_data_size,
+            f"Split message data too large: {len(msg_data.dleag)}",
+        )
+        ensure(
+            msg_data.sequence <= max_chunks,
+            f"Split message sequence too high: {msg_data.sequence}",
+        )
 
         # TODO: Wait for bid msg to arrive first
 
@@ -12652,11 +12668,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             cursor = self.openDB()
             try:
                 q = cursor.execute(
-                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence",
+                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence AND addr_from = :addr_from",
                     {
                         "bid_id": msg_data.msg_id,
                         "msg_type": msg_data.msg_type,
                         "msg_sequence": msg_data.sequence,
+                        "addr_from": msg["from"],
                     },
                 ).fetchone()
                 num_exists = q[0]
@@ -13119,14 +13136,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     raise ValueError("Invalid msg received {}.".format(msg["msgid"]))
                 return
 
-            network_type = msg.get("msg_net", "smsg")
+            network_type: str = msg.get("msg_net", "smsg")
             if network_type == "smsg":
                 self.num_smsg_messages_received += 1
             elif network_type == "simplex":
                 pass  # Counted earlier, split between group and direct
             else:
                 self.log.warning(f"processMsg unknown network: {network_type}")
-            msg_type = int(msg["hex"][:2], 16)
+            msg_type: int = int(msg["hex"][:2], 16)
 
             if msg_type == MessageTypes.OFFER:
                 self.processOffer(msg)

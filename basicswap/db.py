@@ -492,8 +492,6 @@ class XmrSplitData(Table):
     dleag = Column("blob")
     created_at = Column("integer")
 
-    uc_1 = UniqueConstraint("bid_id", "msg_type", "msg_sequence")
-
 
 class RevokedMessage(Table):
     __tablename__ = "revoked_messages"
