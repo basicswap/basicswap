@@ -5,6 +5,7 @@
 - Updated docker base images to Debian Trixie.
 - By default reject secret hash type offers where the coin pair could use adaptor sig swap.
   - override with "strict_swap_type" setting.
+- Verify follower's script chain lock refund tx sig.
 
 
 0.16.4
