@@ -7938,8 +7938,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     return rv
             else:  # not XMR_SWAP_A_LOCK_REFUND in bid.txns
                 if (
-                    len(xmr_swap.al_lock_refund_tx_sig) > 0
-                    and len(xmr_swap.af_lock_refund_tx_sig) > 0
+                    ci_from.haveSignedLockRefundTx(xmr_swap)
                     and bid.xmr_a_lock_tx is not None
                     and ci_from.isCsvLockMature(
                         offer.lock_type,

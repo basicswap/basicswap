@@ -192,8 +192,22 @@ class AdaptorSigInterface:
     def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [bytes(72), b"", bytes(len(script))]
 
-    def getLockRefundVout(self, lock_refund_tx_data: bytes, vbkv: bytes):
+    def getLockRefundVout(self, lock_refund_tx_data: bytes, vbkv: bytes) -> int:
         return 0
+
+    def haveSignedLockRefundTx(self, xmr_swap) -> bool:
+        if xmr_swap.a_lock_refund_tx is None:
+            return False
+        if (
+            xmr_swap.al_lock_refund_tx_sig is None
+            or xmr_swap.af_lock_refund_tx_sig is None
+        ):
+            return False
+
+        return (
+            len(xmr_swap.al_lock_refund_tx_sig) > 0
+            and len(xmr_swap.af_lock_refund_tx_sig) > 0
+        )
 
 
 class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
