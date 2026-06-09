@@ -159,35 +159,6 @@ class Test(BaseTest):
         rv = read_json_api(1800, "rateslist?from=PART&to=BTC")
         assert len(rv) == 1
 
-    def test_004_validateSwapType(self):
-        logging.info("---------- Test validateSwapType")
-
-        sc = self.swap_clients[0]
-
-        should_pass = [
-            (Coins.BTC, Coins.XMR, SwapTypes.XMR_SWAP),
-            (Coins.XMR, Coins.BTC, SwapTypes.XMR_SWAP),
-            (Coins.BTC, Coins.FIRO, SwapTypes.XMR_SWAP),
-            (Coins.FIRO, Coins.BTC, SwapTypes.XMR_SWAP),
-            (Coins.PIVX, Coins.BTC, SwapTypes.SELLER_FIRST),
-            (Coins.BTC, Coins.PIVX, SwapTypes.SELLER_FIRST),
-        ]
-        should_fail = [
-            (Coins.BTC, Coins.XMR, SwapTypes.SELLER_FIRST),
-            (Coins.XMR, Coins.PART_ANON, SwapTypes.XMR_SWAP),
-            (Coins.FIRO, Coins.PART_ANON, SwapTypes.XMR_SWAP),
-            (Coins.PART_ANON, Coins.FIRO, SwapTypes.XMR_SWAP),
-            (Coins.FIRO, Coins.BTC, SwapTypes.SELLER_FIRST),
-            (Coins.BTC, Coins.FIRO, SwapTypes.SELLER_FIRST),
-        ]
-
-        for case in should_pass:
-            sc.validateSwapType(case[0], case[1], case[2])
-        for case in should_fail:
-            self.assertRaises(
-                ValueError, sc.validateSwapType, case[0], case[1], case[2]
-            )
-
     def test_003_cltv(self):
         test_coin_from = Coins.PART
         logging.info("---------- Test {} cltv".format(test_coin_from.name))
