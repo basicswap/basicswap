@@ -11135,9 +11135,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id)
-        ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}.")
+        ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
-        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+        ensure(reverse_bid is False, f"Offer: {self.log.id(offer_id)} is reversed")
 
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
@@ -12771,9 +12773,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         offer_id = bid_data.offer_msg_id
         offer, xmr_offer = self.getXmrOffer(offer_id)
-        ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}.")
+        ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
-        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}.")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+        ensure(reverse_bid is True, f"Offer: {self.log.id(offer_id)} not reversed")
 
         self.validateMessageNets(bid_data.message_nets)
 
@@ -12888,12 +12892,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         bid_id = msg_data.bid_msg_id
         bid, xmr_swap = self.getXmrBid(bid_id)
-        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
-        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}")
+        ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}")
 
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
-        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
-        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}")
+        ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}")
+        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+        ensure(reverse_bid is True, f"Offer: {self.log.id(bid.offer_id)} not reversed")
 
         ensure(msg["to"] == bid.bid_addr, "Received on incorrect address")
         ensure(msg["from"] == offer.addr_from, "Sent from incorrect address")
