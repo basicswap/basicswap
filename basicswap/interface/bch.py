@@ -1198,3 +1198,8 @@ class BCHInterface(BTCInterface):
 
         txHex = tx.serialize_without_witness()
         return self.signTxWithWallet(txHex)
+
+    def haveSignedLockRefundTx(self, xmr_swap) -> bool:
+        if xmr_swap.a_lock_refund_tx is None:
+            return False
+        return True
