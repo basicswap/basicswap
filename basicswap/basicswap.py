@@ -5257,7 +5257,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             tx_obj.vout[lock_vout].nValue = amount_to_adjusted
 
         self.log.debug(
-            f"Amounts after subfee: to {ci_to.format_amount(amount_to_adjusted)} {ci_to.ticker()}, from {ci_from.format_amount(amount_to_adjusted)} {ci_from.ticker()}"
+            f"Amounts after subfee: to {ci_to.format_amount(amount_to_adjusted)} {ci_to.ticker()}, from {ci_from.format_amount(amount_adjusted)} {ci_from.ticker()}"
         )
         tx_data: bytes = tx_obj.serialize_without_witness()
         return {
