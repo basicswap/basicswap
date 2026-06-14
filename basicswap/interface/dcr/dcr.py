@@ -913,7 +913,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 if self.make_int(txout["value"]) != bid_amount:
                     self._log.warning(
                         "getLockTxHeight found txout {} with incorrect amount {}".format(
-                            txid.hex(), txout["value"]
+                            self._log.id(txid), txout["value"]
                         )
                     )
                     continue

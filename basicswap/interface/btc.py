@@ -2937,10 +2937,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def getLockTxHeight(
         self,
-        txid,
-        dest_address,
-        bid_amount,
-        rescan_from,
+        txid: bytes,
+        dest_address: str,
+        bid_amount: int,
+        rescan_from: int,
         find_index: bool = False,
         vout: int = -1,
     ):
@@ -2999,13 +2999,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 rv["conflicts"] = tx["walletconflicts"]
         except Exception as e:
             self._log.debug(
-                "getLockTxHeight gettransaction failed: %s, %s", txid.hex(), str(e)
+                f"getLockTxHeight gettransaction failed: {self._log.id(txid)}, {e}"
             )
             return None
 
         if find_index:
             tx_obj = self.rpc("decoderawtransaction", [tx["hex"]])
-            rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+            if isinstance(vout, int) and vout >= 0:
+                rv["index"] = vout
+            else:
+                rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
             if rv["index"] is not None and rv["index"] >= 0:
                 rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 
@@ -3109,7 +3112,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             }
         except Exception as e:
             self._log.debug(
-                "getLockTxHeight electrum failed: %s, %s", txid.hex(), str(e)
+                f"getLockTxHeight electrum failed: {self._log.id(txid)}, {e}"
             )
             return None
 

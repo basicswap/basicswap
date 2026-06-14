@@ -15,6 +15,7 @@ from urllib.request import urlopen
 
 from .util import read_json_api
 from basicswap.basicswap import Coins
+from basicswap.basicswap_util import BidStates
 from basicswap.rpc import callrpc
 from basicswap.util import toBool
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
@@ -214,9 +215,23 @@ def stopDaemons(daemons):
 
 
 def wait_for_bid(
-    delay_event, swap_client, bid_id, state=None, sent: bool = False, wait_for: int = 20
+    delay_event,
+    swap_client,
+    bid_id,
+    state=None,
+    sent: bool = False,
+    wait_for: int = 20,
+    fail_fast: bool = True,
 ) -> None:
     swap_client.log.debug(f"TEST: wait_for_bid {bid_id.hex()}")
+
+    if isinstance(state, (list, tuple)):
+        if BidStates.BID_ERROR in state:
+            fail_fast = False
+    elif state is not None:
+        if state == BidStates.BID_ERROR:
+            fail_fast = False
+
     for i in range(wait_for):
         if delay_event.is_set():
             raise ValueError("Test stopped.")
@@ -229,22 +244,23 @@ def wait_for_bid(
         assert len(bids) < 2
         for bid in bids:
             if bid[2] == bid_id:
+                bid_state: int = bid[5]
                 if i > 0 and i % 10 == 0:
                     swap_client.log.debug(
-                        f"TEST: wait_for_bid {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                        f"TEST: wait_for_bid {bid_id.hex()}: Bid state {bid_state}, target {state}."
+                    )
+                if fail_fast and bid_state == BidStates.BID_ERROR:
+                    raise ValueError(
+                        f"wait_for_bid {bid_id.hex()}: Bid state {bid_state}, target {state}."
                     )
                 if isinstance(state, (list, tuple)):
-                    if bid[5] in state:
-                        swap_client.log.debug(
-                            f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid[5]}, target {state}."
-                        )
-                        return
-                    else:
+                    if bid_state not in state:
                         continue
-                elif state is not None and state != bid[5]:
-                    continue
+                elif state is not None:
+                    if bid_state != state:
+                        continue
                 swap_client.log.debug(
-                    f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid[5]}, target {state}."
+                    f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid_state}, target {state}."
                 )
                 return
             else:

@@ -607,13 +607,16 @@ class NAVInterface(BTCInterface):
 
         except Exception as e:
             self._log.debug(
-                "getLockTxHeight gettransaction failed: %s, %s", txid.hex(), str(e)
+                f"getLockTxHeight gettransaction failed: {self._log.id(txid)}, {e}"
             )
             return None
 
         if find_index:
             tx_obj = self.rpc("decoderawtransaction", [tx["hex"]])
-            rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+            if isinstance(vout, int) and vout >= 0:
+                rv["index"] = vout
+            else:
+                rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
             if rv["index"] is not None and rv["index"] >= 0:
                 rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 

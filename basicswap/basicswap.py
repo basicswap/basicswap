@@ -6488,6 +6488,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     TxTypes.ITX_PRE_FUNDED,
                     cursor=use_cursor,
                 )
+
+            if bid.debug_ind == DebugTypes.CREATE_INVALID_COIN_A_LOCK:
+                bid.amount -= int(bid.amount * 0.1)
+                self.log.debug(
+                    f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Reducing lock a txn amount by 10% to {ci_from.format_amount(bid.amount)}.",
+                )
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.DEBUG_TWEAK_APPLIED,
+                    f"ind {bid.debug_ind}",
+                    cursor,
+                )
+
             if prefunded_tx:
                 xmr_swap.a_lock_tx = pi.promoteMockTx(
                     ci_from, prefunded_tx, xmr_swap.a_lock_tx_script
@@ -7659,6 +7672,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_changed = False
 
         found_tx = None
+        check_amount: bool = (
+            False if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND else True
+        )
         if ci_to.watch_blocks_for_scripts():
             if bid.xmr_b_lock_tx is None or bid.xmr_b_lock_tx.txid is None:
                 # Watching chain for dest_address with WatchedScript
@@ -7682,12 +7698,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ci_to.blocks_confirmed,
                 bid.chain_b_height_start,
                 bid_sender,
-                check_amount=(
-                    False if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND else True
-                ),
+                check_amount=check_amount,
             )
 
+        invalid_tx_found: bool = False
         if isinstance(found_tx, int) and found_tx == -1:
+            invalid_tx_found = True
+        elif check_amount and found_tx is not None:
+            # Double check amount
+            value_key: str = "amount" if "amount" in found_tx else "value"
+            if value_key not in found_tx or found_tx[value_key] != bid.amount_to:
+                invalid_tx_found = True
+        if invalid_tx_found:
+            # Keep looking for a valid tx
             if self.countBidEvents(bid, EventLogTypes.LOCK_TX_B_INVALID, cursor) < 1:
                 self.logBidEvent(
                     bid.bid_id,
@@ -7715,7 +7738,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid_id=bid.bid_id,
                     tx_type=TxTypes.XMR_SWAP_B_LOCK,
                     txid=xmr_swap.b_lock_tx_id,
-                    vout=found_tx.get("index", 0),
+                    vout=found_tx.get("index", None),
                 )
             if bid.xmr_b_lock_tx.txid != found_txid:
                 self.log.debug(
@@ -8050,16 +8073,41 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 a_lock_tx_addr = ci_from.getSCLockScriptAddress(
                     xmr_swap.a_lock_tx_script
                 )
+                # Lock TX A should have been verified already
+                if (
+                    bid.xmr_a_lock_tx is None
+                    or bid.xmr_a_lock_tx.txid is None
+                    or not isinstance(bid.xmr_a_lock_tx.vout, int)
+                    or bid.xmr_a_lock_tx.vout < 0
+                ):
+                    raise ValueError("Lock TX A details missing.")
+
+                double_check_value: bool = True
+                if ci_from.get_connection_type() != "rpc":
+                    double_check_value = False
+                if ci_from.interface_type() == Coins.PART_BLIND:
+                    double_check_value = False
                 lock_tx_chain_info = ci_from.getLockTxHeight(
                     bid.xmr_a_lock_tx.txid,
                     a_lock_tx_addr,
                     bid.amount,
                     bid.chain_a_height_start,
                     vout=bid.xmr_a_lock_tx.vout,
+                    find_index=double_check_value,
                 )
-
                 if lock_tx_chain_info is None:
                     return rv
+                # Double check index and amount
+                if double_check_value and (
+                    "value" not in lock_tx_chain_info
+                    or lock_tx_chain_info["value"] != bid.amount
+                ):
+                    raise ValueError("Invalid chain a lock tx value!")
+                if double_check_value and (
+                    "index" not in lock_tx_chain_info
+                    or lock_tx_chain_info["index"] != bid.xmr_a_lock_tx.vout
+                ):
+                    raise ValueError("Chain a lock tx index mismatch!")
 
                 if "txid" in lock_tx_chain_info and (
                     xmr_swap.a_lock_tx_id is None
@@ -11355,17 +11403,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # TODO: check_lock_tx_inputs without txindex
             check_a_lock_tx_inputs = False
-            xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout = ci_from.verifySCLockTx(
-                xmr_swap.a_lock_tx,
-                xmr_swap.a_lock_tx_script,
-                bid.amount,
-                xmr_swap.pkal,
-                xmr_swap.pkaf,
-                a_fee_rate,
-                check_a_lock_tx_inputs,
-                xmr_swap.vkbv,
-                **lockExtraArgs,
-            )
+            try:
+                xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout = ci_from.verifySCLockTx(
+                    xmr_swap.a_lock_tx,
+                    xmr_swap.a_lock_tx_script,
+                    bid.amount,
+                    xmr_swap.pkal,
+                    xmr_swap.pkaf,
+                    a_fee_rate,
+                    check_a_lock_tx_inputs,
+                    xmr_swap.vkbv,
+                    **lockExtraArgs,
+                )
+            except Exception as e:
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.LOCK_TX_A_INVALID,
+                    f"Detected invalid lock tx A: {e}",
+                    None,
+                )
+                raise
 
             (
                 xmr_swap.a_lock_refund_tx_id,
@@ -11821,7 +11878,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         try:
-            b_lock_vout = 0
+            b_lock_vout = None
             if prefunded_tx:
                 self.log.info("Using pre-funded tx")
                 pi = self.pi(offer.swap_type)
