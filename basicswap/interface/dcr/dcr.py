@@ -82,7 +82,7 @@ from coincurve.ecdsaotves import (
 
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = 1 << 22
-SEQUENCE_LOCKTIME_MASK = 0x0000F
+SEQUENCE_LOCKTIME_MASK = 0x0000FFFF
 
 SigHashSerializePrefix: int = 1
 SigHashSerializeWitness: int = 3
@@ -1341,7 +1341,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
             outputs_value = 0
             for txo in tx.vout:
-                outputs_value += txo.nValue
+                outputs_value += txo.value
             fee_paid = inputs_value - outputs_value
             assert fee_paid > 0
 

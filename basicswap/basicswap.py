@@ -11597,6 +11597,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as e:  # noqa: F841
             if self.debug:
                 self.log.error(traceback.format_exc())
+            self.setBidError(bid, str(e), cursor=cursor)
 
     def sendXmrBidCoinALockTx(self, bid_id: bytes, cursor) -> None:
         # Offerer/Leader. Send coin A lock tx

@@ -290,12 +290,12 @@ class PARTInterfaceBlind(PARTInterface):
             except Exception as e:
                 self._log.debug("Searching for locked output: {}".format(str(e)))
                 continue
-            # Should not be possible for commitment not to match
-            v = self.rpc(
-                "verifycommitment",
-                [txo["valueCommitment"], blinded_info["blind"], blinded_info["amount"]],
-            )
-            ensure(v["result"] is True, "verifycommitment failed")
+        # Should not be possible for commitment not to match
+        v = self.rpc(
+            "verifycommitment",
+            [txo["valueCommitment"], blinded_info["blind"], blinded_info["amount"]],
+        )
+        ensure(v["result"] is True, "verifycommitment failed")
         return output_n, blinded_info
 
     def createSCLockTx(self, value: int, script: bytearray, vkbv: bytes) -> bytes:
@@ -1107,24 +1107,24 @@ class PARTInterfaceBlind(PARTInterface):
             if not addr_info["iswatchonly"]:
                 wif_scan_key = self.encodeKey(kbv)
                 self.rpc_wallet("importstealthaddress", [wif_scan_key, Kbs.hex()])
-                self._log.info("Imported watch-only sx_addr: {}".format(sx_addr))
+                self._log.debug(f"Imported watch-only sx_addr: {sx_addr}")
                 self._log.info(
-                    "Rescanning {} chain from height: {}".format(
-                        self.coin_name(), restore_height
-                    )
+                    f"Rescanning {self.coin_name()} chain from height: {restore_height}"
                 )
                 self.rpc_wallet("rescanblockchain", [restore_height])
 
         params = [{"include_watchonly": True, "search": sx_addr}]
         txns = self.rpc_wallet("filtertransactions", params)
-
-        if len(txns) == 1:
-            tx = txns[0]
-            assert (
-                tx["outputs"][0]["stealth_address"] == sx_addr
-            )  # Should not be possible
-            ensure(tx["outputs"][0]["type"] == "blind", "Output is not anon")
-
+        found_invalid_txid_hex: str = None
+        for tx in txns:
+            txid_hex: str = tx["txid"]
+            if tx["outputs"][0]["stealth_address"] != sx_addr:
+                # Should not be possible
+                self._log.warning(
+                    f"Skipping tx {txid_hex} received on different stealth address"
+                )
+                continue
+            ensure(tx["outputs"][0]["type"] == "blind", "Output is not blind")
             if (
                 self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value
                 or check_amount is False
@@ -1133,14 +1133,21 @@ class PARTInterfaceBlind(PARTInterface):
                 if tx["confirmations"] > 0:
                     chain_height = self.rpc("getblockcount")
                     height = chain_height - (tx["confirmations"] - 1)
-                return {"txid": tx["txid"], "amount": cb_swap_value, "height": height}
+                vout: int = tx["outputs"][0]["vout"]
+                return {
+                    "txid": tx["txid"],
+                    "amount": cb_swap_value,
+                    "height": height,
+                    "index": vout,
+                }
             else:
-                self._log.warning(
-                    "Incorrect amount detected for coin b lock txn: {}".format(
-                        tx["txid"]
-                    )
-                )
-                return -1
+                found_invalid_txid_hex = txid_hex
+
+        if found_invalid_txid_hex:
+            self._log.warning(
+                f"Incorrect amount detected for coin b lock txn: {found_invalid_txid_hex}"
+            )
+            return -1
         return None
 
     def spendBLockTx(
@@ -1163,34 +1170,32 @@ class PARTInterfaceBlind(PARTInterface):
             wif_scan_key = self.encodeKey(kbv)
             wif_spend_key = self.encodeKey(kbs)
             self.rpc_wallet("importstealthaddress", [wif_scan_key, wif_spend_key])
-            self._log.info("Imported spend key for sx_addr: {}".format(sx_addr))
+            self._log.debug(f"Imported spend key for sx_addr: {sx_addr}")
             self._log.info(
-                "Rescanning {} chain from height: {}".format(
-                    self.coin_name(), restore_height
-                )
+                f"Rescanning {self.coin_name()} chain from height: {restore_height}"
             )
             self.rpc_wallet("rescanblockchain", [restore_height])
 
-        # TODO: Remove workaround
-        # utxos = self.rpc_wallet('listunspentblind', [1, 9999999, [sx_addr]])
-        utxos = []
-        all_utxos = self.rpc_wallet("listunspentblind", [1, 9999999])
-        for utxo in all_utxos:
-            if utxo.get("stealth_address", "_") == sx_addr:
-                utxos.append(utxo)
-        if len(utxos) < 1:
-            raise TemporaryError("No spendable outputs")
-        elif len(utxos) > 1:
-            raise ValueError("Too many spendable outputs")
+        butxos = self.rpc_wallet("listunspentblind", [1, 9999999, [sx_addr]])
+        utxo = None
+        for blind_utxo in butxos:
+            if chain_b_lock_txid.hex() == blind_utxo["txid"]:
+                utxo_sats: int = self.make_int(blind_utxo["amount"])
+                if lock_tx_vout is not None and lock_tx_vout != blind_utxo["vout"]:
+                    continue
+                elif spend_actual_balance and utxo_sats != cb_swap_value:
+                    continue
+                # Drop through when lock_tx_vout is None and spend_actual_balance is False
+                utxo = blind_utxo
+                break
 
-        utxo = utxos[0]
-        utxo_sats = self.make_int(utxo["amount"])
+        if utxo is None:
+            raise TemporaryError("Spendable output not found")
+        utxo_sats: int = self.make_int(utxo["amount"])
 
         if spend_actual_balance and utxo_sats != cb_swap_value:
             self._log.warning(
-                "Spending actual balance {}, not swap value {}.".format(
-                    utxo_sats, cb_swap_value
-                )
+                f"Spending actual balance {utxo_sats}, not swap value {cb_swap_value}."
             )
             cb_swap_value = utxo_sats
 
@@ -1381,7 +1386,6 @@ class PARTInterfaceAnon(PARTInterface):
     ):
         Kbv = self.getPubkey(kbv)
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
-        self._log.debug("sx_addr: {}".format(sx_addr))
 
         # Tx recipient must import the stealth address as watch only
         if bid_sender:
@@ -1391,24 +1395,24 @@ class PARTInterfaceAnon(PARTInterface):
             if not addr_info["iswatchonly"]:
                 wif_scan_key = self.encodeKey(kbv)
                 self.rpc_wallet("importstealthaddress", [wif_scan_key, Kbs.hex()])
-                self._log.info("Imported watch-only sx_addr: {}".format(sx_addr))
+                self._log.debug(f"Imported watch-only sx_addr: {sx_addr}")
                 self._log.info(
-                    "Rescanning {} chain from height: {}".format(
-                        self.coin_name(), restore_height
-                    )
+                    f"Rescanning {self.coin_name()} chain from height: {restore_height}"
                 )
                 self.rpc_wallet("rescanblockchain", [restore_height])
 
         params = [{"include_watchonly": True, "search": sx_addr}]
         txns = self.rpc_wallet("filtertransactions", params)
-
-        if len(txns) == 1:
-            tx = txns[0]
-            assert (
-                tx["outputs"][0]["stealth_address"] == sx_addr
-            )  # Should not be possible
+        found_invalid_txid_hex: str = None
+        for tx in txns:
+            txid_hex: str = tx["txid"]
+            if tx["outputs"][0]["stealth_address"] != sx_addr:
+                # Should not be possible
+                self._log.warning(
+                    f"Skipping tx {txid_hex} received on different stealth address"
+                )
+                continue
             ensure(tx["outputs"][0]["type"] == "anon", "Output is not anon")
-
             if (
                 self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value
                 or check_amount is False
@@ -1417,14 +1421,21 @@ class PARTInterfaceAnon(PARTInterface):
                 if tx["confirmations"] > 0:
                     chain_height = self.rpc("getblockcount")
                     height = chain_height - (tx["confirmations"] - 1)
-                return {"txid": tx["txid"], "amount": cb_swap_value, "height": height}
+                vout: int = tx["outputs"][0]["vout"]
+                return {
+                    "txid": tx["txid"],
+                    "amount": cb_swap_value,
+                    "height": height,
+                    "index": vout,
+                }
             else:
-                self._log.warning(
-                    "Incorrect amount detected for coin b lock txn: {}".format(
-                        tx["txid"]
-                    )
-                )
-                return -1
+                found_invalid_txid_hex = txid_hex
+
+        if found_invalid_txid_hex:
+            self._log.warning(
+                f"Incorrect amount detected for coin b lock txn: {found_invalid_txid_hex}"
+            )
+            return -1
         return None
 
     def spendBLockTx(
@@ -1447,29 +1458,33 @@ class PARTInterfaceAnon(PARTInterface):
             wif_scan_key = self.encodeKey(kbv)
             wif_spend_key = self.encodeKey(kbs)
             self.rpc_wallet("importstealthaddress", [wif_scan_key, wif_spend_key])
-            self._log.info("Imported spend key for sx_addr: {}".format(sx_addr))
+            self._log.debug(f"Imported spend key for sx_addr: {sx_addr}")
             self._log.info(
-                "Rescanning {} chain from height: {}".format(
-                    self.coin_name(), restore_height
-                )
+                f"Rescanning {self.coin_name()} chain from height: {restore_height}"
             )
             self.rpc_wallet("rescanblockchain", [restore_height])
 
         autxos = self.rpc_wallet("listunspentanon", [1, 9999999, [sx_addr]])
 
-        if len(autxos) < 1:
-            raise TemporaryError("No spendable outputs")
-        elif len(autxos) > 1:
-            raise ValueError("Too many spendable outputs")
+        utxo = None
+        for anon_utxo in autxos:
+            if chain_b_lock_txid.hex() == anon_utxo["txid"]:
+                utxo_sats: int = self.make_int(anon_utxo["amount"])
+                if lock_tx_vout is not None and lock_tx_vout != anon_utxo["vout"]:
+                    continue
+                elif spend_actual_balance and utxo_sats != cb_swap_value:
+                    continue
+                # Drop through when lock_tx_vout is None and spend_actual_balance is False
+                utxo = anon_utxo
+                break
 
-        utxo = autxos[0]
-        utxo_sats = self.make_int(utxo["amount"])
+        if utxo is None:
+            raise TemporaryError("Spendable output not found")
+        utxo_sats: int = self.make_int(utxo["amount"])
 
         if spend_actual_balance and utxo_sats != cb_swap_value:
             self._log.warning(
-                "Spending actual balance {}, not swap value {}.".format(
-                    utxo_sats, cb_swap_value
-                )
+                f"Spending actual balance {utxo_sats}, not swap value {cb_swap_value}."
             )
             cb_swap_value = utxo_sats
 

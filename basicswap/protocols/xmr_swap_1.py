@@ -270,8 +270,7 @@ class XmrSwapInterface(ProtocolInterface):
         tx_obj = ci.loadTx(tx_data, allow_witness=False)
 
         lock_vout = findOutput(tx_obj, script_dest)
-        if lock_vout < 0:
-            raise ValueError("swap output not found")
+        ensure(lock_vout is not None, "Swap output not found")
 
         return tx_obj.vout[lock_vout].nValue
 
@@ -279,8 +278,7 @@ class XmrSwapInterface(ProtocolInterface):
         script: bytes = self.getMockScript()
         script_dest: bytes = ci.getScriptDest(script)
         lock_vout = findOutput(tx_obj, script_dest)
-        if lock_vout is None:
-            raise ValueError("swap output not found")
+        ensure(lock_vout is not None, "Swap output not found")
         return lock_vout
 
     def promoteMockTx(self, ci, mock_tx: bytes, script: bytearray) -> bytearray:
@@ -315,8 +313,7 @@ class XmrSwapInterface(ProtocolInterface):
         tx_obj = ci.loadTx(tx_data, allow_witness=False)
 
         lock_vout = findOutput(tx_obj, script_pk)
-        if lock_vout < 0:
-            raise ValueError("swap output not found")
+        ensure(lock_vout is not None, "Swap output not found")
 
         return tx_obj.vout[lock_vout].nValue
 
@@ -324,8 +321,7 @@ class XmrSwapInterface(ProtocolInterface):
         mock_pk: bytes = self.getMockPubkey(ci)
         script_pk = ci.getPkDest(mock_pk)
         lock_vout = findOutput(tx_obj, script_pk)
-        if lock_vout is None:
-            raise ValueError("swap output not found")
+        ensure(lock_vout is not None, "Swap output not found")
         return lock_vout
 
     def promoteMockPTx(self, ci, tx_data: bytes, kbv: bytes, Kbs: bytes) -> bytes:
@@ -333,8 +329,8 @@ class XmrSwapInterface(ProtocolInterface):
         script_pk = ci.getPkDest(mock_pk)
         tx_obj = ci.loadTx(tx_data)
         lock_vout = findOutput(tx_obj, script_pk)
-        if lock_vout < 0:
-            raise ValueError("swap output not found")
+        ensure(lock_vout is not None, "Swap output not found")
+
         tx_obj.vout[lock_vout].scriptPubKey = ci.getPkDest(Kbs)
 
         return tx_obj.serialize()
