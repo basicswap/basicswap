@@ -467,7 +467,21 @@ class XMRInterface(CoinInterface):
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
 
             Kbv = self.getPubkey(kbv)
-            shared_addr = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
+            shared_addr: str = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
+
+            # Check that the wallet is not already sending to the lock address
+            txns = self.rpc_wallet("get_transfers", {"out": True, "pending": True})
+            for tag in ("pending", "out"):
+                if tag not in txns:
+                    continue
+                for tx in txns[tag]:
+                    for destination in tx.get("destinations", []):
+                        if destination.get("address", None) == shared_addr:
+                            tx_hash: bytes = bytes.fromhex(tx["txid"])
+                            self._log.warning(
+                                f"Already sending to lock address {shared_addr} in tx: {self._log.id(tx_hash)}"
+                            )
+                            return tx_hash
 
             params = {
                 "destinations": [{"amount": output_amount, "address": shared_addr}],
@@ -482,8 +496,7 @@ class XMRInterface(CoinInterface):
                     self._log.addr(shared_addr),
                 )
             )
-            tx_hash = bytes.fromhex(rv["tx_hash"])
-
+            tx_hash: bytes = bytes.fromhex(rv["tx_hash"])
             return tx_hash
 
     def findTxB(
