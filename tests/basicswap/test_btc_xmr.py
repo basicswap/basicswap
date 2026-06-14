@@ -39,6 +39,7 @@ from tests.basicswap.common import (
     abandon_all_swaps,
     wait_for_balance,
     wait_for_bid,
+    wait_for_bid_states,
     wait_for_event,
     wait_for_offer,
     wait_for_unspent,
@@ -216,20 +217,14 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
-            swap_clients[id_offerer],
             bid_id,
+            swap_clients[id_offerer],
+            BidStates.SWAP_COMPLETED,
+            swap_clients[id_bidder],
             BidStates.SWAP_COMPLETED,
             wait_for=(self.extra_wait_time + 180),
-        )
-        wait_for_bid(
-            test_delay_event,
-            swap_clients[id_bidder],
-            bid_id,
-            BidStates.SWAP_COMPLETED,
-            sent=True,
-            wait_for=(self.extra_wait_time + 30),
         )
 
         amount_from = float(ci_from.format_amount(amt_swap))
@@ -356,22 +351,14 @@ class TestFunctions(BaseTest):
         )
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        leader_sent_bid: bool = True if reverse_bid else False
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
+            bid_id,
             swap_clients[id_leader],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            sent=leader_sent_bid,
-            wait_for=(self.extra_wait_time + 180),
-        )
-        wait_for_bid(
-            test_delay_event,
             swap_clients[id_follower],
-            bid_id,
             [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
-            sent=(not leader_sent_bid),
-            wait_for=(self.extra_wait_time + 30),
+            wait_for=(self.extra_wait_time + 180),
         )
 
         # TODO: Discard block rewards
@@ -451,8 +438,6 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        leader_sent_bid: bool = True if reverse_bid else False
-
         expect_state = (
             (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED)
             if with_mercy
@@ -464,21 +449,14 @@ class TestFunctions(BaseTest):
             # When using BCH, can't set XMR_SWAP_FAILED_SWIPED as should wait for mercy tx
             expect_state = expect_state + (BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,)
 
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
+            bid_id,
             swap_clients[id_leader],
-            bid_id,
             expect_state,
-            wait_for=(self.extra_wait_time + 180),
-            sent=leader_sent_bid,
-        )
-        wait_for_bid(
-            test_delay_event,
             swap_clients[id_follower],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_SWIPED,
-            wait_for=(self.extra_wait_time + 80),
-            sent=(not leader_sent_bid),
+            wait_for=(self.extra_wait_time + 240),
         )
 
         # TODO: Exclude block rewards
@@ -564,22 +542,14 @@ class TestFunctions(BaseTest):
         )
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        leader_sent_bid: bool = True if reverse_bid else False
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
+            bid_id,
             swap_clients[id_leader],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            wait_for=(self.extra_wait_time + 200),
-            sent=leader_sent_bid,
-        )
-        wait_for_bid(
-            test_delay_event,
             swap_clients[id_follower],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            sent=(not leader_sent_bid),
-            wait_for=(self.extra_wait_time + 30),
+            wait_for=(self.extra_wait_time + 240),
         )
 
         js_w0_after = read_json_api(1800 + id_offerer, "wallets")

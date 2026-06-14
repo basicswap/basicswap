@@ -242,33 +242,120 @@ def wait_for_bid(
         }
         bids = swap_client.listBids(sent=sent, filters=filters)
         assert len(bids) < 2
-        for bid in bids:
-            if bid[2] == bid_id:
-                bid_state: int = bid[5]
-                if i > 0 and i % 10 == 0:
-                    swap_client.log.debug(
-                        f"TEST: wait_for_bid {bid_id.hex()}: Bid state {bid_state}, target {state}."
-                    )
-                if fail_fast and bid_state == BidStates.BID_ERROR:
-                    raise ValueError(
-                        f"wait_for_bid {bid_id.hex()}: Bid state {bid_state}, target {state}."
-                    )
-                if isinstance(state, (list, tuple)):
-                    if bid_state not in state:
-                        continue
-                elif state is not None:
-                    if bid_state != state:
-                        continue
+        if len(bids) < 1:
+            if i > 0 and i % 10 == 0:
                 swap_client.log.debug(
-                    f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid_state}, target {state}."
+                    f"TEST: wait_for_bid {bid_id.hex()}: Bid not found."
                 )
-                return
-            else:
+            continue
+        bid = bids[0]
+        assert bid[2] == bid_id
+        bid_state: int = bid[5]
+        if i > 0 and i % 10 == 0:
+            swap_client.log.debug(
+                f"TEST: wait_for_bid {bid_id.hex()}: Bid state {bid_state}, target {state}."
+            )
+        if fail_fast and bid_state == BidStates.BID_ERROR:
+            raise ValueError(
+                f"wait_for_bid {bid_id.hex()}: Bid state {bid_state}, target {state}."
+            )
+        if isinstance(state, (list, tuple)):
+            if bid_state not in state:
+                continue
+        elif state is not None:
+            if bid_state != state:
+                continue
+        swap_client.log.debug(
+            f"TEST: wait_for_bid found {bid_id.hex()}: Bid state {bid_state}, target {state}."
+        )
+        return
+    raise ValueError(f"wait_for_bid timed out {bid_id.hex()}.")
+
+
+def wait_for_bid_states(
+    delay_event,
+    bid_id,
+    swap_client_a,
+    state_a,
+    swap_client_b,
+    state_b,
+    wait_for: int = 20,
+    fail_fast_a: bool = True,
+    fail_fast_b: bool = True,
+) -> None:
+    for swap_client, expect_state in (
+        (swap_client_a, state_a),
+        (swap_client_b, state_b),
+    ):
+        swap_client.log.debug(
+            f"TEST: wait_for_bid_states {bid_id.hex()}, state {expect_state}"
+        )
+
+    fail_fast = [fail_fast_a, fail_fast_b]
+    if isinstance(state_a, (list, tuple)):
+        if BidStates.BID_ERROR in state_a:
+            fail_fast[0] = False
+    elif state_a == BidStates.BID_ERROR:
+        fail_fast[0] = False
+    if isinstance(state_b, (list, tuple)):
+        if BidStates.BID_ERROR in state_b:
+            fail_fast[1] = False
+    elif state_b == BidStates.BID_ERROR:
+        fail_fast[1] = False
+
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError("Test stopped.")
+        delay_event.wait(1)
+
+        filters = {
+            "bid_id": bid_id,
+        }
+        num_passed: int = 0
+        bid_states = [None] * 2
+        for n, (swap_client, expect_state) in enumerate(
+            (
+                (swap_client_a, state_a),
+                (swap_client_b, state_b),
+            )
+        ):
+            bids = swap_client.listBids(sent=None, filters=filters)
+            assert len(bids) < 2
+            if len(bids) < 1:
                 if i > 0 and i % 10 == 0:
                     swap_client.log.debug(
-                        f"TEST: wait_for_bid {bid_id.hex()}: Bid not found."
+                        f"TEST: wait_for_bid_states {bid_id.hex()}: Bid not found."
                     )
-    raise ValueError(f"wait_for_bid timed out {bid_id.hex()}.")
+                continue
+            bid = bids[0]
+            assert bid[2] == bid_id
+            bid_state: int = bid[5]
+            bid_states[n] = bid_state
+            if i > 0 and i % 10 == 0:
+                swap_client.log.debug(
+                    f"TEST: wait_for_bid_states {bid_id.hex()}: Bid state {bid_state}, target {expect_state}."
+                )
+            if fail_fast[n] and bid_state == BidStates.BID_ERROR:
+                raise ValueError(
+                    f"wait_for_bid_states {bid_id.hex()}: Bid state {bid_state}, target {expect_state}."
+                )
+            if isinstance(expect_state, (list, tuple)):
+                if bid_state not in expect_state:
+                    continue
+            elif expect_state is not None:
+                if bid_state != expect_state:
+                    continue
+            num_passed += 1
+        if num_passed == 2:
+            swap_client_a.log.debug(
+                f"TEST: wait_for_bid_states found {bid_id.hex()}: Bid state {bid_states[0]}, target {state_a}."
+            )
+            swap_client_b.log.debug(
+                f"TEST: wait_for_bid_states found {bid_id.hex()}: Bid state {bid_states[1]}, target {state_b}."
+            )
+            return
+
+    raise ValueError(f"wait_for_bid_states timed out {bid_id.hex()}.")
 
 
 def wait_for_bid_tx_state(
