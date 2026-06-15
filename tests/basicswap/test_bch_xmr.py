@@ -13,6 +13,7 @@ import unittest
 
 import basicswap.config as cfg
 from basicswap.basicswap import (
+    BidStates,
     Coins,
     SwapTypes,
 )
@@ -25,6 +26,8 @@ from tests.basicswap.common import (
     prepareDataDir,
     stopDaemons,
     waitForRPC,
+    wait_for_bid,
+    wait_for_offer,
 )
 from basicswap.contrib.test_framework.messages import (
     CTxIn,
@@ -220,10 +223,110 @@ class TestBCH(BasicSwapTest):
         cls.bch_daemons.clear()
 
     def mineBlock(self, num_blocks=1):
-        self.callnoderpc("generatetoaddress", [num_blocks, self.bch_addr])
+        if self.bch_addr is None:
+            logging.info("BCH mining paused")
+        else:
+            self.callnoderpc("generatetoaddress", [num_blocks, self.bch_addr])
+
+    def pauseMining(self):
+        logging.info(f"Pausing BCH mining to {self.bch_addr}")
+        self.old_bch_addr: str = self.__class__.bch_addr
+        self.__class__.bch_addr = None
+
+    def continueMining(self):
+        logging.info(f"Resuming BCH mining to {self.old_bch_addr}")
+        self.__class__.bch_addr = self.old_bch_addr
 
     def check_softfork_active(self, feature_name):
         return True
+
+    def do_test_09_expire_accepted(self, coin_from, coin_to):
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} Expire Accepted"
+        )
+
+        swap_clients = self.swap_clients
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+
+        id_offerer: int = self.node_a_id
+        id_bidder: int = self.node_b_id
+
+        # Leader sends the initial (chain a) lock tx.
+        # Follower sends the participate (chain b) lock tx.
+        id_leader: int = id_bidder if reverse_bid else id_offerer
+        id_follower: int = id_offerer if reverse_bid else id_bidder
+
+        swap_clients = self.swap_clients
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        self.prepare_balance(
+            coin_from, 100.0, 1800 + id_offerer, 1801 if reverse_bid else 1800
+        )
+        self.prepare_balance(
+            coin_to, 100.0, 1800 + id_bidder, 1800 if reverse_bid else 1801
+        )
+
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].listOffers(filters={"offer_id": offer_id})[0]
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        try:
+            self.pauseMining()
+            old_check_expired_seconds = swap_clients[0].check_expired_seconds
+
+            swap_clients[id_offerer].acceptBid(bid_id)
+
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_follower],
+                bid_id,
+                BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+                sent=None,
+                wait_for=(self.extra_wait_time + 80),
+            )
+            for node_id in (id_leader, id_follower):
+                swap_clients[node_id].setMockTimeOffset(13 * 3600)
+                swap_clients[node_id].check_expired_seconds = 2
+
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_follower],
+                bid_id,
+                BidStates.SWAP_TIMEDOUT,
+                sent=None,
+                wait_for=(self.extra_wait_time + 60),
+            )
+
+            # Leader (which funded the lock tx) should not timeout.
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_leader],
+                bid_id,
+                BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+                sent=None,
+                wait_for=(self.extra_wait_time + 40),
+            )
+
+        finally:
+            self.continueMining()
+            for node_id in (id_leader, id_follower):
+                swap_clients[node_id].setMockTimeOffset(0)
+                swap_clients[node_id].check_expired_seconds = old_check_expired_seconds
 
     def test_001_nested_segwit(self):
         logging.info(f"---------- Test {self.test_coin.name} p2sh nested segwit")

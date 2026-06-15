@@ -83,7 +83,10 @@ class TestFunctions(BaseTest):
         return callnoderpc(node_id, method, params, wallet, self.base_rpc_port)
 
     def mineBlock(self, num_blocks=1):
-        self.callnoderpc("generatetoaddress", [num_blocks, self.btc_addr])
+        if self.btc_addr is None:
+            logging.info("BTC mining paused")
+        else:
+            self.callnoderpc("generatetoaddress", [num_blocks, self.btc_addr])
 
     def check_softfork_active(self, feature_name):
         deploymentinfo = self.callnoderpc("getdeploymentinfo")
@@ -759,6 +762,7 @@ class TestFunctions(BaseTest):
         # Follower sends the participate (chain b) lock tx.
         id_leader: int = id_bidder if reverse_bid else id_offerer
         id_follower: int = id_offerer if reverse_bid else id_bidder
+        coin_leader: int = coin_to if reverse_bid else coin_from
 
         swap_clients = self.swap_clients
         reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
@@ -787,9 +791,7 @@ class TestFunctions(BaseTest):
         )
 
         try:
-            # Stop BTC mining
-            old_btc_addr: str = self.__class__.btc_addr
-            self.__class__.btc_addr = None
+            self.pauseMining()
             old_check_expired_seconds = swap_clients[0].check_expired_seconds
 
             swap_clients[id_offerer].acceptBid(bid_id)
@@ -812,7 +814,7 @@ class TestFunctions(BaseTest):
                     chain_a_lock_txid = tx["txid"]
             assert chain_a_lock_txid
 
-            ci_btc_l = swap_clients[id_leader].ci(Coins.BTC)
+            ci_btc_l = swap_clients[id_leader].ci(coin_leader)
             rv = ci_btc_l.rpc_wallet(
                 "psbtbumpfee",
                 [
@@ -849,7 +851,7 @@ class TestFunctions(BaseTest):
                 wait_for=90,
             )
             # Mine the replacement tx
-            ci_btc_l.rpc_wallet("generatetoaddress", [1, old_btc_addr])
+            ci_btc_l.rpc_wallet("generatetoaddress", [1, self.old_btc_addr])
 
             for node_id in (id_leader, id_follower):
                 swap_clients[node_id].setMockTimeOffset(13 * 3600)
@@ -875,8 +877,7 @@ class TestFunctions(BaseTest):
             )
 
         finally:
-            # Restore BTC mining:
-            self.__class__.btc_addr = old_btc_addr
+            self.continueMining()
             for node_id in (id_leader, id_follower):
                 swap_clients[node_id].setMockTimeOffset(0)
                 swap_clients[node_id].check_expired_seconds = old_check_expired_seconds
@@ -967,6 +968,15 @@ class BasicSwapTest(TestFunctions):
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
         settings["fetchpricesthread"] = False
+
+    def pauseMining(self):
+        logging.info(f"Pausing BTC mining to {self.btc_addr}")
+        self.old_btc_addr: str = self.__class__.btc_addr
+        self.__class__.btc_addr = None
+
+    def continueMining(self):
+        logging.info(f"Resuming BTC mining to {self.old_btc_addr}")
+        self.__class__.btc_addr = self.old_btc_addr
 
     def test_001_nested_segwit(self):
         # p2sh-p2wpkh

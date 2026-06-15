@@ -9415,7 +9415,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid = self.swaps_in_progress[watched_script.bid_id][0]
             if bid.xmr_a_lock_tx.txid != txid:
                 self.log.debug(
-                    f"Updating xmr_a_lock_tx from {self.log.id(bid.xmr_a_lock_tx.txid)} to {txid}."
+                    f"Updating xmr_a_lock_tx from {self.log.id(bid.xmr_a_lock_tx.txid)} to {self.log.id(txid)}."
                 )
                 bid.xmr_a_lock_tx.txid = txid
                 bid.xmr_a_lock_tx.vout = vout
