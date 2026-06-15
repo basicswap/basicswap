@@ -272,11 +272,7 @@ class BCHInterface(BTCInterface):
         vout: int = -1,
         return_invalid_txids: bool = False,
     ) -> dict | None:
-        """
-        TODO: BCH Watchonly
-        Replace with importWatchOnlyAddress when it works again
-        Currently importing the watchonly address only works if rescanblockchain is run on every iteration
-        """
+        # Currently, for BCH, importing the watchonly address only works if rescanblockchain is run on every iteration
         if txid is None:
             self._log.debug("TODO: getLockTxHeight")
             return None

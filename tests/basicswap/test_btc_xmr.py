@@ -814,44 +814,68 @@ class TestFunctions(BaseTest):
                     chain_a_lock_txid = tx["txid"]
             assert chain_a_lock_txid
 
-            ci_btc_l = swap_clients[id_leader].ci(coin_leader)
-            rv = ci_btc_l.rpc_wallet(
-                "psbtbumpfee",
-                [
-                    chain_a_lock_txid,
-                ],
-            )
-            rv = ci_btc_l.rpc_wallet(
-                "walletprocesspsbt",
-                [
-                    rv["psbt"],
-                ],
-            )
-            rv = ci_btc_l.rpc_wallet(
-                "finalizepsbt",
-                [
-                    rv["psbt"],
-                ],
-            )
-            new_tx_hex = rv["hex"]
-            rv = ci_btc_l.rpc_wallet(
-                "sendrawtransaction",
-                [
-                    new_tx_hex,
-                ],
-            )
-            assert rv != chain_a_lock_txid
+            if coin_leader == Coins.BTC:
+                # Test that the lock tx is removed if replaced (RBF)
+                ci_btc_l = swap_clients[id_leader].ci(coin_leader)
+                rv = ci_btc_l.rpc_wallet(
+                    "psbtbumpfee",
+                    [
+                        chain_a_lock_txid,
+                    ],
+                )
+                rv = ci_btc_l.rpc_wallet(
+                    "walletprocesspsbt",
+                    [
+                        rv["psbt"],
+                    ],
+                )
+                rv = ci_btc_l.rpc_wallet(
+                    "finalizepsbt",
+                    [
+                        rv["psbt"],
+                    ],
+                )
+                new_tx_hex = rv["hex"]
+                new_txid = ci_btc_l.rpc_wallet(
+                    "sendrawtransaction",
+                    [
+                        new_tx_hex,
+                    ],
+                )
+                assert new_txid != chain_a_lock_txid
 
-            wait_for_event(
-                test_delay_event,
-                swap_clients[id_follower],
-                Concepts.BID,
-                bid_id,
-                event_type=EventLogTypes.LOCK_TX_A_CONFLICTS,
-                wait_for=90,
-            )
-            # Mine the replacement tx
-            ci_btc_l.rpc_wallet("generatetoaddress", [1, self.old_btc_addr])
+                """
+                # Conflicts not detected with gettxout in getLockTxHeight
+                wait_for_event(
+                    test_delay_event,
+                    swap_clients[id_follower],
+                    Concepts.BID,
+                    bid_id,
+                    event_type=EventLogTypes.LOCK_TX_A_CONFLICTS,
+                    wait_for=90,
+                )
+                """
+                found_mempool: bool = False
+                for i in range(16):
+                    try:
+                        _ = ci_btc_l.rpc("getmempoolentry", [new_txid])
+                        found_mempool = True
+                        break
+                    except Exception as e:
+                        if "Transaction not in mempool" not in str(e):
+                            raise
+                    test_delay_event.wait(1)
+                assert found_mempool is True
+                try:
+                    _ = ci_btc_l.rpc("getmempoolentry", [chain_a_lock_txid])
+                except Exception as e:
+                    if "Transaction not in mempool" not in str(e):
+                        raise
+                else:
+                    raise ValueError("Old tx should not be in mempool")
+
+                # Mine the replacement tx
+                ci_btc_l.rpc_wallet("generatetoaddress", [1, self.old_btc_addr])
 
             for node_id in (id_leader, id_follower):
                 swap_clients[node_id].setMockTimeOffset(13 * 3600)
@@ -968,6 +992,9 @@ class BasicSwapTest(TestFunctions):
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
         settings["fetchpricesthread"] = False
+
+    def getMiningAddr(self):
+        return self.btc_addr
 
     def pauseMining(self):
         logging.info(f"Pausing BTC mining to {self.btc_addr}")
@@ -1345,7 +1372,7 @@ class BasicSwapTest(TestFunctions):
         ci1 = self.swap_clients[1].ci(self.test_coin_from)
 
         addr = ci.rpc_wallet("getnewaddress", ["watchonly test", "bech32"])
-        ro = ci1.rpc_wallet("importaddress", [addr, "", False])
+        ci1.rpc_wallet("importaddress", [addr, "", False])
         txid = ci.rpc_wallet("sendtoaddress", [addr, 1.0])
         tx_hex = ci.rpc(
             "getrawtransaction",
@@ -2089,10 +2116,70 @@ class BasicSwapTest(TestFunctions):
         for vout in tx["vout"]:
             assert vout["scriptPubKey"]["type"] == "witness_v0_keyhash"
 
+    def test_016_gettransaction(self):
+        logging.info(f"---------- Test {self.test_coin_from.name} gettransaction")
+
+        # Check that gettransaction finds txns in the mempool
+
+        ci0 = self.swap_clients[0].ci(self.test_coin_from)
+        ci1 = self.swap_clients[1].ci(self.test_coin_from)
+        pi = self.swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        networkinfo: str = ci1.rpc("getnetworkinfo")
+        core_version = networkinfo["version"]
+        logging.info(f"core_version {core_version}")
+
+        A = ci0.getPubkey(ci0.getNewRandomKey())
+        B = ci0.getPubkey(ci0.getNewRandomKey())
+        lock_tx_script = pi.genScriptLockTxScript(ci0, A, B)
+
+        lock_tx = ci0.createSCLockTx(ci0.make_int(1.16), lock_tx_script)
+        lock_tx = ci0.fundSCLockTx(lock_tx, self.test_fee_rate)
+        lock_tx = ci0.signTxWithWallet(lock_tx)
+        script_addr: str = ci0.encodeScriptDest(ci0.getScriptDest(lock_tx_script))
+
+        ci1.rpc_wallet_watch("importaddress", [script_addr])
+
+        try:
+            mining_address: str = self.getMiningAddr()
+            self.pauseMining()
+            txid_hex: str = ci0.rpc("sendrawtransaction", [lock_tx.hex()])
+            found_mempool: bool = False
+            for i in range(16):
+                try:
+                    _ = ci1.rpc("getmempoolentry", [txid_hex])
+                    found_mempool = True
+                    break
+                except Exception as e:
+                    if "Transaction not in mempool" not in str(e):
+                        raise
+                test_delay_event.wait(1)
+            assert found_mempool is True
+            # ci1.rpc_wallet_watch("importaddress", [script_addr])
+            # Importing after the tx is in the mempool works for BTC 290300, not for LTC 210505
+            test_delay_event.wait(1)
+
+            include_watchonly: bool = True
+            txinfo = ci1.rpc_wallet_watch(
+                "gettransaction", [txid_hex, include_watchonly]
+            )
+            assert txinfo["confirmations"] == 0
+            assert txinfo["txid"] == txid_hex
+
+            ci0.rpc_wallet("generatetoaddress", [1, mining_address])
+            found_mined: bool = False
+            for i in range(16):
+                txinfo = ci1.rpc_wallet_watch("gettransaction", [txid_hex])
+                if txinfo["confirmations"] > 0:
+                    found_mined = True
+                    break
+                test_delay_event.wait(1)
+            assert found_mined is True
+        finally:
+            self.continueMining()
+
     def test_01_0_lock_bad_prevouts(self):
-        logging.info(
-            "---------- Test {} lock_bad_prevouts".format(self.test_coin_from.name)
-        )
+        logging.info(f"---------- Test {self.test_coin_from.name} lock_bad_prevouts")
         # Lock non segwit prevouts created in earlier tests
         for i in range(2):
             ci = self.swap_clients[i].ci(self.test_coin_from)

@@ -220,8 +220,11 @@ class FIROInterface(BTCInterface):
         vout: int = -1,
         return_invalid_txids: bool = False,
     ) -> dict | None:
-        # Add watchonly address and rescan if required
+        if txid is not None and isinstance(vout, int) and vout >= 0:
+            # Prefer to use gettxout if the txid and vout are known
+            return self.getLockTxVout(txid, vout, dest_address, return_invalid_txids)
 
+        # Add watchonly address and rescan if required
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
             self._log.info(

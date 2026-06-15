@@ -228,6 +228,9 @@ class TestBCH(BasicSwapTest):
         else:
             self.callnoderpc("generatetoaddress", [num_blocks, self.bch_addr])
 
+    def getMiningAddr(self):
+        return self.bch_addr
+
     def pauseMining(self):
         logging.info(f"Pausing BCH mining to {self.bch_addr}")
         self.old_bch_addr: str = self.__class__.bch_addr

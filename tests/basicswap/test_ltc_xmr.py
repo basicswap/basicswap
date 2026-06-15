@@ -43,6 +43,9 @@ class TestLTC(BasicSwapTest):
     def mineBlock(self, num_blocks=1):
         self.callnoderpc("generatetoaddress", [num_blocks, self.ltc_addr])
 
+    def getMiningAddr(self):
+        return self.ltc_addr
+
     def pauseMining(self):
         logging.info(f"Pausing LTC mining to {self.ltc_addr}")
         self.old_ltc_addr: str = self.__class__.ltc_addr
