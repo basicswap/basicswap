@@ -351,7 +351,7 @@ class XMRInterface(CoinInterface):
                 if i < self._num_chaininfo_retries - 1 and self.is_transient_error(e):
                     time.sleep(self._chaininfo_retry_delay)
                     continue
-                raise (e)
+                raise
 
     def getWalletInfo(self):
         with self._mx_wallet:
@@ -366,7 +366,7 @@ class XMRInterface(CoinInterface):
                         "unconfirmed_balance": 0,
                     }
                     return rv
-                raise e
+                raise
 
             rv = {}
             self.rpc_wallet("refresh")
@@ -820,9 +820,9 @@ class XMRInterface(CoinInterface):
                 "change_wallet_password",
                 {"old_password": old_password, "new_password": new_password},
             )
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             self._wallet_password = orig_password
-            raise e
+            raise
 
     def unlockWallet(self, password: str, check_seed: bool = True) -> None:
         self._log.info("unlockWallet - {}".format(self.ticker()))

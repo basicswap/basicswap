@@ -662,10 +662,10 @@ def compare_bid_states_unordered(states, expect_states, ignore_states=[]) -> boo
         assert len(states) == len(expect_states)
         for state in expect_states:
             assert any(state in s[1] for s in states)
-    except Exception as e:
+    except Exception as e:  # noqa: F841
         logging.info("Expecting states: {}".format(json.dumps(expect_states, indent=4)))
         logging.info("Have states: {}".format(json.dumps(states, indent=4)))
-        raise e
+        raise
     return True
 
 

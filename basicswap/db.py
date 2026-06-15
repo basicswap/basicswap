@@ -1004,7 +1004,7 @@ class DBMethods:
                 "SELECT value FROM kv_int WHERE key = :key", {"key": str_key}
             ).fetchall()
             return rows[0][0]
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             if default_val is not None:
                 if update_if_default:
                     use_cursor.execute(
@@ -1017,7 +1017,7 @@ class DBMethods:
                     )
                 return default_val
             else:
-                raise e
+                raise
         finally:
             if cursor is None:
                 self.closeDB(use_cursor)

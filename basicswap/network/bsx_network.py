@@ -747,10 +747,10 @@ class BSXNetwork:
             if return_msg:
                 return bytes.fromhex(ro["msgid"]), bytes.fromhex(ro["msg"])
             return bytes.fromhex(ro["msgid"])
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             if self.debug:
                 self.log.error("smsgsend failed {}".format(json.dumps(ro, indent=4)))
-            raise e
+            raise
 
     def forwardSmsg(self, smsg_msg: bytes) -> None:
         options = {"submitmsg": True, "rehashmsg": False}

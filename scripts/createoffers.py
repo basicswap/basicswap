@@ -202,7 +202,7 @@ def make_json_api_func(host: str, port: int, auth_string: str = None):
                     raise e
         except Exception as e:
             print(f"Error during API connection: {e}")
-            raise e
+            raise
 
     return api_func
 

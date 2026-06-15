@@ -147,9 +147,9 @@ class TestBCH(BasicSwapTest):
                         "-wallet=bsx_wallet create",
                         bch_wallet_bin,
                     )
-                except Exception as e:
+                except Exception as e:  # noqa: F841
                     logging.warning("bch: bitcoin-wallet create failed")
-                    raise e
+                    raise
 
         cls.bch_daemons.append(
             startDaemon(

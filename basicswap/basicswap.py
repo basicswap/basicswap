@@ -1831,10 +1831,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     continue
                 try:
                     self.ci(c).unlockWallet(password)
-                except Exception as e:
+                except Exception as e:  # noqa: F841
                     self.log.warning(f"Failed to unlock wallet {getCoinName(c)}")
                     if coin is not None or c == Coins.PART:
-                        raise e
+                        raise
                 if c == Coins.PART:
                     self._is_locked = False
 
@@ -3257,7 +3257,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # <  0.21: sethdseed cannot set a new HD seed while still in Initial Block Download.
             self.log.error(f"initialiseWallet failed: {e}")
             if raise_errors:
-                raise e
+                raise
             if self.debug:
                 self.log.error(traceback.format_exc())
             return
@@ -5689,10 +5689,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.log.error(
                             f"Submit refund_txn unexpectedly worked {self.logIDT(bytes.fromhex(txid))}"
                         )
-                    except Exception as ex:
-                        if ci_from.isTxNonFinalError(str(ex)) is False:
-                            self.log.error(f"Submit refund_txn unexpected error: {ex}")
-                            raise ex
+                    except Exception as e:
+                        if ci_from.isTxNonFinalError(str(e)) is False:
+                            self.log.error(f"Submit refund_txn unexpected error: {e}")
+                            raise
 
             if txid is not None:
                 msg_buf = BidAcceptMessage()
@@ -8426,8 +8426,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                             self.commitDB()
 
-        except Exception as ex:
-            raise ex
+        except Exception as e:  # noqa: F841
+            raise
         finally:
             self.closeDB(cursor)
 

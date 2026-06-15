@@ -265,9 +265,9 @@ class WalletManager:
             self._swap_client.commitDB()
             return address
 
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             self._swap_client.rollbackDB()
-            raise e
+            raise
         finally:
             if cursor is None:
                 self._swap_client.closeDB(use_cursor, commit=False)
@@ -825,10 +825,10 @@ class WalletManager:
             )
             if owns_cursor:
                 self._swap_client.commitDB()
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             if owns_cursor:
                 self._swap_client.rollbackDB()
-            raise e
+            raise
         finally:
             if owns_cursor:
                 self._swap_client.closeDB(cursor, commit=False)
@@ -1149,9 +1149,9 @@ class WalletManager:
 
                 self._swap_client.commitDB()
                 return added
-            except Exception as e:
+            except Exception as e:  # noqa: F841
                 self._swap_client.rollbackDB()
-                raise e
+                raise
             finally:
                 self._swap_client.closeDB(cursor, commit=False)
         finally:
@@ -1297,9 +1297,9 @@ class WalletManager:
             if added > 0:
                 self._swap_client.commitDB()
             return added
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             self._swap_client.rollbackDB()
-            raise e
+            raise
         finally:
             self._swap_client.closeDB(cursor, commit=False)
 

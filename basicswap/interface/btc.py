@@ -719,7 +719,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 else:
                 """
                 if "Already have this key" not in str(e):
-                    raise (e)
+                    raise
                 self._log.info(
                     f"{self.coin_name()} wallet already has the correct HD seed."
                 )

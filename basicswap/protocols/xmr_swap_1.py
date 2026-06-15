@@ -134,9 +134,9 @@ def recoverNoScriptTxnWithKey(self, bid_id: bytes, encoded_key, cursor=None):
         self.commitDB()
 
         return txid
-    except Exception as e:
+    except Exception as e:  # noqa: F841
         self.log.error(traceback.format_exc())
-        raise (e)
+        raise
     finally:
         if cursor is None:
             self.closeDB(use_cursor, commit=False)

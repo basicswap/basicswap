@@ -770,7 +770,7 @@ class Test(TestFunctions):
             )
         except Exception as e:
             if "transaction already in block chain" not in str(e):
-                raise (e)
+                raise
         ro = self.callnoderpc("gettransaction", [txid, True], node_id=1)
         assert ro["txid"] == txid
         assert ro["details"][0]["involvesWatchonly"] is True
