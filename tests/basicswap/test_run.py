@@ -48,6 +48,7 @@ from tests.basicswap.common import (
     TEST_HTTP_PORT,
     wait_for_balance,
     wait_for_bid,
+    wait_for_bid_states,
     wait_for_bid_tx_state,
     wait_for_event,
     wait_for_in_progress,
@@ -872,20 +873,22 @@ class Test(BaseTest):
         wait_for_bid(test_delay_event, swap_clients[0], bid_id)
         swap_clients[0].acceptBid(bid_id)
 
-        wait_for_bid(
+        wait_for_event(
             test_delay_event,
             swap_clients[0],
+            Concepts.BID,
             bid_id,
+            event_type=EventLogTypes.LOCK_TX_B_INVALID,
+            wait_for=90,
+        )
+        wait_for_bid_states(
+            test_delay_event,
+            bid_id,
+            swap_clients[0],
+            BidStates.SWAP_COMPLETED,
+            swap_clients[1],
             BidStates.SWAP_COMPLETED,
             wait_for=120,
-        )
-        wait_for_bid(
-            test_delay_event,
-            swap_clients[0],
-            bid_id,
-            BidStates.SWAP_COMPLETED,
-            sent=True,
-            wait_for=30,
         )
 
         js_0_bid = read_json_api(1800, f"bids/{bid_id.hex()}")

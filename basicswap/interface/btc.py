@@ -2943,7 +2943,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         rescan_from: int,
         find_index: bool = False,
         vout: int = -1,
-    ):
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
         if self._connection_type == "electrum":
             return self._getLockTxHeightElectrum(
                 txid, dest_address, bid_amount, rescan_from, find_index, vout
@@ -2958,6 +2959,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
             self.rpc_wallet("rescanblockchain", [rescan_from])
 
+        invalid_txids: list[str] = []
         return_txid = True if txid is None else False
         if txid is None:
             txns = self.rpc_wallet_watch(
@@ -2972,11 +2974,19 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
 
             for tx in txns:
+                # Double check
+                if tx["address"] != dest_address:
+                    self._log.warning("listunspent malfunctioning!")
+                    continue
                 if self.make_int(tx["amount"]) == bid_amount:
                     txid = bytes.fromhex(tx["txid"])
                     break
+                else:
+                    invalid_txids.append(tx["txid"])
 
         if txid is None:
+            if return_invalid_txids and len(invalid_txids):
+                return {"invalid": invalid_txids}
             return None
 
         try:

@@ -5012,7 +5012,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def logBidEvent(
         self, bid_id: bytes, event_type: int, event_msg: str, cursor
     ) -> None:
-        self.log.debug(f"logBidEvent {self.log.id(bid_id)} {event_type}")
+        self.log.debug(f"logBidEvent {self.log.id(bid_id)} {event_type} {event_msg}")
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, cursor)
 
     def countEvents(
@@ -6890,7 +6890,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         xmr_swap=None,
         cursor=None,
     ) -> None:
-        self.log.error(f"Bid {self.log.id(bid.bid_id)} - Error: {error_str}")
+        self.log.error(f"Bid {self.log.id(bid.bid_id)} - {error_str}")
         self.logEvent(Concepts.BID, bid.bid_id, EventLogTypes.ERROR, error_str, cursor)
         bid.setState(BidStates.BID_ERROR)
         if save_bid:
@@ -7718,7 +7718,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "Detected invalid lock tx B",
                     cursor,
                 )
-                bid_changed = True
+                bid_changed = True  # Commit bid event
         elif found_tx is not None:
             if found_tx["height"] != 0 and (
                 bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height
@@ -7726,19 +7726,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_SEEN, "", cursor)
 
             found_txid = bytes.fromhex(found_tx["txid"])
+            found_vout = found_tx.get("index", None)
             if (
                 bid.xmr_b_lock_tx is None
                 or bid.xmr_b_lock_tx.chain_height is None
                 or xmr_swap.b_lock_tx_id != found_txid
             ):
-                self.log.debug(f"Found lock tx B in {ci_to.coin_name()} chain")
+                self.log.debug(
+                    f"Found lock tx B in {ci_to.coin_name()} chain, txid: {self.log.id(found_txid)}:{found_vout}"
+                )
                 xmr_swap.b_lock_tx_id = found_txid
             if bid.xmr_b_lock_tx is None:
                 bid.xmr_b_lock_tx = SwapTx(
                     bid_id=bid.bid_id,
                     tx_type=TxTypes.XMR_SWAP_B_LOCK,
                     txid=xmr_swap.b_lock_tx_id,
-                    vout=found_tx.get("index", None),
+                    vout=found_vout,
                 )
             if bid.xmr_b_lock_tx.txid != found_txid:
                 self.log.debug(
@@ -8414,7 +8417,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             bid.chain_a_height_start,
                             vout=refund_tx.vout,
                         )
-
                         if (
                             lock_refund_tx_chain_info is not None
                             and lock_refund_tx_chain_info.get("height", 0) > 0
@@ -8613,8 +8615,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid.chain_b_height_start,
                 find_index=True,
                 vout=participate_txvout,
+                return_invalid_txids=True,
             )
-            if found:
+            if found and "invalid" in found:
+                # Keep looking for a valid tx
+                cursor = None
+                try:
+                    cursor = self.openDB()
+                    if (
+                        self.countBidEvents(
+                            bid, EventLogTypes.LOCK_TX_B_INVALID, cursor
+                        )
+                        < 1
+                    ):
+                        self.logBidEvent(
+                            bid.bid_id,
+                            EventLogTypes.LOCK_TX_B_INVALID,
+                            "Detected invalid lock tx B",
+                            cursor,
+                        )
+                finally:
+                    self.closeDB(cursor)
+                    del cursor
+            elif found:
                 participate_txid_hex: str = found.get(
                     "txid",
                     None if participate_txid is None else participate_txid.hex(),
@@ -8629,7 +8652,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         bid,
                         f"Incorrect output amount in participate txn {self.logIDT(participate_txid_hex)}: {txo_value} != {bid.amount_to}",
                     )
-                    return True
+                    return True  # Deactivate bid
                 index = found.get("index", participate_txvout)
                 if bid.participate_tx.conf != found["depth"]:
                     save_bid = True

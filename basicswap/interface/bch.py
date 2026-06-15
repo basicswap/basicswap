@@ -270,7 +270,8 @@ class BCHInterface(BTCInterface):
         rescan_from: int,
         find_index: bool = False,
         vout: int = -1,
-    ):
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
         """
         TODO: BCH Watchonly
         Replace with importWatchOnlyAddress when it works again

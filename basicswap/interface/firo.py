@@ -218,7 +218,8 @@ class FIROInterface(BTCInterface):
         rescan_from,
         find_index: bool = False,
         vout: int = -1,
-    ):
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
         # Add watchonly address and rescan if required
 
         if not self.isAddressMine(dest_address, or_watch_only=True):
@@ -233,6 +234,7 @@ class FIROInterface(BTCInterface):
             )
             self.rescanBlockchainForAddress(rescan_from, dest_address)
 
+        invalid_txids: list[str] = []
         return_txid = True if txid is None else False
         if txid is None:
             txns = self.rpc(
@@ -247,11 +249,19 @@ class FIROInterface(BTCInterface):
             )
 
             for tx in txns:
+                # Double check
+                if tx["address"] != dest_address:
+                    self._log.warning("listunspent malfunctioning!")
+                    continue
                 if self.make_int(tx["amount"]) == bid_amount:
                     txid = bytes.fromhex(tx["txid"])
                     break
+                else:
+                    invalid_txids.append(tx["txid"])
 
         if txid is None:
+            if return_invalid_txids and len(invalid_txids):
+                return {"invalid": invalid_txids}
             return None
 
         try:

@@ -893,7 +893,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         rescan_from,
         find_index: bool = False,
         vout: int = -1,
-    ):
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
         if txid is None:
             self._log.debug("TODO: getLockTxHeight")
             return None
