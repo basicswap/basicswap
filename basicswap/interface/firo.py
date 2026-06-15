@@ -171,7 +171,7 @@ class FIROInterface(BTCInterface):
                 if type_from == "spark":
                     # Construct params: dict where address is the key, wrapped in array for RPC
                     params = [
-                        { addr_to: {"amount": value, "subtractfee": subfee}}
+                        {addr_to: {"amount": value, "subtractFee": subfee}}
                     ]
                     result = self.rpc_wallet("spendspark", params)
                 else:
