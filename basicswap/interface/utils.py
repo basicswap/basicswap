@@ -132,7 +132,9 @@ class FeeValidator:
                 return networkinfo["relayfee"], "relayfee_rpc"
         return None, None
 
-    def validateFeeRate(self, feerate: int, concept_type: int) -> None:
+    def validateFeeRate(
+        self, feerate: int, concept_type: int, force_bypass: bool = False
+    ) -> None:
         if self._low_feerate > 0:
             min_feerate, min_feerate_src = (self._low_feerate, "set_value")
             hard_min_feerate, hard_min_feerate_src = (None, None)
@@ -184,13 +186,25 @@ class FeeValidator:
             err_msg: str = (
                 f"Fee rate too low, {feerate} < {min_feerate}, {min_feerate_src}"
             )
-            self._log.error(err_msg)
-            raise ValueError(err_msg)
+            if force_bypass:
+                self._log.warning(f"Forced bypass: {err_msg}")
+            else:
+                self._log.error(err_msg)
+                raise ValueError(err_msg)
 
         if feerate > max_feerate:
+            err_msg: str = (
+                f"Fee rate too high, {feerate} > {max_feerate}, {max_feerate_src}"
+            )
+            if force_bypass:
+                self._log.warning(f"Forced bypass: {err_msg}")
+                return
             # If validating for an offer, allow high fees if estimate source is relayfee
             # Fee will be validated again on sending bid
-            if concept_type == Concepts.OFFER and self._allow_highfee_offers_when_minfee:
+            if (
+                concept_type == Concepts.OFFER
+                and self._allow_highfee_offers_when_minfee
+            ):
                 if max_feerate_src in ("relayfee", "min_relay_fee"):
                     self._log.debug(
                         "Allowing offer through as max feerate source is minfee"

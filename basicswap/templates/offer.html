@@ -548,6 +548,14 @@
          <input type="number" class="bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="validmins" min="10" max="1440" value="{{ data.nb_validmins }}">
         </td>
        </tr>
+       {% if data.xmr_type == true %}
+       <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+        <td class="py-3 px-6 bold">Bypass Fee Checks</td>
+        <td class="py-3 px-6">
+          <input type="checkbox" name="bypass_fee_checks" id="bypass_fee_checks" value="bypass_fee_checks"/>
+        </td>
+       </tr>
+       {% endif %}
        {% if data.debug_ui == true %}
        <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
         <td class="py-3 px-6 bold">Debug Option:</td>
