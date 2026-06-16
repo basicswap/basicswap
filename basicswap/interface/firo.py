@@ -170,9 +170,7 @@ class FIROInterface(BTCInterface):
             try:
                 if type_from == "spark":
                     # Construct params: dict where address is the key, wrapped in array for RPC
-                    params = [
-                        {"address": addr_to, "amount": value, "subtractfee": subfee}
-                    ]
+                    params = [{addr_to: {"amount": value, "subtractFee": subfee}}]
                     result = self.rpc_wallet("spendspark", params)
                 else:
                     # Use automintspark to perform a plain -> spark tx of full balance
