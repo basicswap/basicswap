@@ -10,6 +10,7 @@ import logging
 import os
 import urllib
 from urllib.request import urlopen
+from basicswap.util import toBool as make_boolean  # noqa: F401
 
 PORT_OFS = int(os.getenv("PORT_OFS", 1))
 UI_PORT = 12700 + PORT_OFS
@@ -20,14 +21,6 @@ REQUIRED_SETTINGS = {
     "use_segwit": True,
     "connection_type": "rpc",
 }
-
-
-def make_boolean(s) -> bool:
-    if isinstance(s, bool):
-        return s
-    if isinstance(s, int):
-        return False if s == 0 else True
-    return s.lower() in ["1", "true"]
 
 
 def post_json_req(url, json_data):
