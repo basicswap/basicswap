@@ -1100,9 +1100,7 @@ class PARTInterfaceBlind(PARTInterface):
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
 
         # Tx recipient must import the stealth address as watch only
-        if bid_sender:
-            cb_swap_value *= -1
-        else:
+        if not bid_sender:
             addr_info = self.rpc_wallet("getaddressinfo", [sx_addr])
             if not addr_info["iswatchonly"]:
                 wif_scan_key = self.encodeKey(kbv)
@@ -1125,18 +1123,19 @@ class PARTInterfaceBlind(PARTInterface):
                 )
                 continue
             ensure(tx["outputs"][0]["type"] == "blind", "Output is not blind")
-            if (
-                self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value
-                or check_amount is False
-            ):
+            tx_amount = self.make_int(tx["outputs"][0]["amount"])
+            if bid_sender:
+                tx_amount *= -1
+            if tx_amount == cb_swap_value or check_amount is False:
                 height = 0
                 if tx["confirmations"] > 0:
                     chain_height = self.rpc("getblockcount")
                     height = chain_height - (tx["confirmations"] - 1)
                 vout: int = tx["outputs"][0]["vout"]
+
                 return {
                     "txid": tx["txid"],
-                    "amount": cb_swap_value,
+                    "amount": tx_amount,
                     "height": height,
                     "index": vout,
                 }
@@ -1388,9 +1387,7 @@ class PARTInterfaceAnon(PARTInterface):
         sx_addr = self.formatStealthAddress(Kbv, Kbs)
 
         # Tx recipient must import the stealth address as watch only
-        if bid_sender:
-            cb_swap_value *= -1
-        else:
+        if not bid_sender:
             addr_info = self.rpc_wallet("getaddressinfo", [sx_addr])
             if not addr_info["iswatchonly"]:
                 wif_scan_key = self.encodeKey(kbv)
@@ -1413,10 +1410,10 @@ class PARTInterfaceAnon(PARTInterface):
                 )
                 continue
             ensure(tx["outputs"][0]["type"] == "anon", "Output is not anon")
-            if (
-                self.make_int(tx["outputs"][0]["amount"]) == cb_swap_value
-                or check_amount is False
-            ):
+            tx_amount: int = self.make_int(tx["outputs"][0]["amount"])
+            if bid_sender:
+                tx_amount *= -1
+            if tx_amount == cb_swap_value or check_amount is False:
                 height = 0
                 if tx["confirmations"] > 0:
                     chain_height = self.rpc("getblockcount")
@@ -1424,7 +1421,7 @@ class PARTInterfaceAnon(PARTInterface):
                 vout: int = tx["outputs"][0]["vout"]
                 return {
                     "txid": tx["txid"],
-                    "amount": cb_swap_value,
+                    "amount": tx_amount,
                     "height": height,
                     "index": vout,
                 }

@@ -218,6 +218,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_SPEND_TX_SEEN = auto()
     LOCK_TX_B_SPEND_TX_SEEN = auto()
     LOCK_TX_B_REFUND_TX_SEEN = auto()
+    LOCK_TX_A_INVALID = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -230,6 +231,7 @@ class DebugTypes(IntEnum):
     BID_STOP_AFTER_COIN_A_LOCK = auto()
     BID_DONT_SPEND_COIN_A_LOCK_REFUND = auto()
     BID_DONT_SPEND_COIN_A_LOCK_REFUND2 = auto()  # continues
+    CREATE_INVALID_COIN_A_LOCK = auto()
     CREATE_INVALID_COIN_B_LOCK = auto()
     BUYER_STOP_AFTER_ITX = auto()
     MAKE_INVALID_ITX = auto()

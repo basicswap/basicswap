@@ -719,7 +719,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 else:
                 """
                 if "Already have this key" not in str(e):
-                    raise (e)
+                    raise
                 self._log.info(
                     f"{self.coin_name()} wallet already has the correct HD seed."
                 )
@@ -2935,19 +2935,93 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_tx_dest = self.getScriptDest(lock_script)
         return self.encodeScriptDest(lock_tx_dest)
 
+    def getLockTxVout(
+        self,
+        txid: bytes,
+        vout: int,
+        dest_address: str,
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
+        try:
+            txout = self.rpc("gettxout", [txid.hex(), vout, True])
+            if txout is None:
+                return None
+
+            block_height: int = 0
+            confirmations: int = (
+                0 if "confirmations" not in txout else txout["confirmations"]
+            )
+            if confirmations > 0:
+                if "bestblock" in txout:
+                    chain_height: int = self.getBlockHeader(txout["bestblock"])[
+                        "height"
+                    ]
+                else:
+                    chain_height: int = self.getChainHeight()
+                block_height = chain_height - (confirmations - 1)
+
+            # Double check address
+            if "addresses" in txout["scriptPubKey"]:
+                if (
+                    len(txout["scriptPubKey"]["addresses"]) != 1
+                    or txout["scriptPubKey"]["addresses"][0] != dest_address
+                ):
+                    self._log.warning(
+                        "getLockTxHeight found txout {}:{} with incorrect address {}".format(
+                            self._log.id(txid), vout, txout["scriptPubKey"]["addresses"]
+                        )
+                    )
+                    if return_invalid_txids:
+                        return {"invalid": [txid.hex()]}
+                    return None
+            elif "address" in txout["scriptPubKey"]:
+                if txout["scriptPubKey"]["address"] != dest_address:
+                    self._log.warning(
+                        "getLockTxHeight found txout {}:{} with incorrect address {}".format(
+                            self._log.id(txid), vout, txout["scriptPubKey"]["address"]
+                        )
+                    )
+                    if return_invalid_txids:
+                        return {"invalid": [txid.hex()]}
+                    return None
+            else:
+                self._log.warning(
+                    f"getLockTxHeight found txout {self._log.id(txid)}:{vout} without address"
+                )
+                if return_invalid_txids:
+                    return {"invalid": [txid.hex()]}
+                return None
+
+            rv = {
+                "txid": txid.hex(),
+                "depth": confirmations,
+                "index": vout,
+                "height": block_height,
+                "value": self.make_int(txout["value"]),
+            }
+            return rv
+        except Exception as e:
+            self._log.debug(f"getLockTxHeight gettxout error: {e}")
+        return None
+
     def getLockTxHeight(
         self,
-        txid,
-        dest_address,
-        bid_amount,
-        rescan_from,
+        txid: bytes,
+        dest_address: str,
+        bid_amount: int,
+        rescan_from: int,
         find_index: bool = False,
         vout: int = -1,
-    ):
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
         if self._connection_type == "electrum":
             return self._getLockTxHeightElectrum(
                 txid, dest_address, bid_amount, rescan_from, find_index, vout
             )
+
+        if txid is not None and isinstance(vout, int) and vout >= 0:
+            # Prefer to use gettxout if the txid and vout are known
+            return self.getLockTxVout(txid, vout, dest_address, return_invalid_txids)
 
         # Add watchonly address and rescan if required
         if not self.isAddressMine(dest_address, or_watch_only=True):
@@ -2958,6 +3032,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
             self.rpc_wallet("rescanblockchain", [rescan_from])
 
+        invalid_txids: list[str] = []
         return_txid = True if txid is None else False
         if txid is None:
             txns = self.rpc_wallet_watch(
@@ -2972,11 +3047,19 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
 
             for tx in txns:
+                # Double check
+                if tx["address"] != dest_address:
+                    self._log.warning("listunspent malfunctioning!")
+                    continue
                 if self.make_int(tx["amount"]) == bid_amount:
                     txid = bytes.fromhex(tx["txid"])
                     break
+                else:
+                    invalid_txids.append(tx["txid"])
 
         if txid is None:
+            if return_invalid_txids and len(invalid_txids):
+                return {"invalid": invalid_txids}
             return None
 
         try:
@@ -2999,13 +3082,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 rv["conflicts"] = tx["walletconflicts"]
         except Exception as e:
             self._log.debug(
-                "getLockTxHeight gettransaction failed: %s, %s", txid.hex(), str(e)
+                f"getLockTxHeight gettransaction failed: {self._log.id(txid)}, {e}"
             )
             return None
 
         if find_index:
             tx_obj = self.rpc("decoderawtransaction", [tx["hex"]])
-            rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+            if isinstance(vout, int) and vout >= 0:
+                rv["index"] = vout
+            else:
+                rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
             if rv["index"] is not None and rv["index"] >= 0:
                 rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 
@@ -3109,7 +3195,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             }
         except Exception as e:
             self._log.debug(
-                "getLockTxHeight electrum failed: %s, %s", txid.hex(), str(e)
+                f"getLockTxHeight electrum failed: {self._log.id(txid)}, {e}"
             )
             return None
 

@@ -227,11 +227,11 @@ class Test(TestBase):
             for k, w in wallets_original.items():
                 assert w["deposit_address"] == wallets_restored[k]["deposit_address"]
 
-        except Exception as e:
+        except Exception as e:  # noqa: F841
             traceback.print_exc()
             self.finalise(processes)
             logging.info("Test failed.")
-            raise e
+            raise
 
         self.finalise(processes)
         logging.info("Test passed.")

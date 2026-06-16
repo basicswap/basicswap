@@ -1266,7 +1266,7 @@ class Test(BaseTest):
                 if isinstance(e, TemporaryError):
                     continue
                 else:
-                    raise (e)
+                    raise
                 test_delay_event.wait(1)
 
         lock_tx_b_spend = ci.getTransaction(lock_tx_b_spend_txid)

@@ -96,9 +96,9 @@ def test_swap_dir(driver):
     rv = read_json_api(node_1_port, "offers/new", offer_data)
     try:
         offer_2_id = rv["offer_id"]
-    except Exception as e:
+    except Exception as e:  # noqa: F841
         logger.info(f"rv: {rv}")
-        raise e
+        raise
 
     wait_for_balance(node_2_port, "xmr", 5.0)
 
@@ -114,9 +114,9 @@ def test_swap_dir(driver):
     rv = read_json_api(node_2_port, "offers/new", offer_data)
     try:
         offer_3_id = rv["offer_id"]
-    except Exception as e:
+    except Exception as e:  # noqa: F841
         logger.info(f"rv: {rv}")
-        raise e
+        raise
 
     # Wait for offers to propagate
     for i in range(1000):

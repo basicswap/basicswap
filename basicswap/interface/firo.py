@@ -216,9 +216,13 @@ class FIROInterface(BTCInterface):
         rescan_from,
         find_index: bool = False,
         vout: int = -1,
-    ):
-        # Add watchonly address and rescan if required
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
+        if txid is not None and isinstance(vout, int) and vout >= 0:
+            # Prefer to use gettxout if the txid and vout are known
+            return self.getLockTxVout(txid, vout, dest_address, return_invalid_txids)
 
+        # Add watchonly address and rescan if required
         if not self.isAddressMine(dest_address, or_watch_only=True):
             self.importWatchOnlyAddress(dest_address, "bid")
             self._log.info(
@@ -231,6 +235,7 @@ class FIROInterface(BTCInterface):
             )
             self.rescanBlockchainForAddress(rescan_from, dest_address)
 
+        invalid_txids: list[str] = []
         return_txid = True if txid is None else False
         if txid is None:
             txns = self.rpc(
@@ -245,11 +250,19 @@ class FIROInterface(BTCInterface):
             )
 
             for tx in txns:
+                # Double check
+                if tx["address"] != dest_address:
+                    self._log.warning("listunspent malfunctioning!")
+                    continue
                 if self.make_int(tx["amount"]) == bid_amount:
                     txid = bytes.fromhex(tx["txid"])
                     break
+                else:
+                    invalid_txids.append(tx["txid"])
 
         if txid is None:
+            if return_invalid_txids and len(invalid_txids):
+                return {"invalid": invalid_txids}
             return None
 
         try:
@@ -267,13 +280,16 @@ class FIROInterface(BTCInterface):
 
         except Exception as e:
             self._log.debug(
-                "getLockTxHeight gettransaction failed: %s, %s", txid.hex(), str(e)
+                f"getLockTxHeight gettransaction failed: {self._log.id(txid)}, {e}"
             )
             return None
 
         if find_index:
             tx_obj = self.rpc("decoderawtransaction", [tx["hex"]])
-            rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+            if isinstance(vout, int) and vout >= 0:
+                rv["index"] = vout
+            else:
+                rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
             if rv["index"] is not None and rv["index"] >= 0:
                 rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 

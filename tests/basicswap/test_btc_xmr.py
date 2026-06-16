@@ -39,6 +39,7 @@ from tests.basicswap.common import (
     abandon_all_swaps,
     wait_for_balance,
     wait_for_bid,
+    wait_for_bid_states,
     wait_for_event,
     wait_for_offer,
     wait_for_unspent,
@@ -82,7 +83,10 @@ class TestFunctions(BaseTest):
         return callnoderpc(node_id, method, params, wallet, self.base_rpc_port)
 
     def mineBlock(self, num_blocks=1):
-        self.callnoderpc("generatetoaddress", [num_blocks, self.btc_addr])
+        if self.btc_addr is None:
+            logging.info("BTC mining paused")
+        else:
+            self.callnoderpc("generatetoaddress", [num_blocks, self.btc_addr])
 
     def check_softfork_active(self, feature_name):
         deploymentinfo = self.callnoderpc("getdeploymentinfo")
@@ -216,20 +220,14 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
-            swap_clients[id_offerer],
             bid_id,
+            swap_clients[id_offerer],
+            BidStates.SWAP_COMPLETED,
+            swap_clients[id_bidder],
             BidStates.SWAP_COMPLETED,
             wait_for=(self.extra_wait_time + 180),
-        )
-        wait_for_bid(
-            test_delay_event,
-            swap_clients[id_bidder],
-            bid_id,
-            BidStates.SWAP_COMPLETED,
-            sent=True,
-            wait_for=(self.extra_wait_time + 30),
         )
 
         amount_from = float(ci_from.format_amount(amt_swap))
@@ -356,22 +354,14 @@ class TestFunctions(BaseTest):
         )
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        leader_sent_bid: bool = True if reverse_bid else False
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
+            bid_id,
             swap_clients[id_leader],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            sent=leader_sent_bid,
-            wait_for=(self.extra_wait_time + 180),
-        )
-        wait_for_bid(
-            test_delay_event,
             swap_clients[id_follower],
-            bid_id,
             [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
-            sent=(not leader_sent_bid),
-            wait_for=(self.extra_wait_time + 30),
+            wait_for=(self.extra_wait_time + 180),
         )
 
         # TODO: Discard block rewards
@@ -451,8 +441,6 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        leader_sent_bid: bool = True if reverse_bid else False
-
         expect_state = (
             (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED)
             if with_mercy
@@ -464,21 +452,14 @@ class TestFunctions(BaseTest):
             # When using BCH, can't set XMR_SWAP_FAILED_SWIPED as should wait for mercy tx
             expect_state = expect_state + (BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,)
 
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
+            bid_id,
             swap_clients[id_leader],
-            bid_id,
             expect_state,
-            wait_for=(self.extra_wait_time + 180),
-            sent=leader_sent_bid,
-        )
-        wait_for_bid(
-            test_delay_event,
             swap_clients[id_follower],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_SWIPED,
-            wait_for=(self.extra_wait_time + 80),
-            sent=(not leader_sent_bid),
+            wait_for=(self.extra_wait_time + 240),
         )
 
         # TODO: Exclude block rewards
@@ -564,22 +545,14 @@ class TestFunctions(BaseTest):
         )
         swap_clients[id_offerer].acceptBid(bid_id)
 
-        leader_sent_bid: bool = True if reverse_bid else False
-        wait_for_bid(
+        wait_for_bid_states(
             test_delay_event,
+            bid_id,
             swap_clients[id_leader],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            wait_for=(self.extra_wait_time + 200),
-            sent=leader_sent_bid,
-        )
-        wait_for_bid(
-            test_delay_event,
             swap_clients[id_follower],
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            sent=(not leader_sent_bid),
-            wait_for=(self.extra_wait_time + 30),
+            wait_for=(self.extra_wait_time + 240),
         )
 
         js_w0_after = read_json_api(1800 + id_offerer, "wallets")
@@ -789,6 +762,7 @@ class TestFunctions(BaseTest):
         # Follower sends the participate (chain b) lock tx.
         id_leader: int = id_bidder if reverse_bid else id_offerer
         id_follower: int = id_offerer if reverse_bid else id_bidder
+        coin_leader: int = coin_to if reverse_bid else coin_from
 
         swap_clients = self.swap_clients
         reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
@@ -817,9 +791,7 @@ class TestFunctions(BaseTest):
         )
 
         try:
-            # Stop BTC mining
-            old_btc_addr: str = self.__class__.btc_addr
-            self.__class__.btc_addr = None
+            self.pauseMining()
             old_check_expired_seconds = swap_clients[0].check_expired_seconds
 
             swap_clients[id_offerer].acceptBid(bid_id)
@@ -842,49 +814,73 @@ class TestFunctions(BaseTest):
                     chain_a_lock_txid = tx["txid"]
             assert chain_a_lock_txid
 
-            ci_btc_l = swap_clients[id_leader].ci(Coins.BTC)
-            rv = ci_btc_l.rpc_wallet(
-                "psbtbumpfee",
-                [
-                    chain_a_lock_txid,
-                ],
-            )
-            rv = ci_btc_l.rpc_wallet(
-                "walletprocesspsbt",
-                [
-                    rv["psbt"],
-                ],
-            )
-            rv = ci_btc_l.rpc_wallet(
-                "finalizepsbt",
-                [
-                    rv["psbt"],
-                ],
-            )
-            new_tx_hex = rv["hex"]
-            rv = ci_btc_l.rpc_wallet(
-                "sendrawtransaction",
-                [
-                    new_tx_hex,
-                ],
-            )
-            assert rv != chain_a_lock_txid
+            if coin_leader == Coins.BTC:
+                # Test that the lock tx is removed if replaced (RBF)
+                ci_btc_l = swap_clients[id_leader].ci(coin_leader)
+                rv = ci_btc_l.rpc_wallet(
+                    "psbtbumpfee",
+                    [
+                        chain_a_lock_txid,
+                    ],
+                )
+                rv = ci_btc_l.rpc_wallet(
+                    "walletprocesspsbt",
+                    [
+                        rv["psbt"],
+                    ],
+                )
+                rv = ci_btc_l.rpc_wallet(
+                    "finalizepsbt",
+                    [
+                        rv["psbt"],
+                    ],
+                )
+                new_tx_hex = rv["hex"]
+                new_txid = ci_btc_l.rpc_wallet(
+                    "sendrawtransaction",
+                    [
+                        new_tx_hex,
+                    ],
+                )
+                assert new_txid != chain_a_lock_txid
 
-            wait_for_event(
-                test_delay_event,
-                swap_clients[id_follower],
-                Concepts.BID,
-                bid_id,
-                event_type=EventLogTypes.LOCK_TX_A_CONFLICTS,
-                wait_for=90,
-            )
-            # Mine the replacement tx
-            ci_btc_l.rpc_wallet("generatetoaddress", [1, old_btc_addr])
+                """
+                # Conflicts not detected with gettxout in getLockTxHeight
+                wait_for_event(
+                    test_delay_event,
+                    swap_clients[id_follower],
+                    Concepts.BID,
+                    bid_id,
+                    event_type=EventLogTypes.LOCK_TX_A_CONFLICTS,
+                    wait_for=90,
+                )
+                """
+                found_mempool: bool = False
+                for i in range(16):
+                    try:
+                        _ = ci_btc_l.rpc("getmempoolentry", [new_txid])
+                        found_mempool = True
+                        break
+                    except Exception as e:
+                        if "Transaction not in mempool" not in str(e):
+                            raise
+                    test_delay_event.wait(1)
+                assert found_mempool is True
+                try:
+                    _ = ci_btc_l.rpc("getmempoolentry", [chain_a_lock_txid])
+                except Exception as e:
+                    if "Transaction not in mempool" not in str(e):
+                        raise
+                else:
+                    raise ValueError("Old tx should not be in mempool")
 
-            swap_clients[0].setMockTimeOffset(13 * 3600)
-            swap_clients[1].setMockTimeOffset(13 * 3600)
-            swap_clients[0].check_expired_seconds = 2
-            swap_clients[1].check_expired_seconds = 2
+                # Mine the replacement tx
+                ci_btc_l.rpc_wallet("generatetoaddress", [1, self.old_btc_addr])
+
+            for node_id in (id_leader, id_follower):
+                swap_clients[node_id].setMockTimeOffset(13 * 3600)
+                swap_clients[node_id].check_expired_seconds = 2
+
             wait_for_bid(
                 test_delay_event,
                 swap_clients[id_follower],
@@ -905,12 +901,80 @@ class TestFunctions(BaseTest):
             )
 
         finally:
-            # Restore BTC mining:
-            self.__class__.btc_addr = old_btc_addr
-            swap_clients[0].setMockTimeOffset(0)
-            swap_clients[1].setMockTimeOffset(0)
-            swap_clients[0].check_expired_seconds = old_check_expired_seconds
-            swap_clients[1].check_expired_seconds = old_check_expired_seconds
+            self.continueMining()
+            for node_id in (id_leader, id_follower):
+                swap_clients[node_id].setMockTimeOffset(0)
+                swap_clients[node_id].check_expired_seconds = old_check_expired_seconds
+
+    def do_test_10_underfunded_lock_a(self, coin_from, coin_to):
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} Underfunded Lock A"
+        )
+
+        # Test that the follower detects and logs an invalid chain a lock tx,
+        # then keeps checking until timing out the bid
+
+        swap_clients = self.swap_clients
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+
+        id_offerer: int = self.node_a_id
+        id_bidder: int = self.node_b_id
+
+        # Leader sends the initial (chain a) lock tx.
+        # Follower sends the participate (chain b) lock tx.
+        id_leader: int = id_bidder if reverse_bid else id_offerer
+        id_follower: int = id_offerer if reverse_bid else id_bidder
+
+        swap_clients = self.swap_clients
+        reverse_bid: bool = swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        self.prepare_balance(
+            coin_from, 100.0, 1800 + id_offerer, 1801 if reverse_bid else 1800
+        )
+        amt_swap: int = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap: int = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id: bytes = swap_clients[id_offerer].postOffer(
+            coin_from, coin_to, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].listOffers(filters={"offer_id": offer_id})[0]
+        bid_id: bytes = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        swap_clients[id_leader].setBidDebugInd(
+            bid_id, DebugTypes.CREATE_INVALID_COIN_A_LOCK
+        )
+        try:
+            swap_clients[id_offerer].acceptBid(bid_id)
+
+            wait_for_event(
+                test_delay_event,
+                swap_clients[id_follower],
+                Concepts.BID,
+                bid_id,
+                event_type=EventLogTypes.LOCK_TX_A_INVALID,
+                wait_for=90,
+            )
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_follower],
+                bid_id,
+                BidStates.BID_ERROR,
+                sent=None,
+                wait_for=(self.extra_wait_time + 10),
+            )
+        finally:
+            for node_id in (id_leader, id_follower):
+                swap_clients[node_id].abandonBid(bid_id)
 
 
 class BasicSwapTest(TestFunctions):
@@ -928,6 +992,18 @@ class BasicSwapTest(TestFunctions):
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
         settings["fetchpricesthread"] = False
+
+    def getMiningAddr(self):
+        return self.btc_addr
+
+    def pauseMining(self):
+        logging.info(f"Pausing BTC mining to {self.btc_addr}")
+        self.old_btc_addr: str = self.__class__.btc_addr
+        self.__class__.btc_addr = None
+
+    def continueMining(self):
+        logging.info(f"Resuming BTC mining to {self.old_btc_addr}")
+        self.__class__.btc_addr = self.old_btc_addr
 
     def test_001_nested_segwit(self):
         # p2sh-p2wpkh
@@ -1296,7 +1372,7 @@ class BasicSwapTest(TestFunctions):
         ci1 = self.swap_clients[1].ci(self.test_coin_from)
 
         addr = ci.rpc_wallet("getnewaddress", ["watchonly test", "bech32"])
-        ro = ci1.rpc_wallet("importaddress", [addr, "", False])
+        ci1.rpc_wallet("importaddress", [addr, "", False])
         txid = ci.rpc_wallet("sendtoaddress", [addr, 1.0])
         tx_hex = ci.rpc(
             "getrawtransaction",
@@ -2040,10 +2116,70 @@ class BasicSwapTest(TestFunctions):
         for vout in tx["vout"]:
             assert vout["scriptPubKey"]["type"] == "witness_v0_keyhash"
 
+    def test_016_gettransaction(self):
+        logging.info(f"---------- Test {self.test_coin_from.name} gettransaction")
+
+        # Check that gettransaction finds txns in the mempool
+
+        ci0 = self.swap_clients[0].ci(self.test_coin_from)
+        ci1 = self.swap_clients[1].ci(self.test_coin_from)
+        pi = self.swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        networkinfo: str = ci1.rpc("getnetworkinfo")
+        core_version = networkinfo["version"]
+        logging.info(f"core_version {core_version}")
+
+        A = ci0.getPubkey(ci0.getNewRandomKey())
+        B = ci0.getPubkey(ci0.getNewRandomKey())
+        lock_tx_script = pi.genScriptLockTxScript(ci0, A, B)
+
+        lock_tx = ci0.createSCLockTx(ci0.make_int(1.16), lock_tx_script)
+        lock_tx = ci0.fundSCLockTx(lock_tx, self.test_fee_rate)
+        lock_tx = ci0.signTxWithWallet(lock_tx)
+        script_addr: str = ci0.encodeScriptDest(ci0.getScriptDest(lock_tx_script))
+
+        ci1.rpc_wallet_watch("importaddress", [script_addr])
+
+        try:
+            mining_address: str = self.getMiningAddr()
+            self.pauseMining()
+            txid_hex: str = ci0.rpc("sendrawtransaction", [lock_tx.hex()])
+            found_mempool: bool = False
+            for i in range(16):
+                try:
+                    _ = ci1.rpc("getmempoolentry", [txid_hex])
+                    found_mempool = True
+                    break
+                except Exception as e:
+                    if "Transaction not in mempool" not in str(e):
+                        raise
+                test_delay_event.wait(1)
+            assert found_mempool is True
+            # ci1.rpc_wallet_watch("importaddress", [script_addr])
+            # Importing after the tx is in the mempool works for BTC 290300, not for LTC 210505
+            test_delay_event.wait(1)
+
+            include_watchonly: bool = True
+            txinfo = ci1.rpc_wallet_watch(
+                "gettransaction", [txid_hex, include_watchonly]
+            )
+            assert txinfo["confirmations"] == 0
+            assert txinfo["txid"] == txid_hex
+
+            ci0.rpc_wallet("generatetoaddress", [1, mining_address])
+            found_mined: bool = False
+            for i in range(16):
+                txinfo = ci1.rpc_wallet_watch("gettransaction", [txid_hex])
+                if txinfo["confirmations"] > 0:
+                    found_mined = True
+                    break
+                test_delay_event.wait(1)
+            assert found_mined is True
+        finally:
+            self.continueMining()
+
     def test_01_0_lock_bad_prevouts(self):
-        logging.info(
-            "---------- Test {} lock_bad_prevouts".format(self.test_coin_from.name)
-        )
+        logging.info(f"---------- Test {self.test_coin_from.name} lock_bad_prevouts")
         # Lock non segwit prevouts created in earlier tests
         for i in range(2):
             ci = self.swap_clients[i].ci(self.test_coin_from)
@@ -2482,6 +2618,12 @@ class BasicSwapTest(TestFunctions):
 
     def test_09_expire_accepted_rev(self):
         self.do_test_09_expire_accepted(Coins.XMR, self.test_coin_from)
+
+    def test_10_underfunded_lock_a(self):
+        self.do_test_10_underfunded_lock_a(self.test_coin_from, Coins.XMR)
+
+    def test_10_underfunded_lock_a_rev(self):
+        self.do_test_10_underfunded_lock_a(Coins.XMR, self.test_coin_from)
 
     def test_11_fee_validation(self):
         coin_from, coin_to = (self.test_coin_from, Coins.XMR)

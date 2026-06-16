@@ -270,12 +270,9 @@ class BCHInterface(BTCInterface):
         rescan_from: int,
         find_index: bool = False,
         vout: int = -1,
-    ):
-        """
-        TODO: BCH Watchonly
-        Replace with importWatchOnlyAddress when it works again
-        Currently importing the watchonly address only works if rescanblockchain is run on every iteration
-        """
+        return_invalid_txids: bool = False,
+    ) -> dict | None:
+        # Currently, for BCH, importing the watchonly address only works if rescanblockchain is run on every iteration
         if txid is None:
             self._log.debug("TODO: getLockTxHeight")
             return None
@@ -295,7 +292,7 @@ class BCHInterface(BTCInterface):
                 if self.make_int(txout["value"]) != bid_amount:
                     self._log.warning(
                         "getLockTxHeight found txout {} with incorrect amount {}".format(
-                            txid.hex(), txout["value"]
+                            self._log.id(txid), txout["value"]
                         )
                     )
                     continue
