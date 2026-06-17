@@ -875,5 +875,7 @@ class XMRInterface(CoinInterface):
             self._log.error(f"listWalletTransactions failed: {e}")
             return []
 
-    def validateFeeRate(self, fee_rate: int) -> None:
+    def validateFeeRate(
+        self, fee_rate: int, concept_type: int, force_bypass: bool = False
+    ) -> None:
         pass  # Fee rate isn't used

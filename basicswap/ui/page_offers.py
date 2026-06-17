@@ -679,6 +679,8 @@ def page_offer(self, url_split: List[str], post_string: str) -> bytes:
                     extra_options["prefunded_tx"] = bytes.fromhex(
                         get_data_entry(form_data, "prefunded_bid_tx")
                     )
+                if have_data_entry(form_data, "bypass_fee_checks"):
+                    extra_options["bypass_fee_validation"] = True
 
                 sent_bid_id = swap_client.postBid(
                     offer_id,

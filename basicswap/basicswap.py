@@ -4136,8 +4136,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 msg_buf.fee_rate_to = ci_to.make_int(fee_rate)
 
             if swap_type == SwapTypes.XMR_SWAP:
-                ci_from.validateFeeRate(msg_buf.fee_rate_from)
-                ci_to.validateFeeRate(msg_buf.fee_rate_to)
+                ci_from.validateFeeRate(msg_buf.fee_rate_from, Concepts.OFFER)
+                ci_to.validateFeeRate(msg_buf.fee_rate_to, Concepts.OFFER)
 
                 xmr_offer = XmrOffer()
 
@@ -6072,6 +6072,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Send MSG1L F -> L or MSG0F L -> F
         self.log.debug(f"postXmrBid {self.logIDO(offer_id)}")
 
+        bypass_fee_validation: bool = extra_options.get("bypass_fee_validation", False)
+        if bypass_fee_validation:
+            self.log.warning("Post bid: Bypassing fee checks!")
+
         try:
             cursor = self.openDB()
             offer, xmr_offer = self.getXmrOffer(offer_id, cursor=cursor)
@@ -6094,8 +6098,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.checkCoinsReady(coin_from, coin_to)
 
-            ci_from.validateFeeRate(xmr_offer.a_fee_rate)
-            ci_to.validateFeeRate(xmr_offer.b_fee_rate)
+            ci_from.validateFeeRate(
+                xmr_offer.a_fee_rate, Concepts.BID, bypass_fee_validation
+            )
+            ci_to.validateFeeRate(
+                xmr_offer.b_fee_rate, Concepts.BID, bypass_fee_validation
+            )
 
             bid_created_at: int = self.getTime()
             valid_for_seconds: int = extra_options.get("valid_for_seconds", 60 * 10)
@@ -6113,7 +6121,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ci_to.validatePrefundedTxAmounts(prefunded_tx_data)
                 )
                 self.log.debug(f"Using prefunded tx: {self.log.id(prefunded_txid)}")
-                ci_to.validateFeeRate(prefunded_tx_fee_rate)
+                ci_to.validateFeeRate(
+                    prefunded_tx_fee_rate, Concepts.BID, bypass_fee_validation
+                )
             else:
                 amount, amount_to, bid_rate = self.setBidAmounts(
                     amount, offer, extra_options, ci_from
@@ -10364,8 +10374,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(len(offer_data.pkhash_seller) == 0, "Unexpected data")
             ensure(len(offer_data.secret_hash) == 0, "Unexpected data")
 
-            ci_from.validateFeeRate(offer_data.fee_rate_from)
-            ci_to.validateFeeRate(offer_data.fee_rate_to)
+            ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
+            ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
 
         else:
             raise ValueError("Unknown swap type {}.".format(offer_data.swap_type))
