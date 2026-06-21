@@ -667,6 +667,15 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                     get_data_entry(post_data, "bid_amount"), ci_from
                 )
 
+            if have_data_entry(post_data, "prefunded_bid_tx"):
+                extra_options["prefunded_tx"] = bytes.fromhex(
+                    get_data_entry(post_data, "prefunded_bid_tx")
+                )
+            if have_data_entry(post_data, "bypass_fee_checks"):
+                extra_options["bypass_fee_validation"] = toBool(
+                    get_data_entry(post_data, "bypass_fee_checks")
+                )
+
             if offer.swap_type == SwapTypes.XMR_SWAP:
                 bid_id = swap_client.postXmrBid(
                     offer_id,
@@ -766,7 +775,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
 
             return bytes(json.dumps(old_states), "UTF-8")
 
-        edit_bid = False
+        edit_bid: bool = False
         data = describeBid(
             swap_client,
             bid,
