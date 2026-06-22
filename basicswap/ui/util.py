@@ -473,9 +473,7 @@ def describeBid(
                     )
                 except Exception as e:  # noqa: F841
                     swap_client.log.debug(
-                        "Unable to get xmr_b_half_privatekey for bid: {}".format(
-                            bid.bid_id.hex()
-                        )
+                        f"Unable to get xmr_b_half_privatekey for bid: {swap_client.log.id(bid.bid_id)}"
                     )
                 try:
                     remote_split_key = getChainBRemoteSplitKey(
@@ -484,11 +482,19 @@ def describeBid(
                     if remote_split_key:
                         data["xmr_b_half_privatekey_remote"] = remote_split_key
                 except Exception as e:  # noqa: F841
-                    swap_client.log.debug(
-                        "Unable to get xmr_b_half_privatekey_remote for bid: {}".format(
-                            bid.bid_id.hex()
+                    # Reduce log clutter.  Log only when node is expected to have remote key.
+                    if (
+                        bid.was_sent
+                        and bid.xmr_a_lock_tx
+                        and bid.xmr_a_lock_tx.state == TxStates.TX_REFUNDED
+                    ) or (
+                        bid.was_received
+                        and bid.xmr_a_lock_tx
+                        and bid.xmr_a_lock_tx.state == TxStates.TX_REDEEMED
+                    ):
+                        swap_client.log.debug(
+                            f"Unable to get xmr_b_half_privatekey_remote for bid: {swap_client.log.id(bid.bid_id)}"
                         )
-                    )
 
             if show_lock_transfers:
                 if xmr_swap.pkbs:

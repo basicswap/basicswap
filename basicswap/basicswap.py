@@ -78,6 +78,7 @@ from .ui.util import getCoinName
 from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
+    BalanceError,
     LockedCoinError,
     TemporaryError,
     InactiveCoin,
@@ -4014,7 +4015,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     f" Debug: Spendable balance: {ci.format_amount(current_balance)}."
                 )
             self.log.error(err_msg)
-            raise ValueError(err_msg)
+            raise BalanceError(err_msg) from None
 
     def getOfferAddressTo(self, extra_options) -> str:
         if "addr_send_to" in extra_options:
@@ -10620,6 +10621,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 use_cursor,
                 {"active_ind": 1, "record_id": link.strategy_id},
             )
+            if strategy is None:
+                self.log.debug(
+                    f"Automation link: {link.record_id} found without strategy: {link.strategy_id}."
+                )
+                return False
+
             opts = json.loads(strategy.data.decode("UTF-8"))
 
             bid_amount: int = bid.amount

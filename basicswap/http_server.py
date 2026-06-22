@@ -26,9 +26,11 @@ from http.cookies import SimpleCookie
 
 from . import __version__
 from .util import (
+    BalanceError,
+    LockedCoinError,
     dumpj,
-    toBool,
     format_timestamp,
+    toBool,
 )
 from .chainparams import (
     Coins,
@@ -724,9 +726,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def handle_http(self, status_code, path, post_string="", is_json=False):
-        from basicswap.util import LockedCoinError
-        from basicswap.ui.util import getCoinName
-
         swap_client = self.server.swap_client
         parsed = parse.urlparse(self.path)
         url_split = parsed.path.split("/")
@@ -798,6 +797,10 @@ class HttpHandler(BaseHTTPRequestHandler):
                     clean_msg = f"Wallet locked: {getCoinName(ex.coinid)} wallet must be unlocked"
                     swap_client.log.warning(clean_msg)
                     return js_error(self, clean_msg)
+                elif isinstance(ex, BalanceError):
+                    # Suppress traceback
+                    method: str = url_split[2] if len(url_split) > 2 else "unknown"
+                    swap_client.log.error(f"js method: {method} failed - {ex}")
                 elif swap_client.debug is True:
                     swap_client.log.error(traceback.format_exc())
                 return js_error(self, str(ex))
