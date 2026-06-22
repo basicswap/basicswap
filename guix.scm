@@ -106,11 +106,11 @@
     (arguments
      `(#:phases
        (modify-phases %standard-phases
-         (add-before 'build 'set-version
-           (lambda _
-             (setenv "COINCURVE_IGNORE_SYSTEM_LIB" "OFF")
-             ;; ZIP does not support timestamps before 1980.
-             (setenv "SOURCE_DATE_EPOCH" "315532800")))
+         (replace 'set-version
+            (lambda _
+              (setenv "COINCURVE_IGNORE_SYSTEM_LIB" "OFF")
+              ;; ZIP does not support timestamps before 1980.
+              (setenv "SOURCE_DATE_EPOCH" "315532800")))
          )))
     (propagated-inputs
      (list
@@ -135,15 +135,15 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.16.5")
+  (version "0.16.6")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "1aa53e38f96ffa753cc6eeaee1cc9fccbd0ce5dd")))
+      (commit "c33f0007ca0ec620173ec51eef1f18f7814f0a41")))
     (sha256
       (base32
-        "0k2r16f0imyzh0x90a2a37m41imnd183vdlf9b8nrx4l884h543y"))
+        "15gwxbhdsjslh1jvs7cign87h28sncnf41818c5rqh6593p67jgp"))
     (file-name (git-file-name name version))))
   (build-system pyproject-build-system)
 
