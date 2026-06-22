@@ -107,8 +107,8 @@ known_coins = {
     "namecoin": (NMC_VERSION, NMC_VERSION_TAG, ("RoseTuring",)),
     "monero": (MONERO_VERSION, MONERO_VERSION_TAG, ("binaryfate",)),
     "wownero": (WOWNERO_VERSION, WOWNERO_VERSION_TAG, ("wowario",)),
-    "pivx": (PIVX_VERSION, PIVX_VERSION_TAG, ("fuzzbawls",)),
-    "dash": (DASH_VERSION, DASH_VERSION_TAG, ("pasta",)),
+    "pivx": (PIVX_VERSION, PIVX_VERSION_TAG, ("Fuzzbawls",)),
+    "dash": (DASH_VERSION, DASH_VERSION_TAG, ("pasta", "UdjinM6")),
     "firo": (FIRO_VERSION, FIRO_VERSION_TAG, ("reuben",)),
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
     "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
@@ -144,7 +144,7 @@ expected_key_ids = {
     "davidburkett38": ("D35621D53A1CC6A3456758D03620E9D387E55666",),
     "xanimo": ("2EAA8B1021C71AD5186CA07F6E8F17C1B1BCDCBE",),
     "patricklodder": ("DC6EF4A8BF9F1B1E4DE1EE522D3A345B98D0DC1F",),
-    "fuzzbawls": ("0CFBDA9F60D661BA31EB5D50C1ABA64407731FD9",),
+    "Fuzzbawls": ("0CFBDA9F60D661BA31EB5D50C1ABA64407731FD9",),
     "pasta": (
         "29590362EC878A81FD3C202B52527BEDABE87984",
         "02B8E7D002167C8B451AF05FE2F3D7916E722D38",
@@ -159,6 +159,7 @@ expected_key_ids = {
     "decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",),
     "Calin_Culianu": ("D465135F97D0047E18E99DC321810A542031C02C",),
     "SimpleX_Chat": ("FB44AF81A45BDE327319797C85107E357D4A17FC",),
+    "UdjinM6": ("3F5D48C9F00293CD365A3A9883592BD1400D58D9",),
 }
 
 GUIX_SSL_CERT_DIR = None
@@ -788,7 +789,28 @@ def extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts=
 
 def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     version, version_tag, signers = version_data
-    logger.info(f"Prepare core {coin} v{version}{version_tag}")
+
+    passed: bool = False
+    for signer in signers:
+        try:
+            tryPrepareCore(
+                coin, version_data, signer, settings, data_dir, extra_opts=extra_opts
+            )
+            passed = True
+            break
+        except Exception as e:
+            if len(signers) < 2:
+                raise
+            logger.warning(
+                f"Prepare core failed: {coin} v{version}{version_tag} - Signer: {signer}. Error: {e}"
+            )
+    if passed is False:
+        raise RuntimeError(f"Prepare core failed: {coin} v{version}{version_tag}")
+
+
+def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}):
+    version, version_tag, signers = version_data
+    logger.info(f"Prepare core: {coin} v{version}{version_tag} - Signer: {signer}")
 
     bin_dir = os.path.expanduser(settings["chainclients"][coin]["bindir"])
     if not os.path.exists(bin_dir):
@@ -807,7 +829,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
         if coin == "particl":
             filename_extra = PARTICL_LINUX_EXTRA
 
-    signing_key_name = signers[0]
+    signing_key_name = signer
     if coin == "monero":
         use_file_ext = "tar.bz2" if FILE_EXT == "tar.gz" else FILE_EXT
         release_filename = "{}-{}-{}.{}".format(coin, version, BIN_ARCH, use_file_ext)
@@ -1002,7 +1024,7 @@ def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
             assert_url = "https://raw.githubusercontent.com/PIVX-Project/gitian.sigs/master/{}-{}/{}/{}".format(
                 version + version_tag,
                 os_dir_name,
-                signing_key_name.capitalize(),
+                signing_key_name,
                 assert_filename,
             )
         elif coin == "dash":
