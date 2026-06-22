@@ -1,4 +1,40 @@
 
+0.16.6
+==============
+
+- feat: ui add skip fee checks checkbox when placing bids
+- build: add alternative dash release signer
+
+- fix: Improve Part anon and blind scriptless lock tx detection and spending
+- fix: Add more limits to split messages
+- fix: Check if offer matches reverse state for incoming messages
+- fix: solve BCH regression not finding refund txns.
+  - Add haveSignedLockRefundTx
+- Firo spark withdraw fix
+- Prevent reused receive addresses and fix the gap-limit calculation in the Electrum HD wallet.
+  - Previously an address could be handed out again even after it had already been used,
+    and the gap-limit check looked at the total derivation index instead of the run of
+    trailing unused addresses, so address reuse could trigger at the wrong time.
+  - This adds an ever_used flag to wallet addresses (with a DB migration for existing wallets),
+    only recycles addresses that were never used, and bases the gap-limit decision on the number
+    of unused addresses at the end of the chain. Addresses are marked used when they're handed out or first receive funds.
+- amm: dialog fixes
+  - amm: ensure swap type auto-updates
+  - amm: dont silently change the coin_to when both coins are the same
+
+- swaps: only enforce secret hash if both coins are same type
+- refactor: ease validateFeeRate limits
+- refactor: use gettxout in getLockTxHeight() when possible
+- refactor: log event for invalid ptx seen
+- refactor: log event for invalid lock tx a
+- refactor: check pending transfers before sending xmr lock tx
+- refactor: reduce log clutter
+  - Show xmr_b_half_privatekey_remote debug message only when it's expected to be there.
+
+- dash: Bump to 23.1.4 mandatory
+- particl: Bump to 27.2.4
+
+
 0.16.5
 ==============
 
