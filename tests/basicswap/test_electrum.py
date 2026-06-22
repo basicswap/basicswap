@@ -51,6 +51,7 @@ import shutil
 import subprocess
 import sys
 import unittest
+from io import BytesIO
 
 import basicswap.config as cfg
 from basicswap.basicswap_util import (
@@ -65,6 +66,7 @@ from basicswap.chainparams import (
     getCoinIdFromName,
 )
 from basicswap.util.daemon import Daemon
+from basicswap.contrib.test_framework.messages import CTransaction
 
 from tests.basicswap.common import (
     prepare_balance,
@@ -79,9 +81,10 @@ from tests.basicswap.extended.test_xmr_persistent import (
 )
 from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.util import (
-    read_json_api,
     post_json_api,
+    read_json_api,
 )
+from basicswap.interface.electrumx import ElectrumConnection
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -552,6 +555,7 @@ class Test(TestFunctions):
     update_min = 1.7
     daemons = []
 
+    electrumx_port = 50001
     test_coin_a = Coins.PART
     test_coin_b = Coins.BTC
     test_coin_xmr = Coins.XMR
@@ -644,7 +648,7 @@ class Test(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        cls.addElectrumxDaemon("bitcoin", 32793, 50001)
+        cls.addElectrumxDaemon("bitcoin", 32793, cls.electrumx_port)
         super().setUpClass()
 
     @classmethod
@@ -849,6 +853,128 @@ class Test(TestFunctions):
         self.do_test_04_follower_recover_b_lock_tx(
             self.test_coin_xmr, self.test_coin_b, self.port_node_0, self.port_node_1
         )
+
+    def test_06_preselect_bid_inputs(self):
+        coin_from, coin_to = (self.test_coin_xmr, self.test_coin_b)
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} Preselected bid inputs"
+        )
+
+        port_node_from = self.port_node_0
+        port_node_to = self.port_node_1
+
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_xmr,
+            100,
+            self.port_node_0,
+            self.port_node_1,
+            True,
+        )
+
+        ticker_from: str = chainparams[coin_from]["ticker"]
+        ticker_to: str = chainparams[coin_to]["ticker"]
+
+        reverse_bid: bool = True if coin_from in (Coins.XMR,) else False
+        port_offerer: int = port_node_from
+        port_bidder: int = port_node_to
+        port_leader: int = port_bidder if reverse_bid else port_offerer
+        port_follower: int = port_offerer if reverse_bid else port_bidder
+        logger.info(
+            f"Offerer, bidder, leader, follower: {port_offerer}, {port_bidder}, {port_leader}, {port_follower}"
+        )
+
+        amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        data = {
+            "addr_from": "-1",
+            "coin_from": ticker_from,
+            "coin_to": ticker_to,
+            "amt_from": amt_from_str,
+            "amt_to": amt_to_str,
+            "swap_type": "adaptor_sig",
+            "lockhrs": 24,
+        }
+
+        logger.info(
+            f"Creating offer {amt_from_str} {ticker_from} -> {amt_to_str} {ticker_to}"
+        )
+        offer_id: str = post_json_api(port_node_from, "offers/new", data)["offer_id"]
+        wait_for_offer(self.delay_event, port_node_to, offer_id)
+        offer = read_json_api(port_node_to, f"offers/{offer_id}")[0]
+        assert offer["offer_id"] == offer_id
+
+        data = {
+            "offer_id": offer_id,
+            "amount_to": amt_to_str,
+            "bid_rate": offer["rate"],
+        }
+        subfee_bid_data = read_json_api(port_node_to, "getsubfeebidtx", data)
+        assert offer["offer_id"] == offer_id
+
+        prefunded_bid_tx = CTransaction()
+        prefunded_bid_tx.deserialize(BytesIO(bytes.fromhex(subfee_bid_data["bid_tx"])))
+
+        data = {
+            "offer_id": offer_id,
+            "amount_from": subfee_bid_data["amount_from"],
+            "amount_to": subfee_bid_data["amount_to"],
+            "prefunded_bid_tx": subfee_bid_data["bid_tx"],
+            "validmins": 60,
+        }
+
+        rv = post_json_api(port_node_to, "bids/new", data)
+        bid_id: str = rv["bid_id"]
+
+        wait_for_bid_state(
+            self.delay_event, port_node_from, bid_id, BidStates.BID_RECEIVED
+        )
+        rv = post_json_api(port_offerer, f"bids/{bid_id}", {"accept": True})
+        assert rv["bid_state"] in ("Accepted", "Request accepted")
+
+        logger.info("Completing swap")
+        wait_for_bid_state(
+            self.delay_event, port_node_from, bid_id, BidStates.SWAP_COMPLETED, 240
+        )
+        wait_for_bid_state(
+            self.delay_event, port_node_to, bid_id, BidStates.SWAP_COMPLETED, 240
+        )
+
+        bid_info = read_json_api(port_node_to, f"bids/{bid_id}", {"show_extra": True})
+        chain_a_lock_txid_hex: str = next(
+            (t["txid"] for t in bid_info["txns"] if t["type"] == "Chain A Lock"), None
+        )
+
+        conn = ElectrumConnection("127.0.0.1", self.electrumx_port, use_ssl=False)
+        conn.connect()
+        try:
+            _ = conn.call("server.version", ["2.0", "1.4"])
+            chain_a_lock_txinfo = conn.call(
+                "blockchain.transaction.get", [chain_a_lock_txid_hex, True]
+            )
+        finally:
+            conn.disconnect()
+
+        chain_a_lock_tx = CTransaction()
+        chain_a_lock_tx.deserialize(BytesIO(bytes.fromhex(chain_a_lock_txinfo["hex"])))
+
+        prefunded_inputs = {
+            (vin.prevout.hash, vin.prevout.n) for vin in prefunded_bid_tx.vin
+        }
+        chain_inputs = {
+            (vin.prevout.hash, vin.prevout.n) for vin in chain_a_lock_tx.vin
+        }
+        assert len(prefunded_inputs) == len(chain_inputs)
+        for prefunded_input in prefunded_inputs:
+            assert prefunded_input in chain_inputs
 
 
 if __name__ == "__main__":

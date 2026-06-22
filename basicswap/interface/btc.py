@@ -1289,7 +1289,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx_fee_rate,
         vkbv=None,
     ):
-        tx_lock = CTransaction()
         tx_lock = self.loadTx(tx_lock_bytes)
 
         output_script = self.getScriptDest(script_lock)
@@ -1884,7 +1883,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
     ) -> bytes:
         if self.useBackend():
-            return self._fundTxElectrum(tx, feerate)
+            return self._fundTxElectrum(tx, feerate, subfee=subfee)
 
         feerate_str = self.format_amount(feerate)
         # TODO: Unlock unspents if bid cancelled
@@ -1902,7 +1901,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx_bytes: bytes = bytes.fromhex(rv["hex"])
         return tx_bytes
 
-    def _fundTxElectrum(self, tx: bytes, feerate) -> bytes:
+    def _fundTxElectrum(self, tx, feerate, subfee: bool = False) -> bytes:
         wm = self.getWalletManager()
         backend = self.getBackend()
         if not wm or not backend:
@@ -1967,7 +1966,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         selected_utxos = []
         total_input = 0
-        target = total_output + est_fee
+        target = total_output if subfee else total_output + est_fee
 
         for utxo in utxos:
             selected_utxos.append(utxo)
@@ -1976,7 +1975,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 10 + len(parsed_tx.vout) * 34 + len(selected_utxos) * input_vsize + 34
             )
             est_fee = est_vsize * fee_per_vbyte
-            target = total_output + est_fee
+            target = total_output if subfee else total_output + est_fee
             if total_input >= target:
                 break
 
@@ -2000,7 +1999,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         for out in parsed_tx.vout:
             funded_tx.vout.append(out)
 
-        witness_bytes_len_est: int = self.getWitnessStackSerialisedLength(
+        witness_bytes_len_est = self.getWitnessStackSerialisedLength(
             dummy_witness_stack
         )
 
@@ -2011,7 +2010,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         rough_vsize = 10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * 68
         rough_fee = max(round(feerate_satkb * rough_vsize / 1000), min_relay_fee)
-        rough_change = total_input - total_output - rough_fee
+        rough_change = (
+            (total_input - total_output)
+            if subfee
+            else (total_input - total_output - rough_fee)
+        )
         dust_limit = self.getdustlimit()
 
         if rough_change > dust_limit:
@@ -2028,7 +2031,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 funded_tx, add_witness_bytes=witness_bytes_len_est
             )
             final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
-            change = total_input - total_output - final_fee
+            change = (
+                (total_input - total_output)
+                if subfee
+                else (total_input - total_output - final_fee)
+            )
 
             if change > dust_limit:
                 funded_tx.vout[-1].nValue = change
@@ -2047,6 +2054,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
             final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
             change = 0
+
+        if subfee:
+            new_value = funded_tx.vout[0].nValue - final_fee
+            if new_value <= dust_limit:
+                raise ValueError(
+                    f"Output {funded_tx.vout[0].nValue} too small to cover fee {final_fee}"
+                )
+            funded_tx.vout[0].nValue = new_value
 
         for utxo in selected_utxos:
             wm.lockUTXO(
@@ -3606,81 +3621,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self, addr_to: str, amount: int, sub_fee: bool = False
     ) -> str:
         feerate, _rate_src = self.get_fee_rate()
-        if isinstance(feerate, int):
-            fee_per_vbyte = max(1, feerate // 1000)
-        else:
-            fee_per_vbyte = max(1, int(feerate * 100000))
-
-        if sub_fee:
-            wm = self.getWalletManager()
-            backend = self.getBackend()
-            if not wm or not backend:
-                raise ValueError("Electrum backend or WalletManager not available")
-
-            funded_addresses = wm.getFundedAddresses(self.coin_type())
-            addr_to_sh = (
-                funded_addresses
-                if funded_addresses
-                else wm.getSignableAddresses(self.coin_type())
-            )
-
-            scripthashes = list(addr_to_sh.values())
-            sh_to_addr = {sh: addr for addr, sh in addr_to_sh.items()}
-            batch_utxos = backend.getBatchUnspent(scripthashes)
-
-            all_utxos = []
-            for sh, sh_utxos in batch_utxos.items():
-                addr = sh_to_addr.get(sh, "")
-                for utxo in sh_utxos:
-                    utxo["address"] = addr
-                    all_utxos.append(utxo)
-
-            if not all_utxos:
-                raise ValueError("No UTXOs available")
-
-            total_balance = sum(u.get("value", 0) for u in all_utxos)
-
-            est_vsize = 10 + 31 + len(all_utxos) * 68
-            min_fee = 250
-            est_fee = max(est_vsize * fee_per_vbyte, min_fee)
-
-            if total_balance <= est_fee:
-                raise ValueError(
-                    f"Balance {total_balance} too small to cover fee {est_fee}"
-                )
-
-            tx = CTransaction()
-            tx.nVersion = self.txVersion()
-
-            for utxo in all_utxos:
-                txid_bytes = bytes.fromhex(utxo["txid"])[::-1]
-                txid_int = int.from_bytes(txid_bytes, "little")
-                txin = CTxIn(COutPoint(txid_int, utxo["vout"]))
-                txin.nSequence = 0xFFFFFFFD
-                tx.vin.append(txin)
-
-            script = self.getDestForAddress(addr_to)
-            tx.vout.append(self.txoType()(total_balance - est_fee, script))
-
-            tx_key = self._getTxInputsKey(tx)
-            with self._pending_utxos_lock:
-                self._pending_utxos_map[tx_key] = all_utxos
-
-            self._log.debug(
-                f"_createRawFundedTransactionElectrum: sub_fee=True, utxos={len(all_utxos)}, "
-                f"balance={total_balance}, fee={est_fee}"
-            )
-            return tx.serialize().hex()
-
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         script = self.getDestForAddress(addr_to)
-        output = self.txoType()(amount, script)
-        tx.vout.append(output)
-
-        tx_bytes = tx.serialize()
-        funded_tx = self.fundTx(tx_bytes, feerate)
-
+        tx.vout.append(self.txoType()(amount, script))
+        funded_tx = self.fundTx(tx.serialize(), feerate, subfee=sub_fee)
         return funded_tx.hex()
 
     def createRawSignedTransaction(self, addr_to, amount) -> str:
@@ -4620,6 +4565,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def validatePrefundedTxAmounts(self, tx_data: bytes) -> (bytes, int):
         # unspent_utxos = self.listUtxos()
         tx_obj = self.loadTx(tx_data, allow_witness=False)
+        electrum_backend = self.getBackend() if self.useBackend() else None
 
         total_out: int = 0
         total_in: int = 0
@@ -4634,11 +4580,19 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             if (txi_txid_hex, txi_vout) in used_utxos:
                 raise ValueError(f"Duplicate txin {txi_txid_hex} {txi_vout}")
 
-            prev_tx = self.rpc_wallet("gettransaction", [txi_txid_hex])
-            prev_tx_obj = self.describeTx(prev_tx["hex"])
+            if electrum_backend:
+                tx_info = electrum_backend.getTransaction(txi_txid_hex)
+                prev_tx = self.loadTx(bytes.fromhex(tx_info["hex"]))
+                if len(prev_tx.vout) <= txi_vout:
+                    raise ValueError(f"Missing txout {txi_vout} in {txi_txid_hex} ")
 
-            txo = prev_tx_obj["vout"][txi_vout]
-            total_in += self.make_int(txo["value"])
+                total_in += prev_tx.vout[txi_vout].nValue
+            else:
+                prev_tx = self.rpc_wallet("gettransaction", [txi_txid_hex])
+                prev_tx_obj = self.describeTx(prev_tx["hex"])
+
+                txo = prev_tx_obj["vout"][txi_vout]
+                total_in += self.make_int(txo["value"])
             dummy_witness_stack.append(self.getP2WPKHDummyWitness())
             used_utxos.add((txi_txid_hex, txi_vout))
 
