@@ -5,6 +5,7 @@
 - feat: ui add skip fee checks checkbox when placing bids
 - build: add alternative dash release signer
 
+**Fixes**
 - fix: Improve Part anon and blind scriptless lock tx detection and spending
 - fix: Add more limits to split messages
 - fix: Check if offer matches reverse state for incoming messages
@@ -22,6 +23,7 @@
   - amm: ensure swap type auto-updates
   - amm: dont silently change the coin_to when both coins are the same
 
+**Refactors**
 - swaps: only enforce secret hash if both coins are same type
 - refactor: ease validateFeeRate limits
 - refactor: use gettxout in getLockTxHeight() when possible
@@ -31,6 +33,7 @@
 - refactor: reduce log clutter
   - Show xmr_b_half_privatekey_remote debug message only when it's expected to be there.
 
+**Updates**
 - dash: Bump to 23.1.4 mandatory
 - particl: Bump to 27.2.4
 
