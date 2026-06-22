@@ -1298,18 +1298,6 @@ const AmmTablesManager = (function() {
 
         if (coinFromSelect && coinToSelect) {
             const handleCoinChange = function() {
-                const fromValue = coinFromSelect.value;
-                const toValue = coinToSelect.value;
-
-                if (fromValue && toValue && fromValue === toValue) {
-                    for (let i = 0; i < coinToSelect.options.length; i++) {
-                        if (coinToSelect.options[i].value !== fromValue) {
-                            coinToSelect.selectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-
                 if (type === 'offer') {
                     const swapType = document.getElementById('add-offer-swap-type');
                     if (swapType) {
@@ -1763,18 +1751,6 @@ const AmmTablesManager = (function() {
 
             if (editCoinFromSelect && editCoinToSelect) {
                 const handleEditCoinChange = function() {
-                    const fromValue = editCoinFromSelect.value;
-                    const toValue = editCoinToSelect.value;
-
-                    if (fromValue && toValue && fromValue === toValue) {
-                        for (let i = 0; i < editCoinToSelect.options.length; i++) {
-                            if (editCoinToSelect.options[i].value !== fromValue) {
-                                editCoinToSelect.selectedIndex = i;
-                                break;
-                            }
-                        }
-                    }
-
                     if (type === 'offer') {
                         const swapType = document.getElementById('edit-offer-swap-type');
                         if (swapType) {
