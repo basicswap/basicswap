@@ -29,6 +29,10 @@ class AutomationConstraintTemporary(ValueError):
     pass
 
 
+class BalanceError(ValueError):
+    pass
+
+
 class InactiveCoin(Exception):
     def __init__(self, coinid):
         self.coinid = coinid
