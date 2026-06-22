@@ -1309,6 +1309,13 @@ const AmmTablesManager = (function() {
                         }
                     }
                 }
+
+                if (type === 'offer') {
+                    const swapType = document.getElementById('add-offer-swap-type');
+                    if (swapType) {
+                        updateSwapTypeOptions(coinFromSelect.value, coinToSelect.value, swapType);
+                    }
+                }
             };
 
             coinFromSelect.addEventListener('change', handleCoinChange);
@@ -1711,7 +1718,10 @@ const AmmTablesManager = (function() {
                 document.getElementById('edit-offer-valid-seconds').value = item.offer_valid_seconds || '3600';
                 document.getElementById('edit-offer-address').value = item.address || 'auto';
                 document.getElementById('edit-offer-adjust-rates').value = item.adjust_rates_based_on_market || 'false';
-                document.getElementById('edit-offer-swap-type').value = item.swap_type || 'adaptor_sig';
+                const editSwapTypeEl = document.getElementById('edit-offer-swap-type');
+                editSwapTypeEl.disabled = false;
+                editSwapTypeEl.value = item.swap_type || 'adaptor_sig';
+                editSwapTypeEl.dispatchEvent(new Event('change'));
                 document.getElementById('edit-offer-min-swap-amount').value = item.min_swap_amount || '0.001';
                 document.getElementById('edit-offer-amount-step').value = item.amount_step || '0.001';
                 const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
@@ -1762,6 +1772,13 @@ const AmmTablesManager = (function() {
                                 editCoinToSelect.selectedIndex = i;
                                 break;
                             }
+                        }
+                    }
+
+                    if (type === 'offer') {
+                        const swapType = document.getElementById('edit-offer-swap-type');
+                        if (swapType) {
+                            updateSwapTypeOptions(editCoinFromSelect.value, editCoinToSelect.value, swapType);
                         }
                     }
                 };
@@ -2186,23 +2203,16 @@ const AmmTablesManager = (function() {
         coinFromValue = String(coinFromValue);
         coinToValue = String(coinToValue);
 
-        let disableSelect = false;
-
         if (coins_without_segwit.includes(coinFromValue) && coins_without_segwit.includes(coinToValue)) {
             swapTypeSelect.value = 'seller_first';
-            disableSelect = true;
         } else {
             swapTypeSelect.value = 'adaptor_sig';
-            disableSelect = true;
         }
 
-        swapTypeSelect.disabled = disableSelect;
+        swapTypeSelect.dispatchEvent(new Event('change'));
 
-        if (disableSelect) {
-            swapTypeSelect.classList.add('bg-gray-200', 'dark:bg-gray-600', 'cursor-not-allowed');
-        } else {
-            swapTypeSelect.classList.remove('bg-gray-200', 'dark:bg-gray-600', 'cursor-not-allowed');
-        }
+        swapTypeSelect.disabled = true;
+        swapTypeSelect.classList.add('bg-gray-200', 'dark:bg-gray-600', 'cursor-not-allowed');
     }
 
     function initializeCustomSelects(modalType = null) {
