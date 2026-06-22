@@ -823,8 +823,8 @@ class Test(unittest.TestCase):
             (Coins.XMR, Coins.BTC, SwapTypes.XMR_SWAP),
             (Coins.BTC, Coins.FIRO, SwapTypes.XMR_SWAP),
             (Coins.FIRO, Coins.BTC, SwapTypes.XMR_SWAP),
-            (Coins.PIVX, Coins.BTC, SwapTypes.SELLER_FIRST),
-            (Coins.BTC, Coins.PIVX, SwapTypes.SELLER_FIRST),
+            (Coins.PIVX, Coins.BTC, SwapTypes.XMR_SWAP),
+            (Coins.BTC, Coins.PIVX, SwapTypes.XMR_SWAP),
             (Coins.DASH, Coins.PIVX, SwapTypes.SELLER_FIRST),
             (Coins.PIVX, Coins.DASH, SwapTypes.SELLER_FIRST),
         ]
