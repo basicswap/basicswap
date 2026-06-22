@@ -154,6 +154,17 @@ def upgradeDatabaseData(self, data_version):
             ):
                 addBidState(self, state, now, cursor)
 
+        if data_version > 0 and data_version < 9:
+            cursor.execute(
+                "UPDATE wallet_addresses SET ever_used = 1"
+                " WHERE is_funded = 1"
+                " OR (cached_balance IS NOT NULL AND cached_balance > 0)"
+                " OR first_seen_height IS NOT NULL"
+            )
+            cursor.execute(
+                "UPDATE wallet_addresses SET ever_used = 0 WHERE ever_used IS NULL"
+            )
+
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
         self.commitDB()
