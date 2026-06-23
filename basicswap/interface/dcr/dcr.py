@@ -1689,8 +1689,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             )
         return inputs
 
-    def unlockInputs(self, tx_bytes):
-        tx = self.loadTx(tx_bytes)
+    def unlockInputs(self, tx_data: bytes) -> None:
+        tx = self.loadTx(tx_data)
 
         inputs = []
         for txi in tx.vin:
@@ -1702,7 +1702,42 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                     "tree": txi.prevout.tree,
                 }
             )
-        self.rpc_wallet("lockunspent", [True, inputs])
+
+        try:
+            self.rpc_wallet("lockunspent", [True, inputs])
+            for txi in tx.vin:
+                txid_hex: str = i2h(txi.prevout.hash)
+                self._log.debug(
+                    f"Unlocked UTXO {self._log.id(txid_hex)}:{txi.prevout.n}"
+                )
+        except Exception as e:
+            # Suppress log message when utxo is already spent
+            if "expected unspent output" in str(e):
+                pass
+            else:
+                raise
+
+    def lockPrefundedTxInputs(self, tx_data: bytes) -> None:
+        tx = self.loadTx(tx_data)
+        inputs = []
+        for txi in tx.vin:
+            inputs.append(
+                {
+                    "txid": i2h(txi.prevout.hash),
+                    "vout": txi.prevout.n,
+                    "tree": txi.prevout.tree,
+                }
+            )
+        try:
+            self.rpc_wallet("lockunspent", [False, inputs])
+            for txi in tx.vin:
+                txid_hex: str = i2h(txi.prevout.hash)
+                self._log.debug(f"Locked UTXO {self._log.id(txid_hex)}:{txi.prevout.n}")
+        except Exception as e:
+            if "already locked" in str(e):
+                self._log.debug("UTXO already locked")
+            else:
+                self._log.warning(f"Error locking UTXOs: {e}")
 
     def getWalletRestoreHeight(self) -> int:
         start_time = self.rpc_wallet("getinfo")["keypoololdest"]

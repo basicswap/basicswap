@@ -1624,12 +1624,14 @@ class WalletManager:
                 )
                 self._swap_client.commitDB()
                 self._log.debug(
-                    f"Unlocked UTXO {txid[:16]}...:{vout} for {Coins(coin_type).name}"
+                    f"Unlocked UTXO {self._log.id(txid, max_chars=16)}...:{vout} for {Coins(coin_type).name}"
                 )
                 return True
             return False
         except Exception as e:
-            self._log.warning(f"Failed to unlock UTXO {txid[:16]}:{vout}: {e}")
+            self._log.warning(
+                f"Failed to unlock UTXO {self._log.id(txid, max_chars=16)}...:{vout}: {e}"
+            )
             self._swap_client.rollbackDB()
             return False
         finally:

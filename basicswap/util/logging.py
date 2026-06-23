@@ -31,15 +31,21 @@ class BSXLogger(logging.Logger):
             )
         return addr
 
-    def id(self, concept_id: bytes, prefix: str = "") -> str:
+    def id(self, concept_id: bytes, prefix: str = "", max_chars=None) -> str:
+        if max_chars and max_chars < 2:
+            raise ValueError("max_chars is too low")
         if concept_id is None:
             return prefix + "None"
         if isinstance(concept_id, str):
             concept_id = bytes.fromhex(concept_id)
+
         if self.safe_logs:
+            limit_chars: int = 16 if max_chars is None else max_chars
             return (prefix if len(prefix) > 0 else "_") + sha256(
                 self.safe_logs_prefix + concept_id
-            )[:8].hex()
+            )[: limit_chars // 2].hex()
+        if max_chars:
+            return prefix + concept_id[: max_chars // 2].hex()
         return prefix + concept_id.hex()
 
     def info_s(self, msg, *args, **kwargs):

@@ -3478,24 +3478,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 query = "UPDATE actions SET active_ind = 2 WHERE linked_id = :bid_id "
             use_cursor.execute(query, {"bid_id": bid.bid_id})
 
-            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
-            # Unlock locked inputs (TODO)
-            if offer.swap_type == SwapTypes.XMR_SWAP:
-                ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
-                rows = use_cursor.execute(
-                    "SELECT a_lock_tx FROM xmr_swaps WHERE bid_id = :bid_id",
-                    {"bid_id": bid.bid_id},
-                ).fetchall()
-                if len(rows) > 0:
-                    xmr_swap_a_lock_tx = rows[0][0]
-                    try:
-                        ci_from.unlockInputs(xmr_swap_a_lock_tx)
-                    except Exception as e:
-                        self.log.debug(f"unlockInputs failed {e}")
-                        pass  # Invalid parameter, unknown transaction
-            elif SwapTypes.SELLER_FIRST:
-                pass  # No prevouts are locked
-
             for coin_type in (Coins(offer.coin_from), Coins(offer.coin_to)):
                 try:
                     ci = self.ci(coin_type)
@@ -3514,6 +3496,48 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Failed to unlock electrum UTXOs for {coin_type}: {e}"
                     )
+
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+            # Unlock locked inputs (TODO)
+            if offer.swap_type == SwapTypes.XMR_SWAP:
+                ci_leader = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+                rows = use_cursor.execute(
+                    "SELECT a_lock_tx FROM xmr_swaps WHERE bid_id = :bid_id",
+                    {"bid_id": bid.bid_id},
+                ).fetchall()
+                if len(rows) > 0:
+                    xmr_swap_a_lock_tx = rows[0][0]
+                    try:
+                        ci_leader.unlockInputs(xmr_swap_a_lock_tx)
+                    except Exception as e:
+                        self.log.warning(f"unlockInputs failed {e}")
+
+                # Check prefunded txns
+                # The prefunded itx should already be unlocked above (a_lock_tx), repeat to catch edge cases
+                prefunded_itx = self.getPreFundedTx(
+                    Concepts.BID,
+                    bid.bid_id,
+                    TxTypes.ITX_PRE_FUNDED,
+                    cursor=use_cursor,
+                )
+                if prefunded_itx:
+                    try:
+                        self.ci(offer.coin_to).unlockInputs(prefunded_itx.tx_data)
+                    except Exception as e:
+                        self.log.warning(f"Prefunded ITx unlockInputs failed {e}")
+                prefunded_ptx = self.getPreFundedTx(
+                    Concepts.BID,
+                    bid.bid_id,
+                    TxTypes.PTX_PRE_FUNDED,
+                    cursor=use_cursor,
+                )
+                if prefunded_ptx:
+                    try:
+                        self.ci(offer.coin_to).unlockInputs(prefunded_ptx.tx_data)
+                    except Exception as e:
+                        self.log.warning(f"Prefunded PTx unlockInputs failed {e}")
+            elif SwapTypes.SELLER_FIRST:
+                pass  # No prevouts are locked
 
             # Update identity stats
             if bid.state in (
@@ -6121,10 +6145,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 prefunded_txid, prefunded_tx_fee_rate = (
                     ci_to.validatePrefundedTxAmounts(prefunded_tx_data)
                 )
-                self.log.debug(f"Using prefunded tx: {self.log.id(prefunded_txid)}")
+                self.log.info(f"Using prefunded tx: {self.log.id(prefunded_txid)}")
                 ci_to.validateFeeRate(
                     prefunded_tx_fee_rate, Concepts.BID, bypass_fee_validation
                 )
+                ci_to.lockPrefundedTxInputs(prefunded_tx_data)
             else:
                 amount, amount_to, bid_rate = self.setBidAmounts(
                     amount, offer, extra_options, ci_from
