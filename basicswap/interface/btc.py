@@ -1883,7 +1883,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
     ) -> bytes:
         if self.useBackend():
-            return self._fundTxElectrum(tx, feerate, subfee=subfee)
+            return self._fundTxElectrum(tx, feerate, lock_unspents=lock_unspents, subfee=subfee)
 
         feerate_str = self.format_amount(feerate)
         # TODO: Unlock unspents if bid cancelled
@@ -1901,7 +1901,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx_bytes: bytes = bytes.fromhex(rv["hex"])
         return tx_bytes
 
-    def _fundTxElectrum(self, tx, feerate, subfee: bool = False) -> bytes:
+    def _fundTxElectrum(self, tx, feerate, lock_unspents: bool = True, subfee: bool = False) -> bytes:
         wm = self.getWalletManager()
         backend = self.getBackend()
         if not wm or not backend:
@@ -2063,15 +2063,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
             funded_tx.vout[0].nValue = new_value
 
-        for utxo in selected_utxos:
-            wm.lockUTXO(
-                self.coin_type(),
-                utxo.get("txid", ""),
-                utxo.get("vout", 0),
-                value=utxo.get("value", 0),
-                address=utxo.get("address"),
-                expires_in=3600,
-            )
+        if lock_unspents:
+            for utxo in selected_utxos:
+                wm.lockUTXO(
+                    self.coin_type(),
+                    utxo.get("txid", ""),
+                    utxo.get("vout", 0),
+                    value=utxo.get("value", 0),
+                    address=utxo.get("address"),
+                    expires_in=3600,
+                )
 
         tx_serialized = funded_tx.serialize()
         tx_key = self._getTxInputsKey(funded_tx)
