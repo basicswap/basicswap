@@ -622,7 +622,6 @@ class Test(TestFunctions):
             "DAEMON_POLL_INTERVAL_BLOCKS": "1000",
             "DAEMON_POLL_INTERVAL_MEMPOOL": "1000",
         }
-        opened_files = []
         stdout_dest = open(f"{ELECTRUMX_DATADIR}/electrumx.log", "w")
         stderr_dest = stdout_dest
         cls.daemons.append(
@@ -640,7 +639,7 @@ class Test(TestFunctions):
                     env=electrumx_env,
                 ),
                 [
-                    opened_files,
+                    stdout_dest,
                 ],
                 f"electrumx_{ticker_lc}",
             )

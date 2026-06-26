@@ -235,8 +235,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         return verify_secp256k1_point(pubkey_bytes)
 
     def isValidAddressHash(self, address_hash: bytes) -> bool:
-        hash_len = len(address_hash)
-        if hash_len == 20:
+        if len(address_hash) == 20:
             return True
 
     def verifySig(self, pubkey: bytes, signed_hash: bytes, sig: bytes) -> bool:

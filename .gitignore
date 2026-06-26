@@ -12,6 +12,7 @@ __pycache__
 .ruff_cache
 .pytest_cache
 .vectorcode
+.Trash*
 *~
 
 # geckodriver.log

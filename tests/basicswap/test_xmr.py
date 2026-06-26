@@ -102,7 +102,7 @@ XMR_BASE_WALLET_RPC_PORT = 23792
 
 signal_event = threading.Event()  # Set if test was cancelled
 test_delay_event = threading.Event()
-RESET_TEST = make_boolean(os.getenv("RESET_TEST", "true"))
+RESET_TEST = make_boolean(os.getenv("RESET_TEST", True))
 
 
 def prepareXmrDataDir(datadir, node_id, conf_file):

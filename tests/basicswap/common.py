@@ -207,7 +207,7 @@ def stopDaemons(daemons):
     for d in daemons:
         try:
             d.handle.wait(timeout=20)
-            for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
+            for fp in d.files:
                 if fp:
                     fp.close()
         except Exception as e:
