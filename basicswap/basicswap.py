@@ -6250,6 +6250,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             if "dest_af" in extra_options:
                 xmr_swap.dest_af = extra_options["dest_af"]
+                ensure(
+                    isinstance(xmr_swap.dest_af, bytes),
+                    "Swap destination must be bytes",
+                )
+                self.log.info("Using supplied destination")
+                self.log.debug(f"Destination {xmr_swap.dest_af.hex()}")
             else:
                 address_out = self.getReceiveAddressFromPool(
                     coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK, cursor=cursor

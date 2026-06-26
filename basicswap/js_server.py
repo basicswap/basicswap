@@ -673,6 +673,14 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 extra_options["bypass_fee_validation"] = toBool(
                     get_data_entry(post_data, "bypass_fee_checks")
                 )
+            if have_data_entry(post_data, "destination_address"):
+                extra_options["dest_af"] = ci_from.decodeAddress(
+                    get_data_entry(post_data, "destination_address")
+                )
+            if have_data_entry(post_data, "destination_script"):
+                extra_options["dest_af"] = bytes.fromhex(
+                    get_data_entry(post_data, "destination_script")
+                )
 
             if offer.swap_type == SwapTypes.XMR_SWAP:
                 bid_id = swap_client.postXmrBid(

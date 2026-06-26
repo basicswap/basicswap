@@ -630,7 +630,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return self.rpc("getblockheader", [block_hash, False])
 
     def getPrevBlockInChain(self, block_header_in):
-        block_header = copy.deeocopy(block_header_in)
+        block_header = copy.deepcopy(block_header_in)
         while True:
             previousblockhash = block_header.get("previousblockhash", None)
             if previousblockhash is None:
@@ -1793,7 +1793,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock spend tx: {}.".format(self._log.id(txid)))
+        self._log.info(f"Verifying lock spend tx: {self._log.id(txid)}.")
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
