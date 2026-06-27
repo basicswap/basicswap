@@ -6180,6 +6180,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap = XmrSwap()
                 xmr_swap.contract_count = self.getNewContractId(cursor)
                 self.setMsgSplitInfo(xmr_swap)
+                if "dest_bl" in extra_options:
+                    xmr_swap.dest_bl = extra_options["dest_bl"]
+                    ensure(
+                        isinstance(xmr_swap.dest_bl, str),
+                        "Swap destination must be string",
+                    )
+                    ensure(
+                        ci_from.isValidAddress(xmr_swap.dest_bl),
+                        f"Swap destination must be a valid {ci_from.ticker()} address",
+                    )
+                    self.log.info("Using supplied destination")
+                    self.log.debug(f"Destination {xmr_swap.dest_bl}")
 
                 bid = Bid(
                     protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
@@ -12260,6 +12272,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci_to = self.ci(coin_to)
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
+        is_redeem_address_owned: bool = True
         try:
             if bid.xmr_b_lock_tx is None:
                 raise TemporaryError("Chain B lock tx not found.")
@@ -12309,7 +12322,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
-            if coin_to in (Coins.XMR, Coins.WOW):
+            if xmr_swap.dest_bl is not None and len(xmr_swap.dest_bl):
+                address_to = xmr_swap.dest_bl
+                is_redeem_address_owned = ci_to.isAddressMine(address_to)
+                self.log.info(
+                    "To provided address"
+                    + ("" if is_redeem_address_owned else " (external)")
+                )
+                self.log.debug(f"Address: {address_to}")
+            elif coin_to in (Coins.XMR, Coins.WOW):
                 address_to = self.getCachedMainWalletAddress(ci_to, cursor)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to, cursor)
@@ -12376,6 +12397,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
         if bid.xmr_b_lock_tx:
             bid.xmr_b_lock_tx.setState(TxStates.TX_REDEEMED)
+
+        if not is_redeem_address_owned:
+            bid.setState(BidStates.SWAP_COMPLETED)
+            self.notify(NT.SWAP_COMPLETED, {"bid_id": bid_id.hex()})
 
         # TODO: Why does using bid.txns error here?
         self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)

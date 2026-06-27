@@ -12,7 +12,7 @@ import time
 from enum import IntEnum, auto
 from typing import Optional
 
-CURRENT_DB_VERSION = 35
+CURRENT_DB_VERSION = 36
 CURRENT_DB_DATA_VERSION = 9
 
 
@@ -419,6 +419,9 @@ class XmrSwap(Table):
 
     # Destination for coin A amount to follower when swap completes successfully
     dest_af = Column("blob")
+    dest_bl = Column(
+        "blob"
+    )  # Destination for coin B amount to leader when swap completes successfully
 
     pkal = Column("blob")
     pkasl = Column("blob")

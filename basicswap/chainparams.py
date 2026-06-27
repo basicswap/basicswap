@@ -302,6 +302,7 @@ chainparams = {
             "min_amount": 1000000000,
             "max_amount": 10000000 * XMR_COIN,
             "address_prefix": 18,
+            "subaddress_prefix": 42,
         },
         "testnet": {
             "rpcport": 28081,
@@ -309,6 +310,7 @@ chainparams = {
             "min_amount": 1000000000,
             "max_amount": 10000000 * XMR_COIN,
             "address_prefix": 18,
+            "subaddress_prefix": 42,
         },
         "regtest": {
             "rpcport": 18081,
@@ -316,6 +318,7 @@ chainparams = {
             "min_amount": 1000000000,
             "max_amount": 10000000 * XMR_COIN,
             "address_prefix": 18,
+            "subaddress_prefix": 42,
         },
     },
     Coins.WOW: {
@@ -329,6 +332,7 @@ chainparams = {
             "min_amount": 100000000,
             "max_amount": 10000000 * WOW_COIN,
             "address_prefix": 4146,
+            "subaddress_prefix": 12208,
         },
         "testnet": {
             "rpcport": 44568,
@@ -336,6 +340,7 @@ chainparams = {
             "min_amount": 100000000,
             "max_amount": 10000000 * WOW_COIN,
             "address_prefix": 4146,
+            "subaddress_prefix": 12208,
         },
         "regtest": {
             "rpcport": 54568,
@@ -343,6 +348,7 @@ chainparams = {
             "min_amount": 100000000,
             "max_amount": 10000000 * WOW_COIN,
             "address_prefix": 4146,
+            "subaddress_prefix": 12208,
         },
     },
     Coins.PIVX: {

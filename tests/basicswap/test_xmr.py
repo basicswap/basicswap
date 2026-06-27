@@ -1125,7 +1125,7 @@ class Test(BaseTest):
             chain_client_settings["manage_wallet_daemon"] = False
 
     def test_010_txn_size(self):
-        logging.info("---------- Test {} txn_size".format(Coins.PART))
+        logging.info(f"---------- Test {Coins.PART.name} txn_size")
 
         swap_clients = self.swap_clients
         ci = swap_clients[0].ci(Coins.PART)
@@ -1979,9 +1979,13 @@ class Test(BaseTest):
 
     def test_08_withdraw(self):
         logging.info("---------- Test XMR withdrawals")
+        swap_clients = self.swap_clients
 
         js_0 = read_json_api(1800, "wallets")
-        address_to = js_0[Coins.XMR.name]["deposit_address"]
+        address_to: str = js_0[Coins.XMR.name]["deposit_address"]
+
+        assert swap_clients[0].ci(Coins.XMR).isAddressMine(address_to) is True
+        assert swap_clients[1].ci(Coins.XMR).isAddressMine(address_to) is False
 
         js_1 = read_json_api(1801, "wallets")
         assert float(js_1[Coins.XMR.name]["balance"]) > 0.0

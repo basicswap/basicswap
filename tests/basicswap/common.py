@@ -132,6 +132,7 @@ def prepare_balance(
     port_target_node: int,
     port_take_from_node: int,
     test_balance: bool = True,
+    wait_until_spendable: bool = True,
 ) -> None:
     if coin == Coins.PART_BLIND:
         coin_ticker: str = "PART"
@@ -172,11 +173,13 @@ def prepare_balance(
         wait_for_amount += current_balance
     delay_iterations = 100 if coin == Coins.NAV else 30
     delay_time = 5 if coin == Coins.NAV else 3
+
+    if wait_until_spendable is False:
+        return
+
     wait_for_balance(
         use_delay_event,
-        "http://127.0.0.1:{}/json/wallets/{}".format(
-            port_target_node, coin_ticker.lower()
-        ),
+        f"http://127.0.0.1:{port_target_node}/json/wallets/{coin_ticker.lower()}",
         balance_type,
         wait_for_amount,
         iterations=delay_iterations,
@@ -497,7 +500,14 @@ def wait_for_balance(
     i = 0
     while not delay_event.is_set():
         rv_js = json.loads(urlopen(url).read())
-        if float(rv_js[balance_key]) >= expect_amount:
+        have_balance = 0.0
+        if isinstance(balance_key, (list, tuple)):
+            for bk in balance_key:
+                have_balance += float(rv_js[bk])
+        else:
+            have_balance = float(rv_js[balance_key])
+
+        if have_balance >= expect_amount:
             return
         delay_event.wait(delay_time)
         i += 1

@@ -37,7 +37,10 @@ from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.network import is_private_ip_address
 from basicswap.util.rfc2440 import rfc2440_hash_password
-from basicswap.util_xmr import encode_address as xmr_encode_address
+from basicswap.util_xmr import (
+    decode_address as xmr_decode_address,
+    encode_address as xmr_encode_address,
+)
 from basicswap.interface.btc import BTCInterface
 from basicswap.interface.xmr import XMRInterface
 from tests.basicswap.mnemonics import mnemonics
@@ -630,11 +633,17 @@ class Test(unittest.TestCase):
         )
         K = ed25519_get_pubkey(k)
 
-        addr = xmr_encode_address(K, K)
+        addr: str = xmr_encode_address(K, K)
         assert addr.startswith("4")
+        Ks, Kv = xmr_decode_address(addr)
+        assert Ks == K
+        assert Kv == K
 
         addr = xmr_encode_address(K, K, 4146)
         assert addr.startswith("Wo")
+        Ks, Kv = xmr_decode_address(addr, 4146)
+        assert Ks == K
+        assert Kv == K
 
     def test_blake256(self):
         test_vectors = [

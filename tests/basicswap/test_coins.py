@@ -18,7 +18,7 @@ export PYTHONPATH=$(pwd)
 pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_coins.py
 
 # Run select test
-pytest -v -s  --log-cli-level=DEBUG tests/basicswap/test_coins.py::Test::test_01_b_full_swap_xmr
+TEST_COIN_A="monero" TEST_COIN_B="bitcoin" pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_coins.py::Test::test_set_destination
 
 # Optionally copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
@@ -36,12 +36,14 @@ from basicswap.basicswap_util import (
     BidStates,
 )
 from basicswap.chainparams import (
+    Coins,
     chainparams,
     getCoinIdFromName,
 )
 
 from tests.basicswap.common import (
     prepare_balance,
+    wait_for_balance,
 )
 from tests.basicswap.test_electrum import (
     wait_for_bid_states,
@@ -75,14 +77,37 @@ class Test(TestFunctions):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        prepare_balance(
-            cls.delay_event,
-            cls.test_coin_b,
-            1000,
-            cls.port_node_1,
-            cls.port_node_0,
-            True,
-        )
+        initial_amount: float = 200.0
+        for should_wait in (False, True):
+            for coin_id in (cls.test_coin_a, cls.test_coin_b):
+                if coin_id == Coins.XMR:
+                    node_to = cls.port_node_0
+                    node_from = cls.port_node_1
+                    if cls.test_coin_a != Coins.XMR:
+                        continue
+                else:
+                    node_to = cls.port_node_1
+                    node_from = cls.port_node_0
+                if should_wait:
+                    coin_ticker: str = chainparams[coin_id]["ticker"]
+                    wait_for_balance(
+                        cls.delay_event,
+                        f"http://127.0.0.1:{node_to}/json/wallets/{coin_ticker.lower()}",
+                        "balance",
+                        initial_amount,
+                        iterations=60,
+                        delay_time=2,
+                    )
+                else:
+                    prepare_balance(
+                        cls.delay_event,
+                        coin_id,
+                        initial_amount,
+                        node_to,
+                        node_from,
+                        True,
+                        wait_until_spendable=False,
+                    )
 
     @classmethod
     def setupNodes(cls):
@@ -169,6 +194,7 @@ class Test(TestFunctions):
             "validmins": 60,
             "destination_address": address_2,
         }
+        logger.info(f"Sending bid with destination_address: {address_2}")
         rv = post_json_api(port_node_to, "bids/new", data)
         bid_id: str = rv["bid_id"]
 
@@ -182,11 +208,20 @@ class Test(TestFunctions):
             BidStates.SWAP_COMPLETED,
             240,
         )
-        wallet_after = read_json_api(self.port_node_2, f"wallets/{ticker_from}")
-        assert (
-            wallet_after["balance"] + wallet_after["unconfirmed"]
-            > wallet_before["balance"] + wallet_before["unconfirmed"]
+        wait_for_balance(
+            self.delay_event,
+            f"http://127.0.0.1:{self.port_node_2}/json/wallets/{ticker_from}",
+            ["balance", "unconfirmed"],
+            float(wallet_before["balance"])
+            + float(wallet_before["unconfirmed"])
+            + 0.01,
+            iterations=40,
+            delay_time=1,
         )
+        wallet_after = read_json_api(self.port_node_2, f"wallets/{ticker_from}")
+        assert float(wallet_after["balance"]) + float(
+            wallet_after["unconfirmed"]
+        ) > float(wallet_before["balance"]) + float(wallet_before["unconfirmed"])
 
 
 if __name__ == "__main__":
