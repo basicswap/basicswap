@@ -1883,7 +1883,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
     ) -> bytes:
         if self.useBackend():
-            return self._fundTxElectrum(tx, feerate, subfee=subfee)
+            return self._fundTxElectrum(
+                tx, feerate, lock_unspents=lock_unspents, subfee=subfee
+            )
 
         feerate_str = self.format_amount(feerate)
         # TODO: Unlock unspents if bid cancelled
@@ -1901,7 +1903,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx_bytes: bytes = bytes.fromhex(rv["hex"])
         return tx_bytes
 
-    def _fundTxElectrum(self, tx, feerate, subfee: bool = False) -> bytes:
+    def _fundTxElectrum(
+        self, tx, feerate, lock_unspents: bool = True, subfee: bool = False
+    ) -> bytes:
         wm = self.getWalletManager()
         backend = self.getBackend()
         if not wm or not backend:
@@ -2063,15 +2067,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
             funded_tx.vout[0].nValue = new_value
 
-        for utxo in selected_utxos:
-            wm.lockUTXO(
-                self.coin_type(),
-                utxo.get("txid", ""),
-                utxo.get("vout", 0),
-                value=utxo.get("value", 0),
-                address=utxo.get("address"),
-                expires_in=3600,
-            )
+        if lock_unspents:
+            for utxo in selected_utxos:
+                wm.lockUTXO(
+                    self.coin_type(),
+                    utxo.get("txid", ""),
+                    utxo.get("vout", 0),
+                    value=utxo.get("value", 0),
+                    address=utxo.get("address"),
+                    expires_in=3600,
+                )
 
         tx_serialized = funded_tx.serialize()
         tx_key = self._getTxInputsKey(funded_tx)
@@ -2160,16 +2165,68 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
         return inputs
 
-    def unlockInputs(self, tx_bytes):
+    def unlockInputs(self, tx_data: bytes) -> None:
+        tx = self.loadTx(tx_data)
         if self.useBackend():
+            wm = self.getWalletManager()
+            backend = self.getBackend()
+            if not wm or not backend:
+                raise ValueError("Electrum backend or WalletManager not available")
+            for txi in tx.vin:
+                wm.unlockUTXO(
+                    self.coin_type(),
+                    i2h(txi.prevout.hash),
+                    txi.prevout.n,
+                )
             return
 
-        tx = self.loadTx(tx_bytes)
+        inputs = []
+        for txi in tx.vin:
+            inputs.append({"txid": i2h(txi.prevout.hash), "vout": txi.prevout.n})
+        try:
+            self.rpc_wallet("lockunspent", [True, inputs])
+            for txi in tx.vin:
+                txid_hex: str = i2h(txi.prevout.hash)
+                self._log.debug(
+                    f"Unlocked UTXO {self._log.id(txid_hex)}:{txi.prevout.n}"
+                )
+        except Exception as e:
+            # Suppress log message when utxo is already spent
+            if "expected unspent output" in str(e):
+                pass
+            else:
+                raise
+
+    def lockPrefundedTxInputs(self, tx_data: bytes) -> None:
+        tx = self.loadTx(tx_data)
+        if self.useBackend():
+            wm = self.getWalletManager()
+            backend = self.getBackend()
+            if not wm or not backend:
+                raise ValueError("Electrum backend or WalletManager not available")
+
+            for txi in tx.vin:
+                wm.lockUTXO(
+                    self.coin_type(),
+                    i2h(txi.prevout.hash),
+                    txi.prevout.n,
+                    expires_in=3600,
+                )
+            return
 
         inputs = []
-        for pi in tx.vin:
-            inputs.append({"txid": i2h(pi.prevout.hash), "vout": pi.prevout.n})
-        self.rpc_wallet("lockunspent", [True, inputs])
+        for txi in tx.vin:
+            inputs.append({"txid": i2h(txi.prevout.hash), "vout": txi.prevout.n})
+        try:
+            self.rpc_wallet("lockunspent", [False, inputs])
+            for txi in tx.vin:
+                txid_hex: str = i2h(txi.prevout.hash)
+                self._log.debug(f"Locked UTXO {self._log.id(txid_hex)}:{txi.prevout.n}")
+        except Exception as e:
+            if "already locked" in str(e):
+                self._log.debug("UTXO already locked")
+            else:
+                self._log.warning(f"Error locking UTXOs: {e}")
 
     def signTxWithWallet(self, tx: bytes) -> bytes:
         if self.useBackend():
@@ -2861,7 +2918,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_tx_vout=None,
     ) -> bytes:
         self._log.info(
-            f"spendBLockTx: {self._log.id(chain_b_lock_txid)} {lock_tx_vout}\n"
+            f"spendBLockTx: {self._log.id(chain_b_lock_txid)}:{lock_tx_vout}\n"
         )
         Kbs = self.getPubkey(kbs)
         script_pk = self.getPkDest(Kbs)
