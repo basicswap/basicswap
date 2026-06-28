@@ -608,6 +608,13 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         block_hash = sha256(sha256(header_bytes))[::-1].hex()
         return {"height": height, "hash": block_hash, "time": block_time}
 
+    def getBestBlockHash(self) -> str:
+        if self._connection_type == "electrum":
+            raise NotImplementedError(
+                "getBestBlockHash by hash not available in electrum mode"
+            )
+        return self.rpc("getbestblockhash")
+
     def getBlockHeader(self, block_hash: str) -> dict:
         if self._connection_type == "electrum":
             raise NotImplementedError(
@@ -615,8 +622,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
         return self.rpc("getblockheader", [block_hash])
 
+    def getRawBlockHeader(self, block_hash: str):
+        if self._connection_type == "electrum":
+            raise NotImplementedError(
+                "getRawBlockHeader by hash not available in electrum mode"
+            )
+        return self.rpc("getblockheader", [block_hash, False])
+
     def getPrevBlockInChain(self, block_header_in):
-        block_header = copy.deeocopy(block_header_in)
+        block_header = copy.deepcopy(block_header_in)
         while True:
             previousblockhash = block_header.get("previousblockhash", None)
             if previousblockhash is None:
@@ -1264,6 +1278,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return False
         return True
 
+    def isScriptP2SH(self, script: bytes) -> bool:
+        if len(script) != 23:
+            return False
+        if script[0] != OP_HASH160:
+            return False
+        if script[1] != 20:
+            return False
+        if script[22] != OP_EQUAL:
+            return False
+        return True
+
     def isScriptP2WPKH(self, script: bytes) -> bool:
         if len(script) != 22:
             return False
@@ -1272,6 +1297,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if script[1] != 20:
             return False
         return True
+
+    def isScriptP2WSH(self, script: bytes) -> bool:
+        if len(script) != 34:
+            return False
+        if script[0] != OP_0:
+            return False
+        if script[1] != 32:
+            return False
+        return True
+
+    def isValidTxoDest(self, script: bytes) -> bool:
+        if self.isScriptP2WPKH(script):
+            return True
+        if self.isScriptP2WSH(script):
+            return True
+        return False
 
     def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
         if self.isScriptP2WPKH(script):
@@ -1291,10 +1332,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     ):
         tx_lock = self.loadTx(tx_lock_bytes)
 
-        output_script = self.getScriptDest(script_lock)
-        locked_n = findOutput(tx_lock, output_script)
+        output_script: bytes = self.getScriptDest(script_lock)
+        locked_n: int = findOutput(tx_lock, output_script)
         ensure(locked_n is not None, "Output not found in tx")
-        locked_coin = tx_lock.vout[locked_n].nValue
+        locked_coin: int = tx_lock.vout[locked_n].nValue
 
         tx_lock.rehash()
         tx_lock_id_int = tx_lock.sha256
@@ -1312,9 +1353,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(locked_coin, self.getScriptDest(refund_script)))
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
-        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
-        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = round(tx_fee_rate * vsize / 1000)
+        witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
+        vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee: int = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -1345,10 +1386,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
 
-        output_script = self.getScriptDest(script_lock_refund)
-        locked_n = findOutput(tx_lock_refund, output_script)
+        output_script: bytes = self.getScriptDest(script_lock_refund)
+        locked_n: int = findOutput(tx_lock_refund, output_script)
         ensure(locked_n is not None, "Output not found in tx")
-        locked_coin = tx_lock_refund.vout[locked_n].nValue
+        locked_coin: int = tx_lock_refund.vout[locked_n].nValue
 
         tx_lock_refund.rehash()
         tx_lock_refund_hash_int = tx_lock_refund.sha256
@@ -1370,9 +1411,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(
             script_lock_refund
         )
-        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
-        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = round(tx_fee_rate * vsize / 1000)
+        witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
+        vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee: int = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -1464,9 +1505,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     ):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = self.getScriptDest(script_lock)
-        locked_n = findOutput(tx_lock, output_script)
+        locked_n: int = findOutput(tx_lock, output_script)
         ensure(locked_n is not None, "Output not found in tx")
-        locked_coin = tx_lock.vout[locked_n].nValue
+        locked_coin: int = tx_lock.vout[locked_n].nValue
 
         tx_lock.rehash()
         tx_lock_id_int = tx_lock.sha256
@@ -1480,14 +1521,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
         )
 
-        tx.vout.append(
-            self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest))
-        )
+        if self.isValidAddressHash(pkh_dest):
+            script_out: bytes = self.getScriptForPubkeyHash(pkh_dest)
+        elif self.isValidTxoDest(pkh_dest):
+            script_out: bytes = pkh_dest
+        else:
+            raise ValueError("Unknown pkh_dest type")
+        tx.vout.append(self.txoType()(locked_coin, script_out))
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
-        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
-        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = round(tx_fee_rate * vsize / 1000)
+        witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
+        vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee: int = round(tx_fee_rate * vsize / 1000)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee
@@ -1748,7 +1793,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         tx = self.loadTx(tx_bytes)
         txid = self.getTxid(tx)
-        self._log.info("Verifying lock spend tx: {}.".format(self._log.id(txid)))
+        self._log.info(f"Verifying lock spend tx: {self._log.id(txid)}.")
 
         ensure(tx.nVersion == self.txVersion(), "Bad version")
         ensure(tx.nLockTime == 0, "nLockTime not 0")
@@ -1757,10 +1802,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_tx = self.loadTx(lock_tx_bytes)
         lock_tx_id = self.getTxid(lock_tx)
 
-        output_script = self.getScriptDest(lock_tx_script)
-        locked_n = findOutput(lock_tx, output_script)
+        output_script: bytes = self.getScriptDest(lock_tx_script)
+        locked_n: int = findOutput(lock_tx, output_script)
         ensure(locked_n is not None, "Output not found in tx")
-        locked_coin = lock_tx.vout[locked_n].nValue
+        locked_coin: int = lock_tx.vout[locked_n].nValue
 
         ensure(tx.vin[0].nSequence == 0, "Bad input nSequence")
         ensure(
@@ -1774,17 +1819,23 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
 
         ensure(len(tx.vout) == 1, "tx doesn't have one output")
-        p2wpkh = self.getScriptForPubkeyHash(a_pkhash_f)
-        ensure(tx.vout[0].scriptPubKey == p2wpkh, "Bad output destination")
+
+        if self.isValidAddressHash(a_pkhash_f):
+            expect_txo_script: bytes = self.getScriptForPubkeyHash(a_pkhash_f)
+        elif self.isValidTxoDest(a_pkhash_f):
+            expect_txo_script: bytes = a_pkhash_f
+        else:
+            raise ValueError("Unknown a_pkhash_f type")
+        ensure(tx.vout[0].scriptPubKey == expect_txo_script, "Bad output destination")
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         fee_paid = locked_coin - tx.vout[0].nValue
         assert fee_paid > 0
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(lock_tx_script)
-        witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
-        vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        fee_rate_paid = fee_paid * 1000 // vsize
+        witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
+        vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        fee_rate_paid: int = fee_paid * 1000 // vsize
 
         self._log.info_s(
             "tx amount, vsize, feerate: %ld, %ld, %ld",

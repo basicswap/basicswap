@@ -73,7 +73,7 @@ from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
 
 test_path = os.path.expanduser(os.getenv("TEST_PATH", "/tmp/test_persistent"))
-RESET_TEST = make_boolean(os.getenv("RESET_TEST", "true"))
+RESET_TEST = make_boolean(os.getenv("RESET_TEST", True))
 
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv("BITCOIN_RPC_PORT_BASE", BTC_BASE_RPC_PORT))

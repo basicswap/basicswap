@@ -149,6 +149,86 @@ def wait_for_bid_state(
     raise ValueError(f"wait_for_bid timed out {bid_id}.")
 
 
+def wait_for_bid_states(
+    delay_event,
+    bid_id_hex: str,
+    node_port_a: int,
+    state_a,
+    node_port_b: int,
+    state_b,
+    wait_for: int = 20,
+    fail_fast_a: bool = True,
+    fail_fast_b: bool = True,
+) -> None:
+    for node_port, expect_state in (
+        (node_port_a, state_a),
+        (node_port_b, state_b),
+    ):
+        logger.info(
+            f"TEST: wait_for_bid_states {bid_id_hex}, node {node_port}, state {expect_state}"
+        )
+
+    fail_fast = [fail_fast_a, fail_fast_b]
+    pass_state_strs = [[], []]
+
+    for n, state in enumerate(
+        (
+            state_a,
+            state_b,
+        )
+    ):
+        if isinstance(state, (list, tuple)):
+            for s in state:
+                pass_state_strs[n].append(strBidState(s))
+            if BidStates.BID_ERROR in state:
+                fail_fast[n] = False
+        else:
+            if state == BidStates.BID_ERROR:
+                fail_fast[n] = False
+            pass_state_strs[n].append(strBidState(state))
+
+    for i in range(wait_for):
+        if delay_event.is_set():
+            raise ValueError("Test stopped.")
+        delay_event.wait(1)
+
+        num_passed: int = 0
+        bid_states = [None] * 2
+        for n, (node_port, expect_state) in enumerate(
+            (
+                (node_port_a, state_a),
+                (node_port_b, state_b),
+            )
+        ):
+            rv = read_json_api(node_port, f"bids/{bid_id_hex}")
+            if "error" in rv and "Unknown bid id" in rv["error"]:
+                continue
+            bid_state = rv["bid_state"]
+            bid_states[n] = bid_state
+            if bid_state in pass_state_strs[n]:
+                num_passed += 1
+            else:
+                if i > 0 and i % 10 == 0:
+                    logger.debug(
+                        f"TEST: wait_for_bid_states {bid_id_hex}, node {node_port}: Bid state {bid_state}, target {pass_state_strs[n]}."
+                    )
+                if fail_fast[n] and bid_state == strBidState(BidStates.BID_ERROR):
+                    raise ValueError(
+                        f"wait_for_bid_states {bid_id_hex}, node {node_port}: Bid state {bid_state}, target {pass_state_strs[n]}."
+                    )
+
+        if num_passed == 2:
+            logger.debug(
+                f"TEST: wait_for_bid_states found {bid_id_hex}, node {node_port}: Bid state {bid_states[0]}, target {pass_state_strs[0]}."
+            )
+            logger.debug(
+                f"TEST: wait_for_bid_states found {bid_id_hex}, node {node_port}: Bid state {bid_states[1]}, target {pass_state_strs[1]}."
+            )
+            return
+
+    raise ValueError(f"wait_for_bid_states timed out {bid_id_hex}.")
+
+
 def wait_for_offer(
     delay_event, node_port: int, offer_id: str, state=None, wait_for: int = 30
 ) -> None:
@@ -173,6 +253,7 @@ class TestFunctions(BaseTestWithPrepare):
 
     port_node_0 = 12701
     port_node_1 = 12702
+    port_node_2 = 12703
 
     def do_test_01_full_swap(
         self,
@@ -223,11 +304,14 @@ class TestFunctions(BaseTestWithPrepare):
         assert rv["bid_state"] in ("Accepted", "Request accepted")
 
         logger.info("Completing swap")
-        wait_for_bid_state(
-            self.delay_event, port_node_from, bid_id, BidStates.SWAP_COMPLETED, 240
-        )
-        wait_for_bid_state(
-            self.delay_event, port_node_to, bid_id, BidStates.SWAP_COMPLETED, 240
+        wait_for_bid_states(
+            self.delay_event,
+            bid_id,
+            port_node_from,
+            BidStates.SWAP_COMPLETED,
+            port_node_to,
+            BidStates.SWAP_COMPLETED,
+            240,
         )
 
     def do_test_02_leader_recover_a_lock_tx(
@@ -296,18 +380,12 @@ class TestFunctions(BaseTestWithPrepare):
         )
         rv = post_json_api(port_offerer, f"bids/{bid_id}", {"accept": True})
         assert rv["bid_state"] in ("Accepted", "Request accepted")
-
-        wait_for_bid_state(
+        wait_for_bid_states(
             self.delay_event,
+            bid_id,
             port_leader,
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            240,
-        )
-        wait_for_bid_state(
-            self.delay_event,
             port_follower,
-            bid_id,
             [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
             240,
         )
@@ -412,18 +490,13 @@ class TestFunctions(BaseTestWithPrepare):
             if with_mercy
             else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )
-        wait_for_bid_state(
+        wait_for_bid_states(
             self.delay_event,
+            bid_id,
             port_leader,
-            bid_id,
             expect_state,
-            240,
-        )
-        wait_for_bid_state(
-            self.delay_event,
             port_follower,
-            bid_id,
-            [BidStates.XMR_SWAP_FAILED_SWIPED],
+            BidStates.XMR_SWAP_FAILED_SWIPED,
             240,
         )
         rv = post_json_api(
@@ -514,18 +587,12 @@ class TestFunctions(BaseTestWithPrepare):
         )
         rv = post_json_api(port_offerer, f"bids/{bid_id}", {"accept": True})
         assert rv["bid_state"] in ("Accepted", "Request accepted")
-
-        wait_for_bid_state(
+        wait_for_bid_states(
             self.delay_event,
+            bid_id,
             port_leader,
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
-            240,
-        )
-        wait_for_bid_state(
-            self.delay_event,
             port_follower,
-            bid_id,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
             240,
         )
@@ -552,7 +619,7 @@ class TestFunctions(BaseTestWithPrepare):
 
 class Test(TestFunctions):
     __test__ = True
-    update_min = 1.7
+    update_min = 1.5
     daemons = []
 
     electrumx_port = 50001
@@ -622,7 +689,6 @@ class Test(TestFunctions):
             "DAEMON_POLL_INTERVAL_BLOCKS": "1000",
             "DAEMON_POLL_INTERVAL_MEMPOOL": "1000",
         }
-        opened_files = []
         stdout_dest = open(f"{ELECTRUMX_DATADIR}/electrumx.log", "w")
         stderr_dest = stdout_dest
         cls.daemons.append(
@@ -640,7 +706,7 @@ class Test(TestFunctions):
                     env=electrumx_env,
                 ),
                 [
-                    opened_files,
+                    stdout_dest,
                 ],
                 f"electrumx_{ticker_lc}",
             )
@@ -941,11 +1007,14 @@ class Test(TestFunctions):
         assert rv["bid_state"] in ("Accepted", "Request accepted")
 
         logger.info("Completing swap")
-        wait_for_bid_state(
-            self.delay_event, port_node_from, bid_id, BidStates.SWAP_COMPLETED, 240
-        )
-        wait_for_bid_state(
-            self.delay_event, port_node_to, bid_id, BidStates.SWAP_COMPLETED, 240
+        wait_for_bid_states(
+            self.delay_event,
+            bid_id,
+            port_node_from,
+            BidStates.SWAP_COMPLETED,
+            port_node_to,
+            BidStates.SWAP_COMPLETED,
+            240,
         )
 
         bid_info = read_json_api(port_node_to, f"bids/{bid_id}", {"show_extra": True})

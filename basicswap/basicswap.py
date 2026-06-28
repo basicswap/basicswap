@@ -4007,8 +4007,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(isinstance(dest, bytes), "Swap destination must be bytes")
         if ci.coin_type() in (Coins.PART_BLIND,):
             return ci.verifyPubkey(dest)
-        # TODO: allow p2wsh
-        return ci.isValidAddressHash(dest)
+        if ci.isValidAddressHash(dest):
+            return True
+        if ci.isValidTxoDest(dest):
+            return True
+        return False
 
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
@@ -6202,6 +6205,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap = XmrSwap()
                 xmr_swap.contract_count = self.getNewContractId(cursor)
                 self.setMsgSplitInfo(xmr_swap)
+                if "dest_bl" in extra_options:
+                    xmr_swap.dest_bl = extra_options["dest_bl"]
+                    ensure(
+                        isinstance(xmr_swap.dest_bl, str),
+                        "Swap destination must be string",
+                    )
+                    ensure(
+                        ci_from.isValidAddress(xmr_swap.dest_bl),
+                        f"Swap destination must be a valid {ci_from.ticker()} address",
+                    )
+                    self.log.info("Using supplied destination")
+                    self.log.debug(f"Destination {xmr_swap.dest_bl}")
 
                 bid = Bid(
                     protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
@@ -6270,62 +6285,98 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.contract_count = self.getNewContractId(cursor)
             self.setMsgSplitInfo(xmr_swap)
 
-            address_out = self.getReceiveAddressFromPool(
-                coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK, cursor=cursor
-            )
-            if coin_from in (Coins.PART_BLIND,):
-                addrinfo = ci_from.rpc("getaddressinfo", [address_out])
-                xmr_swap.dest_af = bytes.fromhex(addrinfo["pubkey"])
+            if "dest_af" in extra_options:
+                xmr_swap.dest_af = extra_options["dest_af"]
+                ensure(
+                    isinstance(xmr_swap.dest_af, bytes),
+                    "Swap destination must be bytes",
+                )
+                self.log.info("Using supplied destination")
+                self.log.debug(f"Destination {xmr_swap.dest_af.hex()}")
             else:
-                xmr_swap.dest_af = ci_from.decodeAddress(address_out)
+                address_out = self.getReceiveAddressFromPool(
+                    coin_from, offer_id, TxTypes.XMR_SWAP_A_LOCK, cursor=cursor
+                )
+                if coin_from in (Coins.PART_BLIND,):
+                    addrinfo = ci_from.rpc("getaddressinfo", [address_out])
+                    xmr_swap.dest_af = bytes.fromhex(addrinfo["pubkey"])
+                else:
+                    xmr_swap.dest_af = ci_from.decodeAddress(address_out)
+            ensure(
+                self.isValidSwapDest(ci_from, xmr_swap.dest_af),
+                "Invalid follower swap dest for coin from",
+            )
 
             for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
-            kbvf = self.getPathKey(
-                coin_from,
-                coin_to,
-                bid_created_at,
-                xmr_swap.contract_count,
-                KeyTypes.KBVF,
-                for_ed25519,
-            )
-            kbsf = self.getPathKey(
-                coin_from,
-                coin_to,
-                bid_created_at,
-                xmr_swap.contract_count,
-                KeyTypes.KBSF,
-                for_ed25519,
-            )
 
-            kaf = self.getPathKey(
-                coin_from,
-                coin_to,
-                bid_created_at,
-                xmr_swap.contract_count,
-                KeyTypes.KAF,
-            )
+            kbsf = None
+            if "vkbvf" in extra_options:
+                xmr_swap.vkbvf = extra_options["vkbvf"]
+                ensure(ci_to.verifyKey(xmr_swap.vkbvf), "Invalid vkbvf supplied")
+                xmr_swap.pkbvf = ci_to.getPubkey(xmr_swap.vkbvf)
+            else:
+                kbvf = self.getPathKey(
+                    coin_from,
+                    coin_to,
+                    bid_created_at,
+                    xmr_swap.contract_count,
+                    KeyTypes.KBVF,
+                    for_ed25519,
+                )
+                xmr_swap.vkbvf = kbvf
+                xmr_swap.pkbvf = ci_to.getPubkey(xmr_swap.vkbvf)
+            if "pkbsf" in extra_options:
+                xmr_swap.pkbsf = extra_options["pkbsf"]
+                ensure(ci_to.verifyPubkey(xmr_swap.pkbsf), "Invalid pkbsf supplied")
+            else:
+                kbsf = self.getPathKey(
+                    coin_from,
+                    coin_to,
+                    bid_created_at,
+                    xmr_swap.contract_count,
+                    KeyTypes.KBSF,
+                    for_ed25519,
+                )
+                xmr_swap.pkbsf = ci_to.getPubkey(kbsf)
+            if "pkaf" in extra_options:
+                xmr_swap.pkaf = extra_options["pkaf"]
+                ensure(ci_to.verifyPubkey(xmr_swap.pkaf), "Invalid pkaf supplied")
+            else:
+                kaf = self.getPathKey(
+                    coin_from,
+                    coin_to,
+                    bid_created_at,
+                    xmr_swap.contract_count,
+                    KeyTypes.KAF,
+                )
+                xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
-            xmr_swap.vkbvf = kbvf
-            xmr_swap.pkbvf = ci_to.getPubkey(kbvf)
-            xmr_swap.pkbsf = ci_to.getPubkey(kbsf)
-
-            xmr_swap.pkaf = ci_from.getPubkey(kaf)
-
-            if ci_to.curve_type() == Curves.ed25519:
+            if "kbsf_dleag" in extra_options:
+                xmr_swap.kbsf_dleag = extra_options["kbsf_dleag"]
+            elif ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
-                xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
             elif ci_to.curve_type() == Curves.secp256k1:
                 xmr_swap.kbsf_dleag = ci_to.signRecoverable(
                     kbsf, "proof kbsf owned for swap"
                 )
-                pk_recovered = ci_to.verifySigAndRecover(
-                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
+            else:
+                raise ValueError("Unknown curve")
+
+            if ci_to.curve_type() == Curves.ed25519:
+                ensure(
+                    ci_to.verifyDLEAG(xmr_swap.kbsf_dleag), "kbsf invalid DLEAG proof"
                 )
+                xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
+            elif ci_to.curve_type() == Curves.secp256k1:
+                hash_msg = "proof kbsf owned for swap"
+                pk_recovered = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, hash_msg)
                 ensure(pk_recovered == xmr_swap.pkbsf, "kbsf recovered pubkey mismatch")
                 xmr_swap.pkasf = xmr_swap.pkbsf
             else:
                 raise ValueError("Unknown curve")
-            assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
+
+            if kbsf:
+                assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
 
             bid = Bid(
                 protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
@@ -11272,8 +11323,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci_from.verifyPubkey(bid_data.pkaf), "Invalid chain A follower public key"
         )
         ensure(
-            ci_from.isValidAddressHash(bid_data.dest_af)
-            or ci_from.verifyPubkey(bid_data.dest_af),
+            self.isValidSwapDest(ci_from, bid_data.dest_af),
             "Invalid destination address",
         )
 
@@ -12247,6 +12297,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci_to = self.ci(coin_to)
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
 
+        is_redeem_address_owned: bool = True
         try:
             if bid.xmr_b_lock_tx is None:
                 raise TemporaryError("Chain B lock tx not found.")
@@ -12296,7 +12347,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             vkbs = ci_to.sumKeys(kbsl, kbsf)
 
-            if coin_to in (Coins.XMR, Coins.WOW):
+            if xmr_swap.dest_bl is not None and len(xmr_swap.dest_bl):
+                address_to = xmr_swap.dest_bl
+                is_redeem_address_owned = ci_to.isAddressMine(address_to)
+                self.log.info(
+                    "To provided address"
+                    + ("" if is_redeem_address_owned else " (external)")
+                )
+                self.log.debug(f"Address: {address_to}")
+            elif coin_to in (Coins.XMR, Coins.WOW):
                 address_to = self.getCachedMainWalletAddress(ci_to, cursor)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to, cursor)
@@ -12363,6 +12422,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
         if bid.xmr_b_lock_tx:
             bid.xmr_b_lock_tx.setState(TxStates.TX_REDEEMED)
+
+        if not is_redeem_address_owned:
+            bid.setState(BidStates.SWAP_COMPLETED)
+            self.notify(NT.SWAP_COMPLETED, {"bid_id": bid_id.hex()})
 
         # TODO: Why does using bid.txns error here?
         self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)

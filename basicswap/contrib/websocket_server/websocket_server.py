@@ -167,7 +167,7 @@ class WebsocketServer(ThreadingMixIn, TCPServer, API):
         self.message_received(self.handler_to_client(handler), self, msg)
 
     def _binary_message_received_(self, handler, msg):
-        self.binary_message_received(self.handler_to_client(handler), self, msg)
+        self.binaryMessageReceived(self.handler_to_client(handler), self, msg)
 
     def _ping_received_(self, handler, msg):
         handler.send_pong(msg)

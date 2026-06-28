@@ -143,6 +143,17 @@ class PARTInterface(BTCInterface):
     def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
+    def isValidTxoDest(self, script: bytes) -> bool:
+        if self.isScriptP2PKH(script):
+            return True
+        if self.isScriptP2SH(script):
+            return True
+        if self.isScriptP2WPKH(script):
+            return True
+        if self.isScriptP2WSH(script):
+            return True
+        return False
+
     def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
         if self.isScriptP2WPKH(script) or self.isScriptP2PKH(script):
             return self.getP2WPKHDummyWitness()

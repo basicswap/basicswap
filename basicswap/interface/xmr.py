@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -109,6 +109,7 @@ class XMRInterface(CoinInterface):
         )
 
         self._addr_prefix = self.chainparams_network()["address_prefix"]
+        self._subaddr_prefix = self.chainparams_network()["subaddress_prefix"]
 
         self.blocks_confirmed = coin_settings["blocks_confirmed"]
         self._restore_height = coin_settings.get("restore_height", 0)
@@ -396,6 +397,23 @@ class XMRInterface(CoinInterface):
             self.rpc_wallet("store")
             return new_address
 
+    def isValidAddress(self, address: str) -> bool:
+        try:
+            Ks, Kv = xmr_util.decode_address(address, self._addr_prefix)
+            ensure(self.verifyPubkey(Ks), "Invalid spend key")
+            ensure(self.verifyPubkey(Kv), "Invalid view key")
+            return True
+        except Exception as e:  # noqa: F841
+            # Try subaddress
+            try:
+                Ks, Kv = xmr_util.decode_address(address, self._subaddr_prefix)
+                ensure(self.verifyPubkey(Ks), "Invalid spend key")
+                ensure(self.verifyPubkey(Kv), "Invalid view key")
+                return True
+            except Exception as e:
+                self._log.warning(f"Invalid {self.ticker()} address: {e}")
+        return False
+
     def get_fee_rate(self, conf_target: int = 2):
         # fees - array of unsigned int; Represents the base fees at different priorities [slow, normal, fast, fastest].
         fee_est = self.rpc("get_fee_estimate")
@@ -579,6 +597,7 @@ class XMRInterface(CoinInterface):
             return rv
 
     def findTxnByHash(self, txid: str):
+        # TODO: Use get_transfer_by_txid and sending wallet when destination address is not owned
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             self.rpc_wallet("refresh")
@@ -609,7 +628,6 @@ class XMRInterface(CoinInterface):
                             "amount": transfer["amount"],
                             "height": transfer["block_height"],
                         }
-
             return None
 
     def spendBLockTx(
@@ -835,9 +853,17 @@ class XMRInterface(CoinInterface):
         self._log.info("lockWallet - {}".format(self.ticker()))
         self._wallet_password = None
 
-    def isAddressMine(self, address):
-        # TODO
-        return True
+    def isAddressMine(self, address: str) -> bool:
+        try:
+            self.openWallet(self._wallet_filename)
+            self.rpc_wallet(
+                "get_address_index",
+                {"address": address},
+            )
+            return True
+        except Exception as e:  # noqa: F841
+            pass
+        return False
 
     def ensureFunds(self, amount: int) -> None:
         if self.getSpendableBalance() < amount:

@@ -633,6 +633,9 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
 
             ci_from = swap_client.ci(offer.coin_from)
             ci_to = swap_client.ci(offer.coin_to)
+            reverse_bid: bool = swap_client.is_reverse_ads_bid(
+                offer.coin_from, offer.coin_to
+            )
             amount_from = inputAmount(get_data_entry(post_data, "amount_from"), ci_from)
 
             addr_from = None
@@ -672,6 +675,21 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
             if have_data_entry(post_data, "bypass_fee_checks"):
                 extra_options["bypass_fee_validation"] = toBool(
                     get_data_entry(post_data, "bypass_fee_checks")
+                )
+            if have_data_entry(post_data, "destination_address"):
+                if reverse_bid:
+                    extra_options["dest_bl"] = get_data_entry(
+                        post_data, "destination_address"
+                    )
+                else:
+                    extra_options["dest_af"] = ci_from.decodeAddress(
+                        get_data_entry(post_data, "destination_address")
+                    )
+            if have_data_entry(post_data, "destination_script"):
+                if reverse_bid:
+                    raise ValueError("TODO")
+                extra_options["dest_af"] = bytes.fromhex(
+                    get_data_entry(post_data, "destination_script")
                 )
 
             if offer.swap_type == SwapTypes.XMR_SWAP:
