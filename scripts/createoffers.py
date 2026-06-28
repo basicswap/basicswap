@@ -41,6 +41,7 @@ Create offers
             # Optional
             "enabled": Set to false to ignore offer template.
             "swap_type": Type of swap, defaults to "adaptor_sig"
+            "lock_hours": Contract lock period in hours. One of 4, 8, 12 or 24 (default: 24).
             "min_swap_amount": Sets "amt_bid_min" on the offer, minimum purchase quantity when offer amount is variable.
         },
         ...
@@ -94,6 +95,10 @@ read_json_api_wallet = None
 
 DEFAULT_CONFIG_FILE: str = "createoffers.json"
 DEFAULT_STATE_FILE: str = "createoffers_state.json"
+
+# Contract lock period options offered in the AMM GUI, in hours.
+VALID_LOCK_HOURS: tuple = (4, 8, 12, 24)
+DEFAULT_LOCK_HOURS: int = 24
 
 
 def post_req(url: str, json_data=None, auth_header_val=None):
@@ -358,6 +363,16 @@ def readConfig(args, known_coins):
         if "amount_variable" not in offer_template:
             print("Setting amount_variable to True for offer", offer_template["name"])
             offer_template["amount_variable"] = True
+            num_changes += 1
+        if (
+            "lock_hours" not in offer_template
+            or int(offer_template["lock_hours"]) not in VALID_LOCK_HOURS
+        ):
+            print(
+                f"Setting lock_hours to {DEFAULT_LOCK_HOURS} for offer",
+                offer_template["name"],
+            )
+            offer_template["lock_hours"] = DEFAULT_LOCK_HOURS
             num_changes += 1
 
         if offer_template.get("enabled", True) is False:
@@ -1233,7 +1248,7 @@ def process_offers(args, config, script_state) -> None:
             ),
             "rate": use_rate,
             "swap_type": offer_template.get("swap_type", "adaptor_sig"),
-            "lockhrs": "24",
+            "lockhrs": offer_template.get("lock_hours", DEFAULT_LOCK_HOURS),
             "automation_strat_id": automation_strat_id,
         }
 

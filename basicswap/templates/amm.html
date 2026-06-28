@@ -892,12 +892,28 @@
                     </div>
 
                     <div>
-                      <label for="add-offer-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
-                      <input type="text" id="add-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
+                      <label for="add-offer-lock-hours" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contract Lock Period</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="add-offer-lock-hours" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="2">2 hours</option>
+                          <option value="4">4 hours</option>
+                          <option value="8">8 hours</option>
+                          <option value="12">12 hours</option>
+                          <option value="24" selected>24 hours (default)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label for="add-offer-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Min Swap Amount</label>
+                      <input type="text" id="add-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" value="0.001" placeholder="0.001">
+                    </div>
+
                     <div>
                       <label for="add-offer-amount-step" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Size Increment <span class="text-red-500">*</span></label>
                       <input type="text" id="add-offer-amount-step" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g., 5.0" required>
@@ -905,8 +921,10 @@
                         How much to adjust offer size when partially filled. Must be between 0.001 and your offer amount.
                       </small>
                     </div>
+                  </div>
 
-                    {% if debug_ui_mode %}
+                  {% if debug_ui_mode %}
+                  <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="add-offer-automation-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto Accept Bids</label>
                       <div class="relative">
@@ -920,8 +938,8 @@
                         </select>
                       </div>
                     </div>
-                    {% endif %}
                   </div>
+                  {% endif %}
 
                   <div>
                     <label for="add-offer-adjust-rates" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Adjust Rates Based on Market</label>
@@ -1178,12 +1196,28 @@
                     </div>
 
                     <div>
-                      <label for="edit-offer-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Minimum Swap Amount</label>
-                      <input type="text" id="edit-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.001">
+                      <label for="edit-offer-lock-hours" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Contract Lock Period</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="edit-offer-lock-hours" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="2">2 hours</option>
+                          <option value="4">4 hours</option>
+                          <option value="8">8 hours</option>
+                          <option value="12">12 hours</option>
+                          <option value="24">24 hours (default)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
                   <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label for="edit-offer-min-swap-amount" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Minimum Swap Amount</label>
+                      <input type="text" id="edit-offer-min-swap-amount" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.001">
+                    </div>
+
                     <div>
                       <label for="edit-offer-amount-step" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Size Increment <span class="text-red-500">*</span></label>
                       <input type="text" id="edit-offer-amount-step" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="e.g., 5.0" required>
@@ -1191,8 +1225,10 @@
                         How much to adjust offer size when partially filled. Must be between 0.001 and your offer amount.
                       </small>
                     </div>
+                  </div>
 
-                    {% if debug_ui_mode %}
+                  {% if debug_ui_mode %}
+                  <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="edit-offer-automation-strategy" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Auto Accept Bids</label>
                       <div class="relative">
@@ -1206,8 +1242,8 @@
                         </select>
                       </div>
                     </div>
-                    {% endif %}
                   </div>
+                  {% endif %}
 
                   <div>
                     <label for="edit-offer-adjust-rates" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Adjust Rates Based on Market</label>

@@ -1269,6 +1269,7 @@ const AmmTablesManager = (function() {
             document.getElementById('add-offer-address').value = 'auto';
             document.getElementById('add-offer-min-swap-amount').value = '0.001';
             document.getElementById('add-offer-amount-step').value = '0.001';
+            document.getElementById('add-offer-lock-hours').value = '24';
 
             const coinFrom = document.getElementById('add-amm-coin-from');
             const coinTo = document.getElementById('add-amm-coin-to');
@@ -1392,6 +1393,7 @@ const AmmTablesManager = (function() {
                 newItem.ratetweakpercent = parseFloat(document.getElementById('add-offer-ratetweakpercent').value || '0');
                 newItem.adjust_rates_based_on_market = document.getElementById('add-offer-adjust-rates').value;
                 newItem.swap_type = document.getElementById('add-offer-swap-type').value || 'adaptor_sig';
+                newItem.lock_hours = parseInt(document.getElementById('add-offer-lock-hours').value) || 24;
                 const automationStrategyElement = document.getElementById('add-offer-automation-strategy');
                 newItem.automation_strategy = automationStrategyElement ? automationStrategyElement.value : 'accept_all';
 
@@ -1712,6 +1714,7 @@ const AmmTablesManager = (function() {
                 editSwapTypeEl.dispatchEvent(new Event('change'));
                 document.getElementById('edit-offer-min-swap-amount').value = item.min_swap_amount || '0.001';
                 document.getElementById('edit-offer-amount-step').value = item.amount_step || '0.001';
+                document.getElementById('edit-offer-lock-hours').value = item.lock_hours || '24';
                 const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
                 if (editAutomationStrategyElement) {
                     editAutomationStrategyElement.value = item.automation_strategy || 'accept_all';
@@ -1863,6 +1866,7 @@ const AmmTablesManager = (function() {
                 updatedItem.ratetweakpercent = parseFloat(document.getElementById('edit-offer-ratetweakpercent').value || '0');
                 updatedItem.adjust_rates_based_on_market = document.getElementById('edit-offer-adjust-rates').value;
                 updatedItem.swap_type = document.getElementById('edit-offer-swap-type').value || 'adaptor_sig';
+                updatedItem.lock_hours = parseInt(document.getElementById('edit-offer-lock-hours').value) || 24;
                 const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
                 updatedItem.automation_strategy = editAutomationStrategyElement ? editAutomationStrategyElement.value : 'accept_all';
 
