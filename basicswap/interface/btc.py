@@ -4391,16 +4391,33 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     else:
                         raise
 
-            try:
-                seed_id = self.getWalletSeedID()
-                needs_seed_init = seed_id == "Not found"
-            except Exception as e:
-                self._log.debug(f"getWalletSeedID failed: {e}")
-                needs_seed_init = True
+            seed_id = None
+            last_seed_err = None
+            max_attempts = 5
+            for _attempt in range(max_attempts):
+                try:
+                    seed_id = self.getWalletSeedID()
+                    last_seed_err = None
+                    break
+                except Exception as e:
+                    last_seed_err = e
+                    self._log.debug(
+                        f"getWalletSeedID failed (attempt {_attempt + 1}/{max_attempts}): {e}"
+                    )
+                    if _attempt < max_attempts - 1:
+                        time.sleep(2**_attempt)  # exponential backoff
+            if last_seed_err is not None:
+                raise last_seed_err
+            needs_seed_init = seed_id == "Not found"
             if needs_seed_init:
                 self._log.info(f"Initializing HD seed for {self.coin_name()}.")
+                if password and self.isWalletEncrypted():
+                    # sethdseed requires the passphrase to be entered first
+                    self.rpc_wallet(
+                        "walletpassphrase", [password, 100000000], timeout=120
+                    )
                 self._sc.initialiseWallet(self.coin_type())
-                if password:
+                if password and not self.isWalletEncrypted():
                     self._log.info(f"Encrypting {self.coin_name()} wallet.")
                     try:
                         self.rpc_wallet("encryptwallet", [password], timeout=120)
