@@ -191,9 +191,10 @@ logger = logging.getLogger("prepare")
 LOG_LEVEL = logging.DEBUG
 logger.propagate = False
 logger.level = LOG_LEVEL
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter("%(levelname)s : %(message)s"))
-logger.addHandler(handler)
+if not len(logger.handlers):
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(levelname)s : %(message)s"))
+    logger.addHandler(handler)
 logging.getLogger("gnupg").setLevel(logging.INFO)
 
 BSX_DOCKER_MODE = toBool(os.getenv("BSX_DOCKER_MODE", False))

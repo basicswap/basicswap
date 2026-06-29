@@ -232,7 +232,7 @@ def run_prepare(
                 fp.write(
                     "connect=127.0.0.1:{}\n".format(PARTICL_PORT_BASE + ip + port_ofs)
                 )
-        for opt in EXTRA_CONFIG_JSON.get("part{}".format(node_id), []):
+        for opt in EXTRA_CONFIG_JSON.get(f"part{node_id}", []):
             fp.write(opt + "\n")
 
     coins_array = with_coins.split(",")
@@ -546,7 +546,7 @@ def run_prepare(
 
     recursive_update_dict(settings, extra_settings)
 
-    extra_config = EXTRA_CONFIG_JSON.get("sc{}".format(node_id), {})
+    extra_config = EXTRA_CONFIG_JSON.get(f"sc{node_id}", {})
     recursive_update_dict(settings, extra_config)
 
     with open(config_path, "w") as fp:
@@ -556,7 +556,12 @@ def run_prepare(
 
 
 def prepare_nodes(
-    num_nodes, extra_coins, use_rpcauth=False, extra_settings={}, port_ofs=0
+    num_nodes,
+    extra_coins,
+    use_rpcauth=False,
+    extra_settings={},
+    port_ofs=0,
+    wallets_password=None,
 ):
     bins_path = os.path.join(TEST_PATH, "bin")
     for i in range(num_nodes):
@@ -567,6 +572,10 @@ def prepare_nodes(
         except Exception as ex:
             logging.warning(f"setUpClass {ex}")
 
+        if wallets_password is not None:
+            assert isinstance(wallets_password, str)
+            logging.info("Using wallets password.")
+            os.environ["WALLET_ENCRYPTION_PWD"] = wallets_password
         run_prepare(
             i,
             client_path,
@@ -578,6 +587,8 @@ def prepare_nodes(
             extra_settings=extra_settings,
             port_ofs=port_ofs,
         )
+        if wallets_password is not None:
+            os.environ.pop("WALLET_ENCRYPTION_PWD", None)
 
 
 class TestBase(unittest.TestCase):

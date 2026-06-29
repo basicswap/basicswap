@@ -20,6 +20,9 @@ pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_coins.py
 # Run select test
 TEST_COIN_A="monero" TEST_COIN_B="bitcoin" pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_coins.py::Test::test_set_destination
 
+# Encrypt wallets
+TEST_WALLET_ENCRYPTION_PWD=test_pwd pytest tests/basicswap/test_coins.py
+
 # Optionally copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
 
@@ -78,6 +81,14 @@ class Test(TestFunctions):
     def setUpClass(cls):
         super().setUpClass()
         initial_amount: float = 200.0
+
+        wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
+        if wallets_password:
+            for i in range(NUM_NODES):
+                read_json_api(
+                    12700 + PORT_OFS + i, "unlock", {"password": wallets_password}
+                )
+
         for should_wait in (False, True):
             for coin_id in (cls.test_coin_a, cls.test_coin_b):
                 if coin_id == Coins.XMR:
@@ -123,6 +134,11 @@ class Test(TestFunctions):
                 logger.warning(f"setupNodes {ex}")
 
             extra_args = []
+            wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
+            if wallets_password is not None:
+                assert isinstance(wallets_password, str)
+                logging.info("Using wallets password.")
+                os.environ["WALLET_ENCRYPTION_PWD"] = wallets_password
             run_prepare(
                 i,
                 client_path,
@@ -135,6 +151,8 @@ class Test(TestFunctions):
                 port_ofs=PORT_OFS,
                 extra_args=extra_args,
             )
+            if wallets_password is not None:
+                os.environ.pop("WALLET_ENCRYPTION_PWD", None)
 
     def test_01_a_full_swap_xmr(self):
         prepare_balance(

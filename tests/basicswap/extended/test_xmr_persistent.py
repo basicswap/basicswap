@@ -295,8 +295,11 @@ def start_processes(self):
         )
         self.processes[-1].start()
 
+    wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
     for i in range(NUM_NODES):
         waitForServer(self.delay_event, UI_PORT + i)
+        if wallets_password:
+            read_json_api(UI_PORT + i, "unlock", {"password": wallets_password})
 
     if "monero" in self.test_coins_list:
         try:
@@ -550,12 +553,14 @@ class BaseTestWithPrepare(unittest.TestCase):
     @classmethod
     def setupNodes(cls):
         logging.info(f"Preparing {NUM_NODES} nodes.")
+        wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
         prepare_nodes(
             NUM_NODES,
             cls.test_coins_list,
             True,
             {"min_sequence_lock_seconds": 60},
             PORT_OFS,
+            wallets_password=wallets_password,
         )
 
     @classmethod
