@@ -191,6 +191,9 @@ def checkAndNotifyBalanceChange(
     if not swap_client.ws_server:
         return
 
+    if swap_client._is_locked is True:
+        return
+
     try:
         blockchain_info = ci.getBlockchainInfo()
         verification_progress = blockchain_info.get("verificationprogress", 1.0)
