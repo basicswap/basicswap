@@ -1834,10 +1834,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.ci(c).unlockWallet(password)
                 except Exception as e:  # noqa: F841
                     self.log.warning(f"Failed to unlock wallet {getCoinName(c)}")
-                    if coin is not None or c == Coins.PART:
-                        raise
-                if c == Coins.PART:
-                    self._is_locked = False
+                    raise
+
+            if coin is None or coin == Coins.PART:
+                self._is_locked = False
 
             self.loadFromDB()
 
