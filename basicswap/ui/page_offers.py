@@ -481,6 +481,100 @@ def offer_to_post_string(self, swap_client, offer_id):
     return parse.urlencode(offer_data).encode()
 
 
+def _fmt_float(value, places: int = 8) -> str:
+    try:
+        s = "{:.{}f}".format(float(value), places)
+    except (TypeError, ValueError):
+        return ""
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s
+
+
+def _add_review_insights(swap_client, page_data, parsed_data) -> None:
+    coin_from = parsed_data.get("coin_from")
+    coin_to = parsed_data.get("coin_to")
+    if coin_from is None or coin_to is None:
+        return
+
+    user_rate = None
+    try:
+        if page_data.get("rate") not in (None, ""):
+            user_rate = float(page_data["rate"])
+    except (TypeError, ValueError):
+        user_rate = None
+
+    try:
+        rates = swap_client.lookupRates(int(coin_from), int(coin_to))
+        cg = rates.get("coingecko", {}) if isinstance(rates, dict) else {}
+        inferred = cg.get("rate_inferred")
+        if inferred is not None:
+            inferred_f = float(inferred)
+            page_data["market_rate_inferred"] = _fmt_float(inferred_f)
+            if user_rate and user_rate > 0 and inferred_f > 0:
+                delta = (user_rate - inferred_f) / inferred_f * 100.0
+                page_data["market_rate_delta_pct"] = round(delta, 1)
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"Review market rate lookup failed: {e}")
+
+    try:
+        ci_to = swap_client.ci(Coins(int(coin_to)))
+        ci_from = swap_client.ci(Coins(int(coin_from)))
+        competitors = swap_client.listOffers(
+            False,
+            {
+                "coin_from": int(coin_from),
+                "coin_to": int(coin_to),
+                "active": "active",
+                "limit": 100,
+            },
+        )
+        comp_rows = []
+        for o in competitors:
+            try:
+                rate_f = float(ci_to.format_amount(o.rate))
+            except Exception:
+                continue
+            comp_rows.append(
+                {
+                    "offer_id": o.offer_id.hex(),
+                    "rate": rate_f,
+                    "rate_str": _fmt_float(rate_f),
+                    "amount_from": ci_from.format_amount(o.amount_from),
+                }
+            )
+        rates_list = [r["rate"] for r in comp_rows]
+        page_data["competitor_count"] = len(rates_list)
+        if rates_list:
+            best = min(rates_list)
+            page_data["competitor_best_rate"] = _fmt_float(best)
+            if user_rate and user_rate > 0:
+                cheaper = sum(1 for r in rates_list if r < user_rate)
+                page_data["competitor_cheaper_count"] = cheaper
+            comp_rows.sort(key=lambda r: r["rate"])
+            for r in comp_rows:
+                r["cheaper_than_yours"] = bool(
+                    user_rate and user_rate > 0 and r["rate"] < user_rate
+                )
+            page_data["competitor_offers"] = comp_rows[:5]
+            page_data["competitor_coin_from"] = int(coin_from)
+            page_data["competitor_coin_to"] = int(coin_to)
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"Review competitor lookup failed: {e}")
+
+    try:
+        total = page_data.get("amt_from_lock_spend_tx_fee")
+        if total is not None:
+            page_data["est_network_fee_total"] = "{} {}".format(
+                total, page_data.get("tla_from", "")
+            ).strip()
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"Review fee total failed: {e}")
+
+
 def page_newoffer(self, url_split, post_string):
     server = self.server
     swap_client = self.server.swap_client
@@ -511,6 +605,7 @@ def page_newoffer(self, url_split, post_string):
 
     form_data = self.checkForm(post_string, "newoffer", err_messages)
 
+    parsed_data = {}
     if form_data:
         try:
             parsed_data, errors = parseOfferFormData(swap_client, form_data, page_data)
@@ -521,26 +616,43 @@ def page_newoffer(self, url_split, post_string):
                 swap_client.log.error(traceback.format_exc())
             err_messages.append(str(e))
 
+    offer_id = None
+    wizard_step = "trade"
+
     if len(err_messages) == 0 and "submit_offer" in page_data:
         try:
             offer_id = postNewOfferFromParsed(swap_client, parsed_data)
-            messages.append(
-                '<a href="/offer/'
-                + offer_id.hex()
-                + '">Sent Offer {}</a>'.format(offer_id.hex())
-            )
-            page_data = {}
+            page_data["offer_id"] = offer_id.hex()
+            wizard_step = "success"
         except Exception as e:
             if swap_client.debug is True:
                 swap_client.log.error(traceback.format_exc())
-            err_messages.append(str(e))
+            page_data["publish_error"] = str(e)
 
-    if len(err_messages) == 0 and "check_offer" in page_data:
-        template = server.env.get_template("offer_confirm.html")
-    elif "step2" in page_data:
-        template = server.env.get_template("offer_new_2.html")
-    else:
-        template = server.env.get_template("offer_new_1.html")
+    if wizard_step != "success":
+        if "submit_offer" in page_data:
+            wizard_step = "review"
+        elif "check_offer" in page_data and len(err_messages) == 0:
+            wizard_step = "review"
+        elif "step2" in page_data:
+            wizard_step = "terms"
+        else:
+            wizard_step = "trade"
+
+    if wizard_step == "review":
+        try:
+            _add_review_insights(swap_client, page_data, parsed_data)
+        except Exception as e:
+            if swap_client.debug is True:
+                swap_client.log.warning(f"Could not build review insights: {e}")
+
+    template_names = {
+        "success": "offer_success.html",
+        "review": "offer_confirm.html",
+        "terms": "offer_new_2.html",
+        "trade": "offer_new_1.html",
+    }
+    template = server.env.get_template(template_names[wizard_step])
 
     if swap_client.debug_ui:
         messages.append("Debug mode active.")

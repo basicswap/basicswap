@@ -11,11 +11,82 @@ import time
 
 from urllib.request import urlopen
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import Select
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from util import get_driver
+
+
+def select_coin(driver, select_id, coin_name):
+    native = driver.find_element(By.ID, select_id)
+    picker = native.find_element(By.XPATH, "./ancestor::div[@data-coin-picker][1]")
+    WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable(
+            picker.find_element(By.CSS_SELECTOR, ".coin-picker-button")
+        )
+    ).click()
+    items = picker.find_elements(By.CSS_SELECTOR, ".coin-picker-item")
+    for item in items:
+        name = item.find_element(By.CSS_SELECTOR, ".coin-picker-name").text.strip()
+        if name == coin_name:
+            item.click()
+            return
+    raise AssertionError(f"Coin '{coin_name}' not found in picker '{select_id}'")
+
+
+def get_published_offer_id(driver):
+    el = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='view-offer']"))
+    )
+    href = el.get_attribute("href")
+    return href.rstrip("/").split("/offer/")[-1]
+
+
+def test_offer_wizard_ui(driver):
+    node1_url = "http://localhost:12701"
+
+    driver.get(node1_url + "/newoffer")
+    time.sleep(1)
+
+    body_text = driver.find_element(By.TAG_NAME, "body").text
+    for label in ("Trade", "Terms", "Review"):
+        assert label in body_text, f"stepper label '{label}' missing"
+
+    select_coin(driver, "coin_from", "Bitcoin")
+    select_coin(driver, "coin_to", "Monero")
+
+    assert driver.find_element(By.ID, "summary-send-coin").text.strip() == "Bitcoin"
+    assert driver.find_element(By.ID, "summary-get-coin").text.strip() == "Monero"
+
+    driver.find_element(By.ID, "swap-coins-btn").click()
+    time.sleep(0.5)
+    assert driver.find_element(By.ID, "summary-send-coin").text.strip() == "Monero"
+    assert driver.find_element(By.ID, "summary-get-coin").text.strip() == "Bitcoin"
+    driver.find_element(By.ID, "swap-coins-btn").click()
+    time.sleep(0.5)
+    assert driver.find_element(By.ID, "summary-send-coin").text.strip() == "Bitcoin"
+
+    continue_btn = driver.find_element(By.NAME, "continue")
+    assert continue_btn.get_attribute("disabled"), "Continue should start disabled"
+
+    driver.find_element(By.NAME, "amt_from").send_keys("1")
+    driver.find_element(By.NAME, "amt_to").send_keys("2")
+    time.sleep(0.6)
+    assert not continue_btn.get_attribute(
+        "disabled"
+    ), "Continue should enable once valid"
+    continue_btn.click()
+
+    WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.NAME, "validhrs"))
+    )
+    assert "Bitcoin" in driver.find_element(By.TAG_NAME, "body").text
+
+    driver.find_element(By.XPATH, "//button[@name='step1' and @form='form']").click()
+    WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.ID, "coin_from"))
+    )
+    assert driver.find_element(By.ID, "summary-send-coin").text.strip() == "Bitcoin"
 
 
 def test_offer(driver):
@@ -24,10 +95,8 @@ def test_offer(driver):
     driver.get(node1_url + "/newoffer")
     time.sleep(1)
 
-    select = Select(driver.find_element(By.ID, "coin_from"))
-    select.select_by_visible_text("Bitcoin")
-    select = Select(driver.find_element(By.ID, "coin_to"))
-    select.select_by_visible_text("Monero")
+    select_coin(driver, "coin_from", "Bitcoin")
+    select_coin(driver, "coin_to", "Monero")
 
     amt_from = driver.find_element(By.NAME, "amt_from")
     amt_to = driver.find_element(By.NAME, "amt_to")
@@ -70,18 +139,14 @@ def test_offer(driver):
     WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.NAME, "submit_offer"))
     ).click()
-    time.sleep(1)
 
-    offer_link = driver.find_element(By.XPATH, "//a[contains(text(),'Sent Offer')]")
-    offer1_id = offer_link.text.split(" ")[2]
+    offer1_id = get_published_offer_id(driver)
 
     driver.get(node1_url + "/newoffer")
     time.sleep(1)
 
-    select = Select(driver.find_element(By.ID, "coin_from"))
-    select.select_by_visible_text("Particl")
-    select = Select(driver.find_element(By.ID, "coin_to"))
-    select.select_by_visible_text("Monero")
+    select_coin(driver, "coin_from", "Particl")
+    select_coin(driver, "coin_to", "Monero")
 
     driver.find_element(By.NAME, "amt_from").send_keys("3")
     driver.find_element(By.NAME, "amt_to").send_keys("4")
@@ -93,10 +158,8 @@ def test_offer(driver):
     WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.NAME, "submit_offer"))
     ).click()
-    time.sleep(1)
 
-    offer_link = driver.find_element(By.XPATH, "//a[contains(text(),'Sent Offer')]")
-    offer2_id = offer_link.text.split(" ")[2]
+    offer2_id = get_published_offer_id(driver)
 
     driver.get(node1_url + "/offer/" + offer1_id)
     WebDriverWait(driver, 20).until(
@@ -108,10 +171,8 @@ def test_offer(driver):
     WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.NAME, "submit_offer"))
     ).click()
-    time.sleep(1)
 
-    offer_link = driver.find_element(By.XPATH, "//a[contains(text(),'Sent Offer')]")
-    offer3_id = offer_link.text.split(" ")[2]
+    offer3_id = get_published_offer_id(driver)
 
     offer3_json = json.loads(urlopen(node1_url + "/json/offers/" + offer3_id).read())[0]
     assert offer3_json["coin_from"] == "Bitcoin"
@@ -128,10 +189,8 @@ def test_offer(driver):
     WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.NAME, "submit_offer"))
     ).click()
-    time.sleep(1)
 
-    offer_link = driver.find_element(By.XPATH, "//a[contains(text(),'Sent Offer')]")
-    offer4_id = offer_link.text.split(" ")[2]
+    offer4_id = get_published_offer_id(driver)
 
     offer4_json = json.loads(urlopen(node1_url + "/json/offers/" + offer4_id).read())[0]
     assert offer4_json["coin_from"] == "Particl"
@@ -143,6 +202,7 @@ def test_offer(driver):
 def run_tests():
     driver = get_driver()
     try:
+        test_offer_wizard_ui(driver)
         test_offer(driver)
     finally:
         driver.close()

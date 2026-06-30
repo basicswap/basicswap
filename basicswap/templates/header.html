@@ -21,7 +21,7 @@
   <link type="text/css" media="all" href="/static/css/libs/flowbite.min.css" rel="stylesheet">
   <link type="text/css" media="all" href="/static/css/libs/tailwind.min.css" rel="stylesheet">
   <!-- Custom styles -->
-  <link type="text/css" media="all" href="/static/css/style.css" rel="stylesheet">
+  <link type="text/css" media="all" href="/static/css/style.css?v={{ static_v }}" rel="stylesheet">
   <script>
     function getAPIKeys() {
       return {
@@ -164,22 +164,13 @@
         </a>
 
         <!-- Desktop Navigation -->
-        <ul class="hidden xl:flex">
-          <!-- Wallets -->
+        <ul class="hidden xl:flex items-center">
+          <!-- Order book -->
           <li>
-            <a class="flex mr-10 items-center py-3 text-gray-50 hover:text-gray-100 text-sm"
-              href="/wallets">
-              {{ wallet_svg | safe }}
-              <span>Wallets</span>
-            </a>
-          </li>
-
-          <!-- Network Order Book -->
-          <li>
-            <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm"
+            <a class="flex mr-10 items-center py-2.5 text-sm {% if current_page == 'offers' %}text-white font-semibold{% else %}text-gray-50 hover:text-gray-100{% endif %}"
               href="/offers">
               {{ order_book_svg | safe }}
-              <span>Network Order Book</span>
+              <span>Order book</span>
               <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs
                 font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">
                 {{ summary.num_network_offers }}
@@ -187,20 +178,29 @@
             </a>
           </li>
 
-          <!-- Place New Offer -->
+          <!-- Wallets -->
           <li>
-            <a class="flex mr-10 items-center py-2.5 text-gray-50 hover:text-gray-100 text-sm"
+            <a class="flex mr-10 items-center py-3 text-sm {% if current_page == 'wallets' or current_page == 'wallet' %}text-white font-semibold{% else %}text-gray-50 hover:text-gray-100{% endif %}"
+              href="/wallets">
+              {{ wallet_svg | safe }}
+              <span>Wallets</span>
+            </a>
+          </li>
+
+          <!-- Create offer -->
+          <li>
+            <a class="flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md shadow-button focus:outline-none"
               href="/newoffer">
               {{ new_offer_svg | safe }}
-              <span>Place New Offer</span>
+              <span>Create Offer</span>
             </a>
           </li>
         </ul>
 
         <!-- Donation Link -->
-        <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto">
+        <ul class="hidden xl:flex lg:justify-end lg:items-center lg:space-x-6 ml-auto mr-6">
           <li>
-            <a href="/donation" class="flex items-center py-2 pr-4 pl-3 text-gray-50 text-sm hover:text-gray-100">
+            <a href="/donation" class="flex items-center py-2 text-sm text-gray-50 hover:text-gray-100">
               {{ love_svg | safe }}
               <span class="ml-2">Donations</span>
             </a>
@@ -427,6 +427,8 @@
           </ul>
           {% endif %}
 
+          {# Notification hidden to-do #}
+          {#
           <div class="relative">
             <button id="notification-history-button" onclick="toggleNotificationDropdown(event)" type="button"
                     class="relative text-green-500 dark:text-green-400 focus:outline-none rounded-lg text-sm ml-5 flex items-center justify-center">
@@ -438,6 +440,7 @@
               </div>
             </div>
           </div>
+          #}
 
           <button data-tooltip-target="tooltip-darkmode" id="theme-toggle" type="button"
             class="text-gray-500 dark:text-gray-400 focus:outline-none rounded-lg text-sm ml-5">
@@ -466,8 +469,7 @@
           <ul class="flex items-center space-x-8">
             <!-- AMM -->
             <li>
-              <a data-tooltip-target="tooltip-amm-subheader" class="flex items-center text-sm text-gray-400
-                hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/amm">
+              <a data-tooltip-target="tooltip-amm-subheader" class="flex items-center text-sm {% if current_page == 'amm' %}text-blue-500 dark:text-white font-semibold{% else %}text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100{% endif %}" href="/amm">
                 {{ automation_svg | safe }}
                 <span>AMM</span>
                 <span id="amm-counter" class="inline-flex justify-center items-center text-xs
@@ -490,8 +492,7 @@
 
             <!-- Your Offers -->
             <li>
-              <a data-tooltip-target="tooltip-your-offers" class="flex items-center text-sm text-gray-400
-                hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100" href="/sentoffers">
+              <a data-tooltip-target="tooltip-your-offers" class="flex items-center text-sm {% if current_page == 'sentoffers' %}text-blue-500 dark:text-white font-semibold{% else %}text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100{% endif %}" href="/sentoffers">
                 {{ your_offers_svg | safe }}
                 <span>Your Offers</span>
                 <span id="offers-counter" class="inline-flex justify-center items-center text-xs
@@ -514,8 +515,7 @@
 
             <!-- Bid Requests -->
             <li>
-              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100
-                dark:hover:text-gray-100" href="/availablebids">
+              <a class="flex items-center text-sm {% if current_page == 'availablebids' %}text-blue-500 dark:text-white font-semibold{% else %}text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100{% endif %}" href="/availablebids">
                 {{ available_bids_svg | safe }}
                 <span>Bid Requests</span>
                 <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs
@@ -532,7 +532,7 @@
 
             <!-- Bids -->
             <li>
-            <a href="/bids" data-tooltip-target="tooltip-bids" class="flex items-center text-sm text-gray-400  hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100">
+            <a href="/bids" data-tooltip-target="tooltip-bids" class="flex items-center text-sm {% if current_page == 'bids' %}text-blue-500 dark:text-white font-semibold{% else %}text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100{% endif %}">
              <span class="inline-block mr-2">{{ bids_sent_svg | safe }}</span>
              <span class="my-auto">Bids</span>
              <span class="flex items-center ml-2 my-auto">
@@ -561,8 +561,7 @@
 
             <!-- Swaps in Progress -->
             <li>
-              <a class="flex items-center text-sm text-gray-400 hover:text-gray-600 dark:text-gray-100
-                dark:hover:text-gray-100" href="/active">
+              <a class="flex items-center text-sm {% if current_page == 'active' %}text-blue-500 dark:text-white font-semibold{% else %}text-gray-400 hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-100{% endif %}" href="/active">
                 <div id="swapContainer" class="inline-flex center-spin mr-2"
                   {% if summary.num_swapping != 0 %}style="animation: spin 2s linear infinite;"{% endif %}>
                   {% if summary.num_swapping != 0 %}
@@ -571,7 +570,7 @@
                     {{ swap_in_progress_svg | safe }}
                   {% endif %}
                 </div>
-                <span>Swaps in Progress</span>
+                <span>Swaps</span>
                 <span id="swaps-counter" class="inline-flex justify-center items-center text-xs
                   font-semibold ml-3 px-2.5 py-1 text-white {% if summary.num_swapping > 0 %}
                   bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
@@ -582,6 +581,7 @@
           </ul>
         </div>
       </div>
+
     </nav>
 
 <!-- Mobile Navigation Menu -->
@@ -611,7 +611,7 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/newoffer">
             {{ new_offer_svg | safe }}
-            <span>Place New Offer</span>
+            <span>Create Offer</span>
           </a>
         </li>
         <li>
@@ -628,6 +628,8 @@
             <span>Donations</span>
           </a>
         </li>
+        {# Notification entry hidden for now (feature unused). Re-enable by uncommenting. #}
+        {#
         <li>
           <button id="notification-history-button-mobile" onclick="toggleNotificationDropdown(event)" ontouchstart="toggleNotificationDropdown(event)"
                   class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded w-full text-left focus:outline-none">
@@ -640,6 +642,7 @@
             </div>
           </div>
         </li>
+        #}
 
       </ul>
 

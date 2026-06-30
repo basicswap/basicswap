@@ -1,6 +1,6 @@
 {# Page Header Banner Macro #}
-{% macro page_header(title, description='', icon='', dark_bg='dark:bg-blue-500', container_class='lg:container mx-auto', inner_padding='py-8 px-8', title_size='text-2xl', title_extra_class='mb-3 tracking-tighter', dots_style='two') %}
-<section class="py-3 px-4 mt-6">
+{% macro page_header(title, description='', icon='', dark_bg='dark:bg-blue-500', container_class='lg:container mx-auto', inner_padding='py-8 px-8', title_size='text-2xl', title_extra_class='mb-3 tracking-tighter', dots_style='two', outer_class='py-3 px-4 mt-6') %}
+<section class="{{ outer_class }}">
   <div class="{{ container_class }}">
     <div class="relative {{ inner_padding }} bg-coolGray-900 {{ dark_bg }} rounded-md overflow-hidden">
       {% if dots_style == 'one' %}
@@ -49,4 +49,47 @@
   {% endif %}
   {% endfor %}
 </ul>
+{% endmacro %}
+
+{# Step indicator. current is 1, 2 or 3. #}
+{% macro offer_stepper(current) %}
+{% set steps = [(1, 'Trade'), (2, 'Terms'), (3, 'Review')] %}
+<nav class="px-4 mt-6 mb-2" aria-label="Progress">
+  <ol class="flex items-center w-full max-w-lg mx-auto">
+    {% for num, label in steps %}
+    {% set is_done = num < current %}
+    {% set is_active = num == current %}
+    <li class="flex items-center {% if not loop.last %}w-full{% endif %}">
+      {% if is_done %}
+      {# Completed steps submit back to that step (form id="form"). #}
+      <button type="submit" form="form" name="step{{ num }}" value="Back" title="Back to {{ label }}" class="group flex items-center gap-2 shrink-0 focus:outline-none">
+      {% else %}
+      <div class="flex items-center gap-2 shrink-0">
+      {% endif %}
+        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-semibold transition-colors
+          {% if is_done %}bg-blue-500 text-white group-hover:bg-blue-600
+          {% elif is_active %}bg-blue-500 text-white
+          {% else %}border border-gray-300 dark:border-gray-500 text-gray-400 dark:text-gray-400{% endif %}">
+          {% if is_done %}
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+          {% else %}{{ num }}{% endif %}
+        </span>
+        <span class="text-sm font-medium whitespace-nowrap
+          {% if is_active %}text-gray-900 dark:text-white{% elif is_done %}text-gray-500 dark:text-gray-300 group-hover:text-blue-500{% else %}text-gray-400 dark:text-gray-400{% endif %}">{{ label }}</span>
+      {% if is_done %}</button>{% else %}</div>{% endif %}
+      {% if not loop.last %}
+      <div class="flex-auto h-px mx-3 {% if is_done %}bg-blue-500{% else %}bg-gray-200 dark:bg-gray-500{% endif %}"></div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+{% endmacro %}
+
+{# Read-only summary row used on Terms/Review steps. #}
+{% macro summary_row(label, value, mono=false) %}
+<div class="flex items-start justify-between gap-4 py-2.5 border-b border-gray-200 dark:border-gray-400 border-opacity-60 last:border-b-0">
+  <span class="text-sm text-gray-500 dark:text-gray-300">{{ label }}</span>
+  <span class="text-sm font-medium text-gray-900 dark:text-white text-right {% if mono %}font-mono break-all{% endif %}">{{ value }}</span>
+</div>
 {% endmacro %}

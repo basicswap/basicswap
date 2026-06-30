@@ -936,6 +936,44 @@ def js_rate(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps({"rate": rate}), "UTF-8")
 
 
+def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+
+    post_data = getFormData(post_string, is_json)
+
+    coin_from = getCoinType(get_data_entry(post_data, "coin_from"))
+    coin_to = getCoinType(get_data_entry(post_data, "coin_to"))
+    ci_from = swap_client.ci(coin_from)
+
+    rv = {"coin_from": ci_from.ticker(), "fee": None}
+    try:
+        reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
+        conf_target = (
+            ci_from._conf_target if coin_from not in (Coins.XMR, Coins.WOW) else 2
+        )
+        from_fee_override, fee_src = swap_client.getFeeRateForCoin(
+            coin_from, conf_target
+        )
+        fee_rate_int = ci_from.make_int(from_fee_override, r=1)
+        lock_spend_tx_vsize = (
+            ci_from.xmr_swap_b_lock_spend_tx_vsize()
+            if reverse_bid
+            else ci_from.xmr_swap_a_lock_spend_tx_vsize()
+        )
+        lock_spend_tx_fee = ci_from.make_int(
+            fee_rate_int * lock_spend_tx_vsize / 1000, r=1
+        )
+        rv["fee"] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
+        rv["fee_rate"] = ci_from.format_amount(fee_rate_int)
+        rv["fee_src"] = fee_src
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"offer_fee_estimate failed: {e}")
+        rv["error"] = "Fee estimate unavailable"
+    return bytes(json.dumps(rv), "UTF-8")
+
+
 def js_index(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
 
@@ -2005,6 +2043,7 @@ endpoints = {
     "rate": js_rate,
     "rates": js_rates,
     "rateslist": js_rates_list,
+    "offerfeeestimate": js_offer_fee_estimate,
     "generatenotification": js_generatenotification,
     "checkupdates": js_checkupdates,
     "updatestatus": js_updatestatus,

@@ -172,7 +172,18 @@
         return;
       }
 
-      const calculatedAmount = floatBalance * percent;
+      let calculatedAmount = floatBalance * percent;
+      if (percent >= 1) {
+        const estFee = (window.FeeEstimate && typeof window.FeeEstimate.fee === 'number')
+          ? window.FeeEstimate.fee : null;
+        if (estFee !== null && estFee >= 0) {
+          calculatedAmount = floatBalance - estFee;
+        } else {
+          const FEE_RESERVE_FRACTION = 0.001; 
+          calculatedAmount = floatBalance * (1 - FEE_RESERVE_FRACTION);
+        }
+        if (calculatedAmount < 0) calculatedAmount = 0;
+      }
       amountInput.value = calculatedAmount.toFixed(8);
     },
 
@@ -261,14 +272,6 @@
         window.testUpdateNotification();
       } else {
         console.error('EventHandlers: testUpdateNotification function not found');
-      }
-    },
-
-    toggleNotificationDropdown: function(event) {
-      if (window.toggleNotificationDropdown && typeof window.toggleNotificationDropdown === 'function') {
-        window.toggleNotificationDropdown(event);
-      } else {
-        console.error('EventHandlers: toggleNotificationDropdown function not found');
       }
     },
 
@@ -480,6 +483,5 @@
   window.setBidAmount = EventHandlers.setBidAmount.bind(EventHandlers);
   window.resetForm = EventHandlers.resetForm.bind(EventHandlers);
   window.hideConfirmModal = EventHandlers.hideConfirmModal.bind(EventHandlers);
-  window.toggleNotificationDropdown = EventHandlers.toggleNotificationDropdown.bind(EventHandlers);
 
 })();

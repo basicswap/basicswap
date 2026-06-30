@@ -302,6 +302,18 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         args_dict["version"] = version
 
+        try:
+            static_dir = os.path.join(os.path.dirname(__file__), "static")
+            mtimes = []
+            for rel in (
+                os.path.join("css", "style.css"),
+                os.path.join("js", "pages", "offer-new-page.js"),
+            ):
+                mtimes.append(int(os.path.getmtime(os.path.join(static_dir, rel))))
+            args_dict["static_v"] = "{}-{}".format(version, max(mtimes))
+        except Exception:
+            args_dict["static_v"] = version
+
         self.putHeaders(status_code, "text/html", extra_headers=extra_headers)
         return bytes(
             template.render(
