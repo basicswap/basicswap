@@ -749,7 +749,7 @@ class Test(TestFunctions):
                 i,
                 client_path,
                 bins_path,
-                cls.test_coins_list,
+                ",".join(cls.test_coins_list),
                 mnemonics[i] if i < len(mnemonics) else None,
                 num_nodes=NUM_NODES,
                 use_rpcauth=True,

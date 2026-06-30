@@ -421,7 +421,7 @@ def getKnownVersion(coin_name: str) -> str:
 
 
 def exitWithError(error_msg: str):
-    sys.stderr.write("Error: {}, exiting.\n".format(error_msg))
+    sys.stderr.write(f"Error: {error_msg}, exiting.\n")
     sys.exit(1)
 
 
