@@ -46,6 +46,15 @@ class SocksTransport(Transport):
 
 
 class JsonrpcDigest:
+
+    @staticmethod
+    def constructUrl(host: str, port: int, method: str = "json_rpc") -> str:
+        scheme: str = "http"
+        if "://" in host:
+            scheme, host = host.split("://", 1)
+        url: str = f"{scheme}://{host}:{port}/{method}"
+        return url
+
     # __getattr__ complicates extending ServerProxy
     def __init__(
         self,
@@ -228,10 +237,7 @@ def callrpc_xmr(
 ):
     # auth is a tuple: (username, password)
     try:
-        if rpc_host.count("://") > 0:
-            url = "{}:{}/{}".format(rpc_host, rpc_port, path)
-        else:
-            url = "http://{}:{}/{}".format(rpc_host, rpc_port, path)
+        url = JsonrpcDigest.constructUrl(rpc_host, rpc_port, path)
 
         x = JsonrpcDigest(url, transport=transport)
         request_body = {
@@ -249,10 +255,10 @@ def callrpc_xmr(
         x.close()
         r = json.loads(v.decode("utf-8"))
     except Exception as ex:
-        raise ValueError("{}RPC Server Error: {}".format(tag, str(ex)))
+        raise ValueError(f"{tag}RPC Server Error: {ex}")
 
     if "error" in r and r["error"] is not None:
-        raise ValueError(tag + "RPC error " + str(r["error"]))
+        raise ValueError(f"{tag}RPC error: {r['error']}")
 
     return r["result"]
 
@@ -268,10 +274,7 @@ def callrpc_xmr2(
     tag="",
 ):
     try:
-        if rpc_host.count("://") > 0:
-            url = "{}:{}/{}".format(rpc_host, rpc_port, method)
-        else:
-            url = "http://{}:{}/{}".format(rpc_host, rpc_port, method)
+        url = JsonrpcDigest.constructUrl(rpc_host, rpc_port, method)
 
         x = JsonrpcDigest(url, transport=transport)
         if auth:
@@ -283,7 +286,7 @@ def callrpc_xmr2(
         x.close()
         r = json.loads(v.decode("utf-8"))
     except Exception as ex:
-        raise ValueError("{}RPC Server Error: {}".format(tag, str(ex)))
+        raise ValueError(f"{tag}RPC Server Error: {ex}")
 
     return r
 

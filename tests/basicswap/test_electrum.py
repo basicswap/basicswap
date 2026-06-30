@@ -740,11 +740,16 @@ class Test(TestFunctions):
                     "--btc-mode=electrum",
                     "--btc-electrum-server=127.0.0.1:50001",
                 ]
+            wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
+            if wallets_password is not None:
+                assert isinstance(wallets_password, str)
+                logging.info("Using wallets password.")
+                os.environ["WALLET_ENCRYPTION_PWD"] = wallets_password
             run_prepare(
                 i,
                 client_path,
                 bins_path,
-                cls.test_coins_list,
+                ",".join(cls.test_coins_list),
                 mnemonics[i] if i < len(mnemonics) else None,
                 num_nodes=NUM_NODES,
                 use_rpcauth=True,
@@ -752,6 +757,8 @@ class Test(TestFunctions):
                 port_ofs=PORT_OFS,
                 extra_args=extra_args,
             )
+            if wallets_password is not None:
+                os.environ.pop("WALLET_ENCRYPTION_PWD", None)
 
     @classmethod
     def tearDownClass(cls):
