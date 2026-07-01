@@ -45,11 +45,17 @@ DEFAULT_ELECTRUM_SERVERS = {
         {"host": "electrum-ltc.petrkr.net", "port": 60002, "ssl": True},
         {"host": "electrum.jochen-hoenicke.de", "port": 50004, "ssl": True},
     ],
+    "digibyte": [
+        {"host": "electrum1.cipig.net", "port": 20059, "ssl": True},
+        {"host": "electrum2.cipig.net", "port": 20059, "ssl": True},
+        {"host": "electrum3.cipig.net", "port": 20059, "ssl": True},
+    ],
 }
 
 DEFAULT_ONION_SERVERS = {
     "bitcoin": [],
     "litecoin": [],
+    "digibyte": [],
 }
 
 

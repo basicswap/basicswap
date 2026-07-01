@@ -33,6 +33,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    DGB = 19
 
 
 class Fiat(IntEnum):
@@ -206,6 +207,44 @@ chainparams = {
             "script_address": 196,
             "key_prefix": 239,
             "hrp": "rdge",
+            "bip44": 1,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+    },
+    Coins.DGB: {
+        "name": "digibyte",
+        "ticker": "DGB",
+        "display_name": "DigiByte",
+        "message_magic": "DigiByte Signed Message:\n",
+        "blocks_target": 15,
+        "decimal_places": 8,
+        "mainnet": {
+            "rpcport": 14022,
+            "pubkey_address": 0x1E,
+            "script_address": 0x3F,
+            "key_prefix": 0x80,
+            "hrp": "dgb",
+            "bip44": 20,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+        "testnet": {
+            "rpcport": 14023,
+            "pubkey_address": 0x7E,
+            "script_address": 0x8C,
+            "key_prefix": 0xFE,
+            "hrp": "dgbt",
+            "bip44": 1,
+            "min_amount": 100000,
+            "max_amount": 10000000 * COIN,
+        },
+        "regtest": {
+            "rpcport": 18443,
+            "pubkey_address": 0x7E,
+            "script_address": 0x8C,
+            "key_prefix": 0xFE,
+            "hrp": "dgbrt",
             "bip44": 1,
             "min_amount": 100000,
             "max_amount": 10000000 * COIN,

@@ -98,6 +98,16 @@ BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")
 DOGECOIN_VERSION_TAG = os.getenv("DOGECOIN_VERSION_TAG", "")
 
+DIGIBYTE_VERSION = os.getenv("DIGIBYTE_VERSION", "8.26.2")
+DIGIBYTE_VERSION_TAG = os.getenv("DIGIBYTE_VERSION_TAG", "")
+DIGIBYTE_KNOWN_HASHES = {
+    "digibyte-8.26.2-x86_64-linux-gnu.tar.gz": "bffa56a4609e374010da36125c7f84521ef449f6c741a3ef765be4a23264535d",
+    "digibyte-8.26.2-aarch64-linux-gnu.tar.gz": "9c302fc000174ceaac70cde29823535edd12a9118fd29cdf0fc85d70f43b60ce",
+    "digibyte-8.26.2-x86_64-apple-darwin.zip": "654b30e6e6c3177fbbf73a9cf7e23b6f5c51b062cf508dd75c65523d8ad289e5",
+    "digibyte-8.26.2-arm64-apple-darwin.zip": "a5ee68b5b7078db379a7d76c72481af09e0e567cb644178325e58ce0fc42de9d",
+    "digibyte-8.26.2-win64-setup.exe": "e4e0fb204490db918980c58d65a783824d6a0d49b403740f39a05b33f0a4960e",
+}
+
 
 known_coins = {
     "particl": (PARTICL_VERSION, PARTICL_VERSION_TAG, ("tecnovert",)),
@@ -113,6 +123,7 @@ known_coins = {
     "navcoin": (NAV_VERSION, NAV_VERSION_TAG, ("nav_builder",)),
     "bitcoincash": (BITCOINCASH_VERSION, BITCOINCASH_VERSION_TAG, ("Calin_Culianu",)),
     "dogecoin": (DOGECOIN_VERSION, DOGECOIN_VERSION_TAG, ("tecnovert",)),
+    "digibyte": (DIGIBYTE_VERSION, DIGIBYTE_VERSION_TAG, ("JaredTate",)),
 }
 
 disabled_coins = [
@@ -158,6 +169,7 @@ expected_key_ids = {
     ),
     "decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",),
     "Calin_Culianu": ("D465135F97D0047E18E99DC321810A542031C02C",),
+    "JaredTate": ("8621501669119D1A98DE636EB9308850E0AC417E",),
     "SimpleX_Chat": ("FB44AF81A45BDE327319797C85107E357D4A17FC",),
     "UdjinM6": ("3F5D48C9F00293CD365A3A9883592BD1400D58D9",),
 }
@@ -303,6 +315,12 @@ DOGE_RPC_PORT = int(os.getenv("DOGE_RPC_PORT", 42069))
 DOGE_ONION_PORT = int(os.getenv("DOGE_ONION_PORT", 6969))
 DOGE_RPC_USER = os.getenv("DOGE_RPC_USER", "")
 DOGE_RPC_PWD = os.getenv("DOGE_RPC_PWD", "")
+
+DGB_RPC_HOST = os.getenv("DGB_RPC_HOST", "127.0.0.1")
+DGB_RPC_PORT = int(os.getenv("DGB_RPC_PORT", 14022))
+DGB_ONION_PORT = int(os.getenv("DGB_ONION_PORT", 12024))
+DGB_RPC_USER = os.getenv("DGB_RPC_USER", "")
+DGB_RPC_PWD = os.getenv("DGB_RPC_PWD", "")
 
 TOR_PROXY_HOST = os.getenv("TOR_PROXY_HOST", "127.0.0.1")
 TOR_PROXY_PORT = int(os.getenv("TOR_PROXY_PORT", 9050))
@@ -928,7 +946,7 @@ def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}
             downloadFile(assert_sig_url, assert_sig_path)
     else:
         major_version = int(version.split(".")[0])
-        use_guix: bool = coin in ("dash",) or major_version >= 22
+        use_guix: bool = coin in ("dash", "digibyte") or major_version >= 22
         arch_name = BIN_ARCH
         if os_name == "osx" and use_guix:
             arch_name = "x86_64-apple-darwin"
@@ -983,6 +1001,15 @@ def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}
             )
             assert_filename = "{}-{}-{}-build.assert".format(coin, os_name, version)
             assert_url = f"https://raw.githubusercontent.com/tecnovert/guix.sigs/dogecoin/{version}/{signing_key_name}/noncodesigned.SHA256SUMS"
+
+        elif coin == "digibyte":
+            release_url = (
+                "https://github.com/DigiByte-Core/digibyte/releases/download/v{}/{}".format(
+                    version + version_tag, release_filename
+                )
+            )
+            assert_filename = f"digibyte-{version}-SHA256SUMS"
+            assert_url = None
 
         elif coin == "bitcoin":
             release_url = "https://bitcoincore.org/bin/bitcoin-core-{}/{}".format(
@@ -1075,17 +1102,27 @@ def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}
         release_path = os.path.join(bin_dir, release_filename)
         downloadRelease(release_url, release_path, extra_opts)
 
-        # Rename assert files with full version
-        assert_filename = "{}-{}-{}-build-{}.assert".format(
-            coin, os_name, version, signing_key_name
-        )
-        assert_path = os.path.join(bin_dir, assert_filename)
-        if not os.path.exists(assert_path):
-            downloadFile(assert_url, assert_path)
+        if coin == "digibyte":
+            # DigiByte doesn't publish SHA256SUMS; use hardcoded hashes
+            assert_path = os.path.join(bin_dir, assert_filename)
+            if not os.path.exists(assert_path):
+                with open(assert_path, "w") as f:
+                    for fname, fhash in DIGIBYTE_KNOWN_HASHES.items():
+                        f.write(f"{fhash}  {fname}\n")
+                logger.info(f"Created local hash file: {assert_filename}")
+        else:
+            # Rename assert files with full version
+            assert_filename = "{}-{}-{}-build-{}.assert".format(
+                coin, os_name, version, signing_key_name
+            )
+            assert_path = os.path.join(bin_dir, assert_filename)
+            if not os.path.exists(assert_path):
+                downloadFile(assert_url, assert_path)
 
         if coin not in (
             "firo",
             "bitcoincash",
+            "digibyte",
         ):
             assert_sig_url = assert_url + (".asc" if use_guix else ".sig")
             if coin not in ("nav",):
@@ -1099,6 +1136,11 @@ def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}
     release_hash: str = getFileHash(release_path)
     logger.info(f"{release_filename} hash: {release_hash}")
     ensureFileHashInFile(release_hash, assert_path)
+
+    if coin == "digibyte":
+        logger.info("DigiByte hash verified against known hashes. Skipping GPG (no signatures published).")
+        extractCore(coin, version_data, settings, bin_dir, release_path, extra_opts)
+        return
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
@@ -1130,6 +1172,8 @@ def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}
         pubkey_filename = "{}_release.pgp".format(coin)
     elif coin in ("dogecoin",):
         pubkey_filename = "particl_{}.pgp".format(signing_key_name)
+    elif coin in ("digibyte",):
+        pubkey_filename = "digibyte_{}.pgp".format(signing_key_name)
     else:
         pubkey_filename = "{}_{}.pgp".format(coin, signing_key_name)
     pubkeyurls = []
@@ -1454,6 +1498,16 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
                         DOGE_RPC_USER, salt, password_to_hmac(salt, DOGE_RPC_PWD)
                     )
                 )
+        elif coin == "digibyte":
+            fp.write("prune=4000\n")
+            fp.write("changetype=bech32\n")
+            fp.write("fallbackfee=0.0002\n")
+            if DGB_RPC_USER != "":
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        DGB_RPC_USER, salt, password_to_hmac(salt, DGB_RPC_PWD)
+                    )
+                )
         elif coin == "bitcoin":
             fp.write("deprecatedrpc=create_bdb\n")
             fp.write("prune=2000\n")
@@ -1665,6 +1719,8 @@ def modify_tor_config(
             default_onionport = LTC_ONION_PORT
         elif coin == "dogecoin":
             default_onionport = DOGE_ONION_PORT
+        elif coin == "digibyte":
+            default_onionport = DGB_ONION_PORT
         elif coin in ("decred",):
             pass
         else:
@@ -1797,6 +1853,8 @@ def printHelp():
     print("--ltc-mode=MODE          Set LTC connection mode: rpc, electrum, or remote.")
     print("--btc-electrum-server=   Custom Electrum server for BTC (host:port:ssl).")
     print("--ltc-electrum-server=   Custom Electrum server for LTC (host:port:ssl).")
+    print("--dgb-mode=MODE          Set DGB connection mode: rpc, electrum, or remote.")
+    print("--dgb-electrum-server=   Custom Electrum server for DGB (host:port:ssl).")
 
     active_coins = []
     for coin_name in known_coins.keys():
@@ -1897,6 +1955,7 @@ def initialise_wallets(
             Coins.BTC,
             Coins.LTC,
             Coins.DOGE,
+            Coins.DGB,
             Coins.DCR,
             Coins.DASH,
             Coins.NMC,
@@ -2037,7 +2096,7 @@ def initialise_wallets(
                                 use_descriptors,
                             ],
                         )
-                    elif c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE):
+                    elif c in (Coins.BTC, Coins.LTC, Coins.NMC, Coins.DOGE, Coins.DGB):
                         # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
                         swap_client.callcoinrpc(
                             c,
@@ -2907,11 +2966,27 @@ def main():
             "core_version_group": 23,
             "min_relay_fee": 0.01,  # RECOMMENDED_MIN_TX_FEE
         },
+        "digibyte": {
+            "connection_type": "rpc",
+            "manage_daemon": shouldManageDaemon("DGB"),
+            "rpchost": DGB_RPC_HOST,
+            "rpcport": DGB_RPC_PORT + port_offset,
+            "onionport": DGB_ONION_PORT + port_offset,
+            "datadir": os.getenv("DGB_DATA_DIR", os.path.join(data_dir, "digibyte")),
+            "bindir": os.path.join(bin_dir, "digibyte"),
+            "use_segwit": True,
+            "use_csv": True,
+            "blocks_confirmed": 40,
+            "conf_target": 2,
+            "core_version_no": getKnownVersion("digibyte"),
+            "core_version_group": 22,
+        },
     }
 
     electrum_supported_coins = {
         "bitcoin": "btc",
         "litecoin": "ltc",
+        "digibyte": "dgb",
     }
 
     for coin_name, coin_prefix in electrum_supported_coins.items():
@@ -2981,6 +3056,9 @@ def main():
     if DOGE_RPC_USER != "":
         chainclients["dogecoin"]["rpcuser"] = DOGE_RPC_USER
         chainclients["dogecoin"]["rpcpassword"] = DOGE_RPC_PWD
+    if DGB_RPC_USER != "":
+        chainclients["digibyte"]["rpcuser"] = DGB_RPC_USER
+        chainclients["digibyte"]["rpcpassword"] = DGB_RPC_PWD
     if BTC_RPC_USER != "":
         chainclients["bitcoin"]["rpcuser"] = BTC_RPC_USER
         chainclients["bitcoin"]["rpcpassword"] = BTC_RPC_PWD
