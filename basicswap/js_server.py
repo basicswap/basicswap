@@ -61,7 +61,7 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
     post_data = getFormData(post_string, is_json)
     address = get_data_entry(post_data, "address")
 
-    if coin_type in (Coins.XMR, Coins.WOW):
+    if coin_type in swap_client.xmr_based_coins:
         value = None
         sweepall = get_data_entry(post_data, "sweepall")
         if not isinstance(sweepall, bool):
@@ -85,7 +85,7 @@ def withdraw_coin(swap_client, coin_type, post_string, is_json):
         txid_hex = swap_client.withdrawCoinExtended(
             coin_type, type_from, value, address, subfee
         )
-    elif coin_type in (Coins.XMR, Coins.WOW):
+    elif coin_type in swap_client.xmr_based_coins:
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, sweepall)
     else:
         txid_hex = swap_client.withdrawCoin(coin_type, value, address, subfee)
@@ -1289,7 +1289,7 @@ def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
 
     ci = swap_client.ci(coin)
     rv = {"coin": ci.ticker()}
-    if coin in (Coins.XMR, Coins.WOW):
+    if coin in swap_client.xmr_based_coins:
         key_view = swap_client.getWalletKey(coin, 1, for_ed25519=True)
         key_spend = swap_client.getWalletKey(coin, 2, for_ed25519=True)
         address = ci.getAddressFromKeys(key_view, key_spend)
@@ -1683,7 +1683,7 @@ def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
             or (current_time - cache_entry["time"]) > TX_CACHE_DURATION
         ):
             all_txs = ci.listWalletTransactions(count=10000, skip=0)
-            if all_txs and coin_id not in (Coins.XMR, Coins.WOW):
+            if all_txs and coin_id not in swap_client.xmr_based_coins:
                 all_txs = list(reversed(all_txs))
             elif not all_txs:
                 all_txs = []

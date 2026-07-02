@@ -2125,7 +2125,7 @@ def initialise_wallets(
                 swap_client.initialiseWallet(
                     c, raise_errors=True, restore_time=restore_time
                 )
-                if c not in (Coins.XMR, Coins.WOW):
+                if c not in swap_client.xmr_based_coins:
                     if restore_time == -1:
                         restore_time = int(time.time())
                         coin_settings["restore_time"] = restore_time

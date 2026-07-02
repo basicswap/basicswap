@@ -49,6 +49,9 @@ class Fiat(IntEnum):
     EUR = -3
 
 
+xmr_based_coins = (Coins.XMR, Coins.WOW)
+
+
 chainparams = {
     Coins.PART: part_params,
     Coins.BTC: btc_params,

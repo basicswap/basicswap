@@ -20,6 +20,7 @@ from basicswap.rpc import callrpc
 from basicswap.util import toBool
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.bin.prepare import downloadPIVXParams
+from basicswap.chainparams import xmr_based_coins
 
 TEST_HTTP_HOST = os.getenv(
     "TEST_HTTP_HOST", "127.0.0.1"
@@ -158,7 +159,7 @@ def prepare_balance(
         "address": js_w[coin_ticker][address_type],
         "subfee": False,
     }
-    if coin in (Coins.XMR, Coins.WOW):
+    if coin in xmr_based_coins:
         post_json["sweepall"] = False
     if coin in (Coins.PART_BLIND, Coins.PART_ANON):
         post_json["type_to"] = type_to
