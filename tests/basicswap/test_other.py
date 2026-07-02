@@ -41,8 +41,8 @@ from basicswap.util_xmr import (
     decode_address as xmr_decode_address,
     encode_address as xmr_encode_address,
 )
-from basicswap.interface.btc import BTCInterface
-from basicswap.interface.xmr import XMRInterface
+from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.xmr.xmr import XMRInterface
 from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.util import REQUIRED_SETTINGS
 

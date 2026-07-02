@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024-2026 The Basicswap developers
@@ -9,7 +8,7 @@ from typing import Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
 from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
-from .btc import BTCInterface, ensure_op, findOutput
+from basicswap.interface.btc.btc import BTCInterface, ensure_op, findOutput
 from basicswap.chainparams import Coins
 from basicswap.interface.contrib.bch_test_framework.cashaddress import Address
 from basicswap.util.crypto import hash160, sha256

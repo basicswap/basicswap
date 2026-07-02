@@ -11,7 +11,7 @@ from basicswap.util import (
     ensure,
 )
 from basicswap.interface.base import Curves
-from basicswap.interface.btc import findOutput
+from basicswap.interface.btc.btc import findOutput
 from basicswap.chainparams import (
     Coins,
 )

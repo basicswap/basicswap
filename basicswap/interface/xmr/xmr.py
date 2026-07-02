@@ -30,7 +30,8 @@ from basicswap.interface.base import (
 from basicswap.util import i2b, b2i, b2h, dumpj, ensure, TemporaryError
 from basicswap.util.network import is_private_ip_address
 from basicswap.rpc_xmr import make_xmr_rpc_func, make_xmr_rpc2_func
-from basicswap.chainparams import XMR_COIN, Coins
+from basicswap.chainparams import Coins
+from basicswap.interface.xmr.chainparams import XMR_COIN
 from basicswap.interface.base import CoinInterface
 
 ed25519_l = 2**252 + 27742317777372353535851937790883648493

@@ -7,7 +7,7 @@
 
 from io import BytesIO
 
-from .btc import BTCInterface
+from basicswap.interface.btc.btc import BTCInterface
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.util.address import decodeAddress

@@ -5,7 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from .btc import BTCInterface
+from basicswap.interface.btc.btc import BTCInterface
 from basicswap.chainparams import Coins
 from basicswap.util.address import decodeAddress
 from basicswap.contrib.mnemonic import Mnemonic

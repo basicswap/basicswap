@@ -8,7 +8,7 @@
 import hashlib
 import random
 
-from .btc import BTCInterface, find_vout_for_address_from_txobj
+from basicswap.interface.btc.btc import BTCInterface, find_vout_for_address_from_txobj
 from basicswap.util import (
     i2b,
     ensure,

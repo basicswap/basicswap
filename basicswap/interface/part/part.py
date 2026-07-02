@@ -30,7 +30,7 @@ from basicswap.util.script import (
 from basicswap.util.address import (
     encodeStealthAddress,
 )
-from basicswap.interface.btc import (
+from basicswap.interface.btc.btc import (
     BTCInterface,
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,

@@ -13,7 +13,7 @@ from coincurve.keys import (
     PublicKey,
     PrivateKey,
 )
-from basicswap.interface.btc import (
+from basicswap.interface.btc.btc import (
     BTCInterface,
     extractScriptLockRefundScriptValues,
     findOutput,

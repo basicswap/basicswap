@@ -40,7 +40,7 @@ from basicswap.contrib.test_framework.script import (
     OP_CHECKLOCKTIMEVERIFY,
     OP_CHECKSEQUENCEVERIFY,
 )
-from basicswap.interface.bch import BCHInterface
+from basicswap.interface.bch.bch import BCHInterface
 from basicswap.util import ensure
 from .test_xmr import test_delay_event, callnoderpc
 

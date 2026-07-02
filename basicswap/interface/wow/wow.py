@@ -4,8 +4,9 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from basicswap.chainparams import WOW_COIN, Coins
-from .xmr import XMRInterface
+from basicswap.chainparams import Coins
+from basicswap.interface.wow.chainparams import WOW_COIN
+from basicswap.interface.xmr.xmr import XMRInterface
 
 
 class WOWInterface(XMRInterface):

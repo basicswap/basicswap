@@ -47,7 +47,7 @@ from tests.basicswap.util import (
     REQUIRED_SETTINGS,
 )
 from tests.basicswap.test_xmr import BaseTest, test_delay_event
-from basicswap.interface.dcr import DCRInterface
+from basicswap.interface.dcr.dcr import DCRInterface
 from basicswap.interface.dcr.messages import CTransaction, CTxIn, COutPoint
 from basicswap.interface.dcr.script import OP_CHECKSEQUENCEVERIFY, push_script_data
 from basicswap.bin.run import startDaemon

@@ -103,7 +103,7 @@ from .util.logging import LogCategories as LC
 from .util.network import is_private_ip_address
 from .util.smsg import smsgGetID
 from .interface.base import Curves
-from .interface.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
+from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from .explorers import default_coingecko_api_key
 from .script import OpCodes
 from .messages_npb import (
@@ -1138,7 +1138,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return interface
         elif coin == Coins.BTC:
-            from .interface.btc import BTCInterface
+            from .interface.btc.btc import BTCInterface
 
             connection_type = self.coin_clients[coin].get("connection_type", "rpc")
             interface = BTCInterface(self.coin_clients[coin], self.chain, self)
@@ -1148,11 +1148,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             return interface
         elif coin == Coins.BCH:
-            from .interface.bch import BCHInterface
+            from .interface.bch.bch import BCHInterface
 
             return BCHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
-            from .interface.ltc import LTCInterface, LTCInterfaceMWEB
+            from .interface.ltc.ltc import LTCInterface, LTCInterfaceMWEB
 
             connection_type = self.coin_clients[coin].get("connection_type", "rpc")
             interface = LTCInterface(self.coin_clients[coin], self.chain, self)
@@ -1166,39 +1166,39 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             return interface
         elif coin == Coins.DOGE:
-            from .interface.doge import DOGEInterface
+            from .interface.doge.doge import DOGEInterface
 
             return DOGEInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DCR:
-            from .interface.dcr import DCRInterface
+            from .interface.dcr.dcr import DCRInterface
 
             return DCRInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.NMC:
-            from .interface.nmc import NMCInterface
+            from .interface.nmc.nmc import NMCInterface
 
             return NMCInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.XMR:
-            from .interface.xmr import XMRInterface
+            from .interface.xmr.xmr import XMRInterface
 
             return XMRInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.WOW:
-            from .interface.wow import WOWInterface
+            from .interface.wow.wow import WOWInterface
 
             return WOWInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.PIVX:
-            from .interface.pivx import PIVXInterface
+            from .interface.pivx.pivx import PIVXInterface
 
             return PIVXInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.DASH:
-            from .interface.dash import DASHInterface
+            from .interface.dash.dash import DASHInterface
 
             return DASHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.FIRO:
-            from .interface.firo import FIROInterface
+            from .interface.firo.firo import FIROInterface
 
             return FIROInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.NAV:
-            from .interface.nav import NAVInterface
+            from .interface.nav.nav import NAVInterface
 
             return NAVInterface(self.coin_clients[coin], self.chain, self)
         else:
