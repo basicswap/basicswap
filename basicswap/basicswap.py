@@ -4452,10 +4452,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             cursor = self.openDB()
             try:
                 rows = cursor.execute(
-                    """SELECT ot.offer_id, o.coin_from, ot.min_wallet_reserve
-                       FROM offer_tracking ot
-                       JOIN offers o ON o.offer_id = ot.offer_id
-                       WHERE ot.mode = :standing AND ot.min_wallet_reserve > 0
+                    """SELECT otr.offer_id, o.coin_from, otr.min_wallet_reserve
+                       FROM offer_tracking otr
+                       JOIN offers o ON o.offer_id = otr.offer_id
+                       WHERE otr.mode = :standing AND otr.min_wallet_reserve > 0
                          AND o.active_ind = 1 AND o.was_sent = 1""",
                     {"standing": int(OfferTrackingModes.STANDING)},
                 ).fetchall()
@@ -4538,7 +4538,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 rows = cursor.execute(
                     """SELECT b.offer_id, SUM(b.amount), COUNT(*) FROM bids b
-                       JOIN offer_tracking ot ON ot.offer_id = b.offer_id
+                       JOIN offer_tracking otr ON otr.offer_id = b.offer_id
                        JOIN offers o ON o.offer_id = b.offer_id AND o.was_sent = 1
                        WHERE b.active_ind = 1 AND b.state = :completed
                        GROUP BY b.offer_id""",
