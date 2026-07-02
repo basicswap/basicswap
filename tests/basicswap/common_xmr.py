@@ -41,6 +41,7 @@ from tests.basicswap.extended.test_nmc import (
 from tests.basicswap.extended.test_dcr import (
     DCR_BASE_PORT,
     DCR_BASE_RPC_PORT,
+    DCR_BASE_WALLET_RPC_PORT,
 )
 from tests.basicswap.test_bch_xmr import (
     BCH_BASE_PORT,
@@ -66,6 +67,9 @@ BITCOIN_TOR_PORT_BASE = int(os.getenv("BITCOIN_TOR_PORT_BASE", BTC_BASE_TOR_PORT
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
 
 DECRED_RPC_PORT_BASE = int(os.getenv("DECRED_RPC_PORT_BASE", DCR_BASE_RPC_PORT))
+DECRED_WALLET_RPC_PORT_BASE = int(
+    os.getenv("DECRED_WALLET_RPC_PORT_BASE", DCR_BASE_WALLET_RPC_PORT)
+)
 
 NAMECOIN_PORT_BASE = int(os.getenv("NAMECOIN_PORT_BASE", NMC_BASE_PORT))
 NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
@@ -157,6 +161,8 @@ def run_prepare(
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
     os.environ["DCR_RPC_PWD"] = "dcr_pwd"
+    os.environ["DCR_WALLET_RPC_PORT"] = str(DECRED_WALLET_RPC_PORT_BASE)
+
     os.environ["NMC_RPC_PORT"] = str(NAMECOIN_RPC_PORT_BASE)
     os.environ["NMC_PORT"] = str(NMC_BASE_PORT)
     os.environ["NMC_ONION_PORT"] = str(NAMECOIN_TOR_PORT_BASE)
@@ -325,7 +331,7 @@ def run_prepare(
             fp.write("nodnsseed=1\n")
             fp.write("nodiscoverip=1\n")
             if node_id == 0:
-                fp.write("miningaddr=SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH\n")
+                fp.write("miningaddr=SsppG7KLiH52NC7iJmUVGVq89FLS83E5vho\n")
                 for ip in range(num_nodes):
                     if ip != node_id:
                         fp.write(

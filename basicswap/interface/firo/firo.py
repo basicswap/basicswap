@@ -53,6 +53,12 @@ class FIROInterface(BTCInterface):
         if "wallet_name" in coin_settings:
             raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
 
+        if network == "regtest":
+            self._log.info(f"Setting {self.coin_name()} regtest mode")
+            from basicswap.interface.contrib.firo_test_framework.mininode import set_regtest as set_firo_regtest
+            # Raise MTP_SWITCH_TIME and PP_SWITCH_TIME in mininode.py
+            set_firo_regtest()
+
     def getExchangeName(self, exchange_name: str) -> str:
         return "zcoin"
 

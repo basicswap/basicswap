@@ -74,6 +74,7 @@ PP_SWITCH_TIME = 1635228000
 
 
 def set_regtest() -> None:
+    print("Setting Firo MTP_SWITCH_TIME and PP_SWITCH_TIME for regtest")
     global MTP_SWITCH_TIME, PP_SWITCH_TIME
     MTP_SWITCH_TIME = 4294967295
     PP_SWITCH_TIME = 4294967295

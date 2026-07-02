@@ -19,7 +19,7 @@ from basicswap.basicswap_util import BidStates
 from basicswap.rpc import callrpc
 from basicswap.util import toBool
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
-from basicswap.bin.prepare import downloadPIVXParams
+from basicswap.interface.pivx.core import downloadPIVXParams
 from basicswap.chainparams import xmr_based_coins
 
 TEST_HTTP_HOST = os.getenv(

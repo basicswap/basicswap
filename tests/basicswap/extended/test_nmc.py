@@ -186,6 +186,7 @@ class TestNMC(BasicSwapTest):
             "use_segwit": True,
             "blocks_confirmed": 1,
             "use_descriptors": NMC_USE_DESCRIPTORS,
+            "wallet_name": "bsx_wallet",
         }
         if NMC_USE_DESCRIPTORS:
             settings["chainclients"]["namecoin"]["watch_wallet_name"] = "bsx_watch"
