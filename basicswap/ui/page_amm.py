@@ -647,7 +647,8 @@ def page_amm(self, _, post_string):
                     "amount_variable": True,
                     "amount_step": 0.001,
                     "address": "auto",
-                    "min_coin_from_amt": 0,
+                    "offer_mode": "standing",
+                    "min_coin_from_amt": 1.0,
                     "offer_valid_seconds": 3600,
                 }
             ],
@@ -958,6 +959,36 @@ def page_amm(self, _, post_string):
                         except ValueError:
                             pass
 
+                    offer_mode = (
+                        form_data.get("offer_mode", ["standing"])[0] or "standing"
+                    )
+                    if offer_mode not in (
+                        "legacy",
+                        "one_time",
+                        "fixed_total",
+                        "standing",
+                    ):
+                        offer_mode = "standing"
+                    new_offer["offer_mode"] = offer_mode
+                    if offer_mode == "fixed_total":
+                        try:
+                            new_offer["total_to_sell"] = float(
+                                form_data.get("offer_total_to_sell", ["0"])[0] or "0"
+                            )
+                        except ValueError:
+                            new_offer["total_to_sell"] = new_offer["amount"]
+                        if new_offer["total_to_sell"] < new_offer["amount"]:
+                            err_messages.append(
+                                "Total to sell must be at least the amount per swap"
+                            )
+                            raise ValueError("total_to_sell < amount")
+                    elif offer_mode == "standing":
+                        if new_offer.get("min_coin_from_amt", 0) <= 0:
+                            err_messages.append(
+                                "Standing offers require a minimum wallet reserve (min coin from amount) greater than 0"
+                            )
+                            raise ValueError("standing without wallet floor")
+
                     if form_data.get("offer_valid_seconds", [""])[0]:
                         try:
                             new_offer["offer_valid_seconds"] = int(
@@ -1106,12 +1137,14 @@ def page_amm(self, _, post_string):
                             "amount_variable": True,  # Whether bidder can set a different amount
                             "amount_step": 0.001,  # Offer size increment (privacy/offer management feature)
                             "address": "auto",  # Address offer is sent from (auto = generate new address per offer)
-                            "min_coin_from_amt": 0,  # Won't generate offers if wallet balance would drop below this
+                            "offer_mode": "standing",  # "one_time", "fixed_total", "standing" or "legacy"
+                            "min_coin_from_amt": 1.0,  # Standing offers: won't generate offers if wallet balance would drop below this
                             "offer_valid_seconds": 3600,  # How long generated offers will be valid for
                             "automation_strategy": "accept_all",  # Auto accept bids: "accept_all", "accept_known", or "none"
                             # Optional settings
                             "swap_type": "adaptor_sig",  # Type of swap, defaults to "adaptor_sig"
                             "min_swap_amount": 0.001,  # Minimum purchase quantity when offer amount is variable
+                            # "total_to_sell": 10.0,  # Only used when offer_mode is "fixed_total"; must be >= amount
                         }
                     ],
                     "bids": [],  # Empty by default

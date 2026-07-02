@@ -364,6 +364,25 @@ def readConfig(args, known_coins):
             print("Setting amount_variable to True for offer", offer_template["name"])
             offer_template["amount_variable"] = True
             num_changes += 1
+        valid_offer_modes = ("legacy", "one_time", "fixed_total", "standing")
+        if offer_template.get("offer_mode", "standing") not in valid_offer_modes:
+            print(
+                f"Invalid offer_mode for {offer_template['name']}, setting to standing"
+            )
+            offer_template["offer_mode"] = "standing"
+            num_changes += 1
+        elif "offer_mode" not in offer_template:
+            offer_template["offer_mode"] = "standing"
+            num_changes += 1
+        if offer_template["offer_mode"] == "fixed_total":
+            total_to_sell = offer_template.get("total_to_sell", amount)
+            if float(total_to_sell) < amount:
+                print(
+                    f"total_to_sell for {offer_template['name']} must be >= amount, "
+                    f"setting to {amount}"
+                )
+                offer_template["total_to_sell"] = amount
+                num_changes += 1
         if (
             "lock_hours" not in offer_template
             or int(offer_template["lock_hours"]) not in VALID_LOCK_HOURS
@@ -729,6 +748,73 @@ def process_offers(args, config, script_state) -> None:
         created_offers = script_state.get("offers", {})
         prev_template_offers = created_offers.get(offer_template["name"], [])
 
+        template_offer_mode = offer_template.get("offer_mode", "standing")
+        template_fixed_remaining = None
+        if template_offer_mode in ("one_time", "fixed_total"):
+            tracking_states = script_state.setdefault("template_tracking", {})
+            template_tracking = tracking_states.setdefault(
+                offer_template["name"], {"exhausted": False, "sold_by_offer": {}}
+            )
+            if template_tracking.get("exhausted"):
+                if args.debug:
+                    print(
+                        f"Template {offer_template['name']} exhausted "
+                        f"({template_offer_mode}), not reposting"
+                    )
+                continue
+
+            sold_by_offer = template_tracking.setdefault("sold_by_offer", {})
+            template_exhausted = False
+            template_in_flight = 0.0
+            for prev_offer in prev_template_offers:
+                prev_offer_id = prev_offer.get("offer_id")
+                if not prev_offer_id:
+                    continue
+                try:
+                    offer_info = read_json_api(f"sentoffers/{prev_offer_id}")
+                    if isinstance(offer_info, list) and offer_info:
+                        offer_info = offer_info[0]
+                    if not isinstance(offer_info, dict):
+                        continue
+                    filled_str = offer_info.get("tracking_filled_amount")
+                    if filled_str is not None:
+                        sold_by_offer[prev_offer_id] = float(filled_str)
+                    template_in_flight += float(
+                        offer_info.get("tracking_in_flight_amount", 0)
+                    )
+                    if template_offer_mode == "one_time" and offer_info.get(
+                        "tracking_exhausted"
+                    ):
+                        template_exhausted = True
+                except Exception as e:
+                    if args.debug:
+                        print(f"Error checking exhaustion for {prev_offer_id}: {e}")
+
+            total_sold = round(sum(sold_by_offer.values()), 8)
+            if template_offer_mode == "fixed_total":
+                total_to_sell = float(
+                    offer_template.get("total_to_sell", offer_template["amount"])
+                )
+                template_fixed_remaining = round(
+                    total_to_sell - total_sold - template_in_flight, 8
+                )
+                if template_fixed_remaining < 0.001:
+                    print(
+                        f"Template {offer_template['name']} exhausted "
+                        f"(fixed_total, sold {total_sold} of {total_to_sell}"
+                        f", in-flight {template_in_flight}), not reposting"
+                    )
+                    continue
+
+            if template_exhausted:
+                template_tracking["exhausted"] = True
+                write_state(args.statefile, script_state)
+                print(
+                    f"Template {offer_template['name']} exhausted "
+                    f"({template_offer_mode}), not reposting"
+                )
+                continue
+
         template_offer_ids = set()
         for prev_offer in prev_template_offers:
             if "offer_id" in prev_offer:
@@ -858,6 +944,12 @@ def process_offers(args, config, script_state) -> None:
             except (TypeError, ValueError) as e:
                 print(f"Error calculating steps: {e}. Using max available amount.")
                 offer_amount = min(max_offer_amount, available_balance)
+
+        if (
+            template_fixed_remaining is not None
+            and offer_amount > template_fixed_remaining
+        ):
+            offer_amount = template_fixed_remaining
 
         delay_next_offer_before = script_state.get("delay_next_offer_before", 0)
         if delay_next_offer_before > int(time.time()):
@@ -1254,6 +1346,19 @@ def process_offers(args, config, script_state) -> None:
 
         if "min_swap_amount" in offer_template:
             offer_data["amt_bid_min"] = offer_template["min_swap_amount"]
+
+        offer_mode = offer_template.get("offer_mode", "standing")
+        offer_data["offer_mode"] = offer_mode
+        if offer_mode == "fixed_total":
+            offer_data["total_to_sell"] = (
+                template_fixed_remaining
+                if template_fixed_remaining is not None
+                else offer_template.get("total_to_sell", offer_amount)
+            )
+        if offer_mode == "standing":
+            min_coin_from_amt = offer_template.get("min_coin_from_amt", 0)
+            if float(min_coin_from_amt) > 0:
+                offer_data["min_wallet_reserve"] = min_coin_from_amt
 
         if args.debug:
             print(

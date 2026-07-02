@@ -15,6 +15,9 @@
           <div>
             <h3 class="text-sm bsx-alert-title">Offer published successfully</h3>
             <p class="text-sm bsx-alert-text">It will stay visible for {{ data.validhrs }} hour{% if data.validhrs != 1 and data.validhrs != '1' %}s{% endif %}.</p>
+            {% if data.tracking_close_behavior is defined %}
+            <p class="text-sm bsx-alert-text mt-1"><b>{{ data.tracking_mode_label }}</b> — {{ data.tracking_close_behavior }}</p>
+            {% endif %}
           </div>
         </div>
       </div>

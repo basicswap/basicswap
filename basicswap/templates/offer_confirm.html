@@ -131,6 +131,24 @@
         {{ summary_row('Contract locked', data.lockhrs ~ ' hours') }}
         {% endif %}
         {{ summary_row('Auto accept', ns.strat_label) }}
+        {% if data.tracking_mode_label is defined %}
+        {{ summary_row('Offer type', data.tracking_mode_label) }}
+        {% if data.tracking_per_swap is defined %}
+        {{ summary_row('Amount per swap', data.tracking_per_swap) }}
+        {% endif %}
+        {% if data.tracking_total is defined %}
+        {{ summary_row('Total to sell', data.tracking_total) }}
+        {% endif %}
+        {% if data.tracking_reserve is defined %}
+        {{ summary_row('Minimum wallet reserve', data.tracking_reserve) }}
+        {% endif %}
+        {% if data.tracking_fills is defined %}
+        {{ summary_row('Fills', data.tracking_fills) }}
+        {% endif %}
+        {% if data.tracking_close_behavior is defined %}
+        {{ summary_row('Closing', data.tracking_close_behavior) }}
+        {% endif %}
+        {% endif %}
         {{ summary_row('Amount variable', 'Yes' if data.amt_var == true else 'No') }}
         {% if data.debug_ui == true %}
         {{ summary_row('Rate variable', 'Yes' if data.rate_var == true else 'No') }}
@@ -191,6 +209,15 @@
   <input type="hidden" name="amt_to" value="{{ data.amt_to }}">
   <input type="hidden" name="amt_bid_min" value="{{ data.amt_bid_min }}">
   <input type="hidden" name="rate" value="{{ data.rate }}">
+  {% if data.offer_mode is defined %}
+  <input type="hidden" name="offer_mode" value="{{ data.offer_mode }}">
+  {% endif %}
+  {% if data.total_to_sell is defined %}
+  <input type="hidden" name="total_to_sell" value="{{ data.total_to_sell }}">
+  {% endif %}
+  {% if data.min_wallet_reserve is defined %}
+  <input type="hidden" name="min_wallet_reserve" value="{{ data.min_wallet_reserve }}">
+  {% endif %}
   <input type="hidden" name="validhrs" value="{{ data.validhrs }}">
   {% if data.debug_ui == true %}
   <input type="hidden" name="lockmins" value="{{ data.lockmins }}">

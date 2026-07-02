@@ -1293,7 +1293,25 @@ function initializeApp() {
     CoinPicker.fireRestored();
 
     ErrorModal.init();
+
+    OfferModeToggle.init();
 }
+
+const OfferModeToggle = {
+    init: function() {
+        const select = DOM.get('offer_mode');
+        if (!select) return;
+        const update = () => {
+            const mode = select.value;
+            const fixedFields = DOM.get('offer_mode_fixed_total_fields');
+            const standingFields = DOM.get('offer_mode_standing_fields');
+            if (fixedFields) fixedFields.classList.toggle('hidden', mode !== 'fixed_total');
+            if (standingFields) standingFields.classList.toggle('hidden', mode !== 'standing');
+        };
+        select.addEventListener('change', update);
+        update();
+    }
+};
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeApp);

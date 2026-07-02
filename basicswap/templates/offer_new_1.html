@@ -109,6 +109,39 @@
             </div>
           </div>
 
+          <!-- Offer type -->
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">Offer type</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white" for="offer_mode">How often can this offer be filled?</label>
+                <div class="relative">
+                  {{ input_down_arrow_offer_svg | safe }}
+                  <select class="pl-3 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="offer_mode" id="offer_mode">
+                    <option value="one_time"{% if data.offer_mode is not defined or data.offer_mode=="one_time" %} selected{% endif %}>One-time — fill once, then close</option>
+                    <option value="fixed_total"{% if data.offer_mode=="fixed_total" %} selected{% endif %}>Fixed total — sell up to a set total, then close</option>
+                    <option value="standing"{% if data.offer_mode=="standing" %} selected{% endif %}>Standing — keep repeating until a wallet floor</option>
+                  </select>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The <b>Amount</b> above is the amount sold per swap. One-time offers close automatically after a single swap so a variable-amount offer can't drain your wallet.</p>
+              </div>
+              <div id="offer_mode_fixed_total_fields" class="hidden">
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white" for="total_to_sell">Total to sell</label>
+                <div class="relative">
+                  <input class="pl-3 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="total_to_sell" name="total_to_sell" value="{{ data.total_to_sell }}" placeholder="0">
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Total amount to sell across all fills. Must be at least the amount per swap. The offer closes once this is reached.</p>
+              </div>
+              <div id="offer_mode_standing_fields" class="hidden">
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white" for="min_wallet_reserve">Minimum wallet reserve</label>
+                <div class="relative">
+                  <input class="pl-3 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="min_wallet_reserve" name="min_wallet_reserve" value="{{ data.min_wallet_reserve }}" placeholder="0">
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The offer is revoked automatically if the sending wallet balance would drop to or below this amount.</p>
+              </div>
+            </div>
+          </div>
+
           <!-- Addresses: network + send-from -->
           <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
             <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">Addresses</h3>

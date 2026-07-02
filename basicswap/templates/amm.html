@@ -514,8 +514,72 @@
                       <li class="break-words"><span class="font-semibold">swap_type:</span> Type of swap, defaults to "adaptor_sig"</li>
                       <li class="break-words"><span class="font-semibold">min_swap_amount:</span> Minimum purchase quantity when offer amount is variable</li>
                       <li class="break-words"><span class="font-semibold">amount_step:</span> <strong>Mandatory privacy feature</strong> that sets the offer size increment. Prevents revealing exact wallet balance by creating stepped offers. Must be >= 0.001 and <= your offer amount. Default: 0.001</li>
+                      <li class="break-words"><span class="font-semibold">offer_mode:</span> Offer lifecycle/tracking mode: <strong>"standing"</strong> (default), <strong>"one_time"</strong>, or <strong>"fixed_total"</strong> (plus <strong>"legacy"</strong>, config file only). See detailed explanation below.</li>
+                      <li class="break-words"><span class="font-semibold">total_to_sell:</span> Only used when <span class="font-semibold">offer_mode</span> is "fixed_total". Cumulative amount to sell across repeated offers before this template stops (must be >= amount)</li>
                     </ul>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <button type="button" class="collapsible-header flex items-center justify-between w-full p-3 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none" data-target="offer-tracking-faq-content">
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Offer Tracking Modes FAQ</h4>
+                <svg class="w-5 h-5 transition-transform transform text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </button>
+              <div id="offer-tracking-faq-content" class="collapsible-content mt-2 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg hidden">
+                <p class="text-sm font-bold text-gray-600 dark:text-gray-400 mb-4">
+                  The <strong>offer_mode</strong> setting controls how an offer template's lifecycle is tracked and when it stops repeating. Here are all available options:
+                </p>
+
+                <div class="space-y-4">
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Standing</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"standing"</code> (default)<br>
+                      <strong>Behavior:</strong> Repeats indefinitely. New offers are skipped while the wallet balance would drop below <strong>min_coin_from_amt</strong>, which acts as the offer's wallet reserve floor.<br>
+                      <strong>Best for:</strong> Continuous, always-on market making.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">One-time</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"one_time"</code><br>
+                      <strong>Behavior:</strong> Creates a single offer for <strong>amount</strong>. Once it is fully filled (or revoked), the template does not create another offer.<br>
+                      <strong>Best for:</strong> Selling a single, fixed batch exactly once.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Fixed total</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"fixed_total"</code><br>
+                      <strong>Behavior:</strong> Repeats, creating offers of <strong>amount</strong> each time, until the cumulative amount sold reaches <strong>total_to_sell</strong>. The amount sold so far is tracked across all swaps for the template.<br>
+                      <strong>Best for:</strong> Capped or inventory-limited selling campaigns.
+                    </p>
+                  </div>
+
+                  <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Legacy</h5>
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"legacy"</code> (config file only, not selectable in the UI)<br>
+                      <strong>Behavior:</strong> No budget/fill tracking row is created; offers repeat using the original pre-tracking behavior. A variable-amount legacy offer can be filled repeatedly until it expires or the wallet can no longer fund swaps.<br>
+                      <strong>Best for:</strong> Existing configs that should keep their current behavior unchanged. Editing a legacy template in the UI converts it to "standing".
+                    </p>
+                  </div>
+                </div>
+
+                <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <h6 class="font-semibold text-gray-900 dark:text-gray-200 mb-2">Important Notes</h6>
+                  <ul class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                    <li>• If <strong>offer_mode</strong> is not set, templates default to <strong>"standing"</strong></li>
+                    <li>• Tracking state (amount filled, fills completed) is persisted per-offer and is self-correcting: a failed or cancelled bid simply drops out of the in-flight total</li>
+                    <li>• <strong>total_to_sell</strong> is only read when <strong>offer_mode</strong> is "fixed_total", and must be greater than or equal to <strong>amount</strong></li>
+                    <li>• For "standing" offers, <strong>min_coin_from_amt</strong> doubles as the minimum wallet reserve used to decide when to stop reposting</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -852,6 +916,28 @@
 
                 <div id="add-offer-fields" class="hidden space-y-4">
                   <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label for="add-offer-mode" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Type</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="add-offer-mode" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="one_time">One-time — fill once, then close</option>
+                          <option value="fixed_total">Fixed total — sell up to a set total, then close</option>
+                          <option value="standing" selected>Standing — repeat until a wallet floor</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div id="add-offer-total-to-sell-wrap" class="hidden">
+                      <label for="add-offer-total-to-sell" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Total to Sell</label>
+                      <input type="text" id="add-offer-total-to-sell" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                      <small class="text-xs text-gray-500 dark:text-gray-400">Must be at least the offer amount. The offer closes once this total is reached.</small>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4">
 
                     <div>
                       <label for="add-offer-ratetweakpercent" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate Tweak Percent</label>
@@ -1155,6 +1241,28 @@
                 </div>
 
                 <div id="edit-offer-fields" class="hidden space-y-4">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label for="edit-offer-mode" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer Type</label>
+                      <div class="relative">
+                        <svg class="absolute top-1/2 right-3 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        <select id="edit-offer-mode" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
+                          <option value="one_time">One-time — fill once, then close</option>
+                          <option value="fixed_total">Fixed total — sell up to a set total, then close</option>
+                          <option value="standing">Standing — repeat until a wallet floor</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div id="edit-offer-total-to-sell-wrap" class="hidden">
+                      <label for="edit-offer-total-to-sell" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Total to Sell</label>
+                      <input type="text" id="edit-offer-total-to-sell" pattern="[0-9]*\.?[0-9]*" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="0.0">
+                      <small class="text-xs text-gray-500 dark:text-gray-400">Must be at least the offer amount. The offer closes once this total is reached.</small>
+                    </div>
+                  </div>
+
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label for="edit-offer-ratetweakpercent" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Rate Tweak Percent</label>

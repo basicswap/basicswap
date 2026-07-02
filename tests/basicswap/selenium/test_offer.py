@@ -13,6 +13,7 @@ from urllib.request import urlopen
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
 
 from util import get_driver
 
@@ -199,11 +200,61 @@ def test_offer(driver):
     print("Test Passed!")
 
 
+def test_offer_tracking_ui(driver):
+    node1_url = "http://localhost:12701"
+
+    driver.get(node1_url + "/newoffer")
+    time.sleep(1)
+
+    select_coin(driver, "coin_from", "Bitcoin")
+    select_coin(driver, "coin_to", "Monero")
+
+    driver.find_element(By.NAME, "amt_from").send_keys("1")
+    driver.find_element(By.NAME, "amt_to").send_keys("2")
+    time.sleep(0.5)
+
+    mode_select = Select(driver.find_element(By.ID, "offer_mode"))
+    mode_select.select_by_value("fixed_total")
+    time.sleep(0.3)
+
+    total_to_sell = driver.find_element(By.ID, "total_to_sell")
+    total_to_sell.clear()
+    total_to_sell.send_keys("5")
+
+    driver.find_element(By.NAME, "continue").click()
+    WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.NAME, "check_offer"))
+    ).click()
+
+    body_text = driver.find_element(By.TAG_NAME, "body").text
+    assert "Fixed total" in body_text, "review summary should show the offer type"
+
+    WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.NAME, "submit_offer"))
+    ).click()
+
+    offer_id = get_published_offer_id(driver)
+
+    offer_json = json.loads(urlopen(node1_url + "/json/offers/" + offer_id).read())[0]
+    assert offer_json.get("tracking_mode_str") == "Fixed total"
+    assert "tracking_total_budget" in offer_json
+    assert offer_json.get("tracking_exhausted") is False
+
+    driver.get(node1_url + "/offer/" + offer_id)
+    time.sleep(1)
+    offer_page_text = driver.find_element(By.TAG_NAME, "body").text
+    assert "Offer Type" in offer_page_text
+    assert "Fill Progress" in offer_page_text
+
+    print("Offer tracking UI test passed!")
+
+
 def run_tests():
     driver = get_driver()
     try:
         test_offer_wizard_ui(driver)
         test_offer(driver)
+        test_offer_tracking_ui(driver)
     finally:
         driver.close()
 

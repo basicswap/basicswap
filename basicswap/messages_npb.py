@@ -6,7 +6,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-
 """
 syntax = "proto3";
 
@@ -145,6 +144,9 @@ class OfferMessage(NonProtobufClass):
         19: ("proof_utxos", NPBW_BYTES, 0),
         20: ("auto_accept_type", NPBW_INT, 0),
         21: ("message_nets", NPBW_BYTES, NPBF_STR),
+        22: ("total_budget_from", NPBW_INT, 0),
+        23: ("max_fills", NPBW_INT, 0),
+        24: ("offer_flags", NPBW_INT, 0),
     }
 
 

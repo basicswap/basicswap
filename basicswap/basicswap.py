@@ -68,6 +68,19 @@ from .chainparams import (
 )
 from .contrib.websocket_server import WebsocketServer
 from .db_upgrades import upgradeDatabase, upgradeDatabaseData
+from .offer_tracking import (
+    OfferTrackingModes,
+    complete_offer_fill,
+    get_offer_tracking,
+    init_offer_tracking,
+    offer_budget_allows,
+    offer_in_flight_amount,
+    offer_tracking_is_exhausted,
+    offer_tracking_remaining,
+    offerTrackingModeFromString,
+    strOfferTrackingMode,
+    validate_offer_budget,
+)
 from .db_util import remove_expired_data
 from .http_server import HttpThread
 from .rpc import escape_rpcauth
@@ -137,6 +150,7 @@ from .db import (
     MessageLink,
     Notification,
     Offer,
+    OfferTracking,
     pack_state,
     PooledAddress,
     PrefundedTx,
@@ -173,6 +187,8 @@ MINPROTO_VERSION_SECRET_HASH = 4
 PROTOCOL_VERSION_ADAPTOR_SIG = 4
 MINPROTO_VERSION_ADAPTOR_SIG = 4
 
+PROTOCOL_VERSION_OFFER_TRACKING = 6
+
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
 
@@ -189,6 +205,9 @@ def checkAndNotifyBalanceChange(
     swap_client, coin_type, ci, cc, new_height, trigger_source="block"
 ):
     if not swap_client.ws_server:
+        return
+
+    if swap_client._is_locked is True:
         return
 
     try:
@@ -1442,6 +1461,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Re-load in-progress bids
         self.loadFromDB()
 
+        # Catch offer fills missed while the node was down
+        self.reconcileOfferTracking()
+
         # Scan inbox
         # TODO: Redundant? small window for zmq messages to go unnoticed during startup?
         options = {"encoding": "hex"}
@@ -1834,10 +1856,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.ci(c).unlockWallet(password)
                 except Exception as e:  # noqa: F841
                     self.log.warning(f"Failed to unlock wallet {getCoinName(c)}")
-                    if coin is not None or c == Coins.PART:
-                        raise
-                if c == Coins.PART:
-                    self._is_locked = False
+                    raise
+
+            if coin is None or coin == Coins.PART:
+                self._is_locked = False
 
             self.loadFromDB()
 
@@ -3677,6 +3699,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.info(f"Swap completed for bid {self.log.id(bid_id)}")
                 event_data["event"] = "swap_completed"
 
+                self.completeOfferTrackingForBid(bid_id)
+
                 if self.ws_server and show_event:
                     self.ws_server.send_message_to_all(json.dumps(event_data))
             elif event_type == NT.UPDATE_AVAILABLE:
@@ -4111,11 +4135,33 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             msg_buf = OfferMessage()
 
-            msg_buf.protocol_version = (
-                PROTOCOL_VERSION_ADAPTOR_SIG
-                if swap_type == SwapTypes.XMR_SWAP
-                else PROTOCOL_VERSION_SECRET_HASH
+            offer_mode = offerTrackingModeFromString(
+                extra_options.get("offer_mode", None)
             )
+            tracking_per_swap: int = int(extra_options.get("per_swap_amount", amount))
+            tracking_total_budget: int = int(extra_options.get("total_budget", 0))
+            tracking_max_fills: int = int(extra_options.get("max_fills", 0))
+            tracking_min_reserve: int = int(extra_options.get("min_wallet_reserve", 0))
+            if offer_mode == OfferTrackingModes.ONE_TIME:
+                tracking_total_budget = tracking_per_swap
+                tracking_max_fills = 1
+            elif offer_mode == OfferTrackingModes.STANDING:
+                tracking_total_budget = 0
+                tracking_max_fills = 0
+
+            msg_buf.protocol_version = (
+                PROTOCOL_VERSION_OFFER_TRACKING
+                if offer_mode != OfferTrackingModes.LEGACY
+                else (
+                    PROTOCOL_VERSION_ADAPTOR_SIG
+                    if swap_type == SwapTypes.XMR_SWAP
+                    else PROTOCOL_VERSION_SECRET_HASH
+                )
+            )
+            if offer_mode != OfferTrackingModes.LEGACY:
+                msg_buf.offer_flags = int(offer_mode)
+                msg_buf.total_budget_from = int(tracking_total_budget)
+                msg_buf.max_fills = int(tracking_max_fills)
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
@@ -4303,6 +4349,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.add(offer, cursor)
             self.add(SentOffer(offer_id=offer_id), cursor)
+
+            if offer_mode != OfferTrackingModes.LEGACY:
+                init_offer_tracking(
+                    self,
+                    offer_id,
+                    offer_mode,
+                    tracking_per_swap,
+                    cursor,
+                    total_budget=tracking_total_budget,
+                    max_fills=tracking_max_fills,
+                    min_wallet_reserve=tracking_min_reserve,
+                    now=offer_created_at,
+                )
         finally:
             self.closeDB(cursor)
         self.log.info(f"Sent OFFER {self.log.id(offer_id)}")
@@ -4353,6 +4412,171 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
         finally:
             self.closeDB(cursor, commit=False)
+
+    def completeOfferTrackingForBid(self, bid_id: bytes) -> None:
+        exhausted: bool = False
+        offer_id = None
+        was_sent: bool = False
+        try:
+            cursor = self.openDB()
+            try:
+                bid, offer = self.getBidAndOffer(bid_id, cursor, with_txns=False)
+                if bid is None or offer is None:
+                    return
+                if not offer.was_sent:
+                    return
+                if get_offer_tracking(self, offer.offer_id, cursor) is None:
+                    return
+                offer_id = offer.offer_id
+                was_sent = bool(offer.was_sent)
+                active = offer.active_ind == 1
+                exhausted = complete_offer_fill(
+                    self, offer.offer_id, bid.amount, cursor
+                )
+            finally:
+                self.closeDB(cursor)
+        except Exception as e:
+            self.log.error(f"Offer tracking completion failed: {e}")
+            return
+
+        if exhausted and was_sent and active and offer_id is not None:
+            try:
+                self.log.info(f"Auto-revoking exhausted offer {self.log.id(offer_id)}")
+                self.revokeOffer(offer_id)
+            except Exception as e:
+                self.log.warning(f"Auto-revoke after fill failed: {e}")
+
+    def checkStandingOfferWalletFloors(self) -> None:
+        to_check = []
+        try:
+            cursor = self.openDB()
+            try:
+                rows = cursor.execute(
+                    """SELECT ot.offer_id, o.coin_from, ot.min_wallet_reserve
+                       FROM offer_tracking ot
+                       JOIN offers o ON o.offer_id = ot.offer_id
+                       WHERE ot.mode = :standing AND ot.min_wallet_reserve > 0
+                         AND o.active_ind = 1 AND o.was_sent = 1""",
+                    {"standing": int(OfferTrackingModes.STANDING)},
+                ).fetchall()
+                for row in rows:
+                    to_check.append((row[0], row[1], row[2]))
+            finally:
+                self.closeDB(cursor)
+        except Exception as e:
+            self.log.debug(f"checkStandingOfferWalletFloors query failed: {e}")
+            return
+
+        for offer_id, coin_from, min_reserve in to_check:
+            try:
+                ci = self.ci(Coins(coin_from))
+                balance: int = ci.getSpendableBalance()
+                if balance <= min_reserve:
+                    self.log.info(
+                        "Revoking standing offer {}, wallet balance {} <= floor {}".format(
+                            self.log.id(offer_id),
+                            ci.format_amount(balance),
+                            ci.format_amount(min_reserve),
+                        )
+                    )
+                    self.revokeOffer(offer_id)
+            except Exception as e:
+                self.log.debug(
+                    f"Standing offer floor check failed for {self.log.id(offer_id)}: {e}"
+                )
+
+    def getOfferTrackingSummary(self, offer, cursor=None) -> dict:
+        use_cursor = self.openDB(cursor)
+        try:
+            row = get_offer_tracking(self, offer.offer_id, use_cursor)
+            if row is None:
+                return None
+            in_flight: int = self.getOfferInFlightAmount(offer, use_cursor)
+            remaining = offer_tracking_remaining(row, in_flight)
+            exhausted = offer_tracking_is_exhausted(row, in_flight)
+            return {
+                "mode": int(row.mode),
+                "mode_str": strOfferTrackingMode(row.mode),
+                "per_swap_amount": int(row.per_swap_amount or 0),
+                "total_budget": int(row.total_budget or 0),
+                "filled_amount": int(row.filled_amount or 0),
+                "fills_completed": int(row.fills_completed or 0),
+                "max_fills": int(row.max_fills or 0),
+                "min_wallet_reserve": int(row.min_wallet_reserve or 0),
+                "in_flight_amount": int(in_flight),
+                "remaining": None if remaining is None else int(remaining),
+                "exhausted": bool(exhausted),
+            }
+        finally:
+            self.closeDB(use_cursor, commit=False)
+
+    def validateOfferWalletFloor(
+        self, offer, bid_amount: int, cursor, exclude_bid_id=None
+    ) -> None:
+        if not offer.was_sent:
+            return
+        row = get_offer_tracking(self, offer.offer_id, cursor)
+        if row is None or int(row.mode) != OfferTrackingModes.STANDING:
+            return
+        floor: int = row.min_wallet_reserve or 0
+        if floor <= 0:
+            return
+        try:
+            ci = self.ci(Coins(offer.coin_from))
+            balance: int = ci.getSpendableBalance()
+        except Exception as e:
+            self.log.warning(f"Wallet floor check unavailable: {e}")
+            return
+        in_flight: int = self.getOfferInFlightAmount(offer, cursor, exclude_bid_id)
+        if balance - in_flight - int(bid_amount) < floor:
+            raise ValueError("Bid would take wallet below the offer's reserve floor")
+
+    def reconcileOfferTracking(self) -> None:
+        to_revoke = []
+        try:
+            cursor = self.openDB()
+            try:
+                rows = cursor.execute(
+                    """SELECT b.offer_id, SUM(b.amount), COUNT(*) FROM bids b
+                       JOIN offer_tracking ot ON ot.offer_id = b.offer_id
+                       JOIN offers o ON o.offer_id = b.offer_id AND o.was_sent = 1
+                       WHERE b.active_ind = 1 AND b.state = :completed
+                       GROUP BY b.offer_id""",
+                    {"completed": int(BidStates.SWAP_COMPLETED)},
+                ).fetchall()
+                for offer_id, total_amount, num_fills in rows:
+                    row = get_offer_tracking(self, offer_id, cursor)
+                    if row is None:
+                        continue
+                    if (row.filled_amount or 0) >= int(total_amount) and (
+                        row.fills_completed or 0
+                    ) >= int(num_fills):
+                        continue
+                    self.log.warning(
+                        f"Reconciling missed fills for offer {self.log.id(offer_id)}"
+                    )
+                    row.filled_amount = max(row.filled_amount or 0, int(total_amount))
+                    row.fills_completed = max(row.fills_completed or 0, int(num_fills))
+                    row.updated_at = int(time.time())
+                    self.updateDB(row, cursor, ["offer_id"])
+                    if offer_tracking_is_exhausted(row, in_flight=0):
+                        offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
+                        if offer is not None and offer.active_ind == 1:
+                            to_revoke.append(offer_id)
+            finally:
+                self.closeDB(cursor)
+        except Exception as e:
+            self.log.warning(f"reconcileOfferTracking failed: {e}")
+            return
+
+        for offer_id in to_revoke:
+            try:
+                self.log.info(
+                    f"Auto-revoking exhausted offer {self.log.id(offer_id)} after reconciliation"
+                )
+                self.revokeOffer(offer_id)
+            except Exception as e:
+                self.log.warning(f"Auto-revoke after reconciliation failed: {e}")
 
     def archiveOffer(self, offer_id) -> None:
         self.log.info(f"Archiving offer {self.log.id(offer_id)}")
@@ -5617,6 +5841,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid.protocol_version >= MINPROTO_VERSION_SECRET_HASH,
                 "Incompatible bid protocol version",
             )
+
+            validate_offer_budget(
+                self,
+                offer,
+                bid.amount,
+                use_cursor,
+                in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
+            )
+            self.validateOfferWalletFloor(offer, bid.amount, use_cursor, bid_id)
+
             if bid.contract_count is None:
                 bid.contract_count = self.getNewContractId(use_cursor)
 
@@ -6477,6 +6711,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             ensure(offer.expire_at > now, "Offer has expired")
 
+            validate_offer_budget(
+                self,
+                offer,
+                bid.amount,
+                use_cursor,
+                in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
+            )
+            self.validateOfferWalletFloor(offer, bid.amount, use_cursor, bid_id)
+
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
             coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
             coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
@@ -6806,6 +7049,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
+
+            validate_offer_budget(
+                self,
+                offer,
+                bid.amount,
+                use_cursor,
+                in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
+            )
+            self.validateOfferWalletFloor(offer, bid.amount, use_cursor, bid_id)
 
             # Bid is reversed
             coin_from = Coins(offer.coin_to)
@@ -10520,6 +10772,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 self.add(offer, cursor)
 
+                if offer_data.protocol_version >= PROTOCOL_VERSION_OFFER_TRACKING:
+                    try:
+                        recv_mode = OfferTrackingModes(int(offer_data.offer_flags))
+                    except Exception:
+                        recv_mode = OfferTrackingModes.LEGACY
+                    if recv_mode != OfferTrackingModes.LEGACY:
+                        self.add(
+                            OfferTracking(
+                                offer_id=offer_id,
+                                active_ind=1,
+                                mode=int(recv_mode),
+                                per_swap_amount=int(offer_data.amount_from),
+                                total_budget=int(offer_data.total_budget_from),
+                                filled_amount=0,
+                                reserved_amount=0,
+                                max_fills=int(offer_data.max_fills),
+                                fills_completed=0,
+                                min_wallet_reserve=0,
+                                created_at=msg["sent"],
+                                updated_at=msg["sent"],
+                            ),
+                            cursor,
+                        )
+
                 if offer.swap_type == SwapTypes.XMR_SWAP:
                     xmr_offer = XmrOffer()
 
@@ -10645,6 +10921,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             total_value += amount
         return bids, total_value
 
+    def getOfferInFlightAmount(self, offer, cursor, exclude_bid_id=None) -> int:
+        """Total amount of accepted-but-not-completed bids for offer."""
+        return offer_in_flight_amount(
+            cursor,
+            offer.offer_id,
+            (ActionTypes.ACCEPT_BID, ActionTypes.ACCEPT_XMR_BID),
+            exclude_bid_id,
+        )
+
     def evaluateKnownIdentityForAutoAccept(self, strategy, identity_stats) -> bool:
         if identity_stats:
             if (
@@ -10726,6 +11011,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             if bid_amount < offer.min_bid_amount:
                 raise AutomationConstraint("Bid amount below offer minimum")
+
+            offer_in_flight: int = self.getOfferInFlightAmount(
+                offer, use_cursor, bid.bid_id
+            )
+            if not offer_budget_allows(
+                self, offer.offer_id, bid_amount, use_cursor, in_flight=offer_in_flight
+            ):
+                raise AutomationConstraint(
+                    "Offer budget exhausted or bid over remaining budget"
+                )
+            try:
+                self.validateOfferWalletFloor(offer, bid_amount, use_cursor, bid.bid_id)
+            except ValueError:
+                raise AutomationConstraint(
+                    "Bid would take wallet below the offer's reserve floor"
+                )
 
             if opts.get("exact_rate_only", False) is True:
                 if not self.ratesMatch(bid_rate, offer.rate, offer.rate):
@@ -13634,6 +13935,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.expireMessageRoutes()
                 self.expireDBRecords()
                 self.checkAcceptedBids()
+                self.checkStandingOfferWalletFloors()
                 self._last_checked_expired = now
 
                 if self._wallet_manager:

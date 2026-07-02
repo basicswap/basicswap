@@ -176,6 +176,15 @@
   {% if data.rate_var==true %}
   <input type="hidden" name="rate_var" value="rv">
   {% endif %}
+  {% if data.offer_mode is defined %}
+  <input type="hidden" name="offer_mode" value="{{ data.offer_mode }}">
+  {% endif %}
+  {% if data.total_to_sell is defined %}
+  <input type="hidden" name="total_to_sell" value="{{ data.total_to_sell }}">
+  {% endif %}
+  {% if data.min_wallet_reserve is defined %}
+  <input type="hidden" name="min_wallet_reserve" value="{{ data.min_wallet_reserve }}">
+  {% endif %}
   </form>
 </div>
 <script src="static/js/pages/offer-new-page.js?v={{ static_v }}"></script>

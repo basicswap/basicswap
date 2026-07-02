@@ -501,6 +501,38 @@ def js_offers(self, url_split, post_string, is_json, sent=False) -> bytes:
             "message_nets": o.message_nets,
         }
         offer_data["auto_accept_type"] = getattr(o, "auto_accept_type", 0)
+
+        try:
+            tracking = swap_client.getOfferTrackingSummary(o)
+        except Exception as e:
+            swap_client.log.debug(
+                f"getOfferTrackingSummary failed for {o.offer_id.hex()}: {e}"
+            )
+            tracking = None
+        if tracking is not None:
+            offer_data["tracking_mode"] = tracking["mode"]
+            offer_data["tracking_mode_str"] = tracking["mode_str"]
+            offer_data["tracking_exhausted"] = tracking["exhausted"]
+            offer_data["tracking_fills_completed"] = tracking["fills_completed"]
+            offer_data["tracking_max_fills"] = tracking["max_fills"]
+            offer_data["tracking_filled_amount"] = ci_from.format_amount(
+                tracking["filled_amount"]
+            )
+            offer_data["tracking_total_budget"] = ci_from.format_amount(
+                tracking["total_budget"]
+            )
+            offer_data["tracking_in_flight_amount"] = ci_from.format_amount(
+                tracking["in_flight_amount"]
+            )
+            if tracking["remaining"] is not None:
+                offer_data["tracking_remaining"] = ci_from.format_amount(
+                    tracking["remaining"]
+                )
+            if tracking["min_wallet_reserve"] > 0:
+                offer_data["tracking_min_wallet_reserve"] = ci_from.format_amount(
+                    tracking["min_wallet_reserve"]
+                )
+
         if with_extra_info:
             offer_data["amount_negotiable"] = o.amount_negotiable
             offer_data["rate_negotiable"] = o.rate_negotiable
@@ -950,7 +982,7 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
     try:
         reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
         conf_target = (
-            ci_from._conf_target if coin_from not in (Coins.XMR, Coins.WOW) else 2
+            ci_from.getConfTarget() if coin_from not in (Coins.XMR, Coins.WOW) else 2
         )
         from_fee_override, fee_src = swap_client.getFeeRateForCoin(
             coin_from, conf_target

@@ -12,7 +12,7 @@ import time
 from enum import IntEnum, auto
 from typing import Optional
 
-CURRENT_DB_VERSION = 36
+CURRENT_DB_VERSION = 37
 CURRENT_DB_DATA_VERSION = 9
 
 
@@ -771,6 +771,23 @@ class NetworkPortal(Table):
     num_issues = Column("integer")
 
     created_at = Column("integer")
+
+
+class OfferTracking(Table):
+    __tablename__ = "offer_tracking"
+
+    offer_id = Column("blob", primary_key=True)
+    active_ind = Column("integer")
+    mode = Column("integer")  # OfferTrackingModes
+    per_swap_amount = Column("integer")  # Amount sold per swap / chunk
+    total_budget = Column("integer")  # Total amount allowed to sell (0 == unlimited)
+    filled_amount = Column("integer")  # Amount completed successfully
+    reserved_amount = Column("integer")  # Amount reserved by in-flight accepted bids
+    max_fills = Column("integer")  # Maximum successful fills (0 == unlimited)
+    fills_completed = Column("integer")  # Number of successful fills so far
+    min_wallet_reserve = Column("integer")  # STANDING wallet floor
+    created_at = Column("integer")
+    updated_at = Column("integer")
 
 
 def extract_schema(input_globals: dict = None) -> dict:
