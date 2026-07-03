@@ -485,7 +485,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 except Exception:
                     self._core_version = "electrum"
             else:
-                self._core_version = self.rpc("getnetworkinfo")["version"]
+                self._core_version = self.rpc("getnetworkinfo", timeout=30)["version"]
         return self._core_version
 
     def getElectrumServer(self) -> str:
