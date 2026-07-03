@@ -8,9 +8,65 @@
 import json
 import logging
 import os
+import subprocess
+import sys
+import threading
 import urllib
 from urllib.request import urlopen
 from basicswap.util import toBool as make_boolean  # noqa: F401
+
+
+def _tee_stream(src, dst, buf):
+    # Drain a subprocess pipe, echoing each line to dst and accumulating it.
+    for line in src:
+        dst.write(line)
+        dst.flush()
+        buf.append(line)
+
+
+def run_prepare_subprocess(args, env=None, expect_code: int = 0, timeout: int = 600):
+    # Run basicswap-prepare in a subprocess so its import-time env reads are
+    # always fresh, regardless of what has imported the module in-process.
+    # args: without the program name (argv[1:] equivalent).
+    # stdout/stderr are streamed to the caller's console (tee) while also being
+    # captured, so the returned CompletedProcess keeps them as separate strings.
+    proc = subprocess.Popen(
+        [sys.executable, "-u", "-m", "basicswap.bin.prepare"] + args,
+        env=os.environ.copy() if env is None else env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    out_buf, err_buf = [], []
+    t_out = threading.Thread(
+        target=_tee_stream, args=(proc.stdout, sys.stdout, out_buf)
+    )
+    t_err = threading.Thread(
+        target=_tee_stream, args=(proc.stderr, sys.stderr, err_buf)
+    )
+    t_out.start()
+    t_err.start()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        raise
+    finally:
+        t_out.join()
+        t_err.join()
+        proc.stdout.close()
+        proc.stderr.close()
+
+    result = subprocess.CompletedProcess(
+        proc.args, proc.returncode, "".join(out_buf), "".join(err_buf)
+    )
+    if result.returncode != expect_code:
+        raise RuntimeError(
+            f"basicswap-prepare exited {result.returncode}, expected {expect_code}:\n"
+            + result.stderr
+        )
+    return result
 
 PORT_OFS = int(os.getenv("PORT_OFS", 1))
 UI_PORT = 12700 + PORT_OFS

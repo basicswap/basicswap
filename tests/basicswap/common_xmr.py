@@ -14,14 +14,13 @@ import signal
 import sys
 import threading
 import unittest
-from io import StringIO
 from urllib.request import urlopen
 from unittest.mock import patch
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.rpc_xmr import callrpc_xmr
 from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import waitForServer
+from tests.basicswap.util import run_prepare_subprocess, waitForServer
 from tests.basicswap.common import (
     BASE_PORT,
     BASE_RPC_PORT,
@@ -171,15 +170,7 @@ def run_prepare(
     os.environ["DOGE_PORT"] = str(DOGE_BASE_PORT)
     os.environ["DOGE_RPC_PORT"] = str(DOGECOIN_RPC_PORT_BASE)
 
-    import basicswap.bin.prepare as prepareSystem
-
-    # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
-    from importlib import reload
-
-    prepareSystem = reload(prepareSystem)
-
     testargs = [
-        "basicswap-prepare",
         f'-datadir="{datadir_path}"',
         f'-bindir="{bins_path}"',
         f"-portoffset={(node_id + port_ofs)}",
@@ -195,16 +186,14 @@ def run_prepare(
     keysdirpath = os.getenv("PGP_KEYS_DIR_PATH", None)
     if keysdirpath is not None:
         testargs.append('-keysdirpath="' + os.path.expanduser(keysdirpath) + '"')
-    with (
-        patch.object(sys, "argv", testargs),
-        patch("sys.stdout", new=StringIO()) as mocked_stdout,
-    ):
-        prepareSystem.main()
-        lines = mocked_stdout.getvalue().split("\n")
-        if mnemonic_in is None:
-            mnemonic_out = lines[-4]
-        else:
-            mnemonic_out = mnemonic_in
+
+    result = run_prepare_subprocess(testargs)
+    if mnemonic_in is None:
+        lines = result.stdout.split("\n")
+        marker = "IMPORTANT - Save your particl wallet recovery phrase:"
+        mnemonic_out = lines[lines.index(marker) + 1]
+    else:
+        mnemonic_out = mnemonic_in
 
     with open(config_path) as fs:
         settings = json.load(fs)
