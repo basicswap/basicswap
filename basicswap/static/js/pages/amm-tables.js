@@ -997,30 +997,6 @@ const AmmTablesManager = (function() {
             item.addEventListener('click', function() {
                 select.value = this.getAttribute('data-value');
 
-                const selectedOption = select.options[select.selectedIndex];
-                const selectedCoinName = selectedOption.textContent.trim();
-                const selectedBalance = selectedOption.getAttribute('data-balance') || '0.00000000';
-                const selectedPendingBalance = selectedOption.getAttribute('data-pending-balance') || '';
-
-                icon.src = itemIcon.src;
-
-                if (showBalance) {
-                    let html = `
-                        <div class="text-gray-900 dark:text-white">${selectedCoinName}</div>
-                        <div class="text-gray-500 dark:text-gray-400 text-xs">Balance: ${selectedBalance}</div>
-                    `;
-
-                    if (selectedPendingBalance && parseFloat(selectedPendingBalance) > 0) {
-                        html += `<div class="text-green-500 text-xs">+${selectedPendingBalance} pending</div>`;
-                    }
-
-                    textContainer.innerHTML = html;
-                    textContainer.className = 'flex-grow text-left flex flex-col justify-center';
-                } else {
-                    textContainer.textContent = selectedCoinName;
-                    textContainer.className = 'flex-grow text-left';
-                }
-
                 dropdown.classList.add('hidden');
 
                 const event = new Event('change', { bubbles: true });
@@ -1030,8 +1006,12 @@ const AmmTablesManager = (function() {
             dropdown.appendChild(item);
         });
 
-        const selectedOption = select.options[select.selectedIndex];
-        if (selectedOption) {
+        function updateButtonDisplay() {
+            const selectedOption =
+                select.options[select.selectedIndex] || select.options[0];
+            if (!selectedOption) {
+                return;
+            }
             const selectedCoinName = selectedOption.textContent.trim();
             const selectedBalance = selectedOption.getAttribute('data-balance') || '0.00000000';
             const selectedPendingBalance = selectedOption.getAttribute('data-pending-balance') || '';
@@ -1055,6 +1035,21 @@ const AmmTablesManager = (function() {
                 textContainer.className = 'flex-grow text-left';
             }
         }
+
+        icon.addEventListener('error', function() {
+            icon.style.display = 'none';
+        });
+        icon.addEventListener('load', function() {
+            icon.style.display = '';
+        });
+
+        if (select._simpleDropdownChangeHandler) {
+            select.removeEventListener('change', select._simpleDropdownChangeHandler);
+        }
+        select._simpleDropdownChangeHandler = updateButtonDisplay;
+        select.addEventListener('change', updateButtonDisplay);
+
+        updateButtonDisplay();
 
         button.addEventListener('click', function() {
             dropdown.classList.toggle('hidden');

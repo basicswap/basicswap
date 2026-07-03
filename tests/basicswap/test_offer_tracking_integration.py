@@ -102,9 +102,7 @@ class OfferTrackingIntegrationTest(unittest.TestCase):
             self._add_bid(db, cursor, b"\xa2" * 28, oid, 2_00000000, STATE_COMPLETED)
             self._add_bid(db, cursor, b"\xa3" * 28, oid, 3_00000000, STATE_FAILED)
 
-            # Only the in-progress bid contributes.
             self.assertEqual(self._in_flight(cursor, oid), 1_00000000)
-            # Excluding it yields zero.
             self.assertEqual(
                 self._in_flight(cursor, oid, exclude_bid_id=b"\xa1" * 28), 0
             )
@@ -119,14 +117,12 @@ class OfferTrackingIntegrationTest(unittest.TestCase):
             self._add_offer(db, cursor, oid)
             init_offer_tracking(db, oid, OfferTrackingModes.ONE_TIME, per_swap, cursor)
 
-            # First bid accepted and in-progress.
             self._add_bid(db, cursor, b"\xb1" * 28, oid, per_swap, STATE_IN_PROGRESS)
 
             offer = db.queryOne(Offer, cursor, {"offer_id": oid})
             in_flight = self._in_flight(cursor, oid, exclude_bid_id=b"\xb2" * 28)
             self.assertEqual(in_flight, per_swap)
 
-            # A second concurrent bid must be rejected (budget already reserved).
             self.assertFalse(
                 offer_budget_allows(db, oid, per_swap, cursor, in_flight=in_flight)
             )

@@ -923,7 +923,9 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   window.confirmPopup = function(action = 'Abandon') {
-    triggerElement = document.activeElement;
+    if (!triggerElement || !triggerElement.form) {
+      triggerElement = document.activeElement;
+    }
     const title = `Confirm ${action} Bid`;
     const showBidDetails = action.toLowerCase() === 'accept';
 
