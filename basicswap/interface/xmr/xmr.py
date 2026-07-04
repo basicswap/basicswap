@@ -120,6 +120,7 @@ class XMRInterface(CoinInterface):
         self._wallet_password = None
         self._have_checked_seed = False
         self._wallet_filename = coin_settings.get("wallet_name", "swap_wallet")
+        self._cached_main_wallet_address = None
 
         daemon_login = None
         if coin_settings.get("rpcuser", "") != "":
@@ -217,6 +218,28 @@ class XMRInterface(CoinInterface):
             raise ValueError("generate_from_keys failed")
 
     def openWallet(self, filename):
+        is_default: bool = filename == self._wallet_filename
+        if is_default and self._cached_main_wallet_address is not None:
+            try:
+                if (
+                    self.rpc_wallet("get_address")["address"]
+                    == self._cached_main_wallet_address
+                ):
+                    return
+            except Exception:
+                pass
+
+        self._openWallet(filename)
+
+        if is_default:
+            try:
+                self._cached_main_wallet_address = self.rpc_wallet("get_address")[
+                    "address"
+                ]
+            except Exception:
+                pass
+
+    def _openWallet(self, filename):
         params = {"filename": filename}
         if self._wallet_password is not None:
             params["password"] = self._wallet_password
