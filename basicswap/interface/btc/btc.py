@@ -682,7 +682,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return
 
         if self._use_descriptors:
-            self._log.info("Importing descriptors")
+            self._log.info(
+                "Importing descriptors. Using {} paths".format(
+                    "legacy" if self._use_legacy_key_paths is True else "bip44"
+                )
+            )
             ek = ExtKeyPair()
             ek.set_seed(key_bytes)
             ek_encoded: str = self.encode_secret_extkey(ek.encode_v())
@@ -967,15 +971,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             if descriptor is None:
                 self._log.debug("Could not find active descriptor.")
                 return "Not found"
-            start = descriptor["desc"].find("]")
-            if start < 3:
-                return "Could not parse descriptor"
-            descriptor = descriptor["desc"][start + 1 :]
+            desc = descriptor["desc"]
+            origin_end = desc.find("]")
+            if origin_end >= 0:
+                start = origin_end + 1
+            else:
+                start = desc.find("(") + 1
+            inner = desc[start:]
 
-            end = descriptor.find("/")
+            end = inner.find("/")
             if end < 10:
                 return "Could not parse descriptor"
-            extkey = descriptor[:end]
+            extkey = inner[:end]
 
             extkey_data = b58decode(extkey)[4:-4]
             extkey_data_hash: bytes = hash160(extkey_data)
@@ -1199,9 +1206,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return hash160(pk)
 
     def getSeedHash(self, seed: bytes) -> bytes:
+        if self._connection_type == "electrum":
+            ek = ExtKeyPair()
+            ek.set_seed(seed)
+            return hash160(ek.encode_p())
+
         if self._use_descriptors:
             ek = ExtKeyPair()
             ek.set_seed(seed)
+
+            if self._use_legacy_key_paths is False:
+                path = self.getWalletAccountPath()
+                ek = ek.derive_path(path)
             return hash160(ek.encode_p())
 
         return self.getAddressHashFromKey(seed)[::-1]

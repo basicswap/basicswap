@@ -880,6 +880,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Passthrough settings
         for setting_name in (
             "use_descriptors",
+            "use_legacy_key_paths",
             "wallet_name",
             "watch_wallet_name",
             "mweb_wallet_name",
@@ -3198,10 +3199,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         finally:
             self._read_zmq_queue = True
 
-    def storeSeedIDForCoin(self, root_key, coin_type, cursor=None) -> None:
+    def storeSeedIDForCoin(self, root_key: bytes, coin_type, cursor=None) -> None:
         ci = self.ci(coin_type)
         db_key_coin_name = ci.coin_name().lower()
-        seed_id = ci.getSeedHash(root_key)
+        seed_id: bytes = ci.getSeedHash(root_key)
 
         key_str = "main_wallet_seedid_" + db_key_coin_name
         self.setStringKV(key_str, seed_id.hex(), cursor)
@@ -3248,11 +3249,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci.initialiseWallet(key_view, key_spend)
             root_address = ci.getAddressFromKeys(key_view, key_spend)
 
+            if ci.getMainWalletAddress() != root_address:
+                raise ValueError("Wallet main address mismatch!")
+
             key_str = "main_wallet_addr_" + db_key_coin_name
             self.setStringKV(key_str, root_address)
             return
 
-        root_key = self.getWalletKey(interface_type, 1)
+        root_key: bytes = self.getWalletKey(interface_type, 1)
         try:
             ci.initialiseWallet(root_key, restore_time)
         except Exception as e:
@@ -3263,6 +3267,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.debug:
                 self.log.error(traceback.format_exc())
             return
+
+        if ci._connection_type != "electrum":
+            expect_seed_id: bytes = ci.getSeedHash(root_key)
+            wallet_seed_id = ci.getWalletSeedID()
+            if expect_seed_id.hex() != wallet_seed_id:
+                raise ValueError("Wallet seed id mismatch!")
 
         try:
             cursor = self.openDB()
@@ -4790,10 +4800,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if len(ci.rpc("listwallets")) < 1:
                 self.log.warning(f"Missing wallet for coin {ci.coin_name()}")
                 return False
-        try:
-            wallet_seedid = ci.getWalletSeedID()
-        except Exception:
-            wallet_seedid = None
+
         if ci.checkExpectedSeed(expect_seedid):
             ci.setWalletSeedWarning(False)
             return True
@@ -4821,7 +4828,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"checkWalletSeed {ci.coin_name()}: computed electrum={electrum_seedid[:16]}..., rpc={rpc_seedid[:16]}..."
                     )
-
+                    try:
+                        wallet_seedid = ci.getWalletSeedID()
+                    except Exception:
+                        wallet_seedid = None
                     if wallet_seedid in (electrum_seedid, rpc_seedid):
                         self.log.info(
                             f"Auto-fixing seed ID for {ci.coin_name()} - wallet matches computed format"
