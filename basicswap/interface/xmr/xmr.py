@@ -582,6 +582,14 @@ class XMRInterface(CoinInterface):
                 current_height = None  # If the transfer is available it will be deep enough
                 #   and (current_height is None or current_height - transfer['block_height'] > cb_block_confirmed):
             """
+            try:
+                open_wallet_addr = self.rpc_wallet("get_address")["address"]
+            except Exception:
+                open_wallet_addr = "UNKNOWN"
+            if open_wallet_addr != address_b58:
+                raise TemporaryError(
+                    f"findTxB open wallet {open_wallet_addr} does not match swap shared wallet {address_b58}; refusing to check coin B lock amount"
+                )
             params = {"transfer_type": "available"}
             transfers = self.rpc_wallet("incoming_transfers", params)
             rv = None
@@ -694,6 +702,14 @@ class XMRInterface(CoinInterface):
             self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
             rv = self.rpc_wallet("get_balance")
+            try:
+                open_wallet_addr = self.rpc_wallet("get_address")["address"]
+            except Exception:
+                open_wallet_addr = "UNKNOWN"
+            if open_wallet_addr != address_b58:
+                raise TemporaryError(
+                    f"spendBLockTx open wallet {open_wallet_addr} does not match swap shared wallet {address_b58}; refusing to spend coin B lock"
+                )
             if rv["balance"] < cb_swap_value:
                 self._log.warning("Balance is too low, checking for existing spend.")
                 txns = self.rpc_wallet("get_transfers", {"out": True})
@@ -857,11 +873,12 @@ class XMRInterface(CoinInterface):
         if old_password != "":
             self._wallet_password = old_password
         try:
-            self.openWallet(self._wallet_filename)
-            self.rpc_wallet(
-                "change_wallet_password",
-                {"old_password": old_password, "new_password": new_password},
-            )
+            with self._mx_wallet:
+                self.openWallet(self._wallet_filename)
+                self.rpc_wallet(
+                    "change_wallet_password",
+                    {"old_password": old_password, "new_password": new_password},
+                )
         except Exception as e:  # noqa: F841
             self._wallet_password = orig_password
             raise
@@ -879,11 +896,12 @@ class XMRInterface(CoinInterface):
 
     def isAddressMine(self, address: str) -> bool:
         try:
-            self.openWallet(self._wallet_filename)
-            self.rpc_wallet(
-                "get_address_index",
-                {"address": address},
-            )
+            with self._mx_wallet:
+                self.openWallet(self._wallet_filename)
+                self.rpc_wallet(
+                    "get_address_index",
+                    {"address": address},
+                )
             return True
         except Exception as e:  # noqa: F841
             pass
