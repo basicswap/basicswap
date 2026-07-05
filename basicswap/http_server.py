@@ -58,7 +58,14 @@ from .ui.page_automation import (
     page_automation_strategy_new,
 )
 
-from .ui.page_amm import page_amm, amm_status_api, amm_autostart_api, amm_debug_api
+from .ui.page_amm import (
+    page_amm,
+    amm_status_api,
+    amm_autostart_api,
+    amm_debug_api,
+    amm_config_api,
+    amm_state_api,
+)
 from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
 from .ui.page_tor import page_tor, get_tor_established_state
@@ -1016,6 +1023,28 @@ class HttpHandler(BaseHTTPRequestHandler):
                         )
                         self.putHeaders(200, "application/json")
                         return json.dumps(debug_data).encode("utf-8")
+                    elif len(url_split) > 2 and url_split[2] == "config":
+                        query_params = {}
+                        if parsed.query:
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        config_result = amm_config_api(
+                            swap_client, post_string, query_params
+                        )
+                        self.putHeaders(200, "application/json")
+                        return json.dumps(config_result).encode("utf-8")
+                    elif len(url_split) > 2 and url_split[2] == "state":
+                        query_params = {}
+                        if parsed.query:
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        state_result = amm_state_api(
+                            swap_client, post_string, query_params
+                        )
+                        self.putHeaders(200, "application/json")
+                        return json.dumps(state_result).encode("utf-8")
                     return page_amm(self, url_split, post_string)
                 if page == "shutdown":
                     return self.page_shutdown(url_split, post_string)

@@ -764,6 +764,7 @@ def process_offers(args, config, script_state) -> None:
                 continue
 
             sold_by_offer = template_tracking.setdefault("sold_by_offer", {})
+            sold_by_offer_snapshot = dict(sold_by_offer)
             template_exhausted = False
             template_in_flight = 0.0
             for prev_offer in prev_template_offers:
@@ -789,6 +790,9 @@ def process_offers(args, config, script_state) -> None:
                 except Exception as e:
                     if args.debug:
                         print(f"Error checking exhaustion for {prev_offer_id}: {e}")
+
+            if sold_by_offer != sold_by_offer_snapshot:
+                write_state(args.statefile, script_state)
 
             total_sold = round(sum(sold_by_offer.values()), 8)
             if template_offer_mode == "fixed_total":

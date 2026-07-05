@@ -4413,6 +4413,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         finally:
             self.closeDB(cursor, commit=False)
 
+        if self.ws_server:
+            self.ws_server.send_message_to_all(
+                json.dumps({"event": "offer_revoked", "offer_id": offer_id.hex()})
+            )
+
     def completeOfferTrackingForBid(self, bid_id: bytes) -> None:
         exhausted: bool = False
         offer_id = None
@@ -10851,6 +10856,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         msg_data.from_bytes(msg_bytes)
 
         now: int = self.getTime()
+        revoked: bool = False
         try:
             cursor = self.openDB()
 
@@ -10892,8 +10898,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "offer_id",
                 ],
             )
+            revoked = True
         finally:
             self.closeDB(cursor)
+
+        if revoked and self.ws_server:
+            self.ws_server.send_message_to_all(
+                json.dumps(
+                    {
+                        "event": "offer_revoked",
+                        "offer_id": msg_data.offer_msg_id.hex(),
+                    }
+                )
+            )
 
     def getCompletedAndActiveBidsValue(self, offer, cursor):
         bids = []
@@ -13740,6 +13757,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         bids_expired: int = 0
         offers_expired: int = 0
+        expired_offer_ids = []
         try:
             cursor = self.openDB()
 
@@ -13814,6 +13832,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         },
                     )
                     offers_expired += 1
+                    expired_offer_ids.append(offer_id)
         finally:
             self.closeDB(cursor)
 
@@ -13823,6 +13842,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Expired {bids_expired} bid{mb} and {offers_expired} offer{mo}"
             )
+
+        if self.ws_server and len(expired_offer_ids) > 0:
+            for offer_id in expired_offer_ids:
+                offer_id_hex = (
+                    offer_id.hex() if hasattr(offer_id, "hex") else str(offer_id)
+                )
+                self.ws_server.send_message_to_all(
+                    json.dumps({"event": "offer_expired", "offer_id": offer_id_hex})
+                )
 
     def update(self) -> None:
         if self._zmq_queue_enabled and self.zmqSubscriber:

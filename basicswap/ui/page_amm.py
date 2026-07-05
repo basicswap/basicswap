@@ -1334,6 +1334,412 @@ def amm_debug_api(swap_client, post_string, params=None):
         return {"success": False, "error": str(e)}
 
 
+VALID_OFFER_MODES = ("legacy", "one_time", "fixed_total", "standing")
+MIN_OFFER_VALID_SECONDS = 600
+MIN_AMOUNT_STEP = 0.001
+
+
+def validate_amm_config(config_data):
+    errors = []
+
+    if not isinstance(config_data, dict):
+        return ["Config must be a JSON object"]
+
+    offers = config_data.get("offers", [])
+    if not isinstance(offers, list):
+        errors.append("'offers' must be a list")
+        offers = []
+
+    seen_offer_names = set()
+    for idx, offer in enumerate(offers):
+        if not isinstance(offer, dict):
+            errors.append(f"Offer #{idx + 1} must be an object")
+            continue
+
+        label = offer.get("name") or f"Offer #{idx + 1}"
+
+        name = offer.get("name", "")
+        if not name or not str(name).strip():
+            errors.append(f"{label}: name is required")
+        elif name in seen_offer_names:
+            errors.append(f"{label}: duplicate template name")
+        else:
+            seen_offer_names.add(name)
+
+        coin_from = offer.get("coin_from", "")
+        coin_to = offer.get("coin_to", "")
+        if not coin_from or not coin_to:
+            errors.append(f"{label}: both coin_from and coin_to are required")
+        elif coin_from == coin_to:
+            errors.append(f"{label}: coin_from and coin_to must be different")
+
+        try:
+            amount = float(offer.get("amount", 0))
+            if amount <= 0:
+                errors.append(f"{label}: amount must be greater than zero")
+        except (TypeError, ValueError):
+            errors.append(f"{label}: amount must be a number")
+            amount = 0
+
+        if "amount_step" in offer:
+            try:
+                amount_step = float(offer["amount_step"])
+                if amount_step < MIN_AMOUNT_STEP:
+                    errors.append(
+                        f"{label}: amount_step must be at least {MIN_AMOUNT_STEP}"
+                    )
+                elif amount > 0 and amount_step > amount:
+                    errors.append(f"{label}: amount_step cannot exceed amount")
+            except (TypeError, ValueError):
+                errors.append(f"{label}: amount_step must be a number")
+
+        if "offer_valid_seconds" in offer:
+            try:
+                if int(offer["offer_valid_seconds"]) < MIN_OFFER_VALID_SECONDS:
+                    errors.append(
+                        f"{label}: offer_valid_seconds must be at least "
+                        f"{MIN_OFFER_VALID_SECONDS}"
+                    )
+            except (TypeError, ValueError):
+                errors.append(f"{label}: offer_valid_seconds must be a number")
+
+        offer_mode = offer.get("offer_mode", "standing")
+        if offer_mode not in VALID_OFFER_MODES:
+            errors.append(
+                f"{label}: offer_mode must be one of {', '.join(VALID_OFFER_MODES)}"
+            )
+
+        if offer_mode == "standing":
+            try:
+                if float(offer.get("min_coin_from_amt", 0)) <= 0:
+                    errors.append(
+                        f"{label}: standing offers require min_coin_from_amt > 0"
+                    )
+            except (TypeError, ValueError):
+                errors.append(f"{label}: min_coin_from_amt must be a number")
+
+        if offer_mode == "fixed_total":
+            try:
+                total_to_sell = float(offer.get("total_to_sell", 0))
+                if total_to_sell < amount:
+                    errors.append(
+                        f"{label}: total_to_sell must be at least the offer amount"
+                    )
+            except (TypeError, ValueError):
+                errors.append(f"{label}: total_to_sell must be a number")
+
+    bids = config_data.get("bids", [])
+    if not isinstance(bids, list):
+        errors.append("'bids' must be a list")
+        bids = []
+
+    seen_bid_names = set()
+    for idx, bid in enumerate(bids):
+        if not isinstance(bid, dict):
+            errors.append(f"Bid #{idx + 1} must be an object")
+            continue
+        label = bid.get("name") or f"Bid #{idx + 1}"
+        name = bid.get("name", "")
+        if not name or not str(name).strip():
+            errors.append(f"{label}: name is required")
+        elif name in seen_bid_names:
+            errors.append(f"{label}: duplicate template name")
+        else:
+            seen_bid_names.add(name)
+        if not bid.get("coin_from") or not bid.get("coin_to"):
+            errors.append(f"{label}: both coin_from and coin_to are required")
+        elif bid.get("coin_from") == bid.get("coin_to"):
+            errors.append(f"{label}: coin_from and coin_to must be different")
+
+    return errors
+
+
+def get_live_offer_fills(swap_client, offer_ids, sold_by_offer):
+    merged = {}
+    for k, v in (sold_by_offer or {}).items():
+        try:
+            merged[k] = float(v)
+        except (TypeError, ValueError):
+            merged[k] = 0.0
+
+    if swap_client is None:
+        return round(sum(merged.values()), 8)
+
+    all_offer_ids = set(merged.keys())
+    all_offer_ids.update(offer_ids)
+
+    for offer_id_hex in all_offer_ids:
+        try:
+            offer = swap_client.getOffer(bytes.fromhex(offer_id_hex))
+            if offer is None:
+                continue
+            summary = swap_client.getOfferTrackingSummary(offer)
+            if summary is None:
+                continue
+            ci_from = swap_client.ci(offer.coin_from)
+            live_filled = float(ci_from.format_amount(summary["filled_amount"]))
+            merged[offer_id_hex] = max(merged.get(offer_id_hex, 0.0), live_filled)
+        except Exception:
+            continue
+
+    return round(sum(merged.values()), 8)
+
+
+OFFER_STATE_LABELS = {
+    1: "Sent",
+    2: "Received",
+    3: "Abandoned",
+    4: "Expired",
+}
+
+
+def classify_offer_ids(swap_client, offer_ids):
+    active_offer_ids = []
+    stale_offer_ids = []
+    offer_details = {}
+
+    if swap_client is None:
+        return list(offer_ids), [], {}
+
+    try:
+        now = swap_client.getTime()
+    except Exception:
+        now = None
+
+    for offer_id_hex in offer_ids:
+        try:
+            offer = swap_client.getOffer(bytes.fromhex(offer_id_hex))
+        except Exception:
+            offer = None
+
+        if offer is None:
+            stale_offer_ids.append(offer_id_hex)
+            offer_details[offer_id_hex] = {
+                "state": "Gone",
+                "is_revoked": False,
+                "is_expired": False,
+            }
+            continue
+
+        active_ind = getattr(offer, "active_ind", 1)
+        expire_at = getattr(offer, "expire_at", None)
+        state = getattr(offer, "state", None)
+
+        is_revoked = active_ind == 2
+        is_expired = (
+            now is not None and expire_at is not None and expire_at <= now
+        ) or state == 4
+
+        offer_details[offer_id_hex] = {
+            "state": OFFER_STATE_LABELS.get(state, "Unknown"),
+            "is_revoked": bool(is_revoked),
+            "is_expired": bool(is_expired),
+        }
+
+        if active_ind == 1 and not is_expired and state in (1, 2):
+            active_offer_ids.append(offer_id_hex)
+        else:
+            stale_offer_ids.append(offer_id_hex)
+
+    return active_offer_ids, stale_offer_ids, offer_details
+
+
+def get_amm_template_runtime(swap_client, config_data=None, state_data=None):
+    runtime = {}
+
+    if config_data is None:
+        config_path = get_amm_config_path(swap_client)
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config_data = json.load(f)
+            except Exception:
+                config_data = {}
+        else:
+            config_data = {}
+
+    if state_data is None:
+        state_path = get_amm_state_path(swap_client)
+        if os.path.exists(state_path):
+            try:
+                with open(state_path, "r") as f:
+                    state_data = json.load(f)
+            except Exception:
+                state_data = {}
+        else:
+            state_data = {}
+
+    state_offers = state_data.get("offers", {})
+    template_tracking = state_data.get("template_tracking", {})
+
+    for offer in config_data.get("offers", []):
+        name = offer.get("name")
+        if not name:
+            continue
+
+        posted = state_offers.get(name, [])
+        offer_ids = [
+            o.get("offer_id")
+            for o in posted
+            if isinstance(o, dict) and o.get("offer_id")
+        ]
+
+        active_offer_ids, stale_offer_ids, offer_details = classify_offer_ids(
+            swap_client, offer_ids
+        )
+
+        tracking = template_tracking.get(name, {})
+        sold_by_offer = tracking.get("sold_by_offer", {})
+
+        entry = {
+            "active_offer_count": len(active_offer_ids),
+            "offer_ids": active_offer_ids,
+            "stale_offer_ids": stale_offer_ids,
+            "offer_details": offer_details,
+            "exhausted": bool(tracking.get("exhausted", False)),
+            "offer_mode": offer.get("offer_mode", "standing"),
+        }
+
+        if offer.get("offer_mode") == "fixed_total":
+            try:
+                entry["fixed_total_budget"] = float(
+                    offer.get("total_to_sell", offer.get("amount", 0))
+                )
+            except (TypeError, ValueError):
+                entry["fixed_total_budget"] = 0
+            entry["fixed_total_sold"] = get_live_offer_fills(
+                swap_client, offer_ids, sold_by_offer
+            )
+            if (
+                entry["fixed_total_budget"] > 0
+                and entry["fixed_total_sold"] >= entry["fixed_total_budget"]
+            ):
+                entry["exhausted"] = True
+
+        runtime[name] = entry
+
+    return runtime
+
+
+def get_amm_bid_runtime(swap_client, config_data=None, state_data=None):
+    runtime = {}
+
+    if config_data is None:
+        config_path = get_amm_config_path(swap_client)
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config_data = json.load(f)
+            except Exception:
+                config_data = {}
+        else:
+            config_data = {}
+
+    if state_data is None:
+        state_path = get_amm_state_path(swap_client)
+        if os.path.exists(state_path):
+            try:
+                with open(state_path, "r") as f:
+                    state_data = json.load(f)
+            except Exception:
+                state_data = {}
+        else:
+            state_data = {}
+
+    state_bids = state_data.get("bids", {})
+
+    for bid in config_data.get("bids", []):
+        name = bid.get("name")
+        if not name:
+            continue
+
+        posted = state_bids.get(name, [])
+        active_bid_ids = [
+            b.get("bid_id")
+            for b in posted
+            if isinstance(b, dict) and b.get("bid_id") and b.get("active", False)
+        ]
+
+        runtime[name] = {
+            "active_bid_count": len(active_bid_ids),
+            "bid_ids": active_bid_ids,
+        }
+
+    return runtime
+
+
+def amm_config_api(swap_client, post_string, params=None):
+    """API endpoint to save the AMM config file without a full page reload."""
+    try:
+        if not post_string:
+            return {"success": False, "error": "No config data provided"}
+
+        if isinstance(post_string, bytes):
+            post_string = post_string.decode("utf-8")
+
+        post_data = parse.parse_qs(post_string)
+        config_content = post_data.get("config_content", [""])[0]
+
+        if not config_content:
+            return {"success": False, "error": "No config data provided"}
+
+        try:
+            config_data = json.loads(config_content)
+        except json.JSONDecodeError as e:
+            return {"success": False, "error": f"Invalid JSON: {str(e)}"}
+
+        validation_errors = validate_amm_config(config_data)
+        if validation_errors:
+            return {
+                "success": False,
+                "error": validation_errors[0],
+                "errors": validation_errors,
+            }
+
+        config_path = get_amm_config_path(swap_client)
+        with open(config_path, "w") as f:
+            json.dump(config_data, f, indent=4)
+
+        swap_client.log.info("AMM config saved via API")
+        return {
+            "success": True,
+            "config_data": config_data,
+            "message": "Config file saved successfully",
+        }
+
+    except Exception as e:
+        swap_client.log.error(f"AMM config API error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+def amm_state_api(swap_client, _, params=None):
+    """API endpoint returning per-template runtime state for live table updates."""
+    try:
+        status = get_amm_status()
+
+        state_data = {}
+        state_path = get_amm_state_path(swap_client)
+        if os.path.exists(state_path):
+            try:
+                with open(state_path, "r") as f:
+                    state_data = json.load(f)
+            except Exception:
+                state_data = {}
+
+        runtime = get_amm_template_runtime(swap_client, state_data=state_data)
+        bid_runtime = get_amm_bid_runtime(swap_client, state_data=state_data)
+
+        return {
+            "success": True,
+            "status": status,
+            "template_runtime": runtime,
+            "bid_runtime": bid_runtime,
+        }
+    except Exception as e:
+        swap_client.log.error(f"AMM state API error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
 def amm_status_api(swap_client, _, params=None):
     """API endpoint to get AMM status"""
     status = get_amm_status()

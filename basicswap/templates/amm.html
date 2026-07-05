@@ -335,6 +335,9 @@
 
         <div id="configTabContent">
           <div class="block" id="json-content" role="tabpanel" aria-labelledby="json-tab">
+            <div id="amm-dirty-banner" class="hidden mb-4 p-3 rounded-md border border-yellow-300 bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-200 text-sm">
+              You have unsaved configuration changes while the AMM is running. Save the config for changes to take effect.
+            </div>
             <div class="mb-4">
               <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Config File (JSON)</label>
               <textarea name="config_content" id="config_content" rows="20" class="font-mono bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" {% if not debug_ui_mode %}readonly{% endif %}>{{ config_content }}</textarea>
@@ -928,6 +931,7 @@
                           <option value="standing" selected>Standing — repeat until a wallet floor</option>
                         </select>
                       </div>
+                      <small class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">One-time posts a single offer and stops once it is filled. Fixed total keeps reposting until the cumulative sold amount reaches Total to Sell. Standing repeats indefinitely, skipping new offers when the wallet balance would drop below the Minimum Balance floor.</small>
                     </div>
 
                     <div id="add-offer-total-to-sell-wrap" class="hidden">
@@ -1254,6 +1258,7 @@
                           <option value="standing">Standing — repeat until a wallet floor</option>
                         </select>
                       </div>
+                      <small class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">One-time posts a single offer and stops once it is filled. Fixed total keeps reposting until the cumulative sold amount reaches Total to Sell. Standing repeats indefinitely, skipping new offers when the wallet balance would drop below the Minimum Balance floor.</small>
                     </div>
 
                     <div id="edit-offer-total-to-sell-wrap" class="hidden">
@@ -1532,6 +1537,7 @@
   </div>
 </div>
 
+<script src="/static/js/modules/amm-template-validation.js"></script>
 <script src="/static/js/pages/amm-tables.js"></script>
 <script src="/static/js/pages/amm-config-tabs.js"></script>
 <script src="/static/js/pages/amm-page.js"></script>

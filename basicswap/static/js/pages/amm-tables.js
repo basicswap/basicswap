@@ -6,7 +6,47 @@ const AmmTablesManager = (function() {
 
     let refreshTimer = null;
     let stateData = null;
+    let templateRuntime = {};
+    let bidRuntime = {};
+    let ammStatus = null;
+    let configDirty = false;
+    let wsSubscribed = false;
+    let wsRefreshPending = false;
     const coinData = {};
+
+    function notify(title, type, options) {
+        if (window.NotificationManager && window.NotificationManager.createToast) {
+            window.NotificationManager.createToast(title, type || 'success', options || {});
+            return;
+        }
+        if (type === 'error') {
+            if (window.showErrorModal) {
+                window.showErrorModal('Error', title);
+            } else {
+                alert(title);
+            }
+        }
+    }
+
+    function fetchAmmState() {
+        return fetch('/amm/state', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        }).then(function(response) {
+            return response.json();
+        }).then(function(data) {
+            if (data && data.success) {
+                templateRuntime = data.template_runtime || {};
+                bidRuntime = data.bid_runtime || {};
+                ammStatus = data.status || null;
+                updateTables();
+                updateDirtyBanner();
+            }
+            return data;
+        }).catch(function() {
+            return null;
+        });
+    }
 
     const offersTab = document.getElementById('offers-tab');
     const bidsTab = document.getElementById('bids-tab');
@@ -105,6 +145,82 @@ const AmmTablesManager = (function() {
         `;
     }
 
+    function getOfferModeLabel(mode) {
+        switch (mode) {
+            case 'one_time': return 'One-time';
+            case 'fixed_total': return 'Fixed total';
+            case 'legacy': return 'Legacy';
+            default: return 'Standing';
+        }
+    }
+
+    function getOfferModeBadge(mode) {
+        const label = getOfferModeLabel(mode);
+        let classes = 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+        if (mode === 'one_time') {
+            classes = 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300';
+        } else if (mode === 'fixed_total') {
+            classes = 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
+        } else if (mode === 'legacy') {
+            classes = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        }
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classes}">${label}</span>`;
+    }
+
+    function getStaleOfferBadge(staleOfferIds, offerDetails) {
+        if (!Array.isArray(staleOfferIds) || staleOfferIds.length === 0) {
+            return '';
+        }
+        let revoked = 0;
+        let expired = 0;
+        let gone = 0;
+        staleOfferIds.forEach(function(id) {
+            const detail = offerDetails[id] || {};
+            if (detail.is_revoked) {
+                revoked += 1;
+            } else if (detail.is_expired) {
+                expired += 1;
+            } else {
+                gone += 1;
+            }
+        });
+
+        let label;
+        if (revoked > 0 && expired === 0 && gone === 0) {
+            label = revoked === 1 ? 'Offer revoked' : `${revoked} revoked`;
+        } else if (expired > 0 && revoked === 0 && gone === 0) {
+            label = expired === 1 ? 'Offer expired' : `${expired} expired`;
+        } else {
+            label = `${staleOfferIds.length} inactive`;
+        }
+
+        const linkId = staleOfferIds[0];
+        const inner = `
+            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+            </svg>${label}`;
+        const classes = 'mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
+        if (linkId) {
+            return `<a href="/offer/${linkId}" class="${classes} hover:underline">${inner}</a>`;
+        }
+        return `<span class="${classes}">${inner}</span>`;
+    }
+
+    function getFixedTotalProgress(runtime) {
+        const budget = parseFloat(runtime.fixed_total_budget || 0);
+        const sold = parseFloat(runtime.fixed_total_sold || 0);
+        if (!budget || budget <= 0) return '';
+        const pct = Math.min(100, Math.round((sold / budget) * 100));
+        return `
+            <div class="mt-1">
+                <div class="text-xs text-gray-500 dark:text-gray-300 mb-0.5">Sold: ${sold} / ${budget} (${pct}%)</div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                    <div class="bg-indigo-500 h-1.5 rounded-full" style="width: ${pct}%"></div>
+                </div>
+            </div>
+        `;
+    }
+
     function renderOffersTable(stateData) {
         if (!offersBody) return;
 
@@ -160,8 +276,18 @@ const AmmTablesManager = (function() {
 
             const amountToReceive = amount * minrate;
 
-            const activeOffersCount = activeOffers[name] && Array.isArray(activeOffers[name]) ?
-                activeOffers[name].length : 0;
+            const runtime = templateRuntime[name] || {};
+            const offerMode = offer.offer_mode || 'standing';
+            const exhausted = runtime.exhausted === true;
+            const offerIds = Array.isArray(runtime.offer_ids) ? runtime.offer_ids : [];
+            const staleOfferIds = Array.isArray(runtime.stale_offer_ids) ? runtime.stale_offer_ids : [];
+            const offerDetails = runtime.offer_details || {};
+
+            const activeOffersCount = runtime.active_offer_count !== undefined
+                ? runtime.active_offer_count
+                : (activeOffers[name] && Array.isArray(activeOffers[name]) ? activeOffers[name].length : 0);
+
+            const staleBadge = getStaleOfferBadge(staleOfferIds, offerDetails);
 
             tableHtml += `
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
@@ -192,6 +318,7 @@ const AmmTablesManager = (function() {
                     <td class="py-3 px-4 text-center">
                         <div class="space-y-1">
                             <div class="flex flex-wrap gap-1 justify-center">
+                                ${getOfferModeBadge(offerMode)}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${amountVariable ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
                                     ${amountVariable ? 'Variable' : 'Fixed'}
                                 </span>
@@ -202,6 +329,7 @@ const AmmTablesManager = (function() {
                                     ${formatDuration(offerValidSeconds)}
                                 </span>
                             </div>
+                            ${offerMode === 'fixed_total' ? getFixedTotalProgress(runtime) : ''}
                             <div class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${adjustRatesValue != 'static' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
                                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
@@ -223,19 +351,21 @@ const AmmTablesManager = (function() {
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
-                        <div class="flex flex-col items-center">
-                            <span class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full
-                                ${enabled
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'}">
-                                ${enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                            <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full hidden
-                                ${activeOffersCount > 0
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                        <div class="flex flex-col items-center gap-1">
+                            <label class="relative inline-flex items-center cursor-pointer" title="Toggle enabled">
+                                <input type="checkbox" class="sr-only peer amm-enable-toggle" data-type="offer" data-name="${name}" data-id="${offer.id || ''}" ${enabled ? 'checked' : ''}>
+                                <div class="w-9 h-5 rounded-full relative ${enabled ? 'bg-green-500 dark:bg-green-600' : 'bg-red-500 dark:bg-red-700'} after:content-[''] after:absolute after:top-[2px] ${enabled ? 'after:left-[18px]' : 'after:left-[2px]'} after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                                <span class="ml-2 text-xs font-medium ${enabled ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}">${enabled ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                            ${activeOffersCount > 0 ? `
+                            <a href="/offer/${offerIds[0] || ''}" class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:underline">
                                 ${activeOffersCount} Running Offer${activeOffersCount !== 1 ? 's' : ''}
-                            </span>
+                            </a>` : ''}
+                            ${exhausted ? `
+                            <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
+                                Exhausted
+                            </span>` : ''}
+                            ${staleBadge}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -312,8 +442,11 @@ const AmmTablesManager = (function() {
             const minCoinToBalance = parseFloat(bid.min_coin_to_balance || 0);
             const maxConcurrent = parseInt(bid.max_concurrent || 1);
             const amountToSend = amount * maxRate;
-            const activeBidsCount = activeBids[name] && Array.isArray(activeBids[name]) ?
-                activeBids[name].length : 0;
+            const bidRt = bidRuntime[name] || {};
+            const bidIds = Array.isArray(bidRt.bid_ids) ? bidRt.bid_ids : [];
+            const activeBidsCount = bidRt.active_bid_count !== undefined
+                ? bidRt.active_bid_count
+                : (activeBids[name] && Array.isArray(activeBids[name]) ? activeBids[name].length : 0);
             const useBalanceBidding = bid.use_balance_bidding !== undefined ? bid.use_balance_bidding : false;
 
             tableHtml += `
@@ -357,19 +490,19 @@ const AmmTablesManager = (function() {
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
-                        <div class="flex flex-col items-center">
-                            <span class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full
-                                ${enabled
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'}">
-                                ${enabled ? 'Enabled' : 'Disabled'}
-                            </span>
-                            <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full hidden
-                                ${activeBidsCount > 0
-                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">
+                        <div class="flex flex-col items-center gap-1">
+                            <label class="relative inline-flex items-center cursor-pointer" title="Toggle enabled">
+                                <input type="checkbox" class="sr-only peer amm-enable-toggle" data-type="bid" data-name="${name}" data-id="${bid.id || ''}" ${enabled ? 'checked' : ''}>
+                                <div class="w-9 h-5 rounded-full relative ${enabled ? 'bg-green-500 dark:bg-green-600' : 'bg-red-500 dark:bg-red-700'} after:content-[''] after:absolute after:top-[2px] ${enabled ? 'after:left-[18px]' : 'after:left-[2px]'} after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                                <span class="ml-2 text-xs font-medium ${enabled ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}">${enabled ? 'Enabled' : 'Disabled'}</span>
+                            </label>
+                            ${activeBidsCount > 0 ? (bidIds[0] ? `
+                            <a href="/bid/${bidIds[0]}" class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:underline">
                                 ${activeBidsCount} Running Bid${activeBidsCount !== 1 ? 's' : ''}
-                            </span>
+                            </a>` : `
+                            <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                                ${activeBidsCount} Running Bid${activeBidsCount !== 1 ? 's' : ''}
+                            </span>`) : ''}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -621,6 +754,13 @@ const AmmTablesManager = (function() {
     function getCombinedData() {
         const initialData = getInitialData();
         if (initialData) {
+            const textareaConfig = parseConfigData();
+            if (textareaConfig && textareaConfig.config) {
+                return {
+                    state: initialData.state,
+                    config: textareaConfig.config
+                };
+            }
             return initialData;
         }
 
@@ -631,6 +771,28 @@ const AmmTablesManager = (function() {
             ...stateData,
             ...configData
         };
+    }
+
+    function persistConfig(configObject) {
+        const body = 'config_content=' + encodeURIComponent(JSON.stringify(configObject));
+        return fetch('/amm/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: body
+        }).then(function(response) {
+            return response.json();
+        });
+    }
+
+    function refreshAfterSave() {
+        if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
+            window.AmmCounterManager.fetchAmmStatus();
+        }
+        if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
+            window.SummaryManager.fetchSummaryData();
+        }
     }
     function updateTables() {
         const data = getCombinedData();
@@ -652,7 +814,7 @@ const AmmTablesManager = (function() {
         }
 
         refreshTimer = setInterval(function() {
-            updateTables();
+            fetchAmmState();
         }, config.refreshInterval);
 
         return refreshTimer;
@@ -663,6 +825,105 @@ const AmmTablesManager = (function() {
             clearInterval(refreshTimer);
             refreshTimer = null;
         }
+    }
+
+    function scheduleWsRefresh() {
+        if (wsRefreshPending) {
+            return;
+        }
+        wsRefreshPending = true;
+        const runFn = function() {
+            wsRefreshPending = false;
+            fetchAmmState();
+        };
+        if (window.CleanupManager && window.CleanupManager.setTimeout) {
+            window.CleanupManager.setTimeout(runFn, 1500);
+        } else {
+            setTimeout(runFn, 1500);
+        }
+    }
+
+    function subscribeWebSocket() {
+        if (wsSubscribed || !window.WebSocketManager || !window.WebSocketManager.addMessageHandler) {
+            return;
+        }
+        const relevantEvents = {
+            new_offer: true,
+            offer_created: true,
+            offer_revoked: true,
+            offer_expired: true,
+            new_bid: true,
+            bid_accepted: true,
+            swap_completed: true
+        };
+        window.WebSocketManager.addMessageHandler('message', function(data) {
+            if (data && data.event && relevantEvents[data.event]) {
+                scheduleWsRefresh();
+            }
+        });
+        wsSubscribed = true;
+    }
+
+    function updateDirtyBanner() {
+        const banner = document.getElementById('amm-dirty-banner');
+        if (!banner) return;
+        const isRunning = ammStatus === 'running';
+        if (isRunning && configDirty) {
+            banner.classList.remove('hidden');
+        } else {
+            banner.classList.add('hidden');
+        }
+    }
+
+    function setupDirtyTracking() {
+        const configTextarea = document.querySelector('textarea[name="config_content"]');
+        if (configTextarea) {
+            configTextarea.addEventListener('input', function() {
+                configDirty = true;
+                updateDirtyBanner();
+            });
+        }
+
+        const saveConfigBtn = document.getElementById('save_config_btn');
+        if (saveConfigBtn) {
+            saveConfigBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                saveConfigViaApi();
+            });
+        }
+    }
+
+    function saveConfigViaApi() {
+        const configTextarea = document.querySelector('textarea[name="config_content"]');
+        if (!configTextarea) {
+            notify('Could not find the configuration textarea.', 'error');
+            return;
+        }
+
+        let config;
+        try {
+            config = JSON.parse(configTextarea.value.trim());
+        } catch (error) {
+            notify('Configuration is not valid JSON: ' + error.message, 'error');
+            return;
+        }
+
+        persistConfig(config).then(function(data) {
+            if (data && data.success) {
+                if (window.ammTablesConfig) {
+                    window.ammTablesConfig.configData = data.config_data || config;
+                }
+                configDirty = false;
+                updateDirtyBanner();
+                updateTables();
+                refreshAfterSave();
+                notify('Config file saved successfully.', 'success');
+            } else {
+                notify((data && data.error) || 'Failed to save the configuration.', 'error');
+            }
+        }).catch(function(error) {
+            notify('Failed to save the configuration: ' + error.message, 'error');
+        });
     }
 
     function setupConfigFormListener() {
@@ -711,8 +972,6 @@ const AmmTablesManager = (function() {
 
         const result = isBidModal ? isTakerDropdown : isMakerDropdown;
 
-        console.log(`[DEBUG] shouldDropdownOptionsShowBalance: ${select.id}, isBidModal=${isBidModal}, isMaker=${isMakerDropdown}, isTaker=${isTakerDropdown}, result=${result}`);
-
         return result;
     }
 
@@ -743,8 +1002,6 @@ const AmmTablesManager = (function() {
                 const shouldShowBalance = shouldDropdownOptionsShowBalance(select);
                 const fullText = originalOption.textContent.trim();
                 const balance = originalOption.getAttribute('data-balance') || '0.00000000';
-
-                console.log(`[DEBUG] refreshDropdownOptions: ${select.id}, option=${coinValue}, shouldShowBalance=${shouldShowBalance}, balance=${balance}`);
 
                 if (shouldShowBalance) {
 
@@ -1148,6 +1405,16 @@ const AmmTablesManager = (function() {
             }
         });
 
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.classList && e.target.classList.contains('amm-enable-toggle')) {
+                const toggle = e.target;
+                const type = toggle.getAttribute('data-type');
+                const name = toggle.getAttribute('data-name');
+                const id = toggle.getAttribute('data-id');
+                toggleEnabled(type, id, name, toggle.checked, toggle);
+            }
+        });
+
         const addModal = document.getElementById('add-amm-modal');
         if (addModal) {
             addModal.addEventListener('click', function(e) {
@@ -1517,7 +1784,6 @@ const AmmTablesManager = (function() {
                         return;
                     }
                     newItem.amount_step = amountStep;
-                    console.log(`Offer Size Increment set to: ${newItem.amount_step}`);
                 } else {
                     if (window.showErrorModal) {
                         window.showErrorModal('Validation Error', 'Invalid Offer Size Increment value. Please enter a valid decimal number.');
@@ -1581,6 +1847,16 @@ const AmmTablesManager = (function() {
                 }
             }
 
+            if (window.AmmTemplateValidation) {
+                const result = type === 'offer'
+                    ? window.AmmTemplateValidation.validateOffer(newItem)
+                    : window.AmmTemplateValidation.validateBid(newItem);
+                if (!result.valid) {
+                    notify(result.errors[0], 'error');
+                    return;
+                }
+            }
+
             if (type === 'offer') {
                 if (!Array.isArray(config.offers)) {
                     config.offers = [];
@@ -1607,47 +1883,28 @@ const AmmTablesManager = (function() {
 
             configTextarea.value = JSON.stringify(config, null, 4);
 
-            closeAddModal();
-
-            const saveButton = document.getElementById('save_config_btn');
-            if (saveButton && !saveButton.disabled) {
-                saveButton.click();
-
-                setTimeout(() => {
-                    if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
-                        window.AmmCounterManager.fetchAmmStatus();
-                    }
-                    if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
-                        window.SummaryManager.fetchSummaryData();
-                    }
-                }, 1000);
-            } else {
-                const form = configTextarea.closest('form');
-                if (form) {
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'save_config';
-                    hiddenInput.value = 'true';
-                    form.appendChild(hiddenInput);
-                    form.submit();
-                } else {
-                    if (window.showErrorModal) {
-                        window.showErrorModal('Error', 'Could not save the configuration. Please try using the Settings tab instead.');
-                    } else {
-                        alert('Error: Could not save the configuration.');
-                    }
-                }
-            }
-
             if (wasReadonly) {
                 configTextarea.setAttribute('readonly', '');
             }
+
+            persistConfig(config).then(function(data) {
+                if (data && data.success) {
+                    if (window.ammTablesConfig) {
+                        window.ammTablesConfig.configData = data.config_data || config;
+                    }
+                    closeAddModal();
+                    updateTables();
+                    refreshAfterSave();
+                    notify(`${type.charAt(0).toUpperCase() + type.slice(1)} "${name}" added.`, 'success');
+                } else {
+                    const errMsg = (data && data.error) || 'Failed to save the configuration.';
+                    notify(errMsg, 'error');
+                }
+            }).catch(function(error) {
+                notify(`Failed to save the configuration: ${error.message}`, 'error');
+            });
         } catch (error) {
-            if (window.showErrorModal) {
-                window.showErrorModal('Configuration Error', `Error processing the configuration: ${error.message}`);
-            } else {
-                alert(`Error processing the configuration: ${error.message}`);
-            }
+            notify(`Error processing the configuration: ${error.message}`, 'error');
             debugLog('Error saving new item:', error);
         }
     }
@@ -2032,7 +2289,6 @@ const AmmTablesManager = (function() {
                         return;
                     }
                     updatedItem.amount_step = amountStep;
-                    console.log(`Offer Size Increment set to: ${updatedItem.amount_step}`);
                 } else {
                     if (window.showErrorModal) {
                         window.showErrorModal('Validation Error', 'Invalid Offer Size Increment value. Please enter a valid decimal number.');
@@ -2100,6 +2356,16 @@ const AmmTablesManager = (function() {
                 }
             }
 
+            if (window.AmmTemplateValidation) {
+                const result = type === 'offer'
+                    ? window.AmmTemplateValidation.validateOffer(updatedItem)
+                    : window.AmmTemplateValidation.validateBid(updatedItem);
+                if (!result.valid) {
+                    notify(result.errors[0], 'error');
+                    return;
+                }
+            }
+
             if (type === 'offer' && Array.isArray(config.offers)) {
                 const index = config.offers.findIndex(item =>
                     (id && item.id === id) || (!id && item.name === originalName)
@@ -2136,45 +2402,86 @@ const AmmTablesManager = (function() {
 
             configTextarea.value = JSON.stringify(config, null, 4);
 
-            closeEditModal();
-
-            const saveButton = document.getElementById('save_config_btn');
-            if (saveButton && !saveButton.disabled) {
-                saveButton.click();
-
-                setTimeout(() => {
-                    if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
-                        window.AmmCounterManager.fetchAmmStatus();
-                    }
-                    if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
-                        window.SummaryManager.fetchSummaryData();
-                    }
-                }, 1000);
-            } else {
-                const form = configTextarea.closest('form');
-                if (form) {
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'save_config';
-                    hiddenInput.value = 'true';
-                    form.appendChild(hiddenInput);
-                    form.submit();
-                } else {
-                    if (window.showErrorModal) {
-                        window.showErrorModal('Error', 'Could not save the configuration. Please try using the Settings tab instead.');
-                    } else {
-                        alert('Error: Could not save the configuration.');
-                    }
-                }
-            }
-
             if (wasReadonly) {
                 configTextarea.setAttribute('readonly', '');
             }
+
+            persistConfig(config).then(function(data) {
+                if (data && data.success) {
+                    if (window.ammTablesConfig) {
+                        window.ammTablesConfig.configData = data.config_data || config;
+                    }
+                    closeEditModal();
+                    updateTables();
+                    refreshAfterSave();
+                    notify('Configuration updated.', 'success');
+                } else {
+                    const errMsg = (data && data.error) || 'Failed to save the configuration.';
+                    notify(errMsg, 'error');
+                }
+            }).catch(function(error) {
+                notify(`Failed to save the configuration: ${error.message}`, 'error');
+            });
         } catch (error) {
-            alert(`Error processing the configuration: ${error.message}`);
+            notify(`Error processing the configuration: ${error.message}`, 'error');
             debugLog('Error saving edited item:', error);
         }
+    }
+
+    function toggleEnabled(type, id, name, newEnabled, toggleEl) {
+        const configTextarea = document.querySelector('textarea[name="config_content"]');
+        if (!configTextarea) {
+            notify('Could not find the configuration textarea.', 'error');
+            if (toggleEl) toggleEl.checked = !newEnabled;
+            return;
+        }
+
+        let config;
+        try {
+            config = JSON.parse(configTextarea.value.trim());
+        } catch (error) {
+            notify('Configuration is not valid JSON.', 'error');
+            if (toggleEl) toggleEl.checked = !newEnabled;
+            return;
+        }
+
+        const list = type === 'offer' ? config.offers : config.bids;
+        if (!Array.isArray(list)) {
+            notify(`No ${type}s found in config.`, 'error');
+            if (toggleEl) toggleEl.checked = !newEnabled;
+            return;
+        }
+
+        const index = list.findIndex(item => (id && item.id === id) || (!id && item.name === name));
+        if (index === -1) {
+            notify(`Could not find the ${type} to update.`, 'error');
+            if (toggleEl) toggleEl.checked = !newEnabled;
+            return;
+        }
+
+        list[index].enabled = newEnabled;
+
+        const wasReadonly = configTextarea.hasAttribute('readonly');
+        if (wasReadonly) configTextarea.removeAttribute('readonly');
+        configTextarea.value = JSON.stringify(config, null, 4);
+        if (wasReadonly) configTextarea.setAttribute('readonly', '');
+
+        persistConfig(config).then(function(data) {
+            if (data && data.success) {
+                if (window.ammTablesConfig) {
+                    window.ammTablesConfig.configData = data.config_data || config;
+                }
+                notify(`${name || type} ${newEnabled ? 'enabled' : 'disabled'}.`, 'success');
+                updateTables();
+                refreshAfterSave();
+            } else {
+                if (toggleEl) toggleEl.checked = !newEnabled;
+                notify((data && data.error) || 'Failed to save the configuration.', 'error');
+            }
+        }).catch(function(error) {
+            if (toggleEl) toggleEl.checked = !newEnabled;
+            notify(`Failed to save the configuration: ${error.message}`, 'error');
+        });
     }
 
     function deleteAmmItem(type, id, name) {
@@ -2231,41 +2538,27 @@ const AmmTablesManager = (function() {
 
             configTextarea.value = JSON.stringify(config, null, 4);
 
-            const saveButton = document.getElementById('save_config_btn');
-            if (saveButton && !saveButton.disabled) {
-                saveButton.click();
-
-                setTimeout(() => {
-                    if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
-                        window.AmmCounterManager.fetchAmmStatus();
-                    }
-                    if (window.SummaryManager && window.SummaryManager.fetchSummaryData) {
-                        window.SummaryManager.fetchSummaryData();
-                    }
-                }, 1000);
-            } else {
-                const form = configTextarea.closest('form');
-                if (form) {
-                    const hiddenInput = document.createElement('input');
-                    hiddenInput.type = 'hidden';
-                    hiddenInput.name = 'save_config';
-                    hiddenInput.value = 'true';
-                    form.appendChild(hiddenInput);
-                    form.submit();
-                } else {
-                    if (window.showErrorModal) {
-                        window.showErrorModal('Error', 'Could not save the configuration. Please try using the Settings tab instead.');
-                    } else {
-                        alert('Error: Could not save the configuration.');
-                    }
-                }
-            }
-
             if (wasReadonly) {
                 configTextarea.setAttribute('readonly', '');
             }
+
+            persistConfig(config).then(function(data) {
+                if (data && data.success) {
+                    if (window.ammTablesConfig) {
+                        window.ammTablesConfig.configData = data.config_data || config;
+                    }
+                    updateTables();
+                    refreshAfterSave();
+                    notify(`${type.charAt(0).toUpperCase() + type.slice(1)} "${name || 'Unnamed'}" deleted.`, 'success');
+                } else {
+                    const errMsg = (data && data.error) || 'Failed to save the configuration.';
+                    notify(errMsg, 'error');
+                }
+            }).catch(function(error) {
+                notify(`Failed to save the configuration: ${error.message}`, 'error');
+            });
         } catch (error) {
-            alert(`Error processing the configuration: ${error.message}`);
+            notify(`Error processing the configuration: ${error.message}`, 'error');
             debugLog('Error deleting item:', error);
         }
     }
@@ -2707,7 +3000,7 @@ const AmmTablesManager = (function() {
 
                 try {
                     await initializePrices();
-                    updateTables();
+                    await fetchAmmState();
                 } finally {
                     setTimeout(() => {
                         if (icon) {
@@ -2720,8 +3013,11 @@ const AmmTablesManager = (function() {
         }
 
         setupConfigFormListener();
+        setupDirtyTracking();
         updateTables();
+        fetchAmmState();
         startRefreshTimer();
+        subscribeWebSocket();
 
         debugLog('AMM Tables Manager initialized');
 
