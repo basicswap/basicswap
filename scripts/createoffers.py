@@ -70,8 +70,6 @@ Create offers
 
 """
 
-__version__ = "0.4"
-
 import argparse
 import json
 import os
@@ -86,6 +84,8 @@ import urllib
 import urllib.error
 import base64
 from urllib.request import urlopen
+
+from basicswap import AMM_VERSION
 
 delay_event = threading.Event()
 shutdown_in_progress = False
@@ -2011,7 +2011,7 @@ def main():
         "-v",
         "--version",
         action="version",
-        version="%(prog)s {version}".format(version=__version__),
+        version="%(prog)s {version}".format(version=AMM_VERSION),
     )
     parser.add_argument(
         "--host",

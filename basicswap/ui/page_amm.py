@@ -14,6 +14,7 @@ import traceback
 import sys
 from urllib import parse
 from urllib.request import Request, urlopen
+from basicswap import AMM_VERSION
 from .util import listAvailableCoinsWithBalances
 
 DEFAULT_AMM_CONFIG_FILE = "createoffers.json"
@@ -1732,6 +1733,7 @@ def amm_state_api(swap_client, _, params=None):
         return {
             "success": True,
             "status": status,
+            "amm_version": AMM_VERSION,
             "template_runtime": runtime,
             "bid_runtime": bid_runtime,
         }

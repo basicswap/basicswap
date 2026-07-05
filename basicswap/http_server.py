@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import formatdate, parsedate_to_datetime
 from http.cookies import SimpleCookie
 
-from . import __version__
+from . import __version__, GUI_VERSION, AMM_VERSION
 from .util import (
     BalanceError,
     LockedCoinError,
@@ -308,6 +308,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.server.msg_id_counter = 0
 
         args_dict["version"] = version
+        args_dict["gui_version"] = GUI_VERSION
+        args_dict["amm_version"] = AMM_VERSION
 
         try:
             static_dir = os.path.join(os.path.dirname(__file__), "static")
