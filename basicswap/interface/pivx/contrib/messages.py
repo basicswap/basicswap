@@ -26,7 +26,16 @@ import struct
 import time
 
 from .siphash import siphash256
-from .util import hex_str_to_bytes, bytes_to_hex_str
+from binascii import hexlify, unhexlify
+
+
+def bytes_to_hex_str(byte_str):
+    return hexlify(byte_str).decode('ascii')
+
+
+def hex_str_to_bytes(hex_str):
+    return unhexlify(hex_str.encode('ascii'))
+
 
 MIN_VERSION_SUPPORTED = 60001
 MY_VERSION = 70925

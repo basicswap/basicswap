@@ -27,7 +27,7 @@ import socket
 import time
 import sys
 import random
-from .util import hex_str_to_bytes, bytes_to_hex_str
+from binascii import hexlify, unhexlify
 from io import BytesIO
 from codecs import encode
 import hashlib
@@ -36,6 +36,15 @@ from threading import Thread
 import logging
 import copy
 from .siphash import siphash256
+
+
+def bytes_to_hex_str(byte_str):
+    return hexlify(byte_str).decode('ascii')
+
+
+def hex_str_to_bytes(hex_str):
+    return unhexlify(hex_str.encode('ascii'))
+
 
 BIP0031_VERSION = 70029
 MY_VERSION = 70029  # past bip-31 for ping/pong
