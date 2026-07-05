@@ -55,4 +55,4 @@ disable-colors = true
 quiet-level = 7
 dictionary = "tests/lint/spelling.extra_dictionary.txt,-"
 ignore-words = "tests/lint/spelling.ignore-words.txt"
-skip = ".git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static"
+skip = ".git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/*/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static"

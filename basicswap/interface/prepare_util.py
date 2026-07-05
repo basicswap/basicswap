@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
-from basicswap.util.network import urlretrieve, make_reporthook
+from basicswap.util.network import make_reporthook
 
 
 @dataclass

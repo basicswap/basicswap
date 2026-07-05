@@ -9,7 +9,6 @@
 import base64
 import contextlib
 import gnupg
-import hashlib
 import json
 import logging
 import os
@@ -31,7 +30,7 @@ from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins, chainparams, getCoinIdFromName
-from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
+from basicswap.contrib.rpcauth import generate_salt
 from basicswap.ui.util import getCoinName
 from basicswap.util import toBool
 from basicswap.util.network import urlretrieve, make_reporthook
@@ -1005,10 +1004,8 @@ def initialise_wallets(
                 module.ensureWallet(prepare_ctx, swap_client, c, coin_settings)
 
             if module.provides_master_key and coin_name in with_coins:
-                particl_wallet_mnemonic, generated_mnemonic = (
-                    module.loadMasterMnemonic(
-                        prepare_ctx, swap_client, c, particl_wallet_mnemonic
-                    )
+                particl_wallet_mnemonic, generated_mnemonic = module.loadMasterMnemonic(
+                    prepare_ctx, swap_client, c, particl_wallet_mnemonic
                 )
 
         for coin_name in with_coins:

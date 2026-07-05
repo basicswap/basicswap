@@ -10,7 +10,6 @@ from basicswap.interface.doge.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
-    getOSDirNames,
 )
 
 DOGECOIN_VERSION = os.getenv("DOGECOIN_VERSION", "23.2.1")

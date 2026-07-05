@@ -22,7 +22,7 @@ from basicswap.interface.btc.btc import (
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.contrib.mnemonic import Mnemonic
-from basicswap.interface.contrib.nav_test_framework.mininode import (
+from basicswap.interface.nav.contrib.mininode import (
     CTxIn,
     CTxOut,
     CBlock,
@@ -46,7 +46,7 @@ from basicswap.basicswap_util import (
     getVoutByScriptPubKey,
 )
 
-from basicswap.interface.contrib.nav_test_framework.script import (
+from basicswap.interface.nav.contrib.script import (
     CScript,
     OP_0,
     OP_EQUAL,

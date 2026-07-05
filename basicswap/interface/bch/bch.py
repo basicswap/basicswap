@@ -10,9 +10,9 @@ from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
 from basicswap.interface.btc.btc import BTCInterface, ensure_op, findOutput
 from basicswap.chainparams import Coins
-from basicswap.interface.contrib.bch_test_framework.cashaddress import Address
+from basicswap.interface.bch.contrib.cashaddress import Address
 from basicswap.util.crypto import hash160, sha256
-from basicswap.interface.contrib.bch_test_framework.script import (
+from basicswap.interface.bch.contrib.script import (
     OP_TXINPUTCOUNT,
     OP_1,
     OP_NUMEQUALVERIFY,

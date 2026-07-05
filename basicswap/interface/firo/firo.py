@@ -17,7 +17,7 @@ from basicswap.rpc import make_rpc_func
 from basicswap.util.crypto import hash160
 from basicswap.util.address import decodeAddress
 from basicswap.chainparams import Coins
-from basicswap.interface.contrib.firo_test_framework.script import (
+from basicswap.interface.firo.contrib.script import (
     CScript,
     OP_DUP,
     OP_EQUAL,
@@ -25,7 +25,7 @@ from basicswap.interface.contrib.firo_test_framework.script import (
     OP_CHECKSIG,
     OP_EQUALVERIFY,
 )
-from basicswap.interface.contrib.firo_test_framework.mininode import (
+from basicswap.interface.firo.contrib.mininode import (
     CBlock,
     FromHex,
     CTransaction,
@@ -55,7 +55,10 @@ class FIROInterface(BTCInterface):
 
         if network == "regtest":
             self._log.info(f"Setting {self.coin_name()} regtest mode")
-            from basicswap.interface.contrib.firo_test_framework.mininode import set_regtest as set_firo_regtest
+            from basicswap.interface.firo.contrib.mininode import (
+                set_regtest as set_firo_regtest,
+            )
+
             # Raise MTP_SWITCH_TIME and PP_SWITCH_TIME in mininode.py
             set_firo_regtest()
 

@@ -57,7 +57,7 @@ jobs:
         cat core_versions.txt
     - name: Run flake8
       run: |
-        flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
+        flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/*/contrib,.eggs,.tox,bin/install_certifi.py
     - name: Run codespell
       run: |
         codespell

@@ -37,7 +37,7 @@ from tests.basicswap.common import (
     wait_for_offer,
     waitForRPC,
 )
-from basicswap.interface.contrib.firo_test_framework.mininode import (
+from basicswap.interface.firo.contrib.mininode import (
     FromHex,
     CTransaction,
     set_regtest,

@@ -11,7 +11,7 @@ from basicswap.interface.btc.btc import BTCInterface
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.util.address import decodeAddress
-from basicswap.interface.contrib.pivx_test_framework.messages import CTransaction
+from basicswap.interface.pivx.contrib.messages import CTransaction
 from basicswap.contrib.test_framework.script import (
     CScript,
     OP_DUP,
