@@ -132,7 +132,7 @@ function continueInitialization() {
 
     const listingLabel = document.querySelector('span[data-listing-label]');
     if (listingLabel) {
-        listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Network Listings: ';
+        listingLabel.textContent = isSentOffers ? 'Total Listings: ' : 'Listings: ';
     }
 }
 

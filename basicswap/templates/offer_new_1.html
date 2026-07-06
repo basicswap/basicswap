@@ -1,7 +1,7 @@
 {% include 'header.html' %} {% from 'style.html' import input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg %}
 {% from 'macros.html' import offer_stepper, page_header %}
 <div class="container mx-auto">
-  {{ page_header('Create Offer', 'Choose what you want to trade. You can review everything before it goes live.', outer_class='py-3 px-4 mt-3') }}
+  {{ page_header('Create Single Offer', 'Choose what you want to trade. You can review everything before it goes live.', outer_class='py-3 px-4 mt-3') }}
   {% include 'inc_messages.html' %}
   {{ offer_stepper(1) }}
 

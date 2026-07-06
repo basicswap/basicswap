@@ -1340,7 +1340,7 @@ def page_offers(self, url_split, post_string, sent=False):
     return self.render_template(
         template,
         {
-            "page_type": "Your Offers" if sent else "Network Order Book",
+            "page_type": "Your Offers" if sent else "Order Book",
             "page_button": "hidden" if sent or offers_count <= 30 else "",
             "page_type_description": (
                 "Your entire offer history."

@@ -170,7 +170,7 @@
             <a class="flex mr-10 items-center py-2.5 text-sm {% if current_page == 'offers' %}text-white font-semibold{% else %}text-gray-50 hover:text-gray-100{% endif %}"
               href="/offers">
               {{ order_book_svg | safe }}
-              <span>Order book</span>
+              <span>Order Book</span>
               <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs
                 font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">
                 {{ summary.num_network_offers }}
@@ -192,7 +192,7 @@
             <a class="flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md shadow-button focus:outline-none"
               href="/newoffer">
               {{ new_offer_svg | safe }}
-              <span>Create Offer</span>
+              <span>Create Single Offer</span>
             </a>
           </li>
         </ul>
@@ -213,7 +213,7 @@
             items-center py-2 pr-4 pl-3 w-full text-gray-50 text-sm md:border-0 md:p-0 md:w-auto
             text-gray-50 hover:text-gray-100">
             {{ settings_svg | safe }}
-            Settings & Tools
+            Settings
             {{ header_arrow_down_svg| safe }}
           </div>
         </ul>
@@ -599,7 +599,7 @@
         <li>
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/offers">
             {{ order_book_svg | safe }}
-            <span>Network Order Book</span>
+            <span>Order Book</span>
             <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs
               font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_network_offers and
               summary.num_network_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
@@ -611,7 +611,7 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
             href="/newoffer">
             {{ new_offer_svg | safe }}
-            <span>Create Offer</span>
+            <span>Create Single Offer</span>
           </a>
         </li>
         <li>
@@ -745,7 +745,7 @@
       </ul>
 
       <!-- Settings Section -->
-      <h3 class="mb-2 text-xs uppercase text-gray-300 font-medium">Settings & Tools</h3>
+      <h3 class="mb-2 text-xs uppercase text-gray-300 font-medium">Settings</h3>
       <ul class="text-sm font-medium">
         <li>
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
