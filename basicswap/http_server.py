@@ -310,6 +310,8 @@ class HttpHandler(BaseHTTPRequestHandler):
         args_dict["version"] = version
         args_dict["gui_version"] = GUI_VERSION
         args_dict["amm_version"] = AMM_VERSION
+        args_dict["update_available"] = getattr(swap_client, "_update_available", False)
+        args_dict["latest_version"] = getattr(swap_client, "_latest_version", None)
 
         try:
             static_dir = os.path.join(os.path.dirname(__file__), "static")
