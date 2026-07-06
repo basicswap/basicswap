@@ -14,14 +14,13 @@ import signal
 import sys
 import threading
 import unittest
-from io import StringIO
 from urllib.request import urlopen
 from unittest.mock import patch
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.rpc_xmr import callrpc_xmr
 from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import waitForServer
+from tests.basicswap.util import run_prepare_subprocess, waitForServer
 from tests.basicswap.common import (
     BASE_PORT,
     BASE_RPC_PORT,
@@ -42,6 +41,7 @@ from tests.basicswap.extended.test_nmc import (
 from tests.basicswap.extended.test_dcr import (
     DCR_BASE_PORT,
     DCR_BASE_RPC_PORT,
+    DCR_BASE_WALLET_RPC_PORT,
 )
 from tests.basicswap.test_bch_xmr import (
     BCH_BASE_PORT,
@@ -67,6 +67,9 @@ BITCOIN_TOR_PORT_BASE = int(os.getenv("BITCOIN_TOR_PORT_BASE", BTC_BASE_TOR_PORT
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
 
 DECRED_RPC_PORT_BASE = int(os.getenv("DECRED_RPC_PORT_BASE", DCR_BASE_RPC_PORT))
+DECRED_WALLET_RPC_PORT_BASE = int(
+    os.getenv("DECRED_WALLET_RPC_PORT_BASE", DCR_BASE_WALLET_RPC_PORT)
+)
 
 NAMECOIN_PORT_BASE = int(os.getenv("NAMECOIN_PORT_BASE", NMC_BASE_PORT))
 NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
@@ -158,6 +161,8 @@ def run_prepare(
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
     os.environ["DCR_RPC_PWD"] = "dcr_pwd"
+    os.environ["DCR_WALLET_RPC_PORT"] = str(DECRED_WALLET_RPC_PORT_BASE)
+
     os.environ["NMC_RPC_PORT"] = str(NAMECOIN_RPC_PORT_BASE)
     os.environ["NMC_PORT"] = str(NMC_BASE_PORT)
     os.environ["NMC_ONION_PORT"] = str(NAMECOIN_TOR_PORT_BASE)
@@ -171,15 +176,7 @@ def run_prepare(
     os.environ["DOGE_PORT"] = str(DOGE_BASE_PORT)
     os.environ["DOGE_RPC_PORT"] = str(DOGECOIN_RPC_PORT_BASE)
 
-    import basicswap.bin.prepare as prepareSystem
-
-    # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
-    from importlib import reload
-
-    prepareSystem = reload(prepareSystem)
-
     testargs = [
-        "basicswap-prepare",
         f'-datadir="{datadir_path}"',
         f'-bindir="{bins_path}"',
         f"-portoffset={(node_id + port_ofs)}",
@@ -195,16 +192,14 @@ def run_prepare(
     keysdirpath = os.getenv("PGP_KEYS_DIR_PATH", None)
     if keysdirpath is not None:
         testargs.append('-keysdirpath="' + os.path.expanduser(keysdirpath) + '"')
-    with (
-        patch.object(sys, "argv", testargs),
-        patch("sys.stdout", new=StringIO()) as mocked_stdout,
-    ):
-        prepareSystem.main()
-        lines = mocked_stdout.getvalue().split("\n")
-        if mnemonic_in is None:
-            mnemonic_out = lines[-4]
-        else:
-            mnemonic_out = mnemonic_in
+
+    result = run_prepare_subprocess(testargs)
+    if mnemonic_in is None:
+        lines = result.stdout.split("\n")
+        marker = "IMPORTANT - Save your particl wallet recovery phrase:"
+        mnemonic_out = lines[lines.index(marker) + 1]
+    else:
+        mnemonic_out = mnemonic_in
 
     with open(config_path) as fs:
         settings = json.load(fs)
@@ -336,7 +331,7 @@ def run_prepare(
             fp.write("nodnsseed=1\n")
             fp.write("nodiscoverip=1\n")
             if node_id == 0:
-                fp.write("miningaddr=SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH\n")
+                fp.write("miningaddr=SsppG7KLiH52NC7iJmUVGVq89FLS83E5vho\n")
                 for ip in range(num_nodes):
                     if ip != node_id:
                         fp.write(

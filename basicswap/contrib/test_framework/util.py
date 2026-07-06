@@ -17,8 +17,6 @@ import platform
 import re
 import time
 
-from . import coverage
-from .authproxy import AuthServiceProxy, JSONRPCException
 from collections.abc import Callable
 from typing import Optional
 
@@ -84,26 +82,6 @@ def assert_greater_than_or_equal(thing1, thing2):
         raise AssertionError("%s < %s" % (str(thing1), str(thing2)))
 
 
-def assert_raises(exc, fun, *args, **kwds):
-    assert_raises_message(exc, None, fun, *args, **kwds)
-
-
-def assert_raises_message(exc, message, fun, *args, **kwds):
-    try:
-        fun(*args, **kwds)
-    except JSONRPCException:
-        raise AssertionError("Use assert_raises_rpc_error() to test RPC failures")
-    except exc as e:
-        if message is not None and message not in e.error['message']:
-            raise AssertionError(
-                "Expected substring not found in error message:\nsubstring: '{}'\nerror message: '{}'.".format(
-                    message, e.error['message']))
-    except Exception as e:
-        raise AssertionError("Unexpected exception raised: " + type(e).__name__)
-    else:
-        raise AssertionError("No exception raised")
-
-
 def assert_raises_process_error(returncode: int, output: str, fun: Callable, *args, **kwds):
     """Execute a process and asserts the process return code and output.
 
@@ -127,47 +105,6 @@ def assert_raises_process_error(returncode: int, output: str, fun: Callable, *ar
             raise AssertionError("Expected substring not found:" + e.output)
     else:
         raise AssertionError("No exception raised")
-
-
-def assert_raises_rpc_error(code: Optional[int], message: Optional[str], fun: Callable, *args, **kwds):
-    """Run an RPC and verify that a specific JSONRPC exception code and message is raised.
-
-    Calls function `fun` with arguments `args` and `kwds`. Catches a JSONRPCException
-    and verifies that the error code and message are as expected. Throws AssertionError if
-    no JSONRPCException was raised or if the error code/message are not as expected.
-
-    Args:
-        code: the error code returned by the RPC call (defined in src/rpc/protocol.h).
-            Set to None if checking the error code is not required.
-        message: [a substring of] the error string returned by the RPC call.
-            Set to None if checking the error string is not required.
-        fun: the function to call. This should be the name of an RPC.
-        args*: positional arguments for the function.
-        kwds**: named arguments for the function.
-    """
-    assert try_rpc(code, message, fun, *args, **kwds), "No exception raised"
-
-
-def try_rpc(code, message, fun, *args, **kwds):
-    """Tries to run an rpc command.
-
-    Test against error code and message if the rpc fails.
-    Returns whether a JSONRPCException was raised."""
-    try:
-        fun(*args, **kwds)
-    except JSONRPCException as e:
-        # JSONRPCException was thrown as expected. Check the code and message values are correct.
-        if (code is not None) and (code != e.error["code"]):
-            raise AssertionError("Unexpected JSONRPC error code %i" % e.error["code"])
-        if (message is not None) and (message not in e.error['message']):
-            raise AssertionError(
-                "Expected substring not found in error message:\nsubstring: '{}'\nerror message: '{}'.".format(
-                    message, e.error['message']))
-        return True
-    except Exception as e:
-        raise AssertionError("Unexpected exception raised: " + type(e).__name__)
-    else:
-        return False
 
 
 def assert_is_hex_string(string):
@@ -318,31 +255,6 @@ PORT_RANGE = 5000
 class PortSeed:
     # Must be initialized with a unique integer for each process
     n = None
-
-
-def get_rpc_proxy(url: str, node_number: int, *, timeout: Optional[int]=None, coveragedir: Optional[str]=None) -> coverage.AuthServiceProxyWrapper:
-    """
-    Args:
-        url: URL of the RPC server to call
-        node_number: the node number (or id) that this calls to
-
-    Kwargs:
-        timeout: HTTP timeout in seconds
-        coveragedir: Directory
-
-    Returns:
-        AuthServiceProxy. convenience object for making RPC calls.
-
-    """
-    proxy_kwargs = {}
-    if timeout is not None:
-        proxy_kwargs['timeout'] = int(timeout)
-
-    proxy = AuthServiceProxy(url, **proxy_kwargs)
-
-    coverage_logfile = coverage.get_filename(coveragedir, node_number) if coveragedir else None
-
-    return coverage.AuthServiceProxyWrapper(proxy, url, coverage_logfile)
 
 
 def p2p_port(n):

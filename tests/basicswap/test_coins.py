@@ -83,17 +83,16 @@ class Test(TestFunctions):
         initial_amount: float = 200.0
 
         wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
-        if wallets_password:
-            for i in range(NUM_NODES):
-                node_port: int = 12700 + PORT_OFS + i
+        for i in range(NUM_NODES):
+            node_port: int = 12700 + PORT_OFS + i
+            if wallets_password:
                 logger.info(f"Unlocking wallet at {node_port}.")
                 read_json_api(node_port, "unlock", {"password": wallets_password})
-
-                for coin_id in (cls.test_coin_a, cls.test_coin_b):
-                    if coin_id in (Coins.BCH, Coins.PIVX):
-                        coin_ticker: str = chainparams[coin_id]["ticker"]
-                        logger.info(f"Reseeding {coin_ticker} wallet at {node_port}.")
-                        read_json_api(node_port, f"wallets/{coin_ticker}/reseed")
+            for coin_id in (cls.test_coin_a, cls.test_coin_b):
+                if coin_id in (Coins.BCH, Coins.PIVX):
+                    coin_ticker: str = chainparams[coin_id]["ticker"]
+                    logger.info(f"Reseeding {coin_ticker} wallet at {node_port}.")
+                    read_json_api(node_port, f"wallets/{coin_ticker}/reseed")
 
         for should_wait in (False, True):
             for coin_id in (cls.test_coin_a, cls.test_coin_b):

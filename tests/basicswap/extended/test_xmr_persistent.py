@@ -70,6 +70,7 @@ from tests.basicswap.common_xmr import (
     PIVX_RPC_PORT_BASE,
     DASH_RPC_PORT_BASE,
     FIRO_RPC_PORT_BASE,
+    DECRED_WALLET_RPC_PORT_BASE,
 )
 from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
@@ -80,7 +81,9 @@ RESET_TEST = make_boolean(os.getenv("RESET_TEST", True))
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv("BITCOIN_RPC_PORT_BASE", BTC_BASE_RPC_PORT))
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
-DECRED_WALLET_RPC_PORT_BASE = int(os.getenv("DECRED_WALLET_RPC_PORT_BASE", 9210))
+DECRED_WALLET_RPC_PORT_BASE = int(
+    os.getenv("DECRED_WALLET_RPC_PORT_BASE", DECRED_WALLET_RPC_PORT_BASE)
+)
 NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
 XMR_BASE_RPC_PORT = int(os.getenv("XMR_BASE_RPC_PORT", XMR_BASE_RPC_PORT))
 BITCOINCASH_RPC_PORT_BASE = int(
@@ -183,7 +186,7 @@ def updateThreadDCR(cls):
             num_passed: int = 0
             for i in range(30):
                 try:
-                    calldcrrpc(0, "purchaseticket", [cls.dcr_acc, 0.1, 0])
+                    calldcrrpc(0, "purchaseticket", [cls.dcr_acc, 0, 1])
                     num_passed += 1
                     if num_passed >= 5:
                         break
@@ -406,7 +409,7 @@ def start_processes(self):
             FIRO_RPC_PORT_BASE + PORT_OFS, "test_firo_{0}:test_firo_pwd_{0}"
         )
         self.firo_addr = self.callfirorpc(0, "getnewaddress", ["mining_addr"])
-        num_blocks: int = 200
+        num_blocks: int = 1352
         have_blocks: int = self.callfirorpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
@@ -544,7 +547,7 @@ class BaseTestWithPrepare(unittest.TestCase):
     processes = []
     btc_addr = None
     ltc_addr = None
-    dcr_addr = "SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH"
+    dcr_addr = "SsppG7KLiH52NC7iJmUVGVq89FLS83E5vho"
     dcr_acc = None
     nmc_addr = None
     xmr_addr = None

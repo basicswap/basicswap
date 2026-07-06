@@ -43,7 +43,7 @@ from basicswap.rpc import (
 from basicswap.rpc_xmr import (
     callrpc_xmr,
 )
-from basicswap.interface.xmr import (
+from basicswap.interface.xmr.xmr import (
     XMR_COIN,
 )
 from tests.basicswap.util import (

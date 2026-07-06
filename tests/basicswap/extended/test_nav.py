@@ -45,7 +45,7 @@ from tests.basicswap.common import (
     wait_for_bid_tx_state,
     waitForRPC,
 )
-from basicswap.interface.contrib.nav_test_framework.mininode import (
+from basicswap.interface.nav.contrib.mininode import (
     ToHex,
     FromHex,
     CTxIn,
@@ -53,7 +53,7 @@ from basicswap.interface.contrib.nav_test_framework.mininode import (
     CTransaction,
     CTxInWitness,
 )
-from basicswap.interface.contrib.nav_test_framework.script import (
+from basicswap.interface.nav.contrib.script import (
     CScript,
     OP_EQUAL,
     OP_CHECKSEQUENCEVERIFY,

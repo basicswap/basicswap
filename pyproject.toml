@@ -47,7 +47,15 @@ path = "basicswap/__init__.py"
 allow-direct-references = true
 
 [tool.ruff]
-exclude = ["basicswap/contrib","basicswap/interface/contrib"]
+exclude = ["contrib",]
+
+[tool.ruff.lint]
+# E131 is a flake8-only code (pycodestyle hanging-indent) used in # noqa comments;
+# tell ruff it is an external code so it does not reject those noqa directives.
+external = ["E131"]
+
+[tool.black]
+force-exclude = "contrib"
 
 [tool.codespell]
 check-filenames = true
@@ -55,4 +63,4 @@ disable-colors = true
 quiet-level = 7
 dictionary = "tests/lint/spelling.extra_dictionary.txt,-"
 ignore-words = "tests/lint/spelling.ignore-words.txt"
-skip = ".git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static"
+skip = ".git,.eggs,.tox,pgp,*.pyc,*basicswap/contrib,*basicswap/interface/*/contrib,*mnemonics.py,bin/install_certifi.py,*basicswap/static"

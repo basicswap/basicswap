@@ -53,7 +53,7 @@ from tests.basicswap.test_xmr import (
 )
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.bin.run import startDaemon
-from basicswap.bin.prepare import downloadPIVXParams
+from basicswap.interface.pivx.core import downloadPIVXParams
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG

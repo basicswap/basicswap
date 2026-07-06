@@ -7,7 +7,7 @@
 from basicswap.script import (
     OpCodes,
 )
-from basicswap.interface.btc import (
+from basicswap.interface.btc.btc import (
     find_vout_for_address_from_txobj,
 )
 
