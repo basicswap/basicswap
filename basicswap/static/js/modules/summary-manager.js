@@ -1,6 +1,17 @@
 const SummaryManager = (function() {
+  const SUMMARY_REFRESH_EVENTS = new Set([
+    'new_offer',
+    'offer_created',
+    'offer_revoked',
+    'offer_expired',
+    'new_bid',
+    'bid_accepted',
+    'swap_completed',
+  ]);
+
   const config = {
-    refreshInterval: window.config?.cacheDuration || 30000,
+    refreshInterval: 30000,
+    wsRefreshDebounce: 250,
     summaryEndpoint: '/json',
     retryDelay: 5000,
     maxRetries: 3,
@@ -12,10 +23,21 @@ const SummaryManager = (function() {
   let webSocket = null;
   let fetchRetryCount = 0;
   let lastSuccessfulData = null;
+  let wsRefreshTimer = null;
+  let fetchInFlight = null;
 
-  function updateElement(elementId, value) {
-    const element = document.getElementById(elementId);
-    if (!element) return false;
+  const COUNTER_ELEMENT_IDS = {
+    networkOffers: ['network-offers-counter', 'network-offers-counter-mobile'],
+    offers: ['offers-counter', 'offers-counter-mobile'],
+    bidRequests: ['bid-requests-counter', 'bid-requests-counter-mobile'],
+    sentBids: ['sent-bids-counter', 'sent-bids-counter-mobile'],
+    recvBids: ['recv-bids-counter', 'recv-bids-counter-mobile'],
+    swaps: ['swaps-counter', 'swaps-counter-mobile'],
+    watchedOutputs: ['watched-outputs-counter', 'watched-outputs-counter-mobile'],
+  };
+
+  function updateCounterElement(element, value, preserveSvg) {
+    if (!element) return;
 
     const safeValue = (value !== undefined && value !== null)
       ? value
@@ -23,7 +45,7 @@ const SummaryManager = (function() {
 
     element.dataset.lastValue = safeValue;
 
-    if (elementId === 'sent-bids-counter' || elementId === 'recv-bids-counter') {
+    if (preserveSvg) {
       const svg = element.querySelector('svg');
       element.textContent = safeValue;
       if (svg) {
@@ -33,40 +55,42 @@ const SummaryManager = (function() {
       element.textContent = safeValue;
     }
 
-    if (['offers-counter', 'bid-requests-counter', 'sent-bids-counter',
-         'recv-bids-counter', 'swaps-counter', 'network-offers-counter',
-         'watched-outputs-counter'].includes(elementId)) {
-      element.classList.remove('bg-blue-500', 'bg-gray-400');
-      element.classList.add(safeValue > 0 ? 'bg-blue-500' : 'bg-gray-400');
-    }
+    element.classList.remove('bg-blue-500', 'bg-gray-400');
+    element.classList.add(safeValue > 0 ? 'bg-blue-500' : 'bg-gray-400');
+  }
 
-    if (elementId === 'swaps-counter') {
-      const swapContainer = document.getElementById('swapContainer');
-      if (swapContainer) {
-        const isSwapping = safeValue > 0;
-        if (isSwapping) {
-          swapContainer.innerHTML = document.querySelector('#swap-in-progress-green-template').innerHTML || '';
-          swapContainer.style.animation = 'spin 2s linear infinite';
-        } else {
-          swapContainer.innerHTML = document.querySelector('#swap-in-progress-template').innerHTML || '';
-          swapContainer.style.animation = 'none';
-        }
+  function updateCounterElements(elementIds, value, preserveSvg) {
+    elementIds.forEach((elementId) => {
+      const element = document.getElementById(elementId);
+      updateCounterElement(element, value, preserveSvg);
+    });
+  }
+
+  function updateSwapContainers(isSwapping) {
+    const greenTemplate = document.getElementById('swap-in-progress-green-template');
+    const idleTemplate = document.getElementById('swap-in-progress-template');
+    document.querySelectorAll('#swapContainer').forEach((swapContainer) => {
+      if (isSwapping) {
+        swapContainer.innerHTML = greenTemplate ? greenTemplate.innerHTML : swapContainer.innerHTML;
+        swapContainer.style.animation = 'spin 2s linear infinite';
+      } else {
+        swapContainer.innerHTML = idleTemplate ? idleTemplate.innerHTML : swapContainer.innerHTML;
+        swapContainer.style.animation = 'none';
       }
-    }
-    return true;
+    });
   }
 
   function updateUIFromData(data) {
     if (!data) return;
 
-    updateElement('network-offers-counter', data.num_network_offers);
-    updateElement('offers-counter', data.num_sent_active_offers);
-    updateElement('offers-counter-mobile', data.num_sent_active_offers);
-    updateElement('sent-bids-counter', data.num_sent_active_bids);
-    updateElement('recv-bids-counter', data.num_recv_active_bids);
-    updateElement('bid-requests-counter', data.num_available_bids);
-    updateElement('swaps-counter', data.num_swapping);
-    updateElement('watched-outputs-counter', data.num_watched_outputs);
+    updateCounterElements(COUNTER_ELEMENT_IDS.networkOffers, data.num_network_offers);
+    updateCounterElements(COUNTER_ELEMENT_IDS.offers, data.num_sent_active_offers);
+    updateCounterElements(COUNTER_ELEMENT_IDS.sentBids, data.num_sent_active_bids, true);
+    updateCounterElements(COUNTER_ELEMENT_IDS.recvBids, data.num_recv_active_bids, true);
+    updateCounterElements(COUNTER_ELEMENT_IDS.bidRequests, data.num_available_bids);
+    updateCounterElements(COUNTER_ELEMENT_IDS.swaps, data.num_swapping);
+    updateCounterElements(COUNTER_ELEMENT_IDS.watchedOutputs, data.num_watched_outputs);
+    updateSwapContainers((data.num_swapping || 0) > 0);
 
     updateTooltips(data);
 
@@ -247,6 +271,42 @@ const SummaryManager = (function() {
     });
   }
 
+  function shouldRefreshForEvent(eventName) {
+    return SUMMARY_REFRESH_EVENTS.has(eventName);
+  }
+
+  function scheduleSummaryRefresh() {
+    if (wsRefreshTimer) {
+      if (window.CleanupManager) {
+        window.CleanupManager.clearTimeout(wsRefreshTimer);
+      } else {
+        clearTimeout(wsRefreshTimer);
+      }
+    }
+
+    wsRefreshTimer = window.CleanupManager
+      ? window.CleanupManager.setTimeout(() => {
+          wsRefreshTimer = null;
+          publicAPI.fetchSummaryData().catch(() => {});
+        }, config.wsRefreshDebounce)
+      : setTimeout(() => {
+          wsRefreshTimer = null;
+          publicAPI.fetchSummaryData().catch(() => {});
+        }, config.wsRefreshDebounce);
+  }
+
+  function handleWebSocketEvent(data) {
+    if (!data || !data.event) return;
+
+    if (shouldRefreshForEvent(data.event)) {
+      scheduleSummaryRefresh();
+    }
+
+    if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
+      window.NotificationManager.handleWebSocketEvent(data);
+    }
+  }
+
   function setupWebSocket() {
     if (webSocket) {
       webSocket.close();
@@ -277,16 +337,7 @@ const SummaryManager = (function() {
       }
 
       if (data.event) {
-        const summaryEvents = ['new_offer', 'offer_revoked', 'new_bid', 'bid_accepted', 'swap_completed'];
-        if (summaryEvents.includes(data.event)) {
-          publicAPI.fetchSummaryData()
-            .then(() => {})
-            .catch(() => {});
-        }
-
-        if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
-          window.NotificationManager.handleWebSocketEvent(data);
-        }
+        handleWebSocketEvent(data);
       }
     };
 
@@ -351,20 +402,7 @@ const SummaryManager = (function() {
           wsManager.connect();
         }
 
-        wsManager.addMessageHandler('message', (data) => {
-          if (data.event) {
-            const summaryEvents = ['new_offer', 'offer_revoked', 'new_bid', 'bid_accepted', 'swap_completed'];
-            if (summaryEvents.includes(data.event)) {
-              this.fetchSummaryData()
-                .then(() => {})
-                .catch(() => {});
-            }
-
-            if (window.NotificationManager && typeof window.NotificationManager.handleWebSocketEvent === 'function') {
-              window.NotificationManager.handleWebSocketEvent(data);
-            }
-          }
-        });
+        wsManager.addMessageHandler('message', handleWebSocketEvent);
       } else {
         setupWebSocket();
       }
@@ -379,7 +417,11 @@ const SummaryManager = (function() {
     },
 
     fetchSummaryData: function() {
-      return fetchSummaryDataWithTimeout()
+      if (fetchInFlight) {
+        return fetchInFlight;
+      }
+
+      fetchInFlight = fetchSummaryDataWithTimeout()
         .then(data => {
           lastSuccessfulData = data;
           cacheSummaryData(data);
@@ -420,7 +462,12 @@ const SummaryManager = (function() {
 
             throw error;
           }
+        })
+        .finally(() => {
+          fetchInFlight = null;
         });
+
+      return fetchInFlight;
     },
 
     updateTooltips: function(data) {
@@ -442,11 +489,21 @@ const SummaryManager = (function() {
     dispose: function() {
       stopRefreshTimer();
 
+      if (wsRefreshTimer) {
+        if (window.CleanupManager) {
+          window.CleanupManager.clearTimeout(wsRefreshTimer);
+        } else {
+          clearTimeout(wsRefreshTimer);
+        }
+        wsRefreshTimer = null;
+      }
+
       if (webSocket && webSocket.readyState === WebSocket.OPEN) {
         webSocket.close();
       }
 
       webSocket = null;
+      fetchInFlight = null;
     }
   };
 

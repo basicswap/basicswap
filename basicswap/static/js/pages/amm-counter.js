@@ -1,6 +1,17 @@
 const AmmCounterManager = (function() {
+    const AMM_REFRESH_EVENTS = new Set([
+        'new_offer',
+        'offer_created',
+        'offer_revoked',
+        'offer_expired',
+        'new_bid',
+        'bid_accepted',
+        'swap_completed',
+    ]);
+
     const config = {
-        refreshInterval: 10000,
+        refreshInterval: 30000,
+        wsRefreshDebounce: 250,
         ammStatusEndpoint: '/amm/status',
         retryDelay: 5000,
         maxRetries: 3,
@@ -10,6 +21,8 @@ const AmmCounterManager = (function() {
     let refreshTimer = null;
     let fetchRetryCount = 0;
     let lastAmmStatus = null;
+    let wsRefreshTimer = null;
+    let fetchInFlight = null;
 
     function isDebugEnabled() {
         return localStorage.getItem('amm_debug_enabled') === 'true' || config.debug;
@@ -107,12 +120,16 @@ const AmmCounterManager = (function() {
     function fetchAmmStatus() {
         debugLog('Fetching AMM status...');
 
+        if (fetchInFlight) {
+            return fetchInFlight;
+        }
+
         let url = config.ammStatusEndpoint;
         if (isDebugEnabled()) {
             url += '?debug=true';
         }
 
-        return fetch(url, {
+        fetchInFlight = fetch(url, {
             headers: {
                 'Accept': 'application/json',
                 'Cache-Control': 'no-cache',
@@ -150,7 +167,32 @@ const AmmCounterManager = (function() {
                 fetchRetryCount = 0;
                 throw error;
             }
+        })
+        .finally(() => {
+            fetchInFlight = null;
         });
+
+        return fetchInFlight;
+    }
+
+    function scheduleAmmRefresh() {
+        if (wsRefreshTimer) {
+            if (window.CleanupManager) {
+                window.CleanupManager.clearTimeout(wsRefreshTimer);
+            } else {
+                clearTimeout(wsRefreshTimer);
+            }
+        }
+
+        wsRefreshTimer = window.CleanupManager
+            ? window.CleanupManager.setTimeout(() => {
+                wsRefreshTimer = null;
+                fetchAmmStatus().catch(() => {});
+            }, config.wsRefreshDebounce)
+            : setTimeout(() => {
+                wsRefreshTimer = null;
+                fetchAmmStatus().catch(() => {});
+            }, config.wsRefreshDebounce);
     }
 
     function startRefreshTimer() {
@@ -181,11 +223,9 @@ const AmmCounterManager = (function() {
         if (window.WebSocketManager && typeof window.WebSocketManager.addMessageHandler === 'function') {
             debugLog('Setting up WebSocket handler for AMM status updates');
             window.WebSocketManager.addMessageHandler('message', (data) => {
-                if (data && data.event) {
+                if (data && data.event && AMM_REFRESH_EVENTS.has(data.event)) {
                     debugLog('WebSocket event received, refreshing AMM status');
-                    fetchAmmStatus()
-                        .then(() => {})
-                        .catch(() => {});
+                    scheduleAmmRefresh();
                 }
             });
         }
@@ -235,6 +275,15 @@ const AmmCounterManager = (function() {
         dispose: function() {
             debugLog('Disposing AMM Counter Manager');
             stopRefreshTimer();
+            if (wsRefreshTimer) {
+                if (window.CleanupManager) {
+                    window.CleanupManager.clearTimeout(wsRefreshTimer);
+                } else {
+                    clearTimeout(wsRefreshTimer);
+                }
+                wsRefreshTimer = null;
+            }
+            fetchInFlight = null;
         }
     };
 

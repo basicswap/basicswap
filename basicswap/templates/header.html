@@ -600,7 +600,7 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/offers">
             {{ order_book_svg | safe }}
             <span>Order Book</span>
-            <span id="network-offers-counter" class="inline-flex justify-center items-center text-xs
+            <span id="network-offers-counter-mobile" class="inline-flex justify-center items-center text-xs
               font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_network_offers and
               summary.num_network_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_network_offers }}
@@ -679,7 +679,7 @@
             href="/availablebids">
             {{ available_bids_svg | safe }}
             <span>Bid Requests</span>
-            <span id="bid-requests-counter" class="inline-flex justify-center items-center text-xs
+            <span id="bid-requests-counter-mobile" class="inline-flex justify-center items-center text-xs
               font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_available_bids and
               summary.num_available_bids > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_available_bids }}
@@ -691,7 +691,7 @@
          {{ bids_received_svg | safe }}
        <span class="my-auto">Bids</span>
        <div class="flex items-center ml-auto my-auto">
-       <span id="sent-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5
+       <span id="sent-bids-counter-mobile" class="inline-flex items-center text-xs font-semibold px-2.5
         py-1 text-white {% if summary.num_sent_active_bids and summary.num_sent_active_bids > 0 %}
         bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full mr-2 bids-tab-link cursor-pointer"
         data-tab-target="#sent">
@@ -700,7 +700,7 @@
         </svg>
         {{ summary.num_sent_active_bids }}
        </span>
-       <span id="recv-bids-counter" class="inline-flex items-center text-xs font-semibold px-2.5
+       <span id="recv-bids-counter-mobile" class="inline-flex items-center text-xs font-semibold px-2.5
         py-1 text-white {% if summary.num_recv_active_bids and summary.num_recv_active_bids > 0 %}
         bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full bids-tab-link cursor-pointer"
         data-tab-target="#received">
@@ -724,7 +724,7 @@
               {% endif %}
             </div>
             <span>Swaps in Progress</span>
-            <span id="swaps-counter" class="inline-flex justify-center items-center text-xs font-semibold
+            <span id="swaps-counter-mobile" class="inline-flex justify-center items-center text-xs font-semibold
               ml-auto px-2.5 py-1 text-white {% if summary.num_swapping and summary.num_swapping > 0 %}
               bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_swapping }}
@@ -735,7 +735,7 @@
           <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded" href="/watched">
             {{ outputs_svg | safe }}
             <span>Watch Outputs</span>
-            <span id="watched-outputs-counter" class="inline-flex justify-center items-center text-xs
+            <span id="watched-outputs-counter-mobile" class="inline-flex justify-center items-center text-xs
               font-semibold ml-auto px-2.5 py-1 text-white {% if summary.num_watched_outputs and
               summary.num_watched_outputs > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_watched_outputs }}
