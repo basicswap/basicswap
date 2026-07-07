@@ -151,7 +151,6 @@ from .db import (
     MessageLink,
     Notification,
     Offer,
-    OfferTracking,
     pack_state,
     PooledAddress,
     PrefundedTx,
@@ -187,8 +186,6 @@ MINPROTO_VERSION_SECRET_HASH = 4
 
 PROTOCOL_VERSION_ADAPTOR_SIG = 4
 MINPROTO_VERSION_ADAPTOR_SIG = 4
-
-PROTOCOL_VERSION_OFFER_TRACKING = 6
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
@@ -4158,18 +4155,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 tracking_max_fills = 0
 
             msg_buf.protocol_version = (
-                PROTOCOL_VERSION_OFFER_TRACKING
-                if offer_mode != OfferTrackingModes.LEGACY
-                else (
-                    PROTOCOL_VERSION_ADAPTOR_SIG
-                    if swap_type == SwapTypes.XMR_SWAP
-                    else PROTOCOL_VERSION_SECRET_HASH
-                )
+                PROTOCOL_VERSION_ADAPTOR_SIG
+                if swap_type == SwapTypes.XMR_SWAP
+                else PROTOCOL_VERSION_SECRET_HASH
             )
-            if offer_mode != OfferTrackingModes.LEGACY:
-                msg_buf.offer_flags = int(offer_mode)
-                msg_buf.total_budget_from = int(tracking_total_budget)
-                msg_buf.max_fills = int(tracking_max_fills)
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
@@ -4499,6 +4488,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
     def getOfferTrackingSummary(self, offer, cursor=None) -> dict:
+        if not offer.was_sent:
+            return None
         use_cursor = self.openDB(cursor)
         try:
             row = get_offer_tracking(self, offer.offer_id, use_cursor)
@@ -10784,30 +10775,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 offer.setState(OfferStates.OFFER_RECEIVED)
                 self.add(offer, cursor)
-
-                if offer_data.protocol_version >= PROTOCOL_VERSION_OFFER_TRACKING:
-                    try:
-                        recv_mode = OfferTrackingModes(int(offer_data.offer_flags))
-                    except Exception:
-                        recv_mode = OfferTrackingModes.LEGACY
-                    if recv_mode != OfferTrackingModes.LEGACY:
-                        self.add(
-                            OfferTracking(
-                                offer_id=offer_id,
-                                active_ind=1,
-                                mode=int(recv_mode),
-                                per_swap_amount=int(offer_data.amount_from),
-                                total_budget=int(offer_data.total_budget_from),
-                                filled_amount=0,
-                                reserved_amount=0,
-                                max_fills=int(offer_data.max_fills),
-                                fills_completed=0,
-                                min_wallet_reserve=0,
-                                created_at=msg["sent"],
-                                updated_at=msg["sent"],
-                            ),
-                            cursor,
-                        )
 
                 if offer.swap_type == SwapTypes.XMR_SWAP:
                     xmr_offer = XmrOffer()
