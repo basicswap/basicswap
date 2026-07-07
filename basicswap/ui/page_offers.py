@@ -44,6 +44,12 @@ from basicswap.chainparams import (
     Coins,
     ticker_map,
 )
+from basicswap.offer_tracking import (
+    OfferTrackingModes,
+    offerTrackingModeFromString,
+    offerTrackingModeToString,
+    strOfferTrackingMode,
+)
 from basicswap.explorers import default_coingecko_api_key
 
 
@@ -133,6 +139,40 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 errors.append("Minimum Purchase Quantity out of range")
     except Exception:
         errors.append("Minimum Purchase Quantity")
+
+    if have_data_entry(form_data, "offer_mode"):
+        page_data["offer_mode"] = get_data_entry(form_data, "offer_mode")
+        try:
+            offer_mode = offerTrackingModeFromString(page_data["offer_mode"])
+            parsed_data["offer_mode"] = int(offer_mode)
+
+            if offer_mode == OfferTrackingModes.FIXED_TOTAL:
+                if have_data_entry(form_data, "total_to_sell"):
+                    page_data["total_to_sell"] = get_data_entry(
+                        form_data, "total_to_sell"
+                    )
+                    total_budget = inputAmount(page_data["total_to_sell"], ci_from)
+                    parsed_data["total_budget"] = total_budget
+                    if (
+                        "amt_from" in parsed_data
+                        and total_budget < parsed_data["amt_from"]
+                    ):
+                        errors.append(
+                            "Total to sell must be at least the amount per swap"
+                        )
+                else:
+                    errors.append("Total to sell is required for a fixed total offer")
+
+            if offer_mode == OfferTrackingModes.STANDING:
+                if have_data_entry(form_data, "min_wallet_reserve"):
+                    page_data["min_wallet_reserve"] = get_data_entry(
+                        form_data, "min_wallet_reserve"
+                    )
+                    parsed_data["min_wallet_reserve"] = inputAmount(
+                        page_data["min_wallet_reserve"], ci_from
+                    )
+        except Exception as e:
+            errors.append(str(e))
 
     if have_data_entry(form_data, "rate") and not have_data_entry(form_data, "amt_to"):
         parsed_data["rate"] = ci_to.make_int(form_data["rate"], r=1)
@@ -394,6 +434,13 @@ def postNewOfferFromParsed(swap_client, parsed_data):
     if parsed_data.get("automation_strat_id", None) is not None:
         extra_options["automation_id"] = parsed_data["automation_strat_id"]
 
+    if parsed_data.get("offer_mode", None) is not None:
+        extra_options["offer_mode"] = int(parsed_data["offer_mode"])
+        if parsed_data.get("total_budget", None) is not None:
+            extra_options["total_budget"] = parsed_data["total_budget"]
+        if parsed_data.get("min_wallet_reserve", None) is not None:
+            extra_options["min_wallet_reserve"] = parsed_data["min_wallet_reserve"]
+
     swap_value = parsed_data["amt_from"]
     if parsed_data.get("amt_to", None) is not None:
         extra_options["amount_to"] = parsed_data["amt_to"]
@@ -404,7 +451,7 @@ def postNewOfferFromParsed(swap_client, parsed_data):
         itx_decoded = ci_from.describeTx(itx.hex())
         n = pi.findMockVout(ci_from, itx_decoded)
         swap_value = ci_from.make_int(itx_decoded["vout"][n]["value"])
-        extra_options = {"prefunded_itx": itx}
+        extra_options["prefunded_itx"] = itx
 
     offer_id = swap_client.postOffer(
         parsed_data["coin_from"],
@@ -478,7 +525,168 @@ def offer_to_post_string(self, swap_client, offer_id):
     except Exception:
         pass  # None found
 
+    try:
+        tracking = swap_client.getOfferTrackingSummary(offer)
+    except Exception:
+        tracking = None
+    if tracking is not None:
+        mode = tracking["mode"]
+        offer_data["offer_mode"] = offerTrackingModeToString(mode)
+        if mode == OfferTrackingModes.FIXED_TOTAL and tracking["total_budget"] > 0:
+            offer_data["total_to_sell"] = ci_from.format_amount(
+                tracking["total_budget"]
+            )
+        elif mode == OfferTrackingModes.STANDING and tracking["min_wallet_reserve"] > 0:
+            offer_data["min_wallet_reserve"] = ci_from.format_amount(
+                tracking["min_wallet_reserve"]
+            )
+
     return parse.urlencode(offer_data).encode()
+
+
+def _fmt_float(value, places: int = 8) -> str:
+    try:
+        s = "{:.{}f}".format(float(value), places)
+    except (TypeError, ValueError):
+        return ""
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s
+
+
+def _add_review_insights(swap_client, page_data, parsed_data) -> None:
+    coin_from = parsed_data.get("coin_from")
+    coin_to = parsed_data.get("coin_to")
+    if coin_from is None or coin_to is None:
+        return
+
+    user_rate = None
+    try:
+        if page_data.get("rate") not in (None, ""):
+            user_rate = float(page_data["rate"])
+    except (TypeError, ValueError):
+        user_rate = None
+
+    try:
+        rates = swap_client.lookupRates(int(coin_from), int(coin_to))
+        cg = rates.get("coingecko", {}) if isinstance(rates, dict) else {}
+        inferred = cg.get("rate_inferred")
+        if inferred is not None:
+            inferred_f = float(inferred)
+            page_data["market_rate_inferred"] = _fmt_float(inferred_f)
+            if user_rate and user_rate > 0 and inferred_f > 0:
+                delta = (user_rate - inferred_f) / inferred_f * 100.0
+                page_data["market_rate_delta_pct"] = round(delta, 1)
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"Review market rate lookup failed: {e}")
+
+    try:
+        ci_to = swap_client.ci(Coins(int(coin_to)))
+        ci_from = swap_client.ci(Coins(int(coin_from)))
+        competitors = swap_client.listOffers(
+            False,
+            {
+                "coin_from": int(coin_from),
+                "coin_to": int(coin_to),
+                "active": "active",
+                "limit": 100,
+            },
+        )
+        comp_rows = []
+        for o in competitors:
+            try:
+                rate_f = float(ci_to.format_amount(o.rate))
+            except Exception:
+                continue
+            comp_rows.append(
+                {
+                    "offer_id": o.offer_id.hex(),
+                    "rate": rate_f,
+                    "rate_str": _fmt_float(rate_f),
+                    "amount_from": ci_from.format_amount(o.amount_from),
+                }
+            )
+        rates_list = [r["rate"] for r in comp_rows]
+        page_data["competitor_count"] = len(rates_list)
+        if rates_list:
+            best = min(rates_list)
+            page_data["competitor_best_rate"] = _fmt_float(best)
+            if user_rate and user_rate > 0:
+                cheaper = sum(1 for r in rates_list if r < user_rate)
+                page_data["competitor_cheaper_count"] = cheaper
+            comp_rows.sort(key=lambda r: r["rate"])
+            for r in comp_rows:
+                r["cheaper_than_yours"] = bool(
+                    user_rate and user_rate > 0 and r["rate"] < user_rate
+                )
+            page_data["competitor_offers"] = comp_rows[:5]
+            page_data["competitor_coin_from"] = int(coin_from)
+            page_data["competitor_coin_to"] = int(coin_to)
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"Review competitor lookup failed: {e}")
+
+    try:
+        total = page_data.get("amt_from_lock_spend_tx_fee")
+        if total is not None:
+            page_data["est_network_fee_total"] = "{} {}".format(
+                total, page_data.get("tla_from", "")
+            ).strip()
+    except Exception as e:
+        if swap_client.debug:
+            swap_client.log.warning(f"Review fee total failed: {e}")
+
+
+def _add_tracking_review(swap_client, page_data, parsed_data) -> None:
+    mode_int = parsed_data.get("offer_mode", None)
+    if mode_int is None:
+        page_data["tracking_mode_label"] = strOfferTrackingMode(
+            OfferTrackingModes.LEGACY
+        )
+        return
+    try:
+        mode = OfferTrackingModes(int(mode_int))
+    except Exception:
+        return
+
+    page_data["tracking_mode_label"] = strOfferTrackingMode(mode)
+    try:
+        ci_from = swap_client.ci(parsed_data["coin_from"])
+    except Exception:
+        ci_from = None
+
+    per_swap = parsed_data.get("amt_from")
+    if ci_from is not None and per_swap is not None:
+        page_data["tracking_per_swap"] = "{} {}".format(
+            ci_from.format_amount(per_swap), ci_from.ticker()
+        )
+
+    if mode == OfferTrackingModes.ONE_TIME:
+        page_data["tracking_fills"] = "1 swap"
+        page_data["tracking_close_behavior"] = "Closes automatically after 1 swap."
+    elif mode == OfferTrackingModes.FIXED_TOTAL:
+        total = parsed_data.get("total_budget")
+        if ci_from is not None and total is not None:
+            page_data["tracking_total"] = "{} {}".format(
+                ci_from.format_amount(total), ci_from.ticker()
+            )
+        page_data["tracking_fills"] = "Multiple swaps up to the total"
+        page_data["tracking_close_behavior"] = (
+            "Closes automatically once the total to sell is reached."
+        )
+    elif mode == OfferTrackingModes.STANDING:
+        reserve = parsed_data.get("min_wallet_reserve")
+        if ci_from is not None and reserve is not None:
+            page_data["tracking_reserve"] = "{} {}".format(
+                ci_from.format_amount(reserve), ci_from.ticker()
+            )
+        page_data["tracking_fills"] = "Repeats indefinitely"
+        page_data["tracking_close_behavior"] = (
+            "Stays open; revoked automatically if the wallet reaches its floor."
+        )
+    else:
+        page_data["tracking_close_behavior"] = "No fill tracking (today's behaviour)."
 
 
 def page_newoffer(self, url_split, post_string):
@@ -511,6 +719,7 @@ def page_newoffer(self, url_split, post_string):
 
     form_data = self.checkForm(post_string, "newoffer", err_messages)
 
+    parsed_data = {}
     if form_data:
         try:
             parsed_data, errors = parseOfferFormData(swap_client, form_data, page_data)
@@ -521,26 +730,49 @@ def page_newoffer(self, url_split, post_string):
                 swap_client.log.error(traceback.format_exc())
             err_messages.append(str(e))
 
+    offer_id = None
+    wizard_step = "trade"
+
     if len(err_messages) == 0 and "submit_offer" in page_data:
         try:
             offer_id = postNewOfferFromParsed(swap_client, parsed_data)
-            messages.append(
-                '<a href="/offer/'
-                + offer_id.hex()
-                + '">Sent Offer {}</a>'.format(offer_id.hex())
-            )
-            page_data = {}
+            page_data["offer_id"] = offer_id.hex()
+            wizard_step = "success"
         except Exception as e:
             if swap_client.debug is True:
                 swap_client.log.error(traceback.format_exc())
-            err_messages.append(str(e))
+            page_data["publish_error"] = str(e)
 
-    if len(err_messages) == 0 and "check_offer" in page_data:
-        template = server.env.get_template("offer_confirm.html")
-    elif "step2" in page_data:
-        template = server.env.get_template("offer_new_2.html")
-    else:
-        template = server.env.get_template("offer_new_1.html")
+    if wizard_step != "success":
+        if "submit_offer" in page_data:
+            wizard_step = "review"
+        elif "check_offer" in page_data and len(err_messages) == 0:
+            wizard_step = "review"
+        elif "step2" in page_data:
+            wizard_step = "terms"
+        else:
+            wizard_step = "trade"
+
+    if wizard_step == "review":
+        try:
+            _add_review_insights(swap_client, page_data, parsed_data)
+        except Exception as e:
+            if swap_client.debug is True:
+                swap_client.log.warning(f"Could not build review insights: {e}")
+    if wizard_step in ("review", "success"):
+        try:
+            _add_tracking_review(swap_client, page_data, parsed_data)
+        except Exception as e:
+            if swap_client.debug is True:
+                swap_client.log.warning(f"Could not build tracking review: {e}")
+
+    template_names = {
+        "success": "offer_success.html",
+        "review": "offer_confirm.html",
+        "terms": "offer_new_2.html",
+        "trade": "offer_new_1.html",
+    }
+    template = server.env.get_template(template_names[wizard_step])
 
     if swap_client.debug_ui:
         messages.append("Debug mode active.")
@@ -831,6 +1063,41 @@ def page_offer(self, url_split: List[str], post_string: str) -> bytes:
         )
     data["amt_swapped"] = ci_from.format_amount(amt_swapped)
 
+    try:
+        tracking = swap_client.getOfferTrackingSummary(offer)
+    except Exception as e:
+        if swap_client.debug is True:
+            swap_client.log.warning(f"getOfferTrackingSummary failed: {e}")
+        tracking = None
+    if tracking is not None:
+        data["tracking_mode"] = tracking["mode"]
+        data["tracking_mode_str"] = tracking["mode_str"]
+        data["tracking_exhausted"] = tracking["exhausted"]
+        data["tracking_fills_completed"] = tracking["fills_completed"]
+        data["tracking_max_fills"] = tracking["max_fills"]
+        data["tracking_filled_amount"] = ci_from.format_amount(
+            tracking["filled_amount"]
+        )
+        data["tracking_in_flight_amount"] = ci_from.format_amount(
+            tracking["in_flight_amount"]
+        )
+        if tracking["total_budget"] > 0:
+            data["tracking_total_budget"] = ci_from.format_amount(
+                tracking["total_budget"]
+            )
+            filled = tracking["filled_amount"]
+            total = tracking["total_budget"]
+            data["tracking_progress_pct"] = (
+                min(100, int(filled * 100 / total)) if total > 0 else 0
+            )
+        if tracking["remaining"] is not None:
+            data["tracking_remaining"] = ci_from.format_amount(tracking["remaining"])
+        if tracking["min_wallet_reserve"] > 0:
+            data["tracking_min_wallet_reserve"] = ci_from.format_amount(
+                tracking["min_wallet_reserve"]
+            )
+        data["tracking_ticker"] = ci_from.ticker()
+
     if show_bid_form:
         coin_to_id = int(ci_to.coin_type())
         wallet_coin_to_id = coin_to_id
@@ -1073,7 +1340,7 @@ def page_offers(self, url_split, post_string, sent=False):
     return self.render_template(
         template,
         {
-            "page_type": "Your Offers" if sent else "Network Order Book",
+            "page_type": "Your Offers" if sent else "Order Book",
             "page_button": "hidden" if sent or offers_count <= 30 else "",
             "page_type_description": (
                 "Your entire offer history."

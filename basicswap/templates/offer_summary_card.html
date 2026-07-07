@@ -1,0 +1,48 @@
+{# Trade summary card. #}
+{% set ns = namespace(coin_from_name='', coin_to_name='') %}
+{% for c in coins_from %}{% if data.coin_from==c[0] %}{% set ns.coin_from_name = c[1] %}{% endif %}{% endfor %}
+{% for c in coins %}{% if data.coin_to==c[0] %}{% set ns.coin_to_name = c[1] %}{% endif %}{% endfor %}
+<div class="bg-white dark:bg-gray-600 rounded-lg p-5 border border-gray-200 dark:border-gray-400">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="inline-flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-500 rounded-full border border-gray-200 dark:border-gray-400">
+        <img class="h-6" src="/static/images/coins/{{ ns.coin_from_name|replace(' ', '-') }}-20.png" alt="{{ ns.coin_from_name }}">
+      </span>
+      <div>
+        <div class="text-xs text-gray-500 dark:text-gray-300">You send</div>
+        <div class="font-semibold text-gray-900 dark:text-white">{{ data.amt_from }} {{ ns.coin_from_name }}</div>
+      </div>
+    </div>
+    <svg class="w-5 h-5 text-blue-500 mx-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+    <div class="flex items-center gap-3">
+      <span class="inline-flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-500 rounded-full border border-gray-200 dark:border-gray-400">
+        <img class="h-6" src="/static/images/coins/{{ ns.coin_to_name|replace(' ', '-') }}-20.png" alt="{{ ns.coin_to_name }}">
+      </span>
+      <div>
+        <div class="text-xs text-gray-500 dark:text-gray-300">You get</div>
+        <div class="font-semibold text-gray-900 dark:text-white">{{ data.amt_to }} {{ ns.coin_to_name }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-400">
+    <div>
+      <div class="text-xs text-gray-500 dark:text-gray-300">Rate</div>
+      <div class="text-sm font-medium text-gray-900 dark:text-white">
+        {% if ns.coin_from_name and ns.coin_to_name %}1 {{ ns.coin_from_name }} = {{ data.rate }} {{ ns.coin_to_name }}{% else %}{{ data.rate }}{% endif %}
+      </div>
+      {% if data.market_rate_delta_pct is defined %}
+      {% set _d = data.market_rate_delta_pct %}
+      <div class="text-xs mt-1
+        {% if _d > 0.1 %}text-amber-600 dark:text-amber-400{% elif _d < -0.1 %}text-blue-600 dark:text-blue-400{% else %}text-green-600 dark:text-green-400{% endif %}">
+        {% if _d > 0.1 %}{{ _d }}% above market{% elif _d < -0.1 %}{{ _d | abs }}% below market{% else %}At market rate{% endif %}
+      </div>
+      {% elif data.market_rate_inferred is defined %}
+      <div class="text-xs mt-1 text-gray-400 dark:text-gray-300">Market: {{ data.market_rate_inferred }}</div>
+      {% endif %}
+    </div>
+    <div>
+      <div class="text-xs text-gray-500 dark:text-gray-300">Minimum purchase</div>
+      <div class="text-sm font-medium text-gray-900 dark:text-white">{{ data.amt_bid_min }}</div>
+    </div>
+  </div>
+</div>

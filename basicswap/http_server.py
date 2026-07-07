@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import formatdate, parsedate_to_datetime
 from http.cookies import SimpleCookie
 
-from . import __version__
+from . import __version__, GUI_VERSION, AMM_VERSION
 from .util import (
     BalanceError,
     LockedCoinError,
@@ -58,7 +58,14 @@ from .ui.page_automation import (
     page_automation_strategy_new,
 )
 
-from .ui.page_amm import page_amm, amm_status_api, amm_autostart_api, amm_debug_api
+from .ui.page_amm import (
+    page_amm,
+    amm_status_api,
+    amm_autostart_api,
+    amm_debug_api,
+    amm_config_api,
+    amm_state_api,
+)
 from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
 from .ui.page_tor import page_tor, get_tor_established_state
@@ -301,6 +308,22 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.server.msg_id_counter = 0
 
         args_dict["version"] = version
+        args_dict["gui_version"] = GUI_VERSION
+        args_dict["amm_version"] = AMM_VERSION
+        args_dict["update_available"] = getattr(swap_client, "_update_available", False)
+        args_dict["latest_version"] = getattr(swap_client, "_latest_version", None)
+
+        try:
+            static_dir = os.path.join(os.path.dirname(__file__), "static")
+            mtimes = []
+            for rel in (
+                os.path.join("css", "style.css"),
+                os.path.join("js", "pages", "offer-new-page.js"),
+            ):
+                mtimes.append(int(os.path.getmtime(os.path.join(static_dir, rel))))
+            args_dict["static_v"] = "{}-{}".format(version, max(mtimes))
+        except Exception:
+            args_dict["static_v"] = version
 
         self.putHeaders(status_code, "text/html", extra_headers=extra_headers)
         return bytes(
@@ -1004,6 +1027,28 @@ class HttpHandler(BaseHTTPRequestHandler):
                         )
                         self.putHeaders(200, "application/json")
                         return json.dumps(debug_data).encode("utf-8")
+                    elif len(url_split) > 2 and url_split[2] == "config":
+                        query_params = {}
+                        if parsed.query:
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        config_result = amm_config_api(
+                            swap_client, post_string, query_params
+                        )
+                        self.putHeaders(200, "application/json")
+                        return json.dumps(config_result).encode("utf-8")
+                    elif len(url_split) > 2 and url_split[2] == "state":
+                        query_params = {}
+                        if parsed.query:
+                            query_params = {
+                                k: v[0] for k, v in parse.parse_qs(parsed.query).items()
+                            }
+                        state_result = amm_state_api(
+                            swap_client, post_string, query_params
+                        )
+                        self.putHeaders(200, "application/json")
+                        return json.dumps(state_result).encode("utf-8")
                     return page_amm(self, url_split, post_string)
                 if page == "shutdown":
                     return self.page_shutdown(url_split, post_string)
