@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
-# Copyright (c) 2025 The Basicswap developers
+# Copyright (c) 2025-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import base64
+import http.client
 import json
 import logging
+import socket
 import traceback
 import urllib
-import http.client
 from xmlrpc.client import (
     Fault,
     Transport,
@@ -48,6 +50,17 @@ class TimeoutSafeTransport(SafeTransport):
 
 
 class Jsonrpc:
+
+    @staticmethod
+    def constructUrl(auth: str, host: str, rpc_port: int, wallet: str = None):
+        scheme: str = "http"
+        if "://" in host:
+            scheme, host = host.split("://", 1)
+        url = f"{scheme}://{auth}@{host}:{rpc_port}/"
+        if wallet is not None:
+            url += "wallet/" + urllib.parse.quote(wallet)
+        return url
+
     # __getattr__ complicates extending ServerProxy
     def __init__(
         self,
@@ -73,8 +86,6 @@ class Jsonrpc:
             auth_part, host_port = parsed.netloc.rsplit("@", 1)
             self.__host = host_port
             if ":" in auth_part:
-                import base64
-
                 auth_bytes = auth_part.encode("utf-8")
                 auth_b64 = base64.b64encode(auth_bytes).decode("ascii")
                 self.__auth = f"Basic {auth_b64}"
@@ -159,9 +170,7 @@ def callrpc(
         return callrpc_pooled(rpc_port, auth, method, params, wallet, host, timeout)
 
     try:
-        url = "http://{}@{}:{}/".format(auth, host, rpc_port)
-        if wallet is not None:
-            url += "wallet/" + urllib.parse.quote(wallet)
+        url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
         x = Jsonrpc(url, timeout=timeout if timeout else 10)
 
         v = x.json_request(method, params)
@@ -180,12 +189,8 @@ def callrpc_pooled(
     rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1", timeout=None
 ):
     from .rpc_pool import get_rpc_pool
-    import http.client
-    import socket
 
-    url = "http://{}@{}:{}/".format(auth, host, rpc_port)
-    if wallet is not None:
-        url += "wallet/" + urllib.parse.quote(wallet)
+    url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
 
     if timeout:
         try:
@@ -250,9 +255,7 @@ def callrpc_pooled(
 
 def openrpc(rpc_port, auth, wallet=None, host="127.0.0.1"):
     try:
-        url = "http://{}@{}:{}/".format(auth, host, rpc_port)
-        if wallet is not None:
-            url += "wallet/" + urllib.parse.quote(wallet)
+        url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
         return Jsonrpc(url)
     except Exception as ex:
         traceback.print_exc()

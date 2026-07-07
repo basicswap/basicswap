@@ -21,7 +21,7 @@ from basicswap.contrib.test_framework.script import (
 )
 from basicswap.interface.base import Secp256k1Interface
 from basicswap.interface.utils import FeeValidator
-from basicswap.interface.btc import (
+from basicswap.interface.btc.btc import (
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
 )

@@ -67,7 +67,10 @@ from tests.basicswap.common_xmr import (
     XMR_BASE_RPC_PORT,
     DOGE_BASE_RPC_PORT,
     NMC_BASE_RPC_PORT,
+    PIVX_RPC_PORT_BASE,
+    DASH_RPC_PORT_BASE,
     FIRO_RPC_PORT_BASE,
+    DECRED_WALLET_RPC_PORT_BASE,
 )
 from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
@@ -78,7 +81,9 @@ RESET_TEST = make_boolean(os.getenv("RESET_TEST", True))
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))
 BITCOIN_RPC_PORT_BASE = int(os.getenv("BITCOIN_RPC_PORT_BASE", BTC_BASE_RPC_PORT))
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
-DECRED_WALLET_RPC_PORT_BASE = int(os.getenv("DECRED_WALLET_RPC_PORT_BASE", 9210))
+DECRED_WALLET_RPC_PORT_BASE = int(
+    os.getenv("DECRED_WALLET_RPC_PORT_BASE", DECRED_WALLET_RPC_PORT_BASE)
+)
 NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
 XMR_BASE_RPC_PORT = int(os.getenv("XMR_BASE_RPC_PORT", XMR_BASE_RPC_PORT))
 BITCOINCASH_RPC_PORT_BASE = int(
@@ -109,39 +114,6 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def callpartrpc(
-    node_id,
-    method,
-    params=[],
-    wallet=None,
-    base_rpc_port=PARTICL_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_part_{0}:test_part_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
-
-
-def callbtcrpc(
-    node_id,
-    method,
-    params=[],
-    wallet="bsx_wallet",
-    base_rpc_port=BITCOIN_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_btc_{0}:test_btc_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
-
-
-def callltcrpc(
-    node_id,
-    method,
-    params=[],
-    wallet=None,
-    base_rpc_port=LITECOIN_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_ltc_{0}:test_ltc_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
-
-
 def calldcrrpc(
     node_id, method, params=[], base_rpc_port=DECRED_WALLET_RPC_PORT_BASE + PORT_OFS
 ):
@@ -149,66 +121,42 @@ def calldcrrpc(
     return callrpc_dcr(base_rpc_port + node_id, auth, method, params)
 
 
-def callnmcrpc(
-    node_id,
-    method,
-    params=[],
-    wallet="bsx_wallet",
-    base_rpc_port=NAMECOIN_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_nmc_{0}:test_nmc_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
+def make_rpc_func(base_rpc_port, auth_template, default_wallet=None):
 
+    def rpc_func(node_id, method, params=None, wallet=None):
+        auth = auth_template.format(node_id)
+        return callrpc(
+            base_rpc_port + node_id,
+            auth,
+            method,
+            params,
+            wallet if wallet is not None else default_wallet,
+        )
 
-def callfirorpc(
-    node_id,
-    method,
-    params=[],
-    base_rpc_port=FIRO_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_firo_{0}:test_firo_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params)
-
-
-def callbchrpc(
-    node_id,
-    method,
-    params=[],
-    wallet=None,
-    base_rpc_port=BITCOINCASH_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_bch_{0}:test_bch_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
-
-
-def calldogerpc(
-    node_id,
-    method,
-    params=[],
-    wallet=None,
-    base_rpc_port=DOGECOIN_RPC_PORT_BASE + PORT_OFS,
-):
-    auth = "test_doge_{0}:test_doge_pwd_{0}".format(node_id)
-    return callrpc(base_rpc_port + node_id, auth, method, params, wallet)
+    return rpc_func
 
 
 def updateThread(cls):
     while not cls.delay_event.is_set():
         try:
             if cls.btc_addr is not None:
-                callbtcrpc(0, "generatetoaddress", [1, cls.btc_addr])
+                cls.callbtcrpc(0, "generatetoaddress", [1, cls.btc_addr])
             if cls.ltc_addr is not None:
-                callltcrpc(0, "generatetoaddress", [1, cls.ltc_addr])
+                cls.callltcrpc(0, "generatetoaddress", [1, cls.ltc_addr])
             if cls.nmc_addr is not None:
-                callnmcrpc(0, "generatetoaddress", [1, cls.nmc_addr])
+                cls.callnmcrpc(0, "generatetoaddress", [1, cls.nmc_addr])
+            if cls.pivx_addr is not None:
+                cls.callpivxrpc(0, "generatetoaddress", [1, cls.pivx_addr])
+            if cls.dash_addr is not None:
+                cls.calldashrpc(0, "generatetoaddress", [1, cls.dash_addr])
             if cls.firo_addr is not None:
-                callfirorpc(0, "generatetoaddress", [1, cls.firo_addr])
+                cls.callfirorpc(0, "generatetoaddress", [1, cls.firo_addr])
             if cls.bch_addr is not None:
-                callbchrpc(0, "generatetoaddress", [1, cls.bch_addr])
+                cls.callbchrpc(0, "generatetoaddress", [1, cls.bch_addr])
             if cls.doge_addr is not None:
-                calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
+                cls.calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
         except Exception as e:
-            print("updateThread error", str(e))
+            print(f"updateThread error: {e}")
         cls.delay_event.wait(random.uniform(cls.update_min, cls.update_max))
 
 
@@ -227,7 +175,7 @@ def updateThreadXMR(cls):
                     auth=xmr_auth,
                 )
         except Exception as e:
-            print("updateThreadXMR error", str(e))
+            print(f"updateThreadXMR error: {e}")
         cls.delay_event.wait(random.uniform(cls.xmr_update_min, cls.xmr_update_max))
 
 
@@ -238,7 +186,7 @@ def updateThreadDCR(cls):
             num_passed: int = 0
             for i in range(30):
                 try:
-                    calldcrrpc(0, "purchaseticket", [cls.dcr_acc, 0.1, 0])
+                    calldcrrpc(0, "purchaseticket", [cls.dcr_acc, 0, 1])
                     num_passed += 1
                     if num_passed >= 5:
                         break
@@ -295,8 +243,11 @@ def start_processes(self):
         )
         self.processes[-1].start()
 
+    wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
     for i in range(NUM_NODES):
         waitForServer(self.delay_event, UI_PORT + i)
+        if wallets_password:
+            read_json_api(UI_PORT + i, "unlock", {"password": wallets_password})
 
     if "monero" in self.test_coins_list:
         try:
@@ -337,22 +288,34 @@ def start_processes(self):
             )
         )
 
-    self.btc_addr = callbtcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
-    num_blocks: int = 500  # Mine enough to activate segwit
-    if callbtcrpc(0, "getblockcount") < num_blocks:
-        logging.info(f"Mining {num_blocks} Bitcoin blocks to {self.btc_addr}")
-        callbtcrpc(0, "generatetoaddress", [num_blocks, self.btc_addr])
-    logging.info("BTC blocks: {}".format(callbtcrpc(0, "getblockcount")))
+    self.callpartrpc = make_rpc_func(
+        PARTICL_RPC_PORT_BASE + PORT_OFS, "test_part_{0}:test_part_pwd_{0}"
+    )
+    if "bitcoin" in self.test_coins_list:
+        self.callbtcrpc = make_rpc_func(
+            BITCOIN_RPC_PORT_BASE + PORT_OFS,
+            "test_btc_{0}:test_btc_pwd_{0}",
+            default_wallet="bsx_wallet",
+        )
+        self.btc_addr = self.callbtcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
+        num_blocks: int = 500  # Mine enough to activate segwit
+        if self.callbtcrpc(0, "getblockcount") < num_blocks:
+            logging.info(f"Mining {num_blocks} Bitcoin blocks to {self.btc_addr}")
+            self.callbtcrpc(0, "generatetoaddress", [num_blocks, self.btc_addr])
+        logging.info("BTC blocks: {}".format(self.callbtcrpc(0, "getblockcount")))
 
     if "litecoin" in self.test_coins_list:
-        self.ltc_addr = callltcrpc(
+        self.callltcrpc = make_rpc_func(
+            LITECOIN_RPC_PORT_BASE + PORT_OFS, "test_ltc_{0}:test_ltc_pwd_{0}"
+        )
+        self.ltc_addr = self.callltcrpc(
             0, "getnewaddress", ["mining_addr"], wallet="bsx_wallet"
         )
         num_blocks: int = 431
-        have_blocks: int = callltcrpc(0, "getblockcount")
+        have_blocks: int = self.callltcrpc(0, "getblockcount")
         if have_blocks < 500:
             logging.info(f"Mining {num_blocks} Litecoin blocks to {self.ltc_addr}")
-            callltcrpc(
+            self.callltcrpc(
                 0,
                 "generatetoaddress",
                 [num_blocks - have_blocks, self.ltc_addr],
@@ -361,14 +324,14 @@ def start_processes(self):
 
             # https://github.com/litecoin-project/litecoin/issues/807
             # Block 432 is when MWEB activates. It requires a peg-in. You'll need to generate an mweb address and send some coins to it. Then it will allow you to mine the next block.
-            mweb_addr = callltcrpc(
+            mweb_addr = self.callltcrpc(
                 0, "getnewaddress", ["mweb_addr", "mweb"], wallet="mweb"
             )
-            callltcrpc(0, "sendtoaddress", [mweb_addr, 1.0], wallet="bsx_wallet")
+            self.callltcrpc(0, "sendtoaddress", [mweb_addr, 1.0], wallet="bsx_wallet")
             num_blocks = 69
 
-            have_blocks: int = callltcrpc(0, "getblockcount")
-            callltcrpc(
+            have_blocks: int = self.callltcrpc(0, "getblockcount")
+            self.callltcrpc(
                 0,
                 "generatetoaddress",
                 [500 - have_blocks, self.ltc_addr],
@@ -405,31 +368,73 @@ def start_processes(self):
         self.update_thread_dcr = threading.Thread(target=updateThreadDCR, args=(self,))
         self.update_thread_dcr.start()
 
-    if "firo" in self.test_coins_list:
-        self.firo_addr = callfirorpc(0, "getnewaddress", ["mining_addr"])
+    if "pivx" in self.test_coins_list:
+        self.callpivxrpc = make_rpc_func(
+            PIVX_RPC_PORT_BASE + PORT_OFS, "test_pivx_{0}:test_pivx_pwd_{0}"
+        )
+        self.pivx_addr = self.callpivxrpc(0, "getnewaddress", ["mining_addr"])
+        num_blocks: int = (
+            1352  # CHECKLOCKTIMEVERIFY soft-fork activates at (regtest) block height 1351.
+        )
+        have_blocks: int = self.callpivxrpc(0, "getblockcount")
+        if have_blocks < num_blocks:
+            logging.info(
+                f"Mining {num_blocks - have_blocks} PIVX blocks to {self.pivx_addr}"
+            )
+            self.callpivxrpc(
+                0,
+                "generatetoaddress",
+                [num_blocks - have_blocks, self.pivx_addr],
+            )
+
+    if "dash" in self.test_coins_list:
+        self.calldashrpc = make_rpc_func(
+            DASH_RPC_PORT_BASE + PORT_OFS, "test_dash_{0}:test_dash_pwd_{0}"
+        )
+        self.dash_addr = self.calldashrpc(0, "getnewaddress", ["mining_addr"])
         num_blocks: int = 200
-        have_blocks: int = callfirorpc(0, "getblockcount")
+        have_blocks: int = self.calldashrpc(0, "getblockcount")
+        if have_blocks < num_blocks:
+            logging.info(
+                f"Mining {num_blocks - have_blocks} DASH blocks to {self.dash_addr}"
+            )
+            self.calldashrpc(
+                0,
+                "generatetoaddress",
+                [num_blocks - have_blocks, self.dash_addr],
+            )
+
+    if "firo" in self.test_coins_list:
+        self.callfirorpc = make_rpc_func(
+            FIRO_RPC_PORT_BASE + PORT_OFS, "test_firo_{0}:test_firo_pwd_{0}"
+        )
+        self.firo_addr = self.callfirorpc(0, "getnewaddress", ["mining_addr"])
+        num_blocks: int = 1352
+        have_blocks: int = self.callfirorpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
                 f"Mining {num_blocks - have_blocks} Firo blocks to {self.firo_addr}"
             )
-            callfirorpc(
+            self.callfirorpc(
                 0,
                 "generatetoaddress",
                 [num_blocks - have_blocks, self.firo_addr],
             )
 
     if "bitcoincash" in self.test_coins_list:
-        self.bch_addr = callbchrpc(
+        self.callbchrpc = make_rpc_func(
+            BITCOINCASH_RPC_PORT_BASE + PORT_OFS, "test_bch_{0}:test_bch_pwd_{0}"
+        )
+        self.bch_addr = self.callbchrpc(
             0, "getnewaddress", ["mining_addr"], wallet="bsx_wallet"
         )
         num_blocks: int = 200
-        have_blocks: int = callbchrpc(0, "getblockcount")
+        have_blocks: int = self.callbchrpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
                 f"Mining {num_blocks - have_blocks} Bitcoincash blocks to {self.bch_addr}"
             )
-            callbchrpc(
+            self.callbchrpc(
                 0,
                 "generatetoaddress",
                 [num_blocks - have_blocks, self.bch_addr],
@@ -437,33 +442,41 @@ def start_processes(self):
             )
 
     if "dogecoin" in self.test_coins_list:
-        self.doge_addr = calldogerpc(0, "getnewaddress", ["mining_addr"])
+        self.calldogerpc = make_rpc_func(
+            DOGECOIN_RPC_PORT_BASE + PORT_OFS, "test_doge_{0}:test_doge_pwd_{0}"
+        )
+        self.doge_addr = self.calldogerpc(0, "getnewaddress", ["mining_addr"])
         num_blocks: int = 200
-        have_blocks: int = calldogerpc(0, "getblockcount")
+        have_blocks: int = self.calldogerpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
                 f"Mining {num_blocks - have_blocks} Dogecoin blocks to {self.doge_addr}"
             )
-            calldogerpc(
+            self.calldogerpc(
                 0, "generatetoaddress", [num_blocks - have_blocks, self.doge_addr]
             )
 
     if "namecoin" in self.test_coins_list:
-        self.nmc_addr = callnmcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
+        self.callnmcrpc = make_rpc_func(
+            NAMECOIN_RPC_PORT_BASE + PORT_OFS,
+            "test_nmc_{0}:test_nmc_pwd_{0}",
+            default_wallet="bsx_wallet",
+        )
+        self.nmc_addr = self.callnmcrpc(0, "getnewaddress", ["mining_addr", "bech32"])
         num_blocks: int = 500
-        have_blocks: int = callnmcrpc(0, "getblockcount")
+        have_blocks: int = self.callnmcrpc(0, "getblockcount")
         if have_blocks < num_blocks:
             logging.info(
                 f"Mining {num_blocks - have_blocks} Namecoin blocks to {self.nmc_addr}"
             )
-            callnmcrpc(
+            self.callnmcrpc(
                 0, "generatetoaddress", [num_blocks - have_blocks, self.nmc_addr]
             )
 
     if RESET_TEST:
         # Lower output split threshold for more stakeable outputs
         for i in range(NUM_NODES):
-            callpartrpc(
+            self.callpartrpc(
                 i,
                 "walletsettings",
                 [
@@ -483,12 +496,12 @@ def start_processes(self):
     for i in range(60):
         if self.delay_event.is_set():
             raise ValueError("Test stopped.")
-        particl_blocks = callpartrpc(0, "getblockcount")
+        particl_blocks = self.callpartrpc(0, "getblockcount")
         print("particl_blocks", particl_blocks)
         if particl_blocks >= num_blocks:
             break
         self.delay_event.wait(1)
-    logging.info("PART blocks: %d", callpartrpc(0, "getblockcount"))
+    logging.info("PART blocks: %d", self.callpartrpc(0, "getblockcount"))
     assert particl_blocks >= num_blocks
 
 
@@ -534,14 +547,16 @@ class BaseTestWithPrepare(unittest.TestCase):
     processes = []
     btc_addr = None
     ltc_addr = None
-    dcr_addr = "SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH"
+    dcr_addr = "SsppG7KLiH52NC7iJmUVGVq89FLS83E5vho"
     dcr_acc = None
     nmc_addr = None
     xmr_addr = None
+    pivx_addr = None
+    dash_addr = None
     firo_addr = None
     bch_addr = None
     doge_addr = None
-    test_coins_list = TEST_COINS_LIST
+    test_coins_list = TEST_COINS_LIST.split(",")
 
     @classmethod
     def modifyConfig(cls, test_path, i):
@@ -550,12 +565,14 @@ class BaseTestWithPrepare(unittest.TestCase):
     @classmethod
     def setupNodes(cls):
         logging.info(f"Preparing {NUM_NODES} nodes.")
+        wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
         prepare_nodes(
             NUM_NODES,
-            cls.test_coins_list,
+            ",".join(cls.test_coins_list),
             True,
             {"min_sequence_lock_seconds": 60},
             PORT_OFS,
+            wallets_password=wallets_password,
         )
 
     @classmethod

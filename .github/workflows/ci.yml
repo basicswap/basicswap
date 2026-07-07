@@ -57,19 +57,19 @@ jobs:
         cat core_versions.txt
     - name: Run flake8
       run: |
-        flake8 --ignore=E203,E501,W503 --exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py
+        flake8
     - name: Run codespell
       run: |
         codespell
     - name: Run black
       run: |
-        black --check --diff --exclude="contrib" .
+        black --check --diff .
     - name: Run test_other
       run: |
         pytest tests/basicswap/test_other.py
     - name: Cache coin cores
       id: cache-cores
-      uses: actions/cache@v5
+      uses: actions/cache@v6
       env:
         cache-name: cache-cores
       with:

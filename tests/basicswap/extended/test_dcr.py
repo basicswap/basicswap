@@ -47,7 +47,7 @@ from tests.basicswap.util import (
     REQUIRED_SETTINGS,
 )
 from tests.basicswap.test_xmr import BaseTest, test_delay_event
-from basicswap.interface.dcr import DCRInterface
+from basicswap.interface.dcr.dcr import DCRInterface
 from basicswap.interface.dcr.messages import CTransaction, CTxIn, COutPoint
 from basicswap.interface.dcr.script import OP_CHECKSEQUENCEVERIFY, push_script_data
 from basicswap.bin.run import startDaemon
@@ -251,7 +251,7 @@ def run_test_bad_ptx(self, coin_from: Coins, coin_to: Coins):
     offerer_states = read_json_api(1800 + node_from, path)
     bidder_states = read_json_api(1800 + node_to, path)
 
-    if coin_to not in (Coins.XMR, Coins.WOW):
+    if coin_to not in swap_clients[node_to].xmr_based_coins:
         return
     # Hard to get the timing right
     assert (
@@ -415,7 +415,7 @@ def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
     bid, xmr_swap = swap_clients[id_offerer].getXmrBid(bid_id)
 
     node_from_ci_to = swap_clients[0].ci(coin_to)
-    if node_from_ci_to.coin_type() in (Coins.XMR, Coins.WOW):
+    if node_from_ci_to.coin_type() in swap_clients[0].xmr_based_coins:
         pass
     else:
         wtx = node_from_ci_to.rpc_wallet(
@@ -430,7 +430,7 @@ def run_test_ads_success_path(self, coin_from: Coins, coin_to: Coins):
         )
 
     node_to_ci_from = swap_clients[1].ci(coin_from)
-    if node_to_ci_from.coin_type() in (Coins.XMR, Coins.WOW):
+    if node_to_ci_from.coin_type() in swap_clients[1].xmr_based_coins:
         pass
     else:
         wtx = node_to_ci_from.rpc_wallet(
@@ -540,7 +540,7 @@ def run_test_ads_both_refund(
     bid, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
 
     node_from_ci_from = swap_clients[0].ci(coin_from)
-    if node_from_ci_from.coin_type() in (Coins.XMR, Coins.WOW):
+    if node_from_ci_from.coin_type() in swap_clients[0].xmr_based_coins:
         pass
     else:
         wtx = node_from_ci_from.rpc_wallet(
@@ -555,7 +555,7 @@ def run_test_ads_both_refund(
         )
 
     node_to_ci_to = swap_clients[1].ci(coin_to)
-    if node_to_ci_to.coin_type() in (Coins.XMR, Coins.WOW):
+    if node_to_ci_to.coin_type() in swap_clients[1].xmr_based_coins:
         pass
     else:
         wtx = node_to_ci_to.rpc_wallet(

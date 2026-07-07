@@ -14,14 +14,13 @@ import signal
 import sys
 import threading
 import unittest
-from io import StringIO
 from urllib.request import urlopen
 from unittest.mock import patch
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.rpc_xmr import callrpc_xmr
 from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import waitForServer
+from tests.basicswap.util import run_prepare_subprocess, waitForServer
 from tests.basicswap.common import (
     BASE_PORT,
     BASE_RPC_PORT,
@@ -42,6 +41,7 @@ from tests.basicswap.extended.test_nmc import (
 from tests.basicswap.extended.test_dcr import (
     DCR_BASE_PORT,
     DCR_BASE_RPC_PORT,
+    DCR_BASE_WALLET_RPC_PORT,
 )
 from tests.basicswap.test_bch_xmr import (
     BCH_BASE_PORT,
@@ -67,6 +67,9 @@ BITCOIN_TOR_PORT_BASE = int(os.getenv("BITCOIN_TOR_PORT_BASE", BTC_BASE_TOR_PORT
 LITECOIN_RPC_PORT_BASE = int(os.getenv("LITECOIN_RPC_PORT_BASE", LTC_BASE_RPC_PORT))
 
 DECRED_RPC_PORT_BASE = int(os.getenv("DECRED_RPC_PORT_BASE", DCR_BASE_RPC_PORT))
+DECRED_WALLET_RPC_PORT_BASE = int(
+    os.getenv("DECRED_WALLET_RPC_PORT_BASE", DCR_BASE_WALLET_RPC_PORT)
+)
 
 NAMECOIN_PORT_BASE = int(os.getenv("NAMECOIN_PORT_BASE", NMC_BASE_PORT))
 NAMECOIN_RPC_PORT_BASE = int(os.getenv("NAMECOIN_RPC_PORT_BASE", NMC_BASE_RPC_PORT))
@@ -75,6 +78,13 @@ NAMECOIN_TOR_PORT_BASE = int(os.getenv("NAMECOIN_TOR_PORT_BASE", NMC_BASE_TOR_PO
 XMR_BASE_P2P_PORT = 17792
 XMR_BASE_RPC_PORT = 29798
 XMR_BASE_WALLET_RPC_PORT = 29998
+
+PIVX_BASE_RPC_PORT = 36832
+PIVX_RPC_PORT_BASE = int(os.getenv("PIVX_RPC_PORT_BASE", PIVX_BASE_RPC_PORT))
+
+DASH_BASE_PORT = 37732
+DASH_BASE_RPC_PORT = 37832
+DASH_RPC_PORT_BASE = int(os.getenv("DASH_RPC_PORT_BASE", DASH_BASE_RPC_PORT))
 
 FIRO_BASE_PORT = 34832
 FIRO_BASE_RPC_PORT = 35832
@@ -151,26 +161,22 @@ def run_prepare(
     os.environ["LTC_RPC_PORT"] = str(LITECOIN_RPC_PORT_BASE)
     os.environ["DCR_RPC_PORT"] = str(DECRED_RPC_PORT_BASE)
     os.environ["DCR_RPC_PWD"] = "dcr_pwd"
+    os.environ["DCR_WALLET_RPC_PORT"] = str(DECRED_WALLET_RPC_PORT_BASE)
+
     os.environ["NMC_RPC_PORT"] = str(NAMECOIN_RPC_PORT_BASE)
     os.environ["NMC_PORT"] = str(NMC_BASE_PORT)
     os.environ["NMC_ONION_PORT"] = str(NAMECOIN_TOR_PORT_BASE)
     os.environ["XMR_RPC_USER"] = "xmr_user"
     os.environ["XMR_RPC_PWD"] = "xmr_pwd"
+    os.environ["PIVX_RPC_PORT"] = str(PIVX_RPC_PORT_BASE)
+    os.environ["DASH_RPC_PORT"] = str(DASH_RPC_PORT_BASE)
     os.environ["FIRO_RPC_PORT"] = str(FIRO_RPC_PORT_BASE)
     os.environ["BCH_PORT"] = str(BCH_BASE_PORT)
     os.environ["BCH_RPC_PORT"] = str(BITCOINCASH_RPC_PORT_BASE)
     os.environ["DOGE_PORT"] = str(DOGE_BASE_PORT)
     os.environ["DOGE_RPC_PORT"] = str(DOGECOIN_RPC_PORT_BASE)
 
-    import basicswap.bin.prepare as prepareSystem
-
-    # Hack: Reload module to set env vars as the basicswap_prepare module is initialised if imported from elsewhere earlier
-    from importlib import reload
-
-    prepareSystem = reload(prepareSystem)
-
     testargs = [
-        "basicswap-prepare",
         f'-datadir="{datadir_path}"',
         f'-bindir="{bins_path}"',
         f"-portoffset={(node_id + port_ofs)}",
@@ -186,16 +192,14 @@ def run_prepare(
     keysdirpath = os.getenv("PGP_KEYS_DIR_PATH", None)
     if keysdirpath is not None:
         testargs.append('-keysdirpath="' + os.path.expanduser(keysdirpath) + '"')
-    with (
-        patch.object(sys, "argv", testargs),
-        patch("sys.stdout", new=StringIO()) as mocked_stdout,
-    ):
-        prepareSystem.main()
-        lines = mocked_stdout.getvalue().split("\n")
-        if mnemonic_in is None:
-            mnemonic_out = lines[-4]
-        else:
-            mnemonic_out = mnemonic_in
+
+    result = run_prepare_subprocess(testargs)
+    if mnemonic_in is None:
+        lines = result.stdout.split("\n")
+        marker = "IMPORTANT - Save your particl wallet recovery phrase:"
+        mnemonic_out = lines[lines.index(marker) + 1]
+    else:
+        mnemonic_out = mnemonic_in
 
     with open(config_path) as fs:
         settings = json.load(fs)
@@ -232,7 +236,7 @@ def run_prepare(
                 fp.write(
                     "connect=127.0.0.1:{}\n".format(PARTICL_PORT_BASE + ip + port_ofs)
                 )
-        for opt in EXTRA_CONFIG_JSON.get("part{}".format(node_id), []):
+        for opt in EXTRA_CONFIG_JSON.get(f"part{node_id}", []):
             fp.write(opt + "\n")
 
     coins_array = with_coins.split(",")
@@ -276,7 +280,7 @@ def run_prepare(
                             BITCOIN_PORT_BASE + ip + port_ofs
                         )
                     )
-            for opt in EXTRA_CONFIG_JSON.get("btc{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"btc{node_id}", []):
                 fp.write(opt + "\n")
 
     if "litecoin" in coins_array:
@@ -310,7 +314,7 @@ def run_prepare(
                     fp.write(
                         "connect=127.0.0.1:{}\n".format(LTC_BASE_PORT + ip + port_ofs)
                     )
-            for opt in EXTRA_CONFIG_JSON.get("ltc{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"ltc{node_id}", []):
                 fp.write(opt + "\n")
 
     if "decred" in coins_array:
@@ -327,7 +331,7 @@ def run_prepare(
             fp.write("nodnsseed=1\n")
             fp.write("nodiscoverip=1\n")
             if node_id == 0:
-                fp.write("miningaddr=SsYbXyjkKAEXXcGdFgr4u4bo4L8RkCxwQpH\n")
+                fp.write("miningaddr=SsppG7KLiH52NC7iJmUVGVq89FLS83E5vho\n")
                 for ip in range(num_nodes):
                     if ip != node_id:
                         fp.write(
@@ -378,7 +382,7 @@ def run_prepare(
                             NAMECOIN_PORT_BASE + ip + port_ofs
                         )
                     )
-            for opt in EXTRA_CONFIG_JSON.get("ncm{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"ncm{node_id}", []):
                 fp.write(opt + "\n")
 
     if "monero" in coins_array:
@@ -426,7 +430,41 @@ def run_prepare(
                     fp.write(
                         "connect=127.0.0.1:{}\n".format(PIVX_BASE_PORT + ip + port_ofs)
                     )
-            for opt in EXTRA_CONFIG_JSON.get("pivx{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"pivx{node_id}", []):
+                fp.write(opt + "\n")
+
+    if "dash" in coins_array:
+        # Pruned nodes don't provide blocks
+        config_filename = os.path.join(datadir_path, "dash", "dash.conf")
+        with open(config_filename, "r") as fp:
+            lines = fp.readlines()
+        with open(config_filename, "w") as fp:
+            for line in lines:
+                if not line.startswith("prune"):
+                    fp.write(line)
+            fp.write("port={}\n".format(DASH_BASE_PORT + node_id + port_ofs))
+            fp.write("bind=127.0.0.1\n")
+            fp.write("dnsseed=0\n")
+            fp.write("discover=0\n")
+            fp.write("listenonion=0\n")
+            fp.write("upnp=0\n")
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = "test_dash_" + str(node_id)
+                rpc_pass = "test_dash_pwd_" + str(node_id)
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        rpc_user, salt, password_to_hmac(salt, rpc_pass)
+                    )
+                )
+                settings["chainclients"]["dash"]["rpcuser"] = rpc_user
+                settings["chainclients"]["dash"]["rpcpassword"] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write(
+                        "connect=127.0.0.1:{}\n".format(DASH_BASE_PORT + ip + port_ofs)
+                    )
+            for opt in EXTRA_CONFIG_JSON.get(f"dash{node_id}", []):
                 fp.write(opt + "\n")
 
     if "firo" in coins_array:
@@ -460,7 +498,7 @@ def run_prepare(
                     fp.write(
                         "connect=127.0.0.1:{}\n".format(FIRO_BASE_PORT + ip + port_ofs)
                     )
-            for opt in EXTRA_CONFIG_JSON.get("firo{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"firo{node_id}", []):
                 fp.write(opt + "\n")
 
     if "bitcoincash" in coins_array:
@@ -493,7 +531,7 @@ def run_prepare(
                     fp.write(
                         "connect=127.0.0.1:{}\n".format(BCH_BASE_PORT + ip + port_ofs)
                     )
-            for opt in EXTRA_CONFIG_JSON.get("bch{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"bch{node_id}", []):
                 fp.write(opt + "\n")
 
     if "dogecoin" in coins_array:
@@ -527,7 +565,7 @@ def run_prepare(
                     fp.write(
                         "connect=127.0.0.1:{}\n".format(DOGE_BASE_PORT + ip + port_ofs)
                     )
-            for opt in EXTRA_CONFIG_JSON.get("doge{}".format(node_id), []):
+            for opt in EXTRA_CONFIG_JSON.get(f"doge{node_id}", []):
                 fp.write(opt + "\n")
 
     settings["startup_delay"] = 1
@@ -546,7 +584,7 @@ def run_prepare(
 
     recursive_update_dict(settings, extra_settings)
 
-    extra_config = EXTRA_CONFIG_JSON.get("sc{}".format(node_id), {})
+    extra_config = EXTRA_CONFIG_JSON.get(f"sc{node_id}", {})
     recursive_update_dict(settings, extra_config)
 
     with open(config_path, "w") as fp:
@@ -556,7 +594,12 @@ def run_prepare(
 
 
 def prepare_nodes(
-    num_nodes, extra_coins, use_rpcauth=False, extra_settings={}, port_ofs=0
+    num_nodes,
+    extra_coins,
+    use_rpcauth=False,
+    extra_settings={},
+    port_ofs=0,
+    wallets_password=None,
 ):
     bins_path = os.path.join(TEST_PATH, "bin")
     for i in range(num_nodes):
@@ -567,6 +610,10 @@ def prepare_nodes(
         except Exception as ex:
             logging.warning(f"setUpClass {ex}")
 
+        if wallets_password is not None:
+            assert isinstance(wallets_password, str)
+            logging.info("Using wallets password.")
+            os.environ["WALLET_ENCRYPTION_PWD"] = wallets_password
         run_prepare(
             i,
             client_path,
@@ -578,6 +625,8 @@ def prepare_nodes(
             extra_settings=extra_settings,
             port_ofs=port_ofs,
         )
+        if wallets_password is not None:
+            os.environ.pop("WALLET_ENCRYPTION_PWD", None)
 
 
 class TestBase(unittest.TestCase):

@@ -19,6 +19,7 @@ from basicswap.util import (
 from basicswap.chainparams import (
     Coins,
     getCoinIdFromTicker,
+    xmr_based_coins,
 )
 
 # Todo: Move at JS
@@ -133,7 +134,7 @@ def format_wallet_data(swap_client, ci, w):
 def format_transactions(ci, transactions, coin_id):
     formatted_txs = []
 
-    if coin_id in (Coins.XMR, Coins.WOW):
+    if coin_id in xmr_based_coins:
         for tx in transactions:
             tx_type = tx.get("type", "")
             direction = (
@@ -324,7 +325,7 @@ def page_wallet(self, url_split, post_string):
 
             if estimate_fee and withdraw:
                 err_messages.append("Estimate fee and withdraw can't be used together.")
-            if estimate_fee and coin_id not in (Coins.XMR, Coins.WOW):
+            if estimate_fee and coin_id not in swap_client.xmr_based_coins:
                 ci = swap_client.ci(coin_id)
                 ticker: str = ci.ticker()
                 err_messages.append(f"Estimate fee unavailable for {ticker}.")
@@ -379,7 +380,7 @@ def page_wallet(self, url_split, post_string):
                                 value, ticker, type_from, address, txid
                             )
                         )
-                    elif coin_id in (Coins.XMR, Coins.WOW):
+                    elif coin_id in swap_client.xmr_based_coins:
                         if estimate_fee:
                             fee_estimate = ci.estimateFee(value, address, sweepall)
                             suffix = "s" if fee_estimate["num_txns"] > 1 else ""
@@ -476,7 +477,7 @@ def page_wallet(self, url_split, post_string):
             getattr(ci, "_connection_type", "rpc") == "electrum"
         )
 
-        if hasattr(ci, "getAccountKey") and k not in (Coins.XMR, Coins.WOW):
+        if hasattr(ci, "getAccountKey") and k not in swap_client.xmr_based_coins:
             try:
                 chain = swap_client.chain
                 zprv_prefix = 0x04B2430C if chain == "mainnet" else 0x045F18BC
@@ -494,7 +495,7 @@ def page_wallet(self, url_split, post_string):
         )
         wallet_data["deposit_address"] = w.get("deposit_address", "Refresh necessary")
 
-        if k in (Coins.XMR, Coins.WOW):
+        if k in swap_client.xmr_based_coins:
             wallet_data["main_address"] = w.get("main_address", "Refresh necessary")
         elif k == Coins.LTC:
             wallet_data["mweb_address"] = w.get("mweb_address", "Refresh necessary")
@@ -575,7 +576,7 @@ def page_wallet(self, url_split, post_string):
                 skip = tx_filters.get("offset", 0)
 
                 all_txs = ci.listWalletTransactions(count=10000, skip=0)
-                if all_txs and coin_id not in (Coins.XMR, Coins.WOW):
+                if all_txs and coin_id not in swap_client.xmr_based_coins:
                     all_txs = list(reversed(all_txs))
                 elif not all_txs:
                     all_txs = []

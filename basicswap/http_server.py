@@ -550,7 +550,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     cmd = get_data_entry(form_data, "cmd")
                 except Exception:
                     raise ValueError("Invalid command")
-                if coin_type in (Coins.XMR, Coins.WOW):
+                if coin_type in swap_client.xmr_based_coins:
                     ci = swap_client.ci(coin_type)
                     arr = cmd.split(None, 1)
                     method = arr[0]
@@ -597,7 +597,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         coins = [
             (str(c[0]) + ",0", c[1])
             for c in coin_available
-            if c[0] not in (Coins.XMR, Coins.WOW)
+            if c[0] not in swap_client.xmr_based_coins
         ]
 
         if any(c[0] == Coins.DCR for c in coin_available):

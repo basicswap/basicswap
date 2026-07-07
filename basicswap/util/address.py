@@ -92,10 +92,12 @@ def getKeyID(key_data: bytes) -> bytes:
     return ripemd160(sha256(key_data))
 
 
-def bech32Decode(hrp: str, addr: str) -> bytes:
+def bech32Decode(hrp: str, addr: str, for_segwit: bool = False) -> bytes:
     hrpgot, data = bech32_decode(addr)
     if hrpgot != hrp:
         return None
+    if for_segwit:
+        data = data[1:]
     decoded = convertbits(data, 5, 8, False)
     if decoded is None or len(decoded) < 2 or len(decoded) > 40:
         return None

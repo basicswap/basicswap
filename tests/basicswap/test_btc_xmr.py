@@ -20,14 +20,11 @@ from basicswap.basicswap_util import (
     TxLockTypes,
     EventLogTypes,
 )
-from basicswap.db import (
-    Concepts,
-)
-from basicswap.util import (
-    make_int,
-)
-from basicswap.util.address import b58decode
+from basicswap.db import Concepts
+from basicswap.util import make_int
 from basicswap.util.address import (
+    b58decode,
+    bech32Decode,
     decodeAddress,
 )
 from basicswap.util.extkey import ExtKeyPair
@@ -1911,6 +1908,12 @@ class BasicSwapTest(TestFunctions):
         assert addr_info["hdkeypath"] == "m/0h/0h/0h"
         if self.test_coin_from == Coins.BTC:
             assert addr == self.expected_addresses["external"]
+        else:
+            addr_decoded = ci.decodeAddress(addr)
+            expected_decoded = bech32Decode(
+                "bcrt", self.expected_addresses["external"], for_segwit=True
+            )
+            assert addr_decoded == expected_decoded
 
         addr_change = self.callnoderpc("getrawchangeaddress", wallet=new_wallet_name)
         addr_info = self.callnoderpc(
@@ -1924,6 +1927,12 @@ class BasicSwapTest(TestFunctions):
         assert addr_info["hdkeypath"] == "m/0h/1h/0h"
         if self.test_coin_from == Coins.BTC:
             assert addr_change == self.expected_addresses["internal"]
+        else:
+            addr_decoded = ci.decodeAddress(addr_change)
+            expected_decoded = bech32Decode(
+                "bcrt", self.expected_addresses["internal"], for_segwit=True
+            )
+            assert addr_decoded == expected_decoded
 
         address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
         for chain in ["external", "internal"]:
@@ -1933,7 +1942,11 @@ class BasicSwapTest(TestFunctions):
             addr0h = ci.encodeSegwitAddress(
                 ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
             )
-            assert addr0h == self.expected_addresses[chain]
+            if self.test_coin_from == Coins.BTC:
+                assert addr0h == self.expected_addresses[chain]
+            else:
+                pass
+                # TODO: derive expected keys
 
         desc_watch = descsum_create(f"addr({addr})")
         self.callnoderpc(

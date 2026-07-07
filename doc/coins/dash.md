@@ -1,6 +1,6 @@
-## DASH Notes
+# DASH Notes
 
-### Importing wallets created with DASH version <21
+## Importing wallets created with DASH version <21
 
 
 From version 21 DASH core can use the sethdseed rpc command.

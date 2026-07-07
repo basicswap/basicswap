@@ -41,8 +41,8 @@ from basicswap.util_xmr import (
     decode_address as xmr_decode_address,
     encode_address as xmr_encode_address,
 )
-from basicswap.interface.btc import BTCInterface
-from basicswap.interface.xmr import XMRInterface
+from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.xmr.xmr import XMRInterface
 from tests.basicswap.mnemonics import mnemonics
 from tests.basicswap.util import REQUIRED_SETTINGS
 
@@ -54,6 +54,7 @@ from basicswap.util import (
     DeserialiseNum,
     validate_amount,
 )
+from basicswap.rpc import Jsonrpc, escape_rpcauth
 from basicswap.messages_npb import (
     BidMessage,
 )
@@ -875,6 +876,18 @@ class Test(unittest.TestCase):
             sc.validateSwapType(case[0], case[1], case[2])
 
         del sc
+
+    def test_jsonrpc(self):
+        logging.info("---------- Test Jsonrpc")
+        host = "127.0.0.1"
+        port = 1234
+        auth = escape_rpcauth("user:p@ss")
+        url = Jsonrpc.constructUrl(auth, host, port)
+        assert url == "http://user:p%40ss@127.0.0.1:1234/"
+
+        host = "https://127.0.0.1"
+        url = Jsonrpc.constructUrl(auth, host, port, "new_wallet")
+        assert url == "https://user:p%40ss@127.0.0.1:1234/wallet/new_wallet"
 
 
 if __name__ == "__main__":
