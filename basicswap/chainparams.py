@@ -20,6 +20,7 @@ from basicswap.interface.dash.chainparams import params as dash_params
 from basicswap.interface.firo.chainparams import params as firo_params
 from basicswap.interface.nav.chainparams import params as nav_params
 from basicswap.interface.bch.chainparams import params as bch_params
+from basicswap.interface.zephyr.chainparams import params as zephyr_params
 
 
 class Coins(IntEnum):
@@ -41,6 +42,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    ZEPH = 19  # Zephyr Protocol (Monero fork w/ Djed stablecoin overlay)
 
 
 class Fiat(IntEnum):
@@ -53,11 +55,12 @@ coins_without_segwit = (Coins.PIVX, Coins.DASH)
 scriptless_coins = (
     Coins.XMR,
     Coins.WOW,
+    Coins.ZEPH,
     Coins.PART_ANON,
     Coins.FIRO,
     Coins.DOGE,
 )
-xmr_based_coins = (Coins.XMR, Coins.WOW)
+xmr_based_coins = (Coins.XMR, Coins.WOW, Coins.ZEPH)
 
 chainparams = {
     Coins.PART: part_params,
@@ -73,6 +76,7 @@ chainparams = {
     Coins.NAV: nav_params,
     Coins.BCH: bch_params,
     Coins.DOGE: doge_params,
+    Coins.ZEPH: zephyr_params,
 }
 
 name_map = {}

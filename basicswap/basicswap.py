@@ -1219,6 +1219,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.wow.wow import WOWInterface
 
             return WOWInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.ZEPH:
+            from .interface.zephyr.zephyr import ZEPHInterface
+
+            return ZEPHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.PIVX:
             from .interface.pivx.pivx import PIVXInterface
 
@@ -1368,6 +1372,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 thread_func = {
                     Coins.XMR: threadPollXMRChainState,
                     Coins.WOW: threadPollXMRChainState,
+                    Coins.ZEPH: threadPollXMRChainState,
                 }.get(
                     c, threadPollChainState
                 )  # default case
