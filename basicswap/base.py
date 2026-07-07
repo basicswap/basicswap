@@ -19,6 +19,9 @@ import threading
 import time
 import traceback
 import urllib
+import urllib.error
+import urllib.parse
+import urllib.request
 
 from sockshandler import SocksiPyHandler
 
@@ -30,6 +33,10 @@ from .rpc import (
 )
 from .util import (
     TemporaryError,
+)
+from .util.network import (
+    is_public_url,
+    is_url_scheme_allowed,
 )
 from .util.logging import (
     BSXLogger,
@@ -43,6 +50,17 @@ from .chainparams import (
 
 def getaddrinfo_tor(*args):
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (args[0], args[1]))]
+
+
+class PublicOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    # Re-validate each redirect target so a public URL can't 30x-bounce to an
+    # internal host (loopback, LAN, cloud-metadata).
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_public_url(newurl):
+            raise urllib.error.HTTPError(
+                newurl, code, "Redirect to non-public address blocked", headers, fp
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 class BaseApp(DBMethods):
@@ -313,17 +331,22 @@ class BaseApp(DBMethods):
             socket.getaddrinfo = self.default_socket_getaddrinfo
         socket.setdefaulttimeout(self.default_socket_timeout)
 
-    def readURL(self, url: str, timeout: int = 120, headers={}) -> bytes:
+    def readURL(
+        self, url: str, timeout: int = 120, headers={}, check_public: bool = False
+    ) -> bytes:
+        if not is_url_scheme_allowed(url):
+            raise ValueError("Unsupported URL scheme.")
         open_handler = None
         if self.use_tor_proxy:
             open_handler = SocksiPyHandler(
                 socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port
             )
-        opener = (
-            urllib.request.build_opener(open_handler)
-            if self.use_tor_proxy
-            else urllib.request.build_opener()
-        )
+        # Tor egresses via the SOCKS proxy (rdns), so local resolution can't vet
+        # the real destination; the scheme allowlist above still applies.
+        build_args = [open_handler] if self.use_tor_proxy else []
+        if check_public and not self.use_tor_proxy:
+            build_args.append(PublicOnlyRedirectHandler())
+        opener = urllib.request.build_opener(*build_args)
         if headers is None:
             opener.addheaders = [("User-agent", "Mozilla/5.0")]
         request = urllib.request.Request(url, headers=headers)

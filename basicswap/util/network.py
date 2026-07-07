@@ -7,7 +7,9 @@
 import contextlib
 import ipaddress
 import os
+import socket
 import time
+import urllib.parse
 
 from urllib.error import ContentTooShortError
 from urllib.parse import _splittype
@@ -23,6 +25,33 @@ def is_private_ip_address(addr: str):
         return ipaddress.ip_address(addr).is_private
     except Exception:
         return False
+
+
+def is_url_scheme_allowed(url: str) -> bool:
+    # Only http(s) may be fetched; blocks file://, ftp://, gopher:// etc.
+    return urllib.parse.urlparse(url).scheme in ("http", "https")
+
+
+def is_public_url(url: str) -> bool:
+    # True only when url is http(s) and its host resolves exclusively to public
+    # addresses. Used to keep the /json/readurl proxy from reaching internal
+    # services (loopback, LAN, cloud-metadata). is_private covers 127.0.0.0/8
+    # and 169.254.0.0/16.
+    parsed = urllib.parse.urlparse(url)
+    if not is_url_scheme_allowed(url):
+        return False
+    host = parsed.hostname
+    if host is None or is_private_ip_address(host):
+        return False
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        addrinfo = socket.getaddrinfo(host, port)
+    except Exception:
+        return False
+    for *_, sockaddr in addrinfo:
+        if is_private_ip_address(sockaddr[0]):
+            return False
+    return True
 
 
 def make_reporthook(read_start: int, logger):
