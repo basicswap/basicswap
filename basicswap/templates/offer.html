@@ -135,6 +135,34 @@
             <td class="py-3 px-6 bold" title="Total coin-from value of completed bids, that this node is involved in">Amount Swapped</td>
             <td class="py-3 px-6">{{ data.amt_swapped }} {{ data.tla_from }}</td>
            </tr>
+           {% if data.tracking_mode_str is defined %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold" title="Per-offer budget / fill tracking type">Offer Type</td>
+            <td class="py-3 px-6">{{ data.tracking_mode_str }}{% if data.tracking_exhausted %} <span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-300 dark:bg-gray-700">Exhausted</span>{% endif %}</td>
+           </tr>
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold" title="Number of completed fills for this offer">Fills Completed</td>
+            <td class="py-3 px-6">{{ data.tracking_fills_completed }}{% if data.tracking_max_fills and data.tracking_max_fills > 0 %} / {{ data.tracking_max_fills }}{% endif %}</td>
+           </tr>
+           {% if data.tracking_total_budget is defined %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold" title="Total amount to sell across all fills">Fill Progress</td>
+            <td class="py-3 px-6">
+             {{ data.tracking_filled_amount }} / {{ data.tracking_total_budget }} {{ data.tracking_ticker }}
+             {% if data.tracking_remaining is defined %}<span class="text-xs text-gray-400">({{ data.tracking_remaining }} {{ data.tracking_ticker }} remaining)</span>{% endif %}
+             <div class="w-full bg-gray-200 dark:bg-gray-700 rounded h-2 mt-1">
+              <div class="bg-blue-500 h-2 rounded" style="width: {{ data.tracking_progress_pct }}%"></div>
+             </div>
+            </td>
+           </tr>
+           {% endif %}
+           {% if data.tracking_min_wallet_reserve is defined %}
+           <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+            <td class="py-3 px-6 bold" title="Offer is revoked when the wallet balance would reach this floor">Wallet Reserve</td>
+            <td class="py-3 px-6">{{ data.tracking_min_wallet_reserve }} {{ data.tracking_ticker }}</td>
+           </tr>
+           {% endif %}
+           {% endif %}
            <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <td class="py-3 px-6 bold" title="If bids can be sent with a different amount">Amount Variable</td>
             <td class="py-3 px-6">{{ data.amount_negotiable }}</td>
@@ -385,6 +413,22 @@
          </th>
         </tr>
        </thead>
+{% if data.tracking_mode_str is defined %}
+<tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+  <td class="py-3 px-6 bold">Offer Type</td>
+  <td class="py-3 px-6">
+    {{ data.tracking_mode_str }}{% if data.tracking_exhausted %} <span class="ml-2 px-2 py-0.5 text-xs rounded bg-gray-300 dark:bg-gray-700">Exhausted</span>{% endif %}
+    {% if data.tracking_total_budget is defined %}
+    <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">
+      {{ data.tracking_filled_amount }} / {{ data.tracking_total_budget }} {{ data.tracking_ticker }} sold
+      {% if data.tracking_remaining is defined %}({{ data.tracking_remaining }} {{ data.tracking_ticker }} remaining){% endif %}
+    </div>
+    {% elif data.tracking_max_fills == 1 %}
+    <div class="text-xs text-gray-500 dark:text-gray-300 mt-1">Single fill only</div>
+    {% endif %}
+  </td>
+</tr>
+{% endif %}
 <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
   <td class="py-3 px-6 bold">Send From Address</td>
   <td class="py-3 px-6">

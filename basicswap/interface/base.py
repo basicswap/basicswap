@@ -149,6 +149,9 @@ class CoinInterface:
         )
         self._conf_target = new_conf_target
 
+    def getConfTarget(self) -> int:
+        return self._conf_target
+
     def walletRestoreHeight(self) -> int:
         return self._restore_height
 

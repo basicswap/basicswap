@@ -1,337 +1,287 @@
-{% include 'header.html' %} {% from 'style.html' import input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg %}
-{% from 'macros.html' import breadcrumb %}
+{% include 'header.html' %} {% from 'style.html' import input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg %}
+{% from 'macros.html' import offer_stepper, page_header %}
 <div class="container mx-auto">
-  <section class="p-5 mt-5">
-    <div class="flex flex-wrap items-center -m-2">
-      <div class="w-full md:w-1/2 p-2">
-        {{ breadcrumb([
-          {'text': 'Home', 'url': '/'},
-          {'text': 'Place', 'url': '/newoffer'}
-        ]) }}
-      </div>
-    </div>
-  </section>
-  <section class="py-4">
-    <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-        <div class="relative z-20 flex flex-wrap items-center -m-3">
-          <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Place an New Offer</h2>
-            <p class="font-normal text-coolGray-200 dark:text-white">Place an order on the network order book.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+  {{ page_header('Create Single Offer', 'Choose what you want to trade. You can review everything before it goes live.', outer_class='py-3 px-4 mt-3') }}
   {% include 'inc_messages.html' %}
-  <section>
-    <div class="p-5 mb-5">
-      <div class="mx-4 p-4">
-        <div class="flex items-center">
+  {{ offer_stepper(1) }}
 
-          <div class="flex items-center text-teal-600 relative">
-            <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
-            {{ step_one_svg | safe }}
-          </div>
-            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-700">Step 1 - Place</div>
-          </div>
+  <form method="post" autocomplete="off" id="form">
+  <section class="px-4 py-6">
+    <div class="lg:container mx-auto">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          <div class="flex-auto border-t-2 border-gray-300 dark:border-gray-400"></div>
+        <!-- Main column -->
+        <div class="lg:col-span-2 space-y-6">
 
-          <div class="flex items-center text-teal-600 relative">
-            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-gray-300 dark:border-gray-400">
-            {{ step_two_svg | safe }}
-          </div>
-            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-700">Step 2 - Setup</div>
-          </div>
+          <!-- Swap card -->
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">What do you want to trade?</h3>
 
-          <div class="flex-auto border-t-2 border-gray-300 dark:border-gray-400"></div>
-
-          <div class="flex items-center text-gray-500 relative">
-            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-gray-300 dark:border-gray-400">
-            {{ step_three_svg | safe }}
-          </div>
-            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-700">Confirm</div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </section>
-  <section class="py-3">
-    <div class="container px-4 mx-auto">
-      <div class="p-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-        <div class="flex flex-wrap items-center justify-between -mx-4 pb-6 border-gray-400 border-opacity-20"> </div>
-        <form method="post" autocomplete="off" id="form">
-          <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Network</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="relative">
-                    {{ input_down_arrow_offer_svg | safe }}
-                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                    {{ select_network_svg | safe }}
-                  </div>
-                    <select class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_to">
-                      <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
-                        {% for a in addrs_to %}
-                        <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} ({{ a[1] }})</option>
-                        {% endfor %}
+            <!-- You send -->
+            <div class="bg-white dark:bg-gray-600 rounded-lg p-4 border border-gray-200 dark:border-gray-400">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-300">You send</span>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-3">
+                <div class="sm:w-1/2">
+                  <div class="coin-picker" data-coin-picker data-with-balance="true" data-placeholder="Select coin you send">
+                    <select class="coin-picker-native select hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-3 bold focus:ring-0" id="coin_from" name="coin_from">
+                      <option value="-1">Select coin you send</option>
+                      {% for c in coins_from %}
+                      <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png" data-balance="{{ c[2] }}">{{ c[1] }} - Balance: {{ c[2] }}</option>
+                      {% endfor %}
                     </select>
                   </div>
+                </div>
+                <div class="sm:w-1/2">
+                  <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-3 focus:ring-0 bold" placeholder="0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}">
+                  <div class="mt-2 flex space-x-2">
+                    <button type="button" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md focus:outline-none" data-set-offer-amount="0.25" data-input-id="amt_from">25%</button>
+                    <button type="button" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md focus:outline-none" data-set-offer-amount="0.5" data-input-id="amt_from">50%</button>
+                    <button type="button" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-md focus:outline-none" data-set-offer-amount="1" data-input-id="amt_from" title="Use your full balance minus an estimated network fee">Max</button>
+                  </div>
+                  <p id="amt-from-balance-hint" class="text-xs mt-2" aria-live="polite"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Reverse sides -->
+            <div class="flex justify-center -my-2 relative z-10">
+              <button type="button" id="swap-coins-btn" title="Reverse send and get" aria-label="Reverse send and get"
+                class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-md focus:outline-none transition-transform hover:rotate-180">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path></svg>
+              </button>
+            </div>
+
+            <!-- You get -->
+            <div class="bg-white dark:bg-gray-600 rounded-lg p-4 border border-gray-200 dark:border-gray-400">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-300">You get</span>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-3">
+                <div class="sm:w-1/2">
+                  <div class="coin-picker" data-coin-picker data-with-balance="false" data-placeholder="Select coin you get">
+                    <select class="coin-picker-native select hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-3 bold focus:ring-0" id="coin_to" name="coin_to">
+                      <option value="-1">Select coin you get</option>
+                      {% for c in coins %}
+                      <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="sm:w-1/2">
+                  <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-3 focus:ring-0 bold" placeholder="0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}">
                 </div>
               </div>
             </div>
           </div>
-<div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-  <div class="w-full md:w-10/12">
-    <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-      <div class="w-full md:w-1/3 p-6">
-        <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
-      </div>
-      <div class="w-full md:flex-1 p-3">
-        <div class="relative">
-          {{ input_down_arrow_offer_svg | safe }}
-          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-          {{ select_address_svg | safe }}
-          </div>
-          <select class="hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from">
-            <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
-            {% for a in addrs %}
-            <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Swap Type</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="relative">
-                    {{ input_down_arrow_offer_svg | safe }}
-                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                    {{ select_swap_type_svg | safe }}
+          <!-- Rate & minimum bid -->
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">Price &amp; minimum</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Rate</label>
+                <div class="flex items-center gap-2">
+                  <div class="relative flex-1">
+                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ select_rate_svg | safe }}</div>
+                    <input class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}">
                   </div>
-                  <select class="hover:border-blue-500 bg-gray-50 pl-10 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type">
+                  <button type="button" id="get_rate_inferred_button" class="px-3 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm focus:outline-none whitespace-nowrap">Use market rate</button>
+                </div>
+                <p id="rate-market-hint" class="text-xs mt-2"></p>
+                <div class="flex items-start mt-3">
+                  <input class="mt-0.5 hover:border-blue-500 w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked="checked">
+                  <div class="ml-2 text-sm">
+                    <label class="font-medium text-gray-800 dark:text-white" for="rate_lock">Fix rate</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-300">When on, the <b>You get</b> amount follows the rate you set. When off, the rate follows the <b>You get</b> amount you type.</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Minimum purchase</label>
+                <div class="relative">
+                  <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ select_bid_amount_svg | safe }}</div>
+                  <input class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded">
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Bids smaller than this are discarded.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Offer type -->
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">Offer type</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white" for="offer_mode">How often can this offer be filled?</label>
+                <div class="relative">
+                  {{ input_down_arrow_offer_svg | safe }}
+                  <select class="pl-3 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="offer_mode" id="offer_mode">
+                    <option value="one_time"{% if data.offer_mode is not defined or data.offer_mode=="one_time" %} selected{% endif %}>One-time — fill once, then close</option>
+                    <option value="fixed_total"{% if data.offer_mode=="fixed_total" %} selected{% endif %}>Fixed total — sell up to a set total, then close</option>
+                    <option value="standing"{% if data.offer_mode=="standing" %} selected{% endif %}>Standing — keep repeating until a wallet floor</option>
+                  </select>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The <b>Amount</b> above is the amount sold per swap. One-time offers close automatically after a single swap so a variable-amount offer can't drain your wallet.</p>
+              </div>
+              <div id="offer_mode_fixed_total_fields" class="hidden">
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white" for="total_to_sell">Total to sell</label>
+                <div class="relative">
+                  <input class="pl-3 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="total_to_sell" name="total_to_sell" value="{{ data.total_to_sell }}" placeholder="0">
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Total amount to sell across all fills. Must be at least the amount per swap. The offer closes once this is reached.</p>
+              </div>
+              <div id="offer_mode_standing_fields" class="hidden">
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white" for="min_wallet_reserve">Minimum wallet reserve</label>
+                <div class="relative">
+                  <input class="pl-3 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="min_wallet_reserve" name="min_wallet_reserve" value="{{ data.min_wallet_reserve }}" placeholder="0">
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The offer is revoked automatically if the sending wallet balance would drop to or below this amount.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Addresses: network + send-from -->
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">Addresses</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Network</label>
+                <div class="relative">
+                  {{ input_down_arrow_offer_svg | safe }}
+                  <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ select_network_svg | safe }}</div>
+                  <select class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_to" id="addr_to">
+                    <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
+                    {% for a in addrs_to %}
+                    <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} ({{ a[1] }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Public is visible to everyone on the network. A private network address only shares the offer with selected peers.</p>
+              </div>
+              <div>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Send-from address</label>
+                <div class="relative">
+                  {{ input_down_arrow_offer_svg | safe }}
+                  <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ select_address_svg | safe }}</div>
+                  <select class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from" id="addr_from">
+                    <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
+                    {% for a in addrs %}
+                    <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The address that will hold and lock the coins you send during the swap.</p>
+                <p id="addr-from-hint" class="text-xs mt-1"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- More options -->
+          <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">More options</h3>
+            <div class="space-y-4">
+              <div{% if not debug_ui_mode %} class="hidden"{% endif %}>
+                <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Swap type</label>
+                <div class="relative">
+                  {{ input_down_arrow_offer_svg | safe }}
+                  <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ select_swap_type_svg | safe }}</div>
+                  <select class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type">
                     {% for a in swap_types %}
                     <option{% if data.swap_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
                     {% endfor %}
                   </select>
+                </div>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Selected automatically based on the coin pair.</p>
+              </div>
+
+              {% if debug_ui_mode == true %}
+              <div class="space-y-2">
+                <div class="flex items-start">
+                  <input class="mt-0.5 w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av">
+                  <div class="ml-2 text-sm">
+                    <label class="font-medium text-gray-800 dark:text-white" for="amt_var">Allow partial fills (amount variable)</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-300">Allow bids with a different amount to the offer.</p>
+                  </div>
+                </div>
+                <div class="flex items-start">
+                  <input class="mt-0.5 w-4 h-4 text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv">
+                  <div class="ml-2 text-sm">
+                    <label class="font-medium text-gray-800 dark:text-white" for="rate_var">Rate variable</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-300">Allow bids with a different rate to the offer.</p>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Send</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                       <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Select Coin You Send</p>
-                      <div class="custom-select">
-                        <div class="relative">
-                          {{ input_down_arrow_offer_svg | safe }}
-                          <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 bold focus:ring-0" id="coin_from" name="coin_from" onchange="set_rate('coin_from');">
-                            <option value="-1">Select coin you send</option>
-                            {% for c in coins_from %}
-                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png" data-balance="{{ c[2] }}">{{ c[1] }} - Balance: {{ c[2] }}</option>
-                            {% endfor %}
-                          </select>
-                          <div class="select-dropdown"> <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0 bold" placeholder="0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" onchange="set_rate('amt_from');">
-                      </div>
-                      <div class="mt-2 flex space-x-2">
-                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-offer-amount="0.25" data-input-id="amt_from">25%</button>
-                        <button type="button" class="hidden md:block py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-offer-amount="0.5" data-input-id="amt_from">50%</button>
-                        <button type="button" class="py-1 px-2 bg-blue-500 text-white text-lg lg:text-sm rounded-md focus:outline-none" data-set-offer-amount="1" data-input-id="amt_from">100%</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Get</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Select Coin You Get</p>
-                      <div class="custom-select">
-                        <div class="relative">
-                          {{ input_down_arrow_offer_svg | safe }}
-                          <select class="select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 bold focus:ring-0" id="coin_to" name="coin_to" onchange="set_rate('coin_to');">
-                            <option value="-1">Select coin you get</option>
-                            {% for c in coins %}
-                            <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-                            {% endfor %}
-                          </select>
-                          <div class="select-dropdown"> <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Get</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0 bold" placeholder="0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" onchange="set_rate('amt_to');">
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Bid Amount</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Minimum Purchase</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_bid_amount_svg | safe }}
-                      </div>
-                      <input class="pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded">
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base dark:text-white text-coolGray-800">Rate</p>             
-                      <div class="flex items-center gap-2">
-                        <div class="relative flex-1">
-                          <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                            {{ select_rate_svg | safe }}
-                          </div>
-                          <input class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" onchange="set_rate('rate');">
-                        </div>
-                        <button type="button" id="get_rate_inferred_button" class="px-4 py-2.5 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm focus:outline-none">Get Rate Inferred</button>
-                      </div>
-                      <div class="flex form-check form-check-inline mt-5">
-                        <div class="flex items-center h-5"> <input class="form-check-input hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_lock" name="rate_lock" value="rl" checked="checked"> </div>
-                        <div class="ml-2 text-sm">
-                          <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox1">Lock Rate</label>
-                          <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Automatically adjusts the <b>You Get</b> value based on the rate you’ve entered. Without it, the rate value is automatically adjusted based on the number of coins you put in <b>You Get.</b></p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-<div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-  <div class="w-full md:w-10/12">
-    <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-      <div class="w-full md:w-1/3 p-6">
-        <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
-      </div>
-      <div class="w-full md:flex-1 p-3">
-        <div class="flex form-check form-check-inline">
-          <div class="flex items-center h-5"> 
-            {% if debug_ui_mode == true %}
-            <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av">
-            {% else %}
-            <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" checked disabled>
-            {% endif %}
-          </div>
-          <div class="ml-2 text-sm">
-            <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2">Amount Variable</label>
-            <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different amount to the offer.</p>
-          </div>
-        </div>
-        <div class="flex mt-2 form-check form-check-inline">
-          <div class="flex items-center h-5"> 
-            {% if debug_ui_mode == true %}
-            <input class="hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv"> 
-            {% else %}
-            <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" disabled>
-            {% endif %}
-          </div>
-          <div class="ml-2 text-sm">
-            <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3">Rate Variable</label>
-            <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300">Allow bids with a different rate to the offer.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-          <div class="pricejsonhidden hidden py-3 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Coin Prices/Rates (JSON)</p>
-                </div>
-                <div class="w-full md:flex-1 p-3 dark:text-white text-sm monospace">
+              {% endif %}
+
+              <div>
+                <button name="check_rates" type="button" value="Check Current Prices/Rates (JSON)" data-lookup-rates class="inline-flex items-center px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+                  <span>Compare to market prices</span>
+                </button>
+                <div class="pricejsonhidden hidden mt-3 dark:text-white text-sm monospace">
                   <p id="rates_display"></p>
                 </div>
               </div>
             </div>
           </div>
-      </div>
-    </div>
-  </section>
-  <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-      <div class="pb-6 border-coolGray-100">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
-            <div class="container mt-5 mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                <div class="px-6">
-                  <div class="flex flex-wrap justify-end">
-                    <div class="w-full md:w-auto p-1.5">
-                      <button name="check_rates" type="button" value="Check Current Prices/Rates (JSON)" data-lookup-rates class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
-                        <span>Check Current Prices/Rates (JSON)</span>
-                    </button>
-                  </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <button name="continue" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                        <span>Continue</span>
-                      </button>
-                    </div>
-                    <input type="hidden" name="formid" value="{{ form_id }}">
-                    <input type="hidden" name="step1" value="a">
-                  </form>
-                  </div>
-                </div>
+        </div>
+
+        <!-- Summary column -->
+        <div class="lg:col-span-1">
+          <div class="sticky top-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+            <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-4">Summary</h3>
+            <div id="offer-summary" class="space-y-3 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-300">You send</span>
+                <span class="text-right">
+                  <span class="font-medium text-gray-900 dark:text-white block"><span id="summary-send-amt">—</span> <span id="summary-send-coin"></span></span>
+                  <span id="summary-send-usd" class="text-xs text-gray-400 dark:text-gray-300"></span>
+                </span>
               </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-300">You get</span>
+                <span class="text-right">
+                  <span class="font-medium text-gray-900 dark:text-white block"><span id="summary-get-amt">—</span> <span id="summary-get-coin"></span></span>
+                  <span id="summary-get-usd" class="text-xs text-gray-400 dark:text-gray-300"></span>
+                </span>
+              </div>
+              <div class="flex justify-between border-t border-gray-200 dark:border-gray-400 pt-3">
+                <span class="text-gray-500 dark:text-gray-300">Rate</span>
+                <span class="font-medium text-gray-900 dark:text-white text-right" id="summary-rate">—</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-300">Min purchase</span>
+                <span class="font-medium text-gray-900 dark:text-white text-right" id="summary-min">—</span>
+              </div>
+            </div>
+            <div class="mt-6">
+              <button name="continue" value="Continue" type="submit" data-testid="offer-continue" class="flex items-center justify-center w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
+                <span>Continue</span>
+                <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+              </button>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
+  <!-- Mobile sticky action bar -->
+  <div class="offer-mobile-bar">
+    <div class="min-w-0 text-sm">
+      <div class="text-gray-900 dark:text-white font-medium truncate"><span id="mobile-send">—</span></div>
+      <div class="text-gray-500 dark:text-gray-300 truncate">→ <span id="mobile-get">—</span></div>
+    </div>
+    <button name="continue" value="Continue" type="submit" class="flex items-center justify-center px-5 py-3 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white rounded-md shadow-button focus:outline-none whitespace-nowrap">
+      <span>Continue</span>
+      <svg class="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+    </button>
+  </div>
+
+  <input type="hidden" name="formid" value="{{ form_id }}">
+  <input type="hidden" name="step1" value="a">
+  </form>
 </div>
 
 <div id="errorModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
@@ -358,59 +308,9 @@
 </div>
 
 <script>
-function setOfferAmount(percent, fieldId) {
-  const amountInput = document.getElementById(fieldId);
-  const coinFromSelect = document.getElementById('coin_from');
-
-  if (!amountInput || !coinFromSelect) {
-    console.error('Required elements not found');
-    return;
-  }
-
-  const selectedOption = coinFromSelect.options[coinFromSelect.selectedIndex];
-  if (!selectedOption || selectedOption.value === '-1') {
-    if (window.showErrorModal) {
-      window.showErrorModal('Validation Error', 'Please select a coin first');
-    } else {
-      alert('Please select a coin first');
-    }
-    return;
-  }
-
-  const balance = selectedOption.getAttribute('data-balance');
-  if (!balance) {
-    console.error('Balance not found for selected coin');
-    return;
-  }
-
-  const floatBalance = parseFloat(balance);
-  if (isNaN(floatBalance) || floatBalance <= 0) {
-    if (window.showErrorModal) {
-      window.showErrorModal('Invalid Balance', 'The selected coin has no available balance. Please select a coin with a positive balance.');
-    } else {
-      alert('Invalid balance for selected coin');
-    }
-    return;
-  }
-
-  const calculatedAmount = floatBalance * percent;
-  amountInput.value = calculatedAmount.toFixed(8);
-
-
-  if (amountInput.onchange) {
-    amountInput.onchange();
-  }
-
-
-  if (typeof set_rate === 'function') {
-    set_rate(fieldId);
-  }
-}
-
 function updateCustomDropdownDisplay(select, coinName, balance, pending) {
   const selectNameElement = select.nextElementSibling?.querySelector('.select-name');
   if (!selectNameElement) return;
-
 
   selectNameElement.innerHTML = '';
   selectNameElement.style.display = 'flex';
@@ -418,12 +318,10 @@ function updateCustomDropdownDisplay(select, coinName, balance, pending) {
   selectNameElement.style.alignItems = 'flex-start';
   selectNameElement.style.lineHeight = '1.2';
 
-
   const coinNameDiv = document.createElement('div');
   coinNameDiv.textContent = coinName;
   coinNameDiv.style.fontWeight = 'normal';
   coinNameDiv.style.color = 'inherit';
-
 
   const balanceDiv = document.createElement('div');
   balanceDiv.textContent = `Balance: ${balance}`;
@@ -433,7 +331,6 @@ function updateCustomDropdownDisplay(select, coinName, balance, pending) {
 
   selectNameElement.appendChild(coinNameDiv);
   selectNameElement.appendChild(balanceDiv);
-
 
   if (pending !== '0.0' && parseFloat(pending) > 0) {
     const pendingDiv = document.createElement('div');
@@ -446,10 +343,8 @@ function updateCustomDropdownDisplay(select, coinName, balance, pending) {
 }
 
 function updateCoinDropdownBalances(balanceData) {
-
   const coinFromSelect = document.getElementById('coin_from');
   if (!coinFromSelect) return;
-
 
   const balanceMap = {};
   const pendingMap = {};
@@ -458,7 +353,6 @@ function updateCoinDropdownBalances(balanceData) {
     pendingMap[coin.id] = coin.pending || '0.0';
   });
 
-
   Array.from(coinFromSelect.options).forEach(option => {
     if (option.value === '-1') return;
 
@@ -466,9 +360,7 @@ function updateCoinDropdownBalances(balanceData) {
     const balance = balanceMap[coinId] || '0.0';
     const pending = pendingMap[coinId] || '0.0';
 
-
     option.setAttribute('data-balance', balance);
-
 
     const coinName = option.textContent.split(' - Balance:')[0];
     if (pending !== '0.0' && parseFloat(pending) > 0) {
@@ -477,12 +369,14 @@ function updateCoinDropdownBalances(balanceData) {
       option.textContent = `${coinName} - Balance: ${balance}`;
     }
 
-
     const select = option.closest('select');
     if (select && select.value === option.value) {
       updateCustomDropdownDisplay(select, coinName, balance, pending);
     }
   });
+
+  if (window.CoinPicker) window.CoinPicker.refreshAll();
+  if (window.OfferSummary) window.OfferSummary.update();
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -497,10 +391,9 @@ document.addEventListener('DOMContentLoaded', function() {
     periodicInterval: 120000
   });
 });
-
 </script>
 
-<script src="static/js/pages/offer-new-page.js"></script>
+<script src="static/js/pages/offer-new-page.js?v={{ static_v }}"></script>
 {% include 'footer.html' %}
 </div>
 </body>

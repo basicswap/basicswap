@@ -1,455 +1,241 @@
-{% include 'header.html' %} {% from 'style.html' import input_down_arrow_offer_svg, select_network_svg, select_address_svg, select_swap_type_svg, select_bid_amount_svg, select_rate_svg, step_one_svg, step_two_svg, step_three_svg, select_setup_svg, input_time_svg, select_target_svg , select_auto_strategy_svg %}
-{% from 'macros.html' import breadcrumb %}
+{% include 'header.html' %}
+{% from 'macros.html' import offer_stepper, summary_row, page_header %}
+{% set ns = namespace(coin_from_name='', coin_to_name='', swap_label='', strat_label='None', from_balance=none, warnings=[]) %}
+{% for c in coins_from %}{% if data.coin_from==c[0] %}{% set ns.coin_from_name = c[1] %}{% set ns.from_balance = c[2] %}{% endif %}{% endfor %}
+{% for c in coins %}{% if data.coin_to==c[0] %}{% set ns.coin_to_name = c[1] %}{% endif %}{% endfor %}
+{% for s in swap_types %}{% if data.swap_type==s[0] %}{% set ns.swap_label = s[1] %}{% endif %}{% endfor %}
+{% for a in automation_strategies %}{% if data.automation_strat_id==a[0] %}{% set ns.strat_label = a[1] %}{% endif %}{% endfor %}
+{# Pre-publish sanity warnings (#9) #}
+{% if ns.from_balance is not none and data.amt_from and (data.amt_from | float) > (ns.from_balance | float) %}{% set _ = ns.warnings.append('The amount you send (' ~ data.amt_from ~ ' ' ~ ns.coin_from_name ~ ') exceeds your available balance (' ~ ns.from_balance ~ ').') %}{% endif %}
+{% if data.amt_bid_min and data.amt_from and (data.amt_bid_min | float) > (data.amt_from | float) %}{% set _ = ns.warnings.append('Minimum purchase is larger than the total amount on offer.') %}{% endif %}
+{% if data.debug_ui != true and data.lockhrs is defined and (data.lockhrs | int) < 2 %}{% set _ = ns.warnings.append('Contract lock time is very short (' ~ data.lockhrs ~ 'h); the swap may fail if a party is slow to respond.') %}{% endif %}
+{% if data.automation_strat_id is defined and data.automation_strat_id != -1 %}{% set _ = ns.warnings.append('Auto-accept is enabled: matching bids will be accepted automatically without manual review.') %}{% endif %}
 <div class="container mx-auto">
-  <section class="p-5 mt-5">
-    <div class="flex flex-wrap items-center -m-2">
-      <div class="w-full md:w-1/2 p-2">
-        {{ breadcrumb([
-          {'text': 'Home', 'url': '/'},
-          {'text': 'Place', 'url': '/newoffer'},
-          {'text': 'Setup', 'url': '#'},
-          {'text': 'Confirm', 'url': '#'}
-        ]) }}
-      </div>
-    </div>
-  </section>
-  <section class="py-4">
-    <div class="container px-4 mx-auto">
-      <div class="relative py-11 px-16 bg-coolGray-900 dark:bg-blue-500 rounded-md overflow-hidden">
-        <img class="absolute z-10 left-4 top-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute z-10 right-4 bottom-4" src="/static/images/elements/dots-red.svg" alt="">
-        <img class="absolute h-64 left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 object-cover" src="/static/images/elements/wave.svg" alt="">
-        <div class="relative z-20 flex flex-wrap items-center -m-3">
-          <div class="w-full md:w-1/2 p-3">
-            <h2 class="mb-6 text-4xl font-bold text-white tracking-tighter">Confirm your Offer</h2>
-            <p class="font-normal text-coolGray-200 dark:text-white">Place an order on the network order book.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+  {{ page_header('Review Your Offer', 'Check the details below, then confirm to publish your offer.', outer_class='py-3 px-4 mt-3') }}
   {% include 'inc_messages.html' %}
-  <section>
-    <div class="p-5 mb-5">
-      <div class="mx-4 p-4">
-        <div class="flex items-center">
-          <div class="flex items-center text-teal-600 relative">
-            <div class="rounded-full h-12 w-12 py-3 border-2 border-blue-500">
-            {{ step_one_svg | safe }}
+  {{ offer_stepper(3) }}
+
+  <form method="post" autocomplete="off" id="form">
+  <section class="px-4 py-6">
+    <div class="lg:container mx-auto max-w-3xl space-y-6">
+
+      {% if data.publish_error %}
+      <div role="alert" class="bsx-alert bsx-alert-error">
+        <div class="flex items-center mb-2">
+          <svg class="w-5 h-5 mr-2 shrink-0 bsx-text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+          <h3 class="text-sm bsx-alert-title">Could not publish offer</h3>
+        </div>
+        <p class="text-sm bsx-alert-text">{{ data.publish_error }}</p>
+        <p class="text-sm bsx-alert-text mt-1">Your details are preserved below — fix the issue and try again.</p>
+      </div>
+      {% endif %}
+
+      {% if ns.warnings | length > 0 %}
+      <div class="bsx-alert bsx-alert-warn">
+        <div class="flex items-center mb-2">
+          <svg class="w-5 h-5 mr-2 shrink-0 offer-hint-warn" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>
+          <h3 class="text-sm bsx-alert-title">Check these before publishing</h3>
+        </div>
+        <ul class="list-disc list-inside space-y-1 text-sm bsx-alert-text">
+          {% for w in ns.warnings %}
+          <li>{{ w }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white">Trade</h3>
+          <button name="step1" type="submit" value="Back" class="inline-flex items-center text-sm font-medium text-blue-500 hover:text-blue-600 focus:outline-none">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            Edit
+          </button>
+        </div>
+        {% include 'offer_summary_card.html' %}
+        {% if data.competitor_count is defined %}
+        <div class="mt-3">
+          <div class="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <svg class="w-4 h-4 mt-0.5 shrink-0 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span>
+              {% if data.competitor_count == 0 %}
+              No other active offers for this pair — yours may be the only one available.
+              {% else %}
+              <strong>{{ data.competitor_count }}</strong> other active offer{% if data.competitor_count != 1 %}s{% endif %} for this pair.{% if data.competitor_cheaper_count is defined and data.competitor_cheaper_count > 0 %} {{ data.competitor_cheaper_count }} {% if data.competitor_cheaper_count != 1 %}have{% else %}has{% endif %} a lower rate than yours.{% endif %}
+              {% endif %}
+            </span>
           </div>
-            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 1</div>
+
+          {% if data.competitor_offers %}
+          <div class="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-400">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 dark:bg-gray-600 text-gray-500 dark:text-gray-300">
+                <tr>
+                  <th class="text-left font-medium px-3 py-2">Rate</th>
+                  <th class="text-right font-medium px-3 py-2">Amount</th>
+                  <th class="text-right font-medium px-3 py-2">vs yours</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200 dark:divide-gray-400">
+                {% for c in data.competitor_offers %}
+                <tr class="text-gray-700 dark:text-gray-200">
+                  <td class="px-3 py-2">
+                    <a href="/offer/{{ c.offer_id }}" class="inline-flex items-center gap-1.5 text-blue-500 hover:text-blue-600">
+                      <img class="h-4 w-4 shrink-0" src="/static/images/coins/{{ ns.coin_from_name|replace(' ', '-') }}-20.png" alt="{{ ns.coin_from_name }}">
+                      <span>1 {{ ns.coin_from_name }} = {{ c.rate_str }}</span>
+                      <img class="h-4 w-4 shrink-0" src="/static/images/coins/{{ ns.coin_to_name|replace(' ', '-') }}-20.png" alt="{{ ns.coin_to_name }}">
+                      <span>{{ ns.coin_to_name }}</span>
+                    </a>
+                  </td>
+                  <td class="px-3 py-2">
+                    <span class="flex items-center justify-end gap-1.5">
+                      <span>{{ c.amount_from }}</span>
+                      <img class="h-4 w-4 shrink-0" src="/static/images/coins/{{ ns.coin_from_name|replace(' ', '-') }}-20.png" alt="{{ ns.coin_from_name }}">
+                      <span>{{ ns.coin_from_name }}</span>
+                    </span>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    {% if c.cheaper_than_yours %}
+                    <span class="offer-badge offer-badge-warn">Lower</span>
+                    {% else %}
+                    <span class="offer-badge offer-badge-neutral">Higher</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
-          <div class="flex-auto border-t-2 border-blue-500 dark:border-blue-500"></div>
-          <div class="flex items-center text-teal-600 relative ">
-            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-blue-500 dark:border-blue-500">
-            {{ step_two_svg | safe }}
-          </div>
-            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Step 2</div>
-          </div>
-          <div class="flex-auto border-t-2 border-blue-500 dark:border-blue-500"></div>
-          <div class="flex items-center text-gray-500 relative">
-            <div class="rounded-full transition duration-500 ease-in-out h-12 w-12 py-3 border-2 border-blue-500 dark:border-blue-500">
-            {{ step_three_svg | safe }}
-          </div>
-            <div class="absolute top-0 -ml-10 text-center mt-16 w-32 text-xs font-medium uppercase dark:text-white text-gray-600">Confirm</div>
-          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-300">
+            Showing the {{ data.competitor_offers | length }} best rate{% if data.competitor_offers | length != 1 %}s{% endif %} for this pair.
+            <a href="/offers" class="text-blue-500 hover:text-blue-600 whitespace-nowrap">Open the full order book →</a>
+          </p>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white">Terms</h3>
+          <button name="step2" type="submit" value="Back" class="inline-flex items-center text-sm font-medium text-blue-500 hover:text-blue-600 focus:outline-none">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            Edit
+          </button>
+        </div>
+        {{ summary_row('Swap type', ns.swap_label) }}
+        {{ summary_row('Offer valid for', data.validhrs ~ ' hours') }}
+        {% if data.debug_ui == true %}
+        {{ summary_row('Contract locked', data.lockmins ~ ' minutes') }}
+        {% else %}
+        {{ summary_row('Contract locked', data.lockhrs ~ ' hours') }}
+        {% endif %}
+        {{ summary_row('Auto accept', ns.strat_label) }}
+        {% if data.tracking_mode_label is defined %}
+        {{ summary_row('Offer type', data.tracking_mode_label) }}
+        {% if data.tracking_per_swap is defined %}
+        {{ summary_row('Amount per swap', data.tracking_per_swap) }}
+        {% endif %}
+        {% if data.tracking_total is defined %}
+        {{ summary_row('Total to sell', data.tracking_total) }}
+        {% endif %}
+        {% if data.tracking_reserve is defined %}
+        {{ summary_row('Minimum wallet reserve', data.tracking_reserve) }}
+        {% endif %}
+        {% if data.tracking_fills is defined %}
+        {{ summary_row('Fills', data.tracking_fills) }}
+        {% endif %}
+        {% if data.tracking_close_behavior is defined %}
+        {{ summary_row('Closing', data.tracking_close_behavior) }}
+        {% endif %}
+        {% endif %}
+        {{ summary_row('Amount variable', 'Yes' if data.amt_var == true else 'No') }}
+        {% if data.debug_ui == true %}
+        {{ summary_row('Rate variable', 'Yes' if data.rate_var == true else 'No') }}
+        {% endif %}
+      </div>
+
+      <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-2">Network &amp; address</h3>
+        {{ summary_row('Network', 'Public Network' if data.addr_to == '-1' or data.addr_to == -1 else data.addr_to, mono=true) }}
+        {{ summary_row('Send from', 'New address' if data.addr_from == '-1' or data.addr_from == -1 else data.addr_from, mono=true) }}
+      </div>
+
+      {# Network fees (adaptor-sig swaps only) #}
+      {% if data.swap_style == 'xmr' %}
+      {% if (data.coin_from | int not in (6, 9)) or (data.coin_to | int not in (6, 9)) %}
+      <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl p-6">
+        <h3 class="text-lg font-semibold text-coolGray-900 dark:text-white mb-2">Network fees</h3>
+        {% if data.coin_from | int not in (6, 9) %}
+        {{ summary_row('Fee rate from', data.from_fee_override ~ ' (' ~ data.from_fee_src ~ ')') }}
+        {% if data.amt_from_lock_spend_tx_fee is defined %}
+        {{ summary_row('Lock tx spend fee', data.amt_from_lock_spend_tx_fee ~ ' ' ~ data.tla_from) }}
+        {% endif %}
+        {% endif %}
+        {% if data.coin_to | int not in (6, 9) %}
+        {{ summary_row('Fee rate to', data.to_fee_override ~ ' (' ~ data.to_fee_src ~ ')') }}
+        {% endif %}
+        {% if data.est_network_fee_total %}
+        {{ summary_row('Estimated network cost', data.est_network_fee_total) }}
+        <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">Estimate only; paid on-chain when the swap executes.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl px-6 py-5">
+        <div class="flex flex-wrap justify-between gap-2">
+          <button name="step2" type="submit" value="Back" class="inline-flex items-center px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+            <span>Back</span>
+          </button>
+          <button name="submit_offer" value="Continue" type="submit" id="offer-confirm-btn" data-testid="offer-confirm" class="inline-flex items-center px-5 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 hover:border-blue-600 rounded-md shadow-button focus:ring-0 focus:outline-none">
+            <svg id="offer-confirm-icon" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <svg id="offer-confirm-spinner" class="hidden animate-spin w-4 h-4 mr-2 text-white" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            <span id="offer-confirm-label">{% if data.publish_error %}Retry publish{% else %}Confirm offer{% endif %}</span>
+          </button>
         </div>
       </div>
     </div>
   </section>
-  <section class="py-3">
-    <div class="container px-4 mx-auto">
-      <div class="p-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-        <div class="flex flex-wrap items-center justify-between -mx-4 pb-6 border-gray-400 border-opacity-20"> </div>
-        <form method="post" autocomplete="off" id='form'>
-          <div class="py-3 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Network</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="relative">
-                    {{ input_down_arrow_offer_svg | safe }}
-                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                    {{ select_network_svg | safe }}
-                  </div>
-                  <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-" name="addr_to" disabled>
-                      <option{% if data.addr_to=="-1" %} selected{% endif %} value="-1">Public Network</option>
-                        {% for a in addrs_to %}
-                        <option{% if data.addr_to==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-                        {% endfor %}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Select Address</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="relative">
-                    {{ input_down_arrow_offer_svg | safe }}
-                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                    {{ select_address_svg | safe }}
-                  </div>
-                  <select class="cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="addr_from" disabled>
-                    {% for a in addrs %}
-                    <option{% if data.addr_from==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[0] }} {{ a[1] }}</option>
-                    {% endfor %}
-                    <option{% if data.addr_from=="-1" %} selected{% endif %} value="-1">New Address</option>
-                  </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Swap Type</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="relative">
-                    {{ input_down_arrow_offer_svg | safe }}
-                    <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                    {{ select_swap_type_svg | safe }}
-                  </div>
-                      <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="swap_type" id="swap_type" disabled>
-                        {% for a in swap_types %}
-                        <option{% if data.swap_type==a[0] %} selected{% endif %} value="{{ a[0] }}">{{ a[1] }}</option>
-                        {% endfor %}
-                      </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Send</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Send:</p>
-                      <div class="custom-select">
-                        <div class="relative">
-                          {{ input_down_arrow_offer_svg | safe }}
-                          <select class="select cursor-not-allowed disabled-select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_from" name="coin_from" disabled>
-                            <option value="-1">Select coin you send</option>
-                            {% for c in coins_from %}
-                            <option{% if data.coin_from==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}
-                            </option>
-                            {% endfor %}
-                          </select>
-                          <div class="select-dropdown">
-                            <img class="select-icon" src="" alt=""> <img class="select-image" src="" alt=""> </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Send</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input hover:border-blue-500 pr-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_from" name="amt_from" value="{{ data.amt_from }}" readonly>
-                      </div>
-                    </div>
-                    {% if data.swap_style == 'xmr' %}
-                    {% if data.coin_from | int in (6, 9) %} {# Not XMR or WOW #}
-                    {% else %}
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Confirm Target</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_target_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="fee_from_conf" min="1" max="32" value="{{ data.fee_from_conf }}" readonly>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee Rate From</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_rate_svg | safe }}
-                      </div> <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_rate_from" value="{{ data.from_fee_override }}" readonly>
-                      </div> <span class="text-sm mt-2 block dark:text-white"> <b>Fee Rate Source:</b> {{ data.from_fee_src }} </span>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee From Increase By</p>
-                      <div class="relative"> <svg class="absolute right-4 top-1/2 transform -translate-y-1/2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M11.3333 6.1133C11.2084 5.98913 11.0395 5.91943 10.8633 5.91943C10.6872 5.91943 10.5182 5.98913 10.3933 6.1133L8.00001 8.47329L5.64001 6.1133C5.5151 5.98913 5.34613 5.91943 5.17001 5.91943C4.99388 5.91943 4.82491 5.98913 4.70001 6.1133C4.63752 6.17527 4.58792 6.249 4.55408 6.33024C4.52023 6.41148 4.50281 6.49862 4.50281 6.58663C4.50281 6.67464 4.52023 6.76177 4.55408 6.84301C4.58792 6.92425 4.63752 6.99799 4.70001 7.05996L7.52667 9.88663C7.58865 9.94911 7.66238 9.99871 7.74362 10.0326C7.82486 10.0664 7.912 10.0838 8.00001 10.0838C8.08801 10.0838 8.17515 10.0664 8.25639 10.0326C8.33763 9.99871 8.41136 9.94911 8.47334 9.88663L11.3333 7.05996C11.3958 6.99799 11.4454 6.92425 11.4793 6.84301C11.5131 6.76177 11.5305 6.67464 11.5305 6.58663C11.5305 6.49862 11.5131 6.41148 11.4793 6.33024C11.4454 6.249 11.3958 6.17527 11.3333 6.1133Z" fill="#8896AB"></path>
-                        </svg>
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_rate_svg | safe }}
-                      </div>
-                      <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_from_extra" disabled>
-                          <option value="0">None</option>
-                          <option value="10" {% if data.fee_from_extra==10 %} selected{% endif %}>10%</option>
-                          <option value="50" {% if data.fee_from_extra==50 %} selected{% endif %}>50%</option>
-                          <option value="100" {% if data.fee_from_extra==100 %} selected{% endif %}>100%</option>
-                        </select>
-                      </div> <span class="text-sm mt-2 block dark:text-white"> <b>Lock Tx Spend Fee:</b> {{ data.amt_from_lock_spend_tx_fee }} {{ data.tla_from }} </span>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">You Get</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Coin You Get</p>
-                      <div class="custom-select">
-                        <div class="relative">
-                          {{ input_down_arrow_offer_svg | safe }}
-                          <select class="cursor-not-allowed disabled-select select hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" id="coin_to" name="coin_to" disabled>
-                            <option value="-1"></option>
-                            {% for c in coins %}
-                            <option{% if data.coin_to==c[0] %} selected{% endif %} value="{{ c[0] }}" data-image="/static/images/coins/{{ c[1]|replace(" ", "-") }}-20.png">{{ c[1] }}</option>
-                            {% endfor %}
-                          </select>
-                          <div class="select-dropdown"> <img class="select-icon" src="" alt="">
-                            <img class="select-image" src="" alt="">
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Amount You Get</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none"> </div> <input class="cursor-not-allowed disabled-input hover:border-blue-500 pr-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-5 focus:ring-0" type="text" id="amt_to" name="amt_to" value="{{ data.amt_to }}" readonly>
-                      </div>
-                    </div>
-                    {% if data.swap_style == 'xmr' %}
-                    {% if data.coin_to | int in (6, 9) %} {# Not XMR or WOW #}
-                    {% else %}
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee To Confirm Target</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_target_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="fee_to_conf" min="1" max="32" value="{{ data.fee_to_conf }}" readonly>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee Rate To</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_rate_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_rate_to" value="{{ data.to_fee_override }}" readonly>
-                      </div> <span class="text-sm mt-2 block dark:text-white"> <b>Fee Rate Source:</b> {{ data.to_fee_src }} </span>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Fee To Increase By</p>
-                      <div class="relative">
-                        {{ input_down_arrow_offer_svg | safe }}
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_rate_svg | safe }}
-                      </div>
-                    <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="fee_to_extra" disabled>
-                          <option value="0">None</option>
-                          <option value="10" {% if data.fee_to_extra==10 %} selected{% endif %}>10%</option>
-                          <option value="50" {% if data.fee_to_extra==50 %} selected{% endif %}>50%</option>
-                          <option value="100" {% if data.fee_to_extra==100 %} selected{% endif %}>100%</option>
-                      </select>
-                      </div>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Bid Amount</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Minimum Purchase</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_bid_amount_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amt_bid_min" name="amt_bid_min" value="{{ data.amt_bid_min }}" title="Bids with an amount below the minimum bid value will be discarded" readonly>
-                      </div>
-                    </div>
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Rate</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_rate_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="rate" name="rate" value="{{ data.rate }}" readonly>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Time</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Offer valid (hrs)</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ input_time_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="validhrs" min="1" max="48" value="{{ data.validhrs }}" readonly>
-                      </div>
-                    </div>
-                    {% if data.debug_ui == true %}
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Contract Locked (Mins)</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ input_time_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockmins" min="10" max="5000" value="{{ data.lockmins }}" readonly>
-                      </div>
-                      {% if data.swap_style != 'xmr' %}
-                      <div class="text-sm text-gray-500 mt-1.5 dark:text-white">(Participate txn will be locked for half the time.)</div>
-                      {% endif %}
-                    </div>
-                    {% else %}
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Contract locked (Hours)</p>
-                      <div class="relative">
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ input_time_svg | safe }}
-                      </div>
-                      <input class="cursor-not-allowed disabled-input pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockhrs" min="1" max="96" value="{{ data.lockhrs }}" readonly>
-                      </div>
-                      {% if data.swap_style != 'xmr' %}
-                      <div class="text-sm text-gray-500 mt-1.5 dark:text-white">(Participate txn will be locked for half the time.)</div>
-                      {% endif %}
-                    </div>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Strategy</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex flex-wrap -m-3">
-                    <div class="w-full md:w-1/2 p-3">
-                      <p class="mb-1.5 font-medium text-base text-coolGray-800 dark:text-white">Auto Accept Strategy</p>
-                      <div class="relative">
-                        {{ input_down_arrow_offer_svg | safe }}
-                        <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">
-                        {{ select_auto_strategy_svg | safe }}
-                      </div>
-                      <select class="cursor-not-allowed disabled-select pl-10 hover:border-blue-500 pl-10 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" name="automation_strat_id" disabled>
-                          <option value="-1" {% if data.automation_strat_id==-1 %} selected{% endif %}>None</option>
-                          {% for a in automation_strategies %}
-                          <option value="{{ a[0] }}" {% if data.automation_strat_id==a[0] %} selected{% endif %}>{{ a[1] }}</option>
-                          {% endfor %}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="py-0 border-b items-center justify-between -mx-4 mb-6 pb-3 border-gray-400 border-opacity-20">
-            <div class="w-full md:w-10/12">
-              <div class="flex flex-wrap -m-3 w-full sm:w-auto px-4 mb-6 sm:mb-0">
-                <div class="w-full md:w-1/3 p-6">
-                  <p class="text-sm text-coolGray-800 dark:text-white font-semibold">Options</p>
-                </div>
-                <div class="w-full md:flex-1 p-3">
-                  <div class="flex form-check form-check-inline">
-                    <div class="flex items-center h-5"> <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="amt_var" name="amt_var" value="av" {% if data.amt_var==true %} checked="checked" {% endif %} disabled> </div>
-                    <div class="ml-2 text-sm">
-                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox2" style="opacity: 0.40;">Amount Variable</label>
-                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different amount to the offer.</p>
-                    </div>
-                  </div>
-                  <div class="flex mt-2 form-check form-check-inline">
-                    <div class="flex items-center h-5"> <input class="cursor-not-allowed hover:border-blue-500 w-5 h-5 form-check-input text-blue-600 bg-gray-50 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-1 dark:bg-gray-500 dark:border-gray-400" type="checkbox" id="rate_var" name="rate_var" value="rv" {% if data.rate_var==true %} checked="checked" {% endif %} disabled> </div>
-                    <div class="ml-2 text-sm">
-                      <label class="form-check-label text-sm font-medium text-gray-800 dark:text-white" for="inlineCheckbox3" style="opacity: 0.40;">Rate Variable</label>
-                      <p id="helper-checkbox-text" class="text-xs font-normal text-gray-500 dark:text-gray-300" style="opacity: 0.40;">Allow bids with a different rate to the offer.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-      </div>
-    </div>
-  </section>
-  <section>
-    <div class="pl-6 pr-6 pt-0 pb-0 h-full overflow-hidden">
-      <div class="pb-6 border-coolGray-100">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
-            <div class="container mt-5 mx-auto">
-              <div class="pt-6 pb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
-                <div class="px-6">
-                  <div class="flex flex-wrap justify-end">
-                    <div class="w-full md:w-auto p-1.5">
-                      <button name="step2" type="submit" value="Back" class="flex flex-wrap justify-center w-full px-4 py-2.5 font-medium text-sm text-coolGray-500 hover:text-coolGray-600 border border-coolGray-200 hover:border-coolGray-300 bg-white rounded-md focus:ring-0 focus:outline-none dark:text-white dark:hover:text-white dark:bg-gray-600 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-600">
-                      <span>Back</span>
-                    </button>
-                  </div>
-                    <div class="w-full md:w-auto p-1.5">
-                      <button name="submit_offer" value="Continue" type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-green-600 hover:border-green-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">
-                        <span>Confirm</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
+
   <input type="hidden" name="formid" value="{{ form_id }}">
   <input type="hidden" name="addr_to" value="{{ data.addr_to }}">
   <input type="hidden" name="addr_from" value="{{ data.addr_from }}">
   <input type="hidden" name="swap_type" value="{{ data.swap_type }}">
   <input type="hidden" name="coin_from" value="{{ data.coin_from }}">
-  <input type="hidden" name="fee_from_extra" value="{{ data.fee_from_extra }}">
   <input type="hidden" name="coin_to" value="{{ data.coin_to }}">
+  <input type="hidden" name="amt_from" value="{{ data.amt_from }}">
+  <input type="hidden" name="amt_to" value="{{ data.amt_to }}">
+  <input type="hidden" name="amt_bid_min" value="{{ data.amt_bid_min }}">
+  <input type="hidden" name="rate" value="{{ data.rate }}">
+  {% if data.offer_mode is defined %}
+  <input type="hidden" name="offer_mode" value="{{ data.offer_mode }}">
+  {% endif %}
+  {% if data.total_to_sell is defined %}
+  <input type="hidden" name="total_to_sell" value="{{ data.total_to_sell }}">
+  {% endif %}
+  {% if data.min_wallet_reserve is defined %}
+  <input type="hidden" name="min_wallet_reserve" value="{{ data.min_wallet_reserve }}">
+  {% endif %}
+  <input type="hidden" name="validhrs" value="{{ data.validhrs }}">
+  {% if data.debug_ui == true %}
+  <input type="hidden" name="lockmins" value="{{ data.lockmins }}">
+  {% else %}
+  <input type="hidden" name="lockhrs" value="{{ data.lockhrs }}">
+  {% endif %}
+  <input type="hidden" name="fee_from_extra" value="{{ data.fee_from_extra }}">
   <input type="hidden" name="fee_to_extra" value="{{ data.fee_to_extra }}">
+  {% if data.swap_style == 'xmr' %}
+  {% if data.coin_from | int not in (6, 9) %}
+  <input type="hidden" name="fee_from_conf" value="{{ data.fee_from_conf }}">
+  <input type="hidden" name="fee_rate_from" value="{{ data.from_fee_override }}">
+  {% endif %}
+  {% if data.coin_to | int not in (6, 9) %}
+  <input type="hidden" name="fee_to_conf" value="{{ data.fee_to_conf }}">
+  <input type="hidden" name="fee_rate_to" value="{{ data.to_fee_override }}">
+  {% endif %}
+  {% endif %}
   {% if data.automation_strat_id != -1 %}
   <input type="hidden" name="automation_strat_id" value="{{ data.automation_strat_id }}">
   {% endif %}
@@ -458,13 +244,10 @@
   {% endif %}
   {% if data.rate_var==true %}
   <input type="hidden" name="rate_var" value="rv">
-{% endif %}
-</form>
-  <script src="static/js/pages/offer-new-page.js"></script>
+  {% endif %}
+  </form>
 </div>
-</div>
-</div>
-</div>
+<script src="static/js/pages/offer-new-page.js?v={{ static_v }}"></script>
 {% include 'footer.html' %}
 </body>
 </html>
