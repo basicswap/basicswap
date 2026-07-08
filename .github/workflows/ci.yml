@@ -17,6 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  PYTHON_VERSION: "3.14"
   BIN_DIR: /tmp/cached_bin
   TEST_RELOAD_PATH: /tmp/test_basicswap
   BSX_SELENIUM_DRIVER: firefox-ci
@@ -24,18 +25,147 @@ env:
   XMR_RPC_PWD: xmr_pwd
 
 jobs:
-  ci:
+  lint:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.14"]
     steps:
     - uses: actions/checkout@v7
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
       uses: actions/setup-python@v6
       with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --require-hashes
+        pip install .[dev]
+    - name: Run flake8
+      run: |
+        flake8
+    - name: Run codespell
+      run: |
+        codespell
+    - name: Run black
+      run: |
+        black --check --diff .
+
+  prepare-cores:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --require-hashes
+        pip install .[dev]
+    - name: Prepare core versions file
+      run: |
+        # Print the core versions to a file for caching
+        basicswap-prepare --version --withcoins=bitcoin | tail -n +2 > core_versions.txt
+        cat core_versions.txt
+    - name: Cache coin cores
+      id: cache-cores
+      uses: actions/cache@v6
+      with:
+        path: /tmp/cached_bin
+        key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
+    - if: ${{ steps.cache-cores.outputs.cache-hit != 'true' }}
+      name: Running basicswap-prepare
+      run: |
+        basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
+
+  test:
+    needs: prepare-cores
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: test_other
+            command: |
+              pytest tests/basicswap/test_other.py
+          - name: test_prepare
+            command: |
+              export PYTHONPATH=$(pwd)
+              export TEST_BIN_PATH="$BIN_DIR"
+              export TEST_PATH=/tmp/test_prepare
+              pytest tests/basicswap/extended/test_prepare.py
+          - name: test_xmr
+            command: |
+              export PYTHONPATH=$(pwd)
+              export PARTICL_BINDIR="$BIN_DIR/particl"
+              export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
+              export XMR_BINDIR="$BIN_DIR/monero"
+              pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx or test_03_a_follower_recover_a_lock_tx or test_11_fee_validation"
+          - name: test_encrypted_xmr_reload
+            command: |
+              export PYTHONPATH=$(pwd)
+              export TEST_PATH=${TEST_RELOAD_PATH}
+              mkdir -p ${TEST_PATH}/bin
+              cp -r $BIN_DIR/* ${TEST_PATH}/bin/
+              pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+            failure_logs: |
+              for i in 0 1 2; do
+                for logname in core_stderr core_stdout wallet_stderr wallet_stdout; do
+                  echo "=== client${i} ${logname}.log ==="
+                  cat /tmp/test_basicswap/client${i}/monero/${logname}.log || true
+                done
+              done
+          - name: selenium
+            firefox: "true"
+            command: |
+              export TEST_PATH=/tmp/test_persistent
+              mkdir -p ${TEST_PATH}/bin
+              cp -r $BIN_DIR/* ${TEST_PATH}/bin/
+              export PYTHONPATH=$(pwd)
+              python tests/basicswap/extended/test_xmr_persistent.py > /tmp/log.txt 2>&1 & TEST_NETWORK_PID=$!
+              echo "Starting test_xmr_persistent, PID $TEST_NETWORK_PID"
+              i=0
+              until curl -s -f -o /dev/null "http://localhost:12701/json/coins"
+              do
+                tail -n 1 /tmp/log.txt
+                sleep 2
+                ((++i))
+                if [ $i -ge 60 ]; then
+                  echo "Timed out waiting for test_xmr_persistent, PID $TEST_NETWORK_PID"
+                  kill $TEST_NETWORK_PID
+                  (exit 1)  # Fail test
+                  break
+                fi
+              done
+              echo "Running test_settings.py"
+              python tests/basicswap/selenium/test_settings.py
+              echo "Running test_swap_direction.py"
+              python tests/basicswap/selenium/test_swap_direction.py
+              kill $TEST_NETWORK_PID
+            failure_logs: |
+              echo "=== SELENIUM BACKGROUND LOG ==="
+              cat /tmp/log.txt
+    name: ${{ matrix.name }}
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Firefox
+      if: ${{ matrix.firefox == 'true' }}
       run: |
         if [ $(dpkg-query -W -f='${Status}' firefox 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
           install -d -m 0755 /etc/apt/keyrings
@@ -47,98 +177,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y firefox gnupg
         fi
+    - name: Install Python dependencies
+      run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt --require-hashes
         pip install .[dev]
-    - name: Install
+    - name: Prepare core versions file
       run: |
-        # Print the core versions to a file for caching
         basicswap-prepare --version --withcoins=bitcoin | tail -n +2 > core_versions.txt
-        cat core_versions.txt
-    - name: Run flake8
-      run: |
-        flake8
-    - name: Run codespell
-      run: |
-        codespell
-    - name: Run black
-      run: |
-        black --check --diff .
-    - name: Run test_other
-      run: |
-        pytest tests/basicswap/test_other.py
-    - name: Cache coin cores
-      id: cache-cores
-      uses: actions/cache@v6
-      env:
-        cache-name: cache-cores
+    - name: Restore coin cores cache
+      uses: actions/cache/restore@v6
       with:
         path: /tmp/cached_bin
         key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
-
-    - if: ${{ steps.cache-cores.outputs.cache-hit != 'true' }}
-      name: Running basicswap-prepare
-      run: |
-        basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=particl,bitcoin,monero
-    - name: Run test_prepare
-      run: |
-        export PYTHONPATH=$(pwd)
-        export TEST_BIN_PATH="$BIN_DIR"
-        export TEST_PATH=/tmp/test_prepare
-        pytest tests/basicswap/extended/test_prepare.py
-    - name: Run test_xmr
-      run: |
-        export PYTHONPATH=$(pwd)
-        export PARTICL_BINDIR="$BIN_DIR/particl"
-        export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
-        export XMR_BINDIR="$BIN_DIR/monero"
-        pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx or test_03_a_follower_recover_a_lock_tx or test_11_fee_validation"
-    - name: Run test_encrypted_xmr_reload
-      id: test_encrypted_xmr_reload
-      run: |
-        export PYTHONPATH=$(pwd)
-        export TEST_PATH=${TEST_RELOAD_PATH}
-        mkdir -p ${TEST_PATH}/bin
-        cp -r $BIN_DIR/* ${TEST_PATH}/bin/
-        pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+    - name: Run ${{ matrix.name }}
+      id: run_test
+      run: ${{ matrix.command }}
     - name: Print log files on failure
-      if: ${{ failure() && steps.test_encrypted_xmr_reload.conclusion == 'failure' }}
-      run: |
-        for i in 0 1 2; do
-          for logname in core_stderr core_stdout wallet_stderr wallet_stdout; do
-            echo "=== client${i} ${logname}.log ==="
-            cat /tmp/test_basicswap/client${i}/monero/${logname}.log || true
-          done
-        done
-    - name: Run selenium tests
-      id: selenium_tests
-      run: |
-        export TEST_PATH=/tmp/test_persistent
-        mkdir -p ${TEST_PATH}/bin
-        cp -r $BIN_DIR/* ${TEST_PATH}/bin/
-        export PYTHONPATH=$(pwd)
-        python tests/basicswap/extended/test_xmr_persistent.py > /tmp/log.txt 2>&1 & TEST_NETWORK_PID=$!
-        echo "Starting test_xmr_persistent, PID $TEST_NETWORK_PID"
-        i=0
-        until curl -s -f -o /dev/null "http://localhost:12701/json/coins"
-        do
-          tail -n 1 /tmp/log.txt
-          sleep 2
-          ((++i))
-          if [ $i -ge 60 ]; then
-            echo "Timed out waiting for test_xmr_persistent, PID $TEST_NETWORK_PID"
-            kill $TEST_NETWORK_PID
-            (exit 1)  # Fail test
-            break
-          fi
-        done
-        echo "Running test_settings.py"
-        python tests/basicswap/selenium/test_settings.py
-        echo "Running test_swap_direction.py"
-        python tests/basicswap/selenium/test_swap_direction.py
-        kill $TEST_NETWORK_PID
-    - name: Print log file on failure
-      if: ${{ failure() && steps.selenium_tests.conclusion == 'failure' }}
-      run: |
-        echo "=== SELENIUM BACKGROUND LOG ==="
-        cat /tmp/log.txt
+      if: ${{ failure() && steps.run_test.conclusion == 'failure' && matrix.failure_logs }}
+      run: ${{ matrix.failure_logs }}
