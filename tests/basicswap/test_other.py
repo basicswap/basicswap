@@ -36,6 +36,7 @@ from basicswap.util.crypto import ripemd160, hash160, blake256
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.network import (
+    is_loopback_address,
     is_private_ip_address,
     is_public_url,
     is_url_scheme_allowed,
@@ -613,6 +614,23 @@ class Test(unittest.TestCase):
         ]
         for addr, is_private in test_addresses:
             assert is_private_ip_address(addr) is is_private
+
+    def test_is_loopback_address(self):
+        test_addresses = [
+            ("localhost", True),
+            ("127.0.0.1", True),
+            ("127.5.5.5", True),
+            ("::1", True),
+            ("::ffff:127.0.0.1", True),
+            ("10.0.0.4", False),
+            ("192.168.1.5", False),
+            ("0.0.0.0", False),
+            ("::ffff:10.0.0.4", False),
+            ("", False),
+            ("example.com", False),
+        ]
+        for addr, is_loopback in test_addresses:
+            assert is_loopback_address(addr) is is_loopback
 
     def test_is_url_scheme_allowed(self):
         test_urls = [

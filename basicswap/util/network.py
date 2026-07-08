@@ -27,6 +27,17 @@ def is_private_ip_address(addr: str):
         return False
 
 
+def is_loopback_address(addr: str) -> bool:
+    if addr == "localhost":
+        return True
+    if addr.startswith("::ffff:"):  # IPv4-mapped IPv6, e.g. ::ffff:127.0.0.1
+        addr = addr[len("::ffff:") :]
+    try:
+        return ipaddress.ip_address(addr).is_loopback  # 127.0.0.0/8, ::1
+    except ValueError:
+        return False
+
+
 def is_url_scheme_allowed(url: str) -> bool:
     # Only http(s) may be fetched; blocks file://, ftp://, gopher:// etc.
     return urllib.parse.urlparse(url).scheme in ("http", "https")

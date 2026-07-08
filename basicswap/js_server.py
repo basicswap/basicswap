@@ -15,6 +15,7 @@ from .util import (
     toBool,
 )
 from .util.network import (
+    is_loopback_address,
     is_public_url,
     is_url_scheme_allowed,
 )
@@ -1346,6 +1347,24 @@ def js_vacuumdb(self, url_split, post_string, is_json) -> bytes:
 def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
+
+    # Seed export returns wallet secrets. Restrict it to local (loopback, not
+    # proxied) callers or a genuinely authenticated session, so an exposed bind
+    # without client_auth_hash can't hand the seed to a remote client (BSX-014).
+    client_ip = self.client_address[0] if self.client_address else ""
+    via_proxy = bool(
+        self.headers.get("X-Forwarded-For") or self.headers.get("X-Forwarded-Proto")
+    )
+    is_local = is_loopback_address(client_ip) and not via_proxy
+    authed = (
+        bool(swap_client.settings.get("client_auth_hash")) and self.is_authenticated()
+    )
+    if not (is_local or authed):
+        raise ValueError(
+            "Wallet seed export is only available over a local connection or "
+            "with authentication enabled."
+        )
+
     post_data = getFormData(post_string, is_json)
 
     coin_in = get_data_entry(post_data, "coin")
