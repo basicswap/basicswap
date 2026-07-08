@@ -967,6 +967,18 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if mime_type == "" or not filepath:
                     raise ValueError("Unknown file type or path")
 
+                # Prevent path traversal. Require the resolved file to stay within static_path
+                static_real = os.path.realpath(static_path)
+                try:
+                    within_static = (
+                        os.path.commonpath((os.path.realpath(filepath), static_real))
+                        == static_real
+                    )
+                except ValueError:
+                    within_static = False
+                if not within_static:
+                    return self.page_404(url_split)
+
                 file_stat = os.stat(filepath)
                 mtime = file_stat.st_mtime
                 file_size = file_stat.st_size
