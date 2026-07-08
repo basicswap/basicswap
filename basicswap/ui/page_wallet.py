@@ -367,7 +367,7 @@ def page_wallet(self, url_split, post_string):
                             type_from, type_to, value, address, subfee
                         )
                         messages.append(
-                            "Withdrew {} {} ({} to {}) to address {}<br/>In txid: {}".format(
+                            "Withdrew {} {} ({} to {}) to address {}\nIn txid: {}".format(
                                 value, ticker, type_from, type_to, address, txid
                             )
                         )
@@ -376,7 +376,7 @@ def page_wallet(self, url_split, post_string):
                             coin_id, type_from, value, address, subfee
                         )
                         messages.append(
-                            "Withdrew {} {} (from {}) to address {}<br/>In txid: {}".format(
+                            "Withdrew {} {} (from {}) to address {}\nIn txid: {}".format(
                                 value, ticker, type_from, address, txid
                             )
                         )
@@ -396,13 +396,13 @@ def page_wallet(self, url_split, post_string):
                             )
                             if sweepall:
                                 messages.append(
-                                    "Swept all {} to address {}<br/>In txid: {}".format(
+                                    "Swept all {} to address {}\nIn txid: {}".format(
                                         ticker, address, txid
                                     )
                                 )
                             else:
                                 messages.append(
-                                    "Withdrew {} {} to address {}<br/>In txid: {}".format(
+                                    "Withdrew {} {} to address {}\nIn txid: {}".format(
                                         value, ticker, address, txid
                                     )
                                 )
@@ -412,7 +412,7 @@ def page_wallet(self, url_split, post_string):
                     else:
                         txid = swap_client.withdrawCoin(coin_id, value, address, subfee)
                         messages.append(
-                            "Withdrew {} {} to address {}<br/>In txid: {}".format(
+                            "Withdrew {} {} to address {}\nIn txid: {}".format(
                                 value, ticker, address, txid
                             )
                         )
@@ -437,7 +437,7 @@ def page_wallet(self, url_split, post_string):
 
                 txid, address = ci.createUTXO(value_sats)
                 messages.append(
-                    "Created new utxo of value {} and address {}<br/>In txid: {}".format(
+                    "Created new utxo of value {} and address {}\nIn txid: {}".format(
                         value, address, txid
                     )
                 )

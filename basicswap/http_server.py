@@ -18,7 +18,7 @@ import http.client
 import base64
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment, PackageLoader, select_autoescape
 from socket import error as SocketError
 from urllib import parse
 from datetime import datetime, timedelta, timezone
@@ -81,7 +81,10 @@ from .ui.page_debug import page_debug
 SESSION_COOKIE_NAME = "basicswap_session_id"
 SESSION_DURATION_MINUTES = 60
 
-env = Environment(loader=PackageLoader("basicswap", "templates"))
+env = Environment(
+    loader=PackageLoader("basicswap", "templates"),
+    autoescape=select_autoescape(["html", "xml"]),
+)
 env.filters["formatts"] = format_timestamp
 
 

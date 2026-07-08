@@ -26,7 +26,7 @@
         {% else %}
         <ul class="ml-4 mt-1">
             <li class="font-semibold text-sm bsx-alert-title"><span class="bold">INFO:</span></li>
-                <li class="font-medium text-sm bsx-alert-text infomsg">{{ m[1] }}</li>
+                <li class="font-medium text-sm bsx-alert-text infomsg whitespace-pre-line">{{ m[1] }}</li>
         </ul>
         {% endif %}
            </div>
@@ -55,7 +55,7 @@
         <ul class="ml-4 mt-1">
             <li class="font-semibold text-sm bsx-text-error error_msg"><span class="bold">ERROR:</span></li>
             {% for m in err_messages %}
-                <li class="font-medium text-sm bsx-alert-text error_msg">{{ m[1] }}</li>
+                <li class="font-medium text-sm bsx-alert-text error_msg whitespace-pre-line">{{ m[1] }}</li>
             {% endfor %}
         </ul>
     {% endif %}
