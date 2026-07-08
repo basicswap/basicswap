@@ -79,7 +79,11 @@ def page_bid(self, url_split, post_string):
             data = {
                 "bid_state": int(form_data[b"new_state"][0]),
                 "bid_action": int(get_data_entry_or(form_data, "new_action", -1)),
-                "debug_ind": int(get_data_entry_or(form_data, "debugind", -1)),
+                "debug_ind": (
+                    int(get_data_entry_or(form_data, "debugind", -1))
+                    if swap_client.debug
+                    else -1
+                ),
                 "kbs_other": get_data_entry_or(form_data, "kbs_other", None),
             }
             try:

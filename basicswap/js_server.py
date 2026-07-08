@@ -743,7 +743,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                     extra_options=extra_options,
                 )
 
-            if have_data_entry(post_data, "debugind"):
+            if have_data_entry(post_data, "debugind") and swap_client.debug:
                 main_debug_ind: bool = toBool(
                     get_data_entry_or(post_data, "maindebugind", True)
                 )
@@ -767,7 +767,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 swap_client.acceptBid(bid_id)
             elif have_data_entry(post_data, "abandon"):
                 swap_client.abandonBid(bid_id)
-            elif have_data_entry(post_data, "debugind"):
+            elif have_data_entry(post_data, "debugind") and swap_client.debug:
                 main_debug_ind: bool = toBool(
                     get_data_entry_or(post_data, "maindebugind", True)
                 )

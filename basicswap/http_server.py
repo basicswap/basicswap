@@ -26,6 +26,7 @@ from email.utils import formatdate, parsedate_to_datetime
 from http.cookies import SimpleCookie
 
 from . import __version__, GUI_VERSION, AMM_VERSION
+from . import config as cfg
 from .util import (
     BalanceError,
     LockedCoinError,
@@ -214,6 +215,16 @@ class HttpHandler(BaseHTTPRequestHandler):
         cookie[SESSION_COOKIE_NAME]["path"] = "/"
         cookie[SESSION_COOKIE_NAME]["httponly"] = True
         cookie[SESSION_COOKIE_NAME]["samesite"] = "Lax"
+        # "Secure" tells the browser to send this cookie back only over HTTPS, so
+        # the session id can't leak over plain HTTP. Set when the request
+        # actually arrived over TLS (a reverse proxy signals this with
+        # X-Forwarded-Proto: https) or when the operator forces it via the
+        # secure_cookies setting.
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "").lower()
+        if forwarded_proto == "https" or self.server.swap_client.settings.get(
+            "secure_cookies", cfg.DEFAULT_SECURE_COOKIES
+        ):
+            cookie[SESSION_COOKIE_NAME]["secure"] = True
         expires = datetime.now(timezone.utc) + timedelta(
             minutes=SESSION_DURATION_MINUTES
         )
@@ -750,12 +761,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         extra_headers = []
 
-        if len(url_split) > 2:
-            token = url_split[2]
-            with self.server.session_lock:
-                expect_token = self.server.session_tokens.get("shutdown", None)
-            if token != expect_token:
-                return self.page_info("Unexpected token, still running.")
+        token = url_split[2] if len(url_split) > 2 else ""
+        with self.server.session_lock:
+            expect_token = self.server.session_tokens.get("shutdown", "")
+        if not expect_token or not hmac.compare_digest(token, expect_token):
+            return self.page_info("Unexpected token, still running.")
 
         session_id = self._get_session_cookie()
         with self.server.session_lock:
