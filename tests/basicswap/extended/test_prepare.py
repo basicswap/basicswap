@@ -376,7 +376,7 @@ class Test(unittest.TestCase):
         )
         assert "success" in rv
 
-        rv = read_json_api(12700, "lock")
+        rv = read_json_api(12700, "lock", {})
         assert "success" in rv
 
         rv = read_json_api(12700, "wallets")

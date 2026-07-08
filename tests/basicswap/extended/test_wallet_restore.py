@@ -221,8 +221,8 @@ class Test(TestBase):
             wallets_original = read_json_api(12700, "wallets")
             # TODO: After restoring a new deposit address should be generated, should be automated
             #       Swaps should use a new key path, not the external path
-            _ = read_json_api(12700, "wallets/part/nextdepositaddr")
-            _ = read_json_api(12703, "wallets/part/nextdepositaddr")
+            _ = read_json_api(12700, "wallets/part/nextdepositaddr", {})
+            _ = read_json_api(12703, "wallets/part/nextdepositaddr", {})
             wallets_restored = read_json_api(12703, "wallets")
             for k, w in wallets_original.items():
                 assert w["deposit_address"] == wallets_restored[k]["deposit_address"]

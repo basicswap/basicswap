@@ -136,7 +136,7 @@ class Test(XmrTestBase):
         rv = read_json_api(12701)
         assert rv["num_swapping"] == 1
 
-        rv = read_json_api(12700, "revokeoffer/{}".format(offer_id))
+        rv = read_json_api(12700, "revokeoffer/{}".format(offer_id), {})
         assert rv["revoked_offer"] == offer_id
 
         logger.info("Completing swap")

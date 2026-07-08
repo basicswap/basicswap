@@ -103,6 +103,11 @@ def page_lock(self, url_split, post_string):
     swap_client = server.swap_client
     swap_client.checkSystemStatus()
 
+    if self.command != "POST":
+        self.send_response(405)
+        self.end_headers()
+        return bytes()
+
     swap_client.lockWallets()
     self.send_response(302)
     self.send_header("Location", "/")

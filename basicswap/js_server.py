@@ -929,7 +929,12 @@ def js_rates(self, url_split, post_string, is_json) -> bytes:
 
 
 def js_rates_list(self, url_split, query_string, is_json) -> bytes:
+    # Works for both POST (params in the body) and GET (params in the URL query).
+    # GET query strings are no longer promoted into the body for /json routes, so
+    # fall back to reading the URL query directly when there is no body.
     get_data = urllib.parse.parse_qs(query_string)
+    if not get_data:
+        get_data = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
 
     sc = self.server.swap_client
     coin_from = getCoinType(get_data["from"][0])

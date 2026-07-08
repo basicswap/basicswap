@@ -690,7 +690,7 @@ def page_amm(self, _, post_string):
         except Exception as e:
             err_messages.append(f"Failed to create default config file: {str(e)}")
 
-    if post_string:
+    if post_string and self.command == "POST":
         try:
             form_data = parse.parse_qs(
                 post_string.decode("utf-8")

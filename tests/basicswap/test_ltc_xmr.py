@@ -348,12 +348,12 @@ class TestLTC(BasicSwapTest):
         )
         assert addr_info0["ismweb"] is True
 
-        ltc_addr = read_json_api(TEST_HTTP_PORT + 0, "wallets/ltc/nextdepositaddr")
+        ltc_addr = read_json_api(TEST_HTTP_PORT + 0, "wallets/ltc/nextdepositaddr", {})
         ltc_mweb_addr = read_json_api(
-            TEST_HTTP_PORT + 0, "wallets/ltc_mweb/nextdepositaddr"
+            TEST_HTTP_PORT + 0, "wallets/ltc_mweb/nextdepositaddr", {}
         )
         assert ltc_mweb_addr.startswith("tmweb1")
-        ltc_mweb_addr2 = read_json_api(TEST_HTTP_PORT + 0, "wallets/ltc/newmwebaddress")
+        ltc_mweb_addr2 = read_json_api(TEST_HTTP_PORT + 0, "wallets/ltc/newmwebaddress", {})
         assert ltc_mweb_addr2.startswith("tmweb1")
 
         assert (

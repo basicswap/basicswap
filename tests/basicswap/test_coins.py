@@ -92,7 +92,7 @@ class Test(TestFunctions):
                 if coin_id in (Coins.BCH, Coins.PIVX):
                     coin_ticker: str = chainparams[coin_id]["ticker"]
                     logger.info(f"Reseeding {coin_ticker} wallet at {node_port}.")
-                    read_json_api(node_port, f"wallets/{coin_ticker}/reseed")
+                    read_json_api(node_port, f"wallets/{coin_ticker}/reseed", {})
 
         for should_wait in (False, True):
             for coin_id in (cls.test_coin_a, cls.test_coin_b):

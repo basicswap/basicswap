@@ -119,7 +119,7 @@ def clear_offers(delay_event, node_id) -> None:
     offers = read_json_api(UI_PORT + node_id, "offers")
 
     for offer in offers:
-        read_json_api(UI_PORT + node_id, "revokeoffer/{}".format(offer["offer_id"]))
+        read_json_api(UI_PORT + node_id, "revokeoffer/{}".format(offer["offer_id"]), {})
 
     for i in range(20):
         delay_event.wait(1)

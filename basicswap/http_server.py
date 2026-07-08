@@ -140,6 +140,65 @@ def parse_cmd(cmd: str, type_map: str):
     return method, typed_params
 
 
+# GET is allowed only for these read /json routes. Every other route — including
+# any new or unknown endpoint — requires POST (fail closed), so a state-changing
+# endpoint can't be reached cross-origin via a GET (<img>/<script>/prefetch)
+# just because someone forgot to list it. Add new READ routes here; new
+# state-changing routes need no change (they are POST-only by default).
+JSON_GET_ALLOWED = frozenset(
+    {
+        "coins",
+        "walletbalances",
+        "wallets",
+        "wallettransactions",
+        "offers",
+        "sentoffers",
+        "bids",
+        "sentbids",
+        "network",
+        "smsgaddresses",
+        "rate",
+        "rates",
+        "rateslist",
+        "offerfeeestimate",
+        "checkupdates",
+        "updatestatus",
+        "notifications",
+        "identities",
+        "automationstrategies",
+        "validateamount",
+        "help",
+        "readurl",
+        "active",
+        "coinprices",
+        "coinvolume",
+        "coinhistory",
+        "messageroutes",
+        "modeswitchinfo",
+    }
+)
+# Read sub-commands of /wallets/<coin>/<cmd>; every other wallet sub-command
+# mutates and requires POST.
+JSON_WALLET_GET_CMDS = frozenset({"listaddresses", "mwebbalance"})
+
+
+def json_requires_post(url_split) -> bool:
+    route = url_split[2] if len(url_split) > 2 else ""
+    if route == "":
+        return False  # /json index — read
+    if route not in JSON_GET_ALLOWED:
+        return True
+    if (
+        route == "wallets"
+        and len(url_split) > 4
+        and url_split[4] not in JSON_WALLET_GET_CMDS
+    ):
+        return True
+    if route == "offers" and len(url_split) > 3 and url_split[3] == "new":
+        return True
+    return False
+
+
 class HttpHandler(BaseHTTPRequestHandler):
     def _get_session_cookie(self):
         if "Cookie" in self.headers:
@@ -807,10 +866,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return b""
 
-        if not post_string and len(parsed.query) > 0:
+        if not post_string and len(parsed.query) > 0 and page != "json":
             post_string = parsed.query
 
         if page == "json":
+            if self.command != "POST" and json_requires_post(url_split):
+                self.putHeaders(405, "application/json")
+                return json.dumps({"error": "POST required"}).encode("utf-8")
             try:
                 self.putHeaders(status_code, "application/json")
                 func = js_url_to_function(url_split)
@@ -994,6 +1056,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == "newautomationstrategy":
                     return page_automation_strategy_new(self, url_split, post_string)
                 if page == "amm":
+                    amm_action = url_split[2] if len(url_split) > 2 else ""
+                    if (
+                        amm_action in ("autostart", "config", "debug")
+                        and self.command != "POST"
+                    ):
+                        self.putHeaders(405, "application/json")
+                        return json.dumps({"error": "POST required"}).encode("utf-8")
                     if len(url_split) > 2 and url_split[2] == "status":
                         query_params = {}
                         if parsed.query:

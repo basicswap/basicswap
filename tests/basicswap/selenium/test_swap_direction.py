@@ -47,7 +47,7 @@ def clear_offers(port_list) -> None:
     for port in port_list:
         offers = read_json_api(port, "offers")
         for offer in offers:
-            read_json_api(port, "revokeoffer/{}".format(offer["offer_id"]))
+            read_json_api(port, "revokeoffer/{}".format(offer["offer_id"]), {})
 
     for i in range(30):
         time.sleep(1)
