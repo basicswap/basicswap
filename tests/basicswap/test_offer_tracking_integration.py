@@ -10,6 +10,7 @@ import time
 import unittest
 
 from basicswap.db import (
+    Action,
     Bid,
     BidState,
     create_db_,
@@ -30,8 +31,21 @@ logger = logging.getLogger()
 STATE_IN_PROGRESS = 100
 STATE_COMPLETED = 101
 STATE_FAILED = 102
+STATE_RECEIVED = 103
 
 ACCEPT_ACTION_TYPES = (3, 4)
+
+# basicswap_util.ActionTypes values, inlined to avoid a heavy import.
+ACTION_ACCEPT_BID = 1
+ACTION_ACCEPT_XMR_BID = 2
+ACTION_ACCEPT_AS_REV_BID = 12
+
+ACCEPT_ACTION_TYPES_PREFIX = (ACTION_ACCEPT_BID, ACTION_ACCEPT_XMR_BID)
+ACCEPT_ACTION_TYPES_ALL = (
+    ACTION_ACCEPT_BID,
+    ACTION_ACCEPT_XMR_BID,
+    ACTION_ACCEPT_AS_REV_BID,
+)
 
 
 class OfferTrackingIntegrationTest(unittest.TestCase):
@@ -46,6 +60,7 @@ class OfferTrackingIntegrationTest(unittest.TestCase):
             (STATE_IN_PROGRESS, 1),
             (STATE_COMPLETED, 0),
             (STATE_FAILED, 0),
+            (STATE_RECEIVED, 0),
         ):
             db.add(
                 BidState(
@@ -91,6 +106,20 @@ class OfferTrackingIntegrationTest(unittest.TestCase):
     def _in_flight(self, cursor, offer_id, exclude_bid_id=None):
         return offer_in_flight_amount(
             cursor, offer_id, ACCEPT_ACTION_TYPES, exclude_bid_id
+        )
+
+    def _add_action(self, db, cursor, bid_id, action_type):
+        now = int(time.time())
+        db.add(
+            Action(
+                active_ind=1,
+                created_at=now,
+                trigger_at=now,
+                linked_id=bid_id,
+                action_type=action_type,
+                action_data=None,
+            ),
+            cursor,
         )
 
     def test_in_flight_counts_only_active_uncompleted(self):
@@ -189,6 +218,40 @@ class OfferTrackingIntegrationTest(unittest.TestCase):
 
             self.assertEqual(self._in_flight(cursor, oid), 0)
             self.assertTrue(offer_budget_allows(db, oid, per_swap, cursor, in_flight=0))
+        finally:
+            db.closeDB(cursor)
+
+    def test_reverse_ads_accept_action_counts_as_in_flight(self):
+        # A reverse-ADS bid is queued for acceptance via ACCEPT_AS_REV_BID before
+        # it reaches an in-progress state, so it must be counted through the
+        # action-type branch or it escapes the budget until the swap starts.
+        db, cursor = self._new_db()
+        try:
+            oid = b"\x16" * 28
+            per_swap = 1_00000000
+            self._add_offer(db, cursor, oid)
+            init_offer_tracking(db, oid, OfferTrackingModes.ONE_TIME, per_swap, cursor)
+
+            bid_id = b"\xd1" * 28
+            self._add_bid(db, cursor, bid_id, oid, per_swap, STATE_RECEIVED)
+            self._add_action(db, cursor, bid_id, ACTION_ACCEPT_AS_REV_BID)
+
+            self.assertEqual(
+                offer_in_flight_amount(cursor, oid, ACCEPT_ACTION_TYPES_PREFIX), 0
+            )
+            self.assertEqual(
+                offer_in_flight_amount(cursor, oid, ACCEPT_ACTION_TYPES_ALL), per_swap
+            )
+
+            offer = db.queryOne(Offer, cursor, {"offer_id": oid})
+            in_flight = offer_in_flight_amount(
+                cursor, oid, ACCEPT_ACTION_TYPES_ALL, exclude_bid_id=b"\xd2" * 28
+            )
+            self.assertFalse(
+                offer_budget_allows(db, oid, per_swap, cursor, in_flight=in_flight)
+            )
+            with self.assertRaises(ValueError):
+                validate_offer_budget(db, offer, per_swap, cursor, in_flight=in_flight)
         finally:
             db.closeDB(cursor)
 
