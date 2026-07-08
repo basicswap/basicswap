@@ -1675,6 +1675,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.info(
                         f"Waiting for {Coins(coin_type).name} RPC. Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
                     )
+                elif any(
+                    log in str(ex)
+                    for log in [
+                        "Expecting value",  # Error after OOM shutdown
+                    ]
+                ):
+                    break
                 else:
                     self.log.warning(
                         f"Can't connect to {Coins(coin_type).name} RPC: {ex}.  Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
