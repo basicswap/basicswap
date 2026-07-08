@@ -1,6 +1,7 @@
 old/
 build/
 venv/
+.venv/
 *.pyc
 __pycache__
 /dist/

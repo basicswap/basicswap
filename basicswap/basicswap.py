@@ -11786,6 +11786,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ),
                     "Invalid BCH lock tx script out_2",
                 )
+                ensure(
+                    timelock == xmr_offer.lock_time_1,
+                    "Invalid BCH lock tx script timelock",
+                )
 
                 lockExtraArgs["mining_fee"] = mining_fee
                 lockExtraArgs["out_1"] = out_1
@@ -11801,6 +11805,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ensure(
                     out_2 == bch_ci.getScriptForPubkeyHash(xmr_swap.dest_af),
                     "Invalid BCH refund tx script out_2",
+                )
+                ensure(
+                    timelock == xmr_offer.lock_time_2,
+                    "Invalid BCH refund tx script timelock",
                 )
 
                 refundExtraArgs["mining_fee"] = mining_fee
