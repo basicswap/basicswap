@@ -4014,6 +4014,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return abs(rate1 - rate2) <= tolerance
 
     def validateBidAmount(self, offer, bid_amount: int, bid_rate: int) -> None:
+        ensure(bid_rate > 0, "Bid rate must be greater than zero")
         ensure(bid_amount >= offer.min_bid_amount, "Bid amount below minimum")
         ensure(bid_amount <= offer.amount_from, "Bid amount above offer amount")
         if not offer.amount_negotiable:
