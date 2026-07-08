@@ -490,7 +490,7 @@ def offer_to_post_string(self, swap_client, offer_id):
     if amount_to is None:
         amount_to = (offer.amount_from * offer.rate) // ci_from.COIN()
     offer_data = {
-        "formid": self.generate_form_id(),
+        "formid": self.server.session_tokens["csrf"],
         "addr_to": offer.addr_to,
         "addr_from": offer.addr_from,
         "coin_from": offer.coin_from,

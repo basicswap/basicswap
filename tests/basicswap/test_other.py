@@ -673,6 +673,25 @@ class Test(unittest.TestCase):
         for headers, expected in cases:
             assert check(Stub(headers)) is expected
 
+    def test_checkform_csrf_token(self):
+        from basicswap.http_server import HttpHandler
+
+        class Srv:
+            session_tokens = {"csrf": "the-server-token"}
+
+        class Stub:
+            server = Srv()
+
+        check = HttpHandler.checkForm
+        msgs = []
+        # Correct token -> returns parsed form data.
+        fd = check(Stub(), b"formid=the-server-token&x=1", "rpc", msgs)
+        assert fd is not None and b"x" in fd
+        # Wrong / missing / empty -> rejected (None).
+        assert check(Stub(), b"formid=wrong&x=1", "rpc", msgs) is None
+        assert check(Stub(), b"x=1", "rpc", msgs) is None
+        assert check(Stub(), "", "rpc", msgs) is None
+
     def test_varint(self):
         test_vectors = [
             (0, 1),

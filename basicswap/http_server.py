@@ -7,6 +7,7 @@
 
 import os
 import gzip
+import hmac
 import json
 import shlex
 import hashlib
@@ -273,19 +274,21 @@ class HttpHandler(BaseHTTPRequestHandler):
         # TODO: Add debug flag to re-enable.
         pass
 
-    def generate_form_id(self):
-        return os.urandom(8).hex()
-
     def checkForm(self, post_string, name, messages):
         if post_string == "":
             return None
         form_data = parse.parse_qs(post_string)
-        form_id = form_data[b"formid"][0].decode("utf-8")
-        with self.server.form_id_lock:
-            if self.server.last_form_id.get(name, None) == form_id:
-                messages.append("Prevented double submit for form {}.".format(form_id))
-                return None
-            self.server.last_form_id[name] = form_id
+        try:
+            form_id = form_data[b"formid"][0].decode("utf-8")
+        except (KeyError, IndexError):
+            messages.append("Missing form token.")
+            return None
+        # Real CSRF check: the form must carry the server-issued token. Replaces
+        # the former per-form-name double-submit latch, which was not a security
+        # control (any fresh value passed).
+        if not hmac.compare_digest(form_id, self.server.session_tokens.get("csrf", "")):
+            messages.append("Invalid form token.")
+            return None
         return form_data
 
     def render_template(
@@ -403,7 +406,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             template.render(
                 title=self.server.title,
                 h2=self.server.title,
-                form_id=self.generate_form_id(),
+                form_id=self.server.session_tokens["csrf"],
                 **args_dict,
             ),
             "UTF-8",
@@ -1210,14 +1213,13 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
         self.allow_cors = allow_cors
         self.swap_client = swap_client
         self.title = "BasicSwap - " + __version__
-        self.last_form_id = dict()
         self.session_tokens = dict()
+        self.session_tokens["csrf"] = secrets.token_urlsafe(32)
         self.active_sessions = {}
         self.env = env
         self.msg_id_counter = 0
 
         self.session_lock = threading.Lock()
-        self.form_id_lock = threading.Lock()
         self.msg_id_lock = threading.Lock()
 
         self.timeout = 60
