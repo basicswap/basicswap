@@ -643,6 +643,36 @@ class Test(unittest.TestCase):
         for url, is_public in test_urls:
             assert is_public_url(url) is is_public
 
+    def test_is_same_origin_request(self):
+        from basicswap.http_server import HttpHandler
+
+        class Stub:
+            def __init__(self, headers):
+                self.headers = headers
+
+        check = HttpHandler.is_same_origin_request
+        cases = [
+            ({}, True),  # header-less (tests/curl/API scripts) -> allowed
+            (
+                {"Origin": "http://127.0.0.1:12700", "Host": "127.0.0.1:12700"},
+                True,
+            ),
+            (
+                {"Origin": "http://localhost:12700", "Host": "localhost:12700"},
+                True,
+            ),
+            ({"Origin": "http://evil.com", "Host": "127.0.0.1:12700"}, False),
+            ({"Origin": "null", "Host": "127.0.0.1:12700"}, False),
+            (
+                {"Referer": "http://127.0.0.1:12700/rpc", "Host": "127.0.0.1:12700"},
+                True,
+            ),
+            ({"Referer": "http://evil.com/x", "Host": "127.0.0.1:12700"}, False),
+            ({"Origin": "http://127.0.0.1:12700"}, False),  # no Host header
+        ]
+        for headers, expected in cases:
+            assert check(Stub(headers)) is expected
+
     def test_varint(self):
         test_vectors = [
             (0, 1),
