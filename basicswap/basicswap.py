@@ -512,6 +512,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._notifications_cache = {}
         self._is_encrypted = None
         self._is_locked = None
+        self._amm_autostart_pending = False
         self._tx_cache = {}
         self._price_cache = {}
         self._volume_cache = {}
@@ -1479,53 +1480,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         autostart_setting = self.settings.get("amm_autostart", False)
         self.log.info(f"Checking AMM autostart setting: {autostart_setting}")
 
-        if autostart_setting:
-            self.log.info("AMM autostart is enabled, starting AMM process...")
-            try:
-                from basicswap.ui.page_amm import (
-                    start_amm_process,
-                    start_amm_process_force,
-                    check_existing_amm_processes,
-                )
-
-                self.log.info("Waiting 2 seconds for BasicSwap to fully initialize...")
-                time.sleep(2)
-
-                amm_host = self.settings.get("htmlhost", "127.0.0.1")
-                amm_port = self.settings.get("htmlport", 12700)
-                amm_debug = False
-
-                self.log.info(
-                    f"Starting AMM with host={amm_host}, port={amm_port}, debug={amm_debug}"
-                )
-
-                existing_pids = check_existing_amm_processes()
-                if existing_pids:
-                    self.log.warning(
-                        f"Found existing AMM processes: {existing_pids}. Using force start to clean up..."
-                    )
-                    success, msg = start_amm_process_force(
-                        self, amm_host, amm_port, debug=amm_debug
-                    )
-                    if success:
-                        self.log.info(f"AMM autostart force successful: {msg}")
-                    else:
-                        self.log.warning(f"AMM autostart force failed: {msg}")
-                else:
-                    success, msg = start_amm_process(
-                        self, amm_host, amm_port, debug=amm_debug
-                    )
-                    if success:
-                        self.log.info(f"AMM autostart successful: {msg}")
-                    else:
-                        self.log.warning(f"AMM autostart failed: {msg}")
-            except Exception as e:
-                self.log.error(f"AMM autostart error: {str(e)}")
-                import traceback
-
-                self.log.error(traceback.format_exc())
-        else:
+        if not autostart_setting:
             self.log.info("AMM autostart is disabled")
+        elif not self.isSystemUnlocked():
+            self.log.info(
+                "AMM autostart is enabled but the system is locked, deferring AMM start until unlock"
+            )
+            self._amm_autostart_pending = True
+        else:
+            self._autostartAMM()
 
         if self.settings.get("fetchpricesthread", True):
             self._price_fetch_running = True
@@ -1708,6 +1671,53 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     f"{ci.coin_name()} chain is still syncing, currently at {synced}."
                 )
 
+    def _autostartAMM(self) -> None:
+        self.log.info("AMM autostart is enabled, starting AMM process...")
+        self._amm_autostart_pending = False
+        try:
+            from basicswap.ui.page_amm import (
+                start_amm_process,
+                start_amm_process_force,
+                check_existing_amm_processes,
+            )
+
+            self.log.info("Waiting 2 seconds for BasicSwap to fully initialize...")
+            time.sleep(2)
+
+            amm_host = self.settings.get("htmlhost", "127.0.0.1")
+            amm_port = self.settings.get("htmlport", 12700)
+            amm_debug = False
+
+            self.log.info(
+                f"Starting AMM with host={amm_host}, port={amm_port}, debug={amm_debug}"
+            )
+
+            existing_pids = check_existing_amm_processes()
+            if existing_pids:
+                self.log.warning(
+                    f"Found existing AMM processes: {existing_pids}. Using force start to clean up..."
+                )
+                success, msg = start_amm_process_force(
+                    self, amm_host, amm_port, debug=amm_debug
+                )
+                if success:
+                    self.log.info(f"AMM autostart force successful: {msg}")
+                else:
+                    self.log.warning(f"AMM autostart force failed: {msg}")
+            else:
+                success, msg = start_amm_process(
+                    self, amm_host, amm_port, debug=amm_debug
+                )
+                if success:
+                    self.log.info(f"AMM autostart successful: {msg}")
+                else:
+                    self.log.warning(f"AMM autostart failed: {msg}")
+        except Exception as e:
+            self.log.error(f"AMM autostart error: {str(e)}")
+            import traceback
+
+            self.log.error(traceback.format_exc())
+
     def isSystemUnlocked(self) -> bool:
         # TODO - Check all active coins
         ci = self.ci(Coins.PART)
@@ -1877,6 +1887,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         finally:
             self._read_zmq_queue = True
+
+        if self._amm_autostart_pending and coin is None:
+            self._autostartAMM()
 
     def _initializeElectrumWallets(self) -> None:
         try:
