@@ -10919,7 +10919,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return offer_in_flight_amount(
             cursor,
             offer.offer_id,
-            (ActionTypes.ACCEPT_BID, ActionTypes.ACCEPT_XMR_BID),
+            (
+                ActionTypes.ACCEPT_BID,
+                ActionTypes.ACCEPT_XMR_BID,
+                ActionTypes.ACCEPT_AS_REV_BID,
+            ),
             exclude_bid_id,
         )
 
