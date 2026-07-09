@@ -812,7 +812,7 @@ class HttpHandler(BaseHTTPRequestHandler):
 
         if page == "json":
             try:
-                self.putHeaders(status_code, "json")
+                self.putHeaders(status_code, "application/json")
                 func = js_url_to_function(url_split)
                 return func(self, url_split, post_string, is_json)
             except Exception as ex:
