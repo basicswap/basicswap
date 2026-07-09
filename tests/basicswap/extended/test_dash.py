@@ -816,7 +816,7 @@ class Test(unittest.TestCase):
         post_json = {
             "value": 100.0,
             "address": read_json_api(
-                1802, "wallets/{}/nextdepositaddr".format(tla_from.lower())
+                1802, "wallets/{}/nextdepositaddr".format(tla_from.lower()), {}
             ),
             "subfee": True,
         }

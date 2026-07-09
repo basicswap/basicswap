@@ -7,6 +7,7 @@
 
 import os
 import gzip
+import hmac
 import json
 import shlex
 import hashlib
@@ -17,7 +18,7 @@ import http.client
 import base64
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment, PackageLoader, select_autoescape
 from socket import error as SocketError
 from urllib import parse
 from datetime import datetime, timedelta, timezone
@@ -25,6 +26,7 @@ from email.utils import formatdate, parsedate_to_datetime
 from http.cookies import SimpleCookie
 
 from . import __version__, GUI_VERSION, AMM_VERSION
+from . import config as cfg
 from .util import (
     BalanceError,
     LockedCoinError,
@@ -79,7 +81,10 @@ from .ui.page_debug import page_debug
 SESSION_COOKIE_NAME = "basicswap_session_id"
 SESSION_DURATION_MINUTES = 60
 
-env = Environment(loader=PackageLoader("basicswap", "templates"))
+env = Environment(
+    loader=PackageLoader("basicswap", "templates"),
+    autoescape=select_autoescape(["html", "xml"]),
+)
 env.filters["formatts"] = format_timestamp
 
 
@@ -140,6 +145,65 @@ def parse_cmd(cmd: str, type_map: str):
     return method, typed_params
 
 
+# GET is allowed only for these read /json routes. Every other route — including
+# any new or unknown endpoint — requires POST (fail closed), so a state-changing
+# endpoint can't be reached cross-origin via a GET (<img>/<script>/prefetch)
+# just because someone forgot to list it. Add new READ routes here; new
+# state-changing routes need no change (they are POST-only by default).
+JSON_GET_ALLOWED = frozenset(
+    {
+        "coins",
+        "walletbalances",
+        "wallets",
+        "wallettransactions",
+        "offers",
+        "sentoffers",
+        "bids",
+        "sentbids",
+        "network",
+        "smsgaddresses",
+        "rate",
+        "rates",
+        "rateslist",
+        "offerfeeestimate",
+        "checkupdates",
+        "updatestatus",
+        "notifications",
+        "identities",
+        "automationstrategies",
+        "validateamount",
+        "help",
+        "readurl",
+        "active",
+        "coinprices",
+        "coinvolume",
+        "coinhistory",
+        "messageroutes",
+        "modeswitchinfo",
+    }
+)
+# Read sub-commands of /wallets/<coin>/<cmd>; every other wallet sub-command
+# mutates and requires POST.
+JSON_WALLET_GET_CMDS = frozenset({"listaddresses", "mwebbalance"})
+
+
+def json_requires_post(url_split) -> bool:
+    route = url_split[2] if len(url_split) > 2 else ""
+    if route == "":
+        return False  # /json index — read
+    if route not in JSON_GET_ALLOWED:
+        return True
+    if (
+        route == "wallets"
+        and len(url_split) > 4
+        and url_split[4] not in JSON_WALLET_GET_CMDS
+    ):
+        return True
+    if route == "offers" and len(url_split) > 3 and url_split[3] == "new":
+        return True
+    return False
+
+
 class HttpHandler(BaseHTTPRequestHandler):
     def _get_session_cookie(self):
         if "Cookie" in self.headers:
@@ -154,6 +218,16 @@ class HttpHandler(BaseHTTPRequestHandler):
         cookie[SESSION_COOKIE_NAME]["path"] = "/"
         cookie[SESSION_COOKIE_NAME]["httponly"] = True
         cookie[SESSION_COOKIE_NAME]["samesite"] = "Lax"
+        # "Secure" tells the browser to send this cookie back only over HTTPS, so
+        # the session id can't leak over plain HTTP. Set when the request
+        # actually arrived over TLS (a reverse proxy signals this with
+        # X-Forwarded-Proto: https) or when the operator forces it via the
+        # secure_cookies setting.
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "").lower()
+        if forwarded_proto == "https" or self.server.swap_client.settings.get(
+            "secure_cookies", cfg.DEFAULT_SECURE_COOKIES
+        ):
+            cookie[SESSION_COOKIE_NAME]["secure"] = True
         expires = datetime.now(timezone.utc) + timedelta(
             minutes=SESSION_DURATION_MINUTES
         )
@@ -193,6 +267,20 @@ class HttpHandler(BaseHTTPRequestHandler):
                 del self.server.active_sessions[session_id]
         return False
 
+    def is_same_origin_request(self) -> bool:
+        # CSRF defence, verify-when-present: a browser always sends Origin on a
+        # cross-origin POST, so a header-less client (tests/curl/API scripts) is
+        # not a browser CSRF and is allowed. When present, the Origin/Referer host
+        # is compared against this request's own Host header, so 127.0.0.1 vs
+        # localhost and reverse-proxy domains all match without hardcoding a bind.
+        origin = self.headers.get("Origin") or self.headers.get("Referer")
+        if not origin:
+            return True
+        host = self.headers.get("Host")
+        if not host:
+            return False
+        return parse.urlparse(origin).netloc == host
+
     def log_error(self, format, *args):
         super().log_message(format, *args)
 
@@ -200,19 +288,21 @@ class HttpHandler(BaseHTTPRequestHandler):
         # TODO: Add debug flag to re-enable.
         pass
 
-    def generate_form_id(self):
-        return os.urandom(8).hex()
-
     def checkForm(self, post_string, name, messages):
         if post_string == "":
             return None
         form_data = parse.parse_qs(post_string)
-        form_id = form_data[b"formid"][0].decode("utf-8")
-        with self.server.form_id_lock:
-            if self.server.last_form_id.get(name, None) == form_id:
-                messages.append("Prevented double submit for form {}.".format(form_id))
-                return None
-            self.server.last_form_id[name] = form_id
+        try:
+            form_id = form_data[b"formid"][0].decode("utf-8")
+        except (KeyError, IndexError):
+            messages.append("Missing form token.")
+            return None
+        # Real CSRF check: the form must carry the server-issued token. Replaces
+        # the former per-form-name double-submit latch, which was not a security
+        # control (any fresh value passed).
+        if not hmac.compare_digest(form_id, self.server.session_tokens.get("csrf", "")):
+            messages.append("Invalid form token.")
+            return None
         return form_data
 
     def render_template(
@@ -330,7 +420,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             template.render(
                 title=self.server.title,
                 h2=self.server.title,
-                form_id=self.generate_form_id(),
+                form_id=self.server.session_tokens["csrf"],
                 **args_dict,
             ),
             "UTF-8",
@@ -674,12 +764,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         extra_headers = []
 
-        if len(url_split) > 2:
-            token = url_split[2]
-            with self.server.session_lock:
-                expect_token = self.server.session_tokens.get("shutdown", None)
-            if token != expect_token:
-                return self.page_info("Unexpected token, still running.")
+        token = url_split[2] if len(url_split) > 2 else ""
+        with self.server.session_lock:
+            expect_token = self.server.session_tokens.get("shutdown", "")
+        if not expect_token or not hmac.compare_digest(token, expect_token):
+            return self.page_info("Unexpected token, still running.")
 
         session_id = self._get_session_cookie()
         with self.server.session_lock:
@@ -807,10 +896,25 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return b""
 
-        if not post_string and len(parsed.query) > 0:
+        # CSRF: block cross-origin state-changing requests. Only POST is checked
+        # (GET writes are already rejected by the method split); reads are left
+        # untouched so a cross-site link to a page still works.
+        if self.command == "POST" and not self.is_same_origin_request():
+            if page == "json":
+                self.putHeaders(403, "application/json")
+                return json.dumps({"error": "Cross-origin request blocked"}).encode(
+                    "utf-8"
+                )
+            self.putHeaders(403, "text/html")
+            return b"Cross-origin request blocked"
+
+        if not post_string and len(parsed.query) > 0 and page != "json":
             post_string = parsed.query
 
         if page == "json":
+            if self.command != "POST" and json_requires_post(url_split):
+                self.putHeaders(405, "application/json")
+                return json.dumps({"error": "POST required"}).encode("utf-8")
             try:
                 self.putHeaders(status_code, "application/json")
                 func = js_url_to_function(url_split)
@@ -862,6 +966,18 @@ class HttpHandler(BaseHTTPRequestHandler):
 
                 if mime_type == "" or not filepath:
                     raise ValueError("Unknown file type or path")
+
+                # Prevent path traversal. Require the resolved file to stay within static_path
+                static_real = os.path.realpath(static_path)
+                try:
+                    within_static = (
+                        os.path.commonpath((os.path.realpath(filepath), static_real))
+                        == static_real
+                    )
+                except ValueError:
+                    within_static = False
+                if not within_static:
+                    return self.page_404(url_split)
 
                 file_stat = os.stat(filepath)
                 mtime = file_stat.st_mtime
@@ -994,6 +1110,13 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == "newautomationstrategy":
                     return page_automation_strategy_new(self, url_split, post_string)
                 if page == "amm":
+                    amm_action = url_split[2] if len(url_split) > 2 else ""
+                    if (
+                        amm_action in ("autostart", "config", "debug")
+                        and self.command != "POST"
+                    ):
+                        self.putHeaders(405, "application/json")
+                        return json.dumps({"error": "POST required"}).encode("utf-8")
                     if len(url_split) > 2 and url_split[2] == "status":
                         query_params = {}
                         if parsed.query:
@@ -1115,14 +1238,13 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
         self.allow_cors = allow_cors
         self.swap_client = swap_client
         self.title = "BasicSwap - " + __version__
-        self.last_form_id = dict()
         self.session_tokens = dict()
+        self.session_tokens["csrf"] = secrets.token_urlsafe(32)
         self.active_sessions = {}
         self.env = env
         self.msg_id_counter = 0
 
         self.session_lock = threading.Lock()
-        self.form_id_lock = threading.Lock()
         self.msg_id_lock = threading.Lock()
 
         self.timeout = 60

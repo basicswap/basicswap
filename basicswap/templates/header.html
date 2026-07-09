@@ -389,7 +389,9 @@
                 <p><b>Wallets:</b> Locked</p>
               </div>
               {% else %}
-              <a href='/lock'>
+              <form method="post" action="/lock" class="inline">
+                <input type="hidden" name="formid" value="{{ form_id }}">
+                <button type="submit" class="p-0 m-0 bg-transparent border-0 cursor-pointer">
                 <div data-tooltip-target="tooltip-unlocked-wallets" class="ml-5 flex items-center
                   text-gray-50 hover:text-gray-100 text-sm">
                   {{ wallet_unlocked_svg | safe }}
@@ -399,7 +401,8 @@
                   transition-opacity duration-300 tooltip">
                   <p><b>Wallets:</b> Unlocked</p>
                 </div>
-              </a>
+                </button>
+              </form>
               {% endif %}
             </li>
           </ul>

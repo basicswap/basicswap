@@ -35,7 +35,12 @@ from basicswap.util.address import decodeAddress, toWIF
 from basicswap.util.crypto import ripemd160, hash160, blake256
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint, decode_varint
-from basicswap.util.network import is_private_ip_address
+from basicswap.util.network import (
+    is_loopback_address,
+    is_private_ip_address,
+    is_public_url,
+    is_url_scheme_allowed,
+)
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.util_xmr import (
     decode_address as xmr_decode_address,
@@ -609,6 +614,101 @@ class Test(unittest.TestCase):
         ]
         for addr, is_private in test_addresses:
             assert is_private_ip_address(addr) is is_private
+
+    def test_is_loopback_address(self):
+        test_addresses = [
+            ("localhost", True),
+            ("127.0.0.1", True),
+            ("127.5.5.5", True),
+            ("::1", True),
+            ("::ffff:127.0.0.1", True),
+            ("10.0.0.4", False),
+            ("192.168.1.5", False),
+            ("0.0.0.0", False),
+            ("::ffff:10.0.0.4", False),
+            ("", False),
+            ("example.com", False),
+        ]
+        for addr, is_loopback in test_addresses:
+            assert is_loopback_address(addr) is is_loopback
+
+    def test_is_url_scheme_allowed(self):
+        test_urls = [
+            ("http://example.com", True),
+            ("https://example.com/path", True),
+            ("file:///etc/passwd", False),
+            ("ftp://example.com", False),
+            ("gopher://example.com", False),
+            ("/etc/passwd", False),
+        ]
+        for url, allowed in test_urls:
+            assert is_url_scheme_allowed(url) is allowed
+
+    def test_is_public_url(self):
+        # Non-http(s) schemes and internal hosts must be rejected; a public IP
+        # literal (resolves to itself, no DNS needed) must be accepted.
+        test_urls = [
+            ("file:///etc/passwd", False),
+            ("ftp://a", False),
+            ("http://127.0.0.1", False),
+            ("http://localhost", False),
+            ("http://169.254.169.254/latest/meta-data/", False),
+            ("http://10.0.0.5", False),
+            ("http://192.168.1.1/", False),
+            ("https://[::1]/", False),
+            ("https://8.8.8.8", True),
+        ]
+        for url, is_public in test_urls:
+            assert is_public_url(url) is is_public
+
+    def test_is_same_origin_request(self):
+        from basicswap.http_server import HttpHandler
+
+        class Stub:
+            def __init__(self, headers):
+                self.headers = headers
+
+        check = HttpHandler.is_same_origin_request
+        cases = [
+            ({}, True),  # header-less (tests/curl/API scripts) -> allowed
+            (
+                {"Origin": "http://127.0.0.1:12700", "Host": "127.0.0.1:12700"},
+                True,
+            ),
+            (
+                {"Origin": "http://localhost:12700", "Host": "localhost:12700"},
+                True,
+            ),
+            ({"Origin": "http://evil.com", "Host": "127.0.0.1:12700"}, False),
+            ({"Origin": "null", "Host": "127.0.0.1:12700"}, False),
+            (
+                {"Referer": "http://127.0.0.1:12700/rpc", "Host": "127.0.0.1:12700"},
+                True,
+            ),
+            ({"Referer": "http://evil.com/x", "Host": "127.0.0.1:12700"}, False),
+            ({"Origin": "http://127.0.0.1:12700"}, False),  # no Host header
+        ]
+        for headers, expected in cases:
+            assert check(Stub(headers)) is expected
+
+    def test_checkform_csrf_token(self):
+        from basicswap.http_server import HttpHandler
+
+        class Srv:
+            session_tokens = {"csrf": "the-server-token"}
+
+        class Stub:
+            server = Srv()
+
+        check = HttpHandler.checkForm
+        msgs = []
+        # Correct token -> returns parsed form data.
+        fd = check(Stub(), b"formid=the-server-token&x=1", "rpc", msgs)
+        assert fd is not None and b"x" in fd
+        # Wrong / missing / empty -> rejected (None).
+        assert check(Stub(), b"formid=wrong&x=1", "rpc", msgs) is None
+        assert check(Stub(), b"x=1", "rpc", msgs) is None
+        assert check(Stub(), "", "rpc", msgs) is None
 
     def test_varint(self):
         test_vectors = [

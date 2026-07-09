@@ -5,4 +5,5 @@ exclude =
     basicswap/interface/*/contrib,
     .eggs,
     .tox,
+    .venv,
     bin/install_certifi.py

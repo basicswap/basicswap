@@ -14,6 +14,11 @@ from .util import (
     ensure,
     toBool,
 )
+from .util.network import (
+    is_loopback_address,
+    is_public_url,
+    is_url_scheme_allowed,
+)
 from .basicswap_util import (
     fiatFromTicker,
     strBidState,
@@ -739,7 +744,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                     extra_options=extra_options,
                 )
 
-            if have_data_entry(post_data, "debugind"):
+            if have_data_entry(post_data, "debugind") and swap_client.debug:
                 main_debug_ind: bool = toBool(
                     get_data_entry_or(post_data, "maindebugind", True)
                 )
@@ -763,7 +768,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 swap_client.acceptBid(bid_id)
             elif have_data_entry(post_data, "abandon"):
                 swap_client.abandonBid(bid_id)
-            elif have_data_entry(post_data, "debugind"):
+            elif have_data_entry(post_data, "debugind") and swap_client.debug:
                 main_debug_ind: bool = toBool(
                     get_data_entry_or(post_data, "maindebugind", True)
                 )
@@ -925,7 +930,12 @@ def js_rates(self, url_split, post_string, is_json) -> bytes:
 
 
 def js_rates_list(self, url_split, query_string, is_json) -> bytes:
+    # Works for both POST (params in the body) and GET (params in the URL query).
+    # GET query strings are no longer promoted into the body for /json routes, so
+    # fall back to reading the URL query directly when there is no body.
     get_data = urllib.parse.parse_qs(query_string)
+    if not get_data:
+        get_data = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
 
     sc = self.server.swap_client
     coin_from = getCoinType(get_data["from"][0])
@@ -1337,6 +1347,24 @@ def js_vacuumdb(self, url_split, post_string, is_json) -> bytes:
 def js_getcoinseed(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
+
+    # Seed export returns wallet secrets. Restrict it to local (loopback, not
+    # proxied) callers or a genuinely authenticated session, so an exposed bind
+    # without client_auth_hash can't hand the seed to a remote client (BSX-014).
+    client_ip = self.client_address[0] if self.client_address else ""
+    via_proxy = bool(
+        self.headers.get("X-Forwarded-For") or self.headers.get("X-Forwarded-Proto")
+    )
+    is_local = is_loopback_address(client_ip) and not via_proxy
+    authed = (
+        bool(swap_client.settings.get("client_auth_hash")) and self.is_authenticated()
+    )
+    if not (is_local or authed):
+        raise ValueError(
+            "Wallet seed export is only available over a local connection or "
+            "with authentication enabled."
+        )
+
     post_data = getFormData(post_string, is_json)
 
     coin_in = get_data_entry(post_data, "coin")
@@ -1479,12 +1507,18 @@ def js_readurl(self, url_split, post_string, is_json) -> bytes:
     if not have_data_entry(post_data, "url"):
         raise ValueError("Requires URL.")
     url = get_data_entry(post_data, "url")
+    if not is_url_scheme_allowed(url):
+        raise ValueError("Unsupported URL scheme.")
+    # The internal-address check is skipped under Tor (egress via the proxy uses
+    # remote DNS, so local resolution can't vet the destination).
+    if not swap_client.use_tor_proxy and not is_public_url(url):
+        raise ValueError("URL host not permitted.")
     default_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
     }
-    response = swap_client.readURL(url, headers=default_headers)
+    response = swap_client.readURL(url, headers=default_headers, check_public=True)
     try:
         error = json.loads(response.decode())
         if "Error" in error:

@@ -1116,6 +1116,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return min_relay_fee, "min_relay_fee"
         return fee_rate, rate_src
 
+    def _ensureFeeRateWithinMax(self, fee_rate, fee_src) -> None:
+        # Refuse a fee rate above the configured maximum (_high_feerate).
+        # An explicit operator override is exempt.
+        if fee_src == "override_feerate":
+            return
+        if self._high_feerate > 0 and self.make_int(fee_rate) > self._high_feerate:
+            raise ValueError(
+                f"{self.coin_name()} fee rate {fee_rate} ({fee_src}) exceeds "
+                f"maximum {self._high_feerate}; refusing to build transaction. "
+                f"Check the fee source or set override_feerate."
+            )
+
     def isSegwitAddress(self, address: str) -> bool:
         return address.startswith(self.chainparams_network()["hrp"] + "1")
 
@@ -3727,6 +3739,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             fee_src = "specified"
         else:
             fee_rate, fee_src = self.get_fee_rate(self._conf_target)
+            self._ensureFeeRateWithinMax(fee_rate, fee_src)
         self._log.debug(
             f"Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}"
         )
@@ -3744,7 +3757,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def _createRawFundedTransactionElectrum(
         self, addr_to: str, amount: int, sub_fee: bool = False
     ) -> str:
-        feerate, _rate_src = self.get_fee_rate()
+        feerate, fee_src = self.get_fee_rate()
+        self._ensureFeeRateWithinMax(feerate, fee_src)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         script = self.getDestForAddress(addr_to)

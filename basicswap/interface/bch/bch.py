@@ -943,6 +943,7 @@ class BCHInterface(BTCInterface):
         ensure(out_2 == _out_2, "out_2 mismatch")
         ensure(public_key == _public_key, "public_key mismatch")
         ensure(timelock == _timelock, "timelock mismatch")
+        ensure(_timelock == csv_val_expect, "timelock mismatch")
 
         fee_paid = locked_coin - mining_fee
         assert fee_paid > 0

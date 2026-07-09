@@ -4014,6 +4014,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return abs(rate1 - rate2) <= tolerance
 
     def validateBidAmount(self, offer, bid_amount: int, bid_rate: int) -> None:
+        ensure(bid_rate > 0, "Bid rate must be greater than zero")
         ensure(bid_amount >= offer.min_bid_amount, "Bid amount below minimum")
         ensure(bid_amount <= offer.amount_from, "Bid amount above offer amount")
         if not offer.amount_negotiable:
@@ -4034,7 +4035,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def isValidSwapDest(self, ci, dest: bytes):
         ensure(isinstance(dest, bytes), "Swap destination must be bytes")
-        if ci.coin_type() in (Coins.PART_BLIND,):
+        if ci.interface_type() in (Coins.PART_BLIND,):
             return ci.verifyPubkey(dest)
         if ci.isValidAddressHash(dest):
             return True
@@ -11786,6 +11787,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ),
                     "Invalid BCH lock tx script out_2",
                 )
+                ensure(
+                    timelock == xmr_offer.lock_time_1,
+                    "Invalid BCH lock tx script timelock",
+                )
 
                 lockExtraArgs["mining_fee"] = mining_fee
                 lockExtraArgs["out_1"] = out_1
@@ -11801,6 +11806,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ensure(
                     out_2 == bch_ci.getScriptForPubkeyHash(xmr_swap.dest_af),
                     "Invalid BCH refund tx script out_2",
+                )
+                ensure(
+                    timelock == xmr_offer.lock_time_2,
+                    "Invalid BCH refund tx script timelock",
                 )
 
                 refundExtraArgs["mining_fee"] = mining_fee

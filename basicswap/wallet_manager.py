@@ -5,11 +5,13 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import os
 import sqlite3
 import threading
 import time
 from typing import Dict, List, Optional, Tuple
 from coincurve import PrivateKey, PublicKey
+from Crypto.Cipher import ChaCha20_Poly1305  # pycryptodome
 
 from .chainparams import Coins
 from .contrib.test_framework import segwit_addr
@@ -23,6 +25,15 @@ from .db_wallet import (
 )
 from .util.crypto import hash160, sha256
 from .util.extkey import ExtKeyPair
+
+# Imported private keys are stored AEAD-encrypted as:
+#   version(1) | nonce(24) | mac(16) | ciphertext
+# The legacy format was a bare XOR against a constant keystream and
+# is exactly the key length (32 bytes), so the two are told apart by length and
+# the version tag below.
+IMPORT_KEY_AEAD_VERSION = 0x01
+_AEAD_NONCE_LEN = 24
+_AEAD_MAC_LEN = 16
 
 
 class WalletManager:
@@ -1038,15 +1049,47 @@ class WalletManager:
             return None
 
     def _getXorKey(self, coin_type: Coins) -> bytes:
+        # Legacy per-coin XOR keystream. Retained only to decrypt rows
+        # written before the AEAD upgrade; never used to encrypt new keys.
         master_key = self._master_keys.get(coin_type)
         if master_key is None:
             raise ValueError(f"Wallet not initialized for {coin_type}")
         return sha256(master_key + b"_import_key")
 
+    def _getImportKey(self, coin_type: Coins) -> bytes:
+        # 32-byte AEAD key for imported private keys, domain-separated from the
+        # legacy XOR keystream.
+        master_key = self._master_keys.get(coin_type)
+        if master_key is None:
+            raise ValueError(f"Wallet not initialized for {coin_type}")
+        return sha256(master_key + b"_import_key_aead")
+
+    @staticmethod
+    def _isAEADImportKey(data: bytes) -> bool:
+        return (
+            len(data) >= 1 + _AEAD_NONCE_LEN + _AEAD_MAC_LEN
+            and data[0] == IMPORT_KEY_AEAD_VERSION
+        )
+
     def _encryptPrivateKey(self, private_key: bytes, coin_type: Coins) -> bytes:
-        return bytes(a ^ b for a, b in zip(private_key, self._getXorKey(coin_type)))
+        # Authenticated encryption with a fresh per-record nonce.
+        key = self._getImportKey(coin_type)
+        nonce = os.urandom(_AEAD_NONCE_LEN)
+        cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
+        ciphertext, mac = cipher.encrypt_and_digest(private_key)
+        return bytes([IMPORT_KEY_AEAD_VERSION]) + nonce + mac + ciphertext
 
     def _decryptPrivateKey(self, encrypted_key: bytes, coin_type: Coins) -> bytes:
+        if self._isAEADImportKey(encrypted_key):
+            key = self._getImportKey(coin_type)
+            nonce = encrypted_key[1 : 1 + _AEAD_NONCE_LEN]
+            mac = encrypted_key[
+                1 + _AEAD_NONCE_LEN : 1 + _AEAD_NONCE_LEN + _AEAD_MAC_LEN
+            ]
+            ciphertext = encrypted_key[1 + _AEAD_NONCE_LEN + _AEAD_MAC_LEN :]
+            cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
+            return cipher.decrypt_and_verify(ciphertext, mac)
+        # Legacy two-time-pad XOR format.
         return bytes(a ^ b for a, b in zip(encrypted_key, self._getXorKey(coin_type)))
 
     def _computeScripthash(self, coin_type: Coins, address: str) -> str:

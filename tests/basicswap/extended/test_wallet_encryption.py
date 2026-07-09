@@ -285,7 +285,7 @@ class Test(unittest.TestCase):
 
             bch_addr = bch_rpc("getnewaddress")
             rv = bch_rpc("generatetoaddress", [1, bch_addr])
-            rv = read_json_api(12700, "wallets/bch/reseed")
+            rv = read_json_api(12700, "wallets/bch/reseed", {})
             assert rv["reseeded"] is True
 
             authcookiepath = os.path.join(test_path, "pivx", "regtest", ".cookie")
@@ -296,7 +296,7 @@ class Test(unittest.TestCase):
 
             pivx_addr = pivx_rpc("getnewaddress")
             rv = pivx_rpc("generatetoaddress", [1, pivx_addr])
-            rv = read_json_api(12700, "wallets/pivx/reseed")
+            rv = read_json_api(12700, "wallets/pivx/reseed", {})
             assert rv["reseeded"] is True
 
             for coin in self.test_coins:
@@ -445,7 +445,7 @@ class Test(unittest.TestCase):
             logging.info("Reseeding BCH")
             bch_addr = bch_rpc("getnewaddress")
             rv = bch_rpc("generatetoaddress", [1, bch_addr])
-            rv = read_json_api(12700, "wallets/bch/reseed")
+            rv = read_json_api(12700, "wallets/bch/reseed", {})
             assert rv["reseeded"] is True
 
             logging.info("Reseeding PIVX")
@@ -457,7 +457,7 @@ class Test(unittest.TestCase):
 
             pivx_addr = pivx_rpc("getnewaddress")
             rv = pivx_rpc("generatetoaddress", [1, pivx_addr])
-            rv = read_json_api(12700, "wallets/pivx/reseed")
+            rv = read_json_api(12700, "wallets/pivx/reseed", {})
             assert rv["reseeded"] is True
 
             for coin in self.test_coins:
@@ -573,7 +573,7 @@ class Test(unittest.TestCase):
 
             bch_addr = bch_rpc("getnewaddress")
             rv = bch_rpc("generatetoaddress", [1, bch_addr])
-            rv = read_json_api(12700, "wallets/bch/reseed")
+            rv = read_json_api(12700, "wallets/bch/reseed", {})
             assert rv["reseeded"] is True
 
             authcookiepath = os.path.join(test_path, "pivx", "regtest", ".cookie")
@@ -584,7 +584,7 @@ class Test(unittest.TestCase):
 
             pivx_addr = pivx_rpc("getnewaddress")
             rv = pivx_rpc("generatetoaddress", [1, pivx_addr])
-            rv = read_json_api(12700, "wallets/pivx/reseed")
+            rv = read_json_api(12700, "wallets/pivx/reseed", {})
             assert rv["reseeded"] is True
 
             for coin in self.test_coins:
@@ -647,7 +647,7 @@ class Test(unittest.TestCase):
             assert rv["expected_seed"] is False
 
             logging.info("Try to reseed pivx (and fail).")
-            rv = read_json_api(12700, "wallets/pivx/reseed")
+            rv = read_json_api(12700, "wallets/pivx/reseed", {})
             assert "Already have this key" in rv["error"]
 
             logging.info("Check both LTC wallets are encrypted and mweb seeds match.")

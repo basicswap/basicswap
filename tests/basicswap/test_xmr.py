@@ -2543,7 +2543,7 @@ class Test(BaseTest):
         js_w2 = read_json_api(1802, "wallets")
         post_json = {
             "value": float(js_w2["PART"]["balance"]),
-            "address": read_json_api(1802, "wallets/part/nextdepositaddr"),
+            "address": read_json_api(1802, "wallets/part/nextdepositaddr", {}),
             "subfee": True,
         }
         json_rv = read_json_api(TEST_HTTP_PORT + 2, "wallets/part/withdraw", post_json)
@@ -2674,8 +2674,8 @@ class Test(BaseTest):
         logging.info("---------- Test that new subaddresses are created")
 
         current_subaddress = read_json_api(1800, "wallets/xmr")["deposit_address"]
-        first_subaddress = read_json_api(1800, "wallets/xmr/nextdepositaddr")
-        second_subaddress = read_json_api(1800, "wallets/xmr/nextdepositaddr")
+        first_subaddress = read_json_api(1800, "wallets/xmr/nextdepositaddr", {})
+        second_subaddress = read_json_api(1800, "wallets/xmr/nextdepositaddr", {})
         assert first_subaddress != second_subaddress
         assert first_subaddress != current_subaddress
         assert second_subaddress != current_subaddress

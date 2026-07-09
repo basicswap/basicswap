@@ -1124,7 +1124,7 @@ class Test(BaseTest):
         js_w2 = read_json_api(1802, "wallets")
         post_json = {
             "value": float(js_w2["PART"]["balance"]),
-            "address": read_json_api(1802, "wallets/part/nextdepositaddr"),
+            "address": read_json_api(1802, "wallets/part/nextdepositaddr", {}),
             "subfee": True,
         }
         json_rv = read_json_api(TEST_HTTP_PORT + 2, "wallets/part/withdraw", post_json)

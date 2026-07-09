@@ -9,6 +9,9 @@ import os
 CONFIG_FILENAME = "basicswap.json"
 BASICSWAP_DATADIR = os.getenv("BASICSWAP_DATADIR", os.path.join("~", ".basicswap"))
 DEFAULT_ALLOW_CORS = False
+# Mark the web session cookie "Secure" (send only over HTTPS). Auto-enabled when
+# the request arrives over TLS (X-Forwarded-Proto: https); this forces it on.
+DEFAULT_SECURE_COOKIES = False
 DEFAULT_RPC_POOL_ENABLED = True
 DEFAULT_RPC_POOL_MAX_CONNECTIONS = 5
 TEST_DATADIRS = os.path.expanduser(os.getenv("DATADIRS", "/tmp/basicswap"))

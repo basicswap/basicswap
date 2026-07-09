@@ -2326,7 +2326,7 @@ class BasicSwapTest(TestFunctions):
         post_json = {
             "value": float(js_w2[tla_from]["balance"]),
             "address": read_json_api(
-                1802, "wallets/{}/nextdepositaddr".format(tla_from.lower())
+                1802, "wallets/{}/nextdepositaddr".format(tla_from.lower()), {}
             ),
             "subfee": True,
         }
@@ -2806,8 +2806,8 @@ class TestBTC(BasicSwapTest):
         help_output = read_json_api(1800, "help")
         assert "getcoinseed" in help_output["commands"]
 
-        rv = read_json_api(1800, "getcoinseed")
-        assert rv["error"] == "No post data"
+        rv = read_json_api(1800, "getcoinseed", {})
+        assert "error" in rv
 
         rv = read_json_api(1800, "getcoinseed", {"coin": "PART"})
         assert "seed is set from the Basicswap mnemonic" in rv["error"]
@@ -2876,7 +2876,7 @@ class TestBTC(BasicSwapTest):
         rv = read_json_api(1800, "automationstrategies/1")
         assert rv["label"] == "Accept All"
 
-        sx_addr = read_json_api(1800, "wallets/part/newstealthaddress")
+        sx_addr = read_json_api(1800, "wallets/part/newstealthaddress", {})
         assert (
             callnoderpc(
                 0,

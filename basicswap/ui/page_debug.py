@@ -58,12 +58,12 @@ def page_debug(self, url_split, post_string):
                 rvj["LTC"] = swap_client.ci(Coins.LTC).getNonSegwitOutputs()
 
                 # json.dumps indent=4 ends up in one line in html side
-                message_output = "BTC:<br/>"
+                message_output = "BTC:\n"
                 for utxo in rvj["BTC"]:
-                    message_output += json.dumps(utxo) + "<br/>"
-                message_output += "LTC:<br/>"
+                    message_output += json.dumps(utxo) + "\n"
+                message_output += "LTC:\n"
                 for utxo in rvj["LTC"]:
-                    message_output += json.dumps(utxo) + "<br/>"
+                    message_output += json.dumps(utxo) + "\n"
                 messages.append(message_output)
             except Exception as e:
                 swap_client.log.error(
