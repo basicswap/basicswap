@@ -1,4 +1,85 @@
 
+0.17.0
+==============
+
+- Updated DB (v37)
+- GUI bumped to v4.0.0.
+  - Live table updates via WebSocket (+ new_offer, offer_revoked, offer_expired, swaps, bids).
+  - Template validation (client + server).
+  - UI badges: offer mode, running offers/bids, exhausted, fixed-total progress, stale/revoked/expired.
+  - Updated enable/disable toggle (green/red), save via API.
+  - Update footer design.
+  - Fix header counter desk/mobile.
+  - GUI: Create Offer redesign
+    - Market rate comparison and estimated network fee.
+    - Added: Failed publishes keep your data so you can retry from review and correct your offer settings.
+    - Better alerts (success/error/default).
+    - Table of competing offers.
+    - Offer modes:
+      - One-time: fills once, then auto-closes (new default for manually created offers).
+      - Fixed total: repeats until a cumulative total_to_sell is reached, then closes.
+      - Standing: repeats continuously, skipping new offers while the wallet would drop below a reserve floor (min_coin_from_amt). Default for AMM templates.
+
+- AMM updates:
+  - Added version. (v0.5.0)
+  - AMM/New offer page: per-offer budget and fill tracking so an offer can't be filled more times than intended.
+  - JSON APIs: POST /amm/config, GET /amm/state (runtime + bid runtime).
+  - Script persists fill progress across restarts / backend aggregates live fills across reposts.
+
+- feat: set a destination address for reversed (adaptor-sig) swaps.New: 3-step flow: Trade → Terms → Review, plus a dedicated success page after published.
+
+**Security**
+This release hardens the local web UI against a malicious page in the user's
+browser and against untrusted callers.
+- Enable Jinja2 autoescape in templates.
+- Add a CSRF token to forms.
+- Block cross-origin POST requests.
+- Require POST for state-changing JSON endpoints.
+- Restrict the URL scheme allowed for js_readurl.
+- Prevent path traversal in /static file serving.
+- Harden the shutdown token, debug_ind, and session cookie.
+- Restrict wallet seed export to local or authenticated callers.
+- Encrypt imported Electrum-wallet private keys with AEAD (ChaCha20-Poly1305, per-record
+  random nonce, domain-separated master-derived key). Decryption stays backward compatible
+  with the legacy format.
+
+**Fixes**
+- interface/bch: use lock_time_1 for the lock-refund-tx input nSequence.
+- fix: bind BCH covenant timelocks to the offer.
+- fix: use the bip44 path for the wallet seedid in descriptor mode.
+- fix: clamp the Electrum fee estimate for withdrawals.
+- fix: ensure bid_rate is positive.
+- fix: lock prefunded bid tx inputs, and add lock_unspent to _fundTxElectrum.
+- http: use the correct application/json header.
+
+**Startup / unlock robustness**
+- Require all wallets to unlock before unlocking the system.
+- Don't treat an RPC timeout as a missing seed during unlock; retry getWalletSeedID with
+  exponential backoff and raise on persistent failure instead of wrongly running
+  sethdseed/encryptwallet on an existing, still-locked wallet.
+- Skip checkAndNotifyBalanceChange while the system is locked.
+- Extend the getnetworkinfo timeout so slow daemons don't stop basicswap on startup.
+
+**AMM**
+- Skip templates with inactive coins instead of killing the AMM.
+- Don't autostart the AMM while the system is locked.
+- Add contract lock time to the GUI and script; remove a stray lock time option.
+
+**Refactors**
+- xmr: only open_wallet when a wallet change is expected.
+- Keep coin specific code more contained to interface folders:
+  - Move chainparams into each coin's folder and migrate interface/contrib into the coin dirs.
+  - Untangle bin/prepare.py.
+- Consolidate linter config and remove unused code.
+
+**Tests**
+- Add all coins to test_xmr_persistent.py.
+- Add new test_coins.py which works for any coin pair.
+- CI: split into a matrix and run jobs concurrently.
+- test_offer.py (Selenium test).
+- New tests covering AMM offer tracking, test_amm_config_api.py.
+
+
 0.16.6
 ==============
 
