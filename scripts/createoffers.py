@@ -396,8 +396,14 @@ def readConfig(args, known_coins):
 
         if offer_template.get("enabled", True) is False:
             continue
-        offer_template["coin_from"] = findCoin(offer_template["coin_from"], known_coins)
-        offer_template["coin_to"] = findCoin(offer_template["coin_to"], known_coins)
+        try:
+            offer_template["coin_from"] = findCoin(
+                offer_template["coin_from"], known_coins
+            )
+            offer_template["coin_to"] = findCoin(offer_template["coin_to"], known_coins)
+        except ValueError as e:
+            print(f"Skipping offer template {offer_template['name']}: {e}")
+            continue
     config["num_enabled_offers"] = num_enabled
 
     bid_templates = config["bids"]
@@ -430,8 +436,12 @@ def readConfig(args, known_coins):
 
         if bid_template.get("enabled", True) is False:
             continue
-        bid_template["coin_from"] = findCoin(bid_template["coin_from"], known_coins)
-        bid_template["coin_to"] = findCoin(bid_template["coin_to"], known_coins)
+        try:
+            bid_template["coin_from"] = findCoin(bid_template["coin_from"], known_coins)
+            bid_template["coin_to"] = findCoin(bid_template["coin_to"], known_coins)
+        except ValueError as e:
+            print(f"Skipping bid template {bid_template['name']}: {e}")
+            continue
     config["num_enabled_bids"] = num_enabled
 
     config["main_loop_delay"] = config.get("main_loop_delay", 60)
@@ -708,6 +718,10 @@ def process_offers(args, config, script_state) -> None:
             print(f"Skipping {offer_template['name']} - coin not available")
             if args.debug:
                 print(f"Error: {e}")
+            continue
+
+        if coin_from_data.get("active") is False or coin_to_data.get("active") is False:
+            print(f"Skipping {offer_template['name']} - coin inactive")
             continue
 
         coin_ticker = coin_from_data["ticker"]
@@ -1527,6 +1541,10 @@ def process_bids(args, config, script_state) -> None:
                 print(f"Coin not found in coins_map for bid: {e}")
             else:
                 print(f"Skipping {bid_template['name']} - coin not available")
+            continue
+
+        if coin_from_data.get("active") is False or coin_to_data.get("active") is False:
+            print(f"Skipping {bid_template['name']} - coin inactive")
             continue
 
         page_limit: int = 25
