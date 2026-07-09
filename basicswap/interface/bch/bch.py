@@ -547,7 +547,11 @@ class BCHInterface(BTCInterface):
         tx.vin.append(
             CTxIn(
                 COutPoint(tx_lock_id_int, locked_n),
-                nSequence=kwargs["timelock"] if "timelock" in kwargs else lock1_value,
+                # Refund input spends the lock tx's refund branch (CSV = lock_time_1), and
+                # verifySCLockRefundTx checks nSequence == lock_time_1 (prevout_seq). The old
+                # kwargs["timelock"] (= lock_time_2) only matched when the two timelocks were
+                # equal; lock_time_2 is carried separately on the refund output. Match btc.py.
+                nSequence=lock1_value,
                 scriptSig=self.getScriptScriptSig(script_lock, None),
             )
         )

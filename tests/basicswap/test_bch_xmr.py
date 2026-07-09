@@ -20,6 +20,7 @@ from basicswap.basicswap import (
 from basicswap.bin.run import startDaemon
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
+from tests.basicswap.extended.test_dcr import run_test_ads_both_refund
 from tests.basicswap.common import (
     callrpc_cli,
     make_rpc_func,
@@ -993,3 +994,11 @@ class TestBCH(BasicSwapTest):
     def test_08_insufficient_funds_rev(self):
         self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
         super().test_08_insufficient_funds_rev()
+
+    def test_14_ads_bch_xmr_both_refund(self):
+        # Regression for the createSCLockRefundTx refund-input nSequence bug: the builder
+        # set nSequence to kwargs["timelock"] (= lock_time_2) while verifySCLockRefundTx
+        # requires lock_time_1 (prevout_seq); the two match only when the timelocks are equal
+        # (the default). run_test_ads_both_refund sets OFFER_LOCK_2_VALUE_INC so they differ,
+        # making acceptBid -> verifySCLockRefundTx raise "Bad input nSequence" without the fix.
+        run_test_ads_both_refund(self, Coins.BCH, Coins.XMR, lock_value=20)
