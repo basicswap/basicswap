@@ -4035,7 +4035,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def isValidSwapDest(self, ci, dest: bytes):
         ensure(isinstance(dest, bytes), "Swap destination must be bytes")
-        if ci.coin_type() in (Coins.PART_BLIND,):
+        if ci.interface_type() in (Coins.PART_BLIND,):
             return ci.verifyPubkey(dest)
         if ci.isValidAddressHash(dest):
             return True
