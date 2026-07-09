@@ -868,7 +868,7 @@ class XMRInterface(CoinInterface):
     def changeWalletPassword(
         self, old_password, new_password, check_seed_if_encrypt: bool = True
     ):
-        self._log.info("changeWalletPassword - {}".format(self.ticker()))
+        self._log.info(f"changeWalletPassword - {self.ticker()}")
         orig_password = self._wallet_password
         if old_password != "":
             self._wallet_password = old_password
@@ -879,6 +879,8 @@ class XMRInterface(CoinInterface):
                     "change_wallet_password",
                     {"old_password": old_password, "new_password": new_password},
                 )
+                # Clear the wallet-opened flag
+                self._cached_main_wallet_address = None
         except Exception as e:  # noqa: F841
             self._wallet_password = orig_password
             raise

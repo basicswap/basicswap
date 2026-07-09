@@ -4369,7 +4369,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def changeWalletPassword(
         self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
     ):
-        self._log.info("changeWalletPassword - {}".format(self.ticker()))
+        self._log.info(f"changeWalletPassword - {self.ticker()}")
         if old_password == "":
             if self.isWalletEncrypted():
                 raise ValueError("Old password must be set")
