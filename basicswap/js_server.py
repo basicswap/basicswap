@@ -20,6 +20,7 @@ from .util.network import (
     is_url_scheme_allowed,
 )
 from .basicswap_util import (
+    AddressTypes,
     fiatFromTicker,
     strBidState,
     strTxState,
@@ -917,6 +918,24 @@ def js_smsgaddresses(self, url_split, post_string, is_json) -> bytes:
     filters = {
         "exclude_inactive": post_data.get("exclude_inactive", True),
     }
+    use_type_map = {
+        "offer_send_from": AddressTypes.OFFER,
+        "offer_send_to": AddressTypes.SEND_OFFER,
+        "bid": AddressTypes.BID,
+    }
+    if have_data_entry(post_data, "use_type"):
+        use_type_str = get_data_entry(post_data, "use_type")
+        if use_type_str not in use_type_map:
+            raise ValueError("Unknown address type")
+        filters["addr_type"] = int(use_type_map[use_type_str])
+    if have_data_entry(post_data, "search"):
+        search_str = get_data_entry(post_data, "search").strip()
+        if search_str:
+            filters["search"] = search_str
+    if have_data_entry(post_data, "limit"):
+        limit = int(get_data_entry(post_data, "limit"))
+        ensure(0 < limit <= 200, "Invalid limit")
+        filters["limit"] = limit
     return bytes(json.dumps(swap_client.listAllSMSGAddresses(filters)), "UTF-8")
 
 
