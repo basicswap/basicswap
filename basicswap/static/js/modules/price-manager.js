@@ -87,7 +87,7 @@ const PriceManager = (function() {
                     ? window.CoinManager.getAllCoins().map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                     : (window.config.coins
                         ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
-                        : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
+                        : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW', 'NAV']);
 
                 if (!coinSymbols.length) {
                     throw new Error('No valid coins configured');
@@ -182,7 +182,7 @@ const PriceManager = (function() {
 
                 const coinNames = window.CoinManager
                     ? window.CoinManager.getAllCoins().map(c => c.name.toLowerCase())
-                    : ['bitcoin', 'bitcoin-cash', 'dash', 'dogecoin', 'decred', 'namecoin', 'litecoin', 'particl', 'pivx', 'monero', 'wownero', 'firo'];
+                    : ['bitcoin', 'bitcoin-cash', 'dash', 'dogecoin', 'decred', 'namecoin', 'litecoin', 'particl', 'pivx', 'monero', 'wownero', 'firo', 'navio'];
 
                 coinNames.forEach(coin => {
                     emptyData[coin] = { usd: null, btc: null };
