@@ -61,11 +61,42 @@ class AmmConfigValidationTest(unittest.TestCase):
         errors = validate_amm_config({"offers": [offer]})
         self.assertTrue(any("offer_valid_seconds" in e for e in errors))
 
-    def test_standing_requires_min_coin_from_amt(self):
+    def test_standing_allows_zero_min_coin_from_amt(self):
         offer = self._valid_standing_offer()
         offer["min_coin_from_amt"] = 0
+        self.assertEqual(validate_amm_config({"offers": [offer]}), [])
+
+    def test_standing_allows_missing_min_coin_from_amt(self):
+        offer = self._valid_standing_offer()
+        del offer["min_coin_from_amt"]
+        self.assertEqual(validate_amm_config({"offers": [offer]}), [])
+
+    def test_standing_rejects_negative_min_coin_from_amt(self):
+        offer = self._valid_standing_offer()
+        offer["min_coin_from_amt"] = -1
         errors = validate_amm_config({"offers": [offer]})
         self.assertTrue(any("min_coin_from_amt" in e for e in errors))
+
+    def test_fixed_total_allows_zero_min_coin_from_amt(self):
+        offer = self._valid_standing_offer()
+        offer["offer_mode"] = "fixed_total"
+        offer["total_to_sell"] = 100
+        offer["min_coin_from_amt"] = 0
+        self.assertEqual(validate_amm_config({"offers": [offer]}), [])
+
+    def test_legacy_zero_floor_config_saves(self):
+        offer = {
+            "name": "my_offer",
+            "coin_from": "Monero",
+            "coin_to": "Bitcoin",
+            "amount": 0.1,
+            "amount_step": 0.001,
+            "offer_valid_seconds": 3600,
+            "offer_mode": "standing",
+            "min_coin_from_amt": 0,
+            "enabled": False,
+        }
+        self.assertEqual(validate_amm_config({"offers": [offer]}), [])
 
     def test_fixed_total_requires_total(self):
         offer = self._valid_standing_offer()

@@ -984,11 +984,11 @@ def page_amm(self, _, post_string):
                             )
                             raise ValueError("total_to_sell < amount")
                     elif offer_mode == "standing":
-                        if new_offer.get("min_coin_from_amt", 0) <= 0:
+                        if new_offer.get("min_coin_from_amt", 0) < 0:
                             err_messages.append(
-                                "Standing offers require a minimum wallet reserve (min coin from amount) greater than 0"
+                                "Minimum wallet reserve (min coin from amount) cannot be negative"
                             )
-                            raise ValueError("standing without wallet floor")
+                            raise ValueError("negative wallet floor")
 
                     if form_data.get("offer_valid_seconds", [""])[0]:
                         try:
@@ -1412,10 +1412,8 @@ def validate_amm_config(config_data):
 
         if offer_mode == "standing":
             try:
-                if float(offer.get("min_coin_from_amt", 0)) <= 0:
-                    errors.append(
-                        f"{label}: standing offers require min_coin_from_amt > 0"
-                    )
+                if float(offer.get("min_coin_from_amt", 0)) < 0:
+                    errors.append(f"{label}: min_coin_from_amt cannot be negative")
             except (TypeError, ValueError):
                 errors.append(f"{label}: min_coin_from_amt must be a number")
 
@@ -1693,7 +1691,7 @@ def amm_config_api(swap_client, post_string, params=None):
         if validation_errors:
             return {
                 "success": False,
-                "error": validation_errors[0],
+                "error": "; ".join(validation_errors),
                 "errors": validation_errors,
             }
 

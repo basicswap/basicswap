@@ -1508,7 +1508,7 @@ const AmmTablesManager = (function() {
 
         document.getElementById('add-amm-type').value = type;
 
-        document.getElementById('add-amm-name').value = 'Unnamed Offer';
+        document.getElementById('add-amm-name').value = '';
         document.getElementById('add-amm-enabled').checked = true;
 
         const coinFromSelect = document.getElementById('add-amm-coin-from');
@@ -1691,14 +1691,26 @@ const AmmTablesManager = (function() {
                 const automationStrategyElement = document.getElementById('add-offer-automation-strategy');
                 newItem.automation_strategy = automationStrategyElement ? automationStrategyElement.value : 'accept_all';
 
-                const minCoinFromAmt = document.getElementById('add-offer-min-coin-from-amt').value;
-                if (minCoinFromAmt) {
-                    newItem.min_coin_from_amt = parseFloat(minCoinFromAmt);
-                }
-
                 const offerModeEl = document.getElementById('add-offer-mode');
                 const offerMode = offerModeEl ? (offerModeEl.value || 'standing') : 'standing';
                 newItem.offer_mode = offerMode;
+
+                const minCoinFromAmt = document.getElementById('add-offer-min-coin-from-amt').value;
+                if (minCoinFromAmt !== '' && minCoinFromAmt !== null) {
+                    const minCoinFromAmtValue = parseFloat(minCoinFromAmt);
+                    if (isNaN(minCoinFromAmtValue) || minCoinFromAmtValue < 0) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Minimum Balance must be zero or greater.');
+                        } else {
+                            alert('Minimum Balance must be zero or greater.');
+                        }
+                        return;
+                    }
+                    newItem.min_coin_from_amt = minCoinFromAmtValue;
+                } else if (offerMode === 'standing' || offerMode === 'legacy') {
+                    newItem.min_coin_from_amt = 0;
+                }
+
                 const offerAmountForMode = parseFloat(document.getElementById('add-amm-amount').value);
                 if (offerMode === 'fixed_total') {
                     const totalToSell = parseFloat(document.getElementById('add-offer-total-to-sell').value);
@@ -1711,15 +1723,6 @@ const AmmTablesManager = (function() {
                         return;
                     }
                     newItem.total_to_sell = totalToSell;
-                } else if (offerMode === 'standing') {
-                    if (!newItem.min_coin_from_amt || newItem.min_coin_from_amt <= 0) {
-                        if (window.showErrorModal) {
-                            window.showErrorModal('Validation Error', 'Standing offers require a Minimum Balance greater than 0 to act as a wallet floor.');
-                        } else {
-                            alert('Standing offers require a Minimum Balance greater than 0 to act as a wallet floor.');
-                        }
-                        return;
-                    }
                 }
 
                 const validSeconds = document.getElementById('add-offer-valid-seconds').value;
@@ -2030,7 +2033,10 @@ const AmmTablesManager = (function() {
                 AmmEditOfferModeToggle.init();
 
                 document.getElementById('edit-offer-ratetweakpercent').value = item.ratetweakpercent || '0';
-                document.getElementById('edit-offer-min-coin-from-amt').value = item.min_coin_from_amt || '';
+                document.getElementById('edit-offer-min-coin-from-amt').value =
+                    (item.min_coin_from_amt !== undefined && item.min_coin_from_amt !== null)
+                        ? String(item.min_coin_from_amt)
+                        : '';
                 document.getElementById('edit-offer-valid-seconds').value = item.offer_valid_seconds || '3600';
                 document.getElementById('edit-offer-address').value = item.address || 'auto';
                 document.getElementById('edit-offer-adjust-rates').value = item.adjust_rates_based_on_market || 'false';
@@ -2174,14 +2180,25 @@ const AmmTablesManager = (function() {
                 return;
             }
 
-            const updatedItem = {
+            let originalItem = null;
+            if (type === 'offer' && Array.isArray(config.offers)) {
+                originalItem = config.offers.find(item =>
+                    (id && item.id === id) || (!id && item.name === originalName)
+                );
+            } else if (type === 'bid' && Array.isArray(config.bids)) {
+                originalItem = config.bids.find(item =>
+                    (id && item.id === id) || (!id && item.name === originalName)
+                );
+            }
+
+            const updatedItem = Object.assign({}, originalItem || {}, {
                 name: name,
                 enabled: document.getElementById('edit-amm-enabled').checked,
                 coin_from: document.getElementById('edit-amm-coin-from').value,
                 coin_to: document.getElementById('edit-amm-coin-to').value,
                 amount: parseFloat(document.getElementById('edit-amm-amount').value),
                 amount_variable: true
-            };
+            });
 
             if (id) {
                 updatedItem.id = id;
@@ -2196,14 +2213,26 @@ const AmmTablesManager = (function() {
                 const editAutomationStrategyElement = document.getElementById('edit-offer-automation-strategy');
                 updatedItem.automation_strategy = editAutomationStrategyElement ? editAutomationStrategyElement.value : 'accept_all';
 
-                const minCoinFromAmt = document.getElementById('edit-offer-min-coin-from-amt').value;
-                if (minCoinFromAmt) {
-                    updatedItem.min_coin_from_amt = parseFloat(minCoinFromAmt);
-                }
-
                 const editOfferModeEl = document.getElementById('edit-offer-mode');
                 const editOfferMode = editOfferModeEl ? (editOfferModeEl.value || 'standing') : 'standing';
                 updatedItem.offer_mode = editOfferMode;
+
+                const minCoinFromAmt = document.getElementById('edit-offer-min-coin-from-amt').value;
+                if (minCoinFromAmt !== '' && minCoinFromAmt !== null) {
+                    const minCoinFromAmtValue = parseFloat(minCoinFromAmt);
+                    if (isNaN(minCoinFromAmtValue) || minCoinFromAmtValue < 0) {
+                        if (window.showErrorModal) {
+                            window.showErrorModal('Validation Error', 'Minimum Balance must be zero or greater.');
+                        } else {
+                            alert('Minimum Balance must be zero or greater.');
+                        }
+                        return;
+                    }
+                    updatedItem.min_coin_from_amt = minCoinFromAmtValue;
+                } else if (editOfferMode === 'standing' || editOfferMode === 'legacy') {
+                    updatedItem.min_coin_from_amt = 0;
+                }
+
                 const editOfferAmountForMode = parseFloat(document.getElementById('edit-amm-amount').value);
                 if (editOfferMode === 'fixed_total') {
                     const editTotalToSell = parseFloat(document.getElementById('edit-offer-total-to-sell').value);
@@ -2216,15 +2245,6 @@ const AmmTablesManager = (function() {
                         return;
                     }
                     updatedItem.total_to_sell = editTotalToSell;
-                } else if (editOfferMode === 'standing') {
-                    if (!updatedItem.min_coin_from_amt || updatedItem.min_coin_from_amt <= 0) {
-                        if (window.showErrorModal) {
-                            window.showErrorModal('Validation Error', 'Standing offers require a Minimum Balance greater than 0 to act as a wallet floor.');
-                        } else {
-                            alert('Standing offers require a Minimum Balance greater than 0 to act as a wallet floor.');
-                        }
-                        return;
-                    }
                 }
 
                 const validSeconds = document.getElementById('edit-offer-valid-seconds').value;
