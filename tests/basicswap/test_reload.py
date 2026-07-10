@@ -24,18 +24,16 @@ import threading
 import multiprocessing
 from unittest.mock import patch
 
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
     post_json_api,
     waitForServer,
-)
-from tests.basicswap.common import (
     callrpc_cli,
     waitForNumOffers,
     waitForNumBids,
     waitForNumSwapping,
 )
-from tests.basicswap.common_xmr import (
+from tests.basicswap.util.harness import (
     prepare_nodes,
 )
 import basicswap.bin.run as runSystem

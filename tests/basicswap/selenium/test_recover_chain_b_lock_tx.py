@@ -18,7 +18,7 @@ from util import (
     click_option,
     get_driver,
 )
-from tests.basicswap.util import read_json_api
+from tests.basicswap.util.common import read_json_api
 
 base_url = "http://localhost"
 

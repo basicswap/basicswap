@@ -27,16 +27,16 @@ import traceback
 import multiprocessing
 from unittest.mock import patch
 
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
     post_json_api,
     waitForServer,
-)
-from tests.basicswap.common import (
     waitForNumOffers,
     waitForNumBids,
+    BTC_BASE_RPC_PORT,
+    LTC_BASE_RPC_PORT,
 )
-from tests.basicswap.common_xmr import (
+from tests.basicswap.util.harness import (
     TestBase,
     run_prepare,
     waitForBidState,
@@ -44,12 +44,8 @@ from tests.basicswap.common_xmr import (
 from basicswap.rpc import (
     callrpc,
 )
-from tests.basicswap.mnemonics import mnemonics
+from tests.basicswap.util.mnemonics import mnemonics
 import basicswap.bin.run as runSystem
-from tests.basicswap.common import (
-    BTC_BASE_RPC_PORT,
-    LTC_BASE_RPC_PORT,
-)
 
 PORT_OFS = int(os.getenv("PORT_OFS", 1))
 TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "~/test_basicswap1"))

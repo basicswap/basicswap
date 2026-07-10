@@ -10,7 +10,7 @@
 export BTC_USE_DESCRIPTORS=true
 export BTC_USE_LEGACY_KEY_PATHS=false
 export EXTRA_CONFIG_JSON="{\"btc0\":[\"txindex=1\",\"rpcworkqueue=1100\"]}"
-python tests/basicswap/extended/test_xmr_persistent.py
+python tests/basicswap/test_persistent.py
 
 
 Start electrumx and electrum daemon
@@ -26,7 +26,7 @@ import sys
 import threading
 import unittest
 
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
     waitForServer,
     UI_PORT,

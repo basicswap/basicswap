@@ -35,11 +35,9 @@ from basicswap.basicswap import (
 )
 from basicswap.chainparams import Coins
 
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     wait_for_bid,
     wait_for_offer,
-)
-from tests.basicswap.util import (
     read_json_api,
 )
 from tests.basicswap.test_xmr import test_delay_event

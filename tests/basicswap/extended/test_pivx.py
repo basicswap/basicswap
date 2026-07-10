@@ -31,10 +31,8 @@ from basicswap.util import (
 from basicswap.basicswap_util import (
     TxLockTypes,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     callrpc_cli,
     stopDaemons,
     wait_for_bid,

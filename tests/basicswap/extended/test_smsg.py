@@ -31,7 +31,7 @@ from basicswap.contrib.test_framework.util import (
     PortSeed,
 )
 
-from tests.basicswap.common import BASE_PORT
+from tests.basicswap.util.common import BASE_PORT
 from tests.basicswap.test_xmr import BaseTest, test_delay_event
 
 

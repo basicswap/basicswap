@@ -20,7 +20,7 @@ from io import StringIO
 from unittest.mock import patch
 
 import basicswap.config as cfg
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     make_boolean,
     read_json_api,
     waitForServer,

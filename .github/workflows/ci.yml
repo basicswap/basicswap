@@ -101,7 +101,7 @@ jobs:
               export PYTHONPATH=$(pwd)
               export TEST_BIN_PATH="$BIN_DIR"
               export TEST_PATH=/tmp/test_prepare
-              pytest tests/basicswap/extended/test_prepare.py
+              pytest tests/basicswap/test_prepare.py
           - name: test_xmr
             command: |
               export PYTHONPATH=$(pwd)
@@ -130,8 +130,8 @@ jobs:
               mkdir -p ${TEST_PATH}/bin
               cp -r $BIN_DIR/* ${TEST_PATH}/bin/
               export PYTHONPATH=$(pwd)
-              python tests/basicswap/extended/test_xmr_persistent.py > /tmp/log.txt 2>&1 & TEST_NETWORK_PID=$!
-              echo "Starting test_xmr_persistent, PID $TEST_NETWORK_PID"
+              python tests/basicswap/test_persistent.py > /tmp/log.txt 2>&1 & TEST_NETWORK_PID=$!
+              echo "Starting test_persistent, PID $TEST_NETWORK_PID"
               i=0
               until curl -s -f -o /dev/null "http://localhost:12701/json/coins"
               do
@@ -139,7 +139,7 @@ jobs:
                 sleep 2
                 ((++i))
                 if [ $i -ge 60 ]; then
-                  echo "Timed out waiting for test_xmr_persistent, PID $TEST_NETWORK_PID"
+                  echo "Timed out waiting for test_persistent, PID $TEST_NETWORK_PID"
                   kill $TEST_NETWORK_PID
                   (exit 1)  # Fail test
                   break

@@ -16,7 +16,7 @@ import basicswap.config as cfg
 from basicswap.rpc_xmr import (
     callrpc_xmr,
 )
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     stopDaemons,
 )
 from tests.basicswap.test_xmr import BaseTest

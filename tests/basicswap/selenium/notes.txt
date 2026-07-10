@@ -2,7 +2,7 @@
 cd basicswap
 . $SWAP_DATADIR/venv/bin/activate
 export PYTHONPATH=$(pwd)
-python tests/basicswap/extended/test_xmr_persistent.py
+python tests/basicswap/test_persistent.py
 
 In another terminal:
 cd basicswap

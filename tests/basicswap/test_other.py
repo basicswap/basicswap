@@ -48,8 +48,11 @@ from basicswap.util_xmr import (
 )
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.interface.xmr.xmr import XMRInterface
-from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import REQUIRED_SETTINGS
+from tests.basicswap.util.mnemonics import mnemonics
+from tests.basicswap.util.common import (
+    REQUIRED_SETTINGS,
+    PREFIX_SECRET_KEY_REGTEST,
+)
 
 from basicswap.basicswap_util import TxLockTypes
 from basicswap.util import (
@@ -74,9 +77,6 @@ from basicswap.contrib.test_framework.messages import (
     CTxIn,
     CTxOut,
     uint256_from_str,
-)
-from tests.basicswap.common import (
-    PREFIX_SECRET_KEY_REGTEST,
 )
 
 logger = logging.getLogger()

@@ -21,15 +21,13 @@ import logging
 import unittest
 import multiprocessing
 
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
     waitForServer,
-)
-from tests.basicswap.common import (
     waitForNumOffers,
     waitForNumBids,
 )
-from tests.basicswap.common_xmr import (
+from tests.basicswap.util.harness import (
     run_process,
     XmrTestBase,
     waitForBidState,

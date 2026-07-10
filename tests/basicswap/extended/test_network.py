@@ -35,10 +35,8 @@ from basicswap.util.address import (
 from basicswap.rpc import (
     callrpc,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     BASE_P2P_PORT,
     BASE_RPC_PORT,
     BASE_ZMQ_PORT,

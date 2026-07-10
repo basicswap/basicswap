@@ -10,7 +10,7 @@ import logging
 import sys
 import time
 
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
 )
 from util import get_driver

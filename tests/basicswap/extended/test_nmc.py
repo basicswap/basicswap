@@ -26,7 +26,7 @@ from basicswap.util import (
 )
 from basicswap.bin.run import startDaemon
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     stopDaemons,
     waitForRPC,
     make_rpc_func,

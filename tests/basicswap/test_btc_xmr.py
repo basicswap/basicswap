@@ -29,10 +29,8 @@ from basicswap.util.address import (
 )
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.interface.base import Curves
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     abandon_all_swaps,
     wait_for_balance,
     wait_for_bid,

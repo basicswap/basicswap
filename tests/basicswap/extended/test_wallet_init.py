@@ -27,12 +27,12 @@ import traceback
 import multiprocessing
 from unittest.mock import patch
 
-from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import (
+from tests.basicswap.util.mnemonics import mnemonics
+from tests.basicswap.util.common import (
     read_json_api,
     waitForServer,
 )
-from tests.basicswap.common_xmr import (
+from tests.basicswap.util.harness import (
     run_prepare,
 )
 import basicswap.bin.run as runSystem
