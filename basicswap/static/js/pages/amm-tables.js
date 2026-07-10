@@ -786,6 +786,17 @@ const AmmTablesManager = (function() {
         });
     }
 
+    function setConfigTextarea(configTextarea, text) {
+        const wasReadonly = configTextarea.hasAttribute('readonly');
+        if (wasReadonly) {
+            configTextarea.removeAttribute('readonly');
+        }
+        configTextarea.value = text;
+        if (wasReadonly) {
+            configTextarea.setAttribute('readonly', '');
+        }
+    }
+
     function refreshAfterSave() {
         if (window.AmmCounterManager && window.AmmCounterManager.fetchAmmStatus) {
             window.AmmCounterManager.fetchAmmStatus();
@@ -1860,6 +1871,16 @@ const AmmTablesManager = (function() {
                 }
             }
 
+            const existingList = type === 'offer' ? config.offers : config.bids;
+            if (Array.isArray(existingList) && existingList.some(item => item && item.name === name)) {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', `A ${type} template named "${name}" already exists.`);
+                } else {
+                    alert(`A ${type} template named "${name}" already exists.`);
+                }
+                return;
+            }
+
             if (type === 'offer') {
                 if (!Array.isArray(config.offers)) {
                     config.offers = [];
@@ -1879,16 +1900,8 @@ const AmmTablesManager = (function() {
                 return;
             }
 
-            const wasReadonly = configTextarea.hasAttribute('readonly');
-            if (wasReadonly) {
-                configTextarea.removeAttribute('readonly');
-            }
-
-            configTextarea.value = JSON.stringify(config, null, 4);
-
-            if (wasReadonly) {
-                configTextarea.setAttribute('readonly', '');
-            }
+            const previousConfigText = configTextarea.value;
+            setConfigTextarea(configTextarea, JSON.stringify(config, null, 4));
 
             persistConfig(config).then(function(data) {
                 if (data && data.success) {
@@ -1900,10 +1913,12 @@ const AmmTablesManager = (function() {
                     refreshAfterSave();
                     notify(`${type.charAt(0).toUpperCase() + type.slice(1)} "${name}" added.`, 'success');
                 } else {
+                    setConfigTextarea(configTextarea, previousConfigText);
                     const errMsg = (data && data.error) || 'Failed to save the configuration.';
                     notify(errMsg, 'error');
                 }
             }).catch(function(error) {
+                setConfigTextarea(configTextarea, previousConfigText);
                 notify(`Failed to save the configuration: ${error.message}`, 'error');
             });
         } catch (error) {
@@ -2191,6 +2206,16 @@ const AmmTablesManager = (function() {
                 );
             }
 
+            const targetList = type === 'offer' ? config.offers : config.bids;
+            if (Array.isArray(targetList) && targetList.some(item => item && item !== originalItem && item.name === name)) {
+                if (window.showErrorModal) {
+                    window.showErrorModal('Validation Error', `A ${type} template named "${name}" already exists.`);
+                } else {
+                    alert(`A ${type} template named "${name}" already exists.`);
+                }
+                return;
+            }
+
             const updatedItem = Object.assign({}, originalItem || {}, {
                 name: name,
                 enabled: document.getElementById('edit-amm-enabled').checked,
@@ -2415,16 +2440,8 @@ const AmmTablesManager = (function() {
                 return;
             }
 
-            const wasReadonly = configTextarea.hasAttribute('readonly');
-            if (wasReadonly) {
-                configTextarea.removeAttribute('readonly');
-            }
-
-            configTextarea.value = JSON.stringify(config, null, 4);
-
-            if (wasReadonly) {
-                configTextarea.setAttribute('readonly', '');
-            }
+            const previousConfigText = configTextarea.value;
+            setConfigTextarea(configTextarea, JSON.stringify(config, null, 4));
 
             persistConfig(config).then(function(data) {
                 if (data && data.success) {
@@ -2436,10 +2453,12 @@ const AmmTablesManager = (function() {
                     refreshAfterSave();
                     notify('Configuration updated.', 'success');
                 } else {
+                    setConfigTextarea(configTextarea, previousConfigText);
                     const errMsg = (data && data.error) || 'Failed to save the configuration.';
                     notify(errMsg, 'error');
                 }
             }).catch(function(error) {
+                setConfigTextarea(configTextarea, previousConfigText);
                 notify(`Failed to save the configuration: ${error.message}`, 'error');
             });
         } catch (error) {
@@ -2481,10 +2500,8 @@ const AmmTablesManager = (function() {
 
         list[index].enabled = newEnabled;
 
-        const wasReadonly = configTextarea.hasAttribute('readonly');
-        if (wasReadonly) configTextarea.removeAttribute('readonly');
-        configTextarea.value = JSON.stringify(config, null, 4);
-        if (wasReadonly) configTextarea.setAttribute('readonly', '');
+        const previousConfigText = configTextarea.value;
+        setConfigTextarea(configTextarea, JSON.stringify(config, null, 4));
 
         persistConfig(config).then(function(data) {
             if (data && data.success) {
@@ -2495,10 +2512,12 @@ const AmmTablesManager = (function() {
                 updateTables();
                 refreshAfterSave();
             } else {
+                setConfigTextarea(configTextarea, previousConfigText);
                 if (toggleEl) toggleEl.checked = !newEnabled;
                 notify((data && data.error) || 'Failed to save the configuration.', 'error');
             }
         }).catch(function(error) {
+            setConfigTextarea(configTextarea, previousConfigText);
             if (toggleEl) toggleEl.checked = !newEnabled;
             notify(`Failed to save the configuration: ${error.message}`, 'error');
         });
@@ -2551,16 +2570,8 @@ const AmmTablesManager = (function() {
                 return;
             }
 
-            const wasReadonly = configTextarea.hasAttribute('readonly');
-            if (wasReadonly) {
-                configTextarea.removeAttribute('readonly');
-            }
-
-            configTextarea.value = JSON.stringify(config, null, 4);
-
-            if (wasReadonly) {
-                configTextarea.setAttribute('readonly', '');
-            }
+            const previousConfigText = configTextarea.value;
+            setConfigTextarea(configTextarea, JSON.stringify(config, null, 4));
 
             persistConfig(config).then(function(data) {
                 if (data && data.success) {
@@ -2571,10 +2582,12 @@ const AmmTablesManager = (function() {
                     refreshAfterSave();
                     notify(`${type.charAt(0).toUpperCase() + type.slice(1)} "${name || 'Unnamed'}" deleted.`, 'success');
                 } else {
+                    setConfigTextarea(configTextarea, previousConfigText);
                     const errMsg = (data && data.error) || 'Failed to save the configuration.';
                     notify(errMsg, 'error');
                 }
             }).catch(function(error) {
+                setConfigTextarea(configTextarea, previousConfigText);
                 notify(`Failed to save the configuration: ${error.message}`, 'error');
             });
         } catch (error) {

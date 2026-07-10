@@ -898,19 +898,24 @@ def page_amm(self, _, post_string):
                 config_content = form_data.get("config_content", [""])[0]
 
                 try:
-                    json.loads(config_content)
+                    parsed_config = json.loads(config_content)
+
+                    validation_errors = validate_amm_config(parsed_config)
+                    if validation_errors:
+                        for validation_error in validation_errors:
+                            err_messages.append(validation_error)
+                        raise ValueError("Config validation failed")
 
                     with open(config_path, "w") as f:
                         f.write(config_content)
 
-                    try:
-                        config_data = json.loads(config_content)
-                    except Exception:
-                        pass
+                    config_data = parsed_config
 
                     messages.append("Config file saved successfully")
                 except json.JSONDecodeError as e:
                     err_messages.append(f"Invalid JSON: {str(e)}")
+                except ValueError:
+                    pass
                 except Exception as e:
                     err_messages.append(f"Failed to save config file: {str(e)}")
 
@@ -1002,6 +1007,16 @@ def page_amm(self, _, post_string):
                     if "offers" not in current_config:
                         current_config["offers"] = []
 
+                    if any(
+                        o.get("name") == new_offer["name"]
+                        for o in current_config["offers"]
+                        if isinstance(o, dict)
+                    ):
+                        err_messages.append(
+                            f"An offer template named '{new_offer['name']}' already exists"
+                        )
+                        raise ValueError("duplicate template name")
+
                     current_config["offers"].append(new_offer)
 
                     with open(config_path, "w") as f:
@@ -1079,6 +1094,16 @@ def page_amm(self, _, post_string):
 
                     if "bids" not in current_config:
                         current_config["bids"] = []
+
+                    if any(
+                        b.get("name") == new_bid["name"]
+                        for b in current_config["bids"]
+                        if isinstance(b, dict)
+                    ):
+                        err_messages.append(
+                            f"A bid template named '{new_bid['name']}' already exists"
+                        )
+                        raise ValueError("duplicate template name")
 
                     current_config["bids"].append(new_bid)
 
