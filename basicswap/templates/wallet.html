@@ -724,7 +724,7 @@
            <td class="py-3 px-6 bold">Type To:</td>
            <td class="py-3 px-6">
             <div class="w-full md:flex-1">
-             <div class="relative"> {{ select_box_arrow_svg }} <select class="{{ select_box_class }}" name="withdraw_type_to_{{ w.cid }}">
+             <div class="relative"> {{ select_box_arrow_svg | safe }} <select class="{{ select_box_class }}" name="withdraw_type_to_{{ w.cid }}">
                <option value="any" {% if w.wd_type_to==-1 %} selected{% endif %}>Select Type</option>
                <option value="plain" {% if w.wd_type_to=='plain' %} selected{% endif %}>Plain</option>
                <option value="blind" {% if w.wd_type_to=='blind' %} selected{% endif %}>Blind</option>
@@ -739,7 +739,7 @@
            <td class="py-3 px-6 bold">Type From:</td>
            <td class="py-3 px-6">
             <div class="w-full md:flex-1">
-             <div class="relative"> {{ select_box_arrow_svg }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
+             <div class="relative"> {{ select_box_arrow_svg | safe }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
                <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
                <option value="mweb" {% if w.wd_type_from=='mweb' %} selected{% endif %}>MWEB</option>
               </select> </div>
@@ -751,7 +751,7 @@
            <td class="py-3 px-6 bold">Type From:</td>
            <td class="py-3 px-6">
             <div class="w-full md:flex-1">
-             <div class="relative"> {{ select_box_arrow_svg }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
+             <div class="relative"> {{ select_box_arrow_svg | safe }} <select id="withdraw_type" class="{{ select_box_class }}" name="withdraw_type_from_{{ w.cid }}">
                <option value="spark" {% if w.wd_type_from=='spark' %} selected{% endif %}>Spark</option>
                <option value="plain" {% if w.wd_type_from=='plain' %} selected{% endif %}>Plain</option>
               </select> </div>
