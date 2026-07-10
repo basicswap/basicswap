@@ -689,7 +689,7 @@ def _add_tracking_review(swap_client, page_data, parsed_data) -> None:
         page_data["tracking_close_behavior"] = "No fill tracking (today's behaviour)."
 
 
-def page_newoffer(self, url_split, post_string):
+def page_newoffer(self, url_split, post_string, get_string=""):
     server = self.server
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
@@ -711,9 +711,9 @@ def page_newoffer(self, url_split, post_string):
         "swap_type": strSwapType(SwapTypes.XMR_SWAP),
     }
 
-    post_data = parse.parse_qs(post_string)
-    if "offer_from" in post_data:
-        offer_from_id_hex = post_data["offer_from"][0]
+    get_data = parse.parse_qs(get_string)
+    if not post_string and "offer_from" in get_data:
+        offer_from_id_hex = get_data["offer_from"][0]
         offer_from_id = decode_offer_id(offer_from_id_hex)
         post_string = offer_to_post_string(self, swap_client, offer_from_id)
 
