@@ -9821,21 +9821,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_id = watched_script.bid_id
         ci = self.ci(coin_type)
 
-        mercy_keyshare = None
-        if len(tx["vout"]) >= 2 and ci.make_int(tx["vout"][vout]["value"]) == 546:
-            try:
-                op_return_script = bytes.fromhex(tx["vout"][0]["scriptPubKey"]["hex"])
-                if (
-                    len(op_return_script) == 39
-                    and op_return_script[:6] == bytes((0x6A, 0x04)) + b"XBSW"
-                    and op_return_script[6] == 0x20
-                ):
-                    keyshare = op_return_script[7:]
-                    if ci.verifyKey(keyshare):
-                        mercy_keyshare = keyshare
-            except Exception as e:
-                self.log.debug(f"Mercy tx check failed: {e}")
-
+        mercy_keyshare = ci.isMercyTx(tx, vout)
         if mercy_keyshare is None:
             self.log.info(
                 f"Found tx is not a mercy tx for bid: {self.log.id(bid_id)}, still watching."
