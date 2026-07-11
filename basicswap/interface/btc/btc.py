@@ -1083,6 +1083,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     fee_sat_vb = self._backend.estimateFee(conf_target)
                     if fee_sat_vb and fee_sat_vb > 0:
                         fee_rate = (fee_sat_vb * 1000) / 1e8
+                        if (
+                            self._high_feerate > 0
+                            and self.make_int(fee_rate) > self._high_feerate
+                        ):
+                            self._log.warning(
+                                f"Electrum fee estimate {fee_rate} for {self.coin_name()} "
+                                f"exceeds high_feerate {self._high_feerate}, using default"
+                            )
+                            return 0.00001, "electrum_default"
                         return fee_rate, "electrum"
                 except Exception as e:
                     self._log.debug(f"Electrum estimateFee failed: {e}")
@@ -2949,6 +2958,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_tx_vout: int,
         script_pk: bytes,
     ) -> (int, int):
+        locked_n = None
+        actual_value = None
         if self.useBackend():
             backend = self.getBackend()
             tx_hex = backend.getTransactionRaw(chain_b_lock_txid.hex())
@@ -2970,7 +2981,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 self._log.warning(
                     f"spendBLockTx: Failed to fetch tx {self._log.id(chain_b_lock_txid)} from backend"
                 )
-                locked_n = lock_tx_vout
             return locked_n, actual_value
         wtx = self.rpc_wallet_watch(
             "gettransaction",
@@ -4689,6 +4699,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             [prevouts_to_spend, {addr_to: self.format_amount(total_amount)}],
         )
         fee_rate, rate_src = self.get_fee_rate(self._conf_target)
+        self._ensureFeeRateWithinMax(fee_rate, rate_src)
         fee_rate_str: str = self.format_amount(fee_rate, True, 1)
         self._log.debug(
             f"Using fee rate: {fee_rate_str}, src: {rate_src}, confirms target: {self._conf_target}"

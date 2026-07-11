@@ -811,10 +811,24 @@ class WalletManager:
                 (int(coin_type), address),
             )
             row = cursor.fetchone()
+            if not row or not row[0]:
+                conn.close()
+                return None
+            encrypted_key = row[0]
+            private_key = self._decryptPrivateKey(encrypted_key, coin_type)
+            if not self._isAEADImportKey(encrypted_key):
+                cursor.execute(
+                    "UPDATE wallet_watch_only SET private_key_encrypted = ? WHERE coin_type = ? AND address = ?",
+                    (
+                        self._encryptPrivateKey(private_key, coin_type),
+                        int(coin_type),
+                        address,
+                    ),
+                )
+                conn.commit()
+                self._log.info("Migrated legacy imported key to AEAD format")
             conn.close()
-            return (
-                self._decryptPrivateKey(row[0], coin_type) if row and row[0] else None
-            )
+            return private_key
         except Exception:
             return None
 
