@@ -509,6 +509,7 @@ def modifyConfig(test_path, i):
         settings = json.load(fp)
 
     if SIMPLEX_CLIENT_PATH != "":
+        logging.info("Adding Simplex config")
         simplex_options = {
             "type": "simplex",
             "server_address": SIMPLEX_SERVER_ADDRESS,
