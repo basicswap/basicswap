@@ -42,10 +42,8 @@ from basicswap.basicswap_util import (
 from basicswap.util.address import (
     toWIF,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     callrpc_cli,
     checkForks,
     stopDaemons,

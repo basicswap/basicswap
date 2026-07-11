@@ -26,7 +26,7 @@ from basicswap.util.ecc import (
 )
 from basicswap.rpc import escape_rpcauth, make_rpc_func
 from basicswap.interface.dcr.rpc import make_rpc_func as make_dcr_rpc_func
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
     waitForServer,
 )

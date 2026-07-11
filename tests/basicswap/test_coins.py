@@ -44,25 +44,23 @@ from basicswap.chainparams import (
     getCoinIdFromName,
 )
 
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     prepare_balance,
     wait_for_balance,
+    post_json_api,
+    read_json_api,
 )
 from tests.basicswap.test_electrum import (
     wait_for_bid_states,
     wait_for_offer,
     TestFunctions,
 )
-from tests.basicswap.common_xmr import run_prepare, TEST_PATH
-from tests.basicswap.extended.test_xmr_persistent import (
+from tests.basicswap.util.harness import run_prepare, TEST_PATH
+from tests.basicswap.test_persistent import (
     NUM_NODES,
     PORT_OFS,
 )
-from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import (
-    post_json_api,
-    read_json_api,
-)
+from tests.basicswap.util.mnemonics import mnemonics
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG

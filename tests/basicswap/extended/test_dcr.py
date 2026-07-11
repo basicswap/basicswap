@@ -33,7 +33,7 @@ from basicswap.interface.dcr.messages import (
 from basicswap.interface.dcr.util import (
     createDCRWallet,
 )
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     compare_bid_states,
     compare_bid_states_unordered,
     stopDaemons,
@@ -41,8 +41,6 @@ from tests.basicswap.common import (
     wait_for_bid_tx_state,
     wait_for_offer,
     waitForRPC,
-)
-from tests.basicswap.util import (
     read_json_api,
     REQUIRED_SETTINGS,
 )

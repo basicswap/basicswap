@@ -68,22 +68,20 @@ from basicswap.chainparams import (
 from basicswap.util.daemon import Daemon
 from basicswap.contrib.test_framework.messages import CTransaction
 
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     prepare_balance,
     stopDaemons,
+    post_json_api,
+    read_json_api,
 )
-from tests.basicswap.common_xmr import run_prepare, TEST_PATH
-from tests.basicswap.extended.test_xmr_persistent import (
+from tests.basicswap.util.harness import run_prepare, TEST_PATH
+from tests.basicswap.test_persistent import (
     BaseTestWithPrepare,
     NUM_NODES,
     PORT_OFS,
     RESET_TEST,
 )
-from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import (
-    post_json_api,
-    read_json_api,
-)
+from tests.basicswap.util.mnemonics import mnemonics
 from basicswap.interface.electrumx import ElectrumConnection
 
 logger = logging.getLogger()

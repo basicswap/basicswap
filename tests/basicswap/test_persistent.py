@@ -13,7 +13,7 @@ cp -r ~/tmp/basicswap_bin/* ${TEST_PATH}/bin
 export PYTHONPATH=$(pwd)
 export XMR_RPC_USER=xmr_user
 export XMR_RPC_PWD=xmr_pwd
-python tests/basicswap/extended/test_xmr_persistent.py
+python tests/basicswap/test_persistent.py
 
 # Copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
@@ -47,22 +47,20 @@ from basicswap.rpc_xmr import (
 from basicswap.rpc import (
     callrpc,
 )
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     BASE_RPC_PORT,
     BTC_BASE_RPC_PORT,
     LTC_BASE_RPC_PORT,
-)
-from tests.basicswap.test_bch_xmr import (
-    BCH_BASE_RPC_PORT,
-)
-from tests.basicswap.util import (
     make_boolean,
     read_json_api,
     waitForServer,
     PORT_OFS,
     UI_PORT,
 )
-from tests.basicswap.common_xmr import (
+from tests.basicswap.test_bch_xmr import (
+    BCH_BASE_RPC_PORT,
+)
+from tests.basicswap.util.harness import (
     prepare_nodes,
     XMR_BASE_RPC_PORT,
     DOGE_BASE_RPC_PORT,

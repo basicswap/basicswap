@@ -30,10 +30,8 @@ from basicswap.util import (
 from basicswap.util.address import (
     decodeWif,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     stopDaemons,
     wait_for_bid,
     make_rpc_func,

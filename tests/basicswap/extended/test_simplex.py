@@ -50,12 +50,12 @@ from basicswap.network.simplex import (
     WebSocketThread,
 )
 from basicswap.network.simplex_chat import startSimplexClient
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     stopDaemons,
     wait_for_bid,
     wait_for_offer,
+    read_json_api,
 )
-from tests.basicswap.util import read_json_api
 from tests.basicswap.test_xmr import BaseTest, test_delay_event, RESET_TEST
 
 SIMPLEX_SERVER_FINGERPRINT = os.getenv("SIMPLEX_SERVER_FINGERPRINT", "")

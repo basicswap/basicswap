@@ -19,9 +19,10 @@ from unittest.mock import patch
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.rpc_xmr import callrpc_xmr
-from tests.basicswap.mnemonics import mnemonics
-from tests.basicswap.util import run_prepare_subprocess, waitForServer
-from tests.basicswap.common import (
+from tests.basicswap.util.mnemonics import mnemonics
+from tests.basicswap.util.common import (
+    run_prepare_subprocess,
+    waitForServer,
     BASE_PORT,
     BASE_RPC_PORT,
     BTC_BASE_PORT,

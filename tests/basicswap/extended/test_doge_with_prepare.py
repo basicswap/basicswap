@@ -20,16 +20,14 @@ import sys
 import logging
 import unittest
 
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     wait_for_balance,
-)
-from tests.basicswap.extended.test_xmr_persistent import (
-    BaseTestWithPrepare,
-    UI_PORT,
-)
-from tests.basicswap.util import (
     read_json_api,
     wait_for_offers,
+)
+from tests.basicswap.test_persistent import (
+    BaseTestWithPrepare,
+    UI_PORT,
 )
 
 logger = logging.getLogger()

@@ -38,10 +38,8 @@ from basicswap.util import (
     make_int,
     format_amount,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     BTC_BASE_RPC_PORT,
     compare_bid_states,
     LTC_BASE_RPC_PORT,

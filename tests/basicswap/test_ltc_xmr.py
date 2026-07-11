@@ -18,10 +18,8 @@ from basicswap.basicswap import (
 from basicswap.util import (
     COIN,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     read_json_api,
-)
-from tests.basicswap.common import (
     wait_for_bid,
     wait_for_offer,
     wait_for_in_progress,

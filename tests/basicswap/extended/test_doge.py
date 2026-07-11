@@ -17,7 +17,7 @@ from basicswap.basicswap import (
 from basicswap.util.address import (
     toWIF,
 )
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     stopDaemons,
     make_rpc_func,
     waitForRPC,

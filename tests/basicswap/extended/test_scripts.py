@@ -7,7 +7,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-Start test_xmr_persistent.py
+Start test_persistent.py
 
 python tests/basicswap/extended/test_scripts.py
 
@@ -30,10 +30,8 @@ import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib import parse
 
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     wait_for_balance,
-)
-from tests.basicswap.util import (
     read_json_api,
     waitForServer,
     wait_for_offers,

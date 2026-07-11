@@ -46,14 +46,10 @@ from basicswap.rpc_xmr import (
 from basicswap.interface.xmr.xmr import (
     XMR_COIN,
 )
-from tests.basicswap.util import (
+from tests.basicswap.util.common import (
     make_boolean,
     post_json_req,
-)
-from tests.basicswap.util import (
     read_json_api,
-)
-from tests.basicswap.common import (
     callrpc_cli,
     prepareDataDir,
     prepare_balance,

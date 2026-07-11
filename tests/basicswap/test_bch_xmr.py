@@ -21,7 +21,7 @@ from basicswap.bin.run import startDaemon
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
 from tests.basicswap.extended.test_dcr import run_test_ads_both_refund
-from tests.basicswap.common import (
+from tests.basicswap.util.common import (
     callrpc_cli,
     make_rpc_func,
     prepareDataDir,
