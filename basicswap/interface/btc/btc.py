@@ -2949,6 +2949,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_tx_vout: int,
         script_pk: bytes,
     ) -> (int, int):
+        actual_value = None  # default; error branches below don't set it
         if self.useBackend():
             backend = self.getBackend()
             tx_hex = backend.getTransactionRaw(chain_b_lock_txid.hex())
