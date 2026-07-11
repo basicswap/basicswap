@@ -9453,14 +9453,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             bid.xmr_a_lock_tx.spend_txid = spending_txid
 
-            is_bch_swap: bool = self.isBchXmrSwap(offer)
             is_spending_lock_tx = False
-            if is_bch_swap:
+            if self.isBchXmrSwap(offer):
                 is_spending_lock_tx = self.ci(coin_from).isSpendingLockTx(spend_tx)
 
             if spending_txid == xmr_swap.a_lock_spend_tx_id or (
-                is_bch_swap
-                and i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
+                i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
                 and is_spending_lock_tx
             ):
                 # bch txids change
@@ -9504,8 +9502,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
 
             elif spending_txid == xmr_swap.a_lock_refund_tx_id or (
-                is_bch_swap
-                and i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
+                i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
                 and not is_spending_lock_tx
             ):
                 self.log.debug("Coin a lock tx spent by lock refund tx.")
@@ -13191,6 +13188,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             f"Split message sequence too high: {msg_data.sequence}",
         )
 
+        # TODO: Wait for bid msg to arrive first
+
         if (
             msg_data.msg_type == XmrSplitMsgTypes.BID
             or msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT
@@ -13212,27 +13211,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         f"Ignoring duplicate xmr_split_data entry: ({self.logIDM(msg_data.msg_id)}, {msg_data.msg_type}, {msg_data.sequence})."
                     )
                     return
-
-                if msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT:
-                    q = cursor.execute(
-                        "SELECT COUNT(*) FROM bids WHERE bid_id = :bid_id",
-                        {"bid_id": msg_data.msg_id},
-                    ).fetchone()
-                    if q[0] < 1:
-                        self.log.warning(
-                            f"Ignoring bid accept split message for unknown bid: {self.logIDM(msg_data.msg_id)}."
-                        )
-                        return
-                else:
-                    q = cursor.execute(
-                        "SELECT COUNT(*) FROM xmr_split_data WHERE addr_from = :addr_from",
-                        {"addr_from": msg["from"]},
-                    ).fetchone()
-                    if q[0] >= max_chunks * 10:
-                        self.log.warning(
-                            f"Ignoring split message from {self.log.addr(msg['from'])}: too many pending entries."
-                        )
-                        return
 
                 dbr = XmrSplitData()
                 dbr.addr_from = msg["from"]
