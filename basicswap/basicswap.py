@@ -13574,8 +13574,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 t for t in self._connect_request_times if now_rl - t < 3600
             ]
             ensure(
-                len(self._connect_request_times)
-                < self._max_connect_requests_per_hour,
+                len(self._connect_request_times) < self._max_connect_requests_per_hour,
                 "Connection request rate limit exceeded",
             )
             self._connect_request_times.append(now_rl)
