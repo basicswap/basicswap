@@ -908,8 +908,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.putHeaders(403, "text/html")
             return b"Cross-origin request blocked"
 
-        if not post_string and len(parsed.query) > 0 and page != "json":
-            post_string = parsed.query
+        get_string = parsed.query
 
         if page == "json":
             if self.command != "POST" and json_requires_post(url_split):
@@ -1084,7 +1083,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 if page == "offers":
                     return page_offers(self, url_split, post_string)
                 if page == "newoffer":
-                    return page_newoffer(self, url_split, post_string)
+                    return page_newoffer(self, url_split, post_string, get_string)
                 if page == "sentoffers":
                     return page_offers(self, url_split, post_string, sent=True)
                 if page == "bid":
