@@ -2920,20 +2920,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             None, dest_address, cb_swap_value, restore_height, find_index=True
         )
 
-        """
-        raw_dest = self.getPkDest(Kbs)
-
-        rv = self.scanTxOutset(raw_dest)
-
-        for utxo in rv['unspents']:
-            if 'height' in utxo and utxo['height'] > 0 and rv['height'] - utxo['height'] > cb_block_confirmed:
-                if self.make_int(utxo['amount']) != cb_swap_value:
-                    self._log.warning('Found output to lock tx pubkey of incorrect value: %s', str(utxo['amount']))
-                else:
-                    return {'txid': utxo['txid'], 'vout': utxo['vout'], 'amount': utxo['amount'], 'height': utxo['height']}
-        return None
-        """
-
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         witness_bytes = 109
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)

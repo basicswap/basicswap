@@ -65,6 +65,8 @@ from .chainparams import (
     chainparams,
     Fiat,
     ticker_map,
+    coins_without_segwit,
+    scriptless_coins,
     xmr_based_coins,
 )
 from .contrib.websocket_server import WebsocketServer
@@ -550,18 +552,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # TODO: Set dynamically
         self.balance_only_coins = (Coins.LTC_MWEB,)
-        self.scriptless_coins = (
-            Coins.XMR,
-            Coins.WOW,
-            Coins.PART_ANON,
-            Coins.FIRO,
-            Coins.DOGE,
-        )
+        self.scriptless_coins = scriptless_coins
         self.adaptor_swap_only_coins = self.scriptless_coins + (
             Coins.PART_BLIND,
             Coins.BCH,
         )
-        self.coins_without_segwit = (Coins.PIVX, Coins.DASH)
+        self.coins_without_segwit = coins_without_segwit
         self.xmr_based_coins = xmr_based_coins
 
         # TODO: Adjust ranges
@@ -8060,6 +8056,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         invalid_tx_found: bool = False
         if isinstance(found_tx, int) and found_tx == -1:
+            invalid_tx_found = True
+        elif isinstance(found_tx, dict) and "invalid" in found_tx:
+            # TODO: Must enable return_invalid_txids for BTC-like coins
             invalid_tx_found = True
         elif check_amount and found_tx is not None:
             # Double check amount
