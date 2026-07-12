@@ -50,9 +50,10 @@
             errors.push('Invalid offer mode.');
         }
 
-        if (mode === 'standing') {
-            if (!isPositiveNumber(offer.min_coin_from_amt)) {
-                errors.push('Standing offers require a Minimum Balance greater than 0 to act as a wallet floor.');
+        if (mode === 'standing' && offer.min_coin_from_amt !== undefined && offer.min_coin_from_amt !== null && offer.min_coin_from_amt !== '') {
+            const floor = parseFloat(offer.min_coin_from_amt);
+            if (isNaN(floor) || floor < 0) {
+                errors.push('Minimum Balance must be zero or greater.');
             }
         }
 

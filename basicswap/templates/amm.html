@@ -581,7 +581,7 @@
                     <li>• If <strong>offer_mode</strong> is not set, templates default to <strong>"standing"</strong></li>
                     <li>• Tracking state (amount filled, fills completed) is persisted per-offer and is self-correcting: a failed or cancelled bid simply drops out of the in-flight total</li>
                     <li>• <strong>total_to_sell</strong> is only read when <strong>offer_mode</strong> is "fixed_total", and must be greater than or equal to <strong>amount</strong></li>
-                    <li>• For "standing" offers, <strong>min_coin_from_amt</strong> doubles as the minimum wallet reserve used to decide when to stop reposting</li>
+                    <li>• For "standing" offers, <strong>min_coin_from_amt</strong> doubles as the minimum wallet reserve used to decide when to stop reposting. A value of 0 means no reserve floor (sell until the wallet is empty)</li>
                   </ul>
                 </div>
               </div>
@@ -931,7 +931,7 @@
                           <option value="standing" selected>Standing — repeat until a wallet floor</option>
                         </select>
                       </div>
-                      <small class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">One-time posts a single offer and stops once it is filled. Fixed total keeps reposting until the cumulative sold amount reaches Total to Sell. Standing repeats indefinitely, skipping new offers when the wallet balance would drop below the Minimum Balance floor.</small>
+                      <small class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">One-time posts a single offer and stops once it is filled. Fixed total keeps reposting until the cumulative sold amount reaches Total to Sell. Standing repeats indefinitely, skipping new offers when the wallet balance would drop below the Minimum Balance floor (0 = no floor, sell everything).</small>
                     </div>
 
                     <div id="add-offer-total-to-sell-wrap" class="hidden">
@@ -1258,7 +1258,7 @@
                           <option value="standing">Standing — repeat until a wallet floor</option>
                         </select>
                       </div>
-                      <small class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">One-time posts a single offer and stops once it is filled. Fixed total keeps reposting until the cumulative sold amount reaches Total to Sell. Standing repeats indefinitely, skipping new offers when the wallet balance would drop below the Minimum Balance floor.</small>
+                      <small class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">One-time posts a single offer and stops once it is filled. Fixed total keeps reposting until the cumulative sold amount reaches Total to Sell. Standing repeats indefinitely, skipping new offers when the wallet balance would drop below the Minimum Balance floor (0 = no floor, sell everything).</small>
                     </div>
 
                     <div id="edit-offer-total-to-sell-wrap" class="hidden">

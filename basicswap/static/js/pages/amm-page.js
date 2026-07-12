@@ -295,8 +295,12 @@
       const enabledOffers = offers.filter(o => o.enabled);
 
       for (const offer of enabledOffers) {
-        if (!offer.min_coin_from_amt || parseFloat(offer.min_coin_from_amt) <= 0) {
-          return { success: false, error: `Offer "${offer.name}" needs a minimum coin amount to protect your wallet balance.` };
+        const mode = offer.offer_mode || 'standing';
+        if (mode !== 'standing') continue;
+        if (offer.min_coin_from_amt === undefined || offer.min_coin_from_amt === null || offer.min_coin_from_amt === '') continue;
+        const floor = parseFloat(offer.min_coin_from_amt);
+        if (isNaN(floor) || floor < 0) {
+          return { success: false, error: `Offer "${offer.name}" has an invalid minimum balance.` };
         }
       }
 

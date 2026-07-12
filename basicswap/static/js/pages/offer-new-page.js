@@ -177,6 +177,66 @@ function handleNewOfferAddress() {
     }
 }
 
+const AddrFromSearch = {
+    initialOptions: null,
+    debounceTimer: null,
+    requestSeq: 0,
+    init: function() {
+        const input = DOM.get('addr_from_search');
+        const select = DOM.get('addr_from');
+        if (!input || !select) return;
+        this.initialOptions = Array.from(select.options).map(o => ({ value: o.value, text: o.text }));
+        input.addEventListener('input', () => {
+            clearTimeout(this.debounceTimer);
+            this.debounceTimer = setTimeout(() => this.search(input.value.trim()), 300);
+        });
+    },
+    search: function(query) {
+        const select = DOM.get('addr_from');
+        if (!select) return;
+        if (!query) {
+            this.render(select, this.initialOptions);
+            return;
+        }
+        const seq = ++this.requestSeq;
+        const params = 'use_type=offer_send_from&limit=50&search=' + encodeURIComponent(query);
+        Ajax.post('/json/smsgaddresses', params, (resp) => {
+            if (seq !== this.requestSeq) return;
+            let results = [];
+            try {
+                const list = (typeof resp === 'string') ? JSON.parse(resp) : resp;
+                if (Array.isArray(list)) {
+                    results = list.map(a => ({ value: a.addr, text: a.addr + (a.note ? ' ' + a.note : '') }));
+                }
+            } catch (e) {
+                results = [];
+            }
+            const options = [{ value: '-1', text: 'New Address' }].concat(results);
+            this.render(select, options);
+        });
+    },
+    render: function(select, options) {
+        const current = select.value;
+        select.innerHTML = '';
+        let hasCurrent = false;
+        options.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.value;
+            opt.text = o.text;
+            select.appendChild(opt);
+            if (o.value === current) hasCurrent = true;
+        });
+        if (!hasCurrent && current && current !== '-1') {
+            const opt = document.createElement('option');
+            opt.value = current;
+            opt.text = current;
+            select.insertBefore(opt, select.options[1] || null);
+            hasCurrent = true;
+        }
+        select.value = hasCurrent ? current : '-1';
+    }
+};
+
 const AddrFromHint = {
     update: function() {
         const hint = DOM.get('addr-from-hint');
@@ -1126,6 +1186,7 @@ const UIEnhancer = {
 
 function initializeApp() {
     handleNewOfferAddress();
+    AddrFromSearch.init();
 
     CoinPicker.init();
 

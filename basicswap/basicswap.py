@@ -15357,6 +15357,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if "addressnote" in filters:
             query_str += " AND note LIKE :note "
             query_data["note"] = "%" + filters["addressnote"] + "%"
+        if "search" in filters:
+            query_str += " AND (addr LIKE :search OR note LIKE :search) "
+            query_data["search"] = "%" + filters["search"] + "%"
         if "addr_type" in filters and filters["addr_type"] > -1:
             query_str += " AND use_type = :addr_type "
             query_data["addr_type"] = filters["addr_type"]

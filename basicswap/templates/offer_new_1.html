@@ -162,6 +162,7 @@
               </div>
               <div>
                 <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Send-from address</label>
+                <input type="text" id="addr_from_search" autocomplete="off" placeholder="Search addresses or labels..." class="hover:border-blue-500 bg-gray-50 text-gray-900 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-300 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 mb-2 focus:ring-0">
                 <div class="relative">
                   {{ input_down_arrow_offer_svg | safe }}
                   <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ select_address_svg | safe }}</div>
@@ -172,7 +173,7 @@
                     {% endfor %}
                   </select>
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The address that will hold and lock the coins you send during the swap.</p>
+                <p class="text-xs text-gray-500 dark:text-gray-300 mt-2">The address that will hold and lock the coins you send during the swap. Showing the most recent addresses; type above to search all.</p>
                 <p id="addr-from-hint" class="text-xs mt-1"></p>
               </div>
             </div>

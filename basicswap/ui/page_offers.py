@@ -52,6 +52,8 @@ from basicswap.offer_tracking import (
 )
 from basicswap.explorers import default_coingecko_api_key
 
+MAX_SEND_FROM_ADDRS = 50
+
 
 def value_or_none(v):
     if v == -1 or v == "-1":
@@ -785,7 +787,14 @@ def page_newoffer(self, url_split, post_string, get_string=""):
     all_addresses = swap_client.listAllSMSGAddresses({})
     addr_notes = {addr["addr"]: addr["note"] for addr in all_addresses}
 
-    addrs_from = [(addr[0], addr_notes.get(addr[0], "")) for addr in addrs_from_raw]
+    addrs_from_all = [(addr[0], addr_notes.get(addr[0], "")) for addr in addrs_from_raw]
+    addrs_from = addrs_from_all[:MAX_SEND_FROM_ADDRS]
+    selected_addr_from = page_data.get("addr_from")
+    if selected_addr_from and selected_addr_from not in (a[0] for a in addrs_from):
+        for a in addrs_from_all:
+            if a[0] == selected_addr_from:
+                addrs_from.append(a)
+                break
     addrs_to = [(addr[0], addr_notes.get(addr[0], "")) for addr in addrs_to_raw]
 
     automation_filters = {"type_ind": Concepts.OFFER, "sort_by": "label"}
