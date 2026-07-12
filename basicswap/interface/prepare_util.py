@@ -37,9 +37,14 @@ class PrepareContext:
     docker_mode: bool = False
     write_tor_settings: Optional[Callable] = None
     gnupg: Optional[Callable] = None
+    gpg_homedir: str = ""
     wallet_encryption_pwd: str = ""
     monerod_proxy_config: Optional[list] = None
     monero_wallet_rpc_proxy_config: Optional[list] = None
+
+
+def createGPG(gnupg_module, homedir):
+    return gnupg_module.GPG(gnupghome=homedir)
 
 
 def exitWithError(error_msg: str):

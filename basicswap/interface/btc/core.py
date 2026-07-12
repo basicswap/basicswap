@@ -13,6 +13,7 @@ from basicswap.interface.btc.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
+    createGPG,
     isValidSignature,
     havePubkey,
     getFileHash,
@@ -196,7 +197,7 @@ class BTCPrepare(CoinPrepareModule):
         pubkey_filename = "{}_{}.pgp".format("particl", "tecnovert")
         pubkeyurls = []
 
-        gpg = ctx.gnupg.GPG()
+        gpg = createGPG(ctx.gnupg, ctx.gpg_homedir)
         if not havePubkey(gpg, fastsync_signers["tecnovert"][0]):
             ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
         with open(asc_file_path, "rb") as fp:
