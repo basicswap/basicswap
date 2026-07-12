@@ -61,19 +61,20 @@ from tests.basicswap.test_bch_xmr import (
     BCH_BASE_RPC_PORT,
 )
 from tests.basicswap.util.harness import (
-    prepare_nodes,
-    XMR_BASE_RPC_PORT,
+    DASH_RPC_PORT_BASE,
+    DECRED_WALLET_RPC_PORT_BASE,
     DOGE_BASE_RPC_PORT,
+    FIRO_RPC_PORT_BASE,
     NMC_BASE_RPC_PORT,
     PIVX_RPC_PORT_BASE,
-    DASH_RPC_PORT_BASE,
-    FIRO_RPC_PORT_BASE,
-    DECRED_WALLET_RPC_PORT_BASE,
+    TEST_PATH,
+    XMR_BASE_RPC_PORT,
+    prepare_nodes,
 )
 from basicswap.interface.dcr.rpc import callrpc as callrpc_dcr
 import basicswap.bin.run as runSystem
 
-test_path = os.path.expanduser(os.getenv("TEST_PATH", "/tmp/test_persistent"))
+test_path = os.path.expanduser(TEST_PATH)
 RESET_TEST = make_boolean(os.getenv("RESET_TEST", True))
 
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))
