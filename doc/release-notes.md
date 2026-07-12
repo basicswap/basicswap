@@ -38,6 +38,12 @@
   fields that are not shown in the form.
 - AMM start wizard no longer requires a positive minimum balance on all enabled offers.
 - Allow duplicate template names; restore the default offer name.
+- Remove duplicate template name rejection from the AMM add/edit UI.
+- Remove duplicate name checks when creating offer/bid templates via the API.
+- Remove duplicate name validation from validate_amm_config() for offers and bids.
+- Pre-fill new template modal with "Unnamed Offer" again instead of an empty name.
+- Update test: duplicate names are allowed
+  - aligned with createoffers.py, which renames name → name_2, etc. on load.
 
 **GUI**
 - Offer page: searchable send-from address dropdown (by label or address), limited to
