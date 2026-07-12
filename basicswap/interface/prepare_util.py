@@ -84,6 +84,13 @@ def havePubkey(gpg, key_id: str) -> bool:
     return False
 
 
+def ensurePubkey(gpg, ctx, signing_key_name, signers, pubkey_filename, pubkeyurls):
+    for fingerprint in signers[signing_key_name]:
+        if havePubkey(gpg, fingerprint):
+            return
+    ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
+
+
 def ensureFileHashInFile(release_hash: str, assert_path: str, logger=None) -> None:
     with (
         open(assert_path, "rb", 0) as fp,
@@ -272,13 +279,10 @@ class CoinPrepareModule:
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
+        ensurePubkey(gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls)
+
         with open(assert_sig_path, "rb") as fp:
             verified = gpg.verify_file(fp, assert_path)
-        if not isValidSignature(verified) and verified.username is None:
-            ctx.logger.warning("Signature made by unknown key.")
-            ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
-            with open(assert_sig_path, "rb") as fp:
-                verified = gpg.verify_file(fp, assert_path)
 
         self.ensureValidSignatureBy(ctx, verified, signing_key_name)
 
