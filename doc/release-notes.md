@@ -1,4 +1,61 @@
 
+0.17.1
+==============
+
+**Security / hardening**
+- BTC/LTC adaptor-sig swaps no longer classify unrecognised spends of the chain A lock tx
+  as refunds. Only exact matches against the precomputed spend/refund txids are accepted
+  (the prevout fallback remains for BCH, where txids are malleable), preventing a malicious
+  Electrum server from forcing a false pre-refund state.
+- Electrum fee estimates exceeding the configured high_feerate are rejected at the source
+  and fall back to the default rate. The fee-rate ceiling is also enforced when combining
+  non-segwit prevouts. Prevents fee-inflation griefing by a malicious Electrum server.
+- Act on Electrum-reported spends only once confirmed, matching full-node behaviour.
+- Auto-migrate imported private keys still stored in the legacy XOR format to AEAD
+  (ChaCha20-Poly1305) on first access.
+- Validate and rate-limit Simplex connection request invitations before passing to /connect.
+- Only dispatch route links belonging to the connected route on Simplex contact-connected events.
+
+**Fixes**
+- Fix crash in spendBLockTx when the Electrum backend fails to return the chain B lock tx
+  or the expected output is missing; getBLockTxo now fails closed with a clear error
+  instead of raising UnboundLocalError.
+- Keep the BCH mercy tx watch alive when an unrelated tx pays the watched script.
+- Don't attempt queued actions while the system is locked.
+
+**AMM (v0.5.1)**
+- Fix duplicate offers.
+- Fix template save regression that blocked editing, disabling, deleting, and adding
+  templates when any standing offer had min_coin_from_amt of 0.
+- Restore min_coin_from_amt = 0 as a valid wallet floor for standing offers
+  (0 = no reserve, sell until the wallet is empty). Only negative values are rejected.
+- Saving the config from the form now validates the whole file first and reports all
+  failing templates instead of only the first.
+- The page keeps a backup of the config before add/edit/enable/disable/delete and
+  restores it if the server rejects the save, keeping the screen in sync with what is
+  actually saved.
+- Edit form no longer drops a stored minimum balance of 0; editing a template preserves
+  fields that are not shown in the form.
+- AMM start wizard no longer requires a positive minimum balance on all enabled offers.
+- Allow duplicate template names; restore the default offer name.
+
+**GUI**
+- Offer page: searchable send-from address dropdown (by label or address), limited to
+  the 50 most recent addresses to prevent the browser hanging with large address lists.
+  The currently selected address is always included.
+- Wallet page: fix buttons and the type-to svg.
+
+**Prepare**
+- Uses a separate gpg homedir (DATADIR/gnupg) so imported PGP pubkeys stay isolated when not
+  running in docker.
+- PGP pubkeys are imported before verifying signatures
+  - Avoids "Signature made by unknown key." warnings.
+
+**Tests / CI**
+- Run BCH/LTC CI tests only when coin-specific code changes
+- Add test_amm_config_api to CI.
+
+
 0.17.0
 ==============
 

@@ -244,7 +244,7 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
-    name: ${{ matrix.name }}
+    name: test_coins (${{ matrix.name }})
     steps:
     - uses: actions/checkout@v7
     - name: Set up Python ${{ env.PYTHON_VERSION }}
