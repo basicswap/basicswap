@@ -37,9 +37,14 @@ class PrepareContext:
     docker_mode: bool = False
     write_tor_settings: Optional[Callable] = None
     gnupg: Optional[Callable] = None
+    gpg_homedir: str = ""
     wallet_encryption_pwd: str = ""
     monerod_proxy_config: Optional[list] = None
     monero_wallet_rpc_proxy_config: Optional[list] = None
+
+
+def createGPG(gnupg_module, homedir):
+    return gnupg_module.GPG(gnupghome=homedir)
 
 
 def exitWithError(error_msg: str):
@@ -77,6 +82,27 @@ def havePubkey(gpg, key_id: str) -> bool:
         if key["fingerprint"] == key_id:
             return True
     return False
+
+
+def ensurePubkey(gpg, ctx, signing_key_name, signers, pubkey_filename, pubkeyurls):
+    for fingerprint in signers[signing_key_name]:
+        if havePubkey(gpg, fingerprint):
+            return
+    ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
+
+
+def ensureValidSignatureBy(result, signing_key_name, signers, logger, filepath):
+    if not isValidSignature(result):
+        raise ValueError("Signature verification failed.")
+
+    if result.fingerprint not in signers[signing_key_name]:
+        raise ValueError(
+            "Signature made by unexpected key fingerprint: " + result.fingerprint
+        )
+
+    logger.info(
+        f'Successfully verified "{os.path.basename(filepath)}" is signed by {signing_key_name} ({result.key_id}).'
+    )
 
 
 def ensureFileHashInFile(release_hash: str, assert_path: str, logger=None) -> None:
@@ -224,20 +250,15 @@ class CoinPrepareModule:
         return pubkeyurls
 
     def ensureValidSignatureBy(
-        self, ctx: PrepareContext, result, signing_key_name: str, signers=None
+        self,
+        ctx: PrepareContext,
+        result,
+        signing_key_name: str,
+        signers=None,
+        filepath=None,
     ) -> None:
-        if signers is None:
-            signers = self.signers
-        if not isValidSignature(result):
-            raise ValueError("Signature verification failed.")
-
-        if result.fingerprint not in signers[signing_key_name]:
-            raise ValueError(
-                "Signature made by unexpected key fingerprint: " + result.fingerprint
-            )
-
-        ctx.logger.debug(
-            f"Found valid signature by {signing_key_name} ({result.key_id})."
+        ensureValidSignatureBy(
+            result, signing_key_name, signers or self.signers, ctx.logger, filepath
         )
 
     def verifyCoreHash(
@@ -267,15 +288,16 @@ class CoinPrepareModule:
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
+
         with open(assert_sig_path, "rb") as fp:
             verified = gpg.verify_file(fp, assert_path)
-        if not isValidSignature(verified) and verified.username is None:
-            ctx.logger.warning("Signature made by unknown key.")
-            ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
-            with open(assert_sig_path, "rb") as fp:
-                verified = gpg.verify_file(fp, assert_path)
 
-        self.ensureValidSignatureBy(ctx, verified, signing_key_name)
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
 
     def getExtractBins(self) -> list:
         bins = [self.name + "d", self.name + "-cli", self.name + "-tx"]

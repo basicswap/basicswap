@@ -44,9 +44,10 @@ from basicswap.bin.run import (
 )
 
 from basicswap.interface.prepare_util import (
+    createGPG,
     ensureFileHashInFile,
+    ensureValidSignatureBy,
     exitWithError,
-    isValidSignature,
     PrepareContext,
     havePubkey,
     getFileHash,
@@ -489,18 +490,6 @@ def testOnionLink():
     logger.info("Onion links work.")
 
 
-def ensureValidSignatureBy(result, signing_key_name):
-    if not isValidSignature(result):
-        raise ValueError("Signature verification failed.")
-
-    if result.fingerprint not in expected_key_ids[signing_key_name]:
-        raise ValueError(
-            "Signature made by unexpected key fingerprint: " + result.fingerprint
-        )
-
-    logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
-
-
 def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
     version, version_tag, signers = version_data
 
@@ -553,7 +542,7 @@ def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}
         )
         return
 
-    gpg = gnupg.GPG()
+    gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
 
     keysdirpath = extra_opts.get("keysdirpath", None)
     if keysdirpath is not None:
@@ -1414,6 +1403,7 @@ def main():
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))
     if bin_dir is None:
         bin_dir = os.path.join(data_dir, "bin")
+    gpg_homedir = os.path.join(data_dir, "gnupg")
 
     logger.info(f"BasicSwap prepare script {__version__}\n")
     logger.info(f"Python version: {platform.python_version()}")
@@ -1431,6 +1421,8 @@ def main():
 
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
+    if not os.path.exists(gpg_homedir):
+        os.makedirs(gpg_homedir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
 
     config_exists = os.path.exists(config_path)
@@ -1513,6 +1505,7 @@ def main():
         docker_mode=BSX_DOCKER_MODE,
         write_tor_settings=writeTorSettings,
         gnupg=gnupg,
+        gpg_homedir=gpg_homedir,
         wallet_encryption_pwd=WALLET_ENCRYPTION_PWD,
         monerod_proxy_config=monerod_proxy_config,
         monero_wallet_rpc_proxy_config=monero_wallet_rpc_proxy_config,
@@ -1842,14 +1835,16 @@ def main():
             if not os.path.exists(assert_sig_path):
                 downloadFile(assert_sig_url, assert_sig_path)
 
-            gpg = gnupg.GPG()
+            gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
             pubkey_filename = "SimpleX_Chat.pgp"
             pubkeyurls = []
             if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
                 importPubkey(gpg, pubkey_filename, pubkeyurls)
             with open(assert_sig_path, "rb") as fp:
                 verified = gpg.verify_file(fp, assert_path)
-            ensureValidSignatureBy(verified, "SimpleX_Chat")
+            ensureValidSignatureBy(
+                verified, "SimpleX_Chat", expected_key_ids, logger, filepath=assert_path
+            )
 
             shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
 

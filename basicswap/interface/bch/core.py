@@ -10,7 +10,7 @@ from basicswap.interface.bch.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
-    isValidSignature,
+    ensurePubkey,
 )
 
 BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "29.0.0")
@@ -89,15 +89,16 @@ class BCHPrepare(CoinPrepareModule):
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
+
         with open(assert_path, "rb") as fp:
             verified = gpg.verify_file(fp)
-        if not isValidSignature(verified) and verified.username is None:
-            ctx.logger.warning("Signature made by unknown key.")
-            ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
-            with open(assert_path, "rb") as fp:
-                verified = gpg.verify_file(fp)
 
-        self.ensureValidSignatureBy(ctx, verified, signing_key_name)
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
 
     def getExtractBins(self) -> list:
         bins = ["bitcoind", "bitcoin-cli", "bitcoin-tx"]
