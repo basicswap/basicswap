@@ -9449,12 +9449,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             bid.xmr_a_lock_tx.spend_txid = spending_txid
 
+            is_bch_swap: bool = self.isBchXmrSwap(offer)
             is_spending_lock_tx = False
-            if self.isBchXmrSwap(offer):
+            if is_bch_swap:
                 is_spending_lock_tx = self.ci(coin_from).isSpendingLockTx(spend_tx)
 
             if spending_txid == xmr_swap.a_lock_spend_tx_id or (
-                i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
+                is_bch_swap
+                and i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
                 and is_spending_lock_tx
             ):
                 # bch txids change
@@ -9498,7 +9500,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
 
             elif spending_txid == xmr_swap.a_lock_refund_tx_id or (
-                i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
+                is_bch_swap
+                and i2b(spend_tx.vin[0].prevout.hash) == xmr_swap.a_lock_tx_id
                 and not is_spending_lock_tx
             ):
                 self.log.debug("Coin a lock tx spent by lock refund tx.")
