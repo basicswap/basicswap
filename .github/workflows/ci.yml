@@ -133,6 +133,7 @@ jobs:
           - name: test_other
             command: |
               pytest tests/basicswap/test_other.py
+              pytest tests/basicswap/test_amm_config_api.py
           - name: test_prepare
             command: |
               export PYTHONPATH=$(pwd)

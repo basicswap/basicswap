@@ -37,11 +37,13 @@ class AmmConfigValidationTest(unittest.TestCase):
         errors = validate_amm_config({"offers": [offer]})
         self.assertTrue(any("name is required" in e for e in errors))
 
-    def test_duplicate_names_reported(self):
+    def test_duplicate_names_allowed(self):
+        # createoffers.py de-duplicates template names on load (name -> name_2),
+        # so the config layer must not reject duplicates.
         offer = self._valid_standing_offer()
         config = {"offers": [dict(offer), dict(offer)]}
         errors = validate_amm_config(config)
-        self.assertTrue(any("duplicate template name" in e for e in errors))
+        self.assertFalse(any("duplicate template name" in e for e in errors))
 
     def test_same_coin_reported(self):
         offer = self._valid_standing_offer()
