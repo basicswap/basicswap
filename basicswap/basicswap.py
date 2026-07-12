@@ -598,6 +598,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._bid_expired_leeway = 5
 
         self.swaps_in_progress = dict()
+        self._connect_request_times = []
+        self._max_connect_requests_per_hour = self.settings.get(
+            "max_connect_requests_per_hour", 30
+        )
 
         self.threads = []
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(
@@ -9819,12 +9823,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     ) -> None:
         bid_id = watched_script.bid_id
         ci = self.ci(coin_type)
-        if (
-            len(tx["vout"]) < 2 or ci.make_int(tx["vout"][vout]["value"]) != 546
-        ):  # Dust limit
 
-            self.log.info(f"Found tx is not a mercy tx for bid: {self.log.id(bid_id)}.")
-            self.removeWatchedScript(coin_type, bid_id, watched_script.script)
+        mercy_keyshare = ci.isMercyTx(tx, vout)
+        if mercy_keyshare is None:
+            self.log.info(
+                f"Found tx is not a mercy tx for bid: {self.log.id(bid_id)}, still watching."
+            )
             return
 
         self.log.info(f"Found mercy tx for bid: {self.log.id(bid_id)}.")
@@ -9838,11 +9842,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 f"Could not find active bid for found mercy tx: {self.logIDB(bid_id)}."
             )
         else:
-            mercy_keyshare = bytes.fromhex(
-                tx["vout"][0]["scriptPubKey"]["asm"].split(" ")[2]
-            )
-            ensure(ci.verifyKey(mercy_keyshare), "Invalid keyshare")
-
             bid = self.swaps_in_progress[bid_id][0]
             bid.txns[TxTypes.BCH_MERCY] = SwapTx(
                 bid_id=bid_id,
@@ -10049,6 +10048,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.debug(f"Checking output {o.txid_hex}:{o.vout} for spend")
                 spend_info = ci.checkWatchedOutput(o.txid_hex, o.vout)
                 if spend_info:
+                    if spend_info.get("height", 0) <= 0:
+                        self.log.debug(
+                            f"Waiting for spend of {o.txid_hex}:{o.vout} to confirm: {self.logIDT(spend_info['txid'])}"
+                        )
+                        continue
                     self.log.debug(
                         f"Found spend via Electrum {self.logIDT(o.txid_hex)} {o.vout} in {self.logIDT(spend_info['txid'])} {spend_info['vin']}"
                     )
@@ -10123,6 +10127,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 spend_info = ci.checkWatchedOutput(o.txid_hex, o.vout)
                 if spend_info:
+                    if spend_info.get("height", 0) <= 0:
+                        self.log.debug(
+                            f"Waiting for spend of {o.txid_hex}:{o.vout} to confirm: {self.logIDT(spend_info['txid'])}"
+                        )
+                        continue
                     raw_tx = ci.getBackend().getTransactionRaw(spend_info["txid"])
                     if raw_tx:
                         tx = ci.loadTx(bytes.fromhex(raw_tx))
@@ -13519,6 +13528,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Direct message route already exists")
 
             connReqInvitation = req_data["connection_req"]
+            ensure(
+                isinstance(connReqInvitation, str), "Invalid connection request type"
+            )
+            ensure(
+                0 < len(connReqInvitation) <= 4096, "Invalid connection request length"
+            )
+            ensure(
+                all(33 <= ord(c) <= 126 for c in connReqInvitation),
+                "Invalid characters in connection request",
+            )
+
+            now_rl: int = self.getTime()
+            self._connect_request_times = [
+                t for t in self._connect_request_times if now_rl - t < 3600
+            ]
+            ensure(
+                len(self._connect_request_times) < self._max_connect_requests_per_hour,
+                "Connection request rate limit exceeded",
+            )
+            self._connect_request_times.append(now_rl)
+
             cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
             response = net_i.wait_for_command_response(cmd_id)
             pccConnId = getResponseData(response, "connection")["pccConnId"]
@@ -13589,9 +13619,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if found_direct_message_route:
                 query_str = (
                     "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
-                    + "WHERE active_ind = 1"
+                    + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
                 )
-                rows = cursor.execute(query_str).fetchall()
+                rows = cursor.execute(
+                    query_str, {"route_id": found_direct_message_route}
+                ).fetchall()
                 for row in rows:
                     record_id, linked_type, linked_id = row
 

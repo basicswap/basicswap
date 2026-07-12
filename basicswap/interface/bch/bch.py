@@ -4,7 +4,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from typing import Union
+from typing import Optional, Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
 from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
@@ -1145,6 +1145,28 @@ class BCHInterface(BTCInterface):
 
     def lockNonSegwitPrevouts(self) -> None:
         pass
+
+    def isMercyTx(self, tx: dict, vout: int) -> Optional[bytes]:
+        # Returns the keyshare if tx matches the mercy tx format created by
+        # createMercyTx: an OP_RETURN "XBSW" keyshare output at vout 0 and a
+        # dust limit output paying the watched script.
+        if len(tx["vout"]) < 2:
+            return None
+        if self.make_int(tx["vout"][vout]["value"]) != 546:
+            return None
+        try:
+            op_return_script = bytes.fromhex(tx["vout"][0]["scriptPubKey"]["hex"])
+            if (
+                len(op_return_script) == 39
+                and op_return_script[:6] == bytes((0x6A, 0x04)) + b"XBSW"
+                and op_return_script[6] == 0x20
+            ):
+                keyshare = op_return_script[7:]
+                if self.verifyKey(keyshare):
+                    return keyshare
+        except Exception as e:
+            self._log.debug(f"isMercyTx check failed: {e}")
+        return None
 
     def createMercyTx(
         self,
