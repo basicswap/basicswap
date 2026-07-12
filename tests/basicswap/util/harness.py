@@ -56,7 +56,7 @@ from tests.basicswap.extended.test_doge import (
 import basicswap.config as cfg
 import basicswap.bin.run as runSystem
 
-TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "~/test_basicswap1"))
+TEST_PATH = os.path.expanduser(os.getenv("TEST_PATH", "/tmp/test_basicswap"))
 
 PARTICL_PORT_BASE = int(os.getenv("PARTICL_PORT_BASE", BASE_PORT))
 PARTICL_RPC_PORT_BASE = int(os.getenv("PARTICL_RPC_PORT_BASE", BASE_RPC_PORT))

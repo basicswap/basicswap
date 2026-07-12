@@ -64,6 +64,8 @@ from basicswap.chainparams import (
     Coins,
     chainparams,
     getCoinIdFromName,
+    coins_without_segwit,
+    scriptless_coins,
 )
 from basicswap.util.daemon import Daemon
 from basicswap.contrib.test_framework.messages import CTransaction
@@ -157,6 +159,7 @@ def wait_for_bid_states(
     wait_for: int = 20,
     fail_fast_a: bool = True,
     fail_fast_b: bool = True,
+    node_callback=None,
 ) -> None:
     for node_port, expect_state in (
         (node_port_a, state_a),
@@ -203,6 +206,8 @@ def wait_for_bid_states(
                 continue
             bid_state = rv["bid_state"]
             bid_states[n] = bid_state
+            if node_callback:
+                node_callback(bid_id_hex, node_port, rv)
             if bid_state in pass_state_strs[n]:
                 num_passed += 1
             else:
@@ -244,6 +249,10 @@ def wait_for_offer(
             pass
             # logger.debug(f"TEST: wait_for_offer {offer_id}, error {e}")
     raise ValueError(f"wait_for_offer timed out {offer_id}.")
+
+
+def is_reverse_bid(coin_from, coin_to):
+    return True if coin_from in scriptless_coins + coins_without_segwit else False
 
 
 class TestFunctions(BaseTestWithPrepare):
@@ -327,7 +336,7 @@ class TestFunctions(BaseTestWithPrepare):
         ticker_from: str = chainparams[coin_from]["ticker"]
         ticker_to: str = chainparams[coin_to]["ticker"]
 
-        reverse_bid: bool = True if coin_from in (Coins.XMR,) else False
+        reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
         port_bidder: int = port_node_to
         port_leader: int = port_bidder if reverse_bid else port_offerer
@@ -413,7 +422,7 @@ class TestFunctions(BaseTestWithPrepare):
         ticker_from: str = chainparams[coin_from]["ticker"]
         ticker_to: str = chainparams[coin_to]["ticker"]
 
-        reverse_bid: bool = True if coin_from in (Coins.XMR,) else False
+        reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
         port_bidder: int = port_node_to
         port_leader: int = port_bidder if reverse_bid else port_offerer
@@ -534,7 +543,7 @@ class TestFunctions(BaseTestWithPrepare):
         ticker_from: str = chainparams[coin_from]["ticker"]
         ticker_to: str = chainparams[coin_to]["ticker"]
 
-        reverse_bid: bool = True if coin_from in (Coins.XMR,) else False
+        reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
         port_bidder: int = port_node_to
         port_leader: int = port_bidder if reverse_bid else port_offerer
@@ -601,7 +610,11 @@ class TestFunctions(BaseTestWithPrepare):
         )
         events = rv["events"]
         logger.info(f"Initiator events: {events}")
-        assert any(event["desc"] == "Detected invalid lock Tx B" for event in events)
+        participating_coin = coin_from if reverse_bid else coin_to
+        if participating_coin in (Coins.XMR,):
+            assert any(
+                event["desc"] == "Detected invalid lock Tx B" for event in events
+            )
         assert any(
             event["desc"] == "Lock tx A refund spend tx published" for event in events
         )
@@ -954,7 +967,7 @@ class Test(TestFunctions):
         ticker_from: str = chainparams[coin_from]["ticker"]
         ticker_to: str = chainparams[coin_to]["ticker"]
 
-        reverse_bid: bool = True if coin_from in (Coins.XMR,) else False
+        reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
         port_bidder: int = port_node_to
         port_leader: int = port_bidder if reverse_bid else port_offerer

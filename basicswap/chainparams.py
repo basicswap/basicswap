@@ -49,8 +49,15 @@ class Fiat(IntEnum):
     EUR = -3
 
 
+coins_without_segwit = (Coins.PIVX, Coins.DASH)
+scriptless_coins = (
+    Coins.XMR,
+    Coins.WOW,
+    Coins.PART_ANON,
+    Coins.FIRO,
+    Coins.DOGE,
+)
 xmr_based_coins = (Coins.XMR, Coins.WOW)
-
 
 chainparams = {
     Coins.PART: part_params,

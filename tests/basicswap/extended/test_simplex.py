@@ -6,6 +6,10 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
+
+mkdir /tmp/simplex
+cp -r ~/PATH_TO/test_certs /tmp/simplex/certs
+
 docker run \
     -e "ADDR=127.0.0.1" \
     -e "PASS=password" \
@@ -15,14 +19,16 @@ docker run \
     -v /tmp/simplex/certs:/certificates \
     simplexchat/smp-server:latest
 
-Fingerprint: Q8SNxc2SRcKyXlhJM8KFUgPNW4KXPGRm4eSLtT_oh-I=
-
-export SIMPLEX_SERVER_ADDRESS=smp://Q8SNxc2SRcKyXlhJM8KFUgPNW4KXPGRm4eSLtT_oh-I=:password@127.0.0.1:5223
+export SIMPLEX_SERVER_FINGERPRINT=$(docker logs simplex_server 2>&1 | grep "^Finger" | cut -c 14-) && echo $SIMPLEX_SERVER_FINGERPRINT
+pytest -v -s tests/basicswap/extended/test_simplex.py::TestSimplex::test_basic
 
 https://github.com/simplex-chat/simplex-chat/issues/4127
     json: {"corrId":"3","cmd":"/_send #1 text test123"}
     direct message: {"corrId":"1","cmd":"/_send @2 text the message"}
 
+Notes:
+    On unusual errors read the simplex-chat logs, run:
+    pkill -9 simplex-chat
 """
 
 import json
@@ -112,6 +118,7 @@ class TestSimplex(unittest.TestCase):
 
     def test_basic(self):
 
+        logger.info(f"TEST_DIR: {TEST_DIR}")
         if os.path.isdir(TEST_DIR):
             if RESET_TEST:
                 logger.info("Removing " + TEST_DIR)
@@ -161,7 +168,8 @@ class TestSimplex(unittest.TestCase):
             waitForConnected(ws_thread, test_delay_event)
             sent_id = ws_thread.send_command("/group bsx")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert getResponseData(response, "type") == "groupCreated"
+            if getResponseData(response, "type") != "groupCreated":
+                raise ValueError(f"Expected groupCreated: {response}")
 
             ws_thread.send_command("/set voice #bsx off")
             ws_thread.send_command("/set files #bsx off")
@@ -428,7 +436,8 @@ class TestSimplex2(BaseTest):
             waitForConnected(ws_thread, test_delay_event)
             sent_id = ws_thread.send_command("/group bsx")
             response = waitForResponse(ws_thread, sent_id, test_delay_event)
-            assert getResponseData(response, "type") == "groupCreated"
+            if getResponseData(response, "type") != "groupCreated":
+                raise ValueError(f"Expected groupCreated: {response}")
 
             ws_thread.send_command("/set voice #bsx off")
             ws_thread.send_command("/set files #bsx off")

@@ -157,7 +157,7 @@ class Test(TestFunctions):
             if wallets_password is not None:
                 os.environ.pop("WALLET_ENCRYPTION_PWD", None)
 
-    def test_01_a_full_swap_xmr(self):
+    def test_01_full_swap_xmr(self):
         prepare_balance(
             self.delay_event,
             self.test_coin_b,
@@ -167,6 +167,39 @@ class Test(TestFunctions):
             True,
         )
         self.do_test_01_full_swap(self.test_coin_a, self.test_coin_b)
+
+    def test_02_leader_recover_a_lock_tx(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        self.do_test_02_leader_recover_a_lock_tx(self.test_coin_a, self.test_coin_b)
+
+    def test_03_follower_recover_a_lock_tx(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        self.do_test_03_follower_recover_a_lock_tx(self.test_coin_a, self.test_coin_b)
+
+    def test_04_follower_recover_b_lock_tx(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        self.do_test_04_follower_recover_b_lock_tx(self.test_coin_a, self.test_coin_b)
 
     def test_set_destination(self):
         prepare_balance(

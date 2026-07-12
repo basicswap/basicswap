@@ -188,12 +188,14 @@ def encryptMsg(
     pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
     privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
+    payload_format: int = 2
     smsg_msg: bytes = smsgEncrypt(
         privkey_from,
         pubkey_to,
         payload,
         timestamp,
         deterministic,
+        payload_format,
         msg_valid,
         difficulty_target=difficulty_target,
     )

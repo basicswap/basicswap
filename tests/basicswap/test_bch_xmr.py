@@ -108,6 +108,7 @@ class TestBCH(BasicSwapTest):
     test_coin = Coins.BCH
     test_coin_from = Coins.BCH
     base_rpc_port = BCH_BASE_RPC_PORT
+    max_fee: int = 10000
 
     bch_daemons = []
     start_ltc_nodes = False
