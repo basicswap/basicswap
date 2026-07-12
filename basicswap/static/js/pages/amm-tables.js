@@ -1519,7 +1519,7 @@ const AmmTablesManager = (function() {
 
         document.getElementById('add-amm-type').value = type;
 
-        document.getElementById('add-amm-name').value = '';
+        document.getElementById('add-amm-name').value = 'Unnamed Offer';
         document.getElementById('add-amm-enabled').checked = true;
 
         const coinFromSelect = document.getElementById('add-amm-coin-from');
@@ -1871,16 +1871,6 @@ const AmmTablesManager = (function() {
                 }
             }
 
-            const existingList = type === 'offer' ? config.offers : config.bids;
-            if (Array.isArray(existingList) && existingList.some(item => item && item.name === name)) {
-                if (window.showErrorModal) {
-                    window.showErrorModal('Validation Error', `A ${type} template named "${name}" already exists.`);
-                } else {
-                    alert(`A ${type} template named "${name}" already exists.`);
-                }
-                return;
-            }
-
             if (type === 'offer') {
                 if (!Array.isArray(config.offers)) {
                     config.offers = [];
@@ -2204,16 +2194,6 @@ const AmmTablesManager = (function() {
                 originalItem = config.bids.find(item =>
                     (id && item.id === id) || (!id && item.name === originalName)
                 );
-            }
-
-            const targetList = type === 'offer' ? config.offers : config.bids;
-            if (Array.isArray(targetList) && targetList.some(item => item && item !== originalItem && item.name === name)) {
-                if (window.showErrorModal) {
-                    window.showErrorModal('Validation Error', `A ${type} template named "${name}" already exists.`);
-                } else {
-                    alert(`A ${type} template named "${name}" already exists.`);
-                }
-                return;
             }
 
             const updatedItem = Object.assign({}, originalItem || {}, {

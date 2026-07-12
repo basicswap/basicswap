@@ -1007,16 +1007,6 @@ def page_amm(self, _, post_string):
                     if "offers" not in current_config:
                         current_config["offers"] = []
 
-                    if any(
-                        o.get("name") == new_offer["name"]
-                        for o in current_config["offers"]
-                        if isinstance(o, dict)
-                    ):
-                        err_messages.append(
-                            f"An offer template named '{new_offer['name']}' already exists"
-                        )
-                        raise ValueError("duplicate template name")
-
                     current_config["offers"].append(new_offer)
 
                     with open(config_path, "w") as f:
@@ -1094,16 +1084,6 @@ def page_amm(self, _, post_string):
 
                     if "bids" not in current_config:
                         current_config["bids"] = []
-
-                    if any(
-                        b.get("name") == new_bid["name"]
-                        for b in current_config["bids"]
-                        if isinstance(b, dict)
-                    ):
-                        err_messages.append(
-                            f"A bid template named '{new_bid['name']}' already exists"
-                        )
-                        raise ValueError("duplicate template name")
 
                     current_config["bids"].append(new_bid)
 
@@ -1376,7 +1356,6 @@ def validate_amm_config(config_data):
         errors.append("'offers' must be a list")
         offers = []
 
-    seen_offer_names = set()
     for idx, offer in enumerate(offers):
         if not isinstance(offer, dict):
             errors.append(f"Offer #{idx + 1} must be an object")
@@ -1387,10 +1366,6 @@ def validate_amm_config(config_data):
         name = offer.get("name", "")
         if not name or not str(name).strip():
             errors.append(f"{label}: name is required")
-        elif name in seen_offer_names:
-            errors.append(f"{label}: duplicate template name")
-        else:
-            seen_offer_names.add(name)
 
         coin_from = offer.get("coin_from", "")
         coin_to = offer.get("coin_to", "")
@@ -1457,7 +1432,6 @@ def validate_amm_config(config_data):
         errors.append("'bids' must be a list")
         bids = []
 
-    seen_bid_names = set()
     for idx, bid in enumerate(bids):
         if not isinstance(bid, dict):
             errors.append(f"Bid #{idx + 1} must be an object")
@@ -1466,10 +1440,6 @@ def validate_amm_config(config_data):
         name = bid.get("name", "")
         if not name or not str(name).strip():
             errors.append(f"{label}: name is required")
-        elif name in seen_bid_names:
-            errors.append(f"{label}: duplicate template name")
-        else:
-            seen_bid_names.add(name)
         if not bid.get("coin_from") or not bid.get("coin_to"):
             errors.append(f"{label}: both coin_from and coin_to are required")
         elif bid.get("coin_from") == bid.get("coin_to"):
