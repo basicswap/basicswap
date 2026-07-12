@@ -206,7 +206,9 @@ class BTCPrepare(CoinPrepareModule):
             isValidSignature(verified)
             and verified.fingerprint in fastsync_signers["tecnovert"]
         ):
-            self.ensureValidSignatureBy(ctx, verified, "tecnovert", fastsync_signers)
+            self.ensureValidSignatureBy(
+                ctx, verified, "tecnovert", fastsync_signers, filepath=asc_file_path
+            )
         else:
             pubkey_filename = "nicolasdorier.asc"
             if not havePubkey(gpg, fastsync_signers["nicolasdorier"][0]):
@@ -214,7 +216,7 @@ class BTCPrepare(CoinPrepareModule):
             with open(asc_file_path, "rb") as fp:
                 verified = gpg.verify_file(fp)
             self.ensureValidSignatureBy(
-                ctx, verified, "nicolasdorier", fastsync_signers
+                ctx, verified, "nicolasdorier", fastsync_signers, filepath=asc_file_path
             )
 
     def prepareFastsync(self, ctx: PrepareContext, extra_opts):

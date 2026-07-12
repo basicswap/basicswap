@@ -46,8 +46,8 @@ from basicswap.bin.run import (
 from basicswap.interface.prepare_util import (
     createGPG,
     ensureFileHashInFile,
+    ensureValidSignatureBy,
     exitWithError,
-    isValidSignature,
     PrepareContext,
     havePubkey,
     getFileHash,
@@ -488,18 +488,6 @@ def testOnionLink():
         "The Tor Project's free software protects your privacy online." in test_response
     )
     logger.info("Onion links work.")
-
-
-def ensureValidSignatureBy(result, signing_key_name):
-    if not isValidSignature(result):
-        raise ValueError("Signature verification failed.")
-
-    if result.fingerprint not in expected_key_ids[signing_key_name]:
-        raise ValueError(
-            "Signature made by unexpected key fingerprint: " + result.fingerprint
-        )
-
-    logger.debug(f"Found valid signature by {signing_key_name} ({result.key_id}).")
 
 
 def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
@@ -1854,7 +1842,9 @@ def main():
                 importPubkey(gpg, pubkey_filename, pubkeyurls)
             with open(assert_sig_path, "rb") as fp:
                 verified = gpg.verify_file(fp, assert_path)
-            ensureValidSignatureBy(verified, "SimpleX_Chat")
+            ensureValidSignatureBy(
+                verified, "SimpleX_Chat", expected_key_ids, logger, filepath=assert_path
+            )
 
             shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
 

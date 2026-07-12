@@ -91,6 +91,20 @@ def ensurePubkey(gpg, ctx, signing_key_name, signers, pubkey_filename, pubkeyurl
     ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
 
 
+def ensureValidSignatureBy(result, signing_key_name, signers, logger, filepath):
+    if not isValidSignature(result):
+        raise ValueError("Signature verification failed.")
+
+    if result.fingerprint not in signers[signing_key_name]:
+        raise ValueError(
+            "Signature made by unexpected key fingerprint: " + result.fingerprint
+        )
+
+    logger.info(
+        f'Successfully verified "{os.path.basename(filepath)}" is signed by {signing_key_name} ({result.key_id}).'
+    )
+
+
 def ensureFileHashInFile(release_hash: str, assert_path: str, logger=None) -> None:
     with (
         open(assert_path, "rb", 0) as fp,
@@ -236,20 +250,15 @@ class CoinPrepareModule:
         return pubkeyurls
 
     def ensureValidSignatureBy(
-        self, ctx: PrepareContext, result, signing_key_name: str, signers=None
+        self,
+        ctx: PrepareContext,
+        result,
+        signing_key_name: str,
+        signers=None,
+        filepath=None,
     ) -> None:
-        if signers is None:
-            signers = self.signers
-        if not isValidSignature(result):
-            raise ValueError("Signature verification failed.")
-
-        if result.fingerprint not in signers[signing_key_name]:
-            raise ValueError(
-                "Signature made by unexpected key fingerprint: " + result.fingerprint
-            )
-
-        ctx.logger.debug(
-            f"Found valid signature by {signing_key_name} ({result.key_id})."
+        ensureValidSignatureBy(
+            result, signing_key_name, signers or self.signers, ctx.logger, filepath
         )
 
     def verifyCoreHash(
@@ -279,12 +288,16 @@ class CoinPrepareModule:
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
-        ensurePubkey(gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls)
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
 
         with open(assert_sig_path, "rb") as fp:
             verified = gpg.verify_file(fp, assert_path)
 
-        self.ensureValidSignatureBy(ctx, verified, signing_key_name)
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
 
     def getExtractBins(self) -> list:
         bins = [self.name + "d", self.name + "-cli", self.name + "-tx"]

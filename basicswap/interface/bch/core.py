@@ -11,7 +11,6 @@ from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
     ensurePubkey,
-    isValidSignature,
 )
 
 BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "29.0.0")
@@ -90,12 +89,16 @@ class BCHPrepare(CoinPrepareModule):
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
-        ensurePubkey(gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls)
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
 
         with open(assert_path, "rb") as fp:
             verified = gpg.verify_file(fp)
 
-        self.ensureValidSignatureBy(ctx, verified, signing_key_name)
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
 
     def getExtractBins(self) -> list:
         bins = ["bitcoind", "bitcoin-cli", "bitcoin-tx"]

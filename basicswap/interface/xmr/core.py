@@ -13,7 +13,6 @@ from basicswap.interface.prepare_util import (
     ensurePubkey,
     exitWithError,
     getOSDirNames,
-    isValidSignature,
 )
 
 MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.5.0")
@@ -120,12 +119,16 @@ class XMRPrepare(CoinPrepareModule):
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
-        ensurePubkey(gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls)
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
 
         with open(assert_path, "rb") as fp:
             verified = gpg.verify_file(fp)
 
-        self.ensureValidSignatureBy(ctx, verified, signing_key_name)
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
 
     def usesWalletRpcDaemonForInit(self) -> bool:
         return True

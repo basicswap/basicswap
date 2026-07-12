@@ -14,7 +14,6 @@ from basicswap.interface.prepare_util import (
     exitWithError,
     getFileHash,
     getOSDirNames,
-    isValidSignature,
 )
 from basicswap.contrib.rpcauth import generate_salt
 
@@ -123,12 +122,16 @@ class NAVPrepare(CoinPrepareModule):
         pubkey_filename = self.getPubkeyFilename(signing_key_name)
         pubkeyurls = self.getAllPubkeyUrls(ctx)
 
-        ensurePubkey(gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls)
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
 
         with open(assert_sig_path, "rb") as fp:
             verified = gpg.verify_file(fp)
 
-        self.ensureValidSignatureBy(ctx, verified, signing_key_name)
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_sig_path
+        )
 
         # .sig file is not a detached signature, recheck release hash in decrypted data
         release_hash = getFileHash(release_path)
