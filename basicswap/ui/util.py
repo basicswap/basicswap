@@ -271,9 +271,7 @@ def describeBid(
             if canAcceptBidState(last_state):
                 state_description = "Pausing briefly before accepting bid"
             elif last_state == BidStates.BID_RECEIVING_ACC:
-                state_description = (
-                    "Pausing briefly before responding to accepted bid"
-                )
+                state_description = "Pausing briefly before responding to accepted bid"
             elif last_state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
                 state_description = f"Pausing briefly before spending from {ci_follower.ticker()} lock tx"
             elif last_state == BidStates.BID_ACCEPTED:
