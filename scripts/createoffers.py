@@ -107,7 +107,7 @@ def post_req(url: str, json_data=None, auth_header_val=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     if auth_header_val:
         req.add_header("Authorization", auth_header_val)
-    if json_data:
+    if json_data is not None:
         req.add_header("Content-Type", "application/json; charset=utf-8")
         post_bytes = json.dumps(json_data).encode("utf-8")
         req.add_header("Content-Length", len(post_bytes))
@@ -857,7 +857,7 @@ def process_offers(args, config, script_state) -> None:
                     print(
                         f"Revoking offer {offer_id}, offer amount {offer_amount_from:.8f} > wallet balance {wallet_balance:.8f}"
                     )
-                    result = read_json_api(f"revokeoffer/{offer_id}")
+                    result = read_json_api(f"revokeoffer/{offer_id}", {})
                     if args.debug:
                         print("revokeoffer", result)
                     else:
@@ -880,7 +880,7 @@ def process_offers(args, config, script_state) -> None:
                         f"Revoking offer {offer_id}, budget changed, "
                         f"reposting with remaining {template_fixed_remaining:.8f}"
                     )
-                    result = read_json_api(f"revokeoffer/{offer_id}")
+                    result = read_json_api(f"revokeoffer/{offer_id}", {})
                     if args.debug:
                         print("revokeoffer", result)
                     offers_found -= 1
@@ -890,7 +890,7 @@ def process_offers(args, config, script_state) -> None:
                             offer_id
                         )
                     )
-                    result = read_json_api(f"revokeoffer/{offer_id}")
+                    result = read_json_api(f"revokeoffer/{offer_id}", {})
                     if args.debug:
                         print("revokeoffer", result)
                     else:
@@ -923,7 +923,7 @@ def process_offers(args, config, script_state) -> None:
                 old_offer_id = old_offer.get("offer_id")
                 print(f"Revoking duplicate offer {old_offer_id}")
                 try:
-                    result = read_json_api(f"revokeoffer/{old_offer_id}")
+                    result = read_json_api(f"revokeoffer/{old_offer_id}", {})
                     if args.debug:
                         print(f"Revoke result: {result}")
 
