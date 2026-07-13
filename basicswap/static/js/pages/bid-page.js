@@ -10,8 +10,8 @@ const BidPage = {
   refreshDebounce: null,
   isRefreshing: false,
   refreshQueued: false,
-  liveStatusBadge: null,
-  liveStatusHandlersAdded: false,
+  liveStatusDot: null,
+  liveStatusRecheckTimer: null,
   spinAnimation: null,
   swapType: null,
   coinFrom: null,
@@ -259,8 +259,10 @@ const BidPage = {
   setupRealtime: function() {
     const refreshBtn = document.getElementById('refresh');
     if (refreshBtn) {
-      const span = refreshBtn.querySelector('span');
-      if (span) span.textContent = 'Refresh';
+      const label = refreshBtn.lastElementChild;
+      if (label && label.tagName === 'SPAN' && label.id !== 'bid-live-dot') {
+        label.textContent = 'Refresh';
+      }
       refreshBtn.addEventListener('click', (e) => {
         e.preventDefault();
         this.refreshLiveContent(true);
@@ -276,52 +278,59 @@ const BidPage = {
         const ev = msg.event;
         if (ev === 'bid_changed' || ev === 'bid_accepted' ||
             ev === 'swap_completed' || ev === 'new_bid') {
+          this.setLiveStatus(true);
           this.scheduleRefresh();
         }
       });
     }
   },
 
+  isWsConnected: function() {
+    const wm = window.WebSocketManager;
+    return !!(wm && typeof wm.isConnected === 'function' && wm.isConnected());
+  },
+
   setupLiveIndicator: function() {
-    const badge = document.getElementById('bid-live-status');
-    if (!badge) return;
+    const refreshBtn = document.getElementById('refresh');
+    const dot = document.getElementById('bid-live-dot');
+    if (!refreshBtn || !dot) return;
 
-    const oldDot = document.getElementById('bid-live-dot');
-    if (oldDot) oldDot.remove();
-
-    this.liveStatusBadge = badge;
+    this.liveStatusDot = dot;
+    this.syncLiveStatus();
 
     const wm = window.WebSocketManager;
-    const connected = !!(wm && typeof wm.isConnected === 'function' && wm.isConnected());
-    this.setLiveStatus(connected);
-    if (!this.liveStatusHandlersAdded &&
-        wm && typeof wm.addMessageHandler === 'function') {
-      this.liveStatusHandlersAdded = true;
+    if (wm && typeof wm.addMessageHandler === 'function') {
       wm.addMessageHandler('connect', () => this.setLiveStatus(true));
       wm.addMessageHandler('disconnect', () => this.setLiveStatus(false));
       wm.addMessageHandler('error', () => this.setLiveStatus(false));
     }
+
+    if (this.liveStatusRecheckTimer) {
+      clearTimeout(this.liveStatusRecheckTimer);
+    }
+    this.liveStatusRecheckTimer = setTimeout(() => this.syncLiveStatus(), 500);
+  },
+
+  syncLiveStatus: function() {
+    this.setLiveStatus(this.isWsConnected());
   },
 
   setLiveStatus: function(connected) {
-    if (!this.liveStatusBadge) return;
-    const chipClass =
-      'inline-flex items-center px-3 py-1.5 rounded-full bg-white bg-opacity-10 text-xs font-medium text-white';
+    if (!this.liveStatusDot) return;
+    const refreshBtn = document.getElementById('refresh');
     if (connected) {
-      this.liveStatusBadge.className = chipClass;
-      this.liveStatusBadge.title = 'Live updates connected';
-      this.liveStatusBadge.innerHTML =
-        '<span class="relative flex h-2 w-2 mr-2">' +
+      if (refreshBtn) {
+        refreshBtn.title = 'Live updates connected';
+      }
+      this.liveStatusDot.innerHTML =
         '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>' +
-        '<span class="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>' +
-        '</span>Live';
+        '<span class="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>';
     } else {
-      this.liveStatusBadge.className = chipClass;
-      this.liveStatusBadge.title = 'Live updates disconnected — click Refresh to update';
-      this.liveStatusBadge.innerHTML =
-        '<span class="relative flex h-2 w-2 mr-2">' +
-        '<span class="relative inline-flex rounded-full h-2 w-2 bg-gray-400"></span>' +
-        '</span>Offline';
+      if (refreshBtn) {
+        refreshBtn.title = 'Live updates disconnected — click Refresh to update';
+      }
+      this.liveStatusDot.innerHTML =
+        '<span class="relative inline-flex rounded-full h-2 w-2 bg-gray-400"></span>';
     }
   },
 
