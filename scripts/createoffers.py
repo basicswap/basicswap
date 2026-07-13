@@ -100,6 +100,8 @@ DEFAULT_STATE_FILE: str = "createoffers_state.json"
 VALID_LOCK_HOURS: tuple = (4, 8, 12, 24)
 DEFAULT_LOCK_HOURS: int = 24
 
+MIN_BUDGET_DELTA: float = 1e-8
+
 
 def post_req(url: str, json_data=None, auth_header_val=None):
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -865,6 +867,22 @@ def process_offers(args, config, script_state) -> None:
                             del prev_template_offers[i]
                             break
                     write_state(args.statefile, script_state)
+                    offers_found -= 1
+                elif template_fixed_remaining is not None and (
+                    float(offer.get("tracking_filled_amount", 0))
+                    + float(offer.get("tracking_in_flight_amount", 0))
+                    > 0
+                    or template_fixed_remaining
+                    > float(offer.get("tracking_remaining", template_fixed_remaining))
+                    + MIN_BUDGET_DELTA
+                ):
+                    print(
+                        f"Revoking offer {offer_id}, budget changed, "
+                        f"reposting with remaining {template_fixed_remaining:.8f}"
+                    )
+                    result = read_json_api(f"revokeoffer/{offer_id}")
+                    if args.debug:
+                        print("revokeoffer", result)
                     offers_found -= 1
                 elif wallet_balance <= min_coin_from_amt:
                     print(
