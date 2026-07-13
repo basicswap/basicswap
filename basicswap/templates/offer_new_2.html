@@ -54,10 +54,10 @@
             <label class="block mb-1.5 text-sm font-medium text-coolGray-800 dark:text-white">Contract locked (hours)</label>
             <div class="relative">
               <div class="flex absolute inset-y-0 left-0 items-center pl-3 pointer-events-none">{{ input_time_svg | safe }}</div>
-              <input class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockhrs" min="1" max="96" value="{{ data.lockhrs }}">
+              <input class="pl-10 hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-3 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-white text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="number" name="lockhrs" min="1" max="24" value="{{ data.lockhrs }}">
             </div>
             <div class="mt-2 flex flex-wrap gap-2">
-              {% for h in [12, 24, 48, 72] %}
+              {% for h in [4, 8, 12, 24] %}
               <button type="button" data-set-value="{{ h }}" data-target-name="lockhrs" class="py-1 px-2 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-md focus:outline-none">{{ h }}h</button>
               {% endfor %}
             </div>

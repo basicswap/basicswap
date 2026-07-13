@@ -705,7 +705,7 @@ def page_newoffer(self, url_split, post_string, get_string=""):
         "fee_from_conf": 2,
         "fee_to_conf": 2,
         "validhrs": 1,
-        "lockhrs": 32,
+        "lockhrs": 24,
         "lockmins": 30,  # used in debug mode
         "debug_ui": swap_client.debug_ui,
         "automation_strat_id": -1,
