@@ -519,6 +519,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._price_cache = {}
         self._volume_cache = {}
         self._historical_cache = {}
+        self._pending_bid_notifications = set()
         self._price_cache_lock = threading.Lock()
         self._price_fetch_thread = None
         self._price_fetch_running = False
@@ -5215,6 +5216,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Must specify offer for save_in_progress")
             self.swaps_in_progress[bid_id] = (bid, save_in_progress)  # (bid, offer)
 
+        self.notifyBidChanged(bid_id)
+
     def saveBid(self, bid_id: bytes, bid, xmr_swap=None, cursor=None) -> None:
         try:
             use_cursor = self.openDB(cursor)
@@ -5284,6 +5287,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     ) -> None:
         self.log.debug(f"logBidEvent {self.log.id(bid_id)} {event_type} {event_msg}")
         self.logEvent(Concepts.BID, bid_id, event_type, event_msg, cursor)
+        self.notifyBidChanged(bid_id)
+
+    def notifyBidChanged(self, bid_id: bytes) -> None:
+        if not self.ws_server:
+            return
+        if self._db_lock_held():
+            self._pending_bid_notifications.add(bid_id)
+        else:
+            self._broadcastBidChanged(bid_id)
+
+    def _broadcastBidChanged(self, bid_id: bytes) -> None:
+        if not self.ws_server:
+            return
+        try:
+            self.ws_server.send_message_to_all(
+                json.dumps({"event": "bid_changed", "bid_id": bid_id.hex()})
+            )
+        except Exception as e:  # noqa: F841
+            self.log.debug(f"notifyBidChanged failed: {e}")
+
+    def _onDBCommitted(self) -> None:
+        pending = self._pending_bid_notifications
+        if not pending:
+            return
+        self._pending_bid_notifications = set()
+        for bid_id in pending:
+            self._broadcastBidChanged(bid_id)
+
+    def _onDBRolledBack(self) -> None:
+        self._pending_bid_notifications.clear()
 
     def countEvents(
         self, linked_type: int, linked_id: bytes, event_type: int, cursor

@@ -965,10 +965,18 @@ class DBMethods:
     def commitDB(self):
         assert self._db_lock_held()
         self._db_con.commit()
+        self._onDBCommitted()
 
     def rollbackDB(self):
         assert self._db_lock_held()
         self._db_con.rollback()
+        self._onDBRolledBack()
+
+    def _onDBCommitted(self) -> None:
+        pass
+
+    def _onDBRolledBack(self) -> None:
+        pass
 
     def closeDBCursor(self, cursor):
         assert self._db_lock_held()
@@ -992,6 +1000,11 @@ class DBMethods:
         self._db_con.close()
         self._db_lock_depth = 0
         self.mxDB.release()
+
+        if commit:
+            self._onDBCommitted()
+        else:
+            self._onDBRolledBack()
 
     def setIntKV(self, str_key: str, int_val: int, cursor=None) -> None:
         try:
