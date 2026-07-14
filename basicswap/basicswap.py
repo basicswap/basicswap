@@ -10013,6 +10013,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     if "Unable to get spent info" not in str(ex):
                         self.log.warning(f"getspentinfo {ex}")
                 if found_spend is not None:
+                    if found_spend.get("height", 0) <= 0:
+                        self.log.debug(
+                            f"Waiting for spend of {o.txid_hex}:{o.vout} to confirm: {self.logIDT(found_spend['txid'])}"
+                        )
+                        continue
                     spend_txid = found_spend["txid"]
                     spend_n = found_spend["index"]
                     self.log.debug(
