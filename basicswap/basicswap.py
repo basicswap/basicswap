@@ -8171,6 +8171,53 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
+
+                # Track the depth of the lock refund tx.
+                refund_tx_depth: int = 0
+                if refund_tx.state == TxStates.TX_CONFIRMED:
+                    refund_tx_depth = ci_from.blocks_confirmed
+                else:
+                    refund_tx_chain_info = ci_from.getLockTxHeight(
+                        refund_tx.txid,
+                        ci_from.getSCLockScriptAddress(
+                            xmr_swap.a_lock_refund_tx_script
+                        ),
+                        ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
+                        bid.chain_a_height_start,
+                        vout=refund_tx.vout,
+                    )
+                    if refund_tx_chain_info is not None:
+                        bid_changed: bool = False
+                        refund_tx_depth = refund_tx_chain_info.get("depth", 0)
+                        if (
+                            refund_tx.state
+                            in (None, TxStates.TX_NONE, TxStates.TX_SENT)
+                            and refund_tx_chain_info["height"] == 0
+                        ):
+                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                            bid_changed = True
+                        if (
+                            not refund_tx.block_height
+                            and refund_tx_chain_info["height"] != 0
+                        ):
+                            self.setTxBlockInfoFromHeight(
+                                ci_from, refund_tx, refund_tx_chain_info["height"]
+                            )
+                            refund_tx.setState(TxStates.TX_IN_CHAIN)
+                            bid_changed = True
+                        if refund_tx_depth >= ci_from.blocks_confirmed:
+                            self.logBidEvent(
+                                bid.bid_id,
+                                EventLogTypes.LOCK_TX_A_REFUND_TX_CONFIRMED,
+                                "",
+                                cursor,
+                            )
+                            refund_tx.setState(TxStates.TX_CONFIRMED)
+                            bid_changed = True
+                        if bid_changed:
+                            self.add(refund_tx, cursor, upsert=True)
+                            self.commitDB()
+
                 if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
                         self.log.debug(
@@ -8190,6 +8237,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
+                            if refund_tx_depth < ci_from.blocks_confirmed:
+                                raise TemporaryError(
+                                    f"Waiting for lock refund tx to reach depth {ci_from.blocks_confirmed}, currently {refund_tx_depth}"
+                                )
                             if self.haveDebugInd(
                                 bid.bid_id,
                                 DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2,
@@ -12667,6 +12718,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             if bid.xmr_b_lock_tx is None:
                 raise TemporaryError("Chain B lock tx not found.")
+            if not bid.xmr_b_lock_tx.chain_height:
+                raise TemporaryError("Chain B lock tx height not known.")
             chain_height: int = ci_to.getChainHeight()
             lock_tx_depth: int = chain_height - bid.xmr_b_lock_tx.chain_height
             if lock_tx_depth < ci_to.depth_spendable():
@@ -12840,6 +12893,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
+            if bid.xmr_b_lock_tx is None:
+                raise TemporaryError("Chain B lock tx not found.")
+            if not bid.xmr_b_lock_tx.chain_height:
+                raise TemporaryError("Chain B lock tx height not known.")
+            chain_height: int = ci_to.getChainHeight()
+            lock_tx_depth: int = chain_height - bid.xmr_b_lock_tx.chain_height
+            if lock_tx_depth < ci_to.depth_spendable():
+                raise TemporaryError(
+                    f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
+                )
+
             if offer.coin_to in self.xmr_based_coins:
                 address_to = self.getCachedMainWalletAddress(ci_to, cursor)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
@@ -12870,7 +12934,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, "", cursor
             )
         except Exception as ex:
-            # TODO: Make min-conf 10?
             error_msg = f"spendBLockTx refund failed for bid {self.log.id(bid_id)} with error {ex}"
             num_retries = self.countBidEvents(
                 bid, EventLogTypes.FAILED_TX_B_REFUND, cursor

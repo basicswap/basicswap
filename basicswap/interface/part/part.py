@@ -1348,8 +1348,9 @@ class PARTInterfaceAnon(PARTInterface):
         # TODO: Estimate with ringsize
         return 1153
 
-    @staticmethod
-    def depth_spendable() -> int:
+    def depth_spendable(self) -> int:
+        if self._network == "regtest":
+            return 2
         return 12
 
     def coin_name(self) -> str:
