@@ -12068,6 +12068,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 coin_from, bid.bid_id, find_script, TxTypes.XMR_SWAP_A_LOCK
             )
 
+        was_received: bool = bid.was_sent if reverse_bid else bid.was_received
+        if (
+            self.isBchXmrSwap(offer)
+            and was_received
+            and BidStates(bid.state) == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND
+            and TxTypes.BCH_MERCY not in bid.txns
+            and TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns
+        ):
+            refund_to_script = self.ci(coin_from).getRefundOutputScript(xmr_swap)
+            self.addWatchedScript(
+                coin_from, bid.bid_id, refund_to_script, TxTypes.BCH_MERCY
+            )
+
     def sendXmrBidTxnSigsFtoL(self, bid_id, cursor) -> None:
         # F -> L: Sending MSG3L
         self.log.debug(f"Signing adaptor-sig bid lock txns {self.logIDB(bid_id)}.")
