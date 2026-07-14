@@ -12685,6 +12685,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             if bid.xmr_b_lock_tx is None:
                 raise TemporaryError("Chain B lock tx not found.")
+            if not bid.xmr_b_lock_tx.chain_height:
+                raise TemporaryError("Chain B lock tx height not known.")
             chain_height: int = ci_to.getChainHeight()
             lock_tx_depth: int = chain_height - bid.xmr_b_lock_tx.chain_height
             if lock_tx_depth < ci_to.depth_spendable():
@@ -12858,6 +12860,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         vkbs = ci_to.sumKeys(kbsl, kbsf)
 
         try:
+            if bid.xmr_b_lock_tx is None:
+                raise TemporaryError("Chain B lock tx not found.")
+            if not bid.xmr_b_lock_tx.chain_height:
+                raise TemporaryError("Chain B lock tx height not known.")
+            chain_height: int = ci_to.getChainHeight()
+            lock_tx_depth: int = chain_height - bid.xmr_b_lock_tx.chain_height
+            if lock_tx_depth < ci_to.depth_spendable():
+                raise TemporaryError(
+                    f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
+                )
+
             if offer.coin_to in self.xmr_based_coins:
                 address_to = self.getCachedMainWalletAddress(ci_to, cursor)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
@@ -12888,7 +12901,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, "", cursor
             )
         except Exception as ex:
-            # TODO: Make min-conf 10?
             error_msg = f"spendBLockTx refund failed for bid {self.log.id(bid_id)} with error {ex}"
             num_retries = self.countBidEvents(
                 bid, EventLogTypes.FAILED_TX_B_REFUND, cursor
