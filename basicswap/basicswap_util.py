@@ -219,6 +219,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_SPEND_TX_SEEN = auto()
     LOCK_TX_B_REFUND_TX_SEEN = auto()
     LOCK_TX_A_INVALID = auto()
+    LOCK_TX_A_REFUND_TX_CONFIRMED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -487,6 +488,8 @@ def describeEventEntry(event_type, event_msg):
         return "Lock tx B spend tx published"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_SEEN:
         return "Lock tx A pre-refund tx seen in chain"
+    if event_type == EventLogTypes.LOCK_TX_A_REFUND_TX_CONFIRMED:
+        return "Lock tx A pre-refund tx confirmed in chain"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN:
         return "Lock tx A refund spend tx seen in chain"
     if event_type == EventLogTypes.SYSTEM_WARNING:
