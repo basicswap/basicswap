@@ -374,6 +374,12 @@ def threadPollElectrumChainState(swap_client, coin_type):
                     if "bestblockhash" in chain_state:
                         cc["chain_best_block"] = chain_state["bestblockhash"]
 
+                if hasattr(ci, "getChainMedianTime"):
+                    mtp = ci.getChainMedianTime()
+                    if mtp is not None:
+                        with swap_client.mxDB:
+                            cc["chain_median_time"] = mtp
+
             try:
                 ci.refreshElectrumWalletInfo()
                 checkAndNotifyBalanceChange(

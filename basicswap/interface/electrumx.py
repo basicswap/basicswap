@@ -571,7 +571,7 @@ class ElectrumServer:
         self._using_default_servers = not user_clearnet and not user_onion
 
         if use_tor:
-            if user_onion and not user_clearnet:
+            if user_onion:
                 final_clearnet = []
             else:
                 final_clearnet = (

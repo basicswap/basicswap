@@ -327,6 +327,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._pending_utxos_lock = threading.Lock()
         self._utxo_reserve_lock = threading.RLock()
         self._merkle_verified: Dict[str, int] = {}
+        self._median_time_cache: Optional[int] = None
+        self._median_time_cache_height: Optional[int] = None
 
     def setBackend(self, backend) -> None:
         self._backend = backend
@@ -521,26 +523,50 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx_obj = self.loadTx(tx_data)
         return tx_obj.vin[vout].nSequence
 
-    def getChainMedianTime(self) -> int:
+    def getChainMedianTime(self) -> Optional[int]:
         if self.useBackend():
-            import struct
+            return self._getChainMedianTimeElectrum()
+        try:
+            mtp = self.rpc("getblockchaininfo")["mediantime"]
+            self._median_time_cache = mtp
+            return mtp
+        except Exception as e:
+            self._log.warning(f"getChainMedianTime rpc error: {e}")
+            return self._median_time_cache
 
-            backend = self.getBackend()
-            if not backend:
-                raise ValueError("No electrum backend available")
+    def _getChainMedianTimeElectrum(self) -> Optional[int]:
+        import struct
+
+        backend = self.getBackend()
+        if not backend:
+            self._log.warning("getChainMedianTime: no electrum backend available")
+            return self._median_time_cache
+        try:
             height = backend.getBlockHeight()
+            if (
+                self._median_time_cache is not None
+                and self._median_time_cache_height == height
+            ):
+                return self._median_time_cache
             start = max(0, height - 10)
             count = height - start + 1
             result = backend._server.call("blockchain.block.headers", [start, count])
             header_bytes = bytes.fromhex(result["hex"])
-            returned = result.get("count", count)
+            returned = min(result.get("count", count), len(header_bytes) // 80)
+            if returned < 1:
+                raise ValueError("No headers returned")
             times = [
                 struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
                 for i in range(returned)
             ]
             times.sort()
-            return times[len(times) // 2]
-        return self.rpc("getblockchaininfo")["mediantime"]
+            mtp = times[len(times) // 2]
+            self._median_time_cache = mtp
+            self._median_time_cache_height = height
+            return mtp
+        except Exception as e:
+            self._log.warning(f"getChainMedianTime electrum error: {e}")
+            return self._median_time_cache
 
     def isCsvLockMature(
         self,
@@ -563,6 +589,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return False
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
+            if chain_mtp is None:
+                return False
             return chain_mtp >= parent_block_time + lock_value
         raise ValueError(f"Unknown lock type {lock_type}")
 
@@ -580,6 +608,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return chain_height + 1 >= nlocktime
         if chain_mtp is None:
             chain_mtp = self.getChainMedianTime()
+        if chain_mtp is None:
+            return False
         return chain_mtp >= nlocktime
 
     def getMempoolTx(self, txid):
