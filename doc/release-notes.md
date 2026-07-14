@@ -1,4 +1,47 @@
 
+0.17.2
+==============
+
+**Security / hardening**
+- Adaptor-sig swaps: track the coin A lock refund tx to `blocks_confirmed` depth before
+  publishing the lock refund spend tx. The refund spend reveals the leader's key share
+  to the counterparty; publishing it while the refund tx is still unconfirmed could let
+  a released follower recover that share and race both legs of the swap.
+- Adaptor-sig swaps: wait for the coin B lock tx to reach spendable depth before the
+  follower broadcasts a chain B lock refund recovery spend (`recoverXmrBidCoinBLockTx`),
+  matching the existing gate on the leader redeem path.
+- Particl spent-index watcher: skip spends reported by `getspentinfo` until they have a
+  known block height, matching the Electrum feeder's confirmed-only behaviour.
+
+**Fixes**
+- BCH adaptor-sig swaps: re-arm the mercy-tx watched script when reloading in-progress
+  bids after a restart. The watch was only kept in memory and could be lost in the
+  pre-refund state, so a mercy tx arriving after restart might go unnoticed.
+- Create Offer: align manual single-offer contract-lock presets with AMM (quick-pick
+  4/8/12/24 h, default 24 h, max 24 h; was 12/24/48/72 h with default 32 h).
+- AMM edit UI: remove a stray lock-time option that did not belong on the template
+  edit form.
+
+**AMM**
+- Send offer revoke messages as POST (was GET).
+- Revoke standing offers when an in-flight or completed swap changes the offer's
+  effective availability (fixed-total / standing logic).
+- AMM tables: send a revoke when disabling an offer from the GUI, so the network copy
+  is withdrawn immediately instead of waiting for the next automation cycle.
+
+**GUI**
+- Bid page: live updates over WebSocket (`bid_changed` events) so swap progress
+  refreshes without manual reload.
+- Bid page: clearer human-readable state descriptions for adaptor-sig and secret-hash
+  swaps, including confirmation-depth context where relevant.
+- Bid page: show a green status indicator while a bid is actively progressing.
+
+**Tests**
+- BTC→XMR: regression test that the leader does not publish the lock refund spend
+  while the lock refund tx is unconfirmed.
+- BCH→XMR: regression test that the mercy-tx watch is re-armed after reload.
+
+
 0.17.1
 ==============
 
