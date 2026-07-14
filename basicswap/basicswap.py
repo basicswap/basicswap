@@ -8179,39 +8179,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
 
                 # Track the depth of the lock refund tx.
-                refund_tx_depth: int = 0
-                if refund_tx.state == TxStates.TX_CONFIRMED:
-                    refund_tx_depth = ci_from.blocks_confirmed
-                else:
-                    refund_tx_chain_info = ci_from.getLockTxHeight(
-                        refund_tx.txid,
-                        ci_from.getSCLockScriptAddress(
-                            xmr_swap.a_lock_refund_tx_script
-                        ),
-                        ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
-                        bid.chain_a_height_start,
-                        vout=refund_tx.vout,
-                    )
-                    if refund_tx_chain_info is not None:
-                        bid_changed: bool = False
-                        refund_tx_depth = refund_tx_chain_info.get("depth", 0)
-                        if (
-                            refund_tx.state
-                            in (None, TxStates.TX_NONE, TxStates.TX_SENT)
-                            and refund_tx_chain_info["height"] == 0
-                        ):
-                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
-                            bid_changed = True
-                        if (
-                            not refund_tx.block_height
-                            and refund_tx_chain_info["height"] != 0
-                        ):
-                            self.setTxBlockInfoFromHeight(
-                                ci_from, refund_tx, refund_tx_chain_info["height"]
-                            )
-                            refund_tx.setState(TxStates.TX_IN_CHAIN)
-                            bid_changed = True
-                        if refund_tx_depth >= ci_from.blocks_confirmed:
+                was_confirmed: bool = refund_tx.state == TxStates.TX_CONFIRMED
+                refund_tx_depth: int = ci_from.blocks_confirmed if was_confirmed else 0
+                refund_tx_chain_info = ci_from.getLockTxHeight(
+                    refund_tx.txid,
+                    ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script),
+                    ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
+                    bid.chain_a_height_start,
+                    vout=refund_tx.vout,
+                )
+                if refund_tx_chain_info is not None:
+                    bid_changed: bool = False
+                    refund_tx_depth = refund_tx_chain_info.get("depth", 0)
+                    if (
+                        refund_tx.state in (None, TxStates.TX_NONE, TxStates.TX_SENT)
+                        and refund_tx_chain_info["height"] == 0
+                    ):
+                        refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                        bid_changed = True
+                    if (
+                        not refund_tx.block_height
+                        and refund_tx_chain_info["height"] != 0
+                    ):
+                        self.setTxBlockInfoFromHeight(
+                            ci_from, refund_tx, refund_tx_chain_info["height"]
+                        )
+                        refund_tx.setState(TxStates.TX_IN_CHAIN)
+                        bid_changed = True
+                    if refund_tx_depth >= ci_from.blocks_confirmed:
+                        if not was_confirmed:
                             self.logBidEvent(
                                 bid.bid_id,
                                 EventLogTypes.LOCK_TX_A_REFUND_TX_CONFIRMED,
@@ -8220,9 +8216,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
                             refund_tx.setState(TxStates.TX_CONFIRMED)
                             bid_changed = True
-                        if bid_changed:
-                            self.add(refund_tx, cursor, upsert=True)
-                            self.commitDB()
+                    elif was_confirmed:
+                        self.log.warning(
+                            f"Lock refund tx {self.logIDT(refund_tx.txid)} dropped below depth {ci_from.blocks_confirmed} (now {refund_tx_depth}) for bid {self.log.id(bid_id)}."
+                        )
+                        refund_tx.setState(
+                            TxStates.TX_IN_CHAIN
+                            if refund_tx_chain_info["height"] != 0
+                            else TxStates.TX_IN_MEMPOOL
+                        )
+                        bid_changed = True
+                    if bid_changed:
+                        self.add(refund_tx, cursor, upsert=True)
+                        self.commitDB()
 
                 if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
@@ -8713,6 +8719,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             bid_changed = True
                     else:
                         raise
+
+                if (
+                    was_sent
+                    and state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED
+                    and bid.xmr_b_lock_tx is None
+                    and self.countQueuedActions(
+                        cursor, bid_id, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B
+                    )
+                    < 1
+                ):
+                    delay = self.get_delay_event_seconds()
+                    self.log.info(
+                        f"Re-queueing adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
+                    )
+                    self.createActionInSession(
+                        delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
+                    )
+                    self.commitDB()
 
                 if (
                     bid.xmr_b_lock_tx
@@ -12264,6 +12288,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
+        if bid.state != BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+            self.log.warning(
+                f"Not sending coin A lock tx for adaptor-sig bid {self.log.id(bid_id)}, unexpected bid state: {strBidState(bid.state)}."
+            )
+            return
+
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
@@ -12474,6 +12504,32 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             TxTypes.PTX_PRE_FUNDED,
             cursor=cursor,
         )
+
+        num_publish_started = self.countBidEvents(
+            bid, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, cursor
+        )
+        num_published = self.countBidEvents(
+            bid, EventLogTypes.LOCK_TX_B_PUBLISHED, cursor
+        )
+        num_publish_failed = self.countBidEvents(
+            bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
+        )
+        if num_publish_started > num_published + num_publish_failed:
+            error_msg = f"A previous coin B lock tx publish attempt for bid {self.log.id(bid_id)} may have broadcast before an unclean shutdown. Not republishing, check the {ci_to.coin_name()} wallet."
+            self.log.error(error_msg)
+            self.setBidError(
+                bid,
+                "Possible coin B lock tx broadcast before crash, manual intervention required.",
+                save_bid=False,
+                cursor=cursor,
+            )
+            self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
+            return
+
+        self.logBidEvent(
+            bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, "", cursor
+        )
+        self.commitDB()
 
         try:
             b_lock_vout = None
@@ -13120,16 +13176,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.BID_ACCEPTED,
+        ]
+        if bid.was_sent and offer.was_sent:
+            allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
+        ensure(
+            bid.state in allowed_states,
+            "Invalid state for bid {}".format(bid.state),
+        )
+
         try:
-            allowed_states = [
-                BidStates.BID_ACCEPTED,
-            ]
-            if bid.was_sent and offer.was_sent:
-                allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
-            ensure(
-                bid.state in allowed_states,
-                "Invalid state for bid {}".format(bid.state),
-            )
             xmr_swap.af_lock_refund_spend_tx_esig = (
                 msg_data.af_lock_refund_spend_tx_esig
             )
