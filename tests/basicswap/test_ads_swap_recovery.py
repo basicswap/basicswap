@@ -5,12 +5,8 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-Tests for the restart/reorg hardening fixes:
-  R5  - coin B lock tx write-ahead idempotency (no double-broadcast after crash).
-  R6  - replayed XMR_BID_TXN_SIGS must not error the bid,
-        sendXmrBidCoinALockTx gated on bid state.
-  R7  - purged SEND_XMR_SWAP_LOCK_TX_B action is re-created.
-  R10 - lock refund tx depth re-queried when TX_CONFIRMED.
+Unit tests for adaptor-sig swap resilience: crash recovery, message replays,
+lost queued actions, and chain reorg handling.
 """
 
 import unittest
@@ -83,13 +79,13 @@ def base_swap_client():
     sc.setBidError = lambda bid, msg, save_bid=True, xmr_swap=None, cursor=None: sc.bid_errors.append(
         msg
     )
-    sc.saveBidInSession = (
-        lambda bid_id, bid, cursor, xmr_swap=None, save_in_progress=None: sc.saved.append(
-            bid.state
-        )
+    sc.saveBidInSession = lambda bid_id, bid, cursor, xmr_swap=None, save_in_progress=None: sc.saved.append(
+        bid.state
     )
-    sc.createActionInSession = lambda delay, action_type, bid_id, cursor: sc.created_actions.append(
-        action_type
+    sc.createActionInSession = (
+        lambda delay, action_type, bid_id, cursor: sc.created_actions.append(
+            action_type
+        )
     )
     sc.get_delay_event_seconds = lambda: 1
     sc.is_reverse_ads_bid = lambda cf, ct: False
@@ -109,7 +105,7 @@ def make_offer():
 
 
 # ---------------------------------------------------------------------------
-# R5 - coin B lock write-ahead idempotency
+# Coin B lock publish recovery
 # ---------------------------------------------------------------------------
 
 
@@ -164,7 +160,7 @@ def make_b_lock_bid():
     )
 
 
-class TestR5CoinBLockIdempotency(unittest.TestCase):
+class TestAdsSwapRecoveryCoinBLock(unittest.TestCase):
     def test_write_ahead_marker_committed_before_broadcast(self):
         bid = make_b_lock_bid()
         sc = make_b_lock_client(bid)
@@ -208,11 +204,11 @@ class TestR5CoinBLockIdempotency(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# R6 - replayed XMR_BID_TXN_SIGS / sendXmrBidCoinALockTx state gate
+# Replayed bid message and coin A lock state gate
 # ---------------------------------------------------------------------------
 
 
-class TestR6ReplayedSigsMessage(unittest.TestCase):
+class TestAdsSwapRecoveryReplayedSigs(unittest.TestCase):
     def make_sigs_msg_client(self, bid):
         sc = base_swap_client()
         xmr_swap = SimpleNamespace()
@@ -258,7 +254,7 @@ class TestR6ReplayedSigsMessage(unittest.TestCase):
         self.assertEqual(bid.state, BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
 
 
-class TestR6CoinALockStateGate(unittest.TestCase):
+class TestAdsSwapRecoveryCoinALockGate(unittest.TestCase):
     def test_errored_bid_does_not_publish_coin_a(self):
         sc = base_swap_client()
         bid = SimpleNamespace(
@@ -299,7 +295,7 @@ class TestR6CoinALockStateGate(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# R7 / R10 - checkXmrBidState based tests
+# Bid state polling recovery
 # ---------------------------------------------------------------------------
 
 
@@ -360,7 +356,7 @@ def make_refund_bid(state, refund_tx):
     )
 
 
-class TestR10RefundDepthRequery(unittest.TestCase):
+class TestAdsSwapRecoveryRefundDepth(unittest.TestCase):
     def run_check(self, refund_tx, chain_info):
         xmr_swap = SimpleNamespace(a_lock_refund_tx_script=b"script")
         bid = make_refund_bid(BidStates.SWAP_COMPLETED, refund_tx)
@@ -422,7 +418,7 @@ class TestR10RefundDepthRequery(unittest.TestCase):
         )
 
 
-class TestR7RequeueLockTxB(unittest.TestCase):
+class TestAdsSwapRecoveryRequeueLockTxB(unittest.TestCase):
     def run_check(self, bid, queued_count=0):
         xmr_swap = SimpleNamespace(a_lock_refund_tx_script=b"script")
         ci = StubCIA(blocks_confirmed=2)
