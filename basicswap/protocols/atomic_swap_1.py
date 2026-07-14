@@ -24,6 +24,7 @@ from . import ProtocolInterface
 
 INITIATE_TX_TIMEOUT = 40 * 60  # TODO: make variable per coin
 ABS_LOCK_TIME_LEEWAY = 10 * 60
+ABS_LOCK_BLOCKS_LEEWAY = 4
 
 
 def buildContractScript(
