@@ -2489,6 +2489,11 @@ const AmmTablesManager = (function() {
                     window.ammTablesConfig.configData = data.config_data || config;
                 }
                 notify(`${name || type} ${newEnabled ? 'enabled' : 'disabled'}.`, 'success');
+                if (type === 'offer' && !newEnabled) {
+                    (templateRuntime[name] || {}).offer_ids?.forEach(function(offerId) {
+                        fetch(`/json/revokeoffer/${offerId}`, { method: 'POST' });
+                    });
+                }
                 updateTables();
                 refreshAfterSave();
             } else {
