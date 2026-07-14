@@ -6,6 +6,13 @@ const BidPage = {
   elapsedTimeInterval: null,
   AUTO_REFRESH_SECONDS: 60,
   refreshPaused: false,
+  wsHandlerId: null,
+  refreshDebounce: null,
+  isRefreshing: false,
+  refreshQueued: false,
+  liveStatusDot: null,
+  liveStatusRecheckTimer: null,
+  spinAnimation: null,
   swapType: null,
   coinFrom: null,
   coinTo: null,
@@ -189,7 +196,7 @@ const BidPage = {
     this.applyEventTooltips();
     this.createProgressBar();
     this.startElapsedTimeUpdater();
-    this.setupAutoRefresh();
+    this.setupRealtime();
   },
 
   findPreviousState: function() {
@@ -249,77 +256,190 @@ const BidPage = {
     return !this.INACTIVE_STATES.includes(this.bidStateInd);
   },
 
-  setupAutoRefresh: function() {
+  setupRealtime: function() {
     const refreshBtn = document.getElementById('refresh');
-    if (!refreshBtn) return;
-
-    if (!this.isActiveState()) {
-      refreshBtn.style.display = 'none';
-      return;
+    if (refreshBtn) {
+      const label = refreshBtn.lastElementChild;
+      if (label && label.tagName === 'SPAN' && label.id !== 'bid-live-dot') {
+        label.textContent = 'Refresh';
+      }
+      refreshBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.refreshLiveContent(true);
+      });
     }
 
-    const originalSpan = refreshBtn.querySelector('span');
-    if (!originalSpan) return;
+    this.setupLiveIndicator();
 
-    let countdown = this.AUTO_REFRESH_SECONDS;
-    let isRefreshing = false;
-    let isPersistentlyPaused = false;
-
-    const updateCountdown = () => {
-      if (this.refreshPaused || isPersistentlyPaused || isRefreshing) return;
-
-      originalSpan.textContent = `Auto-refresh in ${countdown}s`;
-      countdown--;
-
-      if (countdown < 0 && !isRefreshing) {
-        isRefreshing = true;
-        if (this.autoRefreshInterval) {
-          clearInterval(this.autoRefreshInterval);
-          this.autoRefreshInterval = null;
+    if (window.WebSocketManager &&
+        typeof window.WebSocketManager.addMessageHandler === 'function') {
+      this.wsHandlerId = window.WebSocketManager.addMessageHandler('message', (msg) => {
+        if (!msg || msg.bid_id !== this.bidId) return;
+        const ev = msg.event;
+        if (ev === 'bid_changed' || ev === 'bid_accepted' ||
+            ev === 'swap_completed' || ev === 'new_bid') {
+          this.setLiveStatus(true);
+          this.scheduleRefresh();
         }
-        window.location.href = window.location.pathname + window.location.search;
+      });
+    }
+  },
+
+  isWsConnected: function() {
+    const wm = window.WebSocketManager;
+    return !!(wm && typeof wm.isConnected === 'function' && wm.isConnected());
+  },
+
+  setupLiveIndicator: function() {
+    const refreshBtn = document.getElementById('refresh');
+    const dot = document.getElementById('bid-live-dot');
+    if (!refreshBtn || !dot) return;
+
+    this.liveStatusDot = dot;
+    this.syncLiveStatus();
+
+    const wm = window.WebSocketManager;
+    if (wm && typeof wm.addMessageHandler === 'function') {
+      wm.addMessageHandler('connect', () => this.setLiveStatus(true));
+      wm.addMessageHandler('disconnect', () => this.setLiveStatus(false));
+      wm.addMessageHandler('error', () => this.setLiveStatus(false));
+    }
+
+    if (this.liveStatusRecheckTimer) {
+      clearTimeout(this.liveStatusRecheckTimer);
+    }
+    this.liveStatusRecheckTimer = setTimeout(() => this.syncLiveStatus(), 500);
+  },
+
+  syncLiveStatus: function() {
+    this.setLiveStatus(this.isWsConnected());
+  },
+
+  setLiveStatus: function(connected) {
+    if (!this.liveStatusDot) return;
+    const refreshBtn = document.getElementById('refresh');
+    if (connected) {
+      if (refreshBtn) {
+        refreshBtn.title = 'Live updates connected';
       }
-    };
+      this.liveStatusDot.innerHTML =
+        '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>' +
+        '<span class="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>';
+    } else {
+      if (refreshBtn) {
+        refreshBtn.title = 'Live updates disconnected — click Refresh to update';
+      }
+      this.liveStatusDot.innerHTML =
+        '<span class="relative inline-flex rounded-full h-2 w-2 bg-gray-400"></span>';
+    }
+  },
 
-    updateCountdown();
-    this.autoRefreshInterval = setInterval(updateCountdown, 1000);
+  startIconSpin: function() {
+    if (this.spinAnimation) return;
+    const refreshBtn = document.getElementById('refresh');
+    const icon = refreshBtn ? refreshBtn.querySelector('svg') : null;
+    if (!icon || typeof icon.animate !== 'function') return;
+    icon.style.transformOrigin = 'center';
+    this.spinAnimation = icon.animate(
+      [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
+      { duration: 700, iterations: Infinity }
+    );
+  },
 
-    refreshBtn.addEventListener('click', (e) => {
-      e.preventDefault();
+  stopIconSpin: function() {
+    if (!this.spinAnimation) return;
+    this.spinAnimation.cancel();
+    this.spinAnimation = null;
+  },
 
-      if (isPersistentlyPaused) {
-        window.location.href = window.location.pathname + window.location.search;
-      } else {
-        isPersistentlyPaused = true;
-        if (this.autoRefreshInterval) {
-          clearInterval(this.autoRefreshInterval);
-          this.autoRefreshInterval = null;
+  scheduleRefresh: function() {
+    if (this.refreshDebounce) {
+      clearTimeout(this.refreshDebounce);
+    }
+    this.refreshDebounce = setTimeout(() => {
+      this.refreshDebounce = null;
+      this.refreshLiveContent(false);
+    }, 500);
+  },
+
+  canSwapActions: function(el) {
+    if (!el) return false;
+    if (el.getAttribute('data-interactive') === '1') return false;
+    const active = document.activeElement;
+    if (active && el.contains(active) &&
+        ['INPUT', 'SELECT', 'TEXTAREA'].indexOf(active.tagName) !== -1) {
+      return false;
+    }
+    return true;
+  },
+
+  refreshLiveContent: function(force) {
+    if (this.isRefreshing) {
+      this.refreshQueued = true;
+      return;
+    }
+    if (!document.getElementById('bid-live-content')) return;
+    this.isRefreshing = true;
+    this.startIconSpin();
+    const spinStart = Date.now();
+
+    const url = window.location.pathname + window.location.search;
+    fetch(url, {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then((r) => r.text())
+      .then((html) => {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        const freshInfo = doc.getElementById('bid-live-content');
+        const curInfo = document.getElementById('bid-live-content');
+        if (freshInfo && curInfo) {
+          const importedInfo = document.importNode(freshInfo, true);
+          curInfo.replaceWith(importedInfo);
+          const newInd = parseInt(importedInfo.getAttribute('data-bid-state-ind'), 10);
+          if (!isNaN(newInd)) {
+            this.bidStateInd = newInd;
+          }
         }
-        originalSpan.textContent = 'Paused (click to refresh)';
-      }
-    });
 
-    refreshBtn.addEventListener('mouseenter', () => {
-      if (!isPersistentlyPaused) {
-        this.refreshPaused = true;
-        if (this.autoRefreshInterval) {
-          clearInterval(this.autoRefreshInterval);
-          this.autoRefreshInterval = null;
+        const curActions = document.getElementById('bid-actions-content');
+        const freshActions = doc.getElementById('bid-actions-content');
+        if (curActions && freshActions && (force || this.canSwapActions(curActions))) {
+          const importedActions = document.importNode(freshActions, true);
+          curActions.replaceWith(importedActions);
+          if (typeof window.setupBidConfirmDialog === 'function') {
+            try { window.setupBidConfirmDialog(); } catch (e) { /* ignore */ }
+          }
         }
-        originalSpan.textContent = 'Click to pause';
-      }
-    });
 
-    refreshBtn.addEventListener('mouseleave', () => {
-      if (!isPersistentlyPaused) {
-        this.refreshPaused = false;
-        countdown = this.AUTO_REFRESH_SECONDS;
-        if (!this.autoRefreshInterval) {
-          updateCountdown();
-          this.autoRefreshInterval = setInterval(updateCountdown, 1000);
+        this.reinitLiveContent();
+      })
+      .catch(() => { /* keep current content on failure */ })
+      .finally(() => {
+        this.isRefreshing = false;
+        setTimeout(() => {
+          if (!this.isRefreshing) this.stopIconSpin();
+        }, Math.max(0, 500 - (Date.now() - spinStart)));
+        if (this.refreshQueued) {
+          this.refreshQueued = false;
+          this.scheduleRefresh();
         }
-      }
-    });
+      });
+  },
+
+  reinitLiveContent: function() {
+    if (this.elapsedTimeInterval) {
+      clearInterval(this.elapsedTimeInterval);
+      this.elapsedTimeInterval = null;
+    }
+    if (this.bidStateInd === this.DELAYING_STATE) {
+      this.previousStateInd = this.findPreviousState();
+    }
+    try { this.applyStateTooltips(); } catch (e) { /* ignore */ }
+    try { this.applyEventTooltips(); } catch (e) { /* ignore */ }
+    try { this.createProgressBar(); } catch (e) { /* ignore */ }
+    try { this.startElapsedTimeUpdater(); } catch (e) { /* ignore */ }
   },
 
   createTooltip: function(element, tooltipText) {

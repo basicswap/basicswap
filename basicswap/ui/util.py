@@ -254,60 +254,88 @@ def describeBid(
             state_description = "Bid error"
     elif offer.swap_type == SwapTypes.XMR_SWAP:
         if bid.state == BidStates.BID_SENT:
-            state_description = "Waiting for offerer to accept"
-        if bid.state == BidStates.BID_RECEIVING:
+            state_description = "Bid sent, waiting for offerer to accept"
+        elif bid.state == BidStates.BID_RECEIVING:
             # Offerer receiving bid from bidder
-            state_description = "Waiting for bid to be fully received"
+            state_description = "Receiving bid, waiting for it to be fully received"
         elif canAcceptBidState(bid.state):
             # Offerer received bid from bidder
             # TODO: Manual vs automatic
-            state_description = "Bid must be accepted"
+            state_description = "Bid received, waiting to be accepted"
         elif bid.state == BidStates.BID_RECEIVING_ACC:
             state_description = "Receiving accepted bid message"
         elif bid.state == BidStates.BID_ACCEPTED:
-            state_description = (
-                "Offerer has accepted bid, waiting for bidder to respond"
-            )
+            state_description = "Bid accepted, waiting for bidder to respond"
         elif bid.state == BidStates.SWAP_DELAYING:
             last_state = getLastBidState(bid.states)
             if canAcceptBidState(last_state):
-                state_description = "Delaying before accepting bid"
+                state_description = "Pausing briefly before accepting bid"
             elif last_state == BidStates.BID_RECEIVING_ACC:
-                state_description = "Delaying before responding to accepted bid"
+                state_description = "Pausing briefly before responding to accepted bid"
             elif last_state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-                state_description = (
-                    f"Delaying before spending from {ci_follower.ticker()} lock tx"
-                )
+                state_description = f"Pausing briefly before spending from {ci_follower.ticker()} lock tx"
             elif last_state == BidStates.BID_ACCEPTED:
                 state_description = (
-                    f"Delaying before sending {ci_leader.ticker()} lock tx"
+                    f"Pausing briefly before sending {ci_leader.ticker()} lock tx"
                 )
             else:
-                state_description = "Delaying before automated action"
+                state_description = "Pausing briefly before next automated action"
+        elif bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+            state_description = f"Exchanged lock tx signatures, waiting for {ci_leader.ticker()} lock tx"
+        elif bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
+            state_description = f"Exchanged lock spend tx, waiting for {ci_leader.ticker()} lock tx to confirm"
         elif bid.state == BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX:
-            state_description = f"Waiting for {ci_leader.ticker()} lock tx to confirm in chain ({ci_leader.blocks_confirmed} blocks)"
+            state_description = f"{ci_leader.ticker()} lock tx sent, waiting for it to confirm in chain ({ci_leader.blocks_confirmed} blocks)"
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
             if xmr_swap.b_lock_tx_id is None:
-                state_description = f"Waiting for {ci_follower.ticker()} lock tx"
+                state_description = f"{ci_leader.ticker()} lock tx confirmed, waiting for {ci_follower.ticker()} lock tx"
             else:
-                state_description = f"Waiting for {ci_follower.ticker()} lock tx to confirm in chain ({ci_follower.blocks_confirmed} blocks)"
+                state_description = f"{ci_follower.ticker()} lock tx sent, waiting for it to confirm in chain ({ci_follower.blocks_confirmed} blocks)"
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
-            state_description = (
-                f"Waiting for {initiator_role} to unlock {ci_leader.ticker()} lock tx"
-            )
+            state_description = f"Both lock txs confirmed, waiting for {initiator_role} to release the {ci_leader.ticker()} lock tx"
         elif bid.state == BidStates.XMR_SWAP_LOCK_RELEASED:
-            state_description = f"Waiting for {participant_role} to spend from {ci_leader.ticker()} lock tx"
+            state_description = f"Lock released, waiting for {participant_role} to spend from {ci_leader.ticker()} lock tx"
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
-            state_description = f"Waiting for {initiator_role} to spend from {ci_follower.ticker()} lock tx"
+            state_description = f"{ci_leader.ticker()} lock tx spent, waiting for {initiator_role} to spend from {ci_follower.ticker()} lock tx"
         elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
-            state_description = f"Waiting for {ci_follower.ticker()} lock tx spend tx to confirm in chain"
+            state_description = f"{ci_follower.ticker()} lock tx spend tx sent, waiting for it to confirm in chain"
         elif bid.state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
             if bid.was_sent:
-                state_description = (
-                    f"Waiting for {initiator_role} to redeem or locktime to expire"
-                )
+                state_description = f"Pre-refund tx in chain, waiting for {initiator_role} to redeem or locktime to expire"
             else:
-                state_description = "Redeeming output"
+                state_description = "Pre-refund tx in chain, redeeming output"
+        elif bid.state == BidStates.SWAP_COMPLETED:
+            state_description = "Swap completed successfully"
+        elif bid.state == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
+            state_description = (
+                f"{ci_follower.ticker()} lock tx recovered after failed swap"
+            )
+        elif bid.state == BidStates.XMR_SWAP_FAILED_REFUNDED:
+            state_description = "Swap failed, locked coins were refunded"
+        elif bid.state == BidStates.XMR_SWAP_FAILED_SWIPED:
+            state_description = "Swap failed, the other party claimed the refund"
+        elif bid.state == BidStates.XMR_SWAP_FAILED:
+            state_description = "Swap failed"
+
+    if state_description == "":
+        if bid.state == BidStates.SWAP_TIMEDOUT:
+            state_description = "Swap timed out"
+        elif bid.state == BidStates.BID_ABANDONED:
+            state_description = "Bid abandoned, no longer processed"
+        elif bid.state == BidStates.BID_ERROR:
+            state_description = "Bid error, check events for details"
+        elif bid.state == BidStates.BID_REJECTED:
+            state_description = "Bid rejected by offerer"
+        elif bid.state == BidStates.BID_EXPIRED:
+            state_description = "Bid expired before being accepted"
+        elif bid.state == BidStates.BID_AACCEPT_DELAY:
+            state_description = "Waiting for auto-accept delay"
+        elif bid.state == BidStates.BID_AACCEPT_FAIL:
+            state_description = "Auto-accept failed, bid can be accepted manually"
+        elif bid.state == BidStates.BID_REQUEST_SENT:
+            state_description = "Bid request sent, waiting for response"
+        elif bid.state == BidStates.BID_REQUEST_ACCEPTED:
+            state_description = "Bid request accepted"
 
     addr_label = swap_client.getAddressLabel(
         [
