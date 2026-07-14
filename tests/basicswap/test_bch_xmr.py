@@ -15,19 +15,26 @@ import basicswap.config as cfg
 from basicswap.basicswap import (
     BidStates,
     Coins,
+    DebugTypes,
     SwapTypes,
+)
+from basicswap.basicswap_util import (
+    TxLockTypes,
+    TxTypes,
 )
 from basicswap.bin.run import startDaemon
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
 from tests.basicswap.extended.test_dcr import run_test_ads_both_refund
 from tests.basicswap.util.common import (
+    abandon_all_swaps,
     callrpc_cli,
     make_rpc_func,
     prepareDataDir,
     stopDaemons,
     waitForRPC,
     wait_for_bid,
+    wait_for_bid_states,
     wait_for_offer,
 )
 from basicswap.contrib.test_framework.messages import (
@@ -1003,3 +1010,116 @@ class TestBCH(BasicSwapTest):
         # (the default). run_test_ads_both_refund sets OFFER_LOCK_2_VALUE_INC so they differ,
         # making acceptBid -> verifySCLockRefundTx raise "Bad input nSequence" without the fix.
         run_test_ads_both_refund(self, Coins.BCH, Coins.XMR, lock_value=20)
+
+    def test_15_mercy_watch_rearmed_after_restart(self):
+        # Regression: the BCH_MERCY watched script only exists in memory.  If the
+        # leader restarts while the bid is in the pre-refund state, watchXmrSwap
+        # must re-arm the watch or the mercy tx would arrive unseen and the
+        # leader would never recover coin b.
+        coin_from = Coins.BCH
+        coin_to = Coins.XMR
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} mercy watch re-armed after restart"
+        )
+
+        id_offerer: int = self.node_a_id
+        id_bidder: int = self.node_b_id
+
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_offerer])
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_bidder])
+
+        swap_clients = self.swap_clients
+        assert not swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_offerer].ci(coin_to)
+
+        id_leader: int = id_offerer
+        id_follower: int = id_bidder
+        leader_sc = swap_clients[id_leader]
+
+        swap_clients[id_follower].ci(coin_from)._altruistic = True
+
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            amt_swap,
+            SwapTypes.XMR_SWAP,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+            lock_value=20,
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].getOffer(offer_id)
+
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        swap_clients[id_leader].setBidDebugInd(
+            bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
+        )
+        swap_clients[id_follower].setBidDebugInd(
+            bid_id, DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
+        )
+        swap_clients[id_leader].setBidDebugInd(
+            bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False
+        )
+        swap_clients[id_follower].setBidDebugInd(
+            bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False
+        )
+
+        swap_clients[id_offerer].acceptBid(bid_id)
+
+        wait_for_bid(
+            test_delay_event,
+            leader_sc,
+            bid_id,
+            BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,
+            wait_for=(self.extra_wait_time + 240),
+        )
+
+        def have_mercy_watch() -> bool:
+            return any(
+                ws.bid_id == bid_id and ws.tx_type == TxTypes.BCH_MERCY
+                for ws in leader_sc.coin_clients[coin_from]["watched_scripts"]
+            )
+
+        for _i in range(30):
+            if test_delay_event.is_set():
+                raise ValueError("Test stopped.")
+            if have_mercy_watch():
+                break
+            test_delay_event.wait(1)
+        assert have_mercy_watch(), "Mercy watch not armed"
+
+        # Simulate a restart, watches only exist in memory
+        leader_sc.coin_clients[coin_from]["watched_scripts"].clear()
+        leader_sc.coin_clients[coin_from]["watched_outputs"].clear()
+        assert have_mercy_watch() is False
+
+        cursor = leader_sc.openDB()
+        try:
+            bid = leader_sc.getBid(bid_id, cursor=cursor)
+            leader_sc.activateBid(cursor, bid)
+        finally:
+            leader_sc.closeDB(cursor)
+
+        assert have_mercy_watch(), "Mercy watch not re-armed"
+
+        wait_for_bid_states(
+            test_delay_event,
+            bid_id,
+            leader_sc,
+            (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED),
+            swap_clients[id_follower],
+            BidStates.XMR_SWAP_FAILED_SWIPED,
+            wait_for=(self.extra_wait_time + 240),
+        )
