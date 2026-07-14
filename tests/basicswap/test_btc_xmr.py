@@ -364,6 +364,121 @@ class TestFunctions(BaseTest):
         # wl_from_after = self.getBalance(js_wl_after, coin_from)
         # assert (node0_from_before - node0_from_after < 0.02)
 
+    def do_test_02b_leader_confirm_refund_before_spend(
+        self, coin_from: Coins, coin_to: Coins, lock_value: int = 12
+    ) -> None:
+        # Regression: the leader must not publish the coin a lock refund spend tx
+        # (which reveals kbsl to the follower) until the lock refund tx has
+        # confirmed.
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} leader confirms lock refund tx before revealing kbsl"
+        )
+        assert coin_from == Coins.BTC, "Mining control assumes coin a is BTC"
+
+        id_offerer: int = self.node_a_id
+        id_bidder: int = self.node_b_id
+
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_offerer])
+        abandon_all_swaps(test_delay_event, self.swap_clients[id_bidder])
+
+        swap_clients = self.swap_clients
+        assert not swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+        ci_from = swap_clients[id_offerer].ci(coin_from)
+        ci_to = swap_clients[id_offerer].ci(coin_to)
+
+        id_leader: int = id_offerer
+        id_follower: int = id_bidder
+        leader_client = swap_clients[id_leader]
+
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[id_offerer].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            amt_swap,
+            SwapTypes.XMR_SWAP,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+            lock_value=lock_value,
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        offer = swap_clients[id_bidder].getOffer(offer_id)
+
+        bid_id = swap_clients[id_bidder].postXmrBid(offer_id, offer.amount_from)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_offerer],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        self.pauseMining()
+        try:
+            swap_clients[id_follower].setBidDebugInd(
+                bid_id, DebugTypes.BID_STOP_AFTER_COIN_A_LOCK
+            )
+            swap_clients[id_offerer].acceptBid(bid_id)
+
+            # Leader broadcasts the coin a lock tx; confirm it and mature its CSV.
+            wait_for_event(
+                test_delay_event,
+                leader_client,
+                Concepts.BID,
+                bid_id,
+                event_type=EventLogTypes.LOCK_TX_A_PUBLISHED,
+                wait_for=(self.extra_wait_time + 60),
+            )
+            self.callnoderpc("generatetoaddress", [lock_value + 2, self.old_btc_addr])
+
+            # Leader now broadcasts the lock refund tx, which stays unconfirmed
+            # because mining is paused.
+            wait_for_event(
+                test_delay_event,
+                leader_client,
+                Concepts.BID,
+                bid_id,
+                event_type=EventLogTypes.LOCK_TX_A_REFUND_TX_PUBLISHED,
+                wait_for=(self.extra_wait_time + 60),
+            )
+
+            # While the refund tx is unconfirmed the refund spend must not be published
+            for _i in range(20):
+                if test_delay_event.is_set():
+                    raise ValueError("Test stopped.")
+                test_delay_event.wait(1)
+                events = leader_client.getEvents(Concepts.BID, bid_id)
+                assert not any(
+                    e.event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED
+                    for e in events
+                ), "Refund spend published before the lock refund tx confirmed"
+
+            # Confirm the lock refund tx; the leader may now reveal kbsl.
+            self.callnoderpc(
+                "generatetoaddress", [ci_from.blocks_confirmed, self.old_btc_addr]
+            )
+            wait_for_event(
+                test_delay_event,
+                leader_client,
+                Concepts.BID,
+                bid_id,
+                event_type=EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_PUBLISHED,
+                wait_for=(self.extra_wait_time + 60),
+            )
+        finally:
+            self.continueMining()
+
+        wait_for_bid_states(
+            test_delay_event,
+            bid_id,
+            swap_clients[id_leader],
+            BidStates.XMR_SWAP_FAILED_REFUNDED,
+            swap_clients[id_follower],
+            [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
+            wait_for=(self.extra_wait_time + 180),
+        )
+
     def do_test_03_follower_recover_a_lock_tx(
         self, coin_from, coin_to, lock_value: int = 32, with_mercy: bool = False
     ):
@@ -2235,6 +2350,15 @@ class BasicSwapTest(TestFunctions):
     def test_02_leader_recover_a_lock_tx_from_part(self):
         self.prepare_balance(self.test_coin_from, 100.0, 1801, 1800)
         self.do_test_02_leader_recover_a_lock_tx(Coins.PART, self.test_coin_from)
+
+    def test_02_e_leader_confirm_refund_before_spend(self):
+        if not self.has_segwit:
+            return
+        if self.test_coin_from != Coins.BTC:
+            return
+        self.do_test_02b_leader_confirm_refund_before_spend(
+            self.test_coin_from, Coins.XMR
+        )
 
     def test_03_a_follower_recover_a_lock_tx(self):
         if not self.has_segwit:
