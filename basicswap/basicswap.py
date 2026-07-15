@@ -2580,6 +2580,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def _transferLiteWalletBalanceToRPC(self, coin_type: Coins) -> dict:
         try:
 
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         self.log.warning(
