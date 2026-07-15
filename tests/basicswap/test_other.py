@@ -37,6 +37,7 @@ from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.network import (
     is_loopback_address,
+    is_origin_allowed,
     is_private_ip_address,
     is_public_url,
     is_url_scheme_allowed,
@@ -661,6 +662,86 @@ class Test(unittest.TestCase):
         for url, is_public in test_urls:
             assert is_public_url(url) is is_public
 
+    def test_is_origin_allowed(self):
+        # (origin, html_host, html_port, allowed_hosts, expected)
+        cases = [
+            ("http://127.0.0.1:12700", "127.0.0.1", 12700, [], True),
+            ("http://localhost:12700", "127.0.0.1", 12700, [], True),
+            ("http://[::1]:12700", "127.0.0.1", 12700, [], True),
+            # Another port on an allowed host is rejected.
+            ("http://127.0.0.1:8080", "127.0.0.1", 12700, [], False),
+            # Scheme is enforced for the defaults.
+            ("https://127.0.0.1:12700", "127.0.0.1", 12700, [], False),
+            ("http://evil.com", "127.0.0.1", 12700, [], False),
+            ("null", "127.0.0.1", 12700, [], False),
+            ("not a url", "127.0.0.1", 12700, [], False),
+            # Bare configured host -> any scheme/port on that host.
+            (
+                "https://swap.example.com",
+                "127.0.0.1",
+                12700,
+                ["swap.example.com"],
+                True,
+            ),
+            (
+                "https://swap.example.com:8443",
+                "127.0.0.1",
+                12700,
+                ["swap.example.com"],
+                True,
+            ),
+            (
+                "http://swap.example.com:9000",
+                "127.0.0.1",
+                12700,
+                ["swap.example.com"],
+                True,
+            ),
+            # Full-origin entry -> exact scheme+host+port match.
+            (
+                "https://swap.example.com",
+                "127.0.0.1",
+                12700,
+                ["https://swap.example.com"],
+                True,
+            ),
+            (
+                "http://swap.example.com:12700",
+                "127.0.0.1",
+                12700,
+                ["https://swap.example.com"],
+                False,
+            ),
+            (
+                "https://swap.example.com:8443",
+                "127.0.0.1",
+                12700,
+                ["https://swap.example.com"],
+                False,
+            ),
+            # "*" is ignored by the origin check.
+            ("http://evil.com", "127.0.0.1", 12700, ["*"], False),
+            (
+                "https://swap.example.com",
+                "127.0.0.1",
+                12700,
+                ["*", "https://swap.example.com"],
+                True,
+            ),
+            # Concrete bind host on the html port; bind-all is never a valid host.
+            ("http://192.168.1.50:12700", "192.168.1.50", 12700, [], True),
+            ("http://192.168.1.50:12700", "0.0.0.0", 12700, [], False),
+            # html_port supplied as a string.
+            ("http://127.0.0.1:12700", "127.0.0.1", "12700", [], True),
+        ]
+        for origin, hh, hp, ah, expected in cases:
+            assert is_origin_allowed(origin, hh, hp, ah) is expected, (
+                origin,
+                hh,
+                hp,
+                ah,
+            )
+
     def test_is_same_origin_request(self):
         from basicswap.http_server import HttpHandler
 
@@ -669,53 +750,53 @@ class Test(unittest.TestCase):
                 self.settings = settings
 
         class Srv:
-            def __init__(self, host_name, settings):
+            def __init__(self, host_name, port_no, settings):
                 self.host_name = host_name
+                self.port_no = port_no
                 self.swap_client = SwapClient(settings)
 
-        # Subclass HttpHandler (without the socket-handling __init__) so the
-        # sibling helpers _host_check_disabled / _get_allowed_hosts resolve.
-        class Stub(HttpHandler):
-            def __init__(self, headers, host_name="127.0.0.1", settings=None):
+        class Stub:
+            def __init__(
+                self, headers, host_name="127.0.0.1", port_no=12700, settings=None
+            ):
                 self.headers = headers
-                self.server = Srv(host_name, settings or {})
+                self.server = Srv(host_name, port_no, settings or {})
 
         check = HttpHandler.is_same_origin_request
-        # F3: a present Origin/Referer is validated against the allowlist, not
-        # against the request's own Host header.
+        # A present Origin/Referer is validated as a full origin (scheme+host+port)
+        # against the allowed origins; "*" does not disable this check.
         cases = [
             ({}, {}, True),  # header-less (tests/curl/API scripts) -> allowed
             ({"Origin": "http://127.0.0.1:12700"}, {}, True),
             ({"Origin": "http://localhost:12700"}, {}, True),
-            ({"Origin": "http://evil.com"}, {}, False),  # rebinding shape
-            ({"Origin": "null"}, {}, False),  # opaque origin -> no hostname
+            ({"Origin": "http://127.0.0.1:8080"}, {}, False),  # other port blocked
+            ({"Origin": "http://evil.com"}, {}, False),
+            ({"Origin": "null"}, {}, False),
             ({"Referer": "http://127.0.0.1:12700/rpc"}, {}, True),
             ({"Referer": "http://evil.com/x"}, {}, False),
-            # No Host header: F3 validates Origin directly (F1's Host gate
-            # rejects a missing Host upstream), so this is allowed here.
-            ({"Origin": "http://127.0.0.1:12700"}, {}, True),
-            # Configured reverse-proxy domain is accepted.
+            # Bare configured host -> any scheme/port on that host.
             (
                 {"Origin": "https://swap.example.com"},
                 {"allowed_hosts": ["swap.example.com"]},
                 True,
             ),
+            ({"Origin": "https://swap.example.com"}, {}, False),
+            # Full-origin entry -> exact match.
             (
                 {"Origin": "https://swap.example.com"},
-                {},
-                False,  # not configured
+                {"allowed_hosts": ["https://swap.example.com"]},
+                True,
             ),
-            # Host allowlist opted out ("*", with auth): fall back to the
-            # self-referential comparison, which still blocks classic CSRF.
+            (
+                {"Origin": "http://swap.example.com:12700"},
+                {"allowed_hosts": ["https://swap.example.com"]},
+                False,
+            ),
+            # "*" no longer bypasses the origin check.
             (
                 {"Origin": "http://evil.com", "Host": "evil.com"},
                 {"allowed_hosts": ["*"], "client_auth_hash": "x"},
-                True,  # self-referential match (rebinding, knowingly unprotected)
-            ),
-            (
-                {"Origin": "http://evil.com", "Host": "127.0.0.1:12700"},
-                {"allowed_hosts": ["*"], "client_auth_hash": "x"},
-                False,  # classic CSRF still blocked under "*"
+                False,
             ),
         ]
         for headers, settings, expected in cases:
@@ -733,11 +814,14 @@ class Test(unittest.TestCase):
                 self.settings = settings
 
         check = BasicSwap._ws_origin_allowed
-        loopback = {"wshost": "127.0.0.1", "htmlhost": "127.0.0.1"}
+        # The Origin is the html page that opened the socket, so it is matched
+        # against htmlhost/htmlport (not the WebSocket port).
+        loopback = {"htmlhost": "127.0.0.1", "htmlport": 12700}
         cases = [
             ({}, {}, True),  # no Origin (bots/scripts) -> allowed
             ({"origin": "http://127.0.0.1:12700"}, loopback, True),
             ({"origin": "http://localhost:12700"}, loopback, True),
+            ({"origin": "http://127.0.0.1:8080"}, loopback, False),  # other port
             ({"origin": "http://evil.com"}, loopback, False),
             ({"origin": "null"}, loopback, False),
             (
@@ -746,14 +830,18 @@ class Test(unittest.TestCase):
                 True,
             ),
             ({"origin": "https://swap.example.com"}, {}, False),
-            # Bind host (htmlhost) is accepted without an allowed_hosts entry.
+            # Bind host (htmlhost) is accepted on the html port without an entry.
             (
-                {"origin": "https://swap.example.com"},
-                {"htmlhost": "swap.example.com"},
+                {"origin": "http://swap.example.com:12700"},
+                {"htmlhost": "swap.example.com", "htmlport": 12700},
                 True,
             ),
-            # Opt-out: "*" disables the check.
-            ({"origin": "http://evil.com"}, {"allowed_hosts": ["*"]}, True),
+            # "*" does NOT disable the WS origin check.
+            (
+                {"origin": "http://evil.com"},
+                {"allowed_hosts": ["*"], "htmlhost": "127.0.0.1", "htmlport": 12700},
+                False,
+            ),
         ]
         for headers, settings, expected in cases:
             assert check(Stub(settings), headers) is expected, (headers, settings)

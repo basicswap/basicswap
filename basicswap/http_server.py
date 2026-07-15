@@ -43,6 +43,7 @@ from .basicswap_util import (
     strBidState,
 )
 from .util.rfc2440 import verify_rfc2440_password
+from .util.network import is_origin_allowed
 
 from .js_server import (
     js_error,
@@ -270,23 +271,19 @@ class HttpHandler(BaseHTTPRequestHandler):
     def is_same_origin_request(self) -> bool:
         # CSRF defence, verify-when-present: a browser always sends Origin on a
         # cross-origin POST, so a header-less client (tests/curl/API scripts) is
-        # not a browser CSRF and is allowed. When present, the Origin/Referer
-        # hostname is validated against the same allowlist the Host check uses
-        # (_get_allowed_hosts)
+        # not a browser CSRF and is allowed. When present, the full Origin/Referer
+        # (scheme + host + port) is validated against the allowed origins via the
+        # shared is_origin_allowed (also used by the WebSocket handshake). "*" is
+        # a Host-check opt-out only; the origin check is always enforced.
         origin = self.headers.get("Origin") or self.headers.get("Referer")
         if not origin:
             return True
-        if self._host_check_disabled():
-            # Host allowlist opted out ("*"): no trusted host set to validate
-            # against, so fall back to the self-referential comparison.
-            host = self.headers.get("Host")
-            if not host:
-                return False
-            return parse.urlparse(origin).netloc == host
-        origin_host = parse.urlparse(origin).hostname
-        if not origin_host:
-            return False
-        return origin_host.lower() in self._get_allowed_hosts()
+        return is_origin_allowed(
+            origin,
+            getattr(self.server, "host_name", None),
+            getattr(self.server, "port_no", None),
+            self.server.swap_client.settings.get("allowed_hosts", []),
+        )
 
     def _get_allowed_hosts(self) -> set:
         # The fixed set of hostnames this server is legitimately served under.

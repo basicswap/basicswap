@@ -116,7 +116,7 @@ from .util.address import (
 )
 from .util.crypto import sha256
 from .util.logging import LogCategories as LC
-from .util.network import is_private_ip_address
+from .util.network import is_private_ip_address, is_origin_allowed
 from .util.smsg import smsgGetID
 from .interface.base import Curves
 from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
@@ -1533,7 +1533,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 self.log.warning(
                     "HTTP Host-header check is disabled ('*' in allowed_hosts); "
-                    "relying on client_auth_hash for DNS-rebinding protection."
+                    "relying on client_auth_hash for DNS-rebinding protection. The "
+                    "Origin/CSRF check stays enforced, so list any reverse-proxy "
+                    "origin (e.g. 'https://host') in allowed_hosts."
                 )
             elif (
                 self.settings["htmlhost"] not in ("127.0.0.1", "localhost", "::1")
@@ -16639,30 +16641,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return rv
 
     def _ws_origin_allowed(self, headers) -> bool:
-        # Verify-when-present, mirroring http_server.is_same_origin_request:
-        # a browser always sends Origin, so a header-less client (bots/scripts
-        # consuming the feed) is allowed; when present the Origin hostname must be
-        # in the allowlist. The Origin here is the page that opened the socket
-        # (the html UI), so htmlhost/wshost and configured allowed_hosts all count.
+        # Cross-site WebSocket hijacking guard, verify-when-present: a browser
+        # always sends Origin, so a header-less client (bots/scripts consuming the
+        # feed) is allowed; when present the full Origin is validated via the
+        # shared is_origin_allowed (also used by the HTTP same-origin check). The
+        # Origin is the page that opened the socket (the html UI), so it is
+        # matched against the html host/port, not the WebSocket port. "*" is a
+        # Host-check opt-out only and does not disable this check.
         origin = headers.get("origin")
         if not origin:
             return True
-        allowed_hosts_setting = self.settings.get("allowed_hosts", []) or []
-        if "*" in allowed_hosts_setting:
-            return True  # operator opted out of the host/origin check
-        from urllib.parse import urlparse
-
-        origin_host = urlparse(origin).hostname
-        if not origin_host:
-            return False
-        allowed = {"localhost", "127.0.0.1", "::1"}
-        for hn in (self.settings.get("wshost"), self.settings.get("htmlhost")):
-            if hn and hn not in ("0.0.0.0", "::"):
-                allowed.add(str(hn).lower())
-        for h in allowed_hosts_setting:
-            if h != "*":
-                allowed.add(str(h).strip().lower())
-        return origin_host.lower() in allowed
+        return is_origin_allowed(
+            origin,
+            self.settings.get("htmlhost"),
+            self.settings.get("htmlport"),
+            self.settings.get("allowed_hosts", []),
+        )
 
     def ws_new_client(self, client, server):
         pass
