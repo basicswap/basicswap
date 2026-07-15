@@ -41,15 +41,14 @@
                     if (window.location.pathname === '/bids') {
                         navigateToTabDirectly(targetTabId);
                     } else {
-                        localStorage.setItem('bidsTabToActivate', targetTabId.replace('#', ''));
-                        window.location.href = '/bids';
+                        window.location.href = '/bids' + targetTabId;
                     }
                 }
             });
         });
 
         window.bidsTabNavigationInitialized = true;
-        
+
     }
 
     function handleInitialNavigation() {
@@ -57,13 +56,7 @@
             return;
         }
 
-        const tabToActivate = localStorage.getItem('bidsTabToActivate');
-
-        if (tabToActivate) {
-
-            localStorage.removeItem('bidsTabToActivate');
-            activateTabWithRetry('#' + tabToActivate);
-        } else if (window.location.hash) {
+        if (window.location.hash) {
 
             activateTabWithRetry(window.location.hash);
         } else {
@@ -209,8 +202,7 @@
         if (window.location.pathname === '/bids') {
             navigateToTabDirectly('#' + tabId);
         } else {
-            localStorage.setItem('bidsTabToActivate', tabId);
-            window.location.href = '/bids';
+            window.location.href = '/bids#' + tabId;
         }
     };
 })();
