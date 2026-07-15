@@ -13057,6 +13057,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
+        ensure(
+            isActiveBidState(BidStates(bid.state)),
+            f"Bid {self.log.id(bid_id)} not in progress {bid.state}, {strBidState(bid.state)}",
+        )
+
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
