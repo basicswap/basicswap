@@ -2011,6 +2011,9 @@ def main():
             "zmqport": PART_ZMQ_PORT + port_offset,
             "htmlhost": htmlhost,
             "htmlport": UI_HTML_PORT + port_offset,
+            # Hostnames allowed in the HTTP Host header (DNS-rebinding defence).
+            # localhost/127.0.0.1/::1 are always allowed; add LAN IPs/domains here.
+            "allowed_hosts": [],
             "network_key": "7sW2UEcHXvuqEjkpE5mD584zRaQYs6WXYohue4jLFZPTvMSxwvgs",
             "network_pubkey": "035758c4a22d7dd59165db02a56156e790224361eb3191f02197addcb3bde903d2",
             "chainclients": withchainclients,

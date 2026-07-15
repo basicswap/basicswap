@@ -281,6 +281,42 @@ class HttpHandler(BaseHTTPRequestHandler):
             return False
         return parse.urlparse(origin).netloc == host
 
+    def _get_allowed_hosts(self) -> set:
+        # The fixed set of hostnames this server is legitimately served under.
+        allowed = {"localhost", "127.0.0.1", "::1"}
+        host_name = getattr(self.server, "host_name", "") or ""
+        # Never add 0.0.0.0/::/empty — a bind-all address is not a hostname a
+        # browser sends, and http://0.0.0.0 can reach loopback in some browsers
+        # (0.0.0.0-day).
+        if host_name and host_name not in ("0.0.0.0", "::"):
+            allowed.add(host_name.lower())
+        for h in self.server.swap_client.settings.get("allowed_hosts", []) or []:
+            if h != "*":
+                allowed.add(str(h).strip().lower())
+        return allowed
+
+    def _host_check_disabled(self) -> bool:
+        # "*" in allowed_hosts opts out of the Host check (Django ALLOWED_HOSTS
+        # convention). This re-opens DNS-rebinding exposure, so it only takes
+        # effect when client_auth_hash is set (authentication becomes the
+        # fallback defence); otherwise the Host check stays enforced. Startup
+        # also refuses "*" without client_auth_hash.
+        settings = self.server.swap_client.settings
+        if "*" not in (settings.get("allowed_hosts", []) or []):
+            return False
+        return bool(settings.get("client_auth_hash"))
+
+    def is_allowed_host(self) -> bool:
+        if self._host_check_disabled():
+            return True
+        host = self.headers.get("Host")
+        if not host:
+            return False  # fail closed; HTTP/1.1 requires Host, browsers always send it
+        hostname = parse.urlsplit("//" + host).hostname
+        if not hostname:
+            return False
+        return hostname.lower() in self._get_allowed_hosts()
+
     def log_error(self, format, *args):
         super().log_message(format, *args)
 
@@ -842,6 +878,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         parsed = parse.urlparse(self.path)
         url_split = parsed.path.split("/")
         page = url_split[1] if len(url_split) > 1 else ""
+
+        if not self.is_allowed_host():
+            if page == "json":
+                self.putHeaders(403, "application/json")
+                return json.dumps({"error": "Host not allowed"}).encode("utf-8")
+            self.putHeaders(403, "text/html")
+            return b"Host not allowed"
 
         exempt_pages = ["login", "static", "error", "info"]
         auth_header = self.headers.get("Authorization")

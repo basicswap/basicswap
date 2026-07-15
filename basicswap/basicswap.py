@@ -1523,6 +1523,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.threads.append(thread_http)
             thread_http.start()
 
+            allowed_hosts = self.settings.get("allowed_hosts", []) or []
+            if "*" in allowed_hosts:
+                ensure(
+                    self.settings.get("client_auth_hash"),
+                    "'allowed_hosts' contains '*' (HTTP Host-header check disabled), "
+                    "which requires 'client_auth_hash' to be set to prevent "
+                    "DNS-rebinding attacks.",
+                )
+                self.log.warning(
+                    "HTTP Host-header check is disabled ('*' in allowed_hosts); "
+                    "relying on client_auth_hash for DNS-rebinding protection."
+                )
+            elif (
+                self.settings["htmlhost"] not in ("127.0.0.1", "localhost", "::1")
+                and not allowed_hosts
+            ):
+                self.log.warning(
+                    "HTTP server bound to non-loopback host '{}' with no 'allowed_hosts' "
+                    "configured; access via a LAN IP/hostname will be rejected. Add the "
+                    "hostname(s) you browse to under 'allowed_hosts'.".format(
+                        self.settings["htmlhost"]
+                    )
+                )
+
         if "wshost" in self.settings:
             ws_url = "ws://{}:{}".format(
                 self.settings["wshost"], self.settings["wsport"]

@@ -691,6 +691,79 @@ class Test(unittest.TestCase):
         for headers, expected in cases:
             assert check(Stub(headers)) is expected
 
+    def test_is_allowed_host(self):
+        from basicswap.http_server import HttpHandler
+
+        class SwapClient:
+            def __init__(self, settings):
+                self.settings = settings
+
+        class Srv:
+            def __init__(self, host_name, settings):
+                self.host_name = host_name
+                self.swap_client = SwapClient(settings)
+
+        class Stub:
+            def __init__(self, headers, host_name="127.0.0.1", settings=None):
+                self.headers = headers
+                self.server = Srv(host_name, settings or {})
+
+        check = HttpHandler.is_allowed_host
+        # (headers, host_name, settings, expected)
+        cases = [
+            ({"Host": "127.0.0.1:12700"}, "127.0.0.1", {}, True),
+            ({"Host": "localhost:12700"}, "127.0.0.1", {}, True),
+            ({"Host": "[::1]:12700"}, "127.0.0.1", {}, True),
+            ({"Host": "evil.com"}, "127.0.0.1", {}, False),  # rebinding shape
+            ({}, "127.0.0.1", {}, False),  # missing Host -> fail closed
+            (
+                {"Host": "swap.example.com"},
+                "0.0.0.0",
+                {"allowed_hosts": ["swap.example.com"]},
+                True,
+            ),
+            (
+                {"Host": "swap.example.com"},
+                "0.0.0.0",
+                {},
+                False,  # not configured
+            ),
+            (
+                {"Host": "0.0.0.0:12700"},
+                "0.0.0.0",
+                {},
+                False,  # bind-all is never a valid Host
+            ),
+            (
+                {"Host": "192.168.1.50:12700"},
+                "0.0.0.0",
+                {"allowed_hosts": ["192.168.1.50"]},
+                True,
+            ),
+            (
+                {"Host": "anything.example"},
+                "0.0.0.0",
+                {"allowed_hosts": ["*"]},
+                False,  # "*" alone does not disable — client_auth_hash required
+            ),
+            (
+                {"Host": "anything.example"},
+                "0.0.0.0",
+                {"allowed_hosts": ["*"], "client_auth_hash": "x"},
+                True,  # opt-out takes effect only with auth configured
+            ),
+            (
+                {},
+                "127.0.0.1",
+                {"allowed_hosts": ["*"], "client_auth_hash": "x"},
+                True,  # opt-out with auth, no Host
+            ),
+        ]
+        for headers, host_name, settings, expected in cases:
+            assert (
+                check(Stub(headers, host_name, settings)) is expected
+            ), (headers, host_name, settings)
+
     def test_checkform_csrf_token(self):
         from basicswap.http_server import HttpHandler
 
