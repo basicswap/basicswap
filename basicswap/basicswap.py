@@ -10485,6 +10485,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ).fetchone()
         return q[0]
 
+    def isBidTransientError(self, bid_id: bytes, ex, cursor) -> bool:
+        if self.is_transient_error(ex):
+            return True
+        try:
+            bid, offer = self.getBidAndOffer(bid_id, cursor)
+            if offer is None:
+                return False
+            ci_from = self.ci(Coins(offer.coin_from))
+            ci_to = self.ci(Coins(offer.coin_to))
+            return ci_from.is_transient_error(ex) or ci_to.is_transient_error(ex)
+        except Exception:
+            return False
+
     def checkQueuedActions(self) -> None:
         if self.isSystemUnlocked() is False:
             self.log.info("Not checking queued actions.  System is locked.")
@@ -10544,8 +10557,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.logEvent(
                         Concepts.BID, bid_id, EventLogTypes.ERROR, err_msg, cursor
                     )
+                    # Don't error the bid on a transient failure, keep the
+                    # action alive and retry.
+                    if not accepting_bid and self.isBidTransientError(
+                        bid_id, ex, cursor
+                    ):
+                        self.log.warning(
+                            f"Retrying action type {action_type} for bid {self.log.id(bid_id)} after transient error: {ex}"
+                        )
+                        retry_action_ids.append(action_id)
                     # Failing to accept a bid should not set an error state as the bid has not begun yet
-                    if accepting_bid:
+                    elif accepting_bid:
                         # If delaying with no (further) queued actions reset state
                         if self.countQueuedActions(cursor, bid_id, None) < 2:
                             bid, offer = self.getBidAndOffer(bid_id, cursor)
