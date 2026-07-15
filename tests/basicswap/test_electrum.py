@@ -251,8 +251,16 @@ def wait_for_offer(
     raise ValueError(f"wait_for_offer timed out {offer_id}.")
 
 
-def is_reverse_bid(coin_from, coin_to):
+def is_reverse_bid(coin_from: Coins, coin_to: Coins):
     return True if coin_from in scriptless_coins + coins_without_segwit else False
+
+
+def getTickerFromCoinId(coin_id: Coins) -> str:
+    if coin_id in chainparams:
+        return chainparams[coin_id]["ticker"]
+    if isinstance(coin_id, Coins):
+        return coin_id.name
+    raise ValueError(f"TODO: getTickerFromCoinId {coin_id}")
 
 
 class TestFunctions(BaseTestWithPrepare):
@@ -273,8 +281,8 @@ class TestFunctions(BaseTestWithPrepare):
             f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to})"
         )
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
-        ticker_to: str = chainparams[coin_to]["ticker"]
+        ticker_from: str = getTickerFromCoinId(coin_from)
+        ticker_to: str = getTickerFromCoinId(coin_to)
 
         amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
         amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
@@ -333,8 +341,8 @@ class TestFunctions(BaseTestWithPrepare):
             f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) leader recovers coin a lock tx"
         )
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
-        ticker_to: str = chainparams[coin_to]["ticker"]
+        ticker_from: str = getTickerFromCoinId(coin_from)
+        ticker_to: str = getTickerFromCoinId(coin_to)
 
         reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
@@ -419,8 +427,8 @@ class TestFunctions(BaseTestWithPrepare):
         # Leader is too slow to recover the coin a lock tx and follower swipes it
         # Coin B lock tx remains unspent unless a mercy output revealing the follower's keyshare is sent
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
-        ticker_to: str = chainparams[coin_to]["ticker"]
+        ticker_from: str = getTickerFromCoinId(coin_from)
+        ticker_to: str = getTickerFromCoinId(coin_to)
 
         reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
@@ -540,8 +548,8 @@ class TestFunctions(BaseTestWithPrepare):
             f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) follower recovers coin b lock tx"
         )
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
-        ticker_to: str = chainparams[coin_to]["ticker"]
+        ticker_from: str = getTickerFromCoinId(coin_from)
+        ticker_to: str = getTickerFromCoinId(coin_to)
 
         reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from
@@ -641,7 +649,7 @@ class Test(TestFunctions):
     @classmethod
     def addElectrumxDaemon(cls, coin_name: str, node_rpc_port: int, services_port: int):
         coin_type: Coins = getCoinIdFromName(coin_name)
-        ticker: str = chainparams[coin_type]["ticker"]
+        ticker: str = getTickerFromCoinId(coin_type)
         ticker_lc: str = ticker.lower()
 
         logger.info(f"Starting Electrumx for {ticker}")
@@ -964,8 +972,8 @@ class Test(TestFunctions):
             True,
         )
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
-        ticker_to: str = chainparams[coin_to]["ticker"]
+        ticker_from: str = getTickerFromCoinId(coin_from)
+        ticker_to: str = getTickerFromCoinId(coin_to)
 
         reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
         port_offerer: int = port_node_from

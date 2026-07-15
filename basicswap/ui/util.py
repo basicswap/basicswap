@@ -42,7 +42,7 @@ def getCoinType(coin_type_ind):
     try:
         return int(coin_type_ind)
     except Exception:
-        return getCoinIdFromTicker(coin_type_ind)
+        return getCoinIdFromTicker(coin_type_ind, inc_variant=True)
 
 
 def validateAmountString(amount, ci):

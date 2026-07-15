@@ -14903,7 +14903,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if "locked_utxos" in walletinfo:
                 rv["locked_utxos"] = walletinfo["locked_utxos"]
 
-            if coin == Coins.PART:
+            if coin in (Coins.PART, Coins.PART_ANON, Coins.PART_BLIND):
                 rv["stealth_address"] = self.getCachedStealthAddressForCoin(Coins.PART)
                 rv["anon_balance"] = walletinfo["anon_balance"]
                 rv["anon_pending"] = (

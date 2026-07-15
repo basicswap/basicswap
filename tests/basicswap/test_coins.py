@@ -40,7 +40,6 @@ from basicswap.basicswap_util import (
 )
 from basicswap.chainparams import (
     Coins,
-    chainparams,
     getCoinIdFromName,
 )
 
@@ -72,8 +71,8 @@ class Test(TestFunctions):
     __test__ = True
     update_min = 0.7
 
-    test_coin_a = getCoinIdFromName(os.getenv("TEST_COIN_A", "bitcoin"))
-    test_coin_b = getCoinIdFromName(os.getenv("TEST_COIN_B", "monero"))
+    test_coin_a = getCoinIdFromName(os.getenv("TEST_COIN_A", "bitcoin"), True)
+    test_coin_b = getCoinIdFromName(os.getenv("TEST_COIN_B", "monero"), True)
 
     @classmethod
     def setUpClass(cls):
@@ -88,7 +87,7 @@ class Test(TestFunctions):
                 read_json_api(node_port, "unlock", {"password": wallets_password})
             for coin_id in (cls.test_coin_a, cls.test_coin_b):
                 if coin_id in (Coins.BCH, Coins.PIVX):
-                    coin_ticker: str = chainparams[coin_id]["ticker"]
+                    coin_ticker: str = coin_id.name
                     logger.info(f"Reseeding {coin_ticker} wallet at {node_port}.")
                     read_json_api(node_port, f"wallets/{coin_ticker}/reseed", {})
 
@@ -103,16 +102,41 @@ class Test(TestFunctions):
                     node_to = cls.port_node_1
                     node_from = cls.port_node_0
                 if should_wait:
-                    coin_ticker: str = chainparams[coin_id]["ticker"]
+                    coin_ticker: str = coin_id.name
+                    if coin_id == Coins.PART_BLIND:
+                        balance_type: str = "blind_balance"
+                    elif coin_id == Coins.PART_ANON:
+                        balance_type: str = "anon_balance"
+                    else:
+                        balance_type: str = "balance"
+                    if coin_id == Coins.PART_BLIND:
+                        wait_for_balance(
+                            cls.delay_event,
+                            f"http://127.0.0.1:{node_from}/json/wallets/{coin_ticker.lower()}",
+                            balance_type,
+                            initial_amount,
+                            iterations=60,
+                            delay_time=2,
+                        )
                     wait_for_balance(
                         cls.delay_event,
                         f"http://127.0.0.1:{node_to}/json/wallets/{coin_ticker.lower()}",
-                        "balance",
+                        balance_type,
                         initial_amount,
                         iterations=60,
                         delay_time=2,
                     )
                 else:
+                    if coin_id == Coins.PART_BLIND:
+                        prepare_balance(
+                            cls.delay_event,
+                            coin_id,
+                            initial_amount,
+                            node_from,
+                            node_from,
+                            True,
+                            wait_until_spendable=False,
+                        )
                     prepare_balance(
                         cls.delay_event,
                         coin_id,
@@ -216,8 +240,8 @@ class Test(TestFunctions):
             f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) Set Destination"
         )
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
-        ticker_to: str = chainparams[coin_to]["ticker"]
+        ticker_from: str = coin_from.name
+        ticker_to: str = coin_to.name
 
         amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
         amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
@@ -232,7 +256,7 @@ class Test(TestFunctions):
             "automation_strat_id": 1,
         }
 
-        ticker_from: str = chainparams[coin_from]["ticker"]
+        ticker_from: str = coin_from.name
         wallet_before = read_json_api(self.port_node_2, f"wallets/{ticker_from}")
         address_2: str = wallet_before["deposit_address"]
 
