@@ -1553,8 +1553,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             self.log.info(f"Starting WebSocket server at {ws_url}")
 
+            # Reject cross-site WebSocket hijacking: unlike fetch(), a ws://
+            # connection is not blocked by the same-origin policy, so any web
+            # page can open one to loopback. origin_check (required) validates the
+            # handshake Origin against the same allowlist the HTTP server uses.
             self.ws_server = WebsocketServer(
-                host=self.settings["wshost"], port=self.settings["wsport"]
+                self._ws_origin_allowed,
+                host=self.settings["wshost"],
+                port=self.settings["wsport"],
             )
             self.ws_server.client_port = self.settings.get(
                 "wsclientport", self.settings["wsport"]
@@ -16631,6 +16637,32 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return rv_array
 
         return rv
+
+    def _ws_origin_allowed(self, headers) -> bool:
+        # Verify-when-present, mirroring http_server.is_same_origin_request:
+        # a browser always sends Origin, so a header-less client (bots/scripts
+        # consuming the feed) is allowed; when present the Origin hostname must be
+        # in the allowlist. The Origin here is the page that opened the socket
+        # (the html UI), so htmlhost/wshost and configured allowed_hosts all count.
+        origin = headers.get("origin")
+        if not origin:
+            return True
+        allowed_hosts_setting = self.settings.get("allowed_hosts", []) or []
+        if "*" in allowed_hosts_setting:
+            return True  # operator opted out of the host/origin check
+        from urllib.parse import urlparse
+
+        origin_host = urlparse(origin).hostname
+        if not origin_host:
+            return False
+        allowed = {"localhost", "127.0.0.1", "::1"}
+        for hn in (self.settings.get("wshost"), self.settings.get("htmlhost")):
+            if hn and hn not in ("0.0.0.0", "::"):
+                allowed.add(str(hn).lower())
+        for h in allowed_hosts_setting:
+            if h != "*":
+                allowed.add(str(h).strip().lower())
+        return origin_host.lower() in allowed
 
     def ws_new_client(self, client, server):
         pass

@@ -724,6 +724,40 @@ class Test(unittest.TestCase):
                 settings,
             )
 
+    def test_ws_origin_allowed(self):
+        # Cross-site WebSocket hijacking guard: the handshake Origin is validated
+        # against the allowlist (verify-when-present). Headers use lowercased keys
+        # as the contrib websocket server provides them.
+        class Stub:
+            def __init__(self, settings):
+                self.settings = settings
+
+        check = BasicSwap._ws_origin_allowed
+        loopback = {"wshost": "127.0.0.1", "htmlhost": "127.0.0.1"}
+        cases = [
+            ({}, {}, True),  # no Origin (bots/scripts) -> allowed
+            ({"origin": "http://127.0.0.1:12700"}, loopback, True),
+            ({"origin": "http://localhost:12700"}, loopback, True),
+            ({"origin": "http://evil.com"}, loopback, False),
+            ({"origin": "null"}, loopback, False),
+            (
+                {"origin": "https://swap.example.com"},
+                {"allowed_hosts": ["swap.example.com"]},
+                True,
+            ),
+            ({"origin": "https://swap.example.com"}, {}, False),
+            # Bind host (htmlhost) is accepted without an allowed_hosts entry.
+            (
+                {"origin": "https://swap.example.com"},
+                {"htmlhost": "swap.example.com"},
+                True,
+            ),
+            # Opt-out: "*" disables the check.
+            ({"origin": "http://evil.com"}, {"allowed_hosts": ["*"]}, True),
+        ]
+        for headers, settings, expected in cases:
+            assert check(Stub(settings), headers) is expected, (headers, settings)
+
     def test_is_allowed_host(self):
         from basicswap.http_server import HttpHandler
 
