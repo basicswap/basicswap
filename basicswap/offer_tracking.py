@@ -150,7 +150,7 @@ def get_offer_tracking(self, offer_id: bytes, cursor):
 
 
 def offer_in_flight_amount(
-    cursor, offer_id: bytes, accept_action_types, exclude_bid_id=None
+    cursor, offer_id: bytes, accept_action_types, exclude_bid_id=None, reverse_bid=False
 ) -> int:
     action_type_params = {}
     action_placeholders = []
@@ -160,11 +160,12 @@ def offer_in_flight_amount(
         action_placeholders.append(f":{key}")
     action_in = ", ".join(action_placeholders) if action_placeholders else "NULL"
 
-    query = f"""SELECT bids.bid_id, bids.amount FROM bids
+    amount_col = "bids.amount_to" if reverse_bid else "bids.amount"
+    query = f"""SELECT bids.bid_id, {amount_col} FROM bids
            JOIN bidstates ON bidstates.state_id = bids.state AND bidstates.in_progress > 0
            WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
            UNION
-           SELECT bids.bid_id, bids.amount FROM bids
+           SELECT bids.bid_id, {amount_col} FROM bids
            JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND actions.action_type IN ({action_in})
            WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
         """

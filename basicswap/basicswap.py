@@ -4447,8 +4447,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 offer_id = offer.offer_id
                 was_sent = bool(offer.was_sent)
                 active = offer.active_ind == 1
+                reverse_bid: bool = self.is_reverse_ads_bid(
+                    offer.coin_from, offer.coin_to
+                )
+                budget_amount: int = bid.amount_to if reverse_bid else bid.amount
                 exhausted = complete_offer_fill(
-                    self, offer.offer_id, bid.amount, cursor
+                    self, offer.offer_id, budget_amount, cursor
                 )
             finally:
                 self.closeDB(cursor)
@@ -4556,14 +4560,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             cursor = self.openDB()
             try:
                 rows = cursor.execute(
-                    """SELECT b.offer_id, SUM(b.amount), COUNT(*) FROM bids b
+                    """SELECT b.offer_id, SUM(b.amount), SUM(b.amount_to), COUNT(*),
+                              o.coin_from, o.coin_to FROM bids b
                        JOIN offer_tracking otr ON otr.offer_id = b.offer_id
                        JOIN offers o ON o.offer_id = b.offer_id AND o.was_sent = 1
                        WHERE b.active_ind = 1 AND b.state = :completed
                        GROUP BY b.offer_id""",
                     {"completed": int(BidStates.SWAP_COMPLETED)},
                 ).fetchall()
-                for offer_id, total_amount, num_fills in rows:
+                for (
+                    offer_id,
+                    total_amount,
+                    total_amount_to,
+                    num_fills,
+                    coin_from,
+                    coin_to,
+                ) in rows:
+                    if self.is_reverse_ads_bid(coin_from, coin_to):
+                        total_amount = total_amount_to
                     row = get_offer_tracking(self, offer_id, cursor)
                     if row is None:
                         continue
@@ -5893,14 +5907,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "Incompatible bid protocol version",
             )
 
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+            budget_amount: int = bid.amount_to if reverse_bid else bid.amount
             validate_offer_budget(
                 self,
                 offer,
-                bid.amount,
+                budget_amount,
                 use_cursor,
                 in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
             )
-            self.validateOfferWalletFloor(offer, bid.amount, use_cursor, bid_id)
+            self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
 
             if bid.contract_count is None:
                 bid.contract_count = self.getNewContractId(use_cursor)
@@ -6762,16 +6778,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             ensure(offer.expire_at > now, "Offer has expired")
 
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+            budget_amount: int = bid.amount_to if reverse_bid else bid.amount
             validate_offer_budget(
                 self,
                 offer,
-                bid.amount,
+                budget_amount,
                 use_cursor,
                 in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
             )
-            self.validateOfferWalletFloor(offer, bid.amount, use_cursor, bid_id)
+            self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
 
-            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
             coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
             coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
             ci_from = self.ci(coin_from)
@@ -7104,11 +7121,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             validate_offer_budget(
                 self,
                 offer,
-                bid.amount,
+                bid.amount_to,
                 use_cursor,
                 in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
             )
-            self.validateOfferWalletFloor(offer, bid.amount, use_cursor, bid_id)
+            self.validateOfferWalletFloor(offer, bid.amount_to, use_cursor, bid_id)
 
             # Bid is reversed
             coin_from = Coins(offer.coin_to)
@@ -11041,6 +11058,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ActionTypes.ACCEPT_AS_REV_BID,
             ),
             exclude_bid_id,
+            reverse_bid=self.is_reverse_ads_bid(offer.coin_from, offer.coin_to),
         )
 
     def evaluateKnownIdentityForAutoAccept(self, strategy, identity_stats) -> bool:
