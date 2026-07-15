@@ -5868,6 +5868,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, offer = self.getBidAndOffer(bid_id, use_cursor)
             ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             # Ensure bid is still valid
             now: int = self.getTime()
@@ -6762,6 +6763,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             validate_offer_budget(
                 self,
@@ -7101,6 +7103,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             validate_offer_budget(
                 self,
@@ -10927,9 +10930,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     cursor,
                 )
             else:
-                existing_offer.setState(OfferStates.OFFER_RECEIVED)
-                existing_offer.pk_from = pk_from
-                self.add(existing_offer, cursor, upsert=True)
+                if existing_offer.active_ind != 1:
+                    raise RevokedOffer(
+                        f"Ignoring inactive offer {offer_id.hex()}, active_ind: {existing_offer.active_ind}."
+                    )
+                if existing_offer.state != OfferStates.OFFER_RECEIVED:
+                    existing_offer.setState(OfferStates.OFFER_RECEIVED)
+                    existing_offer.pk_from = pk_from
+                    self.add(existing_offer, cursor, upsert=True)
             received_on_net: str = networkTypeToID(msg.get("type", "smsg"))
             self.addMessageNetworkLink(
                 Concepts.OFFER,
