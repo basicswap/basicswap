@@ -2058,7 +2058,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return result
 
         try:
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     bid, offer = swap
                     if offer.coin_from == coin_type or offer.coin_to == coin_type:
@@ -2168,7 +2168,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _checkRPCWalletEmpty(self, coin_type: Coins) -> dict:
         try:
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         return {
@@ -2216,7 +2216,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _checkElectrumWalletEmpty(self, coin_type: Coins) -> dict:
         try:
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         return {
@@ -2580,7 +2580,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def _transferLiteWalletBalanceToRPC(self, coin_type: Coins) -> dict:
         try:
 
-            for bid_id, swap in self.swaps_in_progress.items():
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         self.log.warning(
@@ -8173,39 +8172,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
 
                 # Track the depth of the lock refund tx.
-                refund_tx_depth: int = 0
-                if refund_tx.state == TxStates.TX_CONFIRMED:
-                    refund_tx_depth = ci_from.blocks_confirmed
-                else:
-                    refund_tx_chain_info = ci_from.getLockTxHeight(
-                        refund_tx.txid,
-                        ci_from.getSCLockScriptAddress(
-                            xmr_swap.a_lock_refund_tx_script
-                        ),
-                        ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
-                        bid.chain_a_height_start,
-                        vout=refund_tx.vout,
-                    )
-                    if refund_tx_chain_info is not None:
-                        bid_changed: bool = False
-                        refund_tx_depth = refund_tx_chain_info.get("depth", 0)
-                        if (
-                            refund_tx.state
-                            in (None, TxStates.TX_NONE, TxStates.TX_SENT)
-                            and refund_tx_chain_info["height"] == 0
-                        ):
-                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
-                            bid_changed = True
-                        if (
-                            not refund_tx.block_height
-                            and refund_tx_chain_info["height"] != 0
-                        ):
-                            self.setTxBlockInfoFromHeight(
-                                ci_from, refund_tx, refund_tx_chain_info["height"]
-                            )
-                            refund_tx.setState(TxStates.TX_IN_CHAIN)
-                            bid_changed = True
-                        if refund_tx_depth >= ci_from.blocks_confirmed:
+                was_confirmed: bool = refund_tx.state == TxStates.TX_CONFIRMED
+                refund_tx_depth: int = ci_from.blocks_confirmed if was_confirmed else 0
+                refund_tx_chain_info = ci_from.getLockTxHeight(
+                    refund_tx.txid,
+                    ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script),
+                    ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
+                    bid.chain_a_height_start,
+                    vout=refund_tx.vout,
+                )
+                if refund_tx_chain_info is not None:
+                    bid_changed: bool = False
+                    refund_tx_depth = refund_tx_chain_info.get("depth", 0)
+                    if (
+                        refund_tx.state in (None, TxStates.TX_NONE, TxStates.TX_SENT)
+                        and refund_tx_chain_info["height"] == 0
+                    ):
+                        refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                        bid_changed = True
+                    if (
+                        not refund_tx.block_height
+                        and refund_tx_chain_info["height"] != 0
+                    ):
+                        self.setTxBlockInfoFromHeight(
+                            ci_from, refund_tx, refund_tx_chain_info["height"]
+                        )
+                        refund_tx.setState(TxStates.TX_IN_CHAIN)
+                        bid_changed = True
+                    if refund_tx_depth >= ci_from.blocks_confirmed:
+                        if not was_confirmed:
                             self.logBidEvent(
                                 bid.bid_id,
                                 EventLogTypes.LOCK_TX_A_REFUND_TX_CONFIRMED,
@@ -8214,9 +8209,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
                             refund_tx.setState(TxStates.TX_CONFIRMED)
                             bid_changed = True
-                        if bid_changed:
-                            self.add(refund_tx, cursor, upsert=True)
-                            self.commitDB()
+                    elif was_confirmed:
+                        self.log.warning(
+                            f"Lock refund tx {self.logIDT(refund_tx.txid)} dropped below depth {ci_from.blocks_confirmed} (now {refund_tx_depth}) for bid {self.log.id(bid_id)}."
+                        )
+                        refund_tx.setState(
+                            TxStates.TX_IN_CHAIN
+                            if refund_tx_chain_info["height"] != 0
+                            else TxStates.TX_IN_MEMPOOL
+                        )
+                        bid_changed = True
+                    if bid_changed:
+                        self.add(refund_tx, cursor, upsert=True)
+                        self.commitDB()
 
                 if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
@@ -8709,6 +8714,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         raise
 
                 if (
+                    was_sent
+                    and state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED
+                    and bid.xmr_b_lock_tx is None
+                    and self.countQueuedActions(
+                        cursor, bid_id, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B
+                    )
+                    < 1
+                ):
+                    delay = self.get_delay_event_seconds()
+                    self.log.info(
+                        f"Re-queueing adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
+                    )
+                    self.createActionInSession(
+                        delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
+                    )
+                    self.commitDB()
+
+                if (
                     bid.xmr_b_lock_tx
                     and bid.xmr_b_lock_tx.chain_height is not None
                     and bid.xmr_b_lock_tx.chain_height > 0
@@ -8783,13 +8806,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # Wait for script spend tx to confirm
                 # TODO: Use explorer to get tx / block hash for getrawtransaction
 
-                if was_received:
+                spend_seen: bool = (
+                    bid.xmr_a_lock_tx is not None
+                    and bid.xmr_a_lock_tx.spend_txid == xmr_swap.a_lock_spend_tx_id
+                    and xmr_swap.a_lock_spend_tx is not None
+                )
+                if was_received or spend_seen:
                     try:
-                        txn_hex = ci_from.getMempoolTx(xmr_swap.a_lock_spend_tx_id)
-                        if txn_hex:
-                            self.log.info(
-                                f"Found lock spend txn in {ci_from.coin_name()} mempool, {self.logIDT(xmr_swap.a_lock_spend_tx_id)}"
+                        txn_hex = None
+                        try:
+                            txn_hex = ci_from.getMempoolTx(xmr_swap.a_lock_spend_tx_id)
+                            if txn_hex:
+                                self.log.info(
+                                    f"Found lock spend txn in {ci_from.coin_name()} mempool, {self.logIDT(xmr_swap.a_lock_spend_tx_id)}"
+                                )
+                        except Exception as e:
+                            self.log.debug(
+                                f"getrawtransaction lock spend tx failed: {e}"
                             )
+                        if txn_hex is None and spend_seen:
+                            # Spend tx was detected previously, recheck depth
+                            txn_hex = xmr_swap.a_lock_spend_tx.hex()
+                        if txn_hex:
                             self.process_XMR_SWAP_A_LOCK_tx_spend(
                                 bid_id,
                                 xmr_swap.a_lock_spend_tx_id.hex(),
@@ -8797,7 +8835,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 cursor,
                             )
                     except Exception as e:
-                        self.log.debug(f"getrawtransaction lock spend tx failed: {e}")
+                        self.log.debug(f"process lock spend tx failed: {e}")
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
                 if (
                     was_received
@@ -9553,9 +9591,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 if state == BidStates.XMR_SWAP_LOCK_RELEASED:
                     xmr_swap.a_lock_spend_tx = bytes.fromhex(spend_txn_hex)
-                    bid.setState(
-                        BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED
-                    )  # TODO: Wait for confirmation?
+
+                    spend_tx_depth: int = 0
+                    try:
+                        spend_txout_info = ci_from.getTxOutInfo(spending_txid, 0)
+                        if spend_txout_info is not None:
+                            chain_height: int = ci_from.getChainHeight()
+                            spend_tx_depth = max(
+                                0,
+                                chain_height - spend_txout_info["block_height"] + 1,
+                            )
+                    except Exception as e:
+                        self.log.debug(
+                            f"Could not get lock spend tx depth for bid {self.log.id(bid_id)}: {e}"
+                        )
+
+                    if spend_tx_depth < ci_from.blocks_confirmed:
+                        self.log.info(
+                            f"Waiting for lock spend tx {self.logIDT(spending_txid)} to reach depth {ci_from.blocks_confirmed}, currently {spend_tx_depth}, for bid {self.log.id(bid_id)}."
+                        )
+                        self.saveBidInSession(
+                            bid_id, bid, use_cursor, xmr_swap, save_in_progress=offer
+                        )
+                        return
+
+                    bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED)
 
                     if bid.xmr_a_lock_tx:
                         bid.xmr_a_lock_tx.setState(TxStates.TX_REDEEMED)
@@ -12216,6 +12276,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
+        if bid.state != BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+            self.log.warning(
+                f"Not sending coin A lock tx for adaptor-sig bid {self.log.id(bid_id)}, unexpected bid state: {strBidState(bid.state)}."
+            )
+            return
+
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
@@ -12426,6 +12492,32 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             TxTypes.PTX_PRE_FUNDED,
             cursor=cursor,
         )
+
+        num_publish_started = self.countBidEvents(
+            bid, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, cursor
+        )
+        num_published = self.countBidEvents(
+            bid, EventLogTypes.LOCK_TX_B_PUBLISHED, cursor
+        )
+        num_publish_failed = self.countBidEvents(
+            bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
+        )
+        if num_publish_started > num_published + num_publish_failed:
+            error_msg = f"A previous coin B lock tx publish attempt for bid {self.log.id(bid_id)} may have broadcast before an unclean shutdown. Not republishing, check the {ci_to.coin_name()} wallet."
+            self.log.error(error_msg)
+            self.setBidError(
+                bid,
+                "Possible coin B lock tx broadcast before crash, manual intervention required.",
+                save_bid=False,
+                cursor=cursor,
+            )
+            self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
+            return
+
+        self.logBidEvent(
+            bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, "", cursor
+        )
+        self.commitDB()
 
         try:
             b_lock_vout = None
@@ -13072,16 +13164,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.BID_ACCEPTED,
+        ]
+        if bid.was_sent and offer.was_sent:
+            allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
+        ensure(
+            bid.state in allowed_states,
+            "Invalid state for bid {}".format(bid.state),
+        )
+
         try:
-            allowed_states = [
-                BidStates.BID_ACCEPTED,
-            ]
-            if bid.was_sent and offer.was_sent:
-                allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
-            ensure(
-                bid.state in allowed_states,
-                "Invalid state for bid {}".format(bid.state),
-            )
             xmr_swap.af_lock_refund_spend_tx_esig = (
                 msg_data.af_lock_refund_spend_tx_esig
             )
@@ -14041,7 +14134,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             to_remove = []
             if now - self._last_checked_progress >= self.check_progress_seconds:
-                for bid_id, v in self.swaps_in_progress.items():
+                for bid_id, v in list(self.swaps_in_progress.items()):
                     bid, offer = v
                     try:
                         if self.checkBidState(bid_id, bid, offer) is True:
@@ -14067,7 +14160,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.deactivateBid(None, offer, bid)
 
                 if self._wallet_manager:
-                    for bid_id, v in self.swaps_in_progress.items():
+                    for bid_id, v in list(self.swaps_in_progress.items()):
                         bid, offer = v
                         try:
                             for coin_type in (
