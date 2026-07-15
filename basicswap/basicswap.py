@@ -12018,7 +12018,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )  # TODO: Split BID_ACCEPTED into received and sent
             ensure(
                 bid.state in allowed_states,
-                f"Invalid state for bid {bid.state}",
+                f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
             )
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
@@ -13080,7 +13080,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
             ensure(
                 bid.state in allowed_states,
-                "Invalid state for bid {}".format(bid.state),
+                f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
             )
             xmr_swap.af_lock_refund_spend_tx_esig = (
                 msg_data.af_lock_refund_spend_tx_esig
@@ -13364,6 +13364,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+            BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED,
+        ]
+        if bid.was_sent and offer.was_sent:
+            # Self-bid exception
+            allowed_states.append(BidStates.XMR_SWAP_LOCK_RELEASED)
+        ensure(
+            BidStates(bid.state) in allowed_states,
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
+        )
+
         xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         try:
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
@@ -13561,7 +13573,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             allowed_states.append(BidStates.BID_REQUEST_ACCEPTED)
         ensure(
             bid.state in allowed_states,
-            "Invalid state for bid {}".format(bid.state),
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
 
         ci_from = self.ci(offer.coin_to)
