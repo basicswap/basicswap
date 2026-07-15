@@ -664,32 +664,65 @@ class Test(unittest.TestCase):
     def test_is_same_origin_request(self):
         from basicswap.http_server import HttpHandler
 
-        class Stub:
-            def __init__(self, headers):
+        class SwapClient:
+            def __init__(self, settings):
+                self.settings = settings
+
+        class Srv:
+            def __init__(self, host_name, settings):
+                self.host_name = host_name
+                self.swap_client = SwapClient(settings)
+
+        # Subclass HttpHandler (without the socket-handling __init__) so the
+        # sibling helpers _host_check_disabled / _get_allowed_hosts resolve.
+        class Stub(HttpHandler):
+            def __init__(self, headers, host_name="127.0.0.1", settings=None):
                 self.headers = headers
+                self.server = Srv(host_name, settings or {})
 
         check = HttpHandler.is_same_origin_request
+        # F3: a present Origin/Referer is validated against the allowlist, not
+        # against the request's own Host header.
         cases = [
-            ({}, True),  # header-less (tests/curl/API scripts) -> allowed
+            ({}, {}, True),  # header-less (tests/curl/API scripts) -> allowed
+            ({"Origin": "http://127.0.0.1:12700"}, {}, True),
+            ({"Origin": "http://localhost:12700"}, {}, True),
+            ({"Origin": "http://evil.com"}, {}, False),  # rebinding shape
+            ({"Origin": "null"}, {}, False),  # opaque origin -> no hostname
+            ({"Referer": "http://127.0.0.1:12700/rpc"}, {}, True),
+            ({"Referer": "http://evil.com/x"}, {}, False),
+            # No Host header: F3 validates Origin directly (F1's Host gate
+            # rejects a missing Host upstream), so this is allowed here.
+            ({"Origin": "http://127.0.0.1:12700"}, {}, True),
+            # Configured reverse-proxy domain is accepted.
             (
-                {"Origin": "http://127.0.0.1:12700", "Host": "127.0.0.1:12700"},
+                {"Origin": "https://swap.example.com"},
+                {"allowed_hosts": ["swap.example.com"]},
                 True,
             ),
             (
-                {"Origin": "http://localhost:12700", "Host": "localhost:12700"},
-                True,
+                {"Origin": "https://swap.example.com"},
+                {},
+                False,  # not configured
             ),
-            ({"Origin": "http://evil.com", "Host": "127.0.0.1:12700"}, False),
-            ({"Origin": "null", "Host": "127.0.0.1:12700"}, False),
+            # Host allowlist opted out ("*", with auth): fall back to the
+            # self-referential comparison, which still blocks classic CSRF.
             (
-                {"Referer": "http://127.0.0.1:12700/rpc", "Host": "127.0.0.1:12700"},
-                True,
+                {"Origin": "http://evil.com", "Host": "evil.com"},
+                {"allowed_hosts": ["*"], "client_auth_hash": "x"},
+                True,  # self-referential match (rebinding, knowingly unprotected)
             ),
-            ({"Referer": "http://evil.com/x", "Host": "127.0.0.1:12700"}, False),
-            ({"Origin": "http://127.0.0.1:12700"}, False),  # no Host header
+            (
+                {"Origin": "http://evil.com", "Host": "127.0.0.1:12700"},
+                {"allowed_hosts": ["*"], "client_auth_hash": "x"},
+                False,  # classic CSRF still blocked under "*"
+            ),
         ]
-        for headers, expected in cases:
-            assert check(Stub(headers)) is expected
+        for headers, settings, expected in cases:
+            assert check(Stub(headers, settings=settings)) is expected, (
+                headers,
+                settings,
+            )
 
     def test_is_allowed_host(self):
         from basicswap.http_server import HttpHandler
@@ -703,7 +736,7 @@ class Test(unittest.TestCase):
                 self.host_name = host_name
                 self.swap_client = SwapClient(settings)
 
-        class Stub:
+        class Stub(HttpHandler):
             def __init__(self, headers, host_name="127.0.0.1", settings=None):
                 self.headers = headers
                 self.server = Srv(host_name, settings or {})
@@ -760,9 +793,11 @@ class Test(unittest.TestCase):
             ),
         ]
         for headers, host_name, settings, expected in cases:
-            assert (
-                check(Stub(headers, host_name, settings)) is expected
-            ), (headers, host_name, settings)
+            assert check(Stub(headers, host_name, settings)) is expected, (
+                headers,
+                host_name,
+                settings,
+            )
 
     def test_checkform_csrf_token(self):
         from basicswap.http_server import HttpHandler

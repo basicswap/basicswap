@@ -270,16 +270,23 @@ class HttpHandler(BaseHTTPRequestHandler):
     def is_same_origin_request(self) -> bool:
         # CSRF defence, verify-when-present: a browser always sends Origin on a
         # cross-origin POST, so a header-less client (tests/curl/API scripts) is
-        # not a browser CSRF and is allowed. When present, the Origin/Referer host
-        # is compared against this request's own Host header, so 127.0.0.1 vs
-        # localhost and reverse-proxy domains all match without hardcoding a bind.
+        # not a browser CSRF and is allowed. When present, the Origin/Referer
+        # hostname is validated against the same allowlist the Host check uses
+        # (_get_allowed_hosts)
         origin = self.headers.get("Origin") or self.headers.get("Referer")
         if not origin:
             return True
-        host = self.headers.get("Host")
-        if not host:
+        if self._host_check_disabled():
+            # Host allowlist opted out ("*"): no trusted host set to validate
+            # against, so fall back to the self-referential comparison.
+            host = self.headers.get("Host")
+            if not host:
+                return False
+            return parse.urlparse(origin).netloc == host
+        origin_host = parse.urlparse(origin).hostname
+        if not origin_host:
             return False
-        return parse.urlparse(origin).netloc == host
+        return origin_host.lower() in self._get_allowed_hosts()
 
     def _get_allowed_hosts(self) -> set:
         # The fixed set of hostnames this server is legitimately served under.
