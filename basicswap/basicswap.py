@@ -95,18 +95,19 @@ from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
     BalanceError,
-    LockedCoinError,
-    TemporaryError,
+    DeserialiseNum,
     InactiveCoin,
+    LockedCoinError,
+    RevokedOffer,
+    TemporaryError,
     b2h,
     b2i,
+    ensure,
     format_timestamp,
-    DeserialiseNum,
     h2b,
     i2b,
-    zeroIfNone,
     make_int,
-    ensure,
+    zeroIfNone,
 )
 from .util.address import (
     toWIF,
@@ -10828,12 +10829,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
 
         else:
-            raise ValueError("Unknown swap type {}.".format(offer_data.swap_type))
+            raise ValueError(f"Unknown swap type {offer_data.swap_type}.")
 
         offer_id = bytes.fromhex(msg["msgid"])
 
         if self.isOfferRevoked(offer_id, msg["from"]):
-            raise ValueError("Offer has been revoked {}.".format(offer_id.hex()))
+            raise RevokedOffer(f"Offer has been revoked {offer_id.hex()}.")
 
         pk_from: bytes = getMsgPubkey(self, msg)
         try:
@@ -13865,6 +13866,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Ignoring message involving inactive coin {Coins(ex.coinid).name}, type {MessageTypes(msg_type).name}."
             )
+        except RevokedOffer as ex:
+            self.log.debug(str(ex))
         except Exception as ex:
             self.log.error(f"processMsg {ex}")
             if self.debug:
