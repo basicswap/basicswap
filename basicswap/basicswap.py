@@ -13229,6 +13229,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
+            BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+        ]
+        ensure(
+            bid.state in allowed_states,
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
+        )
+        if bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
+            # Duplicate message or swap-to-self, processed when sent
+            self.log.debug(
+                f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} already in state {strBidState(bid.state)}."
+            )
+            return
+
         try:
             xmr_swap.a_lock_spend_tx = msg_data.a_lock_spend_tx
             xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
@@ -13249,17 +13264,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.pkal, "proof key owned for swap", xmr_swap.kal_sig
             )
 
-            if bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
-                bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
-                bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
-            elif bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
-                self.log.debug(
-                    f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} already in state {bid.state}."
-                )
-            else:
-                self.log.warning(
-                    f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} unexpected state {bid.state}."
-                )
+            bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
+            bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
