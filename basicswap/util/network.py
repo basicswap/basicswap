@@ -82,6 +82,13 @@ def _normalize_origin(value):
     return (scheme, host, port)
 
 
+def normalize_allowed_hosts(value):
+    # Promote a bare string to a list so readers don't iterate it char by char.
+    if isinstance(value, str):
+        return [value] if value else []
+    return value or []
+
+
 def allowed_entry_hostname(entry):
     # Extract the bare hostname from an allowed_hosts entry, which may be a bare
     # host ("host"), a host:port, or a full origin ("scheme://host[:port]").
