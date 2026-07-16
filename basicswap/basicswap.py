@@ -8836,13 +8836,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # Wait for script spend tx to confirm
                 # TODO: Use explorer to get tx / block hash for getrawtransaction
 
-                if was_received:
+                spend_seen: bool = (
+                    bid.xmr_a_lock_tx is not None
+                    and bid.xmr_a_lock_tx.spend_txid == xmr_swap.a_lock_spend_tx_id
+                    and xmr_swap.a_lock_spend_tx is not None
+                )
+                if was_received or spend_seen:
                     try:
-                        txn_hex = ci_from.getMempoolTx(xmr_swap.a_lock_spend_tx_id)
-                        if txn_hex:
-                            self.log.info(
-                                f"Found lock spend txn in {ci_from.coin_name()} mempool, {self.logIDT(xmr_swap.a_lock_spend_tx_id)}"
+                        txn_hex = None
+                        try:
+                            txn_hex = ci_from.getMempoolTx(xmr_swap.a_lock_spend_tx_id)
+                            if txn_hex:
+                                self.log.info(
+                                    f"Found lock spend txn in {ci_from.coin_name()} mempool, {self.logIDT(xmr_swap.a_lock_spend_tx_id)}"
+                                )
+                        except Exception as e:
+                            self.log.debug(
+                                f"getrawtransaction lock spend tx failed: {e}"
                             )
+                        if txn_hex is None and spend_seen:
+                            # Spend tx was detected previously, recheck depth
+                            txn_hex = xmr_swap.a_lock_spend_tx.hex()
+                        if txn_hex:
                             self.process_XMR_SWAP_A_LOCK_tx_spend(
                                 bid_id,
                                 xmr_swap.a_lock_spend_tx_id.hex(),
@@ -8850,7 +8865,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 cursor,
                             )
                     except Exception as e:
-                        self.log.debug(f"getrawtransaction lock spend tx failed: {e}")
+                        self.log.debug(f"process lock spend tx failed: {e}")
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
                 if (
                     was_received
@@ -9606,9 +9621,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 if state == BidStates.XMR_SWAP_LOCK_RELEASED:
                     xmr_swap.a_lock_spend_tx = bytes.fromhex(spend_txn_hex)
-                    bid.setState(
-                        BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED
-                    )  # TODO: Wait for confirmation?
+
+                    spend_tx_depth: int = 0
+                    try:
+                        spend_txout_info = ci_from.getTxOutInfo(spending_txid, 0)
+                        if spend_txout_info is not None:
+                            chain_height: int = ci_from.getChainHeight()
+                            spend_tx_depth = max(
+                                0,
+                                chain_height - spend_txout_info["block_height"] + 1,
+                            )
+                    except Exception as e:
+                        self.log.debug(
+                            f"Could not get lock spend tx depth for bid {self.log.id(bid_id)}: {e}"
+                        )
+
+                    if spend_tx_depth < ci_from.blocks_confirmed:
+                        self.log.info(
+                            f"Waiting for lock spend tx {self.logIDT(spending_txid)} to reach depth {ci_from.blocks_confirmed}, currently {spend_tx_depth}, for bid {self.log.id(bid_id)}."
+                        )
+                        self.saveBidInSession(
+                            bid_id, bid, use_cursor, xmr_swap, save_in_progress=offer
+                        )
+                        return
+
+                    bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED)
 
                     if bid.xmr_a_lock_tx:
                         bid.xmr_a_lock_tx.setState(TxStates.TX_REDEEMED)
