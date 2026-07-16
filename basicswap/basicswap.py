@@ -1526,18 +1526,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             allowed_hosts = self.settings.get("allowed_hosts", []) or []
             if "*" in allowed_hosts:
-                ensure(
-                    self.settings.get("client_auth_hash"),
-                    "'allowed_hosts' contains '*' (HTTP Host-header check disabled), "
-                    "which requires 'client_auth_hash' to be set to prevent "
-                    "DNS-rebinding attacks.",
-                )
-                self.log.warning(
-                    "HTTP Host-header check is disabled ('*' in allowed_hosts); "
-                    "relying on client_auth_hash for DNS-rebinding protection. The "
-                    "Origin/CSRF check stays enforced, so list any reverse-proxy "
-                    "origin (e.g. 'https://host') in allowed_hosts."
-                )
+                if not self.settings.get("unsafe_allow_any_host_without_auth"):
+                    ensure(
+                        self.settings.get("client_auth_hash"),
+                        "'allowed_hosts' contains '*' (HTTP Host-header check disabled), "
+                        "which requires 'client_auth_hash' to be set to prevent "
+                        "DNS-rebinding attacks.",
+                    )
+                if not self.settings.get("client_auth_hash"):
+                    self.log.warning(
+                        "HTTP Host-header check is disabled ('*' in allowed_hosts) "
+                        "with no 'client_auth_hash' set and limit disabled with "
+                        "'unsafe_allow_any_host_without_auth';"
+                        "Only use on a trusted, isolated "
+                        "network or behind an authenticating reverse proxy. The "
+                        "Origin/CSRF check stays enforced, so list any reverse-proxy "
+                        "origin (e.g. 'https://host') in allowed_hosts."
+                    )
+                else:
+                    self.log.warning(
+                        "HTTP Host-header check is disabled ('*' in allowed_hosts); "
+                        "relying on client_auth_hash for DNS-rebinding protection. The "
+                        "Origin/CSRF check stays enforced, so list any reverse-proxy "
+                        "origin (e.g. 'https://host') in allowed_hosts."
+                    )
             elif (
                 self.settings["htmlhost"] not in ("127.0.0.1", "localhost", "::1")
                 and not allowed_hosts

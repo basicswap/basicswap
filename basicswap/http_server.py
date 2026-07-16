@@ -306,11 +306,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         # "*" in allowed_hosts opts out of the Host check (Django ALLOWED_HOSTS
         # convention). This re-opens DNS-rebinding exposure, so it only takes
         # effect when client_auth_hash is set (authentication becomes the
-        # fallback defence); otherwise the Host check stays enforced. Startup
-        # also refuses "*" without client_auth_hash.
+        # fallback defence) or the unsafe_allow_any_host_without_auth override
+        # is enabled; otherwise the Host check stays enforced. Startup also
+        # refuses "*" without client_auth_hash or the override.
         settings = self.server.swap_client.settings
         if "*" not in (settings.get("allowed_hosts", []) or []):
             return False
+        if settings.get("unsafe_allow_any_host_without_auth"):
+            return True
         return bool(settings.get("client_auth_hash"))
 
     def is_allowed_host(self) -> bool:
