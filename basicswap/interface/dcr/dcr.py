@@ -1084,7 +1084,12 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return self.rpc("decoderawtransaction", [tx_hex])
 
     def fundTx(
-        self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
+        self,
+        tx: bytes,
+        feerate: int,
+        lock_unspents: bool = True,
+        subfee: bool = False,
+        bid_id: bytes = None,
     ) -> bytes:
         feerate_str = float(self.format_amount(feerate))
         # TODO: unlock unspents if bid cancelled
@@ -1116,7 +1121,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize()
 
-    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None):
+    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None):
         return self.fundTx(tx_bytes, feerate)
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> bytes:
@@ -1717,7 +1722,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             else:
                 raise
 
-    def lockPrefundedTxInputs(self, tx_data: bytes) -> None:
+    def lockPrefundedTxInputs(self, tx_data: bytes, bid_id: bytes = None) -> None:
         tx = self.loadTx(tx_data)
         inputs = []
         for txi in tx.vin:
