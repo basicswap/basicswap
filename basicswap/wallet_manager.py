@@ -438,6 +438,7 @@ class WalletManager:
         include_internal: bool = True,
         include_watch_only: bool = True,
         funded_only: bool = False,
+        watch_only_require_key: bool = False,
     ) -> List[str]:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
@@ -456,6 +457,11 @@ class WalletManager:
                 )
                 if funded_only:
                     watch_query += " AND (is_funded = 1 OR cached_balance > 0)"
+                if watch_only_require_key:
+                    watch_query += (
+                        " AND private_key_encrypted IS NOT NULL"
+                        " AND private_key_encrypted != ''"
+                    )
                 cursor.execute(watch_query, (int(coin_type),))
                 addresses.extend(
                     row[0]
@@ -607,7 +613,10 @@ class WalletManager:
             total = cursor.fetchone()[0] or 0
 
             cursor.execute(
-                "SELECT COALESCE(SUM(cached_balance), 0) FROM wallet_watch_only WHERE coin_type = ?",
+                "SELECT COALESCE(SUM(cached_balance), 0) FROM wallet_watch_only"
+                " WHERE coin_type = ?"
+                " AND private_key_encrypted IS NOT NULL"
+                " AND private_key_encrypted != ''",
                 (int(coin_type),),
             )
             total += cursor.fetchone()[0] or 0

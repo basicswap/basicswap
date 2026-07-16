@@ -897,7 +897,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         total_unconfirmed_sats = 0
         wm = self.getWalletManager()
         if wm:
-            addresses = wm.getAllAddresses(self.coin_type(), funded_only=funded_only)
+            addresses = wm.getAllAddresses(
+                self.coin_type(),
+                funded_only=funded_only,
+                watch_only_require_key=True,
+            )
 
             if addresses:
                 try:
