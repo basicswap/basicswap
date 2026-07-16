@@ -101,9 +101,15 @@ def getCoinIdFromTicker(ticker: str, inc_variant: bool = False) -> str:
         raise ValueError(f"Unknown coin {ticker}")
 
 
-def getCoinIdFromName(name: str) -> Coins:
+def getCoinIdFromName(name: str, inc_variant: bool = False) -> Coins:
+    lc_name: str = name.lower()
     try:
-        return name_map[name.lower()]
+        if inc_variant:
+            if lc_name == "particl blind":
+                return Coins.PART_BLIND
+            if lc_name == "particl anon":
+                return Coins.PART_ANON
+        return name_map[lc_name]
     except Exception:
         raise ValueError(f"Unknown coin {name}")
 
