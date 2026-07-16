@@ -149,21 +149,21 @@ jobs:
               export PYTHONPATH=$(pwd)
               export TEST_BIN_PATH="$BIN_DIR"
               export TEST_PATH=/tmp/test_prepare
-              pytest tests/basicswap/test_prepare.py
+              pytest -x tests/basicswap/test_prepare.py
           - name: test_xmr
             command: |
               export PYTHONPATH=$(pwd)
               export PARTICL_BINDIR="$BIN_DIR/particl"
               export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
               export XMR_BINDIR="$BIN_DIR/monero"
-              pytest tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx or test_03_a_follower_recover_a_lock_tx or test_11_fee_validation"
+              pytest -x tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx or test_03_a_follower_recover_a_lock_tx or test_11_fee_validation"
           - name: test_encrypted_xmr_reload
             command: |
               export PYTHONPATH=$(pwd)
               export TEST_PATH=${TEST_RELOAD_PATH}
               mkdir -p ${TEST_PATH}/bin
               cp -r $BIN_DIR/* ${TEST_PATH}/bin/
-              pytest tests/basicswap/extended/test_encrypted_xmr_reload.py
+              pytest -x tests/basicswap/extended/test_encrypted_xmr_reload.py
             failure_logs: |
               for i in 0 1 2; do
                 for logname in core_stderr core_stdout wallet_stderr wallet_stdout; do
@@ -306,4 +306,4 @@ jobs:
         export PYTHONPATH=$(pwd)
         mkdir -p ${TEST_PATH}/bin
         cp -r $BIN_DIR/* ${TEST_PATH}/bin/
-        pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_coins.py --deselect tests/basicswap/test_coins.py::Test::test_set_destination
+        pytest -v -s -x --log-cli-level=DEBUG tests/basicswap/test_coins.py --deselect tests/basicswap/test_coins.py::Test::test_set_destination
