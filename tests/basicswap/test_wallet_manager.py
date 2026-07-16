@@ -25,21 +25,25 @@ def _make_db() -> str:
     os.close(fd)
     conn = sqlite3.connect(path)
     cursor = conn.cursor()
-    cursor.execute("""CREATE TABLE wallet_addresses (
+    cursor.execute(
+        """CREATE TABLE wallet_addresses (
             coin_type INTEGER,
             address TEXT,
             is_internal INTEGER DEFAULT 0,
             is_funded INTEGER DEFAULT 0,
             cached_balance INTEGER DEFAULT 0,
             derivation_index INTEGER DEFAULT 0
-        )""")
-    cursor.execute("""CREATE TABLE wallet_watch_only (
+        )"""
+    )
+    cursor.execute(
+        """CREATE TABLE wallet_watch_only (
             coin_type INTEGER,
             address TEXT,
             is_funded INTEGER DEFAULT 0,
             cached_balance INTEGER DEFAULT 0,
             private_key_encrypted BLOB
-        )""")
+        )"""
+    )
     conn.commit()
     conn.close()
     return path
