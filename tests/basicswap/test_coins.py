@@ -109,7 +109,7 @@ class Test(TestFunctions):
                         balance_type: str = "anon_balance"
                     else:
                         balance_type: str = "balance"
-                    if coin_id == Coins.PART_BLIND:
+                    if coin_id in (Coins.PART_BLIND, Coins.PART_ANON):
                         wait_for_balance(
                             cls.delay_event,
                             f"http://127.0.0.1:{node_from}/json/wallets/{coin_ticker.lower()}",
@@ -127,7 +127,7 @@ class Test(TestFunctions):
                         delay_time=2,
                     )
                 else:
-                    if coin_id == Coins.PART_BLIND:
+                    if coin_id in (Coins.PART_BLIND, Coins.PART_ANON):
                         prepare_balance(
                             cls.delay_event,
                             coin_id,
