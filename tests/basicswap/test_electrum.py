@@ -871,10 +871,18 @@ class Test(TestFunctions):
     def test_02_b_leader_recover_a_lock_tx_reverse(self):
         prepare_balance(
             self.delay_event,
-            self.test_coin_b,
+            self.test_coin_xmr,
             100,
             self.port_node_0,
             self.port_node_1,
+            True,
+        )
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
             True,
         )
         self.do_test_02_leader_recover_a_lock_tx(
