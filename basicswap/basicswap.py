@@ -117,7 +117,11 @@ from .util.address import (
 )
 from .util.crypto import sha256
 from .util.logging import LogCategories as LC
-from .util.network import is_private_ip_address, is_origin_allowed
+from .util.network import (
+    is_private_ip_address,
+    is_origin_allowed,
+    normalize_allowed_hosts,
+)
 from .util.smsg import smsgGetID
 from .interface.base import Curves
 from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
@@ -467,6 +471,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.check_delayed_auto_accept_seconds = self.get_int_setting(
             "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
+        if "allowed_hosts" in self.settings:
+            self.settings["allowed_hosts"] = normalize_allowed_hosts(
+                self.settings["allowed_hosts"]
+            )
+
         self.debug_ui = self.settings.get("debug_ui", False)
         self._debug_cases = []
         self._last_checked_actions = 0

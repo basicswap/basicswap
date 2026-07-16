@@ -662,6 +662,20 @@ class Test(unittest.TestCase):
         for url, is_public in test_urls:
             assert is_public_url(url) is is_public
 
+    def test_normalize_allowed_hosts(self):
+        from basicswap.util.network import normalize_allowed_hosts
+
+        self.assertEqual(normalize_allowed_hosts("*"), ["*"])
+        self.assertEqual(
+            normalize_allowed_hosts("swap.example.com"), ["swap.example.com"]
+        )
+        self.assertEqual(normalize_allowed_hosts(""), [])
+        self.assertEqual(normalize_allowed_hosts(None), [])
+        self.assertEqual(
+            normalize_allowed_hosts(["swap.example.com"]), ["swap.example.com"]
+        )
+        self.assertEqual(normalize_allowed_hosts([]), [])
+
     def test_is_origin_allowed(self):
         # (origin, html_host, html_port, allowed_hosts, expected)
         cases = [
