@@ -930,10 +930,11 @@ class PARTInterfaceBlind(PARTInterface):
                         txo["data_hex"],
                     ],
                 )
-                output_n = txo["n"]
+                if txo["scriptPubKey"]["address"] == addr_out:
+                    output_n = txo["n"]
                 break
             except Exception as e:
-                self._log.debug("Searching for locked output: {}".format(str(e)))
+                self._log.debug(f"Searching for locked output: {e}")
                 pass
         ensure(output_n is not None, "Output not found in tx")
 
