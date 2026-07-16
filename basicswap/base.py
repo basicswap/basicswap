@@ -300,11 +300,35 @@ class BaseApp(DBMethods):
             raise ValueError("CLI error " + str(out[1]))
         return out[0].decode("utf-8").strip()
 
+    transient_error_markers = (
+        "read timed out",
+        "no connection to daemon",
+        # Connection-class faults, daemon restarting or briefly unreachable.
+        "connection refused",
+        "connection reset",
+        "connection aborted",
+        "broken pipe",
+        "remote end closed",
+        "temporarily unavailable",
+        # Core warmup (-28) messages, matching the startup wait loop.
+        "loading block index",
+        "verifying blocks",
+        "rewinding blocks",
+        "activating best chain",
+        "loading wallet",
+        "starting network threads",
+        "upgrading",
+        "reaccepting wallet transactions",
+        # Electrum server backend/rate-limit faults.
+        "excessive resource usage",
+        "server busy",
+    )
+
     def is_transient_error(self, ex) -> bool:
         if isinstance(ex, TemporaryError):
             return True
         str_error = str(ex).lower()
-        return "read timed out" in str_error or "no connection to daemon" in str_error
+        return any(marker in str_error for marker in self.transient_error_markers)
 
     def setConnectionParameters(self, timeout=120):
         opener = urllib.request.build_opener()
