@@ -290,6 +290,13 @@ def start_processes(self):
     self.callpartrpc = make_rpc_func(
         PARTICL_RPC_PORT_BASE + PORT_OFS, "test_part_{0}:test_part_pwd_{0}"
     )
+    logging.info("Adding Particl anon outputs")
+    outputs = []
+    for i in range(48):
+        sx_addr = self.callpartrpc(1, "getnewstealthaddress")
+        outputs.append({"address": sx_addr, "amount": 0.5})
+    self.callpartrpc(0, "sendtypeto", ["part", "anon", outputs])
+
     if "bitcoin" in self.test_coins_list:
         self.callbtcrpc = make_rpc_func(
             BITCOIN_RPC_PORT_BASE + PORT_OFS,

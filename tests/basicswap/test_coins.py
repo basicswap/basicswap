@@ -137,6 +137,7 @@ class Test(TestFunctions):
                             True,
                             wait_until_spendable=False,
                         )
+
                     prepare_balance(
                         cls.delay_event,
                         coin_id,
