@@ -2118,7 +2118,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return result
 
         try:
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     bid, offer = swap
                     if offer.coin_from == coin_type or offer.coin_to == coin_type:
@@ -2228,7 +2228,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _checkRPCWalletEmpty(self, coin_type: Coins) -> dict:
         try:
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         return {
@@ -2276,7 +2276,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _checkElectrumWalletEmpty(self, coin_type: Coins) -> dict:
         try:
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         return {
@@ -2640,7 +2640,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def _transferLiteWalletBalanceToRPC(self, coin_type: Coins) -> dict:
         try:
 
-            for bid_id, swap in self.swaps_in_progress.items():
+            for bid_id, swap in list(self.swaps_in_progress.items()):
                 try:
                     if hasattr(swap, "coin_from") and swap.coin_from == coin_type:
                         self.log.warning(
@@ -14179,7 +14179,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             to_remove = []
             if now - self._last_checked_progress >= self.check_progress_seconds:
-                for bid_id, v in self.swaps_in_progress.items():
+                for bid_id, v in list(self.swaps_in_progress.items()):
                     bid, offer = v
                     try:
                         if self.checkBidState(bid_id, bid, offer) is True:
@@ -14205,7 +14205,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.deactivateBid(None, offer, bid)
 
                 if self._wallet_manager:
-                    for bid_id, v in self.swaps_in_progress.items():
+                    for bid_id, v in list(self.swaps_in_progress.items()):
                         bid, offer = v
                         try:
                             for coin_type in (
