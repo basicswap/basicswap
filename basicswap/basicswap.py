@@ -95,18 +95,19 @@ from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
     BalanceError,
-    LockedCoinError,
-    TemporaryError,
+    DeserialiseNum,
     InactiveCoin,
+    LockedCoinError,
+    RevokedOffer,
+    TemporaryError,
     b2h,
     b2i,
+    ensure,
     format_timestamp,
-    DeserialiseNum,
     h2b,
     i2b,
-    zeroIfNone,
     make_int,
-    ensure,
+    zeroIfNone,
 )
 from .util.address import (
     toWIF,
@@ -5867,6 +5868,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, offer = self.getBidAndOffer(bid_id, use_cursor)
             ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             # Ensure bid is still valid
             now: int = self.getTime()
@@ -6761,6 +6763,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             validate_offer_budget(
                 self,
@@ -7100,6 +7103,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}."
             )
             ensure(offer.expire_at > now, "Offer has expired")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             validate_offer_budget(
                 self,
@@ -10828,12 +10832,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
 
         else:
-            raise ValueError("Unknown swap type {}.".format(offer_data.swap_type))
+            raise ValueError(f"Unknown swap type {offer_data.swap_type}.")
 
         offer_id = bytes.fromhex(msg["msgid"])
 
         if self.isOfferRevoked(offer_id, msg["from"]):
-            raise ValueError("Offer has been revoked {}.".format(offer_id.hex()))
+            raise RevokedOffer(f"Offer has been revoked {offer_id.hex()}.")
 
         pk_from: bytes = getMsgPubkey(self, msg)
         try:
@@ -10926,9 +10930,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     cursor,
                 )
             else:
-                existing_offer.setState(OfferStates.OFFER_RECEIVED)
-                existing_offer.pk_from = pk_from
-                self.add(existing_offer, cursor, upsert=True)
+                if existing_offer.active_ind != 1:
+                    raise RevokedOffer(
+                        f"Ignoring inactive offer {offer_id.hex()}, active_ind: {existing_offer.active_ind}."
+                    )
+                if existing_offer.state != OfferStates.OFFER_RECEIVED:
+                    existing_offer.setState(OfferStates.OFFER_RECEIVED)
+                    existing_offer.pk_from = pk_from
+                    self.add(existing_offer, cursor, upsert=True)
             received_on_net: str = networkTypeToID(msg.get("type", "smsg"))
             self.addMessageNetworkLink(
                 Concepts.OFFER,
@@ -12018,7 +12027,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )  # TODO: Split BID_ACCEPTED into received and sent
             ensure(
                 bid.state in allowed_states,
-                f"Invalid state for bid {bid.state}",
+                f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
             )
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
@@ -13057,6 +13066,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
+        ensure(
+            isActiveBidState(BidStates(bid.state)),
+            f"Bid {self.log.id(bid_id)} not in progress {bid.state}, {strBidState(bid.state)}",
+        )
+
         offer, xmr_offer = self.getXmrOffer(bid.offer_id)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
@@ -13080,7 +13094,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
             ensure(
                 bid.state in allowed_states,
-                "Invalid state for bid {}".format(bid.state),
+                f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
             )
             xmr_swap.af_lock_refund_spend_tx_esig = (
                 msg_data.af_lock_refund_spend_tx_esig
@@ -13224,6 +13238,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
+            BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+        ]
+        ensure(
+            bid.state in allowed_states,
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
+        )
+        if bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
+            # Duplicate message or swap-to-self, processed when sent
+            self.log.debug(
+                f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} already in state {strBidState(bid.state)}."
+            )
+            return
+
         try:
             xmr_swap.a_lock_spend_tx = msg_data.a_lock_spend_tx
             xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
@@ -13244,17 +13273,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.pkal, "proof key owned for swap", xmr_swap.kal_sig
             )
 
-            if bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
-                bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
-                bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
-            elif bid.state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX:
-                self.log.debug(
-                    f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} already in state {bid.state}."
-                )
-            else:
-                self.log.warning(
-                    f"processXmrBidLockSpendTx bid {self.log.id(bid_id)} unexpected state {bid.state}."
-                )
+            bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
+            bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
             if self.debug:
@@ -13363,6 +13383,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
+
+        allowed_states = [
+            BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+            BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED,
+        ]
+        if bid.was_sent and offer.was_sent:
+            # Self-bid exception
+            allowed_states.append(BidStates.XMR_SWAP_LOCK_RELEASED)
+        ensure(
+            BidStates(bid.state) in allowed_states,
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
+        )
 
         xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         try:
@@ -13561,7 +13593,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             allowed_states.append(BidStates.BID_REQUEST_ACCEPTED)
         ensure(
             bid.state in allowed_states,
-            "Invalid state for bid {}".format(bid.state),
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
 
         ci_from = self.ci(offer.coin_to)
@@ -13842,6 +13874,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Ignoring message involving inactive coin {Coins(ex.coinid).name}, type {MessageTypes(msg_type).name}."
             )
+        except RevokedOffer as ex:
+            self.log.debug(str(ex))
         except Exception as ex:
             self.log.error(f"processMsg {ex}")
             if self.debug:

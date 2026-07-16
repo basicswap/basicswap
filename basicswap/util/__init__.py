@@ -49,6 +49,10 @@ class LockedCoinError(Exception):
         return "must be unlocked: " + str(self.coinid)
 
 
+class RevokedOffer(Exception):
+    pass
+
+
 def ensure(v, err_string):
     if not v:
         raise ValueError(err_string)
