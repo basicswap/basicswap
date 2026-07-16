@@ -646,18 +646,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def _verifyTxMerkleElectrum(
         self, backend, txid_hex: str, block_height: int
-    ) -> bool:
+    ) -> Optional[bool]:
+        # True: proof verified. False: server returned a proof that does not
+        # match the header (or header PoW is invalid) - fail closed.
+        # None: could not fetch a proof (transient error or stale height) -
+        # treat as unverified but do not cache the result.
         if block_height <= 0:
-            return False
+            return None
         if self._merkle_verified.get(txid_hex) == block_height:
             return True
         try:
             proof = backend._server.get_merkle(txid_hex, block_height)
             if not proof or "merkle" not in proof or "pos" not in proof:
-                self._log.error(
+                self._log.debug(
                     f"Merkle proof missing for {self._log.id(txid_hex)} at height {block_height}"
                 )
-                return False
+                return None
             header_hex = backend._server.call("blockchain.block.header", [block_height])
             header_bytes = bytes.fromhex(header_hex)
             if not check_header_pow(header_bytes):
@@ -673,10 +677,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
                 return False
         except Exception as e:
-            self._log.error(
-                f"Merkle verification failed for {self._log.id(txid_hex)}: {e}"
+            self._log.debug(
+                f"Merkle verification could not complete for {self._log.id(txid_hex)} at height {block_height}: {e}"
             )
-            return False
+            return None
         self._merkle_verified[txid_hex] = block_height
         return True
 
@@ -3373,16 +3377,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         wm = self.getWalletManager()
         if wm:
             cached = wm.getCachedTxConfirmations(self.coin_type(), txid.hex())
-            if cached is not None:
+            if cached is not None and cached[1] > 0:
                 confirmations, block_height = cached
-                if block_height > 0:
-                    if not self._verifyTxMerkleElectrum(
-                        backend, txid.hex(), block_height
-                    ):
-                        block_height = 0
-                        confirmations = 0
-                    else:
-                        confirmations = max(0, chain_height - block_height + 1)
+                if (
+                    self._verifyTxMerkleElectrum(backend, txid.hex(), block_height)
+                    is not True
+                ):
+                    block_height = 0
+                    confirmations = 0
+                else:
+                    confirmations = max(1, chain_height - block_height + 1)
                 rv = {"depth": confirmations, "height": block_height}
                 if find_index:
                     try:
@@ -3431,13 +3435,34 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             confirmations = max(0, chain_height - block_height + 1)
                         break
 
-            if block_height > 0 and not self._verifyTxMerkleElectrum(
-                backend, txid.hex(), block_height
-            ):
-                block_height = 0
-                confirmations = 0
+            verified = None
+            if block_height > 0:
+                verified = self._verifyTxMerkleElectrum(
+                    backend, txid.hex(), block_height
+                )
+                if verified is None:
+                    # block_height may have been derived from a stale cached
+                    # chain height, retry at the height the server reports.
+                    hist_height = 0
+                    for entry in backend.getAddressHistory(dest_address):
+                        if entry.get("txid") == txid.hex():
+                            hist_height = entry.get("height", 0)
+                            break
+                    if hist_height > 0 and hist_height != block_height:
+                        verified = self._verifyTxMerkleElectrum(
+                            backend, txid.hex(), hist_height
+                        )
+                        if verified is True:
+                            block_height = hist_height
+                if verified is True:
+                    # Merkle-verified txns have at least one confirmation,
+                    # even if the cached chain height lags the tx height.
+                    confirmations = max(1, chain_height - block_height + 1)
+                else:
+                    block_height = 0
+                    confirmations = 0
 
-            if wm:
+            if wm and verified is True:
                 wm.cacheTxConfirmations(
                     self.coin_type(), txid.hex(), confirmations, block_height
                 )

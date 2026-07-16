@@ -1259,15 +1259,16 @@ class TestElectrumMerkleAdversarial(unittest.TestCase):
         ci = make_merkle_interface()
         server = MerkleStubServer({"merkle": ["cc" * 32], "pos": 0}, GENESIS_HEADER_HEX)
         backend = StubBackend(server)
-        self.assertFalse(
-            ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 100000)
+        self.assertIs(
+            ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 100000), False
         )
 
     def test_missing_merkle_support_fails_closed(self):
         ci = make_merkle_interface()
         server = MerkleStubServer(None, GENESIS_HEADER_HEX, raise_on_merkle=True)
         backend = StubBackend(server)
-        self.assertFalse(
+        # Transient/fetch failures return None: unverified, but not cached.
+        self.assertIsNone(
             ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 100000)
         )
 
@@ -1277,13 +1278,16 @@ class TestElectrumMerkleAdversarial(unittest.TestCase):
         tampered[76] ^= 0x01
         server = MerkleStubServer({"merkle": [], "pos": 0}, bytes(tampered).hex())
         backend = StubBackend(server)
-        self.assertFalse(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 1))
+        # A proof that fails validation is a hard failure.
+        self.assertIs(
+            ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 1), False
+        )
 
     def test_zero_height_fails_closed(self):
         ci = make_merkle_interface()
         server = MerkleStubServer({"merkle": [], "pos": 0}, GENESIS_HEADER_HEX)
         backend = StubBackend(server)
-        self.assertFalse(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 0))
+        self.assertIsNone(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 0))
 
     def test_verified_result_is_cached(self):
         ci = make_merkle_interface()
@@ -1291,6 +1295,121 @@ class TestElectrumMerkleAdversarial(unittest.TestCase):
         backend = StubBackend(server)
         self.assertTrue(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 1))
         self.assertEqual(ci._merkle_verified.get(GENESIS_COINBASE_TXID), 1)
+
+
+class DepthStubServer:
+    # Only serves a valid merkle proof at valid_height, mimicking a server
+    # that raises for get_merkle at any other (stale/wrong) height.
+    def __init__(self, valid_height, header_hex):
+        self._valid_height = valid_height
+        self._header_hex = header_hex
+
+    def get_merkle(self, txid, height):
+        if height != self._valid_height:
+            raise RuntimeError(f"tx not in block at height {height}")
+        return {"merkle": [], "pos": 0}
+
+    def call(self, method, params):
+        if method == "blockchain.block.header":
+            return self._header_hex
+        raise RuntimeError(f"unexpected call {method}")
+
+
+class DepthStubBackend:
+    def __init__(self, server, confirmations, history_height):
+        self._server = server
+        self._confirmations = confirmations
+        self._history_height = history_height
+
+    def getTransaction(self, txid):
+        return {"confirmations": self._confirmations}
+
+    def getAddressHistory(self, address):
+        return [{"txid": GENESIS_COINBASE_TXID, "height": self._history_height}]
+
+
+class StubWalletManager:
+    def __init__(self, cached=None):
+        self._cached = cached
+        self.cache_calls = []
+
+    def getCachedTxConfirmations(self, coin_type, txid):
+        return self._cached
+
+    def cacheTxConfirmations(self, coin_type, txid, confirmations, block_height):
+        self.cache_calls.append((txid, confirmations, block_height))
+
+
+def make_depth_interface(backend, wm, chain_height):
+    ci = BTCInterface.__new__(BTCInterface)
+    ci._log = StubLog()
+    ci._merkle_verified = {}
+    ci.getBackend = lambda: backend
+    ci.getWalletManager = lambda: wm
+    ci.getChainHeight = lambda: chain_height
+    ci.importWatchOnlyAddress = lambda addr, label: None
+    ci.coin_type = lambda: Coins.BTC
+    return ci
+
+
+class TestElectrumDepthHeightRace(unittest.TestCase):
+    # The chain height used to derive a block height from a confirmations
+    # count can lag the server, sending merkle verification to the wrong
+    # height. Verification must retry at the server-reported history height
+    # and transient failures must not poison the confirmations cache.
+
+    dest_address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+    txid = bytes.fromhex(GENESIS_COINBASE_TXID)
+
+    def test_stale_chain_height_retries_history_height(self):
+        # Tx confirmed at height 101, but our cached chain height is 100:
+        # the derived height (100 - 1 + 1 = 100) fails, history height works.
+        server = DepthStubServer(valid_height=101, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager()
+        ci = make_depth_interface(backend, wm, chain_height=100)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["height"], 101)
+        self.assertEqual(rv["depth"], 1)
+        self.assertEqual(wm.cache_calls, [(GENESIS_COINBASE_TXID, 1, 101)])
+
+    def test_transient_verify_failure_not_cached(self):
+        # No height verifies (server error): depth reports 0 but nothing is
+        # cached, so the next poll re-queries immediately.
+        server = DepthStubServer(valid_height=-1, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager()
+        ci = make_depth_interface(backend, wm, chain_height=100)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["depth"], 0)
+        self.assertEqual(rv["height"], 0)
+        self.assertEqual(wm.cache_calls, [])
+
+    def test_stale_zero_cache_entry_is_requeried(self):
+        # A (0, 0) cache entry from a previous failure must not pin the tx
+        # at zero depth, a fresh query must run and verify.
+        server = DepthStubServer(valid_height=101, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager(cached=(0, 0))
+        ci = make_depth_interface(backend, wm, chain_height=101)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["height"], 101)
+        self.assertEqual(rv["depth"], 1)
+
+    def test_verified_cache_entry_reports_min_one_conf(self):
+        # A verified cached height must never report less than one
+        # confirmation, even if the cached chain height lags the tx height.
+        server = DepthStubServer(valid_height=101, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager(cached=(1, 101))
+        ci = make_depth_interface(backend, wm, chain_height=100)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["height"], 101)
+        self.assertEqual(rv["depth"], 1)
 
 
 class TestElectrumMedianTime(unittest.TestCase):
