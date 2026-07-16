@@ -52,6 +52,10 @@ from basicswap.util.crypto import (
     hash160,
     sha256,
 )
+from basicswap.util.merkle import (
+    check_header_pow,
+    verify_tx_merkle_proof,
+)
 from coincurve.keys import (
     PrivateKey,
     PublicKey,
@@ -321,6 +325,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._backend = None
         self._pending_utxos_map: Dict[str, list] = {}
         self._pending_utxos_lock = threading.Lock()
+        self._utxo_reserve_lock = threading.RLock()
+        self._merkle_verified: Dict[str, int] = {}
+        self._median_time_cache: Optional[int] = None
+        self._median_time_cache_height: Optional[int] = None
 
     def setBackend(self, backend) -> None:
         self._backend = backend
@@ -515,26 +523,50 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx_obj = self.loadTx(tx_data)
         return tx_obj.vin[vout].nSequence
 
-    def getChainMedianTime(self) -> int:
+    def getChainMedianTime(self) -> Optional[int]:
         if self.useBackend():
-            import struct
+            return self._getChainMedianTimeElectrum()
+        try:
+            mtp = self.rpc("getblockchaininfo")["mediantime"]
+            self._median_time_cache = mtp
+            return mtp
+        except Exception as e:
+            self._log.warning(f"getChainMedianTime rpc error: {e}")
+            return self._median_time_cache
 
-            backend = self.getBackend()
-            if not backend:
-                raise ValueError("No electrum backend available")
+    def _getChainMedianTimeElectrum(self) -> Optional[int]:
+        import struct
+
+        backend = self.getBackend()
+        if not backend:
+            self._log.warning("getChainMedianTime: no electrum backend available")
+            return self._median_time_cache
+        try:
             height = backend.getBlockHeight()
+            if (
+                self._median_time_cache is not None
+                and self._median_time_cache_height == height
+            ):
+                return self._median_time_cache
             start = max(0, height - 10)
             count = height - start + 1
             result = backend._server.call("blockchain.block.headers", [start, count])
             header_bytes = bytes.fromhex(result["hex"])
-            returned = result.get("count", count)
+            returned = min(result.get("count", count), len(header_bytes) // 80)
+            if returned < 1:
+                raise ValueError("No headers returned")
             times = [
                 struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
                 for i in range(returned)
             ]
             times.sort()
-            return times[len(times) // 2]
-        return self.rpc("getblockchaininfo")["mediantime"]
+            mtp = times[len(times) // 2]
+            self._median_time_cache = mtp
+            self._median_time_cache_height = height
+            return mtp
+        except Exception as e:
+            self._log.warning(f"getChainMedianTime electrum error: {e}")
+            return self._median_time_cache
 
     def isCsvLockMature(
         self,
@@ -557,6 +589,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return False
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
+            if chain_mtp is None:
+                return False
             return chain_mtp >= parent_block_time + lock_value
         raise ValueError(f"Unknown lock type {lock_type}")
 
@@ -574,6 +608,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return chain_height + 1 >= nlocktime
         if chain_mtp is None:
             chain_mtp = self.getChainMedianTime()
+        if chain_mtp is None:
+            return False
         return chain_mtp >= nlocktime
 
     def getMempoolTx(self, txid):
@@ -607,6 +643,46 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         block_time = struct.unpack("<I", header_bytes[68:72])[0]
         block_hash = sha256(sha256(header_bytes))[::-1].hex()
         return {"height": height, "hash": block_hash, "time": block_time}
+
+    def _verifyTxMerkleElectrum(
+        self, backend, txid_hex: str, block_height: int
+    ) -> Optional[bool]:
+        # True: proof verified. False: server returned a proof that does not
+        # match the header (or header PoW is invalid) - fail closed.
+        # None: could not fetch a proof (transient error or stale height) -
+        # treat as unverified but do not cache the result.
+        if block_height <= 0:
+            return None
+        if self._merkle_verified.get(txid_hex) == block_height:
+            return True
+        try:
+            proof = backend._server.get_merkle(txid_hex, block_height)
+            if not proof or "merkle" not in proof or "pos" not in proof:
+                self._log.debug(
+                    f"Merkle proof missing for {self._log.id(txid_hex)} at height {block_height}"
+                )
+                return None
+            header_hex = backend._server.call("blockchain.block.header", [block_height])
+            header_bytes = bytes.fromhex(header_hex)
+            if not check_header_pow(header_bytes):
+                self._log.error(
+                    f"Block header PoW invalid at height {block_height} for {self._log.id(txid_hex)}"
+                )
+                return False
+            if not verify_tx_merkle_proof(
+                txid_hex, header_bytes, proof["merkle"], proof["pos"]
+            ):
+                self._log.error(
+                    f"Merkle proof mismatch for {self._log.id(txid_hex)} at height {block_height}"
+                )
+                return False
+        except Exception as e:
+            self._log.debug(
+                f"Merkle verification could not complete for {self._log.id(txid_hex)} at height {block_height}: {e}"
+            )
+            return None
+        self._merkle_verified[txid_hex] = block_height
+        return True
 
     def getBestBlockHash(self) -> str:
         if self._connection_type == "electrum":
@@ -1276,8 +1352,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize()
 
-    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None) -> bytes:
-        funded_tx = self.fundTx(tx_bytes, feerate)
+    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None) -> bytes:
+        funded_tx = self.fundTx(tx_bytes, feerate, bid_id=bid_id)
 
         if self._disable_lock_tx_rbf:
             tx = self.loadTx(funded_tx)
@@ -1968,11 +2044,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
 
     def fundTx(
-        self, tx: bytes, feerate: int, lock_unspents: bool = True, subfee: bool = False
+        self,
+        tx: bytes,
+        feerate: int,
+        lock_unspents: bool = True,
+        subfee: bool = False,
+        bid_id: bytes = None,
     ) -> bytes:
         if self.useBackend():
             return self._fundTxElectrum(
-                tx, feerate, lock_unspents=lock_unspents, subfee=subfee
+                tx, feerate, lock_unspents=lock_unspents, subfee=subfee, bid_id=bid_id
             )
 
         feerate_str = self.format_amount(feerate)
@@ -1992,7 +2073,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return tx_bytes
 
     def _fundTxElectrum(
-        self, tx, feerate, lock_unspents: bool = True, subfee: bool = False
+        self,
+        tx,
+        feerate,
+        lock_unspents: bool = True,
+        subfee: bool = False,
+        bid_id: bytes = None,
     ) -> bytes:
         wm = self.getWalletManager()
         backend = self.getBackend()
@@ -2156,15 +2242,25 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             funded_tx.vout[0].nValue = new_value
 
         if lock_unspents:
-            for utxo in selected_utxos:
-                wm.lockUTXO(
-                    self.coin_type(),
-                    utxo.get("txid", ""),
-                    utxo.get("vout", 0),
-                    value=utxo.get("value", 0),
-                    address=utxo.get("address"),
-                    expires_in=3600,
-                )
+            lock_expires_in = 86400 if bid_id is not None else 3600
+            with self._utxo_reserve_lock:
+                for utxo in selected_utxos:
+                    if wm.isUTXOLocked(
+                        self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
+                    ):
+                        raise ValueError(
+                            "UTXO reserved by a concurrent operation, retry funding"
+                        )
+                for utxo in selected_utxos:
+                    wm.lockUTXO(
+                        self.coin_type(),
+                        utxo.get("txid", ""),
+                        utxo.get("vout", 0),
+                        value=utxo.get("value", 0),
+                        address=utxo.get("address"),
+                        bid_id=bid_id,
+                        expires_in=lock_expires_in,
+                    )
 
         tx_serialized = funded_tx.serialize()
         tx_key = self._getTxInputsKey(funded_tx)
@@ -2285,7 +2381,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             else:
                 raise
 
-    def lockPrefundedTxInputs(self, tx_data: bytes) -> None:
+    def lockPrefundedTxInputs(self, tx_data: bytes, bid_id: bytes = None) -> None:
         tx = self.loadTx(tx_data)
         if self.useBackend():
             wm = self.getWalletManager()
@@ -2293,12 +2389,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             if not wm or not backend:
                 raise ValueError("Electrum backend or WalletManager not available")
 
+            lock_expires_in = 86400 if bid_id is not None else 3600
             for txi in tx.vin:
                 wm.lockUTXO(
                     self.coin_type(),
                     i2h(txi.prevout.hash),
                     txi.prevout.n,
-                    expires_in=3600,
+                    bid_id=bid_id,
+                    expires_in=lock_expires_in,
                 )
             return
 
@@ -3279,10 +3377,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         wm = self.getWalletManager()
         if wm:
             cached = wm.getCachedTxConfirmations(self.coin_type(), txid.hex())
-            if cached is not None:
+            if cached is not None and cached[1] > 0:
                 confirmations, block_height = cached
-                if block_height > 0:
-                    confirmations = max(0, chain_height - block_height + 1)
+                if (
+                    self._verifyTxMerkleElectrum(backend, txid.hex(), block_height)
+                    is not True
+                ):
+                    block_height = 0
+                    confirmations = 0
+                else:
+                    confirmations = max(1, chain_height - block_height + 1)
                 rv = {"depth": confirmations, "height": block_height}
                 if find_index:
                     try:
@@ -3331,7 +3435,34 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             confirmations = max(0, chain_height - block_height + 1)
                         break
 
-            if wm:
+            verified = None
+            if block_height > 0:
+                verified = self._verifyTxMerkleElectrum(
+                    backend, txid.hex(), block_height
+                )
+                if verified is None:
+                    # block_height may have been derived from a stale cached
+                    # chain height, retry at the height the server reports.
+                    hist_height = 0
+                    for entry in backend.getAddressHistory(dest_address):
+                        if entry.get("txid") == txid.hex():
+                            hist_height = entry.get("height", 0)
+                            break
+                    if hist_height > 0 and hist_height != block_height:
+                        verified = self._verifyTxMerkleElectrum(
+                            backend, txid.hex(), hist_height
+                        )
+                        if verified is True:
+                            block_height = hist_height
+                if verified is True:
+                    # Merkle-verified txns have at least one confirmation,
+                    # even if the cached chain height lags the tx height.
+                    confirmations = max(1, chain_height - block_height + 1)
+                else:
+                    block_height = 0
+                    confirmations = 0
+
+            if wm and verified is True:
                 wm.cacheTxConfirmations(
                     self.coin_type(), txid.hex(), confirmations, block_height
                 )

@@ -785,6 +785,7 @@ class NAVInterface(BTCInterface):
         feerate: int,
         lock_unspents: bool = True,
         subfee: bool = False,
+        bid_id: bytes = None,
     ):
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
@@ -806,7 +807,9 @@ class NAVInterface(BTCInterface):
 
         return tx_signed.serialize_without_witness()
 
-    def fundSCLockTx(self, tx_bytes: bytes, feerate, vkbv=None) -> bytes:
+    def fundSCLockTx(
+        self, tx_bytes: bytes, feerate, vkbv=None, bid_id: bytes = None
+    ) -> bytes:
         tx_funded = self.fundTx(tx_bytes.hex(), feerate)
         return tx_funded
 

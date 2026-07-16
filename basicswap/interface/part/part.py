@@ -331,7 +331,9 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_wallet("createrawparttransaction", params)
         return bytes.fromhex(rv["hex"])
 
-    def fundSCLockTx(self, tx_bytes: bytes, feerate: int, vkbv: bytes) -> bytes:
+    def fundSCLockTx(
+        self, tx_bytes: bytes, feerate: int, vkbv: bytes, bid_id: bytes = None
+    ) -> bytes:
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
 

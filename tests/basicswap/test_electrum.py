@@ -48,9 +48,11 @@ import logging
 import os
 import random
 import shutil
+import struct
 import subprocess
 import sys
 import unittest
+from hashlib import sha256
 from io import BytesIO
 
 import basicswap.config as cfg
@@ -84,7 +86,16 @@ from tests.basicswap.test_persistent import (
     RESET_TEST,
 )
 from tests.basicswap.util.mnemonics import mnemonics
+from basicswap.interface.btc.btc import BTCInterface
 from basicswap.interface.electrumx import ElectrumConnection
+from basicswap.util.merkle import (
+    check_header_pow,
+    electrum_merkle_root,
+    header_bits,
+    parse_header_merkle_root,
+    target_from_bits,
+    verify_tx_merkle_proof,
+)
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -1070,6 +1081,411 @@ class Test(TestFunctions):
         assert len(prefunded_inputs) == len(chain_inputs)
         for prefunded_input in prefunded_inputs:
             assert prefunded_input in chain_inputs
+
+
+# ---------------------------------------------------------------------------
+# Unit tests, no daemons required
+# ---------------------------------------------------------------------------
+
+
+def dsha256(data: bytes) -> bytes:
+    return sha256(sha256(data).digest()).digest()
+
+
+GENESIS_HEADER_HEX = (
+    "0100000000000000000000000000000000000000000000000000000000000000000000003b"
+    "a3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff"
+    "001d1dac2b7c"
+)
+GENESIS_COINBASE_TXID = (
+    "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
+)
+
+
+def build_regtest_header(merkle_root_le: bytes) -> bytes:
+    version = struct.pack("<I", 1)
+    prev = bytes(32)
+    time_field = struct.pack("<I", 1000)
+    bits = struct.pack("<I", 0x207FFFFF)
+    nonce = struct.pack("<I", 0)
+    return version + prev + merkle_root_le + time_field + bits + nonce
+
+
+def make_header(timestamp: int) -> bytes:
+    header = bytearray(80)
+    header[68:72] = struct.pack("<I", timestamp)
+    return bytes(header)
+
+
+class StubLog:
+    def id(self, v):
+        return str(v)
+
+    def error(self, *args, **kwargs):
+        pass
+
+    def warning(self, *args, **kwargs):
+        pass
+
+    def debug(self, *args, **kwargs):
+        pass
+
+
+class MerkleStubServer:
+    def __init__(self, merkle_result, header_hex, raise_on_merkle=False):
+        self._merkle_result = merkle_result
+        self._header_hex = header_hex
+        self._raise_on_merkle = raise_on_merkle
+
+    def get_merkle(self, txid, height):
+        if self._raise_on_merkle:
+            raise RuntimeError("no merkle support")
+        return self._merkle_result
+
+    def call(self, method, params):
+        if method == "blockchain.block.header":
+            return self._header_hex
+        raise RuntimeError(f"unexpected call {method}")
+
+
+class HeadersStubServer:
+    def __init__(self, headers=None, raise_on_call=False):
+        self._headers = headers or []
+        self._raise_on_call = raise_on_call
+        self.call_count = 0
+
+    def call(self, method, params):
+        self.call_count += 1
+        if self._raise_on_call:
+            raise RuntimeError("server error")
+        if method == "blockchain.block.headers":
+            joined = b"".join(self._headers)
+            return {"hex": joined.hex(), "count": len(self._headers)}
+        raise RuntimeError(f"unexpected call {method}")
+
+
+class StubBackend:
+    def __init__(self, server, height=100, raise_on_height=False):
+        self._server = server
+        self._height = height
+        self._raise_on_height = raise_on_height
+
+    def getBlockHeight(self):
+        if self._raise_on_height:
+            raise RuntimeError("no connection")
+        return self._height
+
+
+def make_merkle_interface():
+    ci = BTCInterface.__new__(BTCInterface)
+    ci._log = StubLog()
+    ci._merkle_verified = {}
+    return ci
+
+
+def make_median_time_interface(backend):
+    ci = BTCInterface.__new__(BTCInterface)
+    ci._log = StubLog()
+    ci._connection_type = "electrum"
+    ci._backend = backend
+    ci._median_time_cache = None
+    ci._median_time_cache_height = None
+    return ci
+
+
+class TestMerkle(unittest.TestCase):
+    def test_single_tx_root_equals_txid(self):
+        header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
+        self.assertEqual(len(header_bytes), 80)
+        root = electrum_merkle_root(GENESIS_COINBASE_TXID, [], 0)
+        self.assertEqual(root, parse_header_merkle_root(header_bytes))
+
+    def test_genesis_pow_valid(self):
+        header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
+        self.assertTrue(check_header_pow(header_bytes))
+
+    def test_verify_full_genesis(self):
+        header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
+        self.assertTrue(
+            verify_tx_merkle_proof(GENESIS_COINBASE_TXID, header_bytes, [], 0)
+        )
+
+    def test_two_tx_branch(self):
+        txa = "aa" * 32
+        txb = "bb" * 32
+        txa_le = bytes.fromhex(txa)[::-1]
+        txb_le = bytes.fromhex(txb)[::-1]
+        root_le = dsha256(txa_le + txb_le)
+        header_bytes = build_regtest_header(root_le)
+
+        self.assertTrue(
+            verify_tx_merkle_proof(txa, header_bytes, [txb], 0, require_pow=False)
+        )
+        self.assertTrue(
+            verify_tx_merkle_proof(txb, header_bytes, [txa], 1, require_pow=False)
+        )
+
+    def test_bad_branch_fails(self):
+        txa = "aa" * 32
+        txb = "bb" * 32
+        txc = "cc" * 32
+        txa_le = bytes.fromhex(txa)[::-1]
+        txb_le = bytes.fromhex(txb)[::-1]
+        root_le = dsha256(txa_le + txb_le)
+        header_bytes = build_regtest_header(root_le)
+
+        self.assertFalse(
+            verify_tx_merkle_proof(txa, header_bytes, [txc], 0, require_pow=False)
+        )
+
+    def test_bits_and_target(self):
+        header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
+        self.assertEqual(header_bits(header_bytes), 0x1D00FFFF)
+        self.assertEqual(
+            target_from_bits(0x1D00FFFF),
+            0x00000000FFFF0000000000000000000000000000000000000000000000000000,
+        )
+
+    def test_pow_fails_on_tampered_header(self):
+        header_bytes = bytearray(bytes.fromhex(GENESIS_HEADER_HEX))
+        header_bytes[36] ^= 0xFF
+        self.assertFalse(check_header_pow(bytes(header_bytes)))
+
+    def test_short_header_raises(self):
+        with self.assertRaises(ValueError):
+            parse_header_merkle_root(b"\x00" * 40)
+
+
+class TestElectrumMerkleAdversarial(unittest.TestCase):
+    def test_honest_server_verifies(self):
+        ci = make_merkle_interface()
+        server = MerkleStubServer({"merkle": [], "pos": 0}, GENESIS_HEADER_HEX)
+        backend = StubBackend(server)
+        self.assertTrue(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 1))
+
+    def test_phantom_height_bad_merkle_fails_closed(self):
+        ci = make_merkle_interface()
+        server = MerkleStubServer({"merkle": ["cc" * 32], "pos": 0}, GENESIS_HEADER_HEX)
+        backend = StubBackend(server)
+        self.assertIs(
+            ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 100000), False
+        )
+
+    def test_missing_merkle_support_fails_closed(self):
+        ci = make_merkle_interface()
+        server = MerkleStubServer(None, GENESIS_HEADER_HEX, raise_on_merkle=True)
+        backend = StubBackend(server)
+        # Transient/fetch failures return None: unverified, but not cached.
+        self.assertIsNone(
+            ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 100000)
+        )
+
+    def test_tampered_header_fails_closed(self):
+        ci = make_merkle_interface()
+        tampered = bytearray(bytes.fromhex(GENESIS_HEADER_HEX))
+        tampered[76] ^= 0x01
+        server = MerkleStubServer({"merkle": [], "pos": 0}, bytes(tampered).hex())
+        backend = StubBackend(server)
+        # A proof that fails validation is a hard failure.
+        self.assertIs(
+            ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 1), False
+        )
+
+    def test_zero_height_fails_closed(self):
+        ci = make_merkle_interface()
+        server = MerkleStubServer({"merkle": [], "pos": 0}, GENESIS_HEADER_HEX)
+        backend = StubBackend(server)
+        self.assertIsNone(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 0))
+
+    def test_verified_result_is_cached(self):
+        ci = make_merkle_interface()
+        server = MerkleStubServer({"merkle": [], "pos": 0}, GENESIS_HEADER_HEX)
+        backend = StubBackend(server)
+        self.assertTrue(ci._verifyTxMerkleElectrum(backend, GENESIS_COINBASE_TXID, 1))
+        self.assertEqual(ci._merkle_verified.get(GENESIS_COINBASE_TXID), 1)
+
+
+class DepthStubServer:
+    # Only serves a valid merkle proof at valid_height, mimicking a server
+    # that raises for get_merkle at any other (stale/wrong) height.
+    def __init__(self, valid_height, header_hex):
+        self._valid_height = valid_height
+        self._header_hex = header_hex
+
+    def get_merkle(self, txid, height):
+        if height != self._valid_height:
+            raise RuntimeError(f"tx not in block at height {height}")
+        return {"merkle": [], "pos": 0}
+
+    def call(self, method, params):
+        if method == "blockchain.block.header":
+            return self._header_hex
+        raise RuntimeError(f"unexpected call {method}")
+
+
+class DepthStubBackend:
+    def __init__(self, server, confirmations, history_height):
+        self._server = server
+        self._confirmations = confirmations
+        self._history_height = history_height
+
+    def getTransaction(self, txid):
+        return {"confirmations": self._confirmations}
+
+    def getAddressHistory(self, address):
+        return [{"txid": GENESIS_COINBASE_TXID, "height": self._history_height}]
+
+
+class StubWalletManager:
+    def __init__(self, cached=None):
+        self._cached = cached
+        self.cache_calls = []
+
+    def getCachedTxConfirmations(self, coin_type, txid):
+        return self._cached
+
+    def cacheTxConfirmations(self, coin_type, txid, confirmations, block_height):
+        self.cache_calls.append((txid, confirmations, block_height))
+
+
+def make_depth_interface(backend, wm, chain_height):
+    ci = BTCInterface.__new__(BTCInterface)
+    ci._log = StubLog()
+    ci._merkle_verified = {}
+    ci.getBackend = lambda: backend
+    ci.getWalletManager = lambda: wm
+    ci.getChainHeight = lambda: chain_height
+    ci.importWatchOnlyAddress = lambda addr, label: None
+    ci.coin_type = lambda: Coins.BTC
+    return ci
+
+
+class TestElectrumDepthHeightRace(unittest.TestCase):
+    # The chain height used to derive a block height from a confirmations
+    # count can lag the server, sending merkle verification to the wrong
+    # height. Verification must retry at the server-reported history height
+    # and transient failures must not poison the confirmations cache.
+
+    dest_address = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
+    txid = bytes.fromhex(GENESIS_COINBASE_TXID)
+
+    def test_stale_chain_height_retries_history_height(self):
+        # Tx confirmed at height 101, but our cached chain height is 100:
+        # the derived height (100 - 1 + 1 = 100) fails, history height works.
+        server = DepthStubServer(valid_height=101, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager()
+        ci = make_depth_interface(backend, wm, chain_height=100)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["height"], 101)
+        self.assertEqual(rv["depth"], 1)
+        self.assertEqual(wm.cache_calls, [(GENESIS_COINBASE_TXID, 1, 101)])
+
+    def test_transient_verify_failure_not_cached(self):
+        # No height verifies (server error): depth reports 0 but nothing is
+        # cached, so the next poll re-queries immediately.
+        server = DepthStubServer(valid_height=-1, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager()
+        ci = make_depth_interface(backend, wm, chain_height=100)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["depth"], 0)
+        self.assertEqual(rv["height"], 0)
+        self.assertEqual(wm.cache_calls, [])
+
+    def test_stale_zero_cache_entry_is_requeried(self):
+        # A (0, 0) cache entry from a previous failure must not pin the tx
+        # at zero depth, a fresh query must run and verify.
+        server = DepthStubServer(valid_height=101, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager(cached=(0, 0))
+        ci = make_depth_interface(backend, wm, chain_height=101)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["height"], 101)
+        self.assertEqual(rv["depth"], 1)
+
+    def test_verified_cache_entry_reports_min_one_conf(self):
+        # A verified cached height must never report less than one
+        # confirmation, even if the cached chain height lags the tx height.
+        server = DepthStubServer(valid_height=101, header_hex=GENESIS_HEADER_HEX)
+        backend = DepthStubBackend(server, confirmations=1, history_height=101)
+        wm = StubWalletManager(cached=(1, 101))
+        ci = make_depth_interface(backend, wm, chain_height=100)
+
+        rv = ci._getLockTxHeightElectrum(self.txid, self.dest_address, 0, 0)
+        self.assertEqual(rv["height"], 101)
+        self.assertEqual(rv["depth"], 1)
+
+
+class TestElectrumMedianTime(unittest.TestCase):
+    def test_successful_fetch(self):
+        timestamps = list(range(1000, 1011))
+        headers = [make_header(t) for t in timestamps]
+        backend = StubBackend(HeadersStubServer(headers), height=100)
+        ci = make_median_time_interface(backend)
+        self.assertEqual(ci.getChainMedianTime(), 1005)
+        self.assertEqual(ci._median_time_cache, 1005)
+        self.assertEqual(ci._median_time_cache_height, 100)
+
+    def test_server_error_returns_none_without_cache(self):
+        backend = StubBackend(HeadersStubServer(raise_on_call=True), height=100)
+        ci = make_median_time_interface(backend)
+        self.assertIsNone(ci.getChainMedianTime())
+
+    def test_server_error_returns_cached_value(self):
+        backend = StubBackend(HeadersStubServer(raise_on_call=True), height=100)
+        ci = make_median_time_interface(backend)
+        ci._median_time_cache = 1005
+        ci._median_time_cache_height = 99
+        self.assertEqual(ci.getChainMedianTime(), 1005)
+
+    def test_height_error_returns_cached_value(self):
+        backend = StubBackend(HeadersStubServer(), height=100, raise_on_height=True)
+        ci = make_median_time_interface(backend)
+        ci._median_time_cache = 1005
+        self.assertEqual(ci.getChainMedianTime(), 1005)
+
+    def test_no_backend_returns_none(self):
+        ci = make_median_time_interface(None)
+        # useBackend() is False with no backend, rpc path raises -> fail soft
+        ci.rpc = lambda *args: (_ for _ in ()).throw(RuntimeError("no rpc"))
+        self.assertIsNone(ci.getChainMedianTime())
+
+    def test_cache_reused_when_height_unchanged(self):
+        timestamps = list(range(1000, 1011))
+        headers = [make_header(t) for t in timestamps]
+        server = HeadersStubServer(headers)
+        backend = StubBackend(server, height=100)
+        ci = make_median_time_interface(backend)
+        self.assertEqual(ci.getChainMedianTime(), 1005)
+        self.assertEqual(ci.getChainMedianTime(), 1005)
+        self.assertEqual(server.call_count, 1)
+
+    def test_empty_headers_fails_soft(self):
+        backend = StubBackend(HeadersStubServer(headers=[]), height=100)
+        ci = make_median_time_interface(backend)
+        self.assertIsNone(ci.getChainMedianTime())
+
+    def test_csv_lock_not_mature_when_mtp_unknown(self):
+        backend = StubBackend(HeadersStubServer(raise_on_call=True), height=100)
+        ci = make_median_time_interface(backend)
+        encoded_sequence = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, 3600)
+        self.assertFalse(
+            ci.isCsvLockMature(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded_sequence,
+                parent_block_height=50,
+                parent_block_time=1000,
+            )
+        )
+
+    def test_abs_lock_not_mature_when_mtp_unknown(self):
+        backend = StubBackend(HeadersStubServer(raise_on_call=True), height=100)
+        ci = make_median_time_interface(backend)
+        self.assertFalse(ci.isAbsLockTimeMature(500000001))
 
 
 if __name__ == "__main__":
