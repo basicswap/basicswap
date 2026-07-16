@@ -1,4 +1,33 @@
 
+0.17.4
+==============
+
+**Security / hardening**
+- Particl blind swaps: verify the lock-tx-spend output pays the expected address.
+
+**Electrum**
+- Confirmations are now Merkle-verified against the block header.
+- Watch-only (keyless) balances are no longer included in spendable wallet balances.
+
+**Fixes**
+- Config: a string `allowed_hosts` value is normalised to a single-element list rather than
+  being iterated per character.
+- Added an `unsafe_allow_any_host_without_auth` override to run with `"*"` in `allowed_hosts`
+  without `client_auth_hash` set.
+- AMM: fixed the AMM UI connection under Docker when `htmlhost` is set to `0.0.0.0`.
+- Active-swap loops: snapshot `swaps_in_progress` before iterating.
+- Queued swap actions now retry on transient daemon/RPC errors instead of failing the
+  action outright.
+- Particl blind swaps: attach the mercy output on the lock-refund swipe tx
+
+**Tests / CI**
+- CI runs the `test_coins` suite for Particl blind and Particl anon (in addition to plain
+  Particl) when `interfaces/part` changes.
+- CI pytest suites now exit early on the first failure.
+- Added tests for Merkle proofs, Electrum median time, adversarial Electrum responses,
+  transient-action retries and Electrum watch-only balances.
+
+
 0.17.3
 ==============
 
