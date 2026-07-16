@@ -607,7 +607,9 @@ def page_amm(self, _, post_string):
     basicswap_port = swap_client.settings.get("htmlport", 12700)
 
     if amm_host == "127.0.0.1" and amm_port == 12700:
-        amm_host = basicswap_host
+        amm_host = (
+            "127.0.0.1" if basicswap_host in ("0.0.0.0", "::", "") else basicswap_host
+        )
         amm_port = basicswap_port
 
     amm_dir = ensure_amm_dir(swap_client)
