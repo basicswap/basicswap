@@ -939,6 +939,18 @@ class Test(unittest.TestCase):
                 {"allowed_hosts": ["*"], "client_auth_hash": "x"},
                 True,  # opt-out with auth, no Host
             ),
+            (
+                {"Host": "anything.example"},
+                "0.0.0.0",
+                {"allowed_hosts": ["*"], "unsafe_allow_any_host_without_auth": True},
+                True,  # explicit unsafe override, no auth required
+            ),
+            (
+                {"Host": "anything.example"},
+                "0.0.0.0",
+                {"unsafe_allow_any_host_without_auth": True},
+                False,  # override alone does nothing without "*"
+            ),
         ]
         for headers, host_name, settings, expected in cases:
             assert check(Stub(headers, host_name, settings)) is expected, (
