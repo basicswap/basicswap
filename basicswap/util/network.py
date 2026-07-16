@@ -82,6 +82,20 @@ def _normalize_origin(value):
     return (scheme, host, port)
 
 
+def allowed_entry_hostname(entry):
+    # Extract the bare hostname from an allowed_hosts entry, which may be a bare
+    # host ("host"), a host:port, or a full origin ("scheme://host[:port]").
+    # Used by the Host-header check so scheme-form entries (added for reverse
+    # proxies) still match the schemeless Host header.
+    e = str(entry).strip()
+    if not e:
+        return None
+    if "://" not in e:
+        e = "//" + e
+    host = urllib.parse.urlsplit(e).hostname
+    return host.lower() if host else None
+
+
 def is_origin_allowed(origin, html_host, html_port, allowed_hosts) -> bool:
     # Validate a browser Origin/Referer for CSRF / cross-site WebSocket hijacking.
     # Shared by the HTTP same-origin check and the WebSocket handshake so the two

@@ -43,7 +43,7 @@ from .basicswap_util import (
     strBidState,
 )
 from .util.rfc2440 import verify_rfc2440_password
-from .util.network import is_origin_allowed
+from .util.network import allowed_entry_hostname, is_origin_allowed
 
 from .js_server import (
     js_error,
@@ -295,8 +295,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         if host_name and host_name not in ("0.0.0.0", "::"):
             allowed.add(host_name.lower())
         for h in self.server.swap_client.settings.get("allowed_hosts", []) or []:
-            if h != "*":
-                allowed.add(str(h).strip().lower())
+            if h == "*":
+                continue
+            hostname = allowed_entry_hostname(h)
+            if hostname:
+                allowed.add(hostname)
         return allowed
 
     def _host_check_disabled(self) -> bool:

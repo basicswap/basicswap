@@ -880,6 +880,18 @@ class Test(unittest.TestCase):
             (
                 {"Host": "swap.example.com"},
                 "0.0.0.0",
+                {"allowed_hosts": ["https://swap.example.com"]},
+                True,  # scheme-form entry still matches the schemeless Host
+            ),
+            (
+                {"Host": "swap.example.com:8443"},
+                "0.0.0.0",
+                {"allowed_hosts": ["https://swap.example.com:8443"]},
+                True,  # hostname extracted from a scheme+port entry
+            ),
+            (
+                {"Host": "swap.example.com"},
+                "0.0.0.0",
                 {},
                 False,  # not configured
             ),
