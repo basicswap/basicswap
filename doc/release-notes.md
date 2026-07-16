@@ -1,4 +1,39 @@
 
+0.17.3
+==============
+
+**Security / hardening**
+- Web UI: added a Host-header allowlist to defend against DNS-rebinding attacks.
+  Requests whose `Host` header is not `localhost` / `127.0.0.1` / `::1` (or a
+  configured host) are now rejected. A new `allowed_hosts` setting lists additional
+  hostnames/origins for LAN, mDNS or reverse-proxy access; loopback access — including
+  Docker with the port published to localhost — needs no configuration.
+- Web UI: the cross-origin (CSRF) check now validates the request `Origin`/`Referer` as a
+  full origin (scheme + host + port) against the allowed origins.
+- Web UI: the WebSocket server now validates the handshake `Origin`, closing a cross-site
+  WebSocket hijack. Browsers cannot spoof `Origin`.
+- `allowed_hosts` entries may be a bare host (matches any scheme/port on that host) or a
+  full `scheme://host[:port]` origin (exact match, for reverse proxies). `"*"` disables
+  only the Host-header check and requires `client_auth_hash` to be set; the Origin/CSRF and
+  WebSocket origin checks remain enforced.
+- Adaptor-sig swaps: constrain which bid states accept the lock-release,
+  coin-A-lock-signature and lock-spend P2P messages, and reject messages for
+  revoked/inactive offers. Prevents a hostile or replayed peer message from mutating a
+  finished/terminal bid or resurrecting it into an active swap.
+
+**Fixes**
+- GUI: the header "Bids" link navigates to the correct page.
+- Electrum: use .onion servers only when Tor is enabled.
+
+**AMM**
+- Remove a redundant fixed-total offers check.
+- Offers: correct the fixed-total budget calculation for reverse adaptor-sig swaps.
+
+**Tests**
+- Unit tests for the Host allowlist, same-origin and WebSocket origin checks.
+- Added Particl blind/anon coverage to `test_coins.py`.
+
+
 0.17.2
 ==============
 
