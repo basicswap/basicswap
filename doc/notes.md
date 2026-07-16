@@ -64,6 +64,21 @@ While basicswap can be configured to host on an external interface:
 If not using docker by changing 'htmlhost' and 'wshost' in basicswap.json
 For docker change 'HTML_PORT' and 'WS_PORT' in the .env file in the same dir as docker-compose.yml
 
+When reaching the UI by a LAN IP, hostname or reverse-proxy domain (rather than
+localhost/127.0.0.1), add it to the 'allowed_hosts' list in basicswap.json, e.g.
+`"allowed_hosts": ["192.168.1.50", "https://swap.example.com"]`. This guards against DNS-rebinding
+(Host header) and cross-site (Origin) attacks. localhost/127.0.0.1/::1 on the configured html port
+are always allowed, so Docker installs that publish the port to localhost need no change. Entry
+formats:
+- a bare host (`192.168.1.50`, `swap.example.com`) allows that host on any scheme/port;
+- an entry with a scheme (`https://swap.example.com`) is matched as an exact origin — use this for a
+  reverse proxy so the browser's `https://…` Origin is accepted.
+
+Setting `"allowed_hosts": ["*"]` disables only the Host-header (DNS-rebinding) check — the
+Origin/CSRF check stays enforced, so a reverse-proxy origin must still be listed
+(`["*", "https://swap.example.com"]`). `"*"` requires 'client_auth_hash' to be set; BasicSwap
+refuses to start with '*' and no 'client_auth_hash'.
+
 A better solution is to use ssh to forward the required ports from the machine running bascswap to the client.
 
     ssh -N -L 5555:localhost:12700 -L 11700:localhost:11700 BASICSWAP_HOST

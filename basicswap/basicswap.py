@@ -117,7 +117,7 @@ from .util.address import (
 )
 from .util.crypto import sha256
 from .util.logging import LogCategories as LC
-from .util.network import is_private_ip_address
+from .util.network import is_private_ip_address, is_origin_allowed
 from .util.smsg import smsgGetID
 from .interface.base import Curves
 from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
@@ -1524,14 +1524,46 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.threads.append(thread_http)
             thread_http.start()
 
+            allowed_hosts = self.settings.get("allowed_hosts", []) or []
+            if "*" in allowed_hosts:
+                ensure(
+                    self.settings.get("client_auth_hash"),
+                    "'allowed_hosts' contains '*' (HTTP Host-header check disabled), "
+                    "which requires 'client_auth_hash' to be set to prevent "
+                    "DNS-rebinding attacks.",
+                )
+                self.log.warning(
+                    "HTTP Host-header check is disabled ('*' in allowed_hosts); "
+                    "relying on client_auth_hash for DNS-rebinding protection. The "
+                    "Origin/CSRF check stays enforced, so list any reverse-proxy "
+                    "origin (e.g. 'https://host') in allowed_hosts."
+                )
+            elif (
+                self.settings["htmlhost"] not in ("127.0.0.1", "localhost", "::1")
+                and not allowed_hosts
+            ):
+                self.log.warning(
+                    "HTTP server bound to non-loopback host '{}' with no 'allowed_hosts' "
+                    "configured; access via a LAN IP/hostname will be rejected. Add the "
+                    "hostname(s) you browse to under 'allowed_hosts'.".format(
+                        self.settings["htmlhost"]
+                    )
+                )
+
         if "wshost" in self.settings:
             ws_url = "ws://{}:{}".format(
                 self.settings["wshost"], self.settings["wsport"]
             )
             self.log.info(f"Starting WebSocket server at {ws_url}")
 
+            # Reject cross-site WebSocket hijacking: unlike fetch(), a ws://
+            # connection is not blocked by the same-origin policy, so any web
+            # page can open one to loopback. origin_check (required) validates the
+            # handshake Origin against the same allowlist the HTTP server uses.
             self.ws_server = WebsocketServer(
-                host=self.settings["wshost"], port=self.settings["wsport"]
+                self._ws_origin_allowed,
+                host=self.settings["wshost"],
+                port=self.settings["wsport"],
             )
             self.ws_server.client_port = self.settings.get(
                 "wsclientport", self.settings["wsport"]
@@ -16659,6 +16691,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return rv_array
 
         return rv
+
+    def _ws_origin_allowed(self, headers) -> bool:
+        # Cross-site WebSocket hijacking guard, verify-when-present: a browser
+        # always sends Origin, so a header-less client (bots/scripts consuming the
+        # feed) is allowed; when present the full Origin is validated via the
+        # shared is_origin_allowed (also used by the HTTP same-origin check). The
+        # Origin is the page that opened the socket (the html UI), so it is
+        # matched against the html host/port, not the WebSocket port. "*" is a
+        # Host-check opt-out only and does not disable this check.
+        origin = headers.get("origin")
+        if not origin:
+            return True
+        return is_origin_allowed(
+            origin,
+            self.settings.get("htmlhost"),
+            self.settings.get("htmlport"),
+            self.settings.get("allowed_hosts", []),
+        )
 
     def ws_new_client(self, client, server):
         pass

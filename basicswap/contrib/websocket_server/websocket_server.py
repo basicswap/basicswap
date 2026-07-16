@@ -124,7 +124,7 @@ class WebsocketServer(ThreadingMixIn, TCPServer, API):
     allow_reuse_address = True
     daemon_threads = True  # comment to keep threads alive until finished
 
-    def __init__(self, host='127.0.0.1', port=0, loglevel=logging.WARNING, key=None, cert=None):
+    def __init__(self, origin_check, host='127.0.0.1', port=0, loglevel=logging.WARNING, key=None, cert=None):
         logger.setLevel(loglevel)
         TCPServer.__init__(self, (host, port), WebSocketHandler)
         self.host = host
@@ -139,6 +139,15 @@ class WebsocketServer(ThreadingMixIn, TCPServer, API):
         self.thread = None
 
         self._deny_clients = False
+
+        # Handshake origin/host guard: a callable taking the request
+        # headers dict (lowercased keys) and returning a bool. The handshake is
+        # rejected when it returns False. This blocks cross-site
+        # WebSocket hijacking, since a ws:// connection is not subject to the
+        # same-origin policy and any web page can open one to loopback.
+        if not callable(origin_check):
+            raise ValueError("origin_check must be a callable")
+        self.origin_check = origin_check
 
     def _run_forever(self, threaded):
         cls_name = self.__class__.__name__
@@ -473,6 +482,13 @@ class WebSocketHandler(StreamRequestHandler):
         try:
             assert headers['upgrade'].lower() == 'websocket'
         except AssertionError:
+            self.keep_alive = False
+            return
+
+        if not self.server.origin_check(headers):
+            logger.warning(
+                "Rejected websocket handshake from disallowed origin: {}".format(headers.get("origin", None))
+            )
             self.keep_alive = False
             return
 

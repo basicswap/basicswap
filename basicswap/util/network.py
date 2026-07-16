@@ -65,6 +65,73 @@ def is_public_url(url: str) -> bool:
     return True
 
 
+def _normalize_origin(value):
+    # value is a full URL with scheme (a browser Origin/Referer).
+    # Returns (scheme, host, port) or None.
+    p = urllib.parse.urlsplit(value)
+    host = (p.hostname or "").lower()
+    scheme = (p.scheme or "").lower()
+    if not host or not scheme:
+        return None
+    try:
+        port = p.port
+    except ValueError:
+        return None
+    if port is None:
+        port = 443 if scheme == "https" else 80
+    return (scheme, host, port)
+
+
+def allowed_entry_hostname(entry):
+    # Extract the bare hostname from an allowed_hosts entry, which may be a bare
+    # host ("host"), a host:port, or a full origin ("scheme://host[:port]").
+    # Used by the Host-header check so scheme-form entries (added for reverse
+    # proxies) still match the schemeless Host header.
+    e = str(entry).strip()
+    if not e:
+        return None
+    if "://" not in e:
+        e = "//" + e
+    host = urllib.parse.urlsplit(e).hostname
+    return host.lower() if host else None
+
+
+def is_origin_allowed(origin, html_host, html_port, allowed_hosts) -> bool:
+    # Validate a browser Origin/Referer for CSRF / cross-site WebSocket hijacking.
+    # Shared by the HTTP same-origin check and the WebSocket handshake so the two
+    # cannot drift. The comparison is against the HTML server's origin (the page
+    # origin), which is what both a same-origin POST and a page-opened WebSocket
+    # carry. "*" in allowed_hosts is a Host-header-check opt-out only and is
+    # ignored here — the origin check is always enforced.
+    norm = _normalize_origin(origin)
+    if norm is None:
+        return False  # opaque ("null") / malformed -> reject
+    scheme, host, port = norm
+
+    # 1. Strict default origins: http on the HTML port, loopback + concrete bind
+    #    host. A page on another port (e.g. http://127.0.0.1:8080) does NOT match.
+    if html_port is not None:
+        default_hosts = {"localhost", "127.0.0.1", "::1"}
+        if html_host and str(html_host) not in ("0.0.0.0", "::"):
+            default_hosts.add(str(html_host).lower())
+        if scheme == "http" and port == int(html_port) and host in default_hosts:
+            return True
+
+    # 2. Configured entries. An entry with a scheme is an exact origin; a bare
+    #    host matches that host on any scheme/port (the operator vouched for it).
+    for entry in allowed_hosts or []:
+        if entry == "*":
+            continue
+        e = str(entry).strip().lower()
+        if "://" in e:
+            t = _normalize_origin(e)
+            if t is not None and (scheme, host, port) == t:
+                return True
+        elif host == e.strip("[]"):
+            return True
+    return False
+
+
 def make_reporthook(read_start: int, logger):
     read = read_start  # Number of bytes read so far
     last_percent_str = ""
