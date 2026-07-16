@@ -818,13 +818,6 @@ def process_offers(args, config, script_state) -> None:
                 template_fixed_remaining = round(
                     total_to_sell - total_sold - template_in_flight, 8
                 )
-                if template_fixed_remaining < 0.001:
-                    print(
-                        f"Template {offer_template['name']} exhausted "
-                        f"(fixed_total, sold {total_sold} of {total_to_sell}"
-                        f", in-flight {template_in_flight}), not reposting"
-                    )
-                    continue
 
             if template_exhausted:
                 template_tracking["exhausted"] = True
