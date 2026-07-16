@@ -489,6 +489,14 @@ class TestFunctions(BaseTestWithPrepare):
         )
         assert "bid_state" in rv  # Test that the return didn't fail
         rv = post_json_api(
+            port_leader,
+            f"bids/{bid_id}",
+            {
+                "debugind": DebugTypes.DONT_RELEASE_COIN_A_LOCK,
+                "maindebugind": False,
+            },
+        )
+        rv = post_json_api(
             port_follower,
             f"bids/{bid_id}",
             {"debugind": DebugTypes.BID_DONT_SPEND_COIN_B_LOCK},

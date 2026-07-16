@@ -8823,8 +8823,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                     self.log.warning(
                                         f"Not releasing ads script coin lock tx for bid {self.log.id(bid_id)}: Chain A lock refund tx already exists."
                                     )
-                                elif (
-                                    bid.debug_ind == DebugTypes.DONT_RELEASE_COIN_A_LOCK
+                                elif self.haveDebugInd(
+                                    bid.bid_id, DebugTypes.DONT_RELEASE_COIN_A_LOCK
                                 ):
                                     self.logBidEvent(
                                         bid_id,

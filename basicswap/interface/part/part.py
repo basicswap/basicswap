@@ -14,10 +14,11 @@ from basicswap.contrib.test_framework.messages import (
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
-    OP_DUP,
-    OP_HASH160,
-    OP_EQUALVERIFY,
     OP_CHECKSIG,
+    OP_DUP,
+    OP_EQUALVERIFY,
+    OP_HASH160,
+    OP_RETURN,
 )
 from basicswap.util import (
     ensure,
@@ -932,10 +933,11 @@ class PARTInterfaceBlind(PARTInterface):
                         txo["data_hex"],
                     ],
                 )
-                output_n = txo["n"]
+                if txo["scriptPubKey"]["address"] == addr_out:
+                    output_n = txo["n"]
                 break
             except Exception as e:
-                self._log.debug("Searching for locked output: {}".format(str(e)))
+                self._log.debug(f"Searching for locked output: {e}")
                 pass
         ensure(output_n is not None, "Output not found in tx")
 
@@ -1028,6 +1030,16 @@ class PARTInterfaceBlind(PARTInterface):
                 "pubkey": output_pubkey_hex,
             }
         ]
+
+        if self.altruistic() and kbsf:
+            mercy_data = bytes((OP_RETURN,)) + b"XBSW" + kbsf
+            outputs.append({"type": "data", "amount": 0, "data": mercy_data.hex()})
+        else:
+            self._log.debug(
+                "Not attaching mercy output, have kbsf {}.".format(
+                    "true" if kbsf else "false"
+                )
+            )
         params = [inputs, outputs]
         rv = self.rpc_wallet("createrawparttransaction", params)
 
@@ -1241,7 +1253,7 @@ class PARTInterfaceBlind(PARTInterface):
             rv = self.rpc("getrawtransaction", [txid_hex, True])
         except Exception as e:  # noqa: F841
             self._log.debug(
-                "findTxnByHash getrawtransaction failed: {}".format(txid_hex)
+                f"findTxnByHash getrawtransaction failed: {self._log.id(txid_hex)}"
             )
             return None
 
@@ -1326,6 +1338,25 @@ class PARTInterfaceBlind(PARTInterface):
         # Find the output of the lock refund tx to spend
         spend_n, input_blinded_info = self.findOutputByNonce(lock_refund_tx_obj, nonce)
         return spend_n
+
+    def inspectSwipeTx(self, tx: dict):
+        find_tag: bytes = bytes((OP_RETURN,)) + b"XBSW"
+        for vout in tx["vout"]:
+            if vout["type"] != "data":
+                continue
+            if "data_hex" not in vout:
+                continue
+            try:
+                data: bytes = bytes.fromhex(vout["data_hex"])
+                if data.startswith(find_tag) is False:
+                    continue
+                if len(data) - len(find_tag) != 32:
+                    raise ValueError("Unexpected mercy output data length")
+                return data[len(find_tag) : len(find_tag) + 32]
+            except Exception as e:
+                self._log.debug(f"inspectSwipeTx vout {vout}, error: {e}")
+
+        return None
 
 
 class PARTInterfaceAnon(PARTInterface):
