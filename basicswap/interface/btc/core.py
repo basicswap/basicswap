@@ -21,7 +21,10 @@ from basicswap.interface.prepare_util import (
 
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.3")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
-bitcoin_signers = {"laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",)}
+bitcoin_signers = {
+    "laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",),
+    "hebasto": ("D1DBF2C4B96F2DEBF4C16654410108112E7EA81F",),
+}
 
 # Fastsync UTXO snapshot hash files are signed by these keys
 fastsync_signers = {
