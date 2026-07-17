@@ -19,7 +19,7 @@ from basicswap.interface.prepare_util import (
     getFileHash,
 )
 
-BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.3")
+BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.4")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 bitcoin_signers = {
     "laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",),
