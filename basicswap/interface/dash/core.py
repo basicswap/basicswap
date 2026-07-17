@@ -9,7 +9,7 @@ import os
 from basicswap.interface.dash.chainparams import params
 from basicswap.interface.prepare_util import CoinPrepareModule, PrepareContext
 
-DASH_VERSION = os.getenv("DASH_VERSION", "23.1.4")
+DASH_VERSION = os.getenv("DASH_VERSION", "23.1.7")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 dash_signers = {
     "pasta": (
