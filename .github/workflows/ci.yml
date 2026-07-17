@@ -11,23 +11,6 @@ on:
       - 'doc/**'
       - '**/README.md'
       - '**/LICENSE'
-  workflow_dispatch:
-    inputs:
-      test_coins:
-        description: 'Force coins into the test matrix (comma-separated, or "all")'
-        required: false
-        default: ''
-        type: string
-      test_coin_a:
-        description: 'Run only test_coins.py with this TEST_COIN_A (needs test_coin_b)'
-        required: false
-        default: ''
-        type: string
-      test_coin_b:
-        description: 'TEST_COIN_B for the test_coin_a mode'
-        required: false
-        default: ''
-        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -50,8 +33,6 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - id: filter
-      # On workflow_dispatch coins are selected by the test_coins input only.
-      if: ${{ github.event_name != 'workflow_dispatch' }}
       uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706  # v4.0.2
       with:
         filters: |
@@ -88,55 +69,18 @@ jobs:
         FIRO_CHANGED: ${{ steps.filter.outputs.firo }}
         BCH_CHANGED: ${{ steps.filter.outputs.bch }}
         DOGE_CHANGED: ${{ steps.filter.outputs.doge }}
-        FORCED_COINS: ${{ github.event.inputs.test_coins }}
-        TEST_COIN_A: ${{ github.event.inputs.test_coin_a }}
-        TEST_COIN_B: ${{ github.event.inputs.test_coin_b }}
       run: |
         entries=""
-        # On workflow_dispatch the paths-filter outputs are empty, force
-        # coins into the matrix from the test_coins input instead.
-        if [ -n "$FORCED_COINS" ]; then
-          echo "Forcing coins into matrix: $FORCED_COINS"
-          for c in part ltc dcr nmc wow pivx dash firo bch doge; do
-            case ",${FORCED_COINS}," in
-              *",${c},"*|*",all,"*)
-                eval "$(echo "$c" | tr 'a-z' 'A-Z')_CHANGED=true";;
-            esac
-          done
-        fi
-        # add_entry name test_coin [test_coin_a] [test_coin_b] [skip_tests] [coins_list]
-        # test_coin can be a comma separated list of non-base coins to prepare.
+        # add_entry name test_coin [test_coin_a] [test_coin_b] [skip_tests]
         # test_coin_a defaults to test_coin, override for coin variants.
         # test_coin_b defaults to bitcoin.
         # skip_tests defaults to false, set for coins without a working regtest.
-        # coins_list defaults to "test_coin,test_coin_b", used for TEST_COINS_LIST.
         add_entry() {
           if [ -n "$entries" ]; then
             entries="${entries},"
           fi
-          coins_list="${6:-$2,${4:-bitcoin}}"
-          cache_paths=$(echo "$2" | sed 's|[^,][^,]*|/tmp/cached_bin/&|g; s|,|\\n|g')
-          key_coins=$(echo "$2" | tr ',' '-')
-          entries="${entries}{\"name\":\"$1\",\"test_coin\":\"$2\",\"test_coin_a\":\"${3:-$2}\",\"test_coin_b\":\"${4:-bitcoin}\",\"skip_tests\":\"${5:-false}\",\"coins_list\":\"$coins_list\",\"cache_paths\":\"$cache_paths\",\"key_coins\":\"$key_coins\"}"
+          entries="${entries}{\"name\":\"$1\",\"test_coin\":\"$2\",\"test_coin_a\":\"${3:-$2}\",\"test_coin_b\":\"${4:-bitcoin}\",\"skip_tests\":\"${5:-false}\"}"
         }
-        # Pair mode: run only test_coins.py for the two coins given.
-        if [ -n "$TEST_COIN_A" ] || [ -n "$TEST_COIN_B" ]; then
-          if [ -z "$TEST_COIN_A" ] || [ -z "$TEST_COIN_B" ]; then
-            echo "Both test_coin_a and test_coin_b inputs must be set" >&2
-            exit 1
-          fi
-          extra_coins=""
-          for c in "$TEST_COIN_A" "$TEST_COIN_B"; do
-            case ",${BASE_COINS}," in
-              *",${c},"*) ;;
-              *) extra_coins="${extra_coins:+${extra_coins},}${c}";;
-            esac
-          done
-          add_entry "${TEST_COIN_A}_${TEST_COIN_B}" "${extra_coins:-$TEST_COIN_A}" "$TEST_COIN_A" "$TEST_COIN_B" false "${TEST_COIN_A},${TEST_COIN_B}"
-          echo "Coin test matrix: [$entries]"
-          echo "matrix=[$entries]" >> "$GITHUB_OUTPUT"
-          exit 0
-        fi
         if [ "$PART_CHANGED" = "true" ]; then
           add_entry test_part_blind particl "particl blind"
           add_entry test_part_anon particl "particl anon"
@@ -348,12 +292,7 @@ jobs:
   test_coins:
     needs: [changes, prepare-cores]
     # Skipped entirely when no coin-specific paths changed.
-    # In pair mode prepare-cores is skipped, missing cores are downloaded here.
-    if: >-
-      ${{ !cancelled() && needs.changes.result == 'success' &&
-          needs.changes.outputs.test_matrix != '[]' &&
-          (needs['prepare-cores'].result == 'success' ||
-           (needs['prepare-cores'].result == 'skipped' && github.event.inputs.test_coin_a != '')) }}
+    if: ${{ needs.changes.outputs.test_matrix != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

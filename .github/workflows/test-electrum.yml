@@ -1,0 +1,79 @@
+name: test_electrum
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+  BASE_COINS: particl,bitcoin,monero
+  BIN_DIR: /tmp/cached_bin
+  ELECTRUMX_SRC_DIR: /tmp/electrumx
+  XMR_RPC_USER: xmr_user
+  XMR_RPC_PWD: xmr_pwd
+
+jobs:
+  test_electrum:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --require-hashes
+        pip install .[dev]
+    - name: Install ElectrumX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libleveldb-dev
+        # Pinned: electrumx master requires Bitcoin Core >= 31.0
+        git clone --depth 1 --branch 1.20.0 https://github.com/spesmilo/electrumx.git "$ELECTRUMX_SRC_DIR"
+        cd "$ELECTRUMX_SRC_DIR"
+        python -m venv venv
+        . venv/bin/activate
+        pip install ".[ujson,leveldb]"
+    - name: Prepare core versions file
+      run: |
+        basicswap-prepare --version --withcoins="$BASE_COINS" | tail -n +2 > core_versions.txt
+    - name: Restore coin cores cache
+      id: cache-cores
+      uses: actions/cache/restore@v6
+      with:
+        path: /tmp/cached_bin
+        key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
+    - if: ${{ steps.cache-cores.outputs.cache-hit != 'true' }}
+      name: Running basicswap-prepare for base coins
+      run: |
+        basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins="$BASE_COINS"
+    - name: Run test_electrum
+      env:
+        TEST_PATH: /tmp/test_electrum
+        TEST_COINS_LIST: bitcoin,monero
+        EXTRA_CONFIG_JSON: '{"btc0":["txindex=1","rpcworkqueue=1100"]}'
+      run: |
+        export PYTHONPATH=$(pwd)
+        mkdir -p ${TEST_PATH}/bin
+        cp -r $BIN_DIR/* ${TEST_PATH}/bin/
+        pytest -v -s -x --log-cli-level=DEBUG tests/basicswap/test_electrum.py
+    - name: Dump logs on failure
+      if: ${{ failure() }}
+      run: |
+        for logfile in /tmp/electrumx_*/electrumx.log; do
+          echo "=== $logfile ==="
+          tail -n 200 "$logfile" || true
+        done
+        for logfile in /tmp/test_electrum/client*/*.log; do
+          echo "=== $logfile ==="
+          tail -n 100 "$logfile" || true
+        done
