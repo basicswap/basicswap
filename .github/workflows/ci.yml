@@ -44,6 +44,8 @@ jobs:
             - 'basicswap/interface/part/**'
           dash:
             - 'basicswap/interface/dash/**'
+          pivx:
+            - 'basicswap/interface/pivx/**'
     - name: Build coin test matrix
       id: matrix
       env:
@@ -51,6 +53,7 @@ jobs:
         LTC_CHANGED: ${{ steps.filter.outputs.ltc }}
         PART_CHANGED: ${{ steps.filter.outputs.part }}
         DASH_CHANGED: ${{ steps.filter.outputs.dash }}
+        PIVX_CHANGED: ${{ steps.filter.outputs.pivx }}
       run: |
         entries=""
         # add_entry name test_coin [test_coin_a] [test_coin_b]
@@ -70,6 +73,9 @@ jobs:
         fi
         if [ "$DASH_CHANGED" = "true" ]; then
           add_entry test_dash dash
+        fi
+        if [ "$PIVX_CHANGED" = "true" ]; then
+          add_entry test_pivx pivx
         fi
         if [ "$PART_CHANGED" = "true" ]; then
           add_entry test_part_blind particl "particl blind"
