@@ -631,26 +631,34 @@ def page_amm(self, _, post_string):
             err_messages.append(f"Failed to read config file: {str(e)}")
     else:
         default_config = {
-            "min_seconds_between_offers": 15,
-            "max_seconds_between_offers": 60,
+            "min_seconds_between_offers": 120,
+            "max_seconds_between_offers": 480,
+            "min_seconds_between_bids": 120,
+            "max_seconds_between_bids": 480,
             "main_loop_delay": 60,
+            "adjust_rates_based_on_market": False,
+            "auth": "",
             "offers": [
                 {
                     "id": "offer1234",
                     "name": "Example Offer",
                     "enabled": False,
-                    "coin_from": "PART",
-                    "coin_to": "BTC",
+                    "coin_from": "Particl",
+                    "coin_to": "Monero",
                     "amount": 1.0,
-                    "minrate": 0.0001,
-                    "ratetweakpercent": 0,
-                    "adjust_rates_based_on_market": True,
+                    "minrate": 0.01,
+                    "ratetweakpercent": 2,
+                    "adjust_rates_based_on_market": False,
                     "amount_variable": True,
-                    "amount_step": 0.001,
+                    "amount_step": 0.1,
                     "address": "auto",
                     "offer_mode": "standing",
-                    "min_coin_from_amt": 1.0,
+                    "min_coin_from_amt": 5.0,
                     "offer_valid_seconds": 3600,
+                    "automation_strategy": "none",
+                    "swap_type": "adaptor_sig",
+                    "min_swap_amount": 0.1,
+                    "attempt_bids_first": False,
                 }
             ],
             "bids": [],
@@ -659,24 +667,24 @@ def page_amm(self, _, post_string):
         if swap_client.debug:
             default_config["prune_state_delay"] = 120
             default_config["prune_state_after_seconds"] = 604800
-            default_config["min_seconds_between_bids"] = 15
-            default_config["max_seconds_between_bids"] = 60
 
             default_config["bids"] = [
                 {
                     "id": "bid5678",
                     "name": "Example Bid",
                     "enabled": False,
-                    "coin_from": "BTC",
-                    "coin_to": "PART",
-                    "amount": 0.001,
-                    "max_rate": 10000.0,
-                    "min_coin_to_balance": 1.0,
+                    "coin_from": "Monero",
+                    "coin_to": "Particl",
+                    "amount": 0.1,
+                    "maxrate": 0.02,
+                    "max_rate": 0.02,
+                    "min_coin_to_balance": 5.0,
                     "max_concurrent": 1,
                     "amount_variable": True,
                     "address": "auto",
-                    "offers_to_bid_on": "auto_accept_only",
-                    "min_swap_amount": 0.001,
+                    "offers_to_bid_on": "known_only",
+                    "min_swap_amount": 0.1,
+                    "use_balance_bidding": False,
                 }
             ]
 
@@ -951,9 +959,12 @@ def page_amm(self, _, post_string):
                         "ratetweakpercent": float(
                             form_data.get("offer_ratetweakpercent", ["0"])[0] or "0"
                         ),
+                        "adjust_rates_based_on_market": False,
                         "amount_variable": "offer_amount_variable" in form_data,
                         "address": form_data.get("offer_address", ["auto"])[0]
                         or "auto",
+                        "automation_strategy": "none",
+                        "attempt_bids_first": False,
                     }
 
                     if form_data.get("offer_min_coin_from_amt", [""])[0]:
@@ -1040,6 +1051,7 @@ def page_amm(self, _, post_string):
                         )
                         raise ValueError("Missing required fields")
 
+                    bid_max_rate = float(form_data.get("bid_max_rate", ["0"])[0] or "0")
                     new_bid = {
                         "id": bid_id,
                         "name": form_data.get("bid_name", ["New Bid"])[0],
@@ -1047,9 +1059,8 @@ def page_amm(self, _, post_string):
                         "coin_from": form_data.get("bid_coin_from", [""])[0],
                         "coin_to": form_data.get("bid_coin_to", [""])[0],
                         "amount": float(form_data.get("bid_amount", ["0"])[0] or "0"),
-                        "max_rate": float(
-                            form_data.get("bid_max_rate", ["0"])[0] or "0"
-                        ),
+                        "maxrate": bid_max_rate,
+                        "max_rate": bid_max_rate,
                         "amount_variable": "bid_amount_variable" in form_data,
                         "address": form_data.get("bid_address", ["auto"])[0] or "auto",
                     }
@@ -1121,39 +1132,40 @@ def page_amm(self, _, post_string):
 
                 default_config = {
                     # General settings
-                    "min_seconds_between_offers": 15,  # Minimum delay between creating offers
-                    "max_seconds_between_offers": 60,  # Maximum delay between creating offers
+                    "min_seconds_between_offers": 120,  # Minimum delay between creating offers
+                    "max_seconds_between_offers": 480,  # Maximum delay between creating offers
+                    "min_seconds_between_bids": 120,  # Minimum delay between creating bids
+                    "max_seconds_between_bids": 480,  # Maximum delay between creating bids
                     "main_loop_delay": 60,  # Seconds between main loop iterations (10-1000)
+                    "adjust_rates_based_on_market": False,  # Global default; prefer CoinGecko over orderbook
                     # Optional settings
-                    "auth": "",  # BasicSwap API auth string, e.g., "admin:password" (if auth is enabled)
-                    # "wallet_port_override": 12345,  # Override wallet API port (for testing only) - uncomment and set if needed
-                    # Offer templates
+                    "auth": "",  # BasicSwap API auth string, e.g., "user:password" (set if UI auth is enabled)
+                    # "wallet_port_override": 12345,  # Override wallet API port (for testing only)
                     "offers": [
                         {
-                            # Required settings
-                            "id": "offer1234",  # Unique identifier for this offer
-                            "name": "Example Offer",  # Template name, must be unique
-                            "enabled": False,  # Set to true to enable this offer
+                            "id": "offer1234",
+                            "name": "Example Offer",
+                            "enabled": False,  # Leave false until minrate and amounts are set for your pair
                             "coin_from": "Particl",  # Coin you send
                             "coin_to": "Monero",  # Coin you receive
                             "amount": 1.0,  # Amount to create the offer for
-                            "minrate": 0.0001,  # Rate below which the offer won't drop
-                            "ratetweakpercent": 0,  # Modify the offer rate from the fetched value (can be negative)
-                            "adjust_rates_based_on_market": False,  # Whether to adjust rates based on existing market offers
-                            "amount_variable": True,  # Whether bidder can set a different amount
-                            "amount_step": 0.001,  # Offer size increment (privacy/offer management feature)
-                            "address": "auto",  # Address offer is sent from (auto = generate new address per offer)
+                            "minrate": 0.01,  # Floor rate — set to the worst price you will still accept
+                            "ratetweakpercent": 2,  # Markup above the reference rate (prefer >= 0)
+                            "adjust_rates_based_on_market": False,  # false=CoinGecko only; avoid "only"/"minrate" (orderbook poisoning)
+                            "amount_variable": True,
+                            "amount_step": 0.1,  # Step size so partial fills do not reveal exact balance
+                            "address": "auto",
                             "offer_mode": "standing",  # "one_time", "fixed_total", "standing" or "legacy"
-                            "min_coin_from_amt": 1.0,  # Standing offers: won't generate offers if wallet balance would drop below this
-                            "offer_valid_seconds": 3600,  # How long generated offers will be valid for
-                            "automation_strategy": "accept_all",  # Auto accept bids: "accept_all", "accept_known", or "none"
-                            # Optional settings
-                            "swap_type": "adaptor_sig",  # Type of swap, defaults to "adaptor_sig"
-                            "min_swap_amount": 0.001,  # Minimum purchase quantity when offer amount is variable
-                            # "total_to_sell": 10.0,  # Only used when offer_mode is "fixed_total"; must be >= amount
+                            "min_coin_from_amt": 5.0,  # Keep a wallet reserve; do not offer below this balance
+                            "offer_valid_seconds": 3600,
+                            "automation_strategy": "none",  # "none", "accept_known", or "accept_all" (accept_all auto-locks funds)
+                            "swap_type": "adaptor_sig",
+                            "min_swap_amount": 0.1,
+                            "attempt_bids_first": False,  # true can overpay ~2% filling the book before posting
+                            # "total_to_sell": 10.0,  # Only for offer_mode "fixed_total"; must be >= amount
                         }
                     ],
-                    "bids": [],  # Empty by default
+                    "bids": [],  # Empty by default — enable bids only after offer settings are proven safe
                 }
 
                 if swap_client.debug:
@@ -1163,33 +1175,26 @@ def page_amm(self, _, post_string):
                     default_config["prune_state_after_seconds"] = (
                         604800  # How long to keep old state data (7 days)
                     )
-                    default_config["min_seconds_between_bids"] = (
-                        15  # Minimum delay between creating bids
-                    )
-                    default_config["max_seconds_between_bids"] = (
-                        60  # Maximum delay between creating bids
-                    )
 
                 if include_bids:
                     default_config["bids"] = [
                         {
-                            # Required settings
-                            "id": "bid5678",  # Unique identifier for this bid
-                            "name": "Example Bid",  # Template name, must be unique
-                            "enabled": False,  # Set to true to enable this bid
+                            "id": "bid5678",
+                            "name": "Example Bid",
+                            "enabled": False,  # Leave false until maxrate is set for your pair
                             "coin_from": "Monero",  # Coin you receive
                             "coin_to": "Particl",  # Coin you send
-                            "amount": 0.001,  # Amount to bid
-                            "max_rate": 10000.0,  # Maximum rate for bids
-                            "min_coin_to_balance": 1.0,  # Won't send bids if wallet amount would drop below this
-                            "offers_to_bid_on": "auto_accept_only",  # Which offers to bid on: "all", "auto_accept_only", or "known_only"
-                            # Optional settings
-                            "max_concurrent": 1,  # Maximum number of bids to have active at once
-                            "amount_variable": True,  # Can send bids below the set amount where possible
-                            # "max_coin_from_balance": 100.0,  # Won't send bids if wallet amount would be above this
-                            "address": "auto",  # Address bid is sent from (auto = generate new address per bid)
-                            "min_swap_amount": 0.001,  # Minimum swap amount
-                            # "use_balance_bidding": False,  # Calculate bid amount as (wallet_balance - offer_min_amount) instead of using template amount
+                            "amount": 0.1,
+                            "maxrate": 0.02,  # Script reads maxrate — set your real ceiling before enabling
+                            "max_rate": 0.02,  # Alias kept for UI compatibility
+                            "min_coin_to_balance": 5.0,  # Keep a reserve of the coin you spend
+                            "offers_to_bid_on": "known_only",  # "known_only", "auto_accept_only", or "all"
+                            "max_concurrent": 1,
+                            "amount_variable": True,
+                            # "max_coin_from_balance": 100.0,
+                            "address": "auto",
+                            "min_swap_amount": 0.1,
+                            "use_balance_bidding": False,
                         }
                     ]
 

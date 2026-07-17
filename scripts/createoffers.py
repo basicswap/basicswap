@@ -52,7 +52,8 @@ Create offers
             "coin_from": Coin you receive.
             "coin_to": Coin you send.
             "amount": amount to bid.
-            "max_rate": Maximum rate for bids.
+            "maxrate": Maximum rate for bids (required by the script).
+            "max_rate": Alias for maxrate (accepted for UI compatibility).
             "min_coin_to_balance": Won't send bids if wallet amount of "coin_to" would drop below.
             "offers_to_bid_on": Which offers to bid on - "all", "auto_accept_only", or "known_only" (default: "all")
 
@@ -430,6 +431,13 @@ def readConfig(args, known_coins):
         if bid_template.get("min_swap_amount", 0.0) < min_swap_size:
             print("Setting min_swap_amount for bid template", bid_template["name"])
             bid_template["min_swap_amount"] = min_swap_size
+
+        if "maxrate" not in bid_template and "max_rate" in bid_template:
+            bid_template["maxrate"] = bid_template["max_rate"]
+            print(f"Using max_rate as maxrate for bid template {bid_template['name']}")
+            num_changes += 1
+        elif "maxrate" in bid_template and "max_rate" not in bid_template:
+            bid_template["max_rate"] = bid_template["maxrate"]
 
         if "address" not in bid_template:
             print("Setting address to auto for bid", bid_template["name"])
