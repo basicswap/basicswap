@@ -78,9 +78,10 @@ class StubCI:
         }
 
 
-def make_swap_client(ci, bid, xmr_swap):
+def make_swap_client(ci, bid, xmr_swap, wait_for_depth=True):
     sc = BasicSwap.__new__(BasicSwap)
     sc.fp = None
+    sc._wait_for_lock_spend_depth = wait_for_depth
     sc.log = StubLog()
     sc.saved = []
     sc.events = []
@@ -172,6 +173,18 @@ class TestAdsSpendDepthGate(unittest.TestCase):
         self.assertIn(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED, bid.states_set)
         self.assertNotIn(BidStates.SWAP_COMPLETED, bid.states_set)
         self.assertEqual(len(sc.notifications), 0)
+
+    def test_gate_disabled_unconfirmed_spend_transitions(self):
+        # Default behavior (option off): transition without waiting for depth.
+        bid = StubBid(BidStates.XMR_SWAP_LOCK_RELEASED)
+        xmr_swap = make_xmr_swap()
+        ci = StubCI(spend_depth=0, blocks_confirmed=2)
+        sc = make_swap_client(ci, bid, xmr_swap, wait_for_depth=False)
+
+        sc.process_XMR_SWAP_A_LOCK_tx_spend(b"bid", SPEND_TXID.hex(), "00")
+
+        self.assertIn(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED, bid.states_set)
+        self.assertIn(BidStates.SWAP_COMPLETED, bid.states_set)
 
 
 if __name__ == "__main__":

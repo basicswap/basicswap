@@ -593,6 +593,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
         self._force_db_upgrade = self.settings.get("force_db_upgrade", False)
+        self._wait_for_lock_spend_depth = self.settings.get(
+            "wait_for_lock_spend_depth", False
+        )
         self._bid_expired_leeway = 5
 
         self.swaps_in_progress = dict()
@@ -8837,7 +8840,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # TODO: Use explorer to get tx / block hash for getrawtransaction
 
                 spend_seen: bool = (
-                    bid.xmr_a_lock_tx is not None
+                    self._wait_for_lock_spend_depth
+                    and bid.xmr_a_lock_tx is not None
                     and bid.xmr_a_lock_tx.spend_txid == xmr_swap.a_lock_spend_tx_id
                     and xmr_swap.a_lock_spend_tx is not None
                 )
@@ -9622,28 +9626,33 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if state == BidStates.XMR_SWAP_LOCK_RELEASED:
                     xmr_swap.a_lock_spend_tx = bytes.fromhex(spend_txn_hex)
 
-                    spend_tx_depth: int = 0
-                    try:
-                        spend_txout_info = ci_from.getTxOutInfo(spending_txid, 0)
-                        if spend_txout_info is not None:
-                            chain_height: int = ci_from.getChainHeight()
-                            spend_tx_depth = max(
-                                0,
-                                chain_height - spend_txout_info["block_height"] + 1,
+                    if self._wait_for_lock_spend_depth:
+                        spend_tx_depth: int = 0
+                        try:
+                            spend_txout_info = ci_from.getTxOutInfo(spending_txid, 0)
+                            if spend_txout_info is not None:
+                                chain_height: int = ci_from.getChainHeight()
+                                spend_tx_depth = max(
+                                    0,
+                                    chain_height - spend_txout_info["block_height"] + 1,
+                                )
+                        except Exception as e:
+                            self.log.debug(
+                                f"Could not get lock spend tx depth for bid {self.log.id(bid_id)}: {e}"
                             )
-                    except Exception as e:
-                        self.log.debug(
-                            f"Could not get lock spend tx depth for bid {self.log.id(bid_id)}: {e}"
-                        )
 
-                    if spend_tx_depth < ci_from.blocks_confirmed:
-                        self.log.info(
-                            f"Waiting for lock spend tx {self.logIDT(spending_txid)} to reach depth {ci_from.blocks_confirmed}, currently {spend_tx_depth}, for bid {self.log.id(bid_id)}."
-                        )
-                        self.saveBidInSession(
-                            bid_id, bid, use_cursor, xmr_swap, save_in_progress=offer
-                        )
-                        return
+                        if spend_tx_depth < ci_from.blocks_confirmed:
+                            self.log.info(
+                                f"Waiting for lock spend tx {self.logIDT(spending_txid)} to reach depth {ci_from.blocks_confirmed}, currently {spend_tx_depth}, for bid {self.log.id(bid_id)}."
+                            )
+                            self.saveBidInSession(
+                                bid_id,
+                                bid,
+                                use_cursor,
+                                xmr_swap,
+                                save_in_progress=offer,
+                            )
+                            return
 
                     bid.setState(BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED)
 
