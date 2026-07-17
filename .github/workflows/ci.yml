@@ -11,6 +11,13 @@ on:
       - 'doc/**'
       - '**/README.md'
       - '**/LICENSE'
+  workflow_dispatch:
+    inputs:
+      test_coins:
+        description: 'Force coins into the test matrix (comma-separated, or "all")'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -33,6 +40,8 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - id: filter
+      # On workflow_dispatch coins are selected by the test_coins input only.
+      if: ${{ github.event_name != 'workflow_dispatch' }}
       uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706  # v4.0.2
       with:
         filters: |
@@ -69,8 +78,20 @@ jobs:
         FIRO_CHANGED: ${{ steps.filter.outputs.firo }}
         BCH_CHANGED: ${{ steps.filter.outputs.bch }}
         DOGE_CHANGED: ${{ steps.filter.outputs.doge }}
+        FORCED_COINS: ${{ github.event.inputs.test_coins }}
       run: |
         entries=""
+        # On workflow_dispatch the paths-filter outputs are empty, force
+        # coins into the matrix from the test_coins input instead.
+        if [ -n "$FORCED_COINS" ]; then
+          echo "Forcing coins into matrix: $FORCED_COINS"
+          for c in part ltc dcr nmc wow pivx dash firo bch doge; do
+            case ",${FORCED_COINS}," in
+              *",${c},"*|*",all,"*)
+                eval "$(echo "$c" | tr 'a-z' 'A-Z')_CHANGED=true";;
+            esac
+          done
+        fi
         # add_entry name test_coin [test_coin_a] [test_coin_b] [skip_tests]
         # test_coin_a defaults to test_coin, override for coin variants.
         # test_coin_b defaults to bitcoin.
