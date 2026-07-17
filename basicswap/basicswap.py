@@ -8226,39 +8226,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
 
                 # Track the depth of the lock refund tx.
-                refund_tx_depth: int = 0
-                if refund_tx.state == TxStates.TX_CONFIRMED:
-                    refund_tx_depth = ci_from.blocks_confirmed
-                else:
-                    refund_tx_chain_info = ci_from.getLockTxHeight(
-                        refund_tx.txid,
-                        ci_from.getSCLockScriptAddress(
-                            xmr_swap.a_lock_refund_tx_script
-                        ),
-                        ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
-                        bid.chain_a_height_start,
-                        vout=refund_tx.vout,
-                    )
-                    if refund_tx_chain_info is not None:
-                        bid_changed: bool = False
-                        refund_tx_depth = refund_tx_chain_info.get("depth", 0)
-                        if (
-                            refund_tx.state
-                            in (None, TxStates.TX_NONE, TxStates.TX_SENT)
-                            and refund_tx_chain_info["height"] == 0
-                        ):
-                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
-                            bid_changed = True
-                        if (
-                            not refund_tx.block_height
-                            and refund_tx_chain_info["height"] != 0
-                        ):
-                            self.setTxBlockInfoFromHeight(
-                                ci_from, refund_tx, refund_tx_chain_info["height"]
-                            )
-                            refund_tx.setState(TxStates.TX_IN_CHAIN)
-                            bid_changed = True
-                        if refund_tx_depth >= ci_from.blocks_confirmed:
+                was_confirmed: bool = refund_tx.state == TxStates.TX_CONFIRMED
+                refund_tx_depth: int = ci_from.blocks_confirmed if was_confirmed else 0
+                refund_tx_chain_info = ci_from.getLockTxHeight(
+                    refund_tx.txid,
+                    ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script),
+                    ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
+                    bid.chain_a_height_start,
+                    vout=refund_tx.vout,
+                )
+                if refund_tx_chain_info is not None:
+                    bid_changed: bool = False
+                    refund_tx_depth = refund_tx_chain_info.get("depth", 0)
+                    if (
+                        refund_tx.state in (None, TxStates.TX_NONE, TxStates.TX_SENT)
+                        and refund_tx_chain_info["height"] == 0
+                    ):
+                        refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                        bid_changed = True
+                    if (
+                        not refund_tx.block_height
+                        and refund_tx_chain_info["height"] != 0
+                    ):
+                        self.setTxBlockInfoFromHeight(
+                            ci_from, refund_tx, refund_tx_chain_info["height"]
+                        )
+                        refund_tx.setState(TxStates.TX_IN_CHAIN)
+                        bid_changed = True
+                    if refund_tx_depth >= ci_from.blocks_confirmed:
+                        if not was_confirmed:
                             self.logBidEvent(
                                 bid.bid_id,
                                 EventLogTypes.LOCK_TX_A_REFUND_TX_CONFIRMED,
@@ -8267,9 +8263,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
                             refund_tx.setState(TxStates.TX_CONFIRMED)
                             bid_changed = True
-                        if bid_changed:
-                            self.add(refund_tx, cursor, upsert=True)
-                            self.commitDB()
+                    elif was_confirmed:
+                        self.log.warning(
+                            f"Lock refund tx {self.logIDT(refund_tx.txid)} dropped below depth {ci_from.blocks_confirmed} (now {refund_tx_depth}) for bid {self.log.id(bid_id)}."
+                        )
+                        refund_tx.setState(
+                            TxStates.TX_IN_CHAIN
+                            if refund_tx_chain_info["height"] != 0
+                            else TxStates.TX_IN_MEMPOOL
+                        )
+                        bid_changed = True
+                    if bid_changed:
+                        self.add(refund_tx, cursor, upsert=True)
+                        self.commitDB()
 
                 if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
