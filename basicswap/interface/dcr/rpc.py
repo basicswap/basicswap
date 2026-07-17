@@ -28,10 +28,10 @@ def callrpc(rpc_port, auth, method, params=[], host="127.0.0.1", timeout=None):
     return r["result"]
 
 
-def openrpc(rpc_port, auth, host="127.0.0.1"):
+def openrpc(rpc_port, auth, host="127.0.0.1", timeout=10):
     try:
         url = "http://{}@{}:{}/".format(auth, host, rpc_port)
-        return Jsonrpc(url)
+        return Jsonrpc(url, timeout=timeout)
     except Exception as ex:
         traceback.print_exc()
         raise ValueError("RPC error " + str(ex))

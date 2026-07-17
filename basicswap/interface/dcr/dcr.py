@@ -283,8 +283,14 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         if "wallet_name" in coin_settings:
             raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
 
-    def open_rpc(self):
-        return openrpc(self._rpcport, self._rpcauth, host=self._rpc_host)
+    def open_rpc(self, timeout=10):
+        # Timeout is per call
+        return openrpc(
+            self._rpcport,
+            self._rpcauth,
+            host=self._rpc_host,
+            timeout=timeout,
+        )
 
     def json_request(self, rpc_conn, method, params):
         try:

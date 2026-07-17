@@ -366,8 +366,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return wm
         return None
 
-    def open_rpc(self, wallet=None):
-        return openrpc(self._rpcport, self._rpcauth, wallet=wallet, host=self._rpc_host)
+    def open_rpc(self, wallet=None, timeout=10):
+        # Timeout is per call
+        return openrpc(
+            self._rpcport,
+            self._rpcauth,
+            wallet=wallet,
+            host=self._rpc_host,
+            timeout=timeout,
+        )
 
     def json_request(self, rpc_conn, method, params):
         try:

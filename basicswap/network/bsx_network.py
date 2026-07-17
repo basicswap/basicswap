@@ -85,6 +85,10 @@ class BSXNetwork:
         self.check_bridges_seconds = self.get_int_setting(
             "check_bridges_seconds", 10, 1, 10 * 60
         )
+        self._smsg_rpc_bulk_timeout = self.get_int_setting(
+            "smsg_rpc_bulk_timeout", 30, 10, 120
+        )
+        self._smsg_rpc_bulk_limit = self.get_int_setting("smsg_rpc_bulk_limit", 5000, 1)
         self._last_checked_bridges = 0
         self._forget_portals_after = 86400 * 7
 
@@ -814,7 +818,7 @@ class BSXNetwork:
             return  # TODO: Switch to paid?
 
         msg_id = message[2:]
-        options = {"encoding": "hex", "setread": True}
+        options = {"encoding": "hex", "updatestatus": True}
         if self._can_use_smsg_payload2:
             options["pubkey_from"] = True
         num_tries = 5
@@ -1165,10 +1169,18 @@ class BSXNetwork:
         if self._poll_smsg:
             if now - self._last_checked_smsg >= self.check_smsg_seconds:
                 self._last_checked_smsg = now
-                options = {"encoding": "hex", "setread": True}
+                options = {
+                    "encoding": "hex",
+                    "updatestatus": True,
+                    "max_results": self._smsg_rpc_bulk_limit,
+                }
                 if self._can_use_smsg_payload2:
                     options["pubkey_from"] = True
-                msgs = self.callrpc("smsginbox", ["unread", "", options])
+                msgs = self.callrpc(
+                    "smsginbox",
+                    ["unread", "", options],
+                    timeout=self._smsg_rpc_bulk_timeout,
+                )
                 for msg in msgs["messages"]:
                     self.processMsg(msg)
 

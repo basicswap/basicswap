@@ -253,10 +253,10 @@ def callrpc_pooled(
             raise ValueError(f"RPC server error: {ex}, method: {method}")
 
 
-def openrpc(rpc_port, auth, wallet=None, host="127.0.0.1"):
+def openrpc(rpc_port, auth, wallet=None, host="127.0.0.1", timeout=10):
     try:
         url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
-        return Jsonrpc(url)
+        return Jsonrpc(url, timeout=timeout)
     except Exception as ex:
         traceback.print_exc()
         raise ValueError(f"RPC error: {ex}")
