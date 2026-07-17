@@ -67,6 +67,7 @@ from .script import (
     OP_EQUALVERIFY,
     OP_HASH160,
     OP_IF,
+    OP_RETURN,
     push_script_data,
 )
 from coincurve.keys import (
@@ -1136,7 +1137,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         push_script_data(script, bytes((2,)))
         script += bytes((OP_CHECKMULTISIG,))
         script += bytes((OP_ELSE,))
-        script += CScriptNum.encode(CScriptNum(csv_val))
+        # Decred requires minimal data pushes: values 1-16 must use OP_1-OP_16.
+        push_script_data(script, CScriptNum.encode(CScriptNum(csv_val))[1:])
         script += bytes((OP_CHECKSEQUENCEVERIFY,))
         script += bytes((OP_DROP,))
         push_script_data(script, Kaf)
@@ -1595,6 +1597,19 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         tx.vout.append(self.txoType()(locked_amount, self.getPubkeyHashDest(pkh_dest)))
 
+        if self.altruistic() and kbsf:
+            # Add mercy_keyshare
+            mercy_script = bytearray((OP_RETURN,))
+            push_script_data(mercy_script, b"XBSW")
+            push_script_data(mercy_script, kbsf)
+            tx.vout.append(self.txoType()(0, bytes(mercy_script)))
+        else:
+            self._log.debug(
+                "Not attaching mercy output, have kbsf {}.".format(
+                    "true" if kbsf else "false"
+                )
+            )
+
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(
             script_lock_refund
         )
@@ -1614,6 +1629,16 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         )
 
         return tx.serialize(TxSerializeType.NoWitness)
+
+    def inspectSwipeTx(self, tx: dict):
+        for vout in tx["vout"]:
+            script_bytes = bytes.fromhex(vout["scriptPubKey"]["hex"])
+            if len(script_bytes) < 39:
+                continue
+            if script_bytes[0] != OP_RETURN:
+                continue
+            return script_bytes[7 : 7 + 32]
+        return None
 
     def signTxOtVES(
         self,

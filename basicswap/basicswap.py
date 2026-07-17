@@ -3325,7 +3325,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
     def initialiseWallet(
-        self, interface_type, raise_errors: bool = False, restore_time: int = -1
+        self,
+        interface_type,
+        raise_errors: bool = False,
+        restore_time: int = -1,
+        verify_seed: bool = True,
     ) -> None:
         if interface_type == Coins.PART:
             return
@@ -3358,7 +3362,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.error(traceback.format_exc())
             return
 
-        if ci._connection_type != "electrum":
+        # verify_seed is unset when the wallet is created pre-seeded with no
+        # daemon running to verify against, the seed is verified at first
+        # startup by checkWalletSeed.
+        if verify_seed and ci._connection_type != "electrum":
             expect_seed_id: bytes = ci.getSeedHash(root_key)
             wallet_seed_id = ci.getWalletSeedID()
             if expect_seed_id.hex() != wallet_seed_id:

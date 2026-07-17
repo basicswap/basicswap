@@ -1019,7 +1019,10 @@ def initialise_wallets(
                 )
 
                 swap_client.initialiseWallet(
-                    c, raise_errors=True, restore_time=restore_time
+                    c,
+                    raise_errors=True,
+                    restore_time=restore_time,
+                    verify_seed=module.startsInitDaemon(),
                 )
                 if c not in swap_client.xmr_based_coins:
                     if restore_time == -1:
