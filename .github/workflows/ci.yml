@@ -44,6 +44,8 @@ jobs:
             - 'basicswap/interface/dcr/**'
           nmc:
             - 'basicswap/interface/nmc/**'
+          wow:
+            - 'basicswap/interface/wow/**'
           pivx:
             - 'basicswap/interface/pivx/**'
           dash:
@@ -61,6 +63,7 @@ jobs:
         LTC_CHANGED: ${{ steps.filter.outputs.ltc }}
         DCR_CHANGED: ${{ steps.filter.outputs.dcr }}
         NMC_CHANGED: ${{ steps.filter.outputs.nmc }}
+        WOW_CHANGED: ${{ steps.filter.outputs.wow }}
         PIVX_CHANGED: ${{ steps.filter.outputs.pivx }}
         DASH_CHANGED: ${{ steps.filter.outputs.dash }}
         FIRO_CHANGED: ${{ steps.filter.outputs.firo }}
@@ -68,14 +71,15 @@ jobs:
         DOGE_CHANGED: ${{ steps.filter.outputs.doge }}
       run: |
         entries=""
-        # add_entry name test_coin [test_coin_a] [test_coin_b]
+        # add_entry name test_coin [test_coin_a] [test_coin_b] [skip_tests]
         # test_coin_a defaults to test_coin, override for coin variants.
         # test_coin_b defaults to bitcoin.
+        # skip_tests defaults to false, set for coins without a working regtest.
         add_entry() {
           if [ -n "$entries" ]; then
             entries="${entries},"
           fi
-          entries="${entries}{\"name\":\"$1\",\"test_coin\":\"$2\",\"test_coin_a\":\"${3:-$2}\",\"test_coin_b\":\"${4:-bitcoin}\"}"
+          entries="${entries}{\"name\":\"$1\",\"test_coin\":\"$2\",\"test_coin_a\":\"${3:-$2}\",\"test_coin_b\":\"${4:-bitcoin}\",\"skip_tests\":\"${5:-false}\"}"
         }
         if [ "$PART_CHANGED" = "true" ]; then
           add_entry test_part_blind particl "particl blind"
@@ -89,6 +93,9 @@ jobs:
         fi
         if [ "$NMC_CHANGED" = "true" ]; then
           add_entry test_nmc namecoin
+        fi
+        if [ "$WOW_CHANGED" = "true" ]; then
+          add_entry test_wow wownero wownero bitcoin true
         fi
         if [ "$PIVX_CHANGED" = "true" ]; then
           add_entry test_pivx pivx
@@ -333,6 +340,7 @@ jobs:
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=${{ matrix.test_coin }}
     - name: Run test_coins for ${{ matrix.test_coin_a }}
+      if: ${{ matrix.skip_tests != 'true' }}
       env:
         TEST_PATH: /tmp/test_coins
         TEST_COINS_LIST: ${{ matrix.test_coin }},${{ matrix.test_coin_b }}
@@ -343,3 +351,7 @@ jobs:
         mkdir -p ${TEST_PATH}/bin
         cp -r $BIN_DIR/* ${TEST_PATH}/bin/
         pytest -v -s -x --log-cli-level=DEBUG tests/basicswap/test_coins.py --deselect tests/basicswap/test_coins.py::Test::test_set_destination
+    - name: Swap tests skipped
+      if: ${{ matrix.skip_tests == 'true' }}
+      run: |
+        echo "::notice title=${{ matrix.test_coin }}::Binary download verified. Swap tests skipped - ${{ matrix.test_coin }} has no working regtest."
