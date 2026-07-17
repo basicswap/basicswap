@@ -48,6 +48,8 @@ jobs:
             - 'basicswap/interface/dash/**'
           bch:
             - 'basicswap/interface/bch/**'
+          doge:
+            - 'basicswap/interface/doge/**'
     - name: Build coin test matrix
       id: matrix
       env:
@@ -57,6 +59,7 @@ jobs:
         PIVX_CHANGED: ${{ steps.filter.outputs.pivx }}
         DASH_CHANGED: ${{ steps.filter.outputs.dash }}
         BCH_CHANGED: ${{ steps.filter.outputs.bch }}
+        DOGE_CHANGED: ${{ steps.filter.outputs.doge }}
       run: |
         entries=""
         # add_entry name test_coin [test_coin_a] [test_coin_b]
@@ -86,6 +89,9 @@ jobs:
         fi
         if [ "$BCH_CHANGED" = "true" ]; then
           add_entry test_bch bitcoincash
+        fi
+        if [ "$DOGE_CHANGED" = "true" ]; then
+          add_entry test_doge dogecoin
         fi
         echo "Coin test matrix: [$entries]"
         echo "matrix=[$entries]" >> "$GITHUB_OUTPUT"
