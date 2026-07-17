@@ -5,8 +5,10 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-Unit tests for adaptor-sig swap coin B lock publish recovery:
-a write-ahead marker must prevent double-broadcast after a crash.
+Unit tests for adaptor-sig swap coin B lock publish recovery: a write-ahead
+marker records that a broadcast was attempted. After a crash the shared view
+wallet (findTxB) is checked before re-broadcasting, so recovery is automatic
+rather than requiring manual intervention.
 """
 
 import unittest
@@ -147,9 +149,20 @@ class TestAdsRecoveryCoinBLock(unittest.TestCase):
         self.assertLess(publish_idx, published_idx)
         self.assertEqual(len(sc.bid_errors), 0)
 
-    def test_unmatched_marker_blocks_rebroadcast(self):
+    def test_unmatched_marker_recovers_when_tx_found(self):
         bid = make_b_lock_bid()
         sc = make_b_lock_client(bid)
+
+        # findTxB detects the lock tx already exists (shared view wallet), so it
+        # must not re-broadcast and must not error the bid.
+        def found_txb(ci, xmr_swap, bid_, cursor, was_sent):
+            bid_.xmr_b_lock_tx = SimpleNamespace(
+                txid=bytes.fromhex("dd" * 32),
+                b_lock_tx_id=bytes.fromhex("dd" * 32),
+            )
+            return True
+
+        sc.findTxB = found_txb
         # Simulate a crash after the marker was committed but before the
         # publish outcome was recorded.
         sc.event_log.append((EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, ""))
@@ -157,7 +170,19 @@ class TestAdsRecoveryCoinBLock(unittest.TestCase):
         sc.sendXmrBidCoinBLockTx(BID_ID, object())
 
         self.assertNotIn("publish", sc.calls)
-        self.assertEqual(len(sc.bid_errors), 1)
+        self.assertEqual(len(sc.bid_errors), 0)
+
+    def test_unmatched_marker_republishes_when_not_found(self):
+        bid = make_b_lock_bid()
+        sc = make_b_lock_client(bid)
+        # Crash after the marker was committed; findTxB finds nothing, so it is
+        # safe to re-publish (publishBLockTx dedups against the sending wallet).
+        sc.event_log.append((EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, ""))
+
+        sc.sendXmrBidCoinBLockTx(BID_ID, object())
+
+        self.assertIn("publish", sc.calls)
+        self.assertEqual(len(sc.bid_errors), 0)
 
     def test_failed_attempt_allows_retry(self):
         bid = make_b_lock_bid()

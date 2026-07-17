@@ -12496,16 +12496,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
         )
         if num_publish_started > num_published + num_publish_failed:
-            error_msg = f"A previous coin B lock tx publish attempt for bid {self.log.id(bid_id)} may have broadcast before an unclean shutdown. Not republishing, check the {ci_to.coin_name()} wallet."
-            self.log.error(error_msg)
-            self.setBidError(
-                bid,
-                "Possible coin B lock tx broadcast before crash, manual intervention required.",
-                save_bid=False,
-                cursor=cursor,
+            self.log.warning(
+                f"Recovering coin B lock tx publish for bid {self.log.id(bid_id)}: no existing lock tx found, re-publishing."
             )
-            self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
-            return
 
         self.logBidEvent(
             bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, "", cursor
