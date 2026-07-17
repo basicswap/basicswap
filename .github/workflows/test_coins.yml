@@ -1,0 +1,179 @@
+name: test_coins
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_coins:
+        description: 'Coins to test against bitcoin (comma-separated interface names, e.g. "dcr,firo", or "all")'
+        required: false
+        default: ''
+        type: string
+      test_coin_a:
+        description: 'Run a single pair: TEST_COIN_A (requires test_coin_b, overrides test_coins)'
+        required: false
+        default: ''
+        type: string
+      test_coin_b:
+        description: 'TEST_COIN_B for the pair mode'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14"
+  BASE_COINS: particl,bitcoin,monero
+  BIN_DIR: /tmp/cached_bin
+  XMR_RPC_USER: xmr_user
+  XMR_RPC_PWD: xmr_pwd
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      test_matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+    - name: Build coin test matrix
+      id: matrix
+      env:
+        TEST_COINS: ${{ github.event.inputs.test_coins }}
+        TEST_COIN_A: ${{ github.event.inputs.test_coin_a }}
+        TEST_COIN_B: ${{ github.event.inputs.test_coin_b }}
+      run: |
+        entries=""
+        # add_entry name test_coin [test_coin_a] [test_coin_b] [skip_tests] [coins_list]
+        # test_coin can be a comma separated list of non-base coins to prepare.
+        # test_coin_a defaults to test_coin, override for coin variants.
+        # test_coin_b defaults to bitcoin.
+        # skip_tests defaults to false, set for coins without a working regtest.
+        # coins_list defaults to "test_coin,test_coin_b", used for TEST_COINS_LIST.
+        add_entry() {
+          if [ -n "$entries" ]; then
+            entries="${entries},"
+          fi
+          coins_list="${6:-$2,${4:-bitcoin}}"
+          cache_paths=$(echo "$2" | sed 's|[^,][^,]*|/tmp/cached_bin/&|g; s|,|\\n|g')
+          key_coins=$(echo "$2" | tr ',' '-')
+          entries="${entries}{\"name\":\"$1\",\"test_coin\":\"$2\",\"test_coin_a\":\"${3:-$2}\",\"test_coin_b\":\"${4:-bitcoin}\",\"skip_tests\":\"${5:-false}\",\"coins_list\":\"$coins_list\",\"cache_paths\":\"$cache_paths\",\"key_coins\":\"$key_coins\"}"
+        }
+        add_coin() {
+          case "$1" in
+            part)
+              add_entry test_part_blind particl "particl blind"
+              add_entry test_part_anon particl "particl anon";;
+            ltc) add_entry test_ltc litecoin;;
+            dcr) add_entry test_dcr decred;;
+            nmc) add_entry test_nmc namecoin;;
+            wow) add_entry test_wow wownero wownero bitcoin true;;
+            pivx) add_entry test_pivx pivx;;
+            dash) add_entry test_dash dash;;
+            firo) add_entry test_firo firo;;
+            bch) add_entry test_bch bitcoincash;;
+            doge) add_entry test_doge dogecoin;;
+            *)
+              echo "Unknown coin: $1" >&2
+              exit 1;;
+          esac
+        }
+        if [ -n "$TEST_COIN_A" ] || [ -n "$TEST_COIN_B" ]; then
+          # Pair mode: run test_coins.py once for the two coins given.
+          if [ -z "$TEST_COIN_A" ] || [ -z "$TEST_COIN_B" ]; then
+            echo "Both test_coin_a and test_coin_b inputs must be set" >&2
+            exit 1
+          fi
+          extra_coins=""
+          for c in "$TEST_COIN_A" "$TEST_COIN_B"; do
+            case ",${BASE_COINS}," in
+              *",${c},"*) ;;
+              *) extra_coins="${extra_coins:+${extra_coins},}${c}";;
+            esac
+          done
+          add_entry "${TEST_COIN_A}_${TEST_COIN_B}" "${extra_coins:-$TEST_COIN_A}" "$TEST_COIN_A" "$TEST_COIN_B" false "${TEST_COIN_A},${TEST_COIN_B}"
+        else
+          if [ -z "$TEST_COINS" ]; then
+            echo "Set the test_coins input, or test_coin_a and test_coin_b" >&2
+            exit 1
+          fi
+          if [ "$TEST_COINS" = "all" ]; then
+            TEST_COINS="part,ltc,dcr,nmc,wow,pivx,dash,firo,bch,doge"
+          fi
+          IFS=','
+          for c in $TEST_COINS; do
+            add_coin "$c"
+          done
+          unset IFS
+        fi
+        echo "Coin test matrix: [$entries]"
+        echo "matrix=[$entries]" >> "$GITHUB_OUTPUT"
+
+  test_coins:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.matrix.outputs.test_matrix) }}
+    name: test_coins (${{ matrix.name }})
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --require-hashes
+        pip install .[dev]
+    - name: Prepare core versions file
+      run: |
+        basicswap-prepare --version --withcoins="$BASE_COINS" | tail -n +2 > core_versions.txt
+    - name: Restore coin cores cache
+      id: cache-cores
+      uses: actions/cache/restore@v6
+      with:
+        path: /tmp/cached_bin
+        key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
+    - if: ${{ steps.cache-cores.outputs.cache-hit != 'true' }}
+      name: Running basicswap-prepare for base coins
+      run: |
+        basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins="$BASE_COINS"
+    - name: Prepare ${{ matrix.test_coin }} core version file
+      if: ${{ !contains(env.BASE_COINS, matrix.test_coin) }}
+      run: |
+        basicswap-prepare --version --withcoins=${{ matrix.test_coin }} | tail -n +2 > test_coin_version.txt
+        cat test_coin_version.txt
+    - name: Cache ${{ matrix.test_coin }} core
+      if: ${{ !contains(env.BASE_COINS, matrix.test_coin) }}
+      id: cache-test-coin
+      uses: actions/cache@v6
+      with:
+        path: ${{ matrix.cache_paths }}
+        key: ${{ matrix.key_coins }}-core-${{ runner.os }}-${{ hashFiles('**/test_coin_version.txt') }}
+    - if: ${{ !contains(env.BASE_COINS, matrix.test_coin) && steps.cache-test-coin.outputs.cache-hit != 'true' }}
+      name: Running basicswap-prepare for ${{ matrix.test_coin }}
+      run: |
+        basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=${{ matrix.test_coin }}
+    - name: Run test_coins for ${{ matrix.test_coin_a }}
+      if: ${{ matrix.skip_tests != 'true' }}
+      env:
+        TEST_PATH: /tmp/test_coins
+        TEST_COINS_LIST: ${{ matrix.coins_list }}
+        TEST_COIN_A: ${{ matrix.test_coin_a }}
+        TEST_COIN_B: ${{ matrix.test_coin_b }}
+      run: |
+        export PYTHONPATH=$(pwd)
+        mkdir -p ${TEST_PATH}/bin
+        cp -r $BIN_DIR/* ${TEST_PATH}/bin/
+        pytest -v -s -x --log-cli-level=DEBUG tests/basicswap/test_coins.py --deselect tests/basicswap/test_coins.py::Test::test_set_destination
+    - name: Swap tests skipped
+      if: ${{ matrix.skip_tests == 'true' }}
+      run: |
+        echo "::notice title=${{ matrix.test_coin }}::Binary download verified. Swap tests skipped - ${{ matrix.test_coin }} has no working regtest."
