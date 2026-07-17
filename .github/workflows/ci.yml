@@ -46,6 +46,8 @@ jobs:
             - 'basicswap/interface/pivx/**'
           dash:
             - 'basicswap/interface/dash/**'
+          firo:
+            - 'basicswap/interface/firo/**'
           bch:
             - 'basicswap/interface/bch/**'
           doge:
@@ -58,6 +60,7 @@ jobs:
         DCR_CHANGED: ${{ steps.filter.outputs.dcr }}
         PIVX_CHANGED: ${{ steps.filter.outputs.pivx }}
         DASH_CHANGED: ${{ steps.filter.outputs.dash }}
+        FIRO_CHANGED: ${{ steps.filter.outputs.firo }}
         BCH_CHANGED: ${{ steps.filter.outputs.bch }}
         DOGE_CHANGED: ${{ steps.filter.outputs.doge }}
       run: |
@@ -86,6 +89,9 @@ jobs:
         fi
         if [ "$DASH_CHANGED" = "true" ]; then
           add_entry test_dash dash
+        fi
+        if [ "$FIRO_CHANGED" = "true" ]; then
+          add_entry test_firo firo
         fi
         if [ "$BCH_CHANGED" = "true" ]; then
           add_entry test_bch bitcoincash
