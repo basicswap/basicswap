@@ -12336,6 +12336,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
+        if bid.state != BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
+            self.log.warning(
+                f"Not sending coin A lock tx for adaptor-sig bid {self.log.id(bid_id)}, unexpected bid state: {strBidState(bid.state)}."
+            )
+            return
+
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
@@ -13197,16 +13203,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.BID_ACCEPTED,
+        ]
+        if bid.was_sent and offer.was_sent:
+            allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
+        ensure(
+            bid.state in allowed_states,
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
+        )
+
         try:
-            allowed_states = [
-                BidStates.BID_ACCEPTED,
-            ]
-            if bid.was_sent and offer.was_sent:
-                allowed_states.append(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
-            ensure(
-                bid.state in allowed_states,
-                f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
-            )
             xmr_swap.af_lock_refund_spend_tx_esig = (
                 msg_data.af_lock_refund_spend_tx_esig
             )
