@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
+# Copyright (c) 2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -19,6 +20,7 @@ OP_EQUALVERIFY = 0x88
 OP_PUSHDATA1 = 0x4C
 OP_PUSHDATA2 = 0x4D
 OP_PUSHDATA4 = 0x4E
+OP_RETURN = 0x6A
 OP_HASH160 = 0xA9
 OP_CHECKSIG = 0xAC
 OP_CHECKMULTISIG = 0xAE

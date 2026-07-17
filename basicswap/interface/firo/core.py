@@ -46,6 +46,9 @@ class FIROPrepare(CoinPrepareModule):
             "core_version_no": self.version + self.version_tag,
             "core_version_group": 14,
             "min_relay_fee": 0.00001,
+            # Firo core pays the conf fallbackfee (0.0002) when estimatefee
+            # has no data, above the default max of relayfee * multiplier (4.0).
+            "high_estimated_feerate_multiplier": 25.0,
         }
 
         if self.rpc_user != "":

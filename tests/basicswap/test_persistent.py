@@ -345,6 +345,18 @@ def start_processes(self):
             )
 
     if "decred" in self.test_coins_list:
+        # dcrwallet passes consensus methods like "generate" through to dcrd,
+        # failing with "disconnected from consensus RPC" until its dcrd
+        # connection is established.
+        for i in range(30):
+            try:
+                if calldcrrpc(0, "walletinfo")["daemonconnected"]:
+                    break
+            except Exception as e:
+                logging.warning(f"Waiting for DCR wallet RPC: {e}")
+            self.delay_event.wait(1.0)
+        else:
+            raise ValueError("dcrwallet not connected to dcrd")
         if RESET_TEST:
             _ = calldcrrpc(0, "getnewaddress")
             # assert (addr == self.dcr_addr)
