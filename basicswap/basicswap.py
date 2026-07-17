@@ -8796,6 +8796,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         raise
 
                 if (
+                    was_sent
+                    and state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED
+                    and bid.xmr_b_lock_tx is None
+                    and self.countQueuedActions(
+                        cursor, bid_id, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B
+                    )
+                    < 1
+                ):
+                    delay = self.get_delay_event_seconds()
+                    self.log.info(
+                        f"Re-queueing adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
+                    )
+                    self.createActionInSession(
+                        delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
+                    )
+                    self.commitDB()
+
+                if (
                     bid.xmr_b_lock_tx
                     and bid.xmr_b_lock_tx.chain_height is not None
                     and bid.xmr_b_lock_tx.chain_height > 0
