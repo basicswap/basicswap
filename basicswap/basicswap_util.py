@@ -220,6 +220,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_REFUND_TX_SEEN = auto()
     LOCK_TX_A_INVALID = auto()
     LOCK_TX_A_REFUND_TX_CONFIRMED = auto()
+    LOCK_TX_B_PUBLISH_STARTED = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -450,6 +451,8 @@ def describeEventEntry(event_type, event_msg):
         return "Lock tx A published"
     if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
         return "Lock tx B published"
+    if event_type == EventLogTypes.LOCK_TX_B_PUBLISH_STARTED:
+        return "Lock tx B publish started"
     if event_type == EventLogTypes.FAILED_TX_B_SPEND:
         return "Failed to publish lock tx B spend: " + event_msg
     if event_type == EventLogTypes.LOCK_TX_A_IN_MEMPOOL:
