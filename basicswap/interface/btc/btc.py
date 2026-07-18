@@ -4894,7 +4894,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
                 txo = prev_tx_obj["vout"][txi_vout]
                 total_in += self.make_int(txo["value"])
-            dummy_witness_stack.append(self.getP2WPKHDummyWitness())
+            dummy_witness_stack.append(self.getP2WPKHDummyWitness(verifying=True))
             used_utxos.add((txi_txid_hex, txi_vout))
 
         fee: int = total_in - total_out

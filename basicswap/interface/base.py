@@ -183,8 +183,9 @@ class CoinInterface:
 
 
 class AdaptorSigInterface:
-    def getP2WPKHDummyWitness(self) -> List[bytes]:
-        return [bytes(72), bytes(33)]
+    def getP2WPKHDummyWitness(self, verifying: bool = True) -> List[bytes]:
+        # 72 bytes overestimates by 1. Core uses 71-byte low-R signatures
+        return [bytes(71 if verifying else 72), bytes(33)]
 
     def getScriptLockTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [b"", bytes(72), bytes(72), bytes(len(script))]
