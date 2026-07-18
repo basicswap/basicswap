@@ -3860,7 +3860,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         feerate: int = None,
     ) -> str:
         if self.useBackend():
-            return self._createRawFundedTransactionElectrum(addr_to, amount, sub_fee)
+            return self._createRawFundedTransactionElectrum(
+                addr_to, amount, sub_fee, lock_unspents=lock_unspents, feerate=feerate
+            )
 
         txn = self.rpc(
             "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
@@ -3886,15 +3888,23 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return self.rpc_wallet("fundrawtransaction", [txn, options])["hex"]
 
     def _createRawFundedTransactionElectrum(
-        self, addr_to: str, amount: int, sub_fee: bool = False
+        self,
+        addr_to: str,
+        amount: int,
+        sub_fee: bool = False,
+        lock_unspents: bool = True,
+        feerate: int = None,
     ) -> str:
-        feerate, fee_src = self.get_fee_rate()
-        self._ensureFeeRateWithinMax(feerate, fee_src)
+        if not feerate:
+            feerate, fee_src = self.get_fee_rate()
+            self._ensureFeeRateWithinMax(feerate, fee_src)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         script = self.getDestForAddress(addr_to)
         tx.vout.append(self.txoType()(amount, script))
-        funded_tx = self.fundTx(tx.serialize(), feerate, subfee=sub_fee)
+        funded_tx = self.fundTx(
+            tx.serialize(), feerate, lock_unspents=lock_unspents, subfee=sub_fee
+        )
         return funded_tx.hex()
 
     def createRawSignedTransaction(self, addr_to, amount) -> str:

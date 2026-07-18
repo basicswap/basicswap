@@ -38,6 +38,9 @@ pytest -v -s --log-cli-level=DEBUG tests/basicswap/test_electrum.py
 # Run select test
 pytest -v -s  --log-cli-level=DEBUG tests/basicswap/test_electrum.py::Test::test_01_b_full_swap_xmr
 
+# Run persistent test (loops until ctrl+c, not collected by pytest)
+python tests/basicswap/test_electrum.py TestPersistent.test_persistent
+
 # Optionally copy coin releases to permanent storage for faster subsequent startups
 cp -r ${TEST_PATH}/bin/* ~/tmp/basicswap_bin/
 
@@ -48,6 +51,7 @@ import logging
 import os
 import random
 import shutil
+import sqlite3
 import struct
 import subprocess
 import sys
@@ -272,6 +276,19 @@ def getTickerFromCoinId(coin_id: Coins) -> str:
     if isinstance(coin_id, Coins):
         return coin_id.name
     raise ValueError(f"TODO: getTickerFromCoinId {coin_id}")
+
+
+def get_locked_utxos(node_id: int) -> dict:
+    # Read the node's db directly, must not interfere with the running node.
+    db_path = os.path.join(TEST_PATH, f"client{node_id}", "db_regtest.sqlite")
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+    try:
+        rows = conn.execute(
+            "SELECT txid, vout, bid_id FROM wallet_locked_utxos"
+        ).fetchall()
+        return {(txid, vout): bid_id for txid, vout, bid_id in rows}
+    finally:
+        conn.close()
 
 
 class TestFunctions(BaseTestWithPrepare):
@@ -1037,7 +1054,13 @@ class Test(TestFunctions):
             "amount_to": amt_to_str,
             "bid_rate": offer["rate"],
         }
+        node_id_to: int = port_node_to - self.port_node_0
+        locked_utxos_before: dict = get_locked_utxos(node_id_to)
         subfee_bid_data = read_json_api(port_node_to, "getsubfeebidtx", data)
+        locked_utxos_after: dict = get_locked_utxos(node_id_to)
+        # Expired locks may be lazily purged during funding, only check for additions.
+        new_locked = [k for k in locked_utxos_after if k not in locked_utxos_before]
+        assert not new_locked, f"getsubfeebidtx must not lock utxos: {new_locked}"
         assert offer["offer_id"] == offer_id
 
         prefunded_bid_tx = CTransaction()
@@ -1053,6 +1076,17 @@ class Test(TestFunctions):
 
         rv = post_json_api(port_node_to, "bids/new", data)
         bid_id: str = rv["bid_id"]
+
+        # Only check the prefunded tx's own inputs, other tests may hold locks.
+        locked_utxos_after_bid: dict = get_locked_utxos(node_id_to)
+        expected_bid_id: bytes = bytes.fromhex(bid_id)
+        for vin in prefunded_bid_tx.vin:
+            txid_hex: str = vin.prevout.hash.to_bytes(32, "big").hex()
+            locked_bid_id = locked_utxos_after_bid.get((txid_hex, vin.prevout.n))
+            assert locked_bid_id == expected_bid_id, (
+                f"prefunded input {txid_hex}:{vin.prevout.n} not locked with bid_id, "
+                f"got {locked_bid_id!r}"
+            )
 
         wait_for_bid_state(
             self.delay_event, port_node_from, bid_id, BidStates.BID_RECEIVED
@@ -1098,6 +1132,15 @@ class Test(TestFunctions):
         assert len(prefunded_inputs) == len(chain_inputs)
         for prefunded_input in prefunded_inputs:
             assert prefunded_input in chain_inputs
+
+
+class TestPersistent(Test):
+    __test__ = False
+
+    def test_persistent(self):
+        while not self.delay_event.is_set():
+            logger.info("Looping indefinitely, ctrl+c to exit.")
+            self.delay_event.wait(10)
 
 
 # ---------------------------------------------------------------------------

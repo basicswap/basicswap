@@ -6521,7 +6521,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ci_to.validateFeeRate(
                     prefunded_tx_fee_rate, Concepts.BID, bypass_fee_validation
                 )
-                ci_to.lockPrefundedTxInputs(prefunded_tx_data)
             else:
                 amount, amount_to, bid_rate = self.setBidAmounts(
                     amount, offer, extra_options, ci_from
@@ -6643,6 +6642,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         tx_data=extra_options["prefunded_tx"],
                     )
                     self.add(prefunded_tx, cursor)
+                    ci_to.lockPrefundedTxInputs(
+                        extra_options["prefunded_tx"], bid_id=bid.bid_id
+                    )
 
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
                 self.commitDB()
@@ -6811,6 +6813,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     tx_data=extra_options["prefunded_tx"],
                 )
                 self.add(prefunded_tx, cursor)
+                ci_to.lockPrefundedTxInputs(
+                    extra_options["prefunded_tx"], bid_id=bid.bid_id
+                )
 
             self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
             self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
