@@ -29,6 +29,8 @@
       };
 
       this.xhr_bid_params.onload = () => {
+        // Reenable "Send Bid" once the amounts are updated after deselecting subfee.
+        this.setSendBidWaiting(false);
         if (this.xhr_bid_params.status == 200) {
           const obj = JSON.parse(this.xhr_bid_params.response);
           const bidAmountSendInput = document.getElementById('bid_amount_send');
@@ -37,20 +39,60 @@
           }
         }
       };
+      this.xhr_bid_params.onerror = () => {
+        this.setSendBidWaiting(false);
+      };
 
       this.xhr_bid_prefund.onload = () => {
+        const bidSubfee = document.getElementById('subfee_bid');
+        if (!bidSubfee || !bidSubfee.checked) {
+          // Subfee was deselected while waiting, discard the stale response.
+          return;
+        }
+        let obj = null;
         if (this.xhr_bid_prefund.status == 200) {
-          const obj = JSON.parse(this.xhr_bid_prefund.response);
-          const bidAmountInput = document.getElementById('bid_amount');
-          if (bidAmountInput) {
-            bidAmountInput.value = obj['amount_from'];
-          }
-          const prefundedBidInput = document.getElementById('prefunded_bid_tx');
-          if (prefundedBidInput) {
-            prefundedBidInput.value = obj['bid_tx'];
+          try {
+            obj = JSON.parse(this.xhr_bid_prefund.response);
+          } catch (e) {
+            obj = null;
           }
         }
+        if (!obj || obj['error']) {
+          let message = 'Failed to create the prefunded bid transaction';
+          if (obj && obj['error']) {
+            message += ': ' + obj['error'];
+          }
+          message += '. Deselect subfee to continue.';
+          this.setSendBidWaiting(true, message);
+          return;
+        }
+        const bidAmountInput = document.getElementById('bid_amount');
+        if (bidAmountInput) {
+          bidAmountInput.value = obj['amount_from'];
+        }
+        const prefundedBidInput = document.getElementById('prefunded_bid_tx');
+        if (prefundedBidInput) {
+          prefundedBidInput.value = obj['bid_tx'];
+        }
+        this.setSendBidWaiting(false);
       };
+      this.xhr_bid_prefund.onerror = () => {
+        this.setSendBidWaiting(true, 'Failed to create the prefunded bid transaction. Deselect subfee to continue.');
+      };
+    },
+
+    setSendBidWaiting: function(waiting, message) {
+      const sendBidBtn = document.querySelector('button[name="sendbid"][value="Send Bid"]');
+      if (sendBidBtn) {
+        sendBidBtn.disabled = waiting;
+        sendBidBtn.classList.toggle('opacity-50', waiting);
+        sendBidBtn.classList.toggle('cursor-not-allowed', waiting);
+      }
+      const waitMsg = document.getElementById('sendbid_wait_msg');
+      if (waitMsg) {
+        waitMsg.textContent = message || 'Preparing the prefunded bid transaction, please wait...';
+        waitMsg.classList.toggle('hidden', !waiting);
+      }
     },
 
     setupEventListeners: function() {
@@ -195,11 +237,17 @@
       if (bidSubfee && bidSubfee.checked) {
         bidAmountInput.readOnly = true;
 
+        const prefundedBidInput = document.getElementById('prefunded_bid_tx');
+        if (prefundedBidInput) {
+          prefundedBidInput.value = "";
+        }
+
         const offer_id = document.getElementById('offer_id')?.value || '';
         if (!offer_id) {
           console.log("offer_id not found!");
           return;
         }
+        this.setSendBidWaiting(true);
         this.xhr_bid_prefund.open('POST', '/json/getsubfeebidtx');
         this.xhr_bid_prefund.setRequestHeader('Content-type', 'application/json;charset=UTF-8');
         const data = { offer_id: offer_id, amount_to: bidAmountSendInput.value , bid_rate: rate};

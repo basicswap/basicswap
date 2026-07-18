@@ -1140,6 +1140,22 @@ class TestPersistent(Test):
     __test__ = False
 
     def test_persistent(self):
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_xmr,
+            100,
+            self.port_node_0,
+            self.port_node_1,
+            True,
+        )
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
         while not self.delay_event.is_set():
             logger.info("Looping indefinitely, ctrl+c to exit.")
             self.delay_event.wait(10)
