@@ -50,9 +50,10 @@ from tests.basicswap.util.common import (
     read_json_api,
 )
 from tests.basicswap.test_electrum import (
+    TestFunctions,
+    is_reverse_bid,
     wait_for_bid_states,
     wait_for_offer,
-    TestFunctions,
 )
 from tests.basicswap.util.harness import run_prepare, TEST_PATH
 from tests.basicswap.test_persistent import (
@@ -301,6 +302,84 @@ class Test(TestFunctions):
         assert float(wallet_after["balance"]) + float(
             wallet_after["unconfirmed"]
         ) > float(wallet_before["balance"]) + float(wallet_before["unconfirmed"])
+
+    def test_06_preselect_bid_inputs(self):
+        coin_from, coin_to = (self.test_coin_a, self.test_coin_b)
+        port_node_from, port_node_to = (self.port_node_0, self.port_node_1)
+        logger.info(
+            f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) Preselected bid inputs"
+        )
+        prepare_balance(
+            self.delay_event,
+            self.test_coin_b,
+            100,
+            self.port_node_1,
+            self.port_node_0,
+            True,
+        )
+        ticker_from: str = coin_from.name
+        ticker_to: str = coin_to.name
+
+        reverse_bid: bool = is_reverse_bid(coin_from, coin_to)
+        port_offerer: int = port_node_from
+        port_bidder: int = port_node_to
+        port_leader: int = port_bidder if reverse_bid else port_offerer
+        port_follower: int = port_offerer if reverse_bid else port_bidder
+        logger.info(
+            f"Offerer, bidder, leader, follower: {port_offerer}, {port_bidder}, {port_leader}, {port_follower}"
+        )
+
+        amt_from_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        amt_to_str = f"{random.uniform(0.5, 10.0):.{8}f}"
+        data = {
+            "addr_from": "-1",
+            "coin_from": ticker_from,
+            "coin_to": ticker_to,
+            "amt_from": amt_from_str,
+            "amt_to": amt_to_str,
+            "swap_type": "adaptor_sig",
+            "lockhrs": 24,
+            "automation_strat_id": 1,
+        }
+
+        logger.info(
+            f"Creating offer {amt_from_str} {ticker_from} -> {amt_to_str} {ticker_to}"
+        )
+        offer_id: str = post_json_api(port_node_from, "offers/new", data)["offer_id"]
+        wait_for_offer(self.delay_event, port_node_to, offer_id)
+        offer = read_json_api(port_node_to, f"offers/{offer_id}")[0]
+        assert offer["offer_id"] == offer_id
+
+        data = {
+            "offer_id": offer_id,
+            "amount_to": amt_to_str,
+            "bid_rate": offer["rate"],
+        }
+        # TODO: Check locked utxos
+        subfee_bid_data = read_json_api(port_node_to, "getsubfeebidtx", data)
+
+        data = {
+            "offer_id": offer_id,
+            "amount_from": subfee_bid_data["amount_from"],
+            "amount_to": subfee_bid_data["amount_to"],
+            "prefunded_bid_tx": subfee_bid_data["bid_tx"],
+            "validmins": 60,
+        }
+
+        rv = post_json_api(port_node_to, "bids/new", data)
+        bid_id: str = rv["bid_id"]
+
+        logger.info("Completing swap")
+        wait_for_bid_states(
+            self.delay_event,
+            bid_id,
+            port_node_from,
+            BidStates.SWAP_COMPLETED,
+            port_node_to,
+            BidStates.SWAP_COMPLETED,
+            240,
+        )
+        # TODO: check lock tx a inputs match prefunded_bid_tx
 
 
 if __name__ == "__main__":
