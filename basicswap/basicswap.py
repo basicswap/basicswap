@@ -8732,7 +8732,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 try:
                     bid_changed = self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 except Exception as e:
-                    if ci_to.is_transient_error(e):
+                    if "not fully synced" in str(e):
+                        # Waiting for the node to sync is not an RPC failure,
+                        # don't count it towards the abort limit.
+                        self.log.warning(
+                            f"Bid {self.log.id(bid_id)}: Waiting for {ci_to.coin_name()} to sync before checking lock tx B."
+                        )
+                    elif ci_to.is_transient_error(e):
                         rpc_error_count = self.countBidEvents(
                             bid, EventLogTypes.LOCK_TX_B_RPC_ERROR, cursor
                         )
