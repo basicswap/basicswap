@@ -88,6 +88,7 @@ from tests.basicswap.test_persistent import (
 from tests.basicswap.util.mnemonics import mnemonics
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.interface.electrumx import ElectrumConnection
+from basicswap.interface.ltc.util import check_header_pow_scrypt
 from basicswap.util.merkle import (
     check_header_pow,
     electrum_merkle_root,
@@ -1118,6 +1119,13 @@ GENESIS_COINBASE_TXID = (
     "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
 )
 
+# Litecoin block #29255 — known valid scrypt PoW header
+LTC_BLOCK_29255_HEADER_HEX = (
+    "01000000f615f7ce3b4fc6b8f61e8f89aedb1d0852507650533a9e3b10b9bbcc"
+    "30639f279fcaa86746e1ef52d3edb3c4ad8259920d509bd073605c9bf1d59983"
+    "752a6b06b817bb4ea78e011d012d59d4"
+)
+
 
 def build_regtest_header(merkle_root_le: bytes) -> bytes:
     version = struct.pack("<I", 1)
@@ -1267,6 +1275,24 @@ class TestMerkle(unittest.TestCase):
         header_bytes = bytearray(bytes.fromhex(GENESIS_HEADER_HEX))
         header_bytes[36] ^= 0xFF
         self.assertFalse(check_header_pow(bytes(header_bytes)))
+
+    def test_ltc_genesis_pow_valid(self):
+        header_bytes = bytes.fromhex(LTC_BLOCK_29255_HEADER_HEX)
+        self.assertEqual(len(header_bytes), 80)
+        self.assertTrue(check_header_pow_scrypt(header_bytes))
+
+    def test_ltc_pow_fails_on_tampered_header(self):
+        header_bytes = bytearray(bytes.fromhex(LTC_BLOCK_29255_HEADER_HEX))
+        header_bytes[36] ^= 0xFF
+        self.assertFalse(check_header_pow_scrypt(bytes(header_bytes)))
+
+    def test_ltc_sha256d_pow_rejects_ltc_header(self):
+        header_bytes = bytes.fromhex(LTC_BLOCK_29255_HEADER_HEX)
+        self.assertFalse(check_header_pow(header_bytes))
+
+    def test_btc_scrypt_pow_rejects_btc_header(self):
+        header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
+        self.assertFalse(check_header_pow_scrypt(header_bytes))
 
     def test_short_header_raises(self):
         with self.assertRaises(ValueError):

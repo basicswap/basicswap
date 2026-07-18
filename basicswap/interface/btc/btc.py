@@ -644,6 +644,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         block_hash = sha256(sha256(header_bytes))[::-1].hex()
         return {"height": height, "hash": block_hash, "time": block_time}
 
+    @staticmethod
+    def _checkHeaderPoW(header_bytes: bytes) -> bool:
+        return check_header_pow(header_bytes)
+
     def _verifyTxMerkleElectrum(
         self, backend, txid_hex: str, block_height: int
     ) -> Optional[bool]:
@@ -664,7 +668,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return None
             header_hex = backend._server.call("blockchain.block.header", [block_height])
             header_bytes = bytes.fromhex(header_hex)
-            if not check_header_pow(header_bytes):
+            if not self._checkHeaderPoW(header_bytes):
                 self._log.error(
                     f"Block header PoW invalid at height {block_height} for {self._log.id(txid_hex)}"
                 )

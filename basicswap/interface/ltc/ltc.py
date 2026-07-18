@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2023 tecnovert
-# Copyright (c) 2024-2025 The Basicswap developers
+# Copyright (c) 2024-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins, chainparams
+from basicswap.interface.ltc.util import check_header_pow_scrypt
 
 
 class LTCInterface(BTCInterface):
@@ -29,6 +30,10 @@ class LTCInterface(BTCInterface):
             host=self._rpc_host,
             wallet=self._rpc_wallet_mweb,
         )
+
+    @staticmethod
+    def _checkHeaderPoW(header_bytes: bytes) -> bool:
+        return check_header_pow_scrypt(header_bytes)
 
     def getNewMwebAddress(self, use_segwit=False, label="swap_receive") -> str:
         if self.useBackend():
