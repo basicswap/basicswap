@@ -2353,7 +2353,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
         return inputs
 
-    def unlockInputs(self, tx_data: bytes) -> None:
+    def unlockInputs(self, tx_data: bytes, cursor=None) -> None:
         tx = self.loadTx(tx_data)
         if self.useBackend():
             wm = self.getWalletManager()
@@ -2365,6 +2365,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     self.coin_type(),
                     i2h(txi.prevout.hash),
                     txi.prevout.n,
+                    cursor=cursor,
                 )
             return
 
@@ -2385,7 +2386,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             else:
                 raise
 
-    def lockPrefundedTxInputs(self, tx_data: bytes, bid_id: bytes = None) -> None:
+    def lockPrefundedTxInputs(
+        self, tx_data: bytes, bid_id: bytes = None, cursor=None
+    ) -> None:
         tx = self.loadTx(tx_data)
         if self.useBackend():
             wm = self.getWalletManager()
@@ -2401,6 +2404,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     txi.prevout.n,
                     bid_id=bid_id,
                     expires_in=lock_expires_in,
+                    cursor=cursor,
                 )
             return
 

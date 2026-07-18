@@ -1632,13 +1632,14 @@ class WalletManager:
         address: str = None,
         bid_id: bytes = None,
         expires_in: int = 3600,
+        cursor=None,
     ) -> bool:
-        """Lock a UTXO to prevent double-spending in concurrent swaps."""
-        cursor = self._swap_client.openDB()
+        # Lock a UTXO to prevent double-spending in concurrent swaps.
+        use_cursor = self._swap_client.openDB(cursor)
         try:
             existing = self._swap_client.queryOne(
                 WalletLockedUTXO,
-                cursor,
+                use_cursor,
                 {"coin_type": int(coin_type), "txid": txid, "vout": vout},
             )
             if existing:
@@ -1646,9 +1647,10 @@ class WalletManager:
                 if bid_id:
                     existing.bid_id = bid_id
                 self._swap_client.updateDB(
-                    existing, cursor, constraints=["coin_type", "txid", "vout"]
+                    existing, use_cursor, constraints=["coin_type", "txid", "vout"]
                 )
-                self._swap_client.commitDB()
+                if cursor is None:
+                    self._swap_client.commitDB()
                 return True
 
             now = int(time.time())
@@ -1662,33 +1664,37 @@ class WalletManager:
                 locked_at=now,
                 expires_at=now + expires_in if expires_in else 0,
             )
-            self._swap_client.add(record, cursor)
-            self._swap_client.commitDB()
+            self._swap_client.add(record, use_cursor)
+            if cursor is None:
+                self._swap_client.commitDB()
             self._log.debug(
                 f"Locked UTXO {txid[:16]}...:{vout} for {Coins(coin_type).name}"
             )
             return True
         except Exception as e:
             self._log.warning(f"Failed to lock UTXO {txid[:16]}:{vout}: {e}")
-            self._swap_client.rollbackDB()
+            if cursor is None:
+                self._swap_client.rollbackDB()
             return False
         finally:
-            self._swap_client.closeDB(cursor, commit=False)
+            if cursor is None:
+                self._swap_client.closeDB(use_cursor, commit=False)
 
-    def unlockUTXO(self, coin_type: Coins, txid: str, vout: int) -> bool:
-        cursor = self._swap_client.openDB()
+    def unlockUTXO(self, coin_type: Coins, txid: str, vout: int, cursor=None) -> bool:
+        use_cursor = self._swap_client.openDB(cursor)
         try:
             existing = self._swap_client.queryOne(
                 WalletLockedUTXO,
-                cursor,
+                use_cursor,
                 {"coin_type": int(coin_type), "txid": txid, "vout": vout},
             )
             if existing:
-                cursor.execute(
+                use_cursor.execute(
                     "DELETE FROM wallet_locked_utxos WHERE coin_type = ? AND txid = ? AND vout = ?",
                     (int(coin_type), txid, vout),
                 )
-                self._swap_client.commitDB()
+                if cursor is None:
+                    self._swap_client.commitDB()
                 self._log.debug(
                     f"Unlocked UTXO {self._log.id(txid, max_chars=16)}...:{vout} for {Coins(coin_type).name}"
                 )
@@ -1698,59 +1704,66 @@ class WalletManager:
             self._log.warning(
                 f"Failed to unlock UTXO {self._log.id(txid, max_chars=16)}...:{vout}: {e}"
             )
-            self._swap_client.rollbackDB()
+            if cursor is None:
+                self._swap_client.rollbackDB()
             return False
         finally:
-            self._swap_client.closeDB(cursor, commit=False)
+            if cursor is None:
+                self._swap_client.closeDB(use_cursor, commit=False)
 
-    def unlockUTXOsForBid(self, coin_type: Coins, bid_id: bytes) -> int:
-        cursor = self._swap_client.openDB()
+    def unlockUTXOsForBid(self, coin_type: Coins, bid_id: bytes, cursor=None) -> int:
+        use_cursor = self._swap_client.openDB(cursor)
         try:
             locked = self._swap_client.query(
                 WalletLockedUTXO,
-                cursor,
+                use_cursor,
                 {"coin_type": int(coin_type), "bid_id": bid_id},
             )
             count = 0
             for utxo in locked:
-                cursor.execute(
+                use_cursor.execute(
                     "DELETE FROM wallet_locked_utxos WHERE coin_type = ? AND txid = ? AND vout = ?",
                     (int(coin_type), utxo.txid, utxo.vout),
                 )
                 count += 1
             if count > 0:
-                self._swap_client.commitDB()
+                if cursor is None:
+                    self._swap_client.commitDB()
                 self._log.debug(
                     f"Unlocked {count} UTXOs for bid {bid_id.hex()[:16]}..."
                 )
             return count
         except Exception as e:
             self._log.warning(f"Failed to unlock UTXOs for bid: {e}")
-            self._swap_client.rollbackDB()
+            if cursor is None:
+                self._swap_client.rollbackDB()
             return 0
         finally:
-            self._swap_client.closeDB(cursor, commit=False)
+            if cursor is None:
+                self._swap_client.closeDB(use_cursor, commit=False)
 
-    def isUTXOLocked(self, coin_type: Coins, txid: str, vout: int) -> bool:
-        cursor = self._swap_client.openDB()
+    def isUTXOLocked(self, coin_type: Coins, txid: str, vout: int, cursor=None) -> bool:
+        use_cursor = self._swap_client.openDB(cursor)
         try:
             existing = self._swap_client.queryOne(
                 WalletLockedUTXO,
-                cursor,
+                use_cursor,
                 {"coin_type": int(coin_type), "txid": txid, "vout": vout},
             )
             if not existing:
                 return False
             if existing.expires_at and existing.expires_at < int(time.time()):
-                cursor.execute(
+                use_cursor.execute(
                     "DELETE FROM wallet_locked_utxos WHERE coin_type = ? AND txid = ? AND vout = ?",
                     (int(coin_type), txid, vout),
                 )
-                self._swap_client.commitDB()
+                if cursor is None:
+                    self._swap_client.commitDB()
                 return False
             return True
         finally:
-            self._swap_client.closeDB(cursor, commit=False)
+            if cursor is None:
+                self._swap_client.closeDB(use_cursor, commit=False)
 
     def getLockedUTXOs(self, coin_type: Coins) -> List[dict]:
         cursor = self._swap_client.openDB()

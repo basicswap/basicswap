@@ -1719,7 +1719,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             )
         return inputs
 
-    def unlockInputs(self, tx_data: bytes) -> None:
+    def unlockInputs(self, tx_data: bytes, cursor=None) -> None:
         tx = self.loadTx(tx_data)
 
         inputs = []
@@ -1747,7 +1747,9 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             else:
                 raise
 
-    def lockPrefundedTxInputs(self, tx_data: bytes, bid_id: bytes = None) -> None:
+    def lockPrefundedTxInputs(
+        self, tx_data: bytes, bid_id: bytes = None, cursor=None
+    ) -> None:
         tx = self.loadTx(tx_data)
         inputs = []
         for txi in tx.vin:

@@ -3595,7 +3595,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         else None
                     )
                     if wm:
-                        unlocked = wm.unlockUTXOsForBid(coin_type, bid.bid_id)
+                        unlocked = wm.unlockUTXOsForBid(
+                            coin_type, bid.bid_id, cursor=use_cursor
+                        )
                         if unlocked > 0:
                             self.log.debug(
                                 f"Unlocked {unlocked} electrum UTXOs for {coin_type.name} on bid deactivation"
@@ -3616,7 +3618,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if len(rows) > 0:
                     xmr_swap_a_lock_tx = rows[0][0]
                     try:
-                        ci_leader.unlockInputs(xmr_swap_a_lock_tx)
+                        ci_leader.unlockInputs(xmr_swap_a_lock_tx, cursor=use_cursor)
                     except Exception as e:
                         self.log.warning(f"unlockInputs failed {e}")
 
@@ -3630,7 +3632,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 if prefunded_itx:
                     try:
-                        self.ci(offer.coin_to).unlockInputs(prefunded_itx.tx_data)
+                        self.ci(offer.coin_to).unlockInputs(
+                            prefunded_itx.tx_data, cursor=use_cursor
+                        )
                     except Exception as e:
                         self.log.warning(f"Prefunded ITx unlockInputs failed {e}")
                 prefunded_ptx = self.getPreFundedTx(
@@ -3641,7 +3645,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 if prefunded_ptx:
                     try:
-                        self.ci(offer.coin_to).unlockInputs(prefunded_ptx.tx_data)
+                        self.ci(offer.coin_to).unlockInputs(
+                            prefunded_ptx.tx_data, cursor=use_cursor
+                        )
                     except Exception as e:
                         self.log.warning(f"Prefunded PTx unlockInputs failed {e}")
             elif SwapTypes.SELLER_FIRST:
@@ -6643,7 +6649,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
                     self.add(prefunded_tx, cursor)
                     ci_to.lockPrefundedTxInputs(
-                        extra_options["prefunded_tx"], bid_id=bid.bid_id
+                        extra_options["prefunded_tx"], bid_id=bid.bid_id, cursor=cursor
                     )
 
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
@@ -6814,7 +6820,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 self.add(prefunded_tx, cursor)
                 ci_to.lockPrefundedTxInputs(
-                    extra_options["prefunded_tx"], bid_id=bid.bid_id
+                    extra_options["prefunded_tx"], bid_id=bid.bid_id, cursor=cursor
                 )
 
             self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)

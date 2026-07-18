@@ -58,6 +58,7 @@ import sys
 import unittest
 from hashlib import sha256
 from io import BytesIO
+from types import SimpleNamespace
 
 import basicswap.config as cfg
 from basicswap.basicswap_util import (
@@ -74,6 +75,7 @@ from basicswap.chainparams import (
     scriptless_coins,
 )
 from basicswap.util.daemon import Daemon
+from basicswap.wallet_manager import WalletManager
 from basicswap.contrib.test_framework.messages import CTransaction
 
 from tests.basicswap.util.common import (
@@ -1178,7 +1180,7 @@ def make_header(timestamp: int) -> bytes:
 
 
 class StubLog:
-    def id(self, v):
+    def id(self, v, **kwargs):
         return str(v)
 
     def error(self, *args, **kwargs):
@@ -1546,6 +1548,163 @@ class TestElectrumMedianTime(unittest.TestCase):
         backend = StubBackend(HeadersStubServer(raise_on_call=True), height=100)
         ci = make_median_time_interface(backend)
         self.assertFalse(ci.isAbsLockTimeMature(500000001))
+
+
+class FakeDBCursor:
+    def __init__(self):
+        self.executed = []
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+        return self
+
+    def fetchall(self):
+        return []
+
+    def close(self):
+        pass
+
+
+class LockUTXOStubClient:
+    def __init__(self, raise_on_add: bool = False, existing=None, locked_rows=None):
+        self._raise_on_add = raise_on_add
+        self._existing = existing
+        self._locked_rows = locked_rows or []
+        self.internal_cursor = FakeDBCursor()
+        self.calls = []
+
+    def openDB(self, cursor=None):
+        self.calls.append(("openDB", cursor))
+        return cursor if cursor is not None else self.internal_cursor
+
+    def closeDB(self, cursor, commit=True):
+        self.calls.append(("closeDB", cursor, commit))
+
+    def commitDB(self):
+        self.calls.append(("commitDB",))
+
+    def rollbackDB(self):
+        self.calls.append(("rollbackDB",))
+
+    def queryOne(self, table, cursor, constraints):
+        return self._existing
+
+    def query(self, table, cursor, constraints):
+        return list(self._locked_rows)
+
+    def add(self, record, cursor):
+        if self._raise_on_add:
+            raise RuntimeError("db error")
+        self.calls.append(("add", cursor))
+
+
+def make_lock_wallet_manager(swap_client) -> WalletManager:
+    wm = WalletManager.__new__(WalletManager)
+    wm._swap_client = swap_client
+    wm._log = StubLog()
+    return wm
+
+
+class TestLockUTXOCursor(unittest.TestCase):
+    # With an external cursor lockUTXO must join the caller's transaction:
+    # no commit (which would commit the caller's pending writes early) and
+    # no rollback on failure (which would discard them).
+
+    txid = "aa" * 32
+
+    def test_external_cursor_no_commit(self):
+        stub = LockUTXOStubClient()
+        wm = make_lock_wallet_manager(stub)
+        sentinel = FakeDBCursor()
+        self.assertTrue(wm.lockUTXO(Coins.BTC, self.txid, 0, cursor=sentinel))
+        names = [c[0] for c in stub.calls]
+        self.assertNotIn("commitDB", names)
+        self.assertNotIn("rollbackDB", names)
+        self.assertNotIn("closeDB", names)
+        self.assertIn(("openDB", sentinel), stub.calls)
+        self.assertIn(("add", sentinel), stub.calls)
+
+    def test_internal_cursor_commits(self):
+        stub = LockUTXOStubClient()
+        wm = make_lock_wallet_manager(stub)
+        self.assertTrue(wm.lockUTXO(Coins.BTC, self.txid, 0))
+        names = [c[0] for c in stub.calls]
+        self.assertIn("commitDB", names)
+        self.assertIn(("closeDB", stub.internal_cursor, False), stub.calls)
+
+    def test_external_cursor_failure_no_rollback(self):
+        stub = LockUTXOStubClient(raise_on_add=True)
+        wm = make_lock_wallet_manager(stub)
+        sentinel = FakeDBCursor()
+        self.assertFalse(wm.lockUTXO(Coins.BTC, self.txid, 0, cursor=sentinel))
+        names = [c[0] for c in stub.calls]
+        self.assertNotIn("rollbackDB", names)
+        self.assertNotIn("closeDB", names)
+
+    def test_internal_cursor_failure_rolls_back(self):
+        stub = LockUTXOStubClient(raise_on_add=True)
+        wm = make_lock_wallet_manager(stub)
+        self.assertFalse(wm.lockUTXO(Coins.BTC, self.txid, 0))
+        names = [c[0] for c in stub.calls]
+        self.assertIn("rollbackDB", names)
+
+    def test_unlock_external_cursor_no_commit(self):
+        row = SimpleNamespace(txid=self.txid, vout=0)
+        stub = LockUTXOStubClient(existing=row)
+        wm = make_lock_wallet_manager(stub)
+        sentinel = FakeDBCursor()
+        self.assertTrue(wm.unlockUTXO(Coins.BTC, self.txid, 0, cursor=sentinel))
+        names = [c[0] for c in stub.calls]
+        self.assertNotIn("commitDB", names)
+        self.assertNotIn("rollbackDB", names)
+        self.assertNotIn("closeDB", names)
+        self.assertEqual(len(sentinel.executed), 1)
+
+    def test_unlock_internal_cursor_commits(self):
+        row = SimpleNamespace(txid=self.txid, vout=0)
+        stub = LockUTXOStubClient(existing=row)
+        wm = make_lock_wallet_manager(stub)
+        self.assertTrue(wm.unlockUTXO(Coins.BTC, self.txid, 0))
+        names = [c[0] for c in stub.calls]
+        self.assertIn("commitDB", names)
+        self.assertIn(("closeDB", stub.internal_cursor, False), stub.calls)
+        self.assertEqual(len(stub.internal_cursor.executed), 1)
+
+    def test_unlock_for_bid_external_cursor_no_commit(self):
+        rows = [
+            SimpleNamespace(txid=self.txid, vout=0),
+            SimpleNamespace(txid=self.txid, vout=1),
+        ]
+        stub = LockUTXOStubClient(locked_rows=rows)
+        wm = make_lock_wallet_manager(stub)
+        sentinel = FakeDBCursor()
+        count = wm.unlockUTXOsForBid(Coins.BTC, b"\xaa" * 28, cursor=sentinel)
+        self.assertEqual(count, 2)
+        names = [c[0] for c in stub.calls]
+        self.assertNotIn("commitDB", names)
+        self.assertNotIn("closeDB", names)
+        self.assertEqual(len(sentinel.executed), 2)
+
+    def test_is_locked_expired_external_cursor_no_commit(self):
+        row = SimpleNamespace(expires_at=1)
+        stub = LockUTXOStubClient(existing=row)
+        wm = make_lock_wallet_manager(stub)
+        sentinel = FakeDBCursor()
+        self.assertFalse(wm.isUTXOLocked(Coins.BTC, self.txid, 0, cursor=sentinel))
+        names = [c[0] for c in stub.calls]
+        self.assertNotIn("commitDB", names)
+        self.assertNotIn("closeDB", names)
+        self.assertEqual(len(sentinel.executed), 1)
+
+    def test_is_locked_active_external_cursor(self):
+        row = SimpleNamespace(expires_at=0)
+        stub = LockUTXOStubClient(existing=row)
+        wm = make_lock_wallet_manager(stub)
+        sentinel = FakeDBCursor()
+        self.assertTrue(wm.isUTXOLocked(Coins.BTC, self.txid, 0, cursor=sentinel))
+        names = [c[0] for c in stub.calls]
+        self.assertNotIn("closeDB", names)
+        self.assertEqual(len(sentinel.executed), 0)
 
 
 if __name__ == "__main__":
