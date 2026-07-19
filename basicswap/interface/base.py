@@ -5,6 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import socks
 import threading
 
 from enum import IntEnum
@@ -125,6 +126,8 @@ class CoinInterface:
 
     def is_transient_error(self, ex) -> bool:
         if isinstance(ex, TemporaryError):
+            return True
+        if isinstance(ex, socks.ProxyError):
             return True
         str_error: str = str(ex).lower()
         if "not enough unlocked money" in str_error:
