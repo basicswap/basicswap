@@ -104,7 +104,7 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def modify_config(test_path, i):
+def modify_config(cls, test_path, i):
     config_path = os.path.join(test_path, f"client{i}", cfg.CONFIG_FILENAME)
     with open(config_path) as fp:
         settings = json.load(fp)
@@ -130,9 +130,12 @@ def modify_config(test_path, i):
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)
 
-    btc_config_path = os.path.join(test_path, f"client{i}", "bitcoin", "bitcoin.conf")
-    with open(btc_config_path, "a") as fp:
-        fp.write("minrelaytxfee=0.00001\n")
+    if "bitcoin" in cls.test_coins_list:
+        btc_config_path = os.path.join(
+            test_path, f"client{i}", "bitcoin", "bitcoin.conf"
+        )
+        with open(btc_config_path, "a") as fp:
+            fp.write("minrelaytxfee=0.00001\n")
 
 
 def wait_for_bid_state(
@@ -663,7 +666,9 @@ class Test(TestFunctions):
 
     electrumx_port = 50001
     test_coin_a = Coins.PART
-    test_coin_b = Coins.BTC
+    test_coin_b_name: str = os.getenv("TEST_COIN_B", "bitcoin")
+    test_coin_b = getCoinIdFromName(test_coin_b_name)
+
     test_coin_xmr = Coins.XMR
 
     @classmethod
@@ -754,12 +759,13 @@ class Test(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        cls.addElectrumxDaemon("bitcoin", 32793, cls.electrumx_port)
+        core_port: int = 32793 if cls.test_coin_b_name == "bitcoin" else 35793
+        cls.addElectrumxDaemon(cls.test_coin_b_name, core_port, cls.electrumx_port)
         super().setUpClass()
 
     @classmethod
     def modifyConfig(cls, test_path, i):
-        modify_config(test_path, i)
+        modify_config(cls, test_path, i)
 
     @classmethod
     def setupNodes(cls):
@@ -776,10 +782,16 @@ class Test(TestFunctions):
 
             extra_args = []
             if i == 1:
-                extra_args = [
-                    "--btc-mode=electrum",
-                    "--btc-electrum-server=127.0.0.1:50001",
-                ]
+                if cls.test_coin_b_name == "litecoin":
+                    extra_args = [
+                        "--ltc-mode=electrum",
+                        "--ltc-electrum-server=127.0.0.1:50001",
+                    ]
+                else:
+                    extra_args = [
+                        "--btc-mode=electrum",
+                        "--btc-electrum-server=127.0.0.1:50001",
+                    ]
             wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
             if wallets_password is not None:
                 assert isinstance(wallets_password, str)
@@ -1243,12 +1255,8 @@ class TestMerkle(unittest.TestCase):
         root_le = dsha256(txa_le + txb_le)
         header_bytes = build_regtest_header(root_le)
 
-        self.assertTrue(
-            verify_tx_merkle_proof(txa, header_bytes, [txb], 0, require_pow=False)
-        )
-        self.assertTrue(
-            verify_tx_merkle_proof(txb, header_bytes, [txa], 1, require_pow=False)
-        )
+        self.assertTrue(verify_tx_merkle_proof(txa, header_bytes, [txb], 0))
+        self.assertTrue(verify_tx_merkle_proof(txb, header_bytes, [txa], 1))
 
     def test_bad_branch_fails(self):
         txa = "aa" * 32
@@ -1259,9 +1267,7 @@ class TestMerkle(unittest.TestCase):
         root_le = dsha256(txa_le + txb_le)
         header_bytes = build_regtest_header(root_le)
 
-        self.assertFalse(
-            verify_tx_merkle_proof(txa, header_bytes, [txc], 0, require_pow=False)
-        )
+        self.assertFalse(verify_tx_merkle_proof(txa, header_bytes, [txc], 0))
 
     def test_bits_and_target(self):
         header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
