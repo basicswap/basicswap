@@ -202,11 +202,11 @@
 }
 
 @keyframes spin {
-    0% { 
-        transform: rotate(0deg); 
+    0% {
+        transform: rotate(0deg);
     }
-    100% { 
-        transform: rotate(360deg); 
+    100% {
+        transform: rotate(360deg);
     }
 }
 
@@ -218,7 +218,7 @@
     border-color: #3b82f6;
 }
 
-#coin_to_button, 
+#coin_to_button,
 #coin_from_button {
     background-repeat: no-repeat;
     background-position: center;
@@ -558,7 +558,7 @@ select.disabled-select-enabled {
     background-color: #3b82f6 !important;
     border-color: #3b82f6 !important;
   }
- 
+
   .multi-select-dropdown label {
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -619,6 +619,10 @@ select.disabled-select-enabled {
     background-color: rgb(35, 43, 58);
     color: #ffffff;
     border-color: rgb(61, 72, 91);
+}
+
+.dark .coin-picker-sunken .coin-picker-button {
+    background-color: rgb(26, 32, 44);
 }
 
 .coin-picker-button-main {
