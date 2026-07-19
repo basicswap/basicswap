@@ -8763,6 +8763,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
                 BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,
             ):
+                bid_changed: bool = False
                 try:
                     bid_changed = self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 except Exception as e:
