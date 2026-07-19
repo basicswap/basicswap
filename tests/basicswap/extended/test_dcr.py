@@ -22,7 +22,14 @@ from basicswap.basicswap import (
     SwapTypes,
     TxStates,
 )
-from basicswap.basicswap_util import TxLockTypes, TxTypes
+from basicswap.basicswap_util import EventLogTypes, TxLockTypes, TxTypes
+from basicswap.bidplanner import FILL_RECEIVE
+from basicswap.db import Concepts
+from basicswap.multibid import (
+    MIN_LEG_TIMEOUT_SECONDS,
+    placeMultiBid,
+    planMultiBid,
+)
 from basicswap.util.crypto import hash160
 from basicswap.interface.dcr.rpc import (
     callrpc,
@@ -1574,6 +1581,99 @@ class Test(BaseTest):
     def test_15_ads_xmr_coin_swipe_refund(self):
         # Reverse bid
         run_test_ads_swipe_refund(self, Coins.XMR, self.test_coin, lock_value=20)
+
+    def test_17_ads_part_coin_plan(self):
+        # The bidder follows and pays a coin B lock per leg, from one output.
+        logging.info(f"---------- Test {self.test_coin.name} follower-side plan")
+
+        coin_from, coin_to = Coins.PART, self.test_coin
+        num_legs: int = 3
+        id_bidder: int = 1
+        makers = (0, 2)
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
+        for maker_id in makers:
+            self.prepare_balance(coin_from, 10.0, 1800 + maker_id, 1801)
+
+        amount: int = ci_from.make_int(1.0)
+        offer_ids = [
+            swap_clients[makers[i % len(makers)]].postOffer(
+                coin_from,
+                coin_to,
+                amount,
+                ci_to.make_int(1.0, r=1),
+                amount,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=True,
+            )
+            for i in range(num_legs)
+        ]
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        for i in range(120):
+            test_delay_event.wait(1)
+            outputs = sorted(ci_to.getSpendableOutputs(), key=lambda o: o["value"])
+            if outputs and outputs[-1]["value"] > ci_to.make_int(50.0):
+                break
+        else:
+            raise ValueError("Deposit did not confirm")
+        held = outputs[:-1]
+        for o in held:
+            ci_to.lockOutput(o["txid"], o["vout"])
+        try:
+            plan, _, _ = planMultiBid(
+                swap_clients[id_bidder],
+                coin_from,
+                coin_to,
+                FILL_RECEIVE,
+                amount * num_legs,
+                max_bids=num_legs,
+                manual_offers=offer_ids,
+            )
+            assert plan.num_bids == num_legs
+            legs = [
+                {"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs
+            ]
+            placed, failed, _ = placeMultiBid(
+                swap_clients[id_bidder],
+                legs,
+                leg_timeout_seconds=MIN_LEG_TIMEOUT_SECONDS,
+            )
+            assert len(placed) == num_legs and len(failed) == 0, failed
+            bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+
+            final_states = (
+                BidStates.SWAP_COMPLETED,
+                BidStates.BID_ERROR,
+                BidStates.BID_ABANDONED,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_REFUNDED,
+            )
+            for i in range(900):
+                test_delay_event.wait(1)
+                states = [swap_clients[id_bidder].getBid(b).state for b in bid_ids]
+                if all(s in final_states for s in states):
+                    break
+            logging.info(
+                "Follower plan leg states: {}".format(
+                    [BidStates(s).name for s in states]
+                )
+            )
+            for b in bid_ids:
+                for event in swap_clients[id_bidder].getEvents(Concepts.BID, b):
+                    logging.info(
+                        f"Leg {b.hex()[:16]} event: {EventLogTypes(event.event_type).name} {event.event_msg}"
+                    )
+            assert all(
+                s == BidStates.SWAP_COMPLETED for s in states
+            ), "not every leg completed"
+        finally:
+            for o in held:
+                ci_to.unlockOutput(o["txid"], o["vout"])
 
 
 if __name__ == "__main__":
