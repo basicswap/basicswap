@@ -71,6 +71,7 @@ from .ui.page_amm import (
 )
 from .ui.page_bids import page_bids, page_bid
 from .ui.page_offers import page_offers, page_offer, page_newoffer
+from .ui.page_smartbuy import page_smartbuy
 from .ui.page_tor import page_tor, get_tor_established_state
 from .ui.page_wallet import page_wallets, page_wallet
 from .ui.page_settings import page_settings
@@ -523,11 +524,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         try:
             static_dir = os.path.join(os.path.dirname(__file__), "static")
             mtimes = []
-            for rel in (
-                os.path.join("css", "style.css"),
-                os.path.join("js", "pages", "offer-new-page.js"),
-            ):
-                mtimes.append(int(os.path.getmtime(os.path.join(static_dir, rel))))
+            for sub_dir in ("css", "js"):
+                for root, _, filenames in os.walk(os.path.join(static_dir, sub_dir)):
+                    for filename in filenames:
+                        if filename.endswith((".css", ".js")):
+                            mtimes.append(
+                                int(os.path.getmtime(os.path.join(root, filename)))
+                            )
             args_dict["static_v"] = "{}-{}".format(version, max(mtimes))
         except Exception:
             args_dict["static_v"] = version
@@ -1237,6 +1240,8 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return page_offers(self, url_split, post_string)
                 if page == "newoffer":
                     return page_newoffer(self, url_split, post_string, get_string)
+                if page == "smartbuy":
+                    return page_smartbuy(self, url_split, post_string)
                 if page == "sentoffers":
                     return page_offers(self, url_split, post_string, sent=True)
                 if page == "bid":

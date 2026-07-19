@@ -90,6 +90,10 @@ class CoinInterface:
         # coin_type() returns the base coin type, interface_type() returns the coin+balance type.
         return self.coin_type()
 
+    def max_batched_lock_outputs(self):
+        # Max swap lock outputs payable in one publishBLockTxs tx; None means unbounded.
+        return None
+
     def setDefaults(self):
         self._unknown_wallet_seed = True
         self._restore_height = None

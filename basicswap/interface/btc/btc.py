@@ -3298,6 +3298,23 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         return txid, lock_vout
 
+    def publishBLockTxs(self, locks, feerate: int, unlock_time: int = 0) -> bytes:
+        """Lock several swaps in one transaction, so their change is not chained."""
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        for _kbv, Kbs, output_amount in locks:
+            tx.vout.append(self.txoType()(output_amount, self.getPkDest(Kbs)))
+
+        b_lock_tx = self.fundTx(tx.serialize(), feerate)
+        b_lock_tx = self.signTxWithWallet(b_lock_tx)
+        txid = bytes.fromhex(self.publishTx(b_lock_tx))
+        self._log.info(
+            "publishBLockTxs {} to {} lock outputs".format(
+                self._log.id(txid), len(locks)
+            )
+        )
+        return txid
+
     def getTxVSize(self, tx, add_bytes: int = 0, add_witness_bytes: int = 0) -> int:
         wsf = self.witnessScaleFactor()
         len_full = len(tx.serialize_with_witness()) + add_bytes + add_witness_bytes
