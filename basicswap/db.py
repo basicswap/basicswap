@@ -148,6 +148,7 @@ class StateRows:
     def setState(self, new_state, state_time=None):
         now = int(time.time()) if state_time is None else state_time
         self.state = new_state
+        self.state_time = now
         if self.isSet("states") is False:
             self.states = pack_state(new_state, now)
         else:

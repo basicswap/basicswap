@@ -9133,9 +9133,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.info(
                     f"Swap timed out waiting for initiate tx for bid {self.log.id(bid_id)}"
                 )
-                bid.setState(
-                    BidStates.SWAP_TIMEDOUT, "Timed out waiting for initiate tx"
-                )
+                bid.setState(BidStates.SWAP_TIMEDOUT)
                 self.saveBid(bid_id, bid)
                 return True  # Mark bid for archiving
         elif state == BidStates.SWAP_INITIATED:
@@ -10800,9 +10798,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         )
                         if self.debug:
                             self.log.error(traceback.format_exc())
-                        bid.setState(
-                            BidStates.BID_ERROR, f"Failed {bid_type} validation: {ex}"
-                        )
+                        bid.setState(BidStates.BID_ERROR)
                         self.updateDB(
                             bid,
                             cursor,
