@@ -94,12 +94,12 @@ jobs:
         if [ "$NMC_CHANGED" = "true" ]; then
           add_entry test_nmc namecoin
         fi
-        if [ "$WOW_CHANGED" = "true" ]; then
-          add_entry test_wow wownero wownero bitcoin true
-        fi
-        if [ "$PIVX_CHANGED" = "true" ]; then
-          add_entry test_pivx pivx
-        fi
+        #if [ "$WOW_CHANGED" = "true" ]; then
+        #  add_entry test_wow wownero wownero bitcoin true
+        #fi
+        #if [ "$PIVX_CHANGED" = "true" ]; then
+        #  add_entry test_pivx pivx
+        #fi
         if [ "$DASH_CHANGED" = "true" ]; then
           add_entry test_dash dash
         fi
