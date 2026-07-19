@@ -2092,6 +2092,25 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         return txid, lock_vout
 
+    def publishBLockTxs(self, locks, feerate: int, unlock_time: int = 0):
+        """Lock several swaps in one transaction, so their change is not chained.
+
+        Returns the txid and the indexes of locks it pays.
+        """
+        tx = CTransaction()
+        tx.version = self.txVersion()
+        for _kbv, Kbs, output_amount in locks:
+            tx.vout.append(self.txoType()(output_amount, self.getPkDest(Kbs)))
+
+        b_lock_tx = self.signTxWithWallet(self.fundTx(tx.serialize(), feerate))
+        txid = bytes.fromhex(self.publishTx(b_lock_tx))
+        self._log.info(
+            "publishBLockTxs {} to {} lock outputs".format(
+                self._log.id(txid), len(locks)
+            )
+        )
+        return txid, list(range(len(locks)))
+
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         witness_bytes = 115
         size = len(tx.serialize()) + witness_bytes
