@@ -49,6 +49,26 @@ class CoinInterface:
     def compareFeeRates(a, b) -> bool:
         return abs(a - b) < 20
 
+    @staticmethod
+    def getVoutValue(vout) -> int:
+        return vout.nValue
+
+    @staticmethod
+    def setVoutValue(vout, value) -> None:
+        vout.nValue = value
+
+    @staticmethod
+    def getVoutScriptPubKey(vout) -> bytes:
+        return vout.scriptPubKey
+
+    @staticmethod
+    def setVoutScriptPubKey(vout, script: bytes) -> None:
+        vout.scriptPubKey = script
+
+    @staticmethod
+    def setTxLockTime(tx, locktime: int) -> None:
+        tx.nLockTime = locktime
+
     def __init__(self, network, **kwargs):
         self.setDefaults()
         self._network = network

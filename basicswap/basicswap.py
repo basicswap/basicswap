@@ -5628,7 +5628,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             tx_obj = ci_to.loadTx(lock_txa, allow_witness=False)
             lock_vout: int = pi.getMockITxSwapVout(ci_to, tx_obj)
-            amount_to_out: int = tx_obj.vout[lock_vout].nValue
+            amount_to_out: int = ci_to.getVoutValue(tx_obj.vout[lock_vout])
         else:
             # Create PTX
             mock_pk: bytes = pi.getMockPubkey(ci_to)
@@ -5636,7 +5636,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             lock_txb = ci_to.fundTx(lock_txb, feerate, lock_unspents=False, subfee=True)
             tx_obj = ci_to.loadTx(lock_txb, allow_witness=False)
             lock_vout: int = pi.getMockPTxSwapVout(ci_to, tx_obj)
-            amount_to_out: int = tx_obj.vout[lock_vout].nValue
+            amount_to_out: int = ci_to.getVoutValue(tx_obj.vout[lock_vout])
 
         amount_from_out: int = (amount_to_out * (10 ** ci_from.exp())) // rate
         extra_options = {"bid_rate": rate}
@@ -5644,7 +5644,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             amount_from_out, offer, extra_options, ci_from
         )
         if amount_to_adjusted < amount_to_out:
-            tx_obj.vout[lock_vout].nValue = amount_to_adjusted
+            ci_to.setVoutValue(tx_obj.vout[lock_vout], amount_to_adjusted)
 
         self.log.debug(
             f"Amounts after subfee: to {ci_to.format_amount(amount_to_adjusted)} {ci_to.ticker()}, from {ci_from.format_amount(amount_adjusted)} {ci_from.ticker()}"

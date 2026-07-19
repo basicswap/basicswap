@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2020-2024 tecnovert
+# Copyright (c) 2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -164,15 +165,15 @@ class AtomicSwapInterface(ProtocolInterface):
         found: int = 0
         ctx = ci.loadTx(mock_tx)
         for txo in ctx.vout:
-            if txo.scriptPubKey == mock_txo_script:
-                txo.scriptPubKey = real_txo_script
+            if ci.getVoutScriptPubKey(txo) == mock_txo_script:
+                ci.setVoutScriptPubKey(txo, real_txo_script)
                 found += 1
 
         if found < 1:
             raise ValueError("Mocked output not found")
         if found > 1:
             raise ValueError("Too many mocked outputs found")
-        ctx.nLockTime = 0
+        ci.setTxLockTime(ctx, 0)
 
         funded_tx = ctx.serialize()
         return ci.signTxWithWallet(funded_tx)

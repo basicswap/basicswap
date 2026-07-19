@@ -166,7 +166,7 @@ class NAVInterface(BTCInterface):
             )
         raise ValueError("Unknown Script")
 
-    def loadTx(self, tx_bytes: bytes) -> CTransaction:
+    def loadTx(self, tx_bytes: bytes, allow_witness: bool = True) -> CTransaction:
         # Load tx from bytes to internal representation
         tx = CTransaction()
         tx.deserialize(BytesIO(tx_bytes))

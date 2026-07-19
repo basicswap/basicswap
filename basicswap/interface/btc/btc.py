@@ -282,6 +282,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def depth_spendable() -> int:
         return 0
 
+    @staticmethod
+    def findOutput(tx, script_pk: bytes) -> int | None:
+        return findOutput(tx, script_pk)
+
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
@@ -4904,7 +4908,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         vsize = self.getTxVSize(tx_obj, add_witness_bytes=witness_bytes_len_est)
         fee_rate = fee * 1000 // vsize
 
-        return bytes.fromhex(txi_txid_hex), fee_rate
+        return self.getTxid(tx_obj), fee_rate
 
     def _getTxOutInfoElectrum(self, txid: bytes, n: int, include_mempool: bool = False):
         backend = self.getBackend()

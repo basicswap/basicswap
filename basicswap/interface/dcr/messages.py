@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Copyright (c) 2024 tecnovert
+# Copyright (c) 2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -193,6 +194,9 @@ class CTransaction:
                 data += txi.signature_script
 
         return data
+
+    def serialize_without_witness(self) -> bytes:
+        return self.serialize(TxSerializeType.NoWitness)
 
     def TxHash(self) -> bytes:
         return blake256(self.serialize(TxSerializeType.NoWitness))[::-1]

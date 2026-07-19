@@ -11,7 +11,6 @@ from basicswap.util import (
     ensure,
 )
 from basicswap.interface.base import Curves
-from basicswap.interface.btc.btc import findOutput
 from basicswap.chainparams import (
     Coins,
 )
@@ -269,15 +268,15 @@ class XmrSwapInterface(ProtocolInterface):
         script_dest: bytes = ci.getScriptDest(script)
         tx_obj = ci.loadTx(tx_data, allow_witness=False)
 
-        lock_vout = findOutput(tx_obj, script_dest)
+        lock_vout = ci.findOutput(tx_obj, script_dest)
         ensure(lock_vout is not None, "Swap output not found")
 
-        return tx_obj.vout[lock_vout].nValue
+        return ci.getVoutValue(tx_obj.vout[lock_vout])
 
     def getMockITxSwapVout(self, ci, tx_obj) -> int:
         script: bytes = self.getMockScript()
         script_dest: bytes = ci.getScriptDest(script)
-        lock_vout = findOutput(tx_obj, script_dest)
+        lock_vout = ci.findOutput(tx_obj, script_dest)
         ensure(lock_vout is not None, "Swap output not found")
         return lock_vout
 
@@ -292,15 +291,15 @@ class XmrSwapInterface(ProtocolInterface):
         found: int = 0
         ctx = ci.loadTx(mock_tx, allow_witness=False)
         for txo in ctx.vout:
-            if txo.scriptPubKey == mock_txo_script:
-                txo.scriptPubKey = real_txo_script
+            if ci.getVoutScriptPubKey(txo) == mock_txo_script:
+                ci.setVoutScriptPubKey(txo, real_txo_script)
                 found += 1
 
         if found < 1:
             raise ValueError("Mocked output not found")
         if found > 1:
             raise ValueError("Too many mocked outputs found")
-        ctx.nLockTime = 0
+        ci.setTxLockTime(ctx, 0)
 
         return ctx.serialize()
 
@@ -312,15 +311,15 @@ class XmrSwapInterface(ProtocolInterface):
         script_pk = ci.getPkDest(mock_pk)
         tx_obj = ci.loadTx(tx_data, allow_witness=False)
 
-        lock_vout = findOutput(tx_obj, script_pk)
+        lock_vout = ci.findOutput(tx_obj, script_pk)
         ensure(lock_vout is not None, "Swap output not found")
 
-        return tx_obj.vout[lock_vout].nValue
+        return ci.getVoutValue(tx_obj.vout[lock_vout])
 
     def getMockPTxSwapVout(self, ci, tx_obj) -> int:
         mock_pk: bytes = self.getMockPubkey(ci)
         script_pk = ci.getPkDest(mock_pk)
-        lock_vout = findOutput(tx_obj, script_pk)
+        lock_vout = ci.findOutput(tx_obj, script_pk)
         ensure(lock_vout is not None, "Swap output not found")
         return lock_vout
 
@@ -328,9 +327,9 @@ class XmrSwapInterface(ProtocolInterface):
         mock_pk: bytes = self.getMockPubkey(ci)
         script_pk = ci.getPkDest(mock_pk)
         tx_obj = ci.loadTx(tx_data)
-        lock_vout = findOutput(tx_obj, script_pk)
+        lock_vout = ci.findOutput(tx_obj, script_pk)
         ensure(lock_vout is not None, "Swap output not found")
 
-        tx_obj.vout[lock_vout].scriptPubKey = ci.getPkDest(Kbs)
+        ci.setVoutScriptPubKey(tx_obj.vout[lock_vout], ci.getPkDest(Kbs))
 
         return tx_obj.serialize()
