@@ -333,6 +333,8 @@ class BaseApp(DBMethods):
     def is_transient_error(self, ex) -> bool:
         if isinstance(ex, TemporaryError):
             return True
+        if isinstance(ex, socks.ProxyError):
+            return True
         str_error = str(ex).lower()
         return any(marker in str_error for marker in self.transient_error_markers)
 
