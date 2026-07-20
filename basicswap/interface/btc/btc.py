@@ -282,6 +282,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def depth_spendable() -> int:
         return 0
 
+    @staticmethod
+    def findOutput(tx, script_pk: bytes) -> int | None:
+        return findOutput(tx, script_pk)
+
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
@@ -2360,7 +2364,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
         return inputs
 
-    def unlockInputs(self, tx_data: bytes) -> None:
+    def unlockInputs(self, tx_data: bytes, cursor=None) -> None:
         tx = self.loadTx(tx_data)
         if self.useBackend():
             wm = self.getWalletManager()
@@ -2372,6 +2376,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     self.coin_type(),
                     i2h(txi.prevout.hash),
                     txi.prevout.n,
+                    cursor=cursor,
                 )
             return
 
@@ -2392,7 +2397,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             else:
                 raise
 
-    def lockPrefundedTxInputs(self, tx_data: bytes, bid_id: bytes = None) -> None:
+    def lockPrefundedTxInputs(
+        self, tx_data: bytes, bid_id: bytes = None, cursor=None
+    ) -> None:
         tx = self.loadTx(tx_data)
         if self.useBackend():
             wm = self.getWalletManager()
@@ -2408,6 +2415,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     txi.prevout.n,
                     bid_id=bid_id,
                     expires_in=lock_expires_in,
+                    cursor=cursor,
                 )
             return
 
@@ -3867,7 +3875,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         feerate: int = None,
     ) -> str:
         if self.useBackend():
-            return self._createRawFundedTransactionElectrum(addr_to, amount, sub_fee)
+            return self._createRawFundedTransactionElectrum(
+                addr_to, amount, sub_fee, lock_unspents=lock_unspents, feerate=feerate
+            )
 
         txn = self.rpc(
             "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
@@ -3893,15 +3903,23 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return self.rpc_wallet("fundrawtransaction", [txn, options])["hex"]
 
     def _createRawFundedTransactionElectrum(
-        self, addr_to: str, amount: int, sub_fee: bool = False
+        self,
+        addr_to: str,
+        amount: int,
+        sub_fee: bool = False,
+        lock_unspents: bool = True,
+        feerate: int = None,
     ) -> str:
-        feerate, fee_src = self.get_fee_rate()
-        self._ensureFeeRateWithinMax(feerate, fee_src)
+        if not feerate:
+            feerate, fee_src = self.get_fee_rate()
+            self._ensureFeeRateWithinMax(feerate, fee_src)
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         script = self.getDestForAddress(addr_to)
         tx.vout.append(self.txoType()(amount, script))
-        funded_tx = self.fundTx(tx.serialize(), feerate, subfee=sub_fee)
+        funded_tx = self.fundTx(
+            tx.serialize(), feerate, lock_unspents=lock_unspents, subfee=sub_fee
+        )
         return funded_tx.hex()
 
     def createRawSignedTransaction(self, addr_to, amount) -> str:
@@ -4887,7 +4905,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
                 txo = prev_tx_obj["vout"][txi_vout]
                 total_in += self.make_int(txo["value"])
-            dummy_witness_stack.append(self.getP2WPKHDummyWitness())
+            dummy_witness_stack.append(self.getP2WPKHDummyWitness(verifying=True))
             used_utxos.add((txi_txid_hex, txi_vout))
 
         fee: int = total_in - total_out
@@ -4897,7 +4915,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         vsize = self.getTxVSize(tx_obj, add_witness_bytes=witness_bytes_len_est)
         fee_rate = fee * 1000 // vsize
 
-        return bytes.fromhex(txi_txid_hex), fee_rate
+        return self.getTxid(tx_obj), fee_rate
 
     def _getTxOutInfoElectrum(self, txid: bytes, n: int, include_mempool: bool = False):
         backend = self.getBackend()

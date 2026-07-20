@@ -49,6 +49,26 @@ class CoinInterface:
     def compareFeeRates(a, b) -> bool:
         return abs(a - b) < 20
 
+    @staticmethod
+    def getVoutValue(vout) -> int:
+        return vout.nValue
+
+    @staticmethod
+    def setVoutValue(vout, value) -> None:
+        vout.nValue = value
+
+    @staticmethod
+    def getVoutScriptPubKey(vout) -> bytes:
+        return vout.scriptPubKey
+
+    @staticmethod
+    def setVoutScriptPubKey(vout, script: bytes) -> None:
+        vout.scriptPubKey = script
+
+    @staticmethod
+    def setTxLockTime(tx, locktime: int) -> None:
+        tx.nLockTime = locktime
+
     def __init__(self, network, **kwargs):
         self.setDefaults()
         self._network = network
@@ -183,8 +203,9 @@ class CoinInterface:
 
 
 class AdaptorSigInterface:
-    def getP2WPKHDummyWitness(self) -> List[bytes]:
-        return [bytes(72), bytes(33)]
+    def getP2WPKHDummyWitness(self, verifying: bool = True) -> List[bytes]:
+        # 72 bytes overestimates by 1. Core uses 71-byte low-R signatures
+        return [bytes(71 if verifying else 72), bytes(33)]
 
     def getScriptLockTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [b"", bytes(72), bytes(72), bytes(len(script))]

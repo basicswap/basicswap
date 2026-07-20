@@ -917,9 +917,14 @@ def page_offer(self, url_split: List[str], post_string: str) -> bytes:
                 debugind = int(get_data_entry_or(form_data, "debugind", -1))
 
                 if have_data_entry(form_data, "subfee_bid"):
-                    extra_options["prefunded_tx"] = bytes.fromhex(
-                        get_data_entry(form_data, "prefunded_bid_tx")
+                    prefunded_bid_tx: str = get_data_entry_or(
+                        form_data, "prefunded_bid_tx", ""
                     )
+                    ensure(
+                        len(prefunded_bid_tx) > 0,
+                        "Prefunded bid tx not found.",
+                    )
+                    extra_options["prefunded_tx"] = bytes.fromhex(prefunded_bid_tx)
                 if have_data_entry(form_data, "bypass_fee_checks"):
                     extra_options["bypass_fee_validation"] = True
 
