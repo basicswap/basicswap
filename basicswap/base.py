@@ -264,10 +264,16 @@ class BaseApp(DBMethods):
                 return c
         raise ValueError(f"Unknown coin: {coin_name}")
 
-    def callrpc(self, method, params=[], wallet=None):
+    def callrpc(self, method, params=[], wallet=None, timeout=10):
         cc = self.coin_clients[Coins.PART]
         return callrpc(
-            cc["rpcport"], cc["rpcauth"], method, params, wallet, cc["rpchost"]
+            cc["rpcport"],
+            cc["rpcauth"],
+            method,
+            params,
+            wallet,
+            cc["rpchost"],
+            timeout=timeout,
         )
 
     def callcoinrpc(self, coin, method, params=[], wallet=None):
@@ -413,18 +419,31 @@ class BaseApp(DBMethods):
         self.mock_time_offset = new_offset
 
     def get_clamped_int_from(
-        self, settings: dict, name: str, default_v: int, min_v: int, max_v
+        self,
+        settings: dict,
+        name: str,
+        default_v: int,
+        min_v: int | None = None,
+        max_v: int | None = None,
     ) -> int:
         value: int = settings.get(name, default_v)
-        if value < min_v:
+        if type(value) is not int:
+            raise ValueError(f'setting "{name}" must be integer type')
+        if min_v is not None and value < min_v:
             self.log.warning(f"Setting {name} to {min_v}")
             value = min_v
-        if value > max_v:
+        if max_v is not None and value > max_v:
             self.log.warning(f"Setting {name} to {max_v}")
             value = max_v
         return value
 
-    def get_int_setting(self, name: str, default_v: int, min_v: int, max_v) -> int:
+    def get_int_setting(
+        self,
+        name: str,
+        default_v: int,
+        min_v: int | None = None,
+        max_v: int | None = None,
+    ) -> int:
         return self.get_clamped_int_from(self.settings, name, default_v, min_v, max_v)
 
     def get_delay_event_seconds(self):

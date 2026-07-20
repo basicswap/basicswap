@@ -594,10 +594,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "max_delay_retry", 5 * 60, self.min_delay_retry, 20 * 60
         )
 
-        self.min_sequence_lock_seconds = self.settings.get(
+        self.min_sequence_lock_seconds = self.get_int_setting(
             "min_sequence_lock_seconds", 60 if self.debug else (1 * 60 * 60)
         )
-        self.max_sequence_lock_seconds = self.settings.get(
+        self.max_sequence_lock_seconds = self.get_int_setting(
             "max_sequence_lock_seconds", 96 * 60 * 60
         )
 
@@ -1484,14 +1484,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Scan inbox
         # TODO: Redundant? small window for zmq messages to go unnoticed during startup?
-        options = {"encoding": "hex"}
+        options = {
+            "encoding": "hex",
+            "max_results": self._smsg_rpc_bulk_limit,
+            "offset": 0,
+        }
         if self._can_use_smsg_payload2:
             options["pubkey_from"] = True
-        ro = self.callrpc("smsginbox", ["unread", "", options])
-        nm = 0
-        for msg in ro["messages"]:
-            self.processMsg(msg)
-            nm += 1
+        nm: int = 0
+        while True:
+            # Reading an smsg sets it read, but only if it decrypted ("hex" present).
+            inbox_messages = self.callrpc(
+                "smsginbox",
+                ["unread", "", options],
+                timeout=self._smsg_rpc_bulk_timeout,
+            )["messages"]
+            for msg in inbox_messages:
+                self.processMsg(msg)
+                nm += 1
+                if (
+                    "hex" not in msg
+                ):  # undecrypted messages are not set read and do not return hex
+                    options["offset"] += 1
+            if len(inbox_messages) < self._smsg_rpc_bulk_limit:
+                break
         self.log.info(f"Scanned {nm} unread messages.")
 
         autostart_setting = self.settings.get("amm_autostart", False)
@@ -10483,11 +10499,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         rpc_conn = None
         try:
             ci_part = self.ci(Coins.PART)
-            rpc_conn = ci_part.open_rpc()
+            rpc_conn = ci_part.open_rpc(timeout=self._smsg_rpc_bulk_timeout)
             num_messages: int = 0
             num_removed: int = 0
 
-            def remove_if_expired(msg):
+            def remove_if_expired(msg) -> bool:
                 nonlocal num_messages, num_removed
                 try:
                     num_messages += 1
@@ -10507,23 +10523,44 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         options = {"encoding": "none", "delete": True}
                         ci_part.json_request(rpc_conn, "smsg", [msg["msgid"], options])
                         num_removed += 1
+                        return True
+                    return False
                 except Exception as e:  # noqa: F841
                     if self.debug:
                         self.log.error(traceback.format_exc())
                         self.log.error(f"Failed to process message {msg}")
 
             now: int = self.getTime()
-            options = {"encoding": "none", "setread": False}
-            inbox_messages = ci_part.json_request(
-                rpc_conn, "smsginbox", ["all", "", options]
-            )["messages"]
-            for msg in inbox_messages:
-                remove_if_expired(msg)
-            outbox_messages = ci_part.json_request(
-                rpc_conn, "smsgoutbox", ["all", "", options]
-            )["messages"]
-            for msg in outbox_messages:
-                remove_if_expired(msg)
+            options = {
+                "encoding": "none",
+                "updatestatus": False,
+                "max_results": self._smsg_rpc_bulk_limit,
+                "offset": 0,
+            }
+            while True:
+                inbox_messages = ci_part.json_request(
+                    rpc_conn, "smsginbox", ["all", "", options]
+                )["messages"]
+                loop_removed: int = 0
+                for msg in inbox_messages:
+                    if remove_if_expired(msg):
+                        loop_removed += 1
+                if len(inbox_messages) < self._smsg_rpc_bulk_limit:
+                    break
+                options["offset"] += len(inbox_messages) - loop_removed
+
+            options["offset"] = 0
+            while True:
+                outbox_messages = ci_part.json_request(
+                    rpc_conn, "smsgoutbox", ["all", "", options]
+                )["messages"]
+                loop_removed: int = 0
+                for msg in outbox_messages:
+                    if remove_if_expired(msg):
+                        loop_removed += 1
+                if len(outbox_messages) < self._smsg_rpc_bulk_limit:
+                    break
+                options["offset"] += len(outbox_messages) - loop_removed
 
             if num_messages + num_removed > 0:
                 self.log.info(f"Expired {num_removed} / {num_messages} messages.")
