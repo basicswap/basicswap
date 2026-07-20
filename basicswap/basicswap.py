@@ -1761,7 +1761,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.info("Waiting 2 seconds for BasicSwap to fully initialize...")
             time.sleep(2)
 
-            amm_host = self.settings.get("htmlhost", "127.0.0.1")
+            basicswap_host = self.settings.get("htmlhost", "127.0.0.1")
+            amm_host = (
+                "127.0.0.1"
+                if basicswap_host in ("0.0.0.0", "::", "")
+                else basicswap_host
+            )
             amm_port = self.settings.get("htmlport", 12700)
             amm_debug = False
 
