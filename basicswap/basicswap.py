@@ -8800,7 +8800,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 try:
                     bid_changed = self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 except Exception as e:
-                    if ci_to.is_transient_error(e):
+                    if "not fully synced" in str(e):
+                        # Waiting for the node to sync is not an RPC failure,
+                        # don't count it towards the abort limit.
+                        self.log.warning(
+                            f"Bid {self.log.id(bid_id)}: Waiting for {ci_to.coin_name()} to sync before checking lock tx B."
+                        )
+                    elif ci_to.is_transient_error(e):
                         rpc_error_count = self.countBidEvents(
                             bid, EventLogTypes.LOCK_TX_B_RPC_ERROR, cursor
                         )
@@ -12621,6 +12627,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             TxTypes.PTX_PRE_FUNDED,
             cursor=cursor,
         )
+
+        num_publish_started = self.countBidEvents(
+            bid, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, cursor
+        )
+        num_published = self.countBidEvents(
+            bid, EventLogTypes.LOCK_TX_B_PUBLISHED, cursor
+        )
+        num_publish_failed = self.countBidEvents(
+            bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
+        )
+        if num_publish_started > num_published + num_publish_failed:
+            self.log.warning(
+                f"Recovering coin B lock tx publish for bid {self.log.id(bid_id)}: no existing lock tx found, re-publishing."
+            )
+
+        self.logBidEvent(
+            bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISH_STARTED, "", cursor
+        )
+        self.commitDB()
 
         try:
             b_lock_vout = None
