@@ -13571,6 +13571,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_sent_to, "Received on incorrect address")
         ensure(msg["from"] == addr_sent_from, "Sent from incorrect address")
 
+        bid_in_unexpected_state: bool = False
         allowed_states = [
             BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
             BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED,
@@ -13578,17 +13579,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if bid.was_sent and offer.was_sent:
             # Self-bid exception
             allowed_states.append(BidStates.XMR_SWAP_LOCK_RELEASED)
+
+        if bid.state in (BidStates.BID_ERROR, BidStates.BID_STALLED_FOR_TEST) and (
+            xmr_swap.al_lock_spend_tx_esig is None
+            or len(xmr_swap.al_lock_spend_tx_esig) == 0
+        ):
+            allowed_states.append(bid.state)
+            bid_in_unexpected_state = True
+            self.log.warning(
+                f"Receiving ADS lock release msg for bid {self.log.id(bid_id)}, in unexpected state {bid.state}."
+            )
+
         ensure(
             BidStates(bid.state) in allowed_states,
             f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
 
-        xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         try:
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
             v = ci_from.verifyTxOtVES(
                 xmr_swap.a_lock_spend_tx,
-                xmr_swap.al_lock_spend_tx_esig,
+                msg_data.al_lock_spend_tx_esig,
                 xmr_swap.pkal,
                 xmr_swap.pkasf,
                 0,
@@ -13596,11 +13607,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 prevout_amount,
             )
             ensure(v, "verifyTxOtVES failed for chain a lock tx leader esig")
+            xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
+            if bid_in_unexpected_state:
+                self.log.error(f"verifyTxOtVES error {ex}, bid in unexpected state")
+                return
             self.setBidError(bid, str(ex))
             self.swaps_in_progress[bid_id] = (bid, offer)
+            return
+        if bid_in_unexpected_state:
+            self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
+            if bid_id in self.swaps_in_progress:
+                self.swaps_in_progress[bid_id] = (bid, offer)
             return
 
         if self.haveDebugInd(bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK):
