@@ -140,10 +140,10 @@
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "106559acecfb91d61019e40d256477e2d845bd94")))
+      (commit "f9ad02f210075ee05cacad1071177931eb323b50")))
     (sha256
       (base32
-        "1310a75zwkd9krybqw3jm5wx722dg12kiphbpmn0i1yyp6bg92ma"))
+        "08sdbh6ixxygmqa9siiq6lsh3j75g3xgn1qj3kri2smj8ishm3wj"))
     (file-name (git-file-name name version))))
   (build-system pyproject-build-system)
 

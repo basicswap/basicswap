@@ -3,33 +3,36 @@
 ==============
 
 **Security / hardening**
- - Adaptor-sig swaps: ignore replayed coin-A lock-signature messages and gate the coin-A lock send.
- - Adaptor-sig swaps: re-create a purged coin-B lock action after a restart.
- - Adaptor-sig swaps: verify and record the received lock-release esig even when
-   the bid is in an error state.
+- Adaptor-sig swaps: ignore replayed coin-A lock-signature messages and gate the coin-A lock send.
+- Adaptor-sig swaps: re-create a purged coin-B lock action after a restart.
+- Adaptor-sig swaps: verify and record the received lock-release esig even when
+  the bid is in an error state.
 
 **Fixes**
- - Networking: classify socks/proxy errors as transient so they retry instead of failing.
- - Sub-fee bids:
-   - Fix an off-by-one when verifying the sub-fee-bid fee;
-   - Disable the "Send Bid" button while a sub-fee bid is processing.
-   - Fix regression where electrum UTXOS were locked when creating prefunded tx instead of bid.
- - Electrum: use the scrypt hash for the Litecoin PoW check.
- - SMSG: add a timeout and page through results for bulk message reads.
- - DB: set `state_time` for HTLC swaps.
- - Decred: Fix prefunded transactions and the prepare / mercy tx.
- - AMM: fix autostart when `htmlhost` is `0.0.0.0`.
+- Networking: classify socks/proxy errors as transient so they retry instead of failing.
+- Sub-fee bids:
+  - Fix an off-by-one when verifying the sub-fee-bid fee;
+  - Disable the "Send Bid" button while a sub-fee bid is processing.
+  - Fix regression where electrum UTXOS were locked when creating prefunded tx instead of bid.
+- Electrum: use the scrypt hash for the Litecoin PoW check.
+- SMSG: add a timeout and page through results for bulk message reads.
+- DB: set `state_time` for HTLC swaps.
+- Decred: Fix prefunded transactions and the prepare / mercy tx.
+- AMM: fix autostart when `htmlhost` is `0.0.0.0`.
 
- **Daemon updates**
- - Bitcoin bumped to v29.4.
-   - Added alternative PGP key
- - Dash bumped to v23.1.7.
- - Monero bumped to v0.18.5.1.
+**Refactors**
+- offers: Bypass legacy limit for standing/fixed/onetime offers.
 
- **Tests / CI**
- - Added Dash, Dogecoin, Firo, Namecoin and Decred coverage to CI.
- - Extra coin tests now run only on pull requests; added a manual `workflow_dispatch` trigger,
-   coin-pair options, and a dedicated `test_electrum.py` workflow.
+**Daemon updates**
+- Bitcoin bumped to v29.4.
+  - Added alternative PGP key
+- Dash bumped to v23.1.7.
+- Monero bumped to v0.18.5.1.
+
+**Tests / CI**
+- Added Dash, Dogecoin, Firo, Namecoin and Decred coverage to CI.
+- Extra coin tests now run only on pull requests; added a manual `workflow_dispatch` trigger,
+  coin-pair options, and a dedicated `test_electrum.py` workflow.
 
 
 0.17.4
