@@ -85,7 +85,7 @@ import urllib.error
 import base64
 from urllib.request import urlopen
 
-from basicswap import AMM_VERSION
+__version__ = "0.5.1"
 
 delay_event = threading.Event()
 shutdown_in_progress = False
@@ -2040,7 +2040,7 @@ def main():
         "-v",
         "--version",
         action="version",
-        version="%(prog)s {version}".format(version=AMM_VERSION),
+        version="%(prog)s {version}".format(version=__version__),
     )
     parser.add_argument(
         "--host",
