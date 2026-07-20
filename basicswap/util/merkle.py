@@ -59,9 +59,6 @@ def verify_tx_merkle_proof(
     header_bytes: bytes,
     branch: list,
     tx_pos: int,
-    require_pow: bool = True,
 ) -> bool:
-    if require_pow and not check_header_pow(header_bytes):
-        return False
     computed_root = electrum_merkle_root(txid_hex, branch, tx_pos)
     return computed_root == parse_header_merkle_root(header_bytes)

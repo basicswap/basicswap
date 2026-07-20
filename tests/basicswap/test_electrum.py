@@ -94,6 +94,7 @@ from tests.basicswap.test_persistent import (
 from tests.basicswap.util.mnemonics import mnemonics
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.interface.electrumx import ElectrumConnection
+from basicswap.interface.ltc.util import check_header_pow_scrypt
 from basicswap.util.merkle import (
     check_header_pow,
     electrum_merkle_root,
@@ -109,7 +110,7 @@ if not len(logger.handlers):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def modify_config(test_path, i):
+def modify_config(cls, test_path, i):
     config_path = os.path.join(test_path, f"client{i}", cfg.CONFIG_FILENAME)
     with open(config_path) as fp:
         settings = json.load(fp)
@@ -135,9 +136,12 @@ def modify_config(test_path, i):
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)
 
-    btc_config_path = os.path.join(test_path, f"client{i}", "bitcoin", "bitcoin.conf")
-    with open(btc_config_path, "a") as fp:
-        fp.write("minrelaytxfee=0.00001\n")
+    if "bitcoin" in cls.test_coins_list:
+        btc_config_path = os.path.join(
+            test_path, f"client{i}", "bitcoin", "bitcoin.conf"
+        )
+        with open(btc_config_path, "a") as fp:
+            fp.write("minrelaytxfee=0.00001\n")
 
 
 def wait_for_bid_state(
@@ -681,7 +685,9 @@ class Test(TestFunctions):
 
     electrumx_port = 50001
     test_coin_a = Coins.PART
-    test_coin_b = Coins.BTC
+    test_coin_b_name: str = os.getenv("TEST_COIN_B", "bitcoin")
+    test_coin_b = getCoinIdFromName(test_coin_b_name)
+
     test_coin_xmr = Coins.XMR
 
     @classmethod
@@ -772,12 +778,13 @@ class Test(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        cls.addElectrumxDaemon("bitcoin", 32793, cls.electrumx_port)
+        core_port: int = 32793 if cls.test_coin_b_name == "bitcoin" else 35793
+        cls.addElectrumxDaemon(cls.test_coin_b_name, core_port, cls.electrumx_port)
         super().setUpClass()
 
     @classmethod
     def modifyConfig(cls, test_path, i):
-        modify_config(test_path, i)
+        modify_config(cls, test_path, i)
 
     @classmethod
     def setupNodes(cls):
@@ -794,10 +801,16 @@ class Test(TestFunctions):
 
             extra_args = []
             if i == 1:
-                extra_args = [
-                    "--btc-mode=electrum",
-                    "--btc-electrum-server=127.0.0.1:50001",
-                ]
+                if cls.test_coin_b_name == "litecoin":
+                    extra_args = [
+                        "--ltc-mode=electrum",
+                        "--ltc-electrum-server=127.0.0.1:50001",
+                    ]
+                else:
+                    extra_args = [
+                        "--btc-mode=electrum",
+                        "--btc-electrum-server=127.0.0.1:50001",
+                    ]
             wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
             if wallets_password is not None:
                 assert isinstance(wallets_password, str)
@@ -1179,6 +1192,13 @@ GENESIS_COINBASE_TXID = (
     "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"
 )
 
+# Litecoin block #29255 — known valid scrypt PoW header
+LTC_BLOCK_29255_HEADER_HEX = (
+    "01000000f615f7ce3b4fc6b8f61e8f89aedb1d0852507650533a9e3b10b9bbcc"
+    "30639f279fcaa86746e1ef52d3edb3c4ad8259920d509bd073605c9bf1d59983"
+    "752a6b06b817bb4ea78e011d012d59d4"
+)
+
 
 def build_regtest_header(merkle_root_le: bytes) -> bytes:
     version = struct.pack("<I", 1)
@@ -1296,12 +1316,8 @@ class TestMerkle(unittest.TestCase):
         root_le = dsha256(txa_le + txb_le)
         header_bytes = build_regtest_header(root_le)
 
-        self.assertTrue(
-            verify_tx_merkle_proof(txa, header_bytes, [txb], 0, require_pow=False)
-        )
-        self.assertTrue(
-            verify_tx_merkle_proof(txb, header_bytes, [txa], 1, require_pow=False)
-        )
+        self.assertTrue(verify_tx_merkle_proof(txa, header_bytes, [txb], 0))
+        self.assertTrue(verify_tx_merkle_proof(txb, header_bytes, [txa], 1))
 
     def test_bad_branch_fails(self):
         txa = "aa" * 32
@@ -1312,9 +1328,7 @@ class TestMerkle(unittest.TestCase):
         root_le = dsha256(txa_le + txb_le)
         header_bytes = build_regtest_header(root_le)
 
-        self.assertFalse(
-            verify_tx_merkle_proof(txa, header_bytes, [txc], 0, require_pow=False)
-        )
+        self.assertFalse(verify_tx_merkle_proof(txa, header_bytes, [txc], 0))
 
     def test_bits_and_target(self):
         header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
@@ -1328,6 +1342,24 @@ class TestMerkle(unittest.TestCase):
         header_bytes = bytearray(bytes.fromhex(GENESIS_HEADER_HEX))
         header_bytes[36] ^= 0xFF
         self.assertFalse(check_header_pow(bytes(header_bytes)))
+
+    def test_ltc_genesis_pow_valid(self):
+        header_bytes = bytes.fromhex(LTC_BLOCK_29255_HEADER_HEX)
+        self.assertEqual(len(header_bytes), 80)
+        self.assertTrue(check_header_pow_scrypt(header_bytes))
+
+    def test_ltc_pow_fails_on_tampered_header(self):
+        header_bytes = bytearray(bytes.fromhex(LTC_BLOCK_29255_HEADER_HEX))
+        header_bytes[36] ^= 0xFF
+        self.assertFalse(check_header_pow_scrypt(bytes(header_bytes)))
+
+    def test_ltc_sha256d_pow_rejects_ltc_header(self):
+        header_bytes = bytes.fromhex(LTC_BLOCK_29255_HEADER_HEX)
+        self.assertFalse(check_header_pow(header_bytes))
+
+    def test_btc_scrypt_pow_rejects_btc_header(self):
+        header_bytes = bytes.fromhex(GENESIS_HEADER_HEX)
+        self.assertFalse(check_header_pow_scrypt(header_bytes))
 
     def test_short_header_raises(self):
         with self.assertRaises(ValueError):
