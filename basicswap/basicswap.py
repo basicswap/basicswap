@@ -3627,11 +3627,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Unlock locked inputs (TODO)
             if offer.swap_type == SwapTypes.XMR_SWAP:
                 ci_leader = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+                we_are_leader: bool = bid.was_sent if reverse_bid else bid.was_received
                 rows = use_cursor.execute(
                     "SELECT a_lock_tx FROM xmr_swaps WHERE bid_id = :bid_id",
                     {"bid_id": bid.bid_id},
                 ).fetchall()
-                if len(rows) > 0:
+                if we_are_leader and len(rows) > 0:
                     xmr_swap_a_lock_tx = rows[0][0]
                     try:
                         ci_leader.unlockInputs(xmr_swap_a_lock_tx, cursor=use_cursor)
