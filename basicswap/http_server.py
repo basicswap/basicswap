@@ -588,6 +588,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             template,
             {
                 "title_str": "Login",
+                "messages": [],
                 "err_messages": err_messages,
                 "summary": {},
                 "encrypted": False,
