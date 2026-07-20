@@ -27,6 +27,7 @@ env:
 
 jobs:
   changes:
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     outputs:
       test_matrix: ${{ steps.matrix.outputs.matrix }}
@@ -292,7 +293,7 @@ jobs:
   test_coins:
     needs: [changes, prepare-cores]
     # Skipped entirely when no coin-specific paths changed.
-    if: ${{ needs.changes.outputs.test_matrix != '[]' }}
+    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.test_matrix != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
