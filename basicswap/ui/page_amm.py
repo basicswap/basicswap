@@ -8,6 +8,7 @@
 import os
 import json
 import time
+import secrets
 import subprocess
 import threading
 import traceback
@@ -282,6 +283,11 @@ def start_amm_process(
     if debug:
         cmd.append("--debug")
 
+    # Give the AMM an ephemeral API token via the environment so its login
+    # credential never has to be written to disk.
+    amm_api_token = secrets.token_urlsafe(32)
+    swap_client._amm_api_token = amm_api_token
+
     try:
         amm_process = subprocess.Popen(
             cmd,
@@ -289,7 +295,11 @@ def start_amm_process(
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             bufsize=1,
-            env=dict(os.environ, PYTHONUNBUFFERED="1"),
+            env=dict(
+                os.environ,
+                PYTHONUNBUFFERED="1",
+                BSX_API_AUTH="amm:" + amm_api_token,
+            ),
         )
 
         with amm_log_lock:
@@ -366,6 +376,9 @@ def stop_amm_process(swap_client=None):
             amm_log_buffer.append(f"Stopped: {', '.join(stopped_processes)}")
         if errors:
             amm_log_buffer.append(f"Errors: {', '.join(errors)}")
+
+    if swap_client is not None:
+        swap_client._amm_api_token = None
 
     amm_process = None
 

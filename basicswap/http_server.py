@@ -988,8 +988,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
                 _, password = decoded_creds.split(":", 1)
 
+                amm_token = getattr(swap_client, "_amm_api_token", None)
                 client_auth_hash = swap_client.settings.get("client_auth_hash")
-                if client_auth_hash and verify_rfc2440_password(
+                if amm_token and hmac.compare_digest(password, amm_token):
+                    basic_auth_ok = True
+                elif client_auth_hash and verify_rfc2440_password(
                     client_auth_hash, password
                 ):
                     basic_auth_ok = True

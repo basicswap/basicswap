@@ -659,6 +659,7 @@
            <li>Password only: API clients may send any username (e.g. admin), which is ignored.</li>
            <li>Web sessions stay unlocked until the session timeout above is reached with no activity. The API is stateless and re-checks the password on every request.</li>
            <li>Can be reset from the config file if forgotten.</li>
+           <li>The AMM authenticates with a temporary token issued when it starts.</li>
           </ul>
           <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">Separate from your wallet encryption password, set on the <a href="/changepassword" class="underline">Change Password</a> page.</p>
          </div>
