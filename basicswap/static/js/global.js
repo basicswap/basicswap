@@ -5,6 +5,7 @@
             if (response.status === 401) {
                 const urlStr = typeof url === 'string' ? url : (url && url.url) || '';
                 if (urlStr.startsWith('/json/') || urlStr.startsWith('/json')) {
+                    document.cookie = 'basicswap_login_next=' + encodeURIComponent(window.location.pathname + window.location.search) + '; path=/; samesite=lax';
                     window.location.href = '/login';
                     return new Response(JSON.stringify({error: 'Session expired'}), {
                         status: 401,
