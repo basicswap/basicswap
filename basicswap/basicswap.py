@@ -14663,6 +14663,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     settings_copy["notifications_swap_completed"] = new_value
                     settings_changed = True
 
+            if "client_auth_hash" in data:
+                new_value = data["client_auth_hash"]
+                if new_value:
+                    ensure(
+                        isinstance(new_value, str),
+                        "New client_auth_hash value not a string",
+                    )
+                    if settings_copy.get("client_auth_hash") != new_value:
+                        settings_copy["client_auth_hash"] = new_value
+                        settings_changed = True
+                elif "client_auth_hash" in settings_copy:
+                    settings_copy.pop("client_auth_hash")
+                    settings_changed = True
+
+            if "session_timeout_minutes" in data:
+                new_value = data["session_timeout_minutes"]
+                ensure(
+                    isinstance(new_value, int),
+                    "New session_timeout_minutes value not integer",
+                )
+                ensure(
+                    1 <= new_value <= 10080,
+                    "session_timeout_minutes must be between 1 and 10080 minutes",
+                )
+                if settings_copy.get("session_timeout_minutes", 60) != new_value:
+                    settings_copy["session_timeout_minutes"] = new_value
+                    settings_changed = True
+
             if "notifications_duration" in data:
                 new_value = data["notifications_duration"]
                 ensure(

@@ -42,6 +42,9 @@
       <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="general" id="general-tab">
        General
       </button>
+      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="security" id="security-tab">
+       Security
+      </button>
       <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="notifications" id="notifications-tab">
        Notifications
       </button>
@@ -55,7 +58,7 @@
  </section>
 
  <div class="container px-4 mx-auto">
-  
+
   <div class="tab-content" id="coins" role="tabpanel" aria-labelledby="coins-tab">
    <form method="post" id="coins-form">
     <div class="space-y-6">
@@ -99,7 +102,7 @@
 
       <div class="coin-details hidden" id="details-{{ c.name }}">
        <div class="px-6 py-6">
-        
+
         {% if c.connection_type %}
         <div class="mb-6">
          <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
@@ -591,6 +594,96 @@
     </div>
     <input type="hidden" name="formid" value="{{ form_id }}">
    </form>
+  </div>
+
+  <div class="tab-content hidden" id="security" role="tabpanel" aria-labelledby="security-tab">
+   <div class="space-y-6">
+
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+      <div class="px-6 py-4">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+        Client Authentication
+       </h3>
+       <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        {% if security_settings.client_auth_enabled %}A password is required to access the web interface and the API.{% else %}No password is set. The web interface and API are open to anyone who can reach this server.{% endif %}
+       </p>
+      </div>
+
+      <div class="px-6 py-6">
+       <form method="post" id="session-timeout-form">
+       <div class="border-b border-gray-300 dark:border-gray-600 pb-6 mb-6">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Session Timeout (minutes)</label>
+        <div class="relative max-w-xs">
+         <input type="number" name="session_timeout_minutes" autocomplete="off" min="1" max="10080" value="{{ security_settings.session_timeout_minutes }}" {% if not security_settings.client_auth_enabled %}disabled{% endif %} class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{% if security_settings.client_auth_enabled %}How long a web session stays valid before the password is required again{% else %}Enable client authentication below to use a session timeout{% endif %}</p>
+        <div class="flex justify-end pt-6 mt-6">
+         <button name="apply_security" value="Apply" type="submit" {% if not security_settings.client_auth_enabled %}disabled{% endif %} class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed">
+          Save Timeout
+         </button>
+        </div>
+       </div>
+       <input type="hidden" name="formid" value="{{ form_id }}">
+       </form>
+
+       <form method="post" id="client-auth-form" autocomplete="off">
+       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="space-y-6">
+         <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">New Password</label>
+          <div class="relative">
+           <input type="password" id="new_password" name="new_password" autocomplete="new-password" placeholder="Enter a password" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" data-target="new_password" aria-label="Toggle password visibility">
+            <svg class="eye-open w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <svg class="eye-closed w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path></svg>
+           </button>
+          </div>
+         </div>
+         <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm Password</label>
+          <div class="relative">
+           <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" placeholder="Re-enter the password" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors" data-target="confirm_password" aria-label="Toggle password visibility">
+            <svg class="eye-open w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            <svg class="eye-closed w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path></svg>
+           </button>
+          </div>
+         </div>
+        </div>
+
+        <div class="space-y-6">
+         <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-6">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">About client authentication</h3>
+          <ul class="space-y-3 text-sm text-gray-600 dark:text-gray-400 list-disc list-outside pl-5">
+           <li>Required for both the web interface and the API.</li>
+           <li>Password only: API clients may send any username (e.g. admin), which is ignored.</li>
+           <li>Web sessions stay unlocked until the session timeout above is reached with no activity. The API is stateless and re-checks the password on every request.</li>
+           <li>Can be reset from the config file if forgotten.</li>
+          </ul>
+          <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">Separate from your wallet encryption password, set on the <a href="/changepassword" class="underline">Change Password</a> page.</p>
+         </div>
+        </div>
+       </div>
+
+       <div class="mt-8 flex justify-end gap-3">
+        {% if security_settings.client_auth_enabled %}
+        <button name="apply_client_auth" value="set" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Change Password
+        </button>
+        <button name="apply_client_auth" value="disable" type="submit" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Disable Password
+        </button>
+        {% else %}
+        <button name="apply_client_auth" value="set" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+         Enable Password
+        </button>
+        {% endif %}
+       </div>
+       <input type="hidden" name="formid" value="{{ form_id }}">
+       </form>
+      </div>
+     </div>
+    </div>
   </div>
 
   <div class="tab-content hidden" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">

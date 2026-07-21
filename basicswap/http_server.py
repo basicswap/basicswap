@@ -263,7 +263,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ):
             cookie[SESSION_COOKIE_NAME]["secure"] = True
         expires = datetime.now(timezone.utc) + timedelta(
-            minutes=SESSION_DURATION_MINUTES
+            minutes=self._session_timeout_minutes()
         )
         cookie[SESSION_COOKIE_NAME]["expires"] = expires.strftime(
             "%a, %d %b %Y %H:%M:%S GMT"
@@ -303,6 +303,21 @@ class HttpHandler(BaseHTTPRequestHandler):
         cookie[LOGIN_NEXT_COOKIE_NAME]["path"] = "/"
         cookie[LOGIN_NEXT_COOKIE_NAME]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
         return ("Set-Cookie", cookie.output(header="").strip())
+
+    def _create_session(self):
+        session_id = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(
+            minutes=self._session_timeout_minutes()
+        )
+        with self.server.session_lock:
+            self.server.active_sessions[session_id] = {"expires": expires}
+        return session_id, self._set_session_cookie(session_id)
+
+    def _drop_other_sessions(self, keep_session_id):
+        with self.server.session_lock:
+            for sid in list(self.server.active_sessions):
+                if sid != keep_session_id:
+                    del self.server.active_sessions[sid]
 
     def is_authenticated(self):
         swap_client = self.server.swap_client
@@ -604,13 +619,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 and password is not None
                 and verify_rfc2440_password(client_auth_hash, password)
             ):
-                session_id = secrets.token_urlsafe(32)
-                expires = datetime.now(timezone.utc) + timedelta(
-                    minutes=SESSION_DURATION_MINUTES
-                )
-                with self.server.session_lock:
-                    self.server.active_sessions[session_id] = {"expires": expires}
-                cookie_header = self._set_session_cookie(session_id)
+                session_id, cookie_header = self._create_session()
 
                 if is_json_request:
                     response_data = {"success": True, "session_id": session_id}

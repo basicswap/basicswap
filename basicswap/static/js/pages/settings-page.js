@@ -10,6 +10,7 @@
 
     init: function() {
       this.setupTabs();
+      this.setupPasswordToggles();
       this.setupCoinHeaders();
       this.setupConfirmModal();
       this.setupNotificationSettings();
@@ -42,6 +43,23 @@
       tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           switchTab(btn.dataset.tab);
+        });
+      });
+    },
+
+    setupPasswordToggles: function() {
+      document.querySelectorAll('.password-toggle').forEach(btn => {
+        const input = document.getElementById(btn.dataset.target);
+        if (!input) return;
+        const eyeOpen = btn.querySelector('.eye-open');
+        const eyeClosed = btn.querySelector('.eye-closed');
+        btn.addEventListener('mousedown', e => e.preventDefault());
+        btn.addEventListener('click', e => {
+          e.preventDefault();
+          const isPassword = input.type === 'password';
+          input.type = isPassword ? 'text' : 'password';
+          if (eyeOpen) eyeOpen.classList.toggle('hidden', isPassword);
+          if (eyeClosed) eyeClosed.classList.toggle('hidden', !isPassword);
         });
       });
     },
