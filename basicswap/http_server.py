@@ -81,7 +81,7 @@ from .ui.page_debug import page_debug
 
 SESSION_COOKIE_NAME = "basicswap_session_id"
 LOGIN_NEXT_COOKIE_NAME = "basicswap_login_next"
-SESSION_DURATION_MINUTES = 60
+SESSION_DURATION_MINUTES = 15
 
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
@@ -227,6 +227,25 @@ class HttpHandler(BaseHTTPRequestHandler):
             return None
         return value
 
+    def page_heartbeat(self):
+        session_id = self._get_session_cookie()
+        slid = False
+        if session_id:
+            now = datetime.now(timezone.utc)
+            with self.server.session_lock:
+                session_data = self.server.active_sessions.get(session_id)
+                if session_data and session_data["expires"] > now:
+                    session_data["expires"] = now + timedelta(
+                        minutes=self._session_timeout_minutes()
+                    )
+                    slid = True
+        if slid:
+            cookie_header = self._set_session_cookie(session_id)
+            self.putHeaders(200, "application/json", extra_headers=[cookie_header])
+            return json.dumps({"success": True}).encode("utf-8")
+        self.putHeaders(401, "application/json")
+        return json.dumps({"error": "Unauthorized"}).encode("utf-8")
+
     def _set_session_cookie(self, session_id):
         cookie = SimpleCookie()
         cookie[SESSION_COOKIE_NAME] = session_id
@@ -299,9 +318,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         with self.server.session_lock:
             session_data = self.server.active_sessions.get(session_id)
             if session_data and session_data["expires"] > datetime.now(timezone.utc):
-                session_data["expires"] = datetime.now(timezone.utc) + timedelta(
-                    minutes=SESSION_DURATION_MINUTES
-                )
                 return True
 
             if session_id in self.server.active_sessions:
@@ -500,6 +516,11 @@ class HttpHandler(BaseHTTPRequestHandler):
             args_dict["static_v"] = "{}-{}".format(version, max(mtimes))
         except Exception:
             args_dict["static_v"] = version
+
+        args_dict["client_auth_enabled"] = bool(
+            swap_client.settings.get("client_auth_hash")
+        )
+        args_dict["session_timeout_minutes"] = self._session_timeout_minutes()
 
         self.putHeaders(status_code, "text/html", extra_headers=extra_headers)
         return bytes(
@@ -1026,6 +1047,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         get_string = parsed.query
 
         if page == "json":
+            if len(url_split) > 2 and url_split[2] == "heartbeat":
+                if self.command != "POST":
+                    self.putHeaders(405, "application/json")
+                    return json.dumps({"error": "POST required"}).encode("utf-8")
+                return self.page_heartbeat()
             if self.command != "POST" and json_requires_post(url_split):
                 self.putHeaders(405, "application/json")
                 return json.dumps({"error": "POST required"}).encode("utf-8")

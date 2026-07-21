@@ -113,6 +113,10 @@
   {% if current_page == 'wallets' or current_page == 'wallet' %}
   <script src="/static/js/modules/wallet-manager.js"></script>
   {% endif %}
+  {% if client_auth_enabled %}
+  <script>window.BSX_SESSION_TIMEOUT_MIN = {{ session_timeout_minutes }};</script>
+  <script src="/static/js/modules/session-heartbeat.js"></script>
+  {% endif %}
   <!-- Memory management -->
   <script src="/static/js/modules/memory-manager.js"></script>
   <!-- Main application script -->
