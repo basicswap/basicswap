@@ -776,10 +776,45 @@ def listAvailableCoinsWithBalances(swap_client, with_variants=True, split_from=F
 
 
 def checkAddressesOwned(swap_client, ci, wallet_info):
+    try:
+        _, is_locked = swap_client.getLockedState()
+        if is_locked:
+            return
+    except Exception:
+        return
+
+    if getattr(ci, "_connection_type", "rpc") == "electrum":
+        wm = ci.getWalletManager() if hasattr(ci, "getWalletManager") else None
+        if wm is None or not wm.isInitialized(ci.coin_type()):
+            ci._log.debug(
+                "Skipping address ownership check for {}: wallet manager not initialised".format(
+                    ci.coin_name()
+                )
+            )
+            return
+
+    def addressUnowned(address: str) -> bool:
+        try:
+            if ci.isAddressMine(address):
+                return False
+        except Exception as e:
+            ci._log.debug("isAddressMine failed: {}".format(e))
+            return False
+        try:
+            ci.getWalletInfo()
+        except Exception as e:
+            ci._log.debug(
+                "Skipping address regeneration for {}, wallet unresponsive: {}".format(
+                    ci.coin_name(), e
+                )
+            )
+            return False
+        return True
+
     if "stealth_address" in wallet_info:
 
         if wallet_info["stealth_address"] != "?":
-            if not ci.isAddressMine(wallet_info["stealth_address"]):
+            if addressUnowned(wallet_info["stealth_address"]):
                 ci._log.warning(
                     "Unowned stealth address: {} - clearing cache and regenerating".format(
                         wallet_info["stealth_address"]
@@ -804,7 +839,7 @@ def checkAddressesOwned(swap_client, ci, wallet_info):
 
     if "deposit_address" in wallet_info:
         if wallet_info["deposit_address"] != "Refresh necessary":
-            if not ci.isAddressMine(wallet_info["deposit_address"]):
+            if addressUnowned(wallet_info["deposit_address"]):
                 ci._log.warning(
                     "Unowned deposit address: {} - clearing cache and regenerating".format(
                         wallet_info["deposit_address"]
