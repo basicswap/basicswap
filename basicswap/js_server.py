@@ -1767,7 +1767,7 @@ def js_coinhistory(self, url_split, post_string, is_json) -> bytes:
 
 
 def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
-    from basicswap.ui.page_wallet import format_transactions
+    from basicswap.ui.page_wallet import format_transactions, get_swap_txids
     import time
 
     TX_CACHE_DURATION = 30
@@ -1786,11 +1786,18 @@ def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
     page_no = 1
     limit = 30
     offset = 0
+    tx_filter = "all"
+    class_filters = ("mweb", "blind", "anon", "spark")
 
     if have_data_entry(post_data, "page_no"):
         page_no = int(get_data_entry(post_data, "page_no"))
         if page_no < 1:
             page_no = 1
+
+    if have_data_entry(post_data, "filter"):
+        tx_filter = get_data_entry(post_data, "filter")
+        if tx_filter not in ("all", "swaps") + class_filters:
+            tx_filter = "all"
 
     if page_no > 1:
         offset = (page_no - 1) * limit
@@ -1814,9 +1821,22 @@ def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
         else:
             all_txs = cache_entry["txs"]
 
-        total_transactions = len(all_txs)
-        raw_txs = all_txs[offset : offset + limit] if all_txs else []
+        swap_txids = get_swap_txids(swap_client)
+
+        if tx_filter in class_filters:
+            filtered_txs = [tx for tx in all_txs if tx.get("tx_class") == tx_filter]
+        elif tx_filter == "swaps":
+            filtered_txs = [
+                tx for tx in all_txs if (tx.get("txid") or "").lower() in swap_txids
+            ]
+        else:
+            filtered_txs = all_txs
+
+        total_transactions = len(filtered_txs)
+        raw_txs = filtered_txs[offset : offset + limit] if filtered_txs else []
         transactions = format_transactions(ci, raw_txs, coin_id)
+        for tx in transactions:
+            tx["is_swap"] = (tx.get("txid") or "").lower() in swap_txids
 
         return bytes(
             json.dumps(
@@ -1826,6 +1846,7 @@ def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
                     "total": total_transactions,
                     "limit": limit,
                     "total_pages": (total_transactions + limit - 1) // limit,
+                    "filter": tx_filter,
                 }
             ),
             "UTF-8",
