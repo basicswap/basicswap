@@ -65,7 +65,7 @@ const api = {
 
             window.config.coins.forEach(coin => {
                 const symbol = coin.symbol.toLowerCase();
-                const coinData = priceData[symbol] || priceData[coin.name.toLowerCase()];
+                const coinData = priceData[symbol] || priceData[coin.name.toLowerCase()] || priceData[coin.coingeckoId];
 
                 if (coinData && coinData.usd) {
                     let priceBtc;
@@ -410,7 +410,7 @@ const ui = {
   },
 
   setActiveContainer: (containerId) => {
-    const containerIds = ['btc', 'xmr', 'part', 'pivx', 'firo', 'dash', 'ltc', 'doge', 'eth', 'dcr', 'nmc', 'zano', 'wow', 'bch'].map(id => `${id}-container`);
+    const containerIds = ['btc', 'xmr', 'part', 'pivx', 'firo', 'dash', 'ltc', 'doge', 'eth', 'dcr', 'nmc', 'zano', 'wow', 'bch', 'nav'].map(id => `${id}-container`);
     containerIds.forEach(id => {
       const container = document.getElementById(id);
       if (container) {

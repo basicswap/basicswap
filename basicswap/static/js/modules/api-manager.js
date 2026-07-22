@@ -245,7 +245,7 @@ const ApiManager = (function() {
                             .filter(coin => coin.usesCoinGecko)
                             .map(coin => coin.name)
                             .join(',') :
-                        'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin';
+                        'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin,navio';
 
                     const response = await this.fetchCoinPrices(coins);
 
@@ -275,7 +275,7 @@ const ApiManager = (function() {
                         ? window.CoinManager.getAllCoins().map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
                         : (window.config.coins
                             ? window.config.coins.map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
-                            : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW']);
+                            : ['BTC', 'XMR', 'PART', 'BCH', 'PIVX', 'FIRO', 'DASH', 'LTC', 'DOGE', 'DCR', 'NMC', 'WOW', 'NAV']);
 
                     const response = await this.makeRequest('/json/coinvolume', 'POST', {}, {
                         coins: coinSymbols.join(','),

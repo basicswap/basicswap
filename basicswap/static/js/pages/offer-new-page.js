@@ -475,6 +475,7 @@ function getRateInferred(event) {
 
 const SwapTypeManager = {
     coins_without_segwit: ['11', '12'],
+    secret_hash_blsct_only_coins: ['14'],
 
     setSwapTypeEnabled: (coinFrom, coinTo, swapTypeElement) => {
         if (!swapTypeElement) return;
@@ -489,6 +490,12 @@ const SwapTypeManager = {
         ) {
             swapTypeElement.disabled = true;
             swapTypeElement.value = 'seller_first';
+            makeHidden = true;
+            swapTypeElement.classList.add('select-disabled');
+        } else if (SwapTypeManager.secret_hash_blsct_only_coins.includes(coinFrom) ||
+                  SwapTypeManager.secret_hash_blsct_only_coins.includes(coinTo)) {
+            swapTypeElement.disabled = true;
+            swapTypeElement.value = 'secret_hash_blsct';
             makeHidden = true;
             swapTypeElement.classList.add('select-disabled');
         } else {

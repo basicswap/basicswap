@@ -66,6 +66,7 @@ class MessageTypes(IntEnum):
     CONNECT_REQ = auto()
     PORTAL_OFFER = auto()
     PORTAL_SEND = auto()
+    NAV_HTLC_PREIMAGE = auto()
 
 
 class AddressTypes(IntEnum):
@@ -84,6 +85,7 @@ class SwapTypes(IntEnum):
     BUYER_FIRST_2MSG = auto()
     XMR_SWAP = auto()
     XMR_BCH_SWAP = auto()
+    SECRET_HASH_BLSCT = auto()
 
 
 class OfferStates(IntEnum):
@@ -581,6 +583,8 @@ def strSwapType(swap_type) -> str:
         return "seller_first"
     if swap_type == SwapTypes.XMR_SWAP:
         return "xmr_swap"
+    if swap_type == SwapTypes.SECRET_HASH_BLSCT:
+        return "secret_hash_blsct"
     return None
 
 
@@ -589,6 +593,8 @@ def strSwapDesc(swap_type) -> str:
         return "Secret Hash"
     if swap_type == SwapTypes.XMR_SWAP:
         return "Adaptor Sig"
+    if swap_type == SwapTypes.SECRET_HASH_BLSCT:
+        return "Secret Hash (BLSCT)"
     return None
 
 

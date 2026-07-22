@@ -643,7 +643,7 @@ const AmmTablesManager = (function() {
 
     async function fetchLatestPrices() {
         try {
-            const coins = 'BTC,BCH,DCR,DOGE,LTC,NMC,XMR,PART,WOW,FIRO,DASH,PIVX';
+            const coins = 'BTC,BCH,DCR,DOGE,LTC,NMC,XMR,PART,WOW,FIRO,DASH,PIVX,NAV';
 
             const response = await fetch('/json/coinprices', {
                 method: 'POST',
