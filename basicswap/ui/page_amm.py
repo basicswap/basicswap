@@ -857,9 +857,6 @@ def page_amm(self, _, post_string):
                         except ValueError:
                             pass
 
-                    if "auth" in form_data:
-                        current_config["auth"] = form_data.get("auth", [""])[0]
-
                     if swap_client.debug_ui:
                         if "min_seconds_between_bids" in form_data:
                             try:

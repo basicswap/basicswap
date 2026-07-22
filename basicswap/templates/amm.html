@@ -406,16 +406,6 @@
                   </div>
                 </div>
 
-                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <h5 class="mb-3 text-base font-medium text-gray-900 dark:text-white">Settings</h5>
-                  <div class="grid grid-cols-1 gap-4">
-                    <div>
-                      <label for="auth" class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Authentication</label>
-                      <input type="text" id="auth" name="auth" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                    </div>
-                  </div>
-                </div>
-
                 <div class="flex justify-end">
                   <button type="submit" name="save_global_settings" value="true" class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">Save Settings</button>
                 </div>
@@ -456,7 +446,7 @@
                     <p class="text-sm font-medium text-gray-700 dark:text-gray-300"><strong>Script Behavior</strong></p>
                     <ul class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
                       <li class="break-words"><span class="font-semibold">main_loop_delay:</span> Seconds between main loop iterations (10-1000)</li>
-                      <li class="break-words"><span class="font-semibold">auth:</span> Basicswap API auth string, e.g., "admin:password". Ignored if client auth is not enabled.</li>
+                      <li class="break-words"><span class="font-semibold">auth:</span> Basicswap API auth string, e.g., "admin:password", for running createoffers.py standalone. Ignored when the AMM is started by BasicSwap (it uses a temporary token) or if client auth is not enabled.</li>
                       <li class="break-words"><span class="font-semibold">wallet_port_override:</span> If needed, uncomment and set to override wallet API port (for testing only)</li>
                     </ul>
                   </div>
