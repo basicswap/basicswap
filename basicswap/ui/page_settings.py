@@ -22,6 +22,7 @@ from basicswap.basicswap_util import (
 from basicswap.chainparams import (
     Coins,
 )
+from basicswap.util.rfc2440 import rfc2440_hash_password
 
 
 def page_settings(self, url_split, post_string):
@@ -31,6 +32,7 @@ def page_settings(self, url_split, post_string):
 
     messages = []
     err_messages = []
+    extra_headers = []
     active_tab = "default"
     form_data = self.checkForm(post_string, "settings", err_messages)
     if form_data:
@@ -45,6 +47,53 @@ def page_settings(self, url_split, post_string):
                     ),
                 }
                 swap_client.editGeneralSettings(data)
+            elif have_data_entry(form_data, "apply_security"):
+                active_tab = "security"
+                data = {
+                    "session_timeout_minutes": int(
+                        get_data_entry_or(form_data, "session_timeout_minutes", "15")
+                    ),
+                }
+                swap_client.editGeneralSettings(data)
+                session_id = self._get_session_cookie()
+                if session_id:
+                    extra_headers.append(self._set_session_cookie(session_id))
+                messages.append("Security settings applied.")
+            elif have_data_entry(form_data, "apply_client_auth"):
+                active_tab = "security"
+                action = get_data_entry(form_data, "apply_client_auth")
+                auth_enabled = bool(swap_client.settings.get("client_auth_hash"))
+                if action == "disable":
+                    allowed_hosts = swap_client.settings.get("allowed_hosts", []) or []
+                    if "*" in allowed_hosts and not swap_client.settings.get(
+                        "unsafe_allow_any_host_without_auth"
+                    ):
+                        err_messages.append(
+                            "Cannot disable the password while 'allowed_hosts' contains '*' (DNS-rebinding protection)."
+                        )
+                    else:
+                        swap_client.editGeneralSettings({"client_auth_hash": ""})
+                        messages.append("Client Authentication disabled.")
+                else:
+                    new_password = get_data_entry_or(form_data, "new_password", "")
+                    confirm_password = get_data_entry_or(
+                        form_data, "confirm_password", ""
+                    )
+                    if new_password == "":
+                        err_messages.append("Password must not be empty.")
+                    elif new_password != confirm_password:
+                        err_messages.append("Passwords do not match.")
+                    else:
+                        swap_client.editGeneralSettings(
+                            {"client_auth_hash": rfc2440_hash_password(new_password)}
+                        )
+                        if auth_enabled:
+                            self._drop_other_sessions(self._get_session_cookie())
+                            messages.append("Client Authentication password changed.")
+                        else:
+                            _, cookie_header = self._create_session()
+                            extra_headers.append(cookie_header)
+                            messages.append("Client Authentication enabled.")
             elif have_data_entry(form_data, "apply_chart"):
                 active_tab = "general"
                 data = {
@@ -348,6 +397,13 @@ def page_settings(self, url_split, post_string):
         "enabled_chart_coins": swap_client.settings.get("enabled_chart_coins", ""),
     }
 
+    security_settings = {
+        "session_timeout_minutes": swap_client.settings.get(
+            "session_timeout_minutes", 15
+        ),
+        "client_auth_enabled": bool(swap_client.settings.get("client_auth_hash")),
+    }
+
     notification_settings = {
         "notifications_new_offers": swap_client.settings.get(
             "notifications_new_offers", False
@@ -396,8 +452,10 @@ def page_settings(self, url_split, post_string):
             "chains": chains_formatted,
             "general_settings": general_settings,
             "chart_settings": chart_settings,
+            "security_settings": security_settings,
             "notification_settings": notification_settings,
             "tor_settings": tor_settings,
             "active_tab": active_tab,
         },
+        extra_headers=extra_headers,
     )

@@ -85,7 +85,7 @@ import urllib.error
 import base64
 from urllib.request import urlopen
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 delay_event = threading.Event()
 shutdown_in_progress = False
@@ -2101,7 +2101,7 @@ def main():
         print(f"Error reading config file {args.configfile}: {e}")
         return 1
 
-    auth_info = initial_config.get("auth")
+    auth_info = os.environ.get("BSX_API_AUTH") or initial_config.get("auth")
 
     read_json_api = make_json_api_func(args.host, args.port, auth_info)
     wallet_api_port_override = initial_config.get("wallet_port_override")
@@ -2167,6 +2167,16 @@ def main():
         while not delay_event.is_set():
             # Read config each iteration so it can be modified without restarting
             config = readConfig(args, known_coins)
+
+            # Hot-reload auth so a password change needs no restart.
+            new_auth = os.environ.get("BSX_API_AUTH") or config.get("auth")
+            if new_auth != auth_info:
+                auth_info = new_auth
+                read_json_api = make_json_api_func(args.host, args.port, auth_info)
+                if wallet_api_port_override:
+                    read_json_api_wallet_auth = make_json_api_func(
+                        args.host, int(wallet_api_port_override), auth_info
+                    )
 
             # override wallet api calls for testing
             if "wallet_port_override" in config:

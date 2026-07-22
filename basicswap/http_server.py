@@ -80,7 +80,8 @@ from .ui.page_smsgaddresses import page_smsgaddresses
 from .ui.page_debug import page_debug
 
 SESSION_COOKIE_NAME = "basicswap_session_id"
-SESSION_DURATION_MINUTES = 60
+LOGIN_NEXT_COOKIE_NAME = "basicswap_login_next"
+SESSION_DURATION_MINUTES = 15
 
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
@@ -213,6 +214,38 @@ class HttpHandler(BaseHTTPRequestHandler):
                 return cookie[SESSION_COOKIE_NAME].value
         return None
 
+    def _session_timeout_minutes(self):
+        return self.server.swap_client.settings.get(
+            "session_timeout_minutes", SESSION_DURATION_MINUTES
+        )
+
+    def _safe_next_path(self, value):
+        # Only allow same-site absolute paths as a redirect target (open-redirect guard).
+        if not value or not value.startswith("/") or value.startswith("//"):
+            return None
+        if "\\" in value or "://" in value or "\n" in value or "\r" in value:
+            return None
+        return value
+
+    def page_heartbeat(self):
+        session_id = self._get_session_cookie()
+        slid = False
+        if session_id:
+            now = datetime.now(timezone.utc)
+            with self.server.session_lock:
+                session_data = self.server.active_sessions.get(session_id)
+                if session_data and session_data["expires"] > now:
+                    session_data["expires"] = now + timedelta(
+                        minutes=self._session_timeout_minutes()
+                    )
+                    slid = True
+        if slid:
+            cookie_header = self._set_session_cookie(session_id)
+            self.putHeaders(200, "application/json", extra_headers=[cookie_header])
+            return json.dumps({"success": True}).encode("utf-8")
+        self.putHeaders(401, "application/json")
+        return json.dumps({"error": "Unauthorized"}).encode("utf-8")
+
     def _set_session_cookie(self, session_id):
         cookie = SimpleCookie()
         cookie[SESSION_COOKIE_NAME] = session_id
@@ -230,7 +263,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         ):
             cookie[SESSION_COOKIE_NAME]["secure"] = True
         expires = datetime.now(timezone.utc) + timedelta(
-            minutes=SESSION_DURATION_MINUTES
+            minutes=self._session_timeout_minutes()
         )
         cookie[SESSION_COOKIE_NAME]["expires"] = expires.strftime(
             "%a, %d %b %Y %H:%M:%S GMT"
@@ -244,6 +277,47 @@ class HttpHandler(BaseHTTPRequestHandler):
         cookie[SESSION_COOKIE_NAME]["httponly"] = True
         cookie[SESSION_COOKIE_NAME]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
         return ("Set-Cookie", cookie.output(header="").strip())
+
+    def _set_login_next_cookie(self, next_path):
+        cookie = SimpleCookie()
+        cookie[LOGIN_NEXT_COOKIE_NAME] = parse.quote(next_path, safe="")
+        cookie[LOGIN_NEXT_COOKIE_NAME]["path"] = "/"
+        cookie[LOGIN_NEXT_COOKIE_NAME]["samesite"] = "Lax"
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "").lower()
+        if forwarded_proto == "https" or self.server.swap_client.settings.get(
+            "secure_cookies", cfg.DEFAULT_SECURE_COOKIES
+        ):
+            cookie[LOGIN_NEXT_COOKIE_NAME]["secure"] = True
+        return ("Set-Cookie", cookie.output(header="").strip())
+
+    def _get_login_next_cookie(self):
+        if "Cookie" in self.headers:
+            cookie = SimpleCookie(self.headers["Cookie"])
+            if LOGIN_NEXT_COOKIE_NAME in cookie:
+                return parse.unquote(cookie[LOGIN_NEXT_COOKIE_NAME].value)
+        return None
+
+    def _clear_login_next_cookie(self):
+        cookie = SimpleCookie()
+        cookie[LOGIN_NEXT_COOKIE_NAME] = ""
+        cookie[LOGIN_NEXT_COOKIE_NAME]["path"] = "/"
+        cookie[LOGIN_NEXT_COOKIE_NAME]["expires"] = "Thu, 01 Jan 1970 00:00:00 GMT"
+        return ("Set-Cookie", cookie.output(header="").strip())
+
+    def _create_session(self):
+        session_id = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(
+            minutes=self._session_timeout_minutes()
+        )
+        with self.server.session_lock:
+            self.server.active_sessions[session_id] = {"expires": expires}
+        return session_id, self._set_session_cookie(session_id)
+
+    def _drop_other_sessions(self, keep_session_id):
+        with self.server.session_lock:
+            for sid in list(self.server.active_sessions):
+                if sid != keep_session_id:
+                    del self.server.active_sessions[sid]
 
     def is_authenticated(self):
         swap_client = self.server.swap_client
@@ -259,9 +333,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         with self.server.session_lock:
             session_data = self.server.active_sessions.get(session_id)
             if session_data and session_data["expires"] > datetime.now(timezone.utc):
-                session_data["expires"] = datetime.now(timezone.utc) + timedelta(
-                    minutes=SESSION_DURATION_MINUTES
-                )
                 return True
 
             if session_id in self.server.active_sessions:
@@ -461,6 +532,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         except Exception:
             args_dict["static_v"] = version
 
+        args_dict["client_auth_enabled"] = bool(
+            swap_client.settings.get("client_auth_hash")
+        )
+        args_dict["session_timeout_minutes"] = self._session_timeout_minutes()
+
         self.putHeaders(status_code, "text/html", extra_headers=extra_headers)
         return bytes(
             template.render(
@@ -543,13 +619,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 and password is not None
                 and verify_rfc2440_password(client_auth_hash, password)
             ):
-                session_id = secrets.token_urlsafe(32)
-                expires = datetime.now(timezone.utc) + timedelta(
-                    minutes=SESSION_DURATION_MINUTES
-                )
-                with self.server.session_lock:
-                    self.server.active_sessions[session_id] = {"expires": expires}
-                cookie_header = self._set_session_cookie(session_id)
+                session_id, cookie_header = self._create_session()
 
                 if is_json_request:
                     response_data = {"success": True, "session_id": session_id}
@@ -561,8 +631,14 @@ class HttpHandler(BaseHTTPRequestHandler):
                     return json.dumps(response_data).encode("utf-8")
                 else:
                     self.send_response(302)
-                    self.send_header("Location", "/offers")
+                    self.send_header(
+                        "Location",
+                        self._safe_next_path(self._get_login_next_cookie())
+                        or "/offers",
+                    )
                     self.send_header(cookie_header[0], cookie_header[1])
+                    clear_next = self._clear_login_next_cookie()
+                    self.send_header(clear_next[0], clear_next[1])
                     self.end_headers()
                     return b""
             else:
@@ -580,7 +656,12 @@ class HttpHandler(BaseHTTPRequestHandler):
             and self.is_authenticated()
         ):
             self.send_response(302)
-            self.send_header("Location", "/offers")
+            self.send_header(
+                "Location",
+                self._safe_next_path(self._get_login_next_cookie()) or "/offers",
+            )
+            clear_next = self._clear_login_next_cookie()
+            self.send_header(clear_next[0], clear_next[1])
             self.end_headers()
             return b""
 
@@ -907,8 +988,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
                 _, password = decoded_creds.split(":", 1)
 
+                amm_token = getattr(swap_client, "_amm_api_token", None)
                 client_auth_hash = swap_client.settings.get("client_auth_hash")
-                if client_auth_hash and verify_rfc2440_password(
+                if amm_token and hmac.compare_digest(password, amm_token):
+                    basic_auth_ok = True
+                elif client_auth_hash and verify_rfc2440_password(
                     client_auth_hash, password
                 ):
                     basic_auth_ok = True
@@ -945,6 +1029,16 @@ class HttpHandler(BaseHTTPRequestHandler):
                 else:
                     self.send_response(302)
                     self.send_header("Location", "/login")
+                    if (
+                        self.command == "GET"
+                        and self.headers.get("Sec-Fetch-Dest", "document") == "document"
+                        and parsed.path not in ("", "/", "/login")
+                    ):
+                        next_target = parsed.path
+                        if parsed.query:
+                            next_target += "?" + parsed.query
+                        next_cookie = self._set_login_next_cookie(next_target)
+                        self.send_header(next_cookie[0], next_cookie[1])
                 clear_cookie_header = self._clear_session_cookie()
                 self.send_header(clear_cookie_header[0], clear_cookie_header[1])
                 self.end_headers()
@@ -965,6 +1059,11 @@ class HttpHandler(BaseHTTPRequestHandler):
         get_string = parsed.query
 
         if page == "json":
+            if len(url_split) > 2 and url_split[2] == "heartbeat":
+                if self.command != "POST":
+                    self.putHeaders(405, "application/json")
+                    return json.dumps({"error": "POST required"}).encode("utf-8")
+                return self.page_heartbeat()
             if self.command != "POST" and json_requires_post(url_split):
                 self.putHeaders(405, "application/json")
                 return json.dumps({"error": "POST required"}).encode("utf-8")
