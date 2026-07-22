@@ -1801,11 +1801,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.error(traceback.format_exc())
 
     def isSystemUnlocked(self) -> bool:
-        # TODO - Check all active coins
+        # A partial unlock leaves _is_locked True.
+        if self._is_locked is True:
+            return False
         ci = self.ci(Coins.PART)
         return not ci.isWalletLocked()
 
     def checkSystemStatus(self) -> None:
+        if self._is_locked is True:
+            raise LockedCoinError(Coins.PART)
         ci = self.ci(Coins.PART)
         try:
             if ci.isWalletLocked():
