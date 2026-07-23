@@ -23,30 +23,30 @@
         'monero_sub_address',
         'stealth_address'
       ];
-      
+
       copyableElements.forEach(id => {
         const element = document.getElementById(id);
         if (!element) return;
-        
+
         element.classList.add('cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-gray-600', 'transition-colors');
-        
+
         if (!element.querySelector('.copy-icon')) {
           const copyIcon = document.createElement('span');
           copyIcon.className = 'copy-icon absolute right-2 inset-y-0 flex items-center text-gray-500 dark:text-gray-300';
           copyIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>`;
-          
+
           element.style.position = 'relative';
           element.style.paddingRight = '2.5rem';
           element.appendChild(copyIcon);
         }
-        
+
         element.addEventListener('click', (e) => {
           const textToCopy = element.innerText.trim();
-          
+
           this.copyToClipboard(textToCopy);
-          
+
           element.classList.add('bg-blue-50', 'dark:bg-blue-900');
 
           this.showCopyFeedback(element);
@@ -80,14 +80,14 @@
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-      
+
       try {
         document.execCommand('copy');
         console.log('Address copied to clipboard (fallback)');
       } catch (err) {
         console.error('Fallback: Failed to copy address', err);
       }
-      
+
       document.body.removeChild(textArea);
     },
 
@@ -153,7 +153,7 @@
     },
 
     setupWithdrawalConfirmation: function() {
-      
+
       const withdrawalClickHandler = (e) => {
         const target = e.target.closest('[data-confirm-withdrawal]');
         if (target) {
@@ -162,7 +162,7 @@
           this.triggerElement = target;
 
           this.confirmWithdrawal().catch(() => {
-            
+
           });
         }
       };
@@ -311,7 +311,7 @@
     },
 
     setupTransactionDisplay: function() {
-      
+
     },
 
     setupWebSocketUpdates: function() {
@@ -436,6 +436,16 @@
       let currentPage = 1;
       let totalPages = 1;
       let isLoading = false;
+      let currentFilter = 'all';
+
+      const classBadges = {
+        mweb: { label: 'MWEB', cls: 'bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300' },
+        blind: { label: 'Blind', cls: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300' },
+        anon: { label: 'Anon', cls: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900 dark:text-yellow-300' },
+        spark: { label: 'Spark', cls: 'bg-pink-100 text-pink-600 dark:bg-pink-900 dark:text-pink-300' },
+      };
+
+      const txTabs = document.querySelectorAll('#tx-tabs .tx-tab');
 
       const prevBtn = document.getElementById('prevPageTx');
       const nextBtn = document.getElementById('nextPageTx');
@@ -492,7 +502,7 @@
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ page_no: page })
+            body: JSON.stringify({ page_no: page, filter: currentFilter })
           });
 
           const data = await response.json();
@@ -546,6 +556,8 @@
                     <span class="inline-flex items-center gap-1 py-1 px-2 rounded-full text-xs font-semibold ${typeClass}">
                       ${typeIcon} ${tx.type}
                     </span>
+                    ${classBadges[tx.tx_class] ? `<span class="inline-flex items-center py-1 px-2 rounded-full text-xs font-semibold ${classBadges[tx.tx_class].cls}">${classBadges[tx.tx_class].label}</span>` : ''}
+                    ${tx.is_swap ? `<span class="inline-flex items-center py-1 px-2 rounded-full text-xs font-semibold bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300">Swap</span>` : ''}
                     <span class="font-semibold ${amountClass}">
                       ${amountPrefix}${tx.amount} ${ticker.toUpperCase()}
                     </span>
@@ -626,13 +638,37 @@
         });
       }
 
+      const setActiveTab = (filter) => {
+        txTabs.forEach(tab => {
+          const active = tab.dataset.txFilter === filter;
+          tab.classList.toggle('bg-blue-500', active);
+          tab.classList.toggle('text-white', active);
+          tab.classList.toggle('bg-white', !active);
+          tab.classList.toggle('text-gray-600', !active);
+          tab.classList.toggle('border', !active);
+          tab.classList.toggle('border-gray-200', !active);
+          tab.classList.toggle('dark:bg-gray-600', !active);
+          tab.classList.toggle('dark:text-gray-200', !active);
+          tab.classList.toggle('dark:border-gray-500', !active);
+        });
+      };
+
+      txTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          if (isLoading || currentFilter === tab.dataset.txFilter) return;
+          currentFilter = tab.dataset.txFilter;
+          setActiveTab(currentFilter);
+          loadTransactions(1);
+        });
+      });
+
       loadTransactions(1);
     }
   };
 
   document.addEventListener('DOMContentLoaded', function() {
     WalletPage.init();
-    
+
     if (window.BalanceUpdatesManager) {
       window.BalanceUpdatesManager.initialize();
     }

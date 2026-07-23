@@ -81,6 +81,35 @@ class LTCInterface(BTCInterface):
                 pass
         return rv
 
+    def _annotateWalletTransactions(self, transactions, count, skip, include_watchonly):
+        try:
+            mweb_txns = self.rpc_wallet_mweb(
+                "listtransactions", ["*", count, skip, include_watchonly]
+            )
+        except Exception as e:
+            self._log.error(f"listWalletTransactions mweb failed: {e}")
+            return transactions
+
+        seen = {
+            (tx.get("txid"), tx.get("category"), tx.get("address"), tx.get("vout"))
+            for tx in transactions
+        }
+        for tx in mweb_txns:
+            key = (
+                tx.get("txid"),
+                tx.get("category"),
+                tx.get("address"),
+                tx.get("vout"),
+            )
+            if key in seen:
+                continue
+            tx["tx_class"] = "mweb"
+            transactions.append(tx)
+            seen.add(key)
+
+        transactions.sort(key=lambda t: t.get("time", t.get("timereceived", 0)) or 0)
+        return transactions
+
     def getUnspentsByAddr(self):
         unspent_addr = dict()
 

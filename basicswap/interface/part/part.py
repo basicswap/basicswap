@@ -111,6 +111,29 @@ class PARTInterface(BTCInterface):
     def getNewStealthAddress(self, label="swap_stealth") -> str:
         return self.rpc_wallet("getnewstealthaddress", [label])
 
+    def _annotateWalletTransactions(self, transactions, count, skip, include_watchonly):
+        def _txids_of_type(tx_type):
+            entries = self.rpc_wallet(
+                "filtertransactions", [{"count": 100000, "type": tx_type}]
+            )
+            return {tx.get("txid") for tx in entries if tx.get("txid")}
+
+        try:
+            blind_txids = _txids_of_type("blind")
+            anon_txids = _txids_of_type("anon")
+        except Exception as e:
+            self._log.error(f"listWalletTransactions filtertransactions failed: {e}")
+            return transactions
+
+        for tx in transactions:
+            txid = tx.get("txid")
+            if txid in anon_txids:
+                tx["tx_class"] = "anon"
+            elif txid in blind_txids:
+                tx["tx_class"] = "blind"
+
+        return transactions
+
     def haveSpentIndex(self):
         version = self.getDaemonVersion()
         index_info = self.rpc(

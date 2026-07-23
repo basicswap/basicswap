@@ -910,6 +910,20 @@
                   Transaction history is not available in Light Wallet mode.
                 </div>
                 {% else %}
+                <div id="tx-tabs" class="flex flex-wrap gap-2 mb-4">
+                  <button type="button" data-tx-filter="all" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-blue-500 text-white">All</button>
+                  {% if w.cid == '3' and not is_electrum_mode %}
+                  <button type="button" data-tx-filter="mweb" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-white text-gray-600 border border-gray-200 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500">MWEB</button>
+                  {% endif %}
+                  {% if w.cid == '1' %}
+                  <button type="button" data-tx-filter="blind" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-white text-gray-600 border border-gray-200 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500">Blind</button>
+                  <button type="button" data-tx-filter="anon" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-white text-gray-600 border border-gray-200 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500">Anon</button>
+                  {% endif %}
+                  {% if w.cid == '13' %}
+                  <button type="button" data-tx-filter="spark" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-white text-gray-600 border border-gray-200 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500">Spark</button>
+                  {% endif %}
+                  <button type="button" data-tx-filter="swaps" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-white text-gray-600 border border-gray-200 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500">Swaps</button>
+                </div>
                 <div id="tx-container" class="space-y-3 pb-6">
                   <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading transactions...</div>
                 </div>

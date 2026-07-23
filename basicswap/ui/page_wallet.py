@@ -131,6 +131,34 @@ def format_wallet_data(swap_client, ci, w):
     return wf
 
 
+def get_swap_txids(swap_client):
+    import sqlite3
+
+    txids = set()
+    try:
+        conn = sqlite3.connect(swap_client.sqlite_file)
+        cursor = conn.cursor()
+        cursor.execute("SELECT hex(txid), hex(spend_txid) FROM transactions")
+        for txid, spend_txid in cursor.fetchall():
+            if txid:
+                txids.add(txid.lower())
+            if spend_txid:
+                txids.add(spend_txid.lower())
+        cursor.execute(
+            "SELECT hex(a_lock_tx_id), hex(a_lock_spend_tx_id), "
+            "hex(a_lock_refund_tx_id), hex(a_lock_refund_spend_tx_id), "
+            "hex(b_lock_tx_id) FROM xmr_swaps"
+        )
+        for row in cursor.fetchall():
+            for value in row:
+                if value:
+                    txids.add(value.lower())
+        conn.close()
+    except Exception:
+        pass
+    return txids
+
+
 def format_transactions(ci, transactions, coin_id):
     formatted_txs = []
 
@@ -176,6 +204,7 @@ def format_transactions(ci, transactions, coin_id):
                         tx.get("time", tx.get("timereceived", 0))
                     ),
                     "address": tx.get("address", ""),
+                    "tx_class": tx.get("tx_class"),
                 }
             )
 

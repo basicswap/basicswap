@@ -126,6 +126,25 @@ class FIROInterface(BTCInterface):
         """Get a new Spark address (alias for consistency with other coins)."""
         return self.getNewSparkAddress()
 
+    def _annotateWalletTransactions(self, transactions, count, skip, include_watchonly):
+        spark_txids = set()
+        for method in ("listsparkmints", "listsparkspends"):
+            try:
+                entries = self.rpc_wallet(method) or []
+                for entry in entries:
+                    txid = entry.get("txid") or entry.get("txId")
+                    if txid:
+                        spark_txids.add(txid)
+            except Exception as e:
+                self._log.debug(f"{method} failed: {e}")
+
+        if spark_txids:
+            for tx in transactions:
+                if tx.get("txid") in spark_txids:
+                    tx["tx_class"] = "spark"
+
+        return transactions
+
     def getWalletInfo(self):
         """Get wallet info including Spark balance."""
         rv = super(FIROInterface, self).getWalletInfo()

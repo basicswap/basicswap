@@ -2922,12 +2922,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if self._connection_type == "electrum":
             return self._listWalletTransactionsElectrum(count, skip)
         try:
-            return self.rpc_wallet(
+            transactions = self.rpc_wallet(
                 "listtransactions", ["*", count, skip, include_watchonly]
             )
         except Exception as e:
             self._log.error(f"listWalletTransactions failed: {e}")
             return []
+        return self._annotateWalletTransactions(
+            transactions, count, skip, include_watchonly
+        )
+
+    def _annotateWalletTransactions(self, transactions, count, skip, include_watchonly):
+        return transactions
 
     def _listWalletTransactionsElectrum(self, count=100, skip=0):
         backend = self.getBackend()
