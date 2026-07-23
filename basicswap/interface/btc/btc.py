@@ -2935,41 +2935,117 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def _annotateWalletTransactions(self, transactions, count, skip, include_watchonly):
         return transactions
 
+    @staticmethod
+    def _electrumVoutAddress(vout):
+        script_pub_key = vout.get("scriptPubKey", {}) if isinstance(vout, dict) else {}
+        if script_pub_key.get("address"):
+            return script_pub_key["address"]
+        addresses = script_pub_key.get("addresses")
+        if addresses:
+            return addresses[0]
+        return None
+
     def _listWalletTransactionsElectrum(self, count=100, skip=0):
         backend = self.getBackend()
         if not backend:
             return []
 
-        transactions = []
+        wm = self.getWalletManager()
+        addresses = wm.getAllAddresses(self.coin_type()) if wm is not None else []
+        if not addresses:
+            return []
+        address_set = set(addresses)
+
         chain_height = backend.getBlockHeight()
 
-        addresses = []
-        if hasattr(self, "_wallet_manager") and self._wallet_manager:
-            addresses = list(self._wallet_manager._addresses.values())
+        tx_heights = {}
+        try:
+            history_map = backend.getAddressHistoryBatch(addresses)
+        except Exception as e:
+            self._log.debug(f"listWalletTransactions electrum history error: {e}")
+            history_map = {}
+        for entries in history_map.values():
+            for entry in entries:
+                txid = entry.get("txid", entry.get("tx_hash"))
+                if txid:
+                    tx_heights[txid] = entry.get("height", 0)
 
-        for address in addresses:
-            try:
-                history = backend.getAddressHistory(address)
-                for tx in history:
-                    tx_hash = tx.get("txid", tx.get("tx_hash", ""))
-                    height = tx.get("height", 0)
-                    confirmations = (
-                        max(0, chain_height - height + 1) if height > 0 else 0
-                    )
-                    transactions.append(
-                        {
-                            "txid": tx_hash,
-                            "address": address,
-                            "confirmations": confirmations,
-                            "category": "receive",
-                            "amount": 0,
-                            "time": 0,
-                        }
-                    )
-            except Exception as e:
-                self._log.debug(f"listWalletTransactions electrum error for tx: {e}")
+        if not tx_heights:
+            return []
 
-        transactions = transactions[skip : skip + count]
+        txids = list(tx_heights.keys())
+        tx_details = backend.getTransactionBatch(txids)
+
+        owned_outputs = {}
+        for txid, tx in tx_details.items():
+            if not tx:
+                continue
+            for vout in tx.get("vout", []):
+                addr = self._electrumVoutAddress(vout)
+                if addr and addr in address_set:
+                    owned_outputs[(txid, vout.get("n"))] = self.make_int(
+                        vout.get("value", 0) or 0, r=1
+                    )
+
+        transactions = []
+        for txid in txids:
+            tx = tx_details.get(txid)
+            if not tx:
+                continue
+
+            credit = 0
+            for vout in tx.get("vout", []):
+                credit += owned_outputs.get((txid, vout.get("n")), 0)
+
+            debit = 0
+            for vin in tx.get("vin", []):
+                debit += owned_outputs.get((vin.get("txid"), vin.get("vout")), 0)
+
+            net = credit - debit
+            height = tx_heights.get(txid, 0)
+
+            confirmations = tx.get("confirmations")
+            if confirmations is None:
+                confirmations = max(0, chain_height - height + 1) if height > 0 else 0
+
+            if net >= 0:
+                category = "receive"
+                address = next(
+                    (
+                        a
+                        for vout in tx.get("vout", [])
+                        for a in [self._electrumVoutAddress(vout)]
+                        if a and a in address_set
+                    ),
+                    "",
+                )
+            else:
+                category = "send"
+                address = next(
+                    (
+                        a
+                        for vout in tx.get("vout", [])
+                        for a in [self._electrumVoutAddress(vout)]
+                        if a and a not in address_set
+                    ),
+                    "",
+                )
+
+            transactions.append(
+                {
+                    "txid": txid,
+                    "address": address,
+                    "confirmations": confirmations,
+                    "category": category,
+                    "amount": float(self.format_amount(abs(net))),
+                    "time": tx.get("blocktime", tx.get("time", 0)),
+                    "height": height,
+                }
+            )
+
+        transactions.sort(
+            key=lambda t: t["height"] if t["height"] > 0 else chain_height + 1
+        )
         return transactions
 
     def setTxSignature(self, tx_bytes: bytes, stack) -> bytes:

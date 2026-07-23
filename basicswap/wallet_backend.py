@@ -201,6 +201,9 @@ class ElectrumBackend(WalletBackend):
         self._cached_fee_time = {}
         self._fee_cache_ttl = 300
 
+        self._tx_detail_cache = {}
+        self._tx_detail_cache_max = 10000
+
         self._max_batch_size = 5
         self._background_mode = False
 
@@ -532,20 +535,45 @@ class ElectrumBackend(WalletBackend):
             self._log.warning(f"getTransactionRaw failed for {txid[:16]}...: {e}")
             return None
 
+    def _cacheConfirmedTx(self, txid: str, tx_info: dict) -> None:
+        if not tx_info or not tx_info.get("blockhash"):
+            return
+        cacheable = dict(tx_info)
+        cacheable.pop("confirmations", None)
+        self._tx_detail_cache[txid] = cacheable
+        overflow = len(self._tx_detail_cache) - self._tx_detail_cache_max
+        if overflow > 0:
+            for stale in list(self._tx_detail_cache.keys())[:overflow]:
+                self._tx_detail_cache.pop(stale, None)
+
     def getTransactionBatch(self, txids: List[str]) -> Dict[str, Optional[dict]]:
         result = {}
         if not txids:
             return result
 
+        missing = []
+        for txid in txids:
+            cached = self._tx_detail_cache.get(txid)
+            if cached is not None:
+                result[txid] = cached
+            else:
+                missing.append(txid)
+
+        if not missing:
+            return result
+
         try:
-            calls = [("blockchain.transaction.get", [txid, True]) for txid in txids]
+            calls = [("blockchain.transaction.get", [txid, True]) for txid in missing]
             responses = self._call_batch(calls)
-            for txid, tx_info in zip(txids, responses):
+            for txid, tx_info in zip(missing, responses):
                 result[txid] = tx_info if tx_info else None
+                self._cacheConfirmedTx(txid, tx_info)
         except Exception as e:
             self._log.debug(f"getTransactionBatch error: {e}")
-            for txid in txids:
-                result[txid] = self.getTransaction(txid)
+            for txid in missing:
+                tx_info = self.getTransaction(txid)
+                result[txid] = tx_info
+                self._cacheConfirmedTx(txid, tx_info)
 
         return result
 
@@ -672,6 +700,38 @@ class ElectrumBackend(WalletBackend):
             return []
         except Exception:
             return []
+
+    def getAddressHistoryBatch(self, addresses: List[str]) -> Dict[str, List[dict]]:
+        result = {addr: [] for addr in addresses}
+
+        addr_to_scripthash = {}
+        for addr in addresses:
+            if self._isUnsupportedAddress(addr):
+                continue
+            try:
+                addr_to_scripthash[addr] = self._addressToScripthash(addr)
+            except Exception:
+                continue
+
+        if not addr_to_scripthash:
+            return result
+
+        scripthashes = list(addr_to_scripthash.values())
+        scripthash_to_addr = {v: k for k, v in addr_to_scripthash.items()}
+
+        batch_results = self._split_batch_call(
+            scripthashes, "blockchain.scripthash.get_history", batch_size=10
+        )
+
+        for scripthash, history in zip(scripthashes, batch_results):
+            addr = scripthash_to_addr.get(scripthash)
+            if addr and history:
+                result[addr] = [
+                    {"txid": h.get("tx_hash"), "height": h.get("height", 0)}
+                    for h in history
+                ]
+
+        return result
 
     def getAddressHistoryBackground(self, address: str) -> List[dict]:
         if self._isUnsupportedAddress(address):
