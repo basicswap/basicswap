@@ -1418,7 +1418,24 @@ def process_offers(args, config, script_state) -> None:
             print(f"Adjusted offer amount to {final_offer_amount} after bidding")
 
         try:
-            new_offer = read_json_api("offers/new", offer_data)
+            offer_step = offer_template.get("amount_step")
+            offer_floor = float(offer_template.get("min_coin_from_amt", 0))
+            while True:
+                new_offer = read_json_api("offers/new", offer_data)
+                if not (
+                    isinstance(new_offer, dict)
+                    and "Insufficient funds" in str(new_offer.get("error", ""))
+                    and offer_step
+                    and round(offer_data["amt_from"] - float(offer_step), 8)
+                    >= offer_floor
+                ):
+                    break
+                offer_data["amt_from"] = round(
+                    offer_data["amt_from"] - float(offer_step), 8
+                )
+                print(
+                    f"Insufficient funds, reducing offer to {offer_data['amt_from']} and retrying"
+                )
 
             if not isinstance(new_offer, dict):
                 if args.debug:
