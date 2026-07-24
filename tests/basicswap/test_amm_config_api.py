@@ -128,12 +128,14 @@ class AmmTemplateRuntimeTest(unittest.TestCase):
         config_data = {
             "offers": [
                 {
+                    "id": "ft",
                     "name": "ft",
                     "offer_mode": "fixed_total",
                     "amount": 10,
                     "total_to_sell": 100,
                 },
                 {
+                    "id": "std",
                     "name": "std",
                     "offer_mode": "standing",
                     "amount": 5,
@@ -165,7 +167,9 @@ class AmmTemplateRuntimeTest(unittest.TestCase):
 
     def test_runtime_exhausted_flag(self):
         config_data = {
-            "offers": [{"name": "once", "offer_mode": "one_time", "amount": 5}]
+            "offers": [
+                {"id": "once", "name": "once", "offer_mode": "one_time", "amount": 5}
+            ]
         }
         state_data = {
             "offers": {},
@@ -182,8 +186,8 @@ class AmmBidRuntimeTest(unittest.TestCase):
     def test_bid_runtime_counts_only_active(self):
         config_data = {
             "bids": [
-                {"name": "bid_a"},
-                {"name": "bid_b"},
+                {"id": "bid_a", "name": "bid_a"},
+                {"id": "bid_b", "name": "bid_b"},
             ]
         }
         state_data = {
@@ -245,6 +249,7 @@ class AmmLiveFillsTest(unittest.TestCase):
         config_data = {
             "offers": [
                 {
+                    "id": "ft",
                     "name": "ft",
                     "offer_mode": "fixed_total",
                     "amount": 10,
@@ -272,6 +277,7 @@ class AmmLiveFillsTest(unittest.TestCase):
         config_data = {
             "offers": [
                 {
+                    "id": "ft",
                     "name": "ft",
                     "offer_mode": "fixed_total",
                     "amount": 10,
@@ -298,6 +304,7 @@ class AmmLiveFillsTest(unittest.TestCase):
         config_data = {
             "offers": [
                 {
+                    "id": "ft",
                     "name": "ft",
                     "offer_mode": "fixed_total",
                     "amount": 10,
@@ -361,7 +368,9 @@ class ClassifyOfferIdsTest(unittest.TestCase):
 
     def test_runtime_uses_active_count(self):
         config_data = {
-            "offers": [{"name": "std", "offer_mode": "standing", "amount": 5}]
+            "offers": [
+                {"id": "std", "name": "std", "offer_mode": "standing", "amount": 5}
+            ]
         }
         state_data = {
             "offers": {"std": [{"offer_id": "0a"}, {"offer_id": "0b"}]},
