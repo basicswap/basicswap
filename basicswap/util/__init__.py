@@ -189,8 +189,12 @@ def format_amount(i: int, display_scale: int, scale: int = None) -> str:
     n = abs(i)
     quotient = n // ep
     remainder = n % ep
-    if display_scale != scale:
-        remainder %= 10**display_scale
+    if display_scale < scale:
+        # Truncate to the first display_scale decimals (no rounding)
+        remainder //= 10 ** (scale - display_scale)
+    elif display_scale > scale:
+        # Pad the stored decimals out to display_scale places
+        remainder *= 10 ** (display_scale - scale)
     rv = "{}.{:0>{scale}}".format(quotient, remainder, scale=display_scale)
     if i < 0:
         rv = "-" + rv

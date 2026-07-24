@@ -180,6 +180,31 @@ class Test(unittest.TestCase):
         # Round up
         assert make_int("0.123456789", r=1) == 12345679
 
+    def test_format_amount(self):
+        # display_scale defaults to scale: fixed-precision, zero-padded
+        assert format_amount(123456789, 8) == "1.23456789"
+        assert format_amount(0, 8) == "0.00000000"
+        assert format_amount(1, 8) == "0.00000001"
+        assert format_amount(-100000000, 8) == "-1.00000000"
+        assert format_amount(2100000000000000, 8) == "21000000.00000000"
+        assert format_amount(10000000000000, 12) == "10.000000000000"
+
+        # Amounts must be integers
+        try:
+            format_amount(1.0, 8)
+            assert False
+        except ValueError as e:
+            assert str(e) == "Amount must be an integer."
+
+        # display_scale < scale: show the first display_scale decimals (truncate, no rounding)
+        assert format_amount(123456789, 4, 8) == "1.2345"
+        assert format_amount(-123456789, 4, 8) == "-1.2345"
+        assert format_amount(199999999, 2, 8) == "1.99"
+
+        # display_scale > scale: pad the stored decimals out to display_scale places
+        assert format_amount(123456789, 12, 8) == "1.234567890000"
+        assert format_amount(150000000, 10, 8) == "1.5000000000"
+
     def test_make_int12(self):
         def test_case(vs, vf, expect_int):
             i = make_int(vs, 12)
