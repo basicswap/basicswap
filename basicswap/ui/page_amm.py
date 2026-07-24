@@ -436,11 +436,11 @@ def get_amm_active_count(swap_client, debug_override=False):
 
             for offer in config_data.get("offers", []):
                 if offer.get("enabled", False):
-                    enabled_offers.add(offer.get("name", ""))
+                    enabled_offers.add(offer.get("id", ""))
 
             for bid in config_data.get("bids", []):
                 if bid.get("enabled", False):
-                    enabled_bids.add(bid.get("name", ""))
+                    enabled_bids.add(bid.get("id", ""))
 
         except Exception as e:
             if debug_enabled:
@@ -531,8 +531,8 @@ def get_amm_active_count(swap_client, debug_override=False):
                     swap_client.log.error(traceback.format_exc())
 
         if "offers" in state_data:
-            for template_name, offers in state_data["offers"].items():
-                if enabled_offers is None or template_name in enabled_offers:
+            for template_id, offers in state_data["offers"].items():
+                if enabled_offers is None or template_id in enabled_offers:
                     active_offer_count = 0
                     for offer in offers:
                         if (
@@ -544,8 +544,8 @@ def get_amm_active_count(swap_client, debug_override=False):
                     amm_count += active_offer_count
 
         if "bids" in state_data:
-            for template_name, bids in state_data["bids"].items():
-                if enabled_bids is None or template_name in enabled_bids:
+            for template_id, bids in state_data["bids"].items():
+                if enabled_bids is None or template_id in enabled_bids:
                     active_bid_count = 0
                     for bid in bids:
                         if "bid_id" in bid and bid.get("active", False):
@@ -561,7 +561,7 @@ def get_amm_active_count(swap_client, debug_override=False):
             most_recent_time = 0
             most_recent_offer = None
 
-            for template_name, offers in state_data["offers"].items():
+            for template_id, offers in state_data["offers"].items():
                 for offer in offers:
                     if "time" in offer and offer["time"] > most_recent_time:
                         most_recent_time = offer["time"]
@@ -1579,11 +1579,11 @@ def get_amm_template_runtime(swap_client, config_data=None, state_data=None):
     template_tracking = state_data.get("template_tracking", {})
 
     for offer in config_data.get("offers", []):
-        name = offer.get("name")
-        if not name:
+        template_id = offer.get("id")
+        if not template_id:
             continue
 
-        posted = state_offers.get(name, [])
+        posted = state_offers.get(template_id, [])
         offer_ids = [
             o.get("offer_id")
             for o in posted
@@ -1594,7 +1594,7 @@ def get_amm_template_runtime(swap_client, config_data=None, state_data=None):
             swap_client, offer_ids
         )
 
-        tracking = template_tracking.get(name, {})
+        tracking = template_tracking.get(template_id, {})
         sold_by_offer = tracking.get("sold_by_offer", {})
 
         entry = {
@@ -1622,7 +1622,7 @@ def get_amm_template_runtime(swap_client, config_data=None, state_data=None):
             ):
                 entry["exhausted"] = True
 
-        runtime[name] = entry
+        runtime[template_id] = entry
 
     return runtime
 
@@ -1655,18 +1655,18 @@ def get_amm_bid_runtime(swap_client, config_data=None, state_data=None):
     state_bids = state_data.get("bids", {})
 
     for bid in config_data.get("bids", []):
-        name = bid.get("name")
-        if not name:
+        template_id = bid.get("id")
+        if not template_id:
             continue
 
-        posted = state_bids.get(name, [])
+        posted = state_bids.get(template_id, [])
         active_bid_ids = [
             b.get("bid_id")
             for b in posted
             if isinstance(b, dict) and b.get("bid_id") and b.get("active", False)
         ]
 
-        runtime[name] = {
+        runtime[template_id] = {
             "active_bid_count": len(active_bid_ids),
             "bid_ids": active_bid_ids,
         }

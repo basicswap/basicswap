@@ -276,7 +276,7 @@ const AmmTablesManager = (function() {
 
             const amountToReceive = amount * minrate;
 
-            const runtime = templateRuntime[name] || {};
+            const runtime = templateRuntime[offer.id] || {};
             const offerMode = offer.offer_mode || 'standing';
             const exhausted = runtime.exhausted === true;
             const offerIds = Array.isArray(runtime.offer_ids) ? runtime.offer_ids : [];
@@ -365,7 +365,13 @@ const AmmTablesManager = (function() {
                             <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300">
                                 Exhausted
                             </span>` : ''}
-                            ${staleBadge}
+                            ${activeOffersCount > 0 ? '' : staleBadge}
+                            ${offerMode === 'one_time' || offerMode === 'fixed_total' ? `
+                            <button type="button" class="reset-amm-item mt-1 inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 focus:ring-0 focus:outline-none"
+                                title="Reset budget (start fresh)" data-type="offer" data-id="${offer.id || ''}" data-name="${name}">
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>
+                                Reset
+                            </button>` : ''}
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
@@ -442,7 +448,7 @@ const AmmTablesManager = (function() {
             const minCoinToBalance = parseFloat(bid.min_coin_to_balance || 0);
             const maxConcurrent = parseInt(bid.max_concurrent || 1);
             const amountToSend = amount * maxRate;
-            const bidRt = bidRuntime[name] || {};
+            const bidRt = bidRuntime[bid.id] || {};
             const bidIds = Array.isArray(bidRt.bid_ids) ? bidRt.bid_ids : [];
             const activeBidsCount = bidRt.active_bid_count !== undefined
                 ? bidRt.active_bid_count
@@ -1371,6 +1377,25 @@ const AmmTablesManager = (function() {
         }
 
         document.addEventListener('click', function(e) {
+            if (e.target && (e.target.classList.contains('reset-amm-item') || e.target.closest('.reset-amm-item'))) {
+                const button = e.target.classList.contains('reset-amm-item') ? e.target : e.target.closest('.reset-amm-item');
+                const type = button.getAttribute('data-type');
+                const id = button.getAttribute('data-id');
+                const name = button.getAttribute('data-name');
+
+                if (window.showConfirmModal) {
+                    window.showConfirmModal(
+                        'Reset budget',
+                        `Reset tracked progress for "${name || 'Unnamed'}"?\n\nThis clears the sold total so the ${type} starts fresh.`,
+                        function() {
+                            resetAmmItem(type, id);
+                        }
+                    );
+                } else if (confirm(`Reset tracked progress for this ${type}?`)) {
+                    resetAmmItem(type, id);
+                }
+            }
+
             if (e.target && (e.target.classList.contains('delete-amm-item') || e.target.closest('.delete-amm-item'))) {
                 const button = e.target.classList.contains('delete-amm-item') ? e.target : e.target.closest('.delete-amm-item');
                 const type = button.getAttribute('data-type');
@@ -2490,7 +2515,7 @@ const AmmTablesManager = (function() {
                 }
                 notify(`${name || type} ${newEnabled ? 'enabled' : 'disabled'}.`, 'success');
                 if (type === 'offer' && !newEnabled) {
-                    (templateRuntime[name] || {}).offer_ids?.forEach(function(offerId) {
+                    (templateRuntime[list[index].id] || {}).offer_ids?.forEach(function(offerId) {
                         fetch(`/json/revokeoffer/${offerId}`, { method: 'POST' });
                     });
                 }
@@ -2504,6 +2529,51 @@ const AmmTablesManager = (function() {
         }).catch(function(error) {
             setConfigTextarea(configTextarea, previousConfigText);
             if (toggleEl) toggleEl.checked = !newEnabled;
+            notify(`Failed to save the configuration: ${error.message}`, 'error');
+        });
+    }
+
+    function resetAmmItem(type, id) {
+        const configTextarea = document.querySelector('textarea[name="config_content"]');
+        if (!configTextarea) {
+            alert('Error: Could not find the configuration textarea.');
+            return;
+        }
+
+        let config;
+        try {
+            config = JSON.parse(configTextarea.value.trim());
+        } catch (error) {
+            notify('Configuration is not valid JSON.', 'error');
+            return;
+        }
+
+        const list = type === 'offer' ? config.offers : config.bids;
+        const item = Array.isArray(list) ? list.find(i => i && i.id === id) : null;
+        if (!item) {
+            notify(`Could not find the ${type} to reset.`, 'error');
+            return;
+        }
+
+        item.id = `${type}_${Date.now()}`;
+
+        const previousConfigText = configTextarea.value;
+        setConfigTextarea(configTextarea, JSON.stringify(config, null, 4));
+
+        persistConfig(config).then(function(data) {
+            if (data && data.success) {
+                if (window.ammTablesConfig) {
+                    window.ammTablesConfig.configData = data.config_data || config;
+                }
+                fetchAmmState();
+                refreshAfterSave();
+                notify(`${type.charAt(0).toUpperCase() + type.slice(1)} budget reset.`, 'success');
+            } else {
+                setConfigTextarea(configTextarea, previousConfigText);
+                notify((data && data.error) || 'Failed to save the configuration.', 'error');
+            }
+        }).catch(function(error) {
+            setConfigTextarea(configTextarea, previousConfigText);
             notify(`Failed to save the configuration: ${error.message}`, 'error');
         });
     }

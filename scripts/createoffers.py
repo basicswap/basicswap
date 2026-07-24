@@ -80,6 +80,7 @@ import sys
 import threading
 import time
 import traceback
+import uuid
 import urllib
 import urllib.error
 import base64
@@ -278,6 +279,7 @@ def readConfig(args, known_coins):
 
     offer_templates = config["offers"]
     offer_templates_map = {}
+    offer_ids_map = {}
     num_enabled = 0
     for i, offer_template in enumerate(offer_templates):
         num_enabled += 1 if offer_template.get("enabled", True) else 0
@@ -294,6 +296,15 @@ def readConfig(args, known_coins):
             offer_template["name"] = f"{original_name}_{offset}"
             num_changes += 1
         offer_templates_map[offer_template["name"]] = offer_template
+
+        if not offer_template.get("id"):
+            offer_template["id"] = f"offer_{uuid.uuid4().hex[:12]}"
+            num_changes += 1
+        elif offer_template["id"] in offer_ids_map:
+            print("Reassigning duplicate id for offer template", offer_template["name"])
+            offer_template["id"] = f"offer_{uuid.uuid4().hex[:12]}"
+            num_changes += 1
+        offer_ids_map[offer_template["id"]] = offer_template
 
         if "enabled" not in offer_template:
             offer_template["enabled"] = True
@@ -410,6 +421,7 @@ def readConfig(args, known_coins):
 
     bid_templates = config["bids"]
     bid_templates_map = {}
+    bid_ids_map = {}
     num_enabled = 0
     for i, bid_template in enumerate(bid_templates):
         num_enabled += 1 if bid_template.get("enabled", True) else 0
@@ -426,6 +438,15 @@ def readConfig(args, known_coins):
             bid_template["name"] = f"{original_name}_{offset}"
             num_changes += 1
         bid_templates_map[bid_template["name"]] = bid_template
+
+        if not bid_template.get("id"):
+            bid_template["id"] = f"bid_{uuid.uuid4().hex[:12]}"
+            num_changes += 1
+        elif bid_template["id"] in bid_ids_map:
+            print("Reassigning duplicate id for bid template", bid_template["name"])
+            bid_template["id"] = f"bid_{uuid.uuid4().hex[:12]}"
+            num_changes += 1
+        bid_ids_map[bid_template["id"]] = bid_template
 
         if bid_template.get("min_swap_amount", 0.0) < min_swap_size:
             print("Setting min_swap_amount for bid template", bid_template["name"])
@@ -762,14 +783,14 @@ def process_offers(args, config, script_state) -> None:
             continue
 
         created_offers = script_state.get("offers", {})
-        prev_template_offers = created_offers.get(offer_template["name"], [])
+        prev_template_offers = created_offers.get(offer_template["id"], [])
 
         template_offer_mode = offer_template.get("offer_mode", "standing")
         template_fixed_remaining = None
         if template_offer_mode in ("one_time", "fixed_total"):
             tracking_states = script_state.setdefault("template_tracking", {})
             template_tracking = tracking_states.setdefault(
-                offer_template["name"], {"exhausted": False, "sold_by_offer": {}}
+                offer_template["id"], {"exhausted": False, "sold_by_offer": {}}
             )
             if template_tracking.get("exhausted"):
                 if args.debug:
@@ -1446,10 +1467,10 @@ def process_offers(args, config, script_state) -> None:
             print(f"New offer created with ID: {new_offer['offer_id']}")
             if "offers" not in script_state:
                 script_state["offers"] = {}
-            template_name = offer_template["name"]
-            if template_name not in script_state["offers"]:
-                script_state["offers"][template_name] = []
-            script_state["offers"][template_name].append(
+            template_id = offer_template["id"]
+            if template_id not in script_state["offers"]:
+                script_state["offers"][template_id] = []
+            script_state["offers"][template_id].append(
                 {"offer_id": new_offer["offer_id"], "time": int(time.time())}
             )
         except Exception as e:
@@ -1506,10 +1527,10 @@ def process_bids(args, config, script_state) -> None:
         max_concurrent = bid_template.get("max_concurrent", 1)
         if "bids" not in script_state:
             script_state["bids"] = {}
-        template_name = bid_template["name"]
-        if template_name not in script_state["bids"]:
-            script_state["bids"][template_name] = []
-        previous_bids = script_state["bids"][template_name]
+        template_id = bid_template["id"]
+        if template_id not in script_state["bids"]:
+            script_state["bids"][template_id] = []
+        previous_bids = script_state["bids"][template_id]
 
         bids_in_progress: int = 0
         for previous_bid in previous_bids:
@@ -1957,7 +1978,7 @@ def process_bids(args, config, script_state) -> None:
                         print(f"Failed to create bid on offer {offer['offer_id']}")
                     continue
 
-            script_state["bids"][template_name].append(
+            script_state["bids"][template_id].append(
                 {"bid_id": bid_id, "time": int(time.time()), "active": True}
             )
 
@@ -1981,6 +2002,46 @@ def process_bids(args, config, script_state) -> None:
             break
 
 
+def reconcile_state_keys(config, script_state):
+    """Re-key state to template ids and drop state for templates the config no longer has.
+
+    Migrates legacy name-keyed state to id keys, and clears entries whose template
+    was deleted or whose id was regenerated (a reset), so a reused name starts clean.
+    """
+    changed: bool = False
+    sections = (
+        (config.get("offers", []), ("offers", "template_tracking")),
+        (config.get("bids", []), ("bids",)),
+    )
+    for templates, section_names in sections:
+        name_to_id = {}
+        valid_ids = set()
+        for template in templates:
+            template_id = template.get("id")
+            if not template_id:
+                continue
+            valid_ids.add(template_id)
+            name = template.get("name")
+            if name:
+                name_to_id[name] = template_id
+
+        for section_name in section_names:
+            section = script_state.get(section_name)
+            if not isinstance(section, dict):
+                continue
+            for key in list(section.keys()):
+                if key in valid_ids:
+                    continue
+                target_id = name_to_id.get(key)
+                if target_id is not None and target_id not in section:
+                    section[target_id] = section.pop(key)
+                    changed = True
+                else:
+                    del section[key]
+                    changed = True
+    return changed
+
+
 def prune_script_state(now, args, config, script_state):
     if shutdown_in_progress:
         return
@@ -1993,7 +2054,7 @@ def prune_script_state(now, args, config, script_state):
 
     max_ttl: int = config["prune_state_after_seconds"]
     if "offers" in script_state:
-        for template_name, template_group in script_state["offers"].items():
+        for template_id, template_group in script_state["offers"].items():
             offers_to_remove = []
             for offer in template_group:
                 if now - offer["time"] > max_ttl:
@@ -2007,7 +2068,7 @@ def prune_script_state(now, args, config, script_state):
                         break
 
     if "bids" in script_state:
-        for template_name, template_group in script_state["bids"].items():
+        for template_id, template_group in script_state["bids"].items():
             bids_to_remove = []
             for bid in template_group:
                 if now - bid["time"] > max_ttl:
@@ -2189,6 +2250,9 @@ def main():
             # Skip processing if shutdown is in progress
             if not shutdown_in_progress:
                 try:
+                    if reconcile_state_keys(config, script_state):
+                        write_state(args.statefile, script_state)
+
                     process_offers(args, config, script_state)
 
                     process_bids(args, config, script_state)
