@@ -75,6 +75,7 @@ from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
 from basicswap.interface.nav.core import prepare_module as nav_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
+from basicswap.interface.zephyr.core import prepare_module as zephyr_prepare
 
 coin_prepare_modules = {
     "particl": part_prepare,
@@ -90,6 +91,7 @@ coin_prepare_modules = {
     "wownero": wow_prepare,
     "pivx": pivx_prepare,
     "firo": firo_prepare,
+    "zephyr": zephyr_prepare,
 }
 
 known_coins = {
@@ -157,6 +159,11 @@ known_coins = {
         doge_prepare.version,
         doge_prepare.version_tag,
         doge_prepare.signers.keys(),
+    ),
+    "zephyr": (
+        zephyr_prepare.version,
+        zephyr_prepare.version_tag,
+        zephyr_prepare.signers.keys(),
     ),
 }
 
@@ -1539,6 +1546,7 @@ def main():
         "navcoin": nav_prepare.getConfigSegment(prepare_ctx),
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
         "dogecoin": doge_prepare.getConfigSegment(prepare_ctx),
+        "zephyr": zephyr_prepare.getConfigSegment(prepare_ctx),
     }
 
     electrum_supported_coins = {
@@ -1610,6 +1618,7 @@ def main():
     chainclients["wownero"]["trusted_daemon"] = extra_opts.get(
         "trust_remote_node", True
     )
+    chainclients["zephyr"]["trusted_daemon"] = extra_opts.get("trust_remote_node", True)
 
     if extra_opts.get("dash_v20_compatible", False):
         chainclients["dash"]["wallet_v20_compatible"] = True

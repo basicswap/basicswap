@@ -1,0 +1,16 @@
+    zephyr_wallet:
+        image: i_zephyr_wallet
+        build:
+            context: zephyr_wallet
+            dockerfile: Dockerfile
+        container_name: zephyr_wallet
+        volumes:
+            - ${DATA_PATH}/zephyr_wallet:/data
+        expose:
+            - ${ZEPH_WALLET_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped

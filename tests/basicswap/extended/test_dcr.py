@@ -573,7 +573,18 @@ def run_test_ads_both_refund(
     bidder_states = read_json_api(1800 + id_bidder, path)
 
     assert compare_bid_states(offerer_states, self.states_offerer[1]) is True
-    assert compare_bid_states(bidder_states, self.states_bidder[1]) is True
+    # Timing: the cross-chain events "Bid Script pre-refund tx in chain" and "Bid Scriptless coin
+    # locked" happen on different chains and can be observed in either order (more likely to
+    # reorder on a slow/loaded host). Accept both, mirroring test_xmr.py's own both-refund test.
+    states_bidder_alt = copy.deepcopy(self.states_bidder[1])
+    states_bidder_alt[7] = "Bid Script pre-refund tx in chain"
+    states_bidder_alt[8] = "Bid Scriptless coin locked"
+    assert any(
+        [
+            compare_bid_states(bidder_states, self.states_bidder[1]),
+            compare_bid_states(bidder_states, states_bidder_alt),
+        ]
+    )
 
 
 def run_test_ads_swipe_refund(

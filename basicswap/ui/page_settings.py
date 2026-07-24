@@ -160,7 +160,7 @@ def page_settings(self, url_split, post_string):
             for name, c in swap_client.settings["chainclients"].items():
                 if have_data_entry(form_data, "apply_" + name):
                     data = {"lookups": get_data_entry(form_data, "lookups_" + name)}
-                    if name in ("monero", "wownero"):
+                    if name in ("monero", "wownero", "zephyr"):
                         data["fee_priority"] = int(
                             get_data_entry(form_data, "fee_priority_" + name)
                         )
@@ -347,7 +347,7 @@ def page_settings(self, url_split, post_string):
                 "address_gap_limit": c.get("address_gap_limit", 50),
             }
         )
-        if name in ("monero", "wownero"):
+        if name in ("monero", "wownero", "zephyr"):
             chains_formatted[-1]["fee_priority"] = c.get("fee_priority", 0)
             chains_formatted[-1]["manage_wallet_daemon"] = c.get(
                 "manage_wallet_daemon", "Unknown"

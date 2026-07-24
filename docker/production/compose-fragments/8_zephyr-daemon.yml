@@ -1,0 +1,16 @@
+    zephyr_daemon:
+        image: i_zephyr_daemon
+        build:
+            context: zephyr_daemon
+            dockerfile: Dockerfile
+        container_name: zephyr_daemon
+        volumes:
+            - ${DATA_PATH}/zephyr_daemon:/data
+        expose:
+            - ${ZEPH_RPC_PORT}
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "3"
+        restart: unless-stopped
