@@ -340,7 +340,8 @@ def threadPollChainState(swap_client, coin_type):
         try:
             chain_state = ci.getBlockchainInfo()
             new_height: int = chain_state["blocks"]
-            if chain_state["bestblockhash"] != cc["chain_best_block"]:
+            block_changed = chain_state["bestblockhash"] != cc["chain_best_block"]
+            if block_changed:
                 swap_client.log.debug(
                     f"New {ci.ticker()} block at height: {new_height}"
                 )
@@ -350,9 +351,14 @@ def threadPollChainState(swap_client, coin_type):
                     if "mediantime" in chain_state:
                         cc["chain_median_time"] = chain_state["mediantime"]
 
-                checkAndNotifyBalanceChange(
-                    swap_client, coin_type, ci, cc, new_height, "block"
-                )
+            checkAndNotifyBalanceChange(
+                swap_client,
+                coin_type,
+                ci,
+                cc,
+                new_height,
+                "block" if block_changed else "poll",
+            )
 
         except Exception as e:
             swap_client.log.warning(f"threadPollChainState {ci.ticker()}, error: {e}")
