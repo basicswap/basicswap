@@ -91,6 +91,7 @@ class XMRInterface(CoinInterface):
             for response in [
                 "failed to get earliest fork height",
                 "failed to get output distribution",
+                "not enough money",
                 "request-sent",
                 "idle",
                 "busy",
