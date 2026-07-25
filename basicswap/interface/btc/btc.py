@@ -2945,18 +2945,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return addresses[0]
         return None
 
-    def _listWalletTransactionsElectrum(self, count=100, skip=0):
-        backend = self.getBackend()
-        if not backend:
-            return []
-
-        wm = self.getWalletManager()
-        addresses = wm.getAllAddresses(self.coin_type()) if wm is not None else []
-        if not addresses:
-            return []
-        address_set = set(addresses)
-
-        chain_height = backend.getBlockHeight()
+    def _electrumHistoryMeta(self, backend, addresses, ttl: int = 30) -> dict:
+        now = time.time()
+        cached = getattr(self, "_electrum_history_meta", None)
+        if cached is not None and (now - cached[0]) < ttl:
+            return cached[1]
 
         tx_heights = {}
         try:
@@ -2970,11 +2963,58 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 if txid:
                     tx_heights[txid] = entry.get("height", 0)
 
-        if not tx_heights:
-            return []
+        self._electrum_history_meta = (now, tx_heights)
+        return tx_heights
 
-        txids = list(tx_heights.keys())
-        tx_details = backend.getTransactionBatch(txids)
+    def getWalletTransactionsPage(
+        self, limit: int = 30, offset: int = 0, only_txids=None
+    ):
+        backend = self.getBackend()
+        if not backend:
+            return [], 0
+
+        wm = self.getWalletManager()
+        addresses = wm.getAllAddresses(self.coin_type()) if wm is not None else []
+        if not addresses:
+            return [], 0
+        address_set = set(addresses)
+
+        chain_height = backend.getBlockHeight()
+
+        tx_heights = self._electrumHistoryMeta(backend, addresses)
+        if not tx_heights:
+            return [], 0
+
+        ordered_txids = sorted(
+            tx_heights.keys(),
+            key=lambda t: tx_heights[t] if tx_heights[t] > 0 else chain_height + 1,
+            reverse=True,
+        )
+        if only_txids is not None:
+            ordered_txids = [t for t in ordered_txids if t.lower() in only_txids]
+
+        total = len(ordered_txids)
+        page_txids = ordered_txids[offset : offset + limit]
+        if not page_txids:
+            return [], total
+
+        tx_details = backend.getTransactionBatch(page_txids)
+
+        parent_txids = set()
+        for txid in page_txids:
+            tx = tx_details.get(txid)
+            if not tx:
+                continue
+            for vin in tx.get("vin", []):
+                prev_txid = vin.get("txid")
+                if (
+                    prev_txid
+                    and prev_txid in tx_heights
+                    and prev_txid not in tx_details
+                ):
+                    parent_txids.add(prev_txid)
+        if parent_txids:
+            tx_details.update(backend.getTransactionBatch(list(parent_txids)))
 
         owned_outputs = {}
         for txid, tx in tx_details.items():
@@ -2988,7 +3028,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     )
 
         transactions = []
-        for txid in txids:
+        for txid in page_txids:
             tx = tx_details.get(txid)
             if not tx:
                 continue
@@ -3043,10 +3083,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 }
             )
 
-        transactions.sort(
-            key=lambda t: t["height"] if t["height"] > 0 else chain_height + 1
-        )
-        return transactions
+        return transactions, total
+
+    def _listWalletTransactionsElectrum(self, count=100, skip=0):
+        transactions, _ = self.getWalletTransactionsPage(count, skip)
+        return list(reversed(transactions))
 
     def setTxSignature(self, tx_bytes: bytes, stack) -> bytes:
         tx = self.loadTx(tx_bytes)

@@ -1805,35 +1805,46 @@ def js_wallettransactions(self, url_split, post_string, is_json) -> bytes:
     try:
         ci = swap_client.ci(coin_id)
 
-        current_time = time.time()
-        cache_entry = swap_client._tx_cache.get(coin_id)
-
-        if (
-            cache_entry is None
-            or (current_time - cache_entry["time"]) > TX_CACHE_DURATION
-        ):
-            all_txs = ci.listWalletTransactions(count=10000, skip=0)
-            if all_txs and coin_id not in swap_client.xmr_based_coins:
-                all_txs = list(reversed(all_txs))
-            elif not all_txs:
-                all_txs = []
-            swap_client._tx_cache[coin_id] = {"txs": all_txs, "time": current_time}
-        else:
-            all_txs = cache_entry["txs"]
-
         swap_txids = get_swap_txids(swap_client)
 
-        if tx_filter in class_filters:
-            filtered_txs = [tx for tx in all_txs if tx.get("tx_class") == tx_filter]
-        elif tx_filter == "swaps":
-            filtered_txs = [
-                tx for tx in all_txs if (tx.get("txid") or "").lower() in swap_txids
-            ]
+        is_electrum = getattr(ci, "_connection_type", "rpc") == "electrum"
+        if is_electrum and hasattr(ci, "getWalletTransactionsPage"):
+            if tx_filter in class_filters:
+                raw_txs, total_transactions = [], 0
+            else:
+                only_txids = swap_txids if tx_filter == "swaps" else None
+                raw_txs, total_transactions = ci.getWalletTransactionsPage(
+                    limit, offset, only_txids
+                )
         else:
-            filtered_txs = all_txs
+            current_time = time.time()
+            cache_entry = swap_client._tx_cache.get(coin_id)
 
-        total_transactions = len(filtered_txs)
-        raw_txs = filtered_txs[offset : offset + limit] if filtered_txs else []
+            if (
+                cache_entry is None
+                or (current_time - cache_entry["time"]) > TX_CACHE_DURATION
+            ):
+                all_txs = ci.listWalletTransactions(count=10000, skip=0)
+                if all_txs and coin_id not in swap_client.xmr_based_coins:
+                    all_txs = list(reversed(all_txs))
+                elif not all_txs:
+                    all_txs = []
+                swap_client._tx_cache[coin_id] = {"txs": all_txs, "time": current_time}
+            else:
+                all_txs = cache_entry["txs"]
+
+            if tx_filter in class_filters:
+                filtered_txs = [tx for tx in all_txs if tx.get("tx_class") == tx_filter]
+            elif tx_filter == "swaps":
+                filtered_txs = [
+                    tx for tx in all_txs if (tx.get("txid") or "").lower() in swap_txids
+                ]
+            else:
+                filtered_txs = all_txs
+
+            total_transactions = len(filtered_txs)
+            raw_txs = filtered_txs[offset : offset + limit] if filtered_txs else []
+
         transactions = format_transactions(ci, raw_txs, coin_id)
         for tx in transactions:
             tx["is_swap"] = (tx.get("txid") or "").lower() in swap_txids

@@ -562,18 +562,26 @@ class ElectrumBackend(WalletBackend):
         if not missing:
             return result
 
-        try:
-            calls = [("blockchain.transaction.get", [txid, True]) for txid in missing]
-            responses = self._call_batch(calls)
-            for txid, tx_info in zip(missing, responses):
-                result[txid] = tx_info if tx_info else None
-                self._cacheConfirmedTx(txid, tx_info)
-        except Exception as e:
-            self._log.debug(f"getTransactionBatch error: {e}")
-            for txid in missing:
-                tx_info = self.getTransaction(txid)
-                result[txid] = tx_info
-                self._cacheConfirmedTx(txid, tx_info)
+        batch_size = 10
+        for i in range(0, len(missing), batch_size):
+            if self._is_server_stopping():
+                self._log.debug("getTransactionBatch: server stopping, aborting")
+                break
+            chunk = missing[i : i + batch_size]
+            try:
+                calls = [("blockchain.transaction.get", [txid, True]) for txid in chunk]
+                responses = self._call_batch(calls)
+                for txid, tx_info in zip(chunk, responses):
+                    result[txid] = tx_info if tx_info else None
+                    self._cacheConfirmedTx(txid, tx_info)
+            except Exception as e:
+                self._log.debug(f"getTransactionBatch chunk error: {e}")
+                for txid in chunk:
+                    if self._is_server_stopping():
+                        break
+                    tx_info = self.getTransaction(txid)
+                    result[txid] = tx_info
+                    self._cacheConfirmedTx(txid, tx_info)
 
         return result
 
