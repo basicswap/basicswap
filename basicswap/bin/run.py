@@ -319,7 +319,7 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     if (
         prepare is False
         and use_tor_proxy is False
-        and coin_id in (Coins.BTC, Coins.NMC)
+        and coin_id in (Coins.BTC, Coins.NMC, Coins.CAPS)
     ):
         port: int = coin_settings.get("port", 8333)
         extra_args.append(f"--bind=0.0.0.0:{port}")
