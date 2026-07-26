@@ -24,6 +24,19 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def close_daemon_files(daemon):
+    for stream in (
+        daemon.handle.stdin,
+        daemon.handle.stdout,
+        daemon.handle.stderr,
+    ):
+        if stream is not None and not stream.closed:
+            stream.close()
+    for fp in daemon.files:
+        if not fp.closed:
+            fp.close()
+
+
 @unittest.skipUnless(
     os.getenv("CAPS_BINDIR") and os.getenv("CAPS_DAEMON_SHA256"),
     "set CAPS_BINDIR and CAPS_DAEMON_SHA256 for the isolated local-binary test",
@@ -118,10 +131,7 @@ class TestCapStashLocalBinary(unittest.TestCase):
                 except Exception:
                     daemon.handle.kill()
                     daemon.handle.wait(timeout=10)
-                if daemon.handle.stdin is not None:
-                    daemon.handle.stdin.close()
-                for fp in daemon.files:
-                    fp.close()
+                close_daemon_files(daemon)
 
 
 if __name__ == "__main__":

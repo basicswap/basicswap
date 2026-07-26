@@ -13,12 +13,8 @@ from basicswap.bin.run import startDaemon
 from basicswap.interface.capstash.capstash import CapStashInterface
 
 
-EXPECTED_DAEMON_SHA256 = (
-    "3701ca15eedd780644bd40a7d820bfc64b5bd321ca78986434597db259773872"
-)
-EXPECTED_CLI_SHA256 = (
-    "8f2704ab3314191a89860f7c444de04c8e141e69db54e64affb2f39db75c9e3b"
-)
+EXPECTED_DAEMON_SHA256 = os.getenv("CAPS_DAEMON_SHA256", "").lower()
+EXPECTED_CLI_SHA256 = os.getenv("CAPS_CLI_SHA256", "").lower()
 
 
 def file_hash(path):
@@ -42,9 +38,24 @@ def wait_until(predicate, description, timeout=30):
     raise TimeoutError(f"Timed out waiting for {description}: {last_error}")
 
 
+def close_daemon_files(daemon):
+    for stream in (
+        daemon.handle.stdin,
+        daemon.handle.stdout,
+        daemon.handle.stderr,
+    ):
+        if stream is not None and not stream.closed:
+            stream.close()
+    for fp in daemon.files:
+        if not fp.closed:
+            fp.close()
+
+
 @unittest.skipUnless(os.getenv("CAPS_BINDIR"), "set CAPS_BINDIR")
 class TestCapStashMultiNode(unittest.TestCase):
     def test_two_node_regtest(self):
+        self.assertTrue(EXPECTED_DAEMON_SHA256, "set CAPS_DAEMON_SHA256")
+        self.assertTrue(EXPECTED_CLI_SHA256, "set CAPS_CLI_SHA256")
         bindir = os.path.abspath(os.environ["CAPS_BINDIR"])
         suffix = ".exe" if os.name == "nt" else ""
         daemon_name = "CapStashd" + suffix
@@ -205,10 +216,7 @@ class TestCapStashMultiNode(unittest.TestCase):
             # CapStash did not auto-load wallets in the standalone probe.
             interfaces[1].rpc("stop")
             daemons[1].handle.wait(timeout=20)
-            if daemons[1].handle.stdin is not None:
-                daemons[1].handle.stdin.close()
-            for fp in daemons[1].files:
-                fp.close()
+            close_daemon_files(daemons[1])
             datadir = os.path.join(root, "node1")
             daemons[1] = startDaemon(
                 datadir,
@@ -352,11 +360,7 @@ class TestCapStashMultiNode(unittest.TestCase):
                         daemon.handle.wait(timeout=10)
                     except Exception:
                         pass
-                if daemon.handle.stdin is not None:
-                    daemon.handle.stdin.close()
-                for fp in daemon.files:
-                    if not fp.closed:
-                        fp.close()
+                close_daemon_files(daemon)
             if not preserve and not failed:
                 shutil.rmtree(root)
             elif failed:

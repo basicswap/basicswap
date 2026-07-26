@@ -55,9 +55,21 @@ class TestCapStash(unittest.TestCase):
         self.assertEqual(params["regtest"]["hrp"], "rcap")
 
     def test_interface_and_coin_type_policy(self):
-        ci = self.make_interface("regtest")
-        self.assertEqual(ci.coin_type(), Coins.CAPS)
-        self.assertEqual(ci.getWalletAccountPath(), "84h/1h/0h")
+        params = chainparams[Coins.CAPS]
+        self.assertIsNone(params["mainnet"]["bip44"])
+        self.assertEqual(params["testnet"]["bip44"], 1)
+        self.assertEqual(params["regtest"]["bip44"], 1)
+
+        ci_regtest = self.make_interface("regtest")
+        self.assertEqual(ci_regtest.coin_type(), Coins.CAPS)
+        self.assertEqual(ci_regtest.getWalletAccountPath(), "84h/1h/0h")
+
+        # A non-regtest interface requires a live swap client for fee-policy
+        # settings. Reuse the inert interface to exercise only the network
+        # identity and derivation policy implemented by CapStashInterface.
+        ci_testnet = self.make_interface("regtest")
+        ci_testnet._network = "testnet"
+        self.assertEqual(ci_testnet.getWalletAccountPath(), "84h/1h/0h")
 
         ci_main = self.make_interface("regtest")
         ci_main._network = "mainnet"

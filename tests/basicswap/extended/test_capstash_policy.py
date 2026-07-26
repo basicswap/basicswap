@@ -14,12 +14,8 @@ from basicswap.bin.run import startDaemon
 from basicswap.interface.capstash.capstash import CapStashInterface
 
 
-EXPECTED_DAEMON_SHA256 = (
-    "3701ca15eedd780644bd40a7d820bfc64b5bd321ca78986434597db259773872"
-)
-EXPECTED_CLI_SHA256 = (
-    "8f2704ab3314191a89860f7c444de04c8e141e69db54e64affb2f39db75c9e3b"
-)
+EXPECTED_DAEMON_SHA256 = os.getenv("CAPS_DAEMON_SHA256", "").lower()
+EXPECTED_CLI_SHA256 = os.getenv("CAPS_CLI_SHA256", "").lower()
 
 
 def file_hash(path):
@@ -46,6 +42,8 @@ def wait_until(predicate, description, timeout=30):
 @unittest.skipUnless(os.getenv("CAPS_BINDIR"), "set CAPS_BINDIR")
 class TestCapStashPolicy(unittest.TestCase):
     def test_fee_dust_and_funding_policy(self):
+        self.assertTrue(EXPECTED_DAEMON_SHA256, "set CAPS_DAEMON_SHA256")
+        self.assertTrue(EXPECTED_CLI_SHA256, "set CAPS_CLI_SHA256")
         bindir = os.path.abspath(os.environ["CAPS_BINDIR"])
         suffix = ".exe" if os.name == "nt" else ""
         daemon_path = os.path.join(bindir, "CapStashd" + suffix)
