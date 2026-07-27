@@ -22,11 +22,21 @@
     @supports (min-height: 100dvh) {
       body { min-height: 100dvh; }
     }
+    @keyframes auth-shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .auth-shake { animation: auth-shake 0.4s ease-in-out; }
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
   <div class="w-full max-w-md px-6">
-    <div class="bg-white dark:bg-gray-800 rounded-xl dark:shadow-lg p-8">
+    <div class="relative bg-white dark:bg-gray-800 rounded-xl dark:shadow-lg p-8">
+      <div id="server-status" class="absolute top-3 right-3 flex items-center gap-1.5 text-xs font-medium" title="Server connection">
+        <span id="server-status-dot" class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+        <span id="server-status-text" class="text-gray-500 dark:text-gray-400">Online</span>
+      </div>
       <div class="text-center mb-8">
         <div class="mb-6">
           <img src="/static/images/logos/basicswap-logo.svg" class="h-16 mx-auto imageshow dark-image">
@@ -65,6 +75,32 @@
         </div>
       </div>
       {% endfor %}
+
+      <div id="offline-alert" class="hidden mb-4 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p class="text-sm font-medium text-red-800 dark:text-red-400">BasicSwap server is unreachable.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="auth-error" class="hidden mb-4 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p id="auth-error-text" class="text-sm font-medium text-red-800 dark:text-red-400"></p>
+          </div>
+        </div>
+      </div>
 
       <form method="post"{% block form_attrs %}{% endblock %} autocomplete="off" id="auth-form">
         <div class="mb-6">
@@ -174,17 +210,143 @@
         });
       }
 
+      const statusDot = document.getElementById('server-status-dot');
+      const statusText = document.getElementById('server-status-text');
+      const offlineAlert = document.getElementById('offline-alert');
+      const authError = document.getElementById('auth-error');
+      const authErrorText = document.getElementById('auth-error-text');
+      const authTextDefault = authText ? authText.textContent : '';
+      let isSubmitting = false;
+      let isOnline = true;
+
+      function applyServerStatus(online) {
+        isOnline = online;
+        if (statusDot) {
+          statusDot.classList.toggle('bg-green-500', online);
+          statusDot.classList.toggle('bg-red-500', !online);
+        }
+        if (statusText) {
+          statusText.textContent = online ? 'Online' : 'Offline';
+        }
+        if (offlineAlert && online) {
+          offlineAlert.classList.add('hidden');
+        }
+        if (authBtn && !isSubmitting) {
+          authBtn.setAttribute('aria-disabled', String(!online));
+          authBtn.classList.toggle('opacity-60', !online);
+          authBtn.classList.toggle('cursor-not-allowed', !online);
+          if (online) {
+            authBtn.classList.remove('ring-2', 'ring-red-500');
+          }
+        }
+      }
+
+      function flashOffline() {
+        if (offlineAlert) {
+          offlineAlert.classList.remove('hidden');
+        }
+        if (!authBtn) return;
+        authBtn.classList.remove('auth-shake');
+        void authBtn.offsetWidth;
+        authBtn.classList.add('auth-shake', 'ring-2', 'ring-red-500');
+        setTimeout(function() {
+          authBtn.classList.remove('auth-shake', 'ring-2', 'ring-red-500');
+        }, 800);
+        if (statusText) {
+          statusText.classList.add('text-red-500');
+          setTimeout(function() { statusText.classList.remove('text-red-500'); }, 800);
+        }
+      }
+
+      async function probeServer() {
+        if (document.visibilityState === 'hidden') {
+          return;
+        }
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 4000);
+          const resp = await fetch(window.location.pathname, {
+            method: 'HEAD',
+            cache: 'no-store',
+            signal: controller.signal,
+          });
+          clearTimeout(timer);
+          applyServerStatus(resp.ok);
+        } catch (e) {
+          applyServerStatus(false);
+        }
+      }
+
+      probeServer();
+      setInterval(probeServer, 5000);
+      window.addEventListener('online', probeServer);
+      window.addEventListener('offline', function() { applyServerStatus(false); });
+      window.addEventListener('focus', probeServer);
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+          probeServer();
+        }
+      });
+
+      function setSubmitting(active) {
+        isSubmitting = active;
+        if (!authBtn) return;
+        authBtn.disabled = active;
+        if (authSpinner) {
+          authSpinner.classList.toggle('hidden', !active);
+        }
+        if (authText) {
+          authText.textContent = active
+            ? (authBtn.dataset.loadingText || authTextDefault)
+            : authTextDefault;
+        }
+      }
+
+      function showAuthError(message) {
+        if (authErrorText) {
+          authErrorText.textContent = message;
+        }
+        if (authError) {
+          authError.classList.remove('hidden');
+        }
+        if (passwordInput) {
+          passwordInput.value = '';
+          passwordInput.focus();
+        }
+      }
+
       if (authForm) {
-        authForm.addEventListener('submit', function() {
-          if (authBtn && authText && authSpinner) {
-            authBtn.disabled = true;
-            authText.textContent = authBtn.dataset.loadingText || authText.textContent;
-            authSpinner.classList.remove('hidden');
+        authForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          if (!isOnline) {
+            flashOffline();
+            return;
+          }
+          if (authError) {
+            authError.classList.add('hidden');
+          }
+          setSubmitting(true);
+          try {
+            const resp = await fetch(authForm.action || window.location.pathname, {
+              method: 'POST',
+              body: new URLSearchParams(new FormData(authForm, e.submitter)),
+              redirect: 'follow',
+            });
+            if (resp.redirected) {
+              window.location.href = resp.url;
+              return;
+            }
+            setSubmitting(false);
+            showAuthError('Invalid password.');
+          } catch (err) {
+            setSubmitting(false);
+            applyServerStatus(false);
+            flashOffline();
           }
         });
       }
 
-      const errorMessages = document.querySelectorAll('[role="alert"]');
+      const errorMessages = document.querySelectorAll('[role="alert"]:not(#offline-alert):not(#auth-error)');
       if (errorMessages.length > 0 && passwordInput) {
         passwordInput.value = '';
         passwordInput.focus();
