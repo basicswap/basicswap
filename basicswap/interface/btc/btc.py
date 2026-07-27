@@ -1086,6 +1086,20 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         wi = self.rpc_wallet("getwalletinfo")
         return "Not found" if "hdseedid" not in wi else wi["hdseedid"]
 
+    def getWalletSeedIDRetry(self, max_attempts: int = 5) -> str:
+        last_seed_err = None
+        for _attempt in range(max_attempts):
+            try:
+                return self.getWalletSeedID()
+            except Exception as e:
+                last_seed_err = e
+                self._log.debug(
+                    f"getWalletSeedID failed (attempt {_attempt + 1}/{max_attempts}): {e}"
+                )
+                if _attempt < max_attempts - 1:
+                    time.sleep(2**_attempt)  # exponential backoff
+        raise last_seed_err
+
     def checkExpectedSeed(self, expect_seedid: str) -> bool:
         wallet_seed_id = self.getWalletSeedID()
         self._expect_seedid_hex = expect_seedid
@@ -4704,23 +4718,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     else:
                         raise
 
-            seed_id = None
-            last_seed_err = None
-            max_attempts = 5
-            for _attempt in range(max_attempts):
-                try:
-                    seed_id = self.getWalletSeedID()
-                    last_seed_err = None
-                    break
-                except Exception as e:
-                    last_seed_err = e
-                    self._log.debug(
-                        f"getWalletSeedID failed (attempt {_attempt + 1}/{max_attempts}): {e}"
-                    )
-                    if _attempt < max_attempts - 1:
-                        time.sleep(2**_attempt)  # exponential backoff
-            if last_seed_err is not None:
-                raise last_seed_err
+            seed_id = self.getWalletSeedIDRetry()
             needs_seed_init = seed_id == "Not found"
             if needs_seed_init:
                 self._log.info(f"Initializing HD seed for {self.coin_name()}.")
