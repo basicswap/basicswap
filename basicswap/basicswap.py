@@ -4576,8 +4576,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                        FROM offer_tracking otr
                        JOIN offers o ON o.offer_id = otr.offer_id
                        WHERE otr.mode = :standing AND otr.min_wallet_reserve > 0
-                         AND o.active_ind = 1 AND o.was_sent = 1""",
-                    {"standing": int(OfferTrackingModes.STANDING)},
+                         AND o.active_ind = 1 AND o.was_sent = 1
+                         AND o.state = :offer_sent AND o.expire_at > :now""",
+                    {
+                        "standing": int(OfferTrackingModes.STANDING),
+                        "offer_sent": int(OfferStates.OFFER_SENT),
+                        "now": self.getTime(),
+                    },
                 ).fetchall()
                 for row in rows:
                     to_check.append((row[0], row[1], row[2]))
