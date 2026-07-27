@@ -92,6 +92,14 @@ shutdown_in_progress = False
 coins_map = {}
 read_json_api = None
 read_json_api_wallet = None
+_wallet_info_cache = {}
+
+
+def get_wallet_info(coin_ticker):
+    if coin_ticker not in _wallet_info_cache:
+        _wallet_info_cache[coin_ticker] = read_json_api_wallet(f"wallets/{coin_ticker}")
+    return _wallet_info_cache[coin_ticker]
+
 
 DEFAULT_CONFIG_FILE: str = "createoffers.json"
 DEFAULT_STATE_FILE: str = "createoffers_state.json"
@@ -730,7 +738,7 @@ def process_offers(args, config, script_state) -> None:
         coin_from_data_name = offer_template["coin_from"]
 
         try:
-            wallet_from = read_json_api_wallet(f"wallets/{coin_ticker}")
+            wallet_from = get_wallet_info(coin_ticker)
             if coin_ticker == "PART":
                 if "variant" in coin_from_data:
                     coin_variant = coin_from_data["variant"]
@@ -1626,9 +1634,7 @@ def process_bids(args, config, script_state) -> None:
                     # This follows the same pattern as offers: balance - min_amount
                     try:
                         # Get wallet balance for the coin we're bidding with (coin_from in the offer)
-                        wallet_from = read_json_api_wallet(
-                            "wallets/{}".format(coin_from_data["ticker"])
-                        )
+                        wallet_from = get_wallet_info(coin_from_data["ticker"])
 
                         wallet_balance = float(wallet_from["balance"]) + float(
                             wallet_from["unconfirmed"]
@@ -1798,9 +1804,7 @@ def process_bids(args, config, script_state) -> None:
             max_coin_from_balance = bid_template.get("max_coin_from_balance", -1)
             if max_coin_from_balance > 0:
                 try:
-                    wallet_from = read_json_api_wallet(
-                        "wallets/{}".format(coin_from_data["ticker"])
-                    )
+                    wallet_from = get_wallet_info(coin_from_data["ticker"])
                     total_balance_from = float(wallet_from.get("balance", 0)) + float(
                         wallet_from.get("unconfirmed", 0)
                     )
@@ -1835,9 +1839,7 @@ def process_bids(args, config, script_state) -> None:
             min_coin_to_balance = bid_template["min_coin_to_balance"]
             if min_coin_to_balance > 0:
                 try:
-                    wallet_to = read_json_api_wallet(
-                        "wallets/{}".format(coin_to_data["ticker"])
-                    )
+                    wallet_to = get_wallet_info(coin_to_data["ticker"])
 
                     total_balance_to = float(wallet_to.get("balance", 0)) + float(
                         wallet_to.get("unconfirmed", 0)
@@ -2165,6 +2167,8 @@ def main():
 
     try:
         while not delay_event.is_set():
+            _wallet_info_cache.clear()
+
             # Read config each iteration so it can be modified without restarting
             config = readConfig(args, known_coins)
 
