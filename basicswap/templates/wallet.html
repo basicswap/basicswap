@@ -905,11 +905,6 @@
           <div class="lg:container mt-5 mx-auto">
             <div id="transaction-history-section" class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
               <div class="px-6">
-                {% if is_electrum_mode %}
-                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-                  Transaction history is not available in Light Wallet mode.
-                </div>
-                {% else %}
                 <div id="tx-tabs" class="flex flex-wrap gap-2 mb-4">
                   <button type="button" data-tx-filter="all" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-blue-500 text-white">All</button>
                   {% if w.cid == '3' and not is_electrum_mode %}
@@ -927,7 +922,6 @@
                 <div id="tx-container" class="space-y-3 pb-6">
                   <div class="text-center py-8 text-gray-500 dark:text-gray-400">Loading transactions...</div>
                 </div>
-                {% endif %}
               </div>
             </div>
           </div>
@@ -936,7 +930,6 @@
     </div>
   </section>
 
-  {% if not is_electrum_mode %}
   <section id="tx-pagination-section" style="display: none;">
     <div class="px-6 py-0 h-full overflow-hidden">
       <div class="pb-6">
@@ -970,25 +963,6 @@
       </div>
     </div>
   </section>
-  {% endif %}
-
-  {% if is_electrum_mode %}
-  <section id="tx-pagination-section">
-    <div class="px-6 py-0 h-full overflow-hidden">
-      <div class="pb-6">
-        <div class="flex flex-wrap items-center justify-between -m-2">
-          <div class="w-full pt-2">
-            <div class="lg:container mx-auto">
-              <div class="py-6 bg-coolGray-100 border-t border-gray-100 dark:border-gray-400 dark:bg-gray-500 rounded-bl-xl rounded-br-xl">
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-  {% endif %}
 
 {% endif %}
 
