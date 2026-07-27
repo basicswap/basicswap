@@ -788,6 +788,7 @@ def process_offers(args, config, script_state) -> None:
 
         template_offer_mode = offer_template.get("offer_mode", "standing")
         template_fixed_remaining = None
+        template_in_flight = 0.0
         if template_offer_mode in ("one_time", "fixed_total"):
             tracking_states = script_state.setdefault("template_tracking", {})
             template_tracking = tracking_states.setdefault(
@@ -804,7 +805,6 @@ def process_offers(args, config, script_state) -> None:
             sold_by_offer = template_tracking.setdefault("sold_by_offer", {})
             sold_by_offer_snapshot = dict(sold_by_offer)
             template_exhausted = False
-            template_in_flight = 0.0
             for prev_offer in prev_template_offers:
                 prev_offer_id = prev_offer.get("offer_id")
                 if not prev_offer_id:
@@ -983,8 +983,14 @@ def process_offers(args, config, script_state) -> None:
             min_wallet_from_amount: float = max(
                 float(offer_template["min_coin_from_amt"]), fee_reserve
             )
+            spendable_balance: float = wallet_balance - template_in_flight
 
-            if wallet_balance - min_offer_amount <= min_wallet_from_amount:
+            offer_ceiling: float = max_offer_amount
+            if template_fixed_remaining is not None:
+                offer_ceiling = min(max_offer_amount, template_fixed_remaining)
+            min_viable_amount: float = min(min_offer_amount, offer_ceiling)
+
+            if spendable_balance - min_viable_amount <= min_wallet_from_amount:
                 print(
                     "Skipping template {}, wallet from balance below minimum".format(
                         offer_template["name"]
@@ -996,23 +1002,15 @@ def process_offers(args, config, script_state) -> None:
             print("Skipping template due to invalid amount values")
             continue
 
-        offer_amount: float = max_offer_amount
-        if wallet_balance - max_offer_amount <= min_wallet_from_amount:
-            available_balance: float = wallet_balance - min_wallet_from_amount
+        offer_amount: float = offer_ceiling
+        if spendable_balance - offer_ceiling <= min_wallet_from_amount:
+            available_balance: float = spendable_balance - min_wallet_from_amount
             try:
                 min_steps: int = int(available_balance / min_offer_amount)
-                if min_steps <= 0:
-                    min_steps = 1
                 offer_amount = min_offer_amount * min_steps
             except (TypeError, ValueError) as e:
                 print(f"Error calculating steps: {e}. Using max available amount.")
-                offer_amount = min(max_offer_amount, available_balance)
-
-        if (
-            template_fixed_remaining is not None
-            and offer_amount > template_fixed_remaining
-        ):
-            offer_amount = template_fixed_remaining
+                offer_amount = min(offer_ceiling, available_balance)
 
         delay_next_offer_before = script_state.get("delay_next_offer_before", 0)
         if delay_next_offer_before > int(time.time()):
