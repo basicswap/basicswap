@@ -93,12 +93,25 @@ coins_map = {}
 read_json_api = None
 read_json_api_wallet = None
 _wallet_info_cache = {}
+_fee_reserve_cache = {}
 
 
 def get_wallet_info(coin_ticker):
     if coin_ticker not in _wallet_info_cache:
         _wallet_info_cache[coin_ticker] = read_json_api_wallet(f"wallets/{coin_ticker}")
     return _wallet_info_cache[coin_ticker]
+
+
+def get_fee_reserve(coin_from_id, coin_to_id, multiplier):
+    key = (coin_from_id, coin_to_id)
+    if key not in _fee_reserve_cache:
+        est = read_json_api(
+            "offerfeeestimate",
+            {"coin_from": coin_from_id, "coin_to": coin_to_id},
+        )
+        fee = est.get("fee") if isinstance(est, dict) else None
+        _fee_reserve_cache[key] = None if fee is None else float(fee) * multiplier
+    return _fee_reserve_cache[key]
 
 
 DEFAULT_CONFIG_FILE: str = "createoffers.json"
@@ -464,6 +477,7 @@ def readConfig(args, known_coins):
         config["main_loop_delay"] = 1000
         num_changes += 1
     config["prune_state_delay"] = config.get("prune_state_delay", 120)
+    config["fee_reserve_mult"] = config.get("fee_reserve_mult", 4)
 
     # Add market-based rate adjustment option (default: false)
     # When enabled, the script will analyze existing offers on the orderbook
@@ -956,7 +970,19 @@ def process_offers(args, config, script_state) -> None:
             min_offer_amount: float = float(
                 offer_template.get("amount_step", max_offer_amount)
             )
-            min_wallet_from_amount: float = float(offer_template["min_coin_from_amt"])
+            fee_reserve = get_fee_reserve(
+                coin_from_data["id"], coin_to_data["id"], config["fee_reserve_mult"]
+            )
+            if fee_reserve is None:
+                print(
+                    "Error: fee estimate unavailable for {}, skipping template".format(
+                        offer_template["name"]
+                    )
+                )
+                continue
+            min_wallet_from_amount: float = max(
+                float(offer_template["min_coin_from_amt"]), fee_reserve
+            )
 
             if wallet_balance - min_offer_amount <= min_wallet_from_amount:
                 print(
@@ -2168,6 +2194,7 @@ def main():
     try:
         while not delay_event.is_set():
             _wallet_info_cache.clear()
+            _fee_reserve_cache.clear()
 
             # Read config each iteration so it can be modified without restarting
             config = readConfig(args, known_coins)
