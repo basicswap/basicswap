@@ -11206,7 +11206,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
                UNION
                SELECT bid_id, amount, state FROM bids
-               JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND (actions.action_type = :action_type_acc_bid OR actions.action_type = :action_type_acc_adp_bid)
+               JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND actions.action_type IN (:action_type_acc_bid, :action_type_acc_adp_bid, :action_type_acc_rev_bid)
                WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
             """,
             {
@@ -11214,6 +11214,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "offer_id": offer.offer_id,
                 "action_type_acc_bid": int(ActionTypes.ACCEPT_BID),
                 "action_type_acc_adp_bid": int(ActionTypes.ACCEPT_XMR_BID),
+                "action_type_acc_rev_bid": int(ActionTypes.ACCEPT_AS_REV_BID),
             },
         )
         for row in q:
@@ -13773,6 +13774,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     delay, ActionTypes.ACCEPT_AS_REV_BID, bid.bid_id, cursor
                 )
                 bid.setState(BidStates.SWAP_DELAYING)
+                self.saveBidInSession(bid.bid_id, bid, cursor)
         finally:
             self.closeDB(cursor)
 
