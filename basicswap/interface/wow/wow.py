@@ -32,7 +32,7 @@ class WOWInterface(XMRInterface):
         return 4
 
     # below only needed until wow is rebased to monero v0.18.4.0+
-    def openWallet(self, filename):
+    def _openWallet(self, filename):
         params = {"filename": filename}
         if self._wallet_password is not None:
             params["password"] = self._wallet_password
