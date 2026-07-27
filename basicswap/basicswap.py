@@ -4587,22 +4587,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(f"checkStandingOfferWalletFloors query failed: {e}")
             return
 
-        for offer_id, coin_from, min_reserve in to_check:
+        balances = {}
+        for coin_from in dict.fromkeys(row[1] for row in to_check):
             try:
-                ci = self.ci(Coins(coin_from))
-                balance: int = ci.getSpendableBalance()
-                if balance <= min_reserve:
-                    self.log.info(
-                        "Revoking standing offer {}, wallet balance {} <= floor {}".format(
-                            self.log.id(offer_id),
-                            ci.format_amount(balance),
-                            ci.format_amount(min_reserve),
-                        )
-                    )
-                    self.revokeOffer(offer_id)
+                balances[coin_from] = self.ci(Coins(coin_from)).getSpendableBalance()
             except Exception as e:
                 self.log.debug(
-                    f"Standing offer floor check failed for {self.log.id(offer_id)}: {e}"
+                    f"Standing offer floor check failed for {Coins(coin_from).name}: {e}"
+                )
+
+        for offer_id, coin_from, min_reserve in to_check:
+            if coin_from not in balances:
+                continue
+            balance: int = balances[coin_from]
+            if balance > min_reserve:
+                continue
+            try:
+                ci = self.ci(Coins(coin_from))
+                self.log.info(
+                    "Revoking standing offer {}, wallet balance {} <= floor {}".format(
+                        self.log.id(offer_id),
+                        ci.format_amount(balance),
+                        ci.format_amount(min_reserve),
+                    )
+                )
+                self.revokeOffer(offer_id)
+            except Exception as e:
+                self.log.debug(
+                    f"Standing offer revoke failed for {self.log.id(offer_id)}: {e}"
                 )
 
     def getOfferTrackingSummary(self, offer, cursor=None) -> dict:
