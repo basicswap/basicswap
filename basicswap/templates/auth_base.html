@@ -89,6 +89,19 @@
         </div>
       </div>
 
+      <div id="auth-error" class="hidden mb-4 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert">
+        <div class="flex items-start">
+          <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p id="auth-error-text" class="text-sm font-medium text-red-800 dark:text-red-400"></p>
+          </div>
+        </div>
+      </div>
+
       <form method="post"{% block form_attrs %}{% endblock %} autocomplete="off" id="auth-form">
         <div class="mb-6">
           <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -200,6 +213,9 @@
       const statusDot = document.getElementById('server-status-dot');
       const statusText = document.getElementById('server-status-text');
       const offlineAlert = document.getElementById('offline-alert');
+      const authError = document.getElementById('auth-error');
+      const authErrorText = document.getElementById('auth-error-text');
+      const authTextDefault = authText ? authText.textContent : '';
       let isSubmitting = false;
       let isOnline = true;
 
@@ -272,23 +288,65 @@
         }
       });
 
+      function setSubmitting(active) {
+        isSubmitting = active;
+        if (!authBtn) return;
+        authBtn.disabled = active;
+        if (authSpinner) {
+          authSpinner.classList.toggle('hidden', !active);
+        }
+        if (authText) {
+          authText.textContent = active
+            ? (authBtn.dataset.loadingText || authTextDefault)
+            : authTextDefault;
+        }
+      }
+
+      function showAuthError(message) {
+        if (authErrorText) {
+          authErrorText.textContent = message;
+        }
+        if (authError) {
+          authError.classList.remove('hidden');
+        }
+        if (passwordInput) {
+          passwordInput.value = '';
+          passwordInput.focus();
+        }
+      }
+
       if (authForm) {
-        authForm.addEventListener('submit', function(e) {
+        authForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
           if (!isOnline) {
-            e.preventDefault();
             flashOffline();
             return;
           }
-          isSubmitting = true;
-          if (authBtn && authText && authSpinner) {
-            authBtn.disabled = true;
-            authText.textContent = authBtn.dataset.loadingText || authText.textContent;
-            authSpinner.classList.remove('hidden');
+          if (authError) {
+            authError.classList.add('hidden');
+          }
+          setSubmitting(true);
+          try {
+            const resp = await fetch(authForm.action || window.location.pathname, {
+              method: 'POST',
+              body: new URLSearchParams(new FormData(authForm, e.submitter)),
+              redirect: 'follow',
+            });
+            if (resp.redirected) {
+              window.location.href = resp.url;
+              return;
+            }
+            setSubmitting(false);
+            showAuthError('Invalid password.');
+          } catch (err) {
+            setSubmitting(false);
+            applyServerStatus(false);
+            flashOffline();
           }
         });
       }
 
-      const errorMessages = document.querySelectorAll('[role="alert"]:not(#offline-alert)');
+      const errorMessages = document.querySelectorAll('[role="alert"]:not(#offline-alert):not(#auth-error)');
       if (errorMessages.length > 0 && passwordInput) {
         passwordInput.value = '';
         passwordInput.focus();
