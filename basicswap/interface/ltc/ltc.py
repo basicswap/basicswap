@@ -221,82 +221,6 @@ class LTCInterface(BTCInterface):
         finally:
             self.rpc_wallet("lockunspent", [True, lock_utxos])
 
-    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
-        if password == "":
-            return
-        self._log.info("unlockWallet - {}".format(self.ticker()))
-
-        if self.useBackend():
-            return
-
-        wallets = self.rpc("listwallets")
-        if self._rpc_wallet not in wallets:
-            try:
-                self.rpc("loadwallet", [self._rpc_wallet])
-            except Exception as e:
-                if "does not exist" in str(e) or "Path does not exist" in str(e):
-                    try:
-                        wallet_dirs = self.rpc("listwalletdir")
-                        existing = [w["name"] for w in wallet_dirs.get("wallets", [])]
-                    except Exception:
-                        existing = []
-                    if len(existing) == 0:
-                        self._log.info(
-                            f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
-                        )
-                        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-                        self.rpc(
-                            "createwallet",
-                            [
-                                self._rpc_wallet,
-                                False,
-                                True,
-                                password,
-                                False,
-                                self._use_descriptors,
-                            ],
-                        )
-                else:
-                    raise
-
-        try:
-            seed_id = self.getWalletSeedID()
-            needs_seed_init = seed_id == "Not found"
-        except Exception as e:
-            self._log.debug(f"getWalletSeedID failed: {e}")
-            needs_seed_init = True
-        if needs_seed_init:
-            self._log.info(f"Initializing HD seed for {self.coin_name()}.")
-            self._sc.initialiseWallet(self.coin_type())
-            if password:
-                self._log.info(f"Encrypting {self.coin_name()} wallet.")
-                try:
-                    self.rpc_wallet("encryptwallet", [password], timeout=120)
-                except Exception as e:
-                    self._log.debug(f"encryptwallet returned: {e}")
-                import time
-
-                for i in range(10):
-                    time.sleep(1)
-                    try:
-                        self.rpc("listwallets")
-                        break
-                    except Exception:
-                        self._log.debug(
-                            f"Waiting for wallet after encryption... {i + 1}/10"
-                        )
-                wallets = self.rpc("listwallets")
-                if self._rpc_wallet not in wallets:
-                    self.rpc("loadwallet", [self._rpc_wallet])
-            self.setWalletSeedWarning(False)
-            check_seed = False
-
-        if self.isWalletEncrypted():
-            self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
-
-        if check_seed:
-            self._sc.checkWalletSeed(self.coin_type())
-
 
 class LTCInterfaceMWEB(LTCInterface):
 
@@ -375,7 +299,7 @@ class LTCInterfaceMWEB(LTCInterface):
             # Max timeout value, ~3 years
             self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
 
-        if self.getWalletSeedID() == "Not found":
+        if self.getWalletSeedIDRetry() == "Not found":
             self._sc.initialiseWallet(self.interface_type())
 
             # Workaround to trigger mweb_spk_man->LoadMWEBKeychain()
@@ -397,13 +321,7 @@ class LTCInterfaceMWEB(LTCInterface):
             self.init_wallet(password)
         else:
             self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
-            try:
-                seed_id = self.getWalletSeedID()
-                needs_seed_init = seed_id == "Not found"
-            except Exception as e:
-                self._log.debug(f"getWalletSeedID failed: {e}")
-                needs_seed_init = True
-            if needs_seed_init:
+            if self.getWalletSeedIDRetry() == "Not found":
                 self._log.info(f"Initializing HD seed for {self.coin_name()}.")
                 self._sc.initialiseWallet(self.interface_type())
 
