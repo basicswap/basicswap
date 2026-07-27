@@ -8617,7 +8617,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
-                if was_sent and bid.xmr_b_lock_tx:
+                if bid.xmr_b_lock_tx is None:
+                    # Nothing was locked on chain B, there is nothing to recover.
+                    rv = True  # Remove from swaps_in_progress
+                elif was_sent:
                     if (
                         self.countQueuedActions(
                             cursor, bid_id, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B
