@@ -1,4 +1,49 @@
 
+0.17.6
+==============
+
+**Security / hardening**
+- Offer revokes: refuse to broadcast revokes for missing, expired, or inactive offers.
+- Offer revokes: drop incoming revokes for provably expired offer ids (timestamp embedded
+  in the offer id; max 48 h TTL) before any database access or logging.
+- Offer revokes: verify revoke signatures against the sender address before storing
+  revokes for unknown offers, so junk revokes cannot evict pending entries.
+- Auth: session heartbeat to prevent static timeout on idle tabs.
+- Auth: login redirects back to the previous page via cookie after re-authentication.
+- AMM: GUI uses auth token instead of storing plaintext password.
+
+**Fixes**
+- Offer revokes: deduplicate repeat revokes and reduce log spam; expand pending-revoke
+  cache (48 → 1000).
+- Offers: fix standing offers with a non-zero reserve floor stalling indefinitely.
+- Offers: check wallet floor once per coin instead of per offer.
+- Adaptor-sig swaps: don't attempt to refund the coin-B side when the lock tx doesn't exist.
+- Automation: respect `max_concurrent_bids` on accepted reverse-ads offers.
+- Litecoin: use BTC's `unlockWallet` for plain LTC; shared seed unlock for MWEB to avoid drift.
+- Monero: treat "not enough money" as transient (retry instead of fail).
+- Wownero: use XMR's `openWallet` optimization.
+- Startup: fix UI unlocking with partial wallet unlock.
+- Electrum wallets: skip deposit address regeneration when wallet ownership cannot be verified.
+- Auth: don't send login attempts to an offline server; show server status on lock screens.
+- Auth: live reload auth config on bad login attempt.
+- AMM: track templates by id instead of name; auto-migrate missing ids.
+- AMM: hide inactive offer pill when an active offer exists for the same template.
+- AMM: fix `createoffers.py` standalone usage when imported from the basicswap package.
+
+**GUI**
+- Wallet: show Electrum transaction history.
+- Wallet: page-scoped tx history loading (don't fetch all coins at once).
+- Wallet: filter tx history by swap / MWEB / blind / anon / spark type.
+- Auth: shared login/unlock template (`auth_base.html`).
+- Settings: client auth configuration UI.
+- AMM: remove clientauth setting from AMM GUI (moved to main settings).
+
+**Tests**
+- Added `test_revoke_offer.py` (revoke send/receive, expired guard, signature validation, dedup).
+- Added `test_createoffers_state.py` (AMM id tracking state).
+- Extended `test_amm_config_api.py`.
+
+
 0.17.5
 ==============
 
