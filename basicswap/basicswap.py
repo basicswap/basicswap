@@ -487,9 +487,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._last_checked_delayed_auto_accept = 0
         self._last_checked_pending_sweeps = 0
         self._pending_sweeps = {}
-        self._possibly_revoked_offers = collections.deque(
-            [], maxlen=48
-        )  # TODO: improve
+        self._possibly_revoked_offers = collections.deque([], maxlen=1000)
         self._expired_offer_revokes = collections.deque([], maxlen=1000)
         self._expiring_bids = []  # List of bids expiring soon
         self._expiring_offers = []  # List of offers expiring soon
@@ -11178,12 +11176,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             offer = self.getOffer(msg_data.offer_msg_id, cursor=cursor)
             if offer is None:
-                self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature)
-
                 # Offer may not have been received yet, or involved an inactive coin on this node.
-                self.log.debug(
-                    f"Offer not found to revoke: {self.log.id(msg_data.offer_msg_id)}."
-                )
+                if self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature):
+                    self.log.debug(
+                        f"Offer not found to revoke: {self.log.id(msg_data.offer_msg_id)}."
+                    )
                 return
 
             if offer.expire_at <= now:
@@ -16216,10 +16213,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return False
 
     def storeOfferRevoke(self, offer_id: bytes, sig) -> bool:
-        self.log.debug(f"Storing revoke request for offer: {self.log.id(offer_id)}.")
         for pair in self._possibly_revoked_offers:
             if offer_id == pair[0]:
                 return False
+        self.log.debug(f"Storing revoke request for offer: {self.log.id(offer_id)}.")
         self._possibly_revoked_offers.appendleft((offer_id, sig))
         return True
 
