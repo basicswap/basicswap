@@ -11198,7 +11198,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     passed = False
                 if passed is not True:
                     self.log.debug(
-                        f"Ignoring revoke with invalid signature for offer: {self.log.id(msg_data.offer_msg_id)}."
+                        f"Ignoring revoke with invalid signature from {self.log.addr(msg['from'])} "
+                        f"for offer: {self.log.id(msg_data.offer_msg_id)}."
                     )
                     return
                 if self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature):
