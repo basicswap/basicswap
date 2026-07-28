@@ -4488,6 +4488,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         cursor = self.openDB()
         try:
             offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
+            ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
+            ensure(offer.expire_at > self.getTime(), "Offer has expired")
 
             if (
                 offer.security_token is not None
