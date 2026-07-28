@@ -490,6 +490,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._possibly_revoked_offers = collections.deque(
             [], maxlen=48
         )  # TODO: improve
+        self._expired_offer_revokes = collections.deque([], maxlen=1000)
         self._expiring_bids = []  # List of bids expiring soon
         self._expiring_offers = []  # List of offers expiring soon
         self._updating_wallets_info = {}
@@ -11163,6 +11164,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         now: int = self.getTime()
         revoked: bool = False
+
+        if msg_data.offer_msg_id in self._expired_offer_revokes:
+            return
+
         try:
             cursor = self.openDB()
 
@@ -11182,6 +11187,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return
 
             if offer.expire_at <= now:
+                self._expired_offer_revokes.append(msg_data.offer_msg_id)
                 self.log.debug(
                     f"Offer is already expired, no need to revoke: {self.log.id(msg_data.offer_msg_id)}."
                 )
