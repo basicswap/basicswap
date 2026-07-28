@@ -4489,6 +4489,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             offer = self.queryOne(Offer, cursor, {"offer_id": offer_id})
             ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
             ensure(offer.expire_at > self.getTime(), "Offer has expired")
+            ensure(offer.active_ind == 1, "Offer not active")
 
             if (
                 offer.security_token is not None
@@ -11163,20 +11164,43 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         now: int = self.getTime()
         revoked: bool = False
 
+        if len(msg_data.offer_msg_id) != 28:
+            raise ValueError("Invalid msg_id length")
+        if len(msg_data.signature) != 65:
+            raise ValueError("Invalid signature length")
+
+        # Offer ids are smsg ids, prefixed with the 8 byte BE timestamp the offer was sent at.
+        # Offers are valid for at most 48 hours (validateOfferValidTime), so a revoke for an
+        # older offer id is provably meaningless and can be dropped without further processing.
+        offer_sent_at: int = int.from_bytes(msg_data.offer_msg_id[:8], byteorder="big")
+        if offer_sent_at + 48 * 60 * 60 + 10 * 60 <= now:
+            return
+
         if msg_data.offer_msg_id in self._expired_offer_revokes:
             return
 
         try:
             cursor = self.openDB()
 
-            if len(msg_data.offer_msg_id) != 28:
-                raise ValueError("Invalid msg_id length")
-            if len(msg_data.signature) != 65:
-                raise ValueError("Invalid signature length")
-
             offer = self.getOffer(msg_data.offer_msg_id, cursor=cursor)
             if offer is None:
                 # Offer may not have been received yet, or involved an inactive coin on this node.
+                # Legitimate revokes are sent from the offer's addr_from, verify the signature
+                # before storing so junk revokes can't evict pending entries.
+                signature_enc = base64.b64encode(msg_data.signature).decode("UTF-8")
+                try:
+                    passed = self.ci(Coins.PART).verifyMessage(
+                        msg["from"],
+                        msg_data.offer_msg_id.hex() + "_revoke",
+                        signature_enc,
+                    )
+                except Exception:
+                    passed = False
+                if passed is not True:
+                    self.log.debug(
+                        f"Ignoring revoke with invalid signature for offer: {self.log.id(msg_data.offer_msg_id)}."
+                    )
+                    return
                 if self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature):
                     self.log.debug(
                         f"Offer not found to revoke: {self.log.id(msg_data.offer_msg_id)}."
