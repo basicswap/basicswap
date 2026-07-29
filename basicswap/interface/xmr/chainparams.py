@@ -26,8 +26,8 @@ params = {
         "walletrpcport": 28082,
         "min_amount": 1000000000,
         "max_amount": 10000000 * XMR_COIN,
-        "address_prefix": 18,
-        "subaddress_prefix": 42,
+        "address_prefix": 53,
+        "subaddress_prefix": 63,
     },
     "regtest": {
         "rpcport": 18081,
