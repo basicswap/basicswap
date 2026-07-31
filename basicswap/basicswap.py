@@ -5710,6 +5710,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         offer = self.getOffer(offer_id)
         ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
         ensure(offer.expire_at > self.getTime(), "Offer has expired")
+        ensure(offer.active_ind == 1, "Offer not active")
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
@@ -6535,6 +6536,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "Incompatible offer protocol version",
             )
             ensure(offer.expire_at > self.getTime(), "Offer has expired")
+            ensure(offer.active_ind == 1, "Offer not active")
             if offer.swap_type != SwapTypes.XMR_SWAP:
                 raise ValueError(f"TODO: Unknown swap type {offer.swap_type.name}")
 
@@ -11527,6 +11529,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer.state == OfferStates.OFFER_RECEIVED, "Bad offer state")
         ensure(msg["to"] == offer.addr_from, "Received on incorrect address")
         ensure(now <= offer.expire_at, "Offer expired")
+        if offer.active_ind != 1:
+            raise RevokedOffer(
+                f"Bid {msg['msgid']} received for inactive offer {offer_id.hex()}."
+            )
         self.validateBidValidTime(
             offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid
         )
@@ -11972,6 +11978,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             raise ValueError("Bad offer state")
         ensure(msg["to"] == offer.addr_from, "Received on incorrect address")
         ensure(now <= offer.expire_at, "Offer expired")
+        if offer.active_ind != 1:
+            raise RevokedOffer(
+                f"Bid {msg['msgid']} received for inactive offer {offer_id.hex()}."
+            )
         self.validateBidValidTime(
             offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid
         )
@@ -13736,6 +13746,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             raise ValueError("Bad offer state")
         ensure(msg["to"] == offer.addr_from, "Received on incorrect address")
         ensure(now <= offer.expire_at, "Offer expired")
+        if offer.active_ind != 1:
+            raise RevokedOffer(
+                f"Bid {msg['msgid']} received for inactive offer {offer_id.hex()}."
+            )
         self.validateBidValidTime(
             offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid
         )
