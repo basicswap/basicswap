@@ -1,4 +1,26 @@
 
+0.17.8
+==============
+
+**Security / hardening**
+- BCH swaps: bind the covenant's signature-check public key to the pubkeys agreed during
+  the bid.
+- BCH swaps: verify the exact covenant fee.  The covenant requires the spent value minus
+  the output value to equal the script's mining fee exactly, but the redeem and
+  refund-spend transactions were built from a fee *rate*.  With any non-default fee rate
+  both exit paths were unbroadcastable once the lock transaction was on chain.
+- BCH swaps: bind the covenant mining fee to the fee rate agreed in the offer.
+
+**Fixes**
+- BCH: fix the fee rate at 1000 sat/kB, so the covenant's absolute fee is stable across
+  nodes rather than depending on the local fee estimate.
+
+**Refactors**
+- Range-check decoded transaction output values in the lock, refund and spend verifiers
+  for Bitcoin-derived coins, Bitcoin Cash and Decred.
+- Documented the absolute-fee convention on the BCH interface.
+
+
 0.17.7
 ==============
 
