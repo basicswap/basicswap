@@ -572,11 +572,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         prevout_script: bytes,
         prevout_value: int,
     ) -> bool:
+        if isinstance(sig, bytes) is False or len(sig) < 1:
+            return False
+        sig_hash_type = sig[-1]
+        if sig_hash_type != SigHashType.SigHashAll:
+            return False
+
         tx = self.loadTx(tx_bytes)
 
-        sig_hash = DCRSignatureHash(prevout_script, SigHashType.SigHashAll, tx, input_n)
+        sig_hash = DCRSignatureHash(prevout_script, sig_hash_type, tx, input_n)
         pubkey = PublicKey(K)
-        return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
+        return pubkey.verify(sig[:-1], sig_hash, hasher=None)
 
     def getTxid(self, tx) -> bytes:
         if isinstance(tx, str):
@@ -1203,8 +1209,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return self.fundTx(tx_bytes, feerate)
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> bytes:
-        assert len(Kal) == 33
-        assert len(Kaf) == 33
+        ensure(len(Kal) == 33, "invalid Kal length")
+        ensure(len(Kaf) == 33, "invalid Kaf length")
 
         script = bytearray()
         script += bytes((OP_IF,))

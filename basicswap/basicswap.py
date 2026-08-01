@@ -13025,6 +13025,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.al_lock_spend_tx_sig,
                     xmr_swap.pkasf,
                 )
+                ensure(
+                    ci_to.getPubkey(kbsf) == xmr_swap.pkbsf,
+                    "Keyshare recovered from lock spend tx does not match expected pubkey",
+                )
             assert kbsf is not None
 
             for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
@@ -13150,6 +13154,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.af_lock_refund_spend_tx_esig,
             af_lock_refund_spend_tx_sig,
             xmr_swap.pkasl,
+        )
+        ensure(
+            ci_to.getPubkey(kbsl) == xmr_swap.pkbsl,
+            "Keyshare recovered from lock refund spend tx does not match expected pubkey",
         )
         assert kbsl is not None
 

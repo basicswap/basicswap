@@ -1396,8 +1396,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return funded_tx
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> CScript:
-        assert len(Kal) == 33
-        assert len(Kaf) == 33
+        ensure(len(Kal) == 33, "invalid Kal length")
+        ensure(len(Kaf) == 33, "invalid Kaf length")
 
         # fmt: off
         return CScript([
@@ -2068,13 +2068,21 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         prevout_script: bytes,
         prevout_value: int,
     ) -> bool:
+        # A sig labelled with any other hashtype verifies against the SIGHASH_ALL
+        # digest here but fails on the node, which digests by the declared type.
+        if isinstance(sig, bytes) is False or len(sig) < 1:
+            return False
+        sig_hash_type = sig[-1]
+        if sig_hash_type != SIGHASH_ALL:
+            return False
+
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitV0SignatureHash(
-            prevout_script, tx, input_n, SIGHASH_ALL, prevout_value
+            prevout_script, tx, input_n, sig_hash_type, prevout_value
         )
 
         pubkey = PublicKey(K)
-        return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
+        return pubkey.verify(sig[:-1], sig_hash, hasher=None)
 
     def fundTx(
         self,

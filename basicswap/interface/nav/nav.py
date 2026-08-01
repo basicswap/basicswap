@@ -456,13 +456,19 @@ class NAVInterface(BTCInterface):
         prevout_script: bytes,
         prevout_value: int,
     ) -> bool:
+        if isinstance(sig, bytes) is False or len(sig) < 1:
+            return False
+        sig_hash_type = sig[-1]
+        if sig_hash_type != SIGHASH_ALL:
+            return False
+
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitVersion1SignatureHash(
-            prevout_script, tx, input_n, SIGHASH_ALL, prevout_value
+            prevout_script, tx, input_n, sig_hash_type, prevout_value
         )
 
         pubkey = PublicKey(K)
-        return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
+        return pubkey.verify(sig[:-1], sig_hash, hasher=None)
 
     def verifyRawTransaction(self, tx_hex: str, prevouts):
         # Only checks signature
