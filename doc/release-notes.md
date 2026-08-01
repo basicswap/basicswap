@@ -1,4 +1,34 @@
 
+0.17.7
+==============
+
+**Security / hardening**
+- Adaptor-sig swaps: verify the hashtype byte on signatures received from a peer.
+  A counterparty could relabel an otherwise valid signature so that it passed local
+  verification but was rejected by the node, leaving the coin A lock unspendable.
+  Affects the script-coin side of adaptor-sig swaps for Bitcoin-derived
+  coins; Bitcoin Cash is not affected.
+
+**Fixes**
+- Adaptor-sig swaps: automatically repair a coin A lock refund tx whose signatures carry a
+  mislabelled hashtype, so swaps affected by the above can refund without manual recovery.
+- AMM: reserve estimated transaction fees when sizing offers. New `fee_reserve_mult`
+  option (default 4); templates are skipped while a fee estimate is unavailable.
+- AMM: account for in-flight amounts when reposting `fixed_total` and `one_time`
+  templates, so a repost is not sized above what the wallet can still fund.
+- AMM: fetch wallet balances once per coin per loop instead of once per template.
+- Bids: reject bids made on, and bids received for, revoked or otherwise inactive offers.
+
+**Refactors**
+- Replaced `assert` with `ensure` throughout.
+- Adaptor-sig swaps: check the keyshare recovered from a counterparty's on-chain witness
+  against the pubkey agreed during the bid, so a bad recovery is reported by cause
+  instead of surfacing later as an unexplained chain B spend failure.
+
+**Other**
+- Build: bump `actions/setup-python` from 6 to 7.
+
+
 0.17.6
 ==============
 
