@@ -93,6 +93,27 @@ shutdown_in_progress = False
 coins_map = {}
 read_json_api = None
 read_json_api_wallet = None
+_wallet_info_cache = {}
+_fee_reserve_cache = {}
+
+
+def get_wallet_info(coin_ticker):
+    if coin_ticker not in _wallet_info_cache:
+        _wallet_info_cache[coin_ticker] = read_json_api_wallet(f"wallets/{coin_ticker}")
+    return _wallet_info_cache[coin_ticker]
+
+
+def get_fee_reserve(coin_from_id, coin_to_id, multiplier):
+    key = (coin_from_id, coin_to_id)
+    if key not in _fee_reserve_cache:
+        est = read_json_api(
+            "offerfeeestimate",
+            {"coin_from": coin_from_id, "coin_to": coin_to_id},
+        )
+        fee = est.get("fee") if isinstance(est, dict) else None
+        _fee_reserve_cache[key] = None if fee is None else float(fee) * multiplier
+    return _fee_reserve_cache[key]
+
 
 DEFAULT_CONFIG_FILE: str = "createoffers.json"
 DEFAULT_STATE_FILE: str = "createoffers_state.json"
@@ -477,6 +498,7 @@ def readConfig(args, known_coins):
         config["main_loop_delay"] = 1000
         num_changes += 1
     config["prune_state_delay"] = config.get("prune_state_delay", 120)
+    config["fee_reserve_mult"] = config.get("fee_reserve_mult", 4)
 
     # Add market-based rate adjustment option (default: false)
     # When enabled, the script will analyze existing offers on the orderbook
@@ -751,7 +773,7 @@ def process_offers(args, config, script_state) -> None:
         coin_from_data_name = offer_template["coin_from"]
 
         try:
-            wallet_from = read_json_api_wallet(f"wallets/{coin_ticker}")
+            wallet_from = get_wallet_info(coin_ticker)
             if coin_ticker == "PART":
                 if "variant" in coin_from_data:
                     coin_variant = coin_from_data["variant"]
@@ -787,6 +809,7 @@ def process_offers(args, config, script_state) -> None:
 
         template_offer_mode = offer_template.get("offer_mode", "standing")
         template_fixed_remaining = None
+        template_in_flight = 0.0
         if template_offer_mode in ("one_time", "fixed_total"):
             tracking_states = script_state.setdefault("template_tracking", {})
             template_tracking = tracking_states.setdefault(
@@ -803,7 +826,6 @@ def process_offers(args, config, script_state) -> None:
             sold_by_offer = template_tracking.setdefault("sold_by_offer", {})
             sold_by_offer_snapshot = dict(sold_by_offer)
             template_exhausted = False
-            template_in_flight = 0.0
             for prev_offer in prev_template_offers:
                 prev_offer_id = prev_offer.get("offer_id")
                 if not prev_offer_id:
@@ -969,9 +991,27 @@ def process_offers(args, config, script_state) -> None:
             min_offer_amount: float = float(
                 offer_template.get("amount_step", max_offer_amount)
             )
-            min_wallet_from_amount: float = float(offer_template["min_coin_from_amt"])
+            fee_reserve = get_fee_reserve(
+                coin_from_data["id"], coin_to_data["id"], config["fee_reserve_mult"]
+            )
+            if fee_reserve is None:
+                print(
+                    "Error: fee estimate unavailable for {}, skipping template".format(
+                        offer_template["name"]
+                    )
+                )
+                continue
+            min_wallet_from_amount: float = max(
+                float(offer_template["min_coin_from_amt"]), fee_reserve
+            )
+            spendable_balance: float = wallet_balance - template_in_flight
 
-            if wallet_balance - min_offer_amount <= min_wallet_from_amount:
+            offer_ceiling: float = max_offer_amount
+            if template_fixed_remaining is not None:
+                offer_ceiling = min(max_offer_amount, template_fixed_remaining)
+            min_viable_amount: float = min(min_offer_amount, offer_ceiling)
+
+            if spendable_balance - min_viable_amount <= min_wallet_from_amount:
                 print(
                     "Skipping template {}, wallet from balance below minimum".format(
                         offer_template["name"]
@@ -983,23 +1023,15 @@ def process_offers(args, config, script_state) -> None:
             print("Skipping template due to invalid amount values")
             continue
 
-        offer_amount: float = max_offer_amount
-        if wallet_balance - max_offer_amount <= min_wallet_from_amount:
-            available_balance: float = wallet_balance - min_wallet_from_amount
+        offer_amount: float = offer_ceiling
+        if spendable_balance - offer_ceiling <= min_wallet_from_amount:
+            available_balance: float = spendable_balance - min_wallet_from_amount
             try:
                 min_steps: int = int(available_balance / min_offer_amount)
-                if min_steps <= 0:
-                    min_steps = 1
                 offer_amount = min_offer_amount * min_steps
             except (TypeError, ValueError) as e:
                 print(f"Error calculating steps: {e}. Using max available amount.")
-                offer_amount = min(max_offer_amount, available_balance)
-
-        if (
-            template_fixed_remaining is not None
-            and offer_amount > template_fixed_remaining
-        ):
-            offer_amount = template_fixed_remaining
+                offer_amount = min(offer_ceiling, available_balance)
 
         delay_next_offer_before = script_state.get("delay_next_offer_before", 0)
         if delay_next_offer_before > int(time.time()):
@@ -1647,9 +1679,7 @@ def process_bids(args, config, script_state) -> None:
                     # This follows the same pattern as offers: balance - min_amount
                     try:
                         # Get wallet balance for the coin we're bidding with (coin_from in the offer)
-                        wallet_from = read_json_api_wallet(
-                            "wallets/{}".format(coin_from_data["ticker"])
-                        )
+                        wallet_from = get_wallet_info(coin_from_data["ticker"])
 
                         wallet_balance = float(wallet_from["balance"]) + float(
                             wallet_from["unconfirmed"]
@@ -1819,9 +1849,7 @@ def process_bids(args, config, script_state) -> None:
             max_coin_from_balance = bid_template.get("max_coin_from_balance", -1)
             if max_coin_from_balance > 0:
                 try:
-                    wallet_from = read_json_api_wallet(
-                        "wallets/{}".format(coin_from_data["ticker"])
-                    )
+                    wallet_from = get_wallet_info(coin_from_data["ticker"])
                     total_balance_from = float(wallet_from.get("balance", 0)) + float(
                         wallet_from.get("unconfirmed", 0)
                     )
@@ -1856,9 +1884,7 @@ def process_bids(args, config, script_state) -> None:
             min_coin_to_balance = bid_template["min_coin_to_balance"]
             if min_coin_to_balance > 0:
                 try:
-                    wallet_to = read_json_api_wallet(
-                        "wallets/{}".format(coin_to_data["ticker"])
-                    )
+                    wallet_to = get_wallet_info(coin_to_data["ticker"])
 
                     total_balance_to = float(wallet_to.get("balance", 0)) + float(
                         wallet_to.get("unconfirmed", 0)
@@ -2226,6 +2252,9 @@ def main():
 
     try:
         while not delay_event.is_set():
+            _wallet_info_cache.clear()
+            _fee_reserve_cache.clear()
+
             # Read config each iteration so it can be modified without restarting
             config = readConfig(args, known_coins)
 
