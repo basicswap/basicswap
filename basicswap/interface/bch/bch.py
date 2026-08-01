@@ -57,6 +57,18 @@ from coincurve.ecdsaotves import (
 
 
 class BCHInterface(BTCInterface):
+    """
+    TODO: fix
+    Fee convention: on the swap covenant paths the feerate / tx_fee_rate arguments are an
+    ABSOLUTE satoshi fee, not the inherited sats/kB rate.  genScriptLockTxScript enforces
+    utxo_value - output_value == mining_fee exactly, and acceptXmrBid builds the script
+    with mining_fee set from that same value, so every tx spending a covenant output must
+    pay precisely that number regardless of its size.
+
+    The generic wallet paths keep sats/kB: createRawFundedTransaction passes it to
+    fundrawtransaction as options["feeRate"], getBLockSpendTxFee scales it by tx size.
+    """
+
     @staticmethod
     def coin_type():
         return Coins.BCH
@@ -227,6 +239,13 @@ class BCHInterface(BTCInterface):
     def withdrawCoin(self, value: float, addr_to: str, subfee: bool):
         params = [addr_to, value, "", "", subfee, 0, False]
         return self.rpc_wallet("sendtoaddress", params)
+
+    def get_fee_rate(self, conf_target: int = 2) -> (float, str):
+        # TODO: fix, the covenant needs an exact absolute fee, so the rate is pinned to
+        #       keep mining_fee inside the range extractScriptLockScriptValues accepts
+        #       and to keep both sides agreeing on it.  Remove once the covenant fee is
+        #       decoupled from the offer fee rate.
+        return 1000 / self.COIN(), "bch_fixed"
 
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         add_bytes = 107
@@ -498,7 +517,7 @@ class BCHInterface(BTCInterface):
         size = self.getTxSize(tx)
 
         fee_info["fee_paid"] = pay_fee
-        fee_info["rate_used"] = tx_fee_rate
+        fee_info["rate_used"] = pay_fee * 1000 // size
         fee_info["size"] = size
         # vsize is the same as size for BCH
         fee_info["vsize"] = size
@@ -562,6 +581,7 @@ class BCHInterface(BTCInterface):
 
         size = self.getTxSize(tx)
         vsize = size
+        rate_used: int = pay_fee * 1000 // size
 
         tx.rehash()
         self._log.info(
@@ -570,7 +590,7 @@ class BCHInterface(BTCInterface):
                 (
                     ""
                     if self._log.safe_logs
-                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                    else f":\n    fee_rate, vsize, fee: {rate_used}, {vsize}, {pay_fee}"
                 ),
             )
         )
@@ -640,6 +660,7 @@ class BCHInterface(BTCInterface):
         vsize = size
 
         pay_fee = mining_fee
+        rate_used: int = pay_fee * 1000 // size
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -649,7 +670,7 @@ class BCHInterface(BTCInterface):
                 (
                     ""
                     if self._log.safe_logs
-                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                    else f":\n    fee_rate, vsize, fee: {rate_used}, {vsize}, {pay_fee}"
                 ),
             )
         )
@@ -877,6 +898,7 @@ class BCHInterface(BTCInterface):
             self.extractScriptLockScriptValues(script_out)
         )
         ensure(mining_fee == _mining_fee, "mining mismatch fee")
+        ensure(_mining_fee == feerate, "mining mismatch fee")
         ensure(out_1 == _out_1, "out_1 mismatch")
         ensure(out_2 == _out_2, "out_2 mismatch")
         ensure(public_key == _public_key, "public_key mismatch")
@@ -943,14 +965,20 @@ class BCHInterface(BTCInterface):
             self.extractScriptLockScriptValues(script_out)
         )
         ensure(mining_fee == _mining_fee, "mining mismatch fee")
+        ensure(_mining_fee == feerate, "mining mismatch fee")
         ensure(out_1 == _out_1, "out_1 mismatch")
         ensure(out_2 == _out_2, "out_2 mismatch")
         ensure(public_key == _public_key, "public_key mismatch")
         ensure(timelock == _timelock, "timelock mismatch")
         ensure(_timelock == csv_val_expect, "timelock mismatch")
 
-        fee_paid = locked_coin - mining_fee
-        ensure(fee_paid > 0, "Non positive fee")
+        lock_mining_fee, _, _, _, _ = self.extractScriptLockScriptValues(prevout_script)
+        fee_paid = swap_value - locked_coin
+        ensure(
+            fee_paid == lock_mining_fee,
+            "Lock refund tx fee does not match covenant mining_fee",
+        )
+        ensure(locked_coin > 0, "Non positive output value")
 
         size = self.getTxSize(tx)
         vsize = size
@@ -1009,14 +1037,19 @@ class BCHInterface(BTCInterface):
             self.extractScriptLockScriptValues(prevout_script)
         )
         ensure(mining_fee == _mining_fee, "mining mismatch fee")
+        ensure(_mining_fee == feerate, "mining mismatch fee")
         ensure(out_1 == _out_1, "out_1 mismatch")
         ensure(out_2 == _out_2, "out_2 mismatch")
         ensure(public_key == _public_key, "public_key mismatch")
         ensure(timelock == _timelock, "timelock mismatch")
 
         tx_value = tx.vout[0].nValue
-        fee_paid = tx_value - mining_fee
-        ensure(fee_paid > 0, "Non positive fee")
+        fee_paid = prevout_value - tx_value
+        ensure(
+            fee_paid == mining_fee,
+            "Lock refund spend tx fee does not match covenant mining_fee",
+        )
+        ensure(tx_value > 0, "Non positive output value")
 
         size = self.getTxSize(tx)
         vsize = size
@@ -1060,9 +1093,15 @@ class BCHInterface(BTCInterface):
         p2pkh = self.getScriptForPubkeyHash(a_pkhash_f)
         ensure(tx.vout[0].scriptPubKey == p2pkh, "Bad output destination")
 
-        # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
+        mining_fee, _, _, _, _ = self.extractScriptLockScriptValues(lock_tx_script)
+        ensure(mining_fee == feerate, "mining mismatch fee")
+
         fee_paid = locked_coin - tx.vout[0].nValue
-        ensure(fee_paid > 0, "Non positive fee")
+        ensure(
+            fee_paid == mining_fee,
+            "Lock spend tx fee does not match covenant mining_fee",
+        )
+        ensure(tx.vout[0].nValue > 0, "Non positive output value")
 
         size = self.getTxSize(tx)
         vsize = size
@@ -1206,6 +1245,7 @@ class BCHInterface(BTCInterface):
         vsize = size
 
         pay_fee = size
+        rate_used: int = pay_fee * 1000 // size
 
         tx.rehash()
         self._log.info(
@@ -1214,7 +1254,7 @@ class BCHInterface(BTCInterface):
                 (
                     ""
                     if self._log.safe_logs
-                    else f":\n    fee_rate, vsize, fee: {1}, {vsize}, {pay_fee}"
+                    else f":\n    fee_rate, vsize, fee: {rate_used}, {vsize}, {pay_fee}"
                 ),
             )
         )
