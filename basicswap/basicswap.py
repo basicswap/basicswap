@@ -513,10 +513,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
         self._sc_lock_tx_timeout = self.get_int_setting(
-            "sc_lock_tx_timeout", 48 * 3600, 3600, 6 * 3600
+            "sc_lock_tx_timeout", 6 * 3600, 3600, 48 * 3600
         )  # Seconds
         self._sc_lock_tx_mempool_timeout = self.get_int_setting(
-            "sc_lock_tx_mempool_timeout", 48 * 3600, 3600, 12 * 3600
+            "sc_lock_tx_mempool_timeout", 12 * 3600, 3600, 48 * 3600
         )  # Seconds
 
         self._max_logfile_bytes = self.settings.get(
