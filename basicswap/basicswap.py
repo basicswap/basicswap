@@ -6976,7 +6976,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 pkh_dest = xmr_swap.dest_af
                 # refund script
-                refundExtraArgs["mining_fee"] = 1000
+                refundExtraArgs["mining_fee"] = a_fee_rate
                 refundExtraArgs["out_1"] = ci_from.getScriptForPubkeyHash(pkh_refund_to)
                 refundExtraArgs["out_2"] = ci_from.getScriptForPubkeyHash(pkh_dest)
                 refundExtraArgs["public_key"] = xmr_swap.pkaf
@@ -6988,7 +6988,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 refundExtraArgs["refund_lock_tx_script"] = refund_lock_tx_script
 
                 # lock script
-                lockExtraArgs["mining_fee"] = 1000
+                lockExtraArgs["mining_fee"] = a_fee_rate
                 lockExtraArgs["out_1"] = ci_from.getScriptForPubkeyHash(pkh_dest)
                 lockExtraArgs["out_2"] = ci_from.scriptToP2SH32LockingBytecode(
                     refund_lock_tx_script
@@ -12209,6 +12209,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     timelock == xmr_offer.lock_time_1,
                     "Invalid BCH lock tx script timelock",
                 )
+                ensure(
+                    public_key == xmr_swap.pkal,
+                    "Invalid BCH lock tx script public_key",
+                )
 
                 lockExtraArgs["mining_fee"] = mining_fee
                 lockExtraArgs["out_1"] = out_1
@@ -12228,6 +12232,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ensure(
                     timelock == xmr_offer.lock_time_2,
                     "Invalid BCH refund tx script timelock",
+                )
+                ensure(
+                    public_key == xmr_swap.pkaf,
+                    "Invalid BCH refund tx script public_key",
                 )
 
                 refundExtraArgs["mining_fee"] = mining_fee

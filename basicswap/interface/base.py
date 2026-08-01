@@ -92,6 +92,12 @@ class CoinInterface:
         amount_int = make_int(amount_in, self.exp(), r=r) if conv_int else amount_in
         return format_amount(amount_int, self.exp())
 
+    def max_money(self) -> int:
+        return 21000000 * self.COIN()
+
+    def money_range(self, sats: int) -> bool:
+        return sats >= 0 and sats <= self.max_money()
+
     def coin_name(self) -> str:
         coin_chainparams = chainparams[self.coin_type()]
         if "display_name" in coin_chainparams:
