@@ -6,6 +6,7 @@
 
 import os
 
+from basicswap.util import ensure
 from basicswap.interface.nav.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
@@ -138,7 +139,7 @@ class NAVPrepare(CoinPrepareModule):
         ctx.logger.warning("Double checking Navcoin release hash.")
         with open(assert_sig_path, "rb") as fp:
             decrypted = gpg.decrypt_file(fp)
-            assert release_hash in str(decrypted)
+            ensure(release_hash in str(decrypted), "release hash not found in sig")
 
     def prepareDataDir(
         self,
@@ -149,7 +150,7 @@ class NAVPrepare(CoinPrepareModule):
     ) -> None:
         core_settings = settings["chainclients"][self.name]
         wallet_name = core_settings.get("wallet_name", "wallet.dat")
-        assert len(wallet_name) > 0
+        ensure(len(wallet_name) > 0, "Wallet name is blank")
         data_dir = core_settings["datadir"]
         tor_control_password = extra_opts.get("tor_control_password", None)
 

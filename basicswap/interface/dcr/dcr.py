@@ -344,7 +344,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return b58encode(data + checksum[0:4])
 
     def sh_to_address(self, sh: bytes) -> str:
-        assert len(sh) == 20
+        ensure(len(sh) == 20, "Invalid script hash length")
         prefix = self.chainparams_network()["script_address"]
         data = prefix.to_bytes(2, "big") + sh
         checksum = blake256(blake256(data))
@@ -572,11 +572,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         prevout_script: bytes,
         prevout_value: int,
     ) -> bool:
+        if isinstance(sig, bytes) is False or len(sig) < 1:
+            return False
+        sig_hash_type = sig[-1]
+        if sig_hash_type != SigHashType.SigHashAll:
+            return False
+
         tx = self.loadTx(tx_bytes)
 
-        sig_hash = DCRSignatureHash(prevout_script, SigHashType.SigHashAll, tx, input_n)
+        sig_hash = DCRSignatureHash(prevout_script, sig_hash_type, tx, input_n)
         pubkey = PublicKey(K)
-        return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
+        return pubkey.verify(sig[:-1], sig_hash, hasher=None)
 
     def getTxid(self, tx) -> bytes:
         if isinstance(tx, str):
@@ -588,7 +594,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def getScriptDest(self, script: bytes) -> bytes:
         # P2SH
         script_hash = self.pkh(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
 
         return (
             bytes((OP_HASH160,))
@@ -603,7 +609,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
     def getPubkeyHashDest(self, pkh: bytes) -> bytes:
         # P2PKH
-        assert len(pkh) == 20
+        ensure(len(pkh) == 20, "Invalid pubkey hash length")
         return (
             bytes((OP_DUP,))
             + bytes((OP_HASH160,))
@@ -637,7 +643,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             # TODO: How to estimate required fee?
             try:
                 fee_rate: float = self.rpc_wallet("walletinfo")["txfee"]
-                assert fee_rate > 0.0, "Non positive feerate"
+                ensure(fee_rate > 0.0, "Non positive feerate")
                 return fee_rate, "paytxfee"
             except Exception:
                 fee_rate: float = self.rpc("getnetworkinfo")["relayfee"]
@@ -829,7 +835,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         message_hash = blake256(bytes(message, "utf-8"))
         pubkey = PublicKey(K)
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
-        assert rv is True
+        ensure(rv is True, "Failed to verify compact pubkey")
 
     def verifySigAndRecover(self, sig, message: str) -> bytes:
         message_hash = blake256(bytes(message, "utf-8"))
@@ -1203,8 +1209,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return self.fundTx(tx_bytes, feerate)
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> bytes:
-        assert len(Kal) == 33
-        assert len(Kaf) == 33
+        ensure(len(Kal) == 33, "invalid Kal length")
+        ensure(len(Kaf) == 33, "invalid Kaf length")
 
         script = bytearray()
         script += bytes((OP_IF,))
@@ -1428,7 +1434,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             for txo in tx.vout:
                 outputs_value += txo.value
             fee_paid = inputs_value - outputs_value
-            assert fee_paid > 0
+            ensure(fee_paid > 0, "Non positive fee")
 
             size = len(tx.serialize()) + add_witness_bytes
             size += 1
@@ -1489,7 +1495,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         fee_paid = locked_coin - tx.vout[0].value
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Non positive fee")
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(lock_tx_script)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
@@ -1562,7 +1568,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(C == Kaf, "Bad script pubkey")
 
         fee_paid = swap_value - locked_coin
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Non positive fee")
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(prevout_script)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
@@ -1622,7 +1628,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx_value = tx.vout[0].value
 
         fee_paid = prevout_value - tx_value
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Non positive fee")
 
         dummy_witness_stack = self.getScriptLockRefundSpendTxDummyWitness(
             prevout_script

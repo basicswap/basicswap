@@ -136,7 +136,7 @@ class NAVInterface(BTCInterface):
 
         script = CScript([OP_0, pkh])
         script_hash = hash160(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
 
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
@@ -148,7 +148,7 @@ class NAVInterface(BTCInterface):
         # P2SH-p2wpkh
         script = CScript([OP_0, pkh])
         script_hash = hash160(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
         return encodeAddress(
             bytes((self.chainparams_network()["script_address"],)) + script_hash
         )
@@ -456,13 +456,19 @@ class NAVInterface(BTCInterface):
         prevout_script: bytes,
         prevout_value: int,
     ) -> bool:
+        if isinstance(sig, bytes) is False or len(sig) < 1:
+            return False
+        sig_hash_type = sig[-1]
+        if sig_hash_type != SIGHASH_ALL:
+            return False
+
         tx = self.loadTx(tx_bytes)
         sig_hash = SegwitVersion1SignatureHash(
-            prevout_script, tx, input_n, SIGHASH_ALL, prevout_value
+            prevout_script, tx, input_n, sig_hash_type, prevout_value
         )
 
         pubkey = PublicKey(K)
-        return pubkey.verify(sig[:-1], sig_hash, hasher=None)  # Pop the hashtype byte
+        return pubkey.verify(sig[:-1], sig_hash, hasher=None)
 
     def verifyRawTransaction(self, tx_hex: str, prevouts):
         # Only checks signature
@@ -675,7 +681,7 @@ class NAVInterface(BTCInterface):
         return self.getP2SHP2WSHDest(script)
 
     def getDestForScriptHash(self, script_hash):
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:

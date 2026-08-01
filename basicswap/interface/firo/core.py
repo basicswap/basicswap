@@ -6,6 +6,7 @@
 
 import os
 
+from basicswap.util import ensure
 from basicswap.interface.firo.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
@@ -139,7 +140,7 @@ class FIROPrepare(CoinPrepareModule):
         # As the base but without the [test]/[regtest] config section headers.
         core_settings = settings["chainclients"][self.name]
         wallet_name = core_settings.get("wallet_name", "wallet.dat")
-        assert len(wallet_name) > 0
+        ensure(len(wallet_name) > 0, "Wallet name is blank")
         data_dir = core_settings["datadir"]
         tor_control_password = extra_opts.get("tor_control_password", None)
 

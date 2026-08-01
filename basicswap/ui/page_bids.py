@@ -37,7 +37,7 @@ def page_bid(self, url_split, post_string):
     ensure(len(url_split) > 2, "Bid ID not specified")
     try:
         bid_id = bytes.fromhex(url_split[2])
-        assert len(bid_id) == 28
+        ensure(len(bid_id) == 28, "Invalid bid id length")
     except Exception:
         raise ValueError("Bad bid ID")
     server = self.server

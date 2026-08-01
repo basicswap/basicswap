@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2025 The Basicswap developers
+# Copyright (c) 2025-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,6 +18,7 @@ from coincurve.keys import (
 )
 from Crypto.Cipher import AES
 
+from basicswap.util import ensure
 from basicswap.util.crypto import hash160, sha256, ripemd160
 from basicswap.util.ecc import getSecretInt
 from basicswap.contrib.test_framework.messages import (
@@ -38,16 +39,16 @@ def aes_unpad(s: bytes):
 
 
 def aes_encrypt(raw: bytes, pass_data: bytes, iv: bytes):
-    assert len(pass_data) == 32
-    assert len(iv) == 16
+    ensure(len(pass_data) == 32, "Invalid pass_data size")
+    ensure(len(iv) == 16, "Invalid iv size")
     raw = aes_pad(raw)
     cipher = AES.new(pass_data, AES.MODE_CBC, iv)
     return cipher.encrypt(raw)
 
 
 def aes_decrypt(enc, pass_data: bytes, iv: bytes):
-    assert len(pass_data) == 32
-    assert len(iv) == 16
+    ensure(len(pass_data) == 32, "Invalid pass_data size")
+    ensure(len(iv) == 16, "Invalid iv size")
     cipher = AES.new(pass_data, AES.MODE_CBC, iv)
     return aes_unpad(cipher.decrypt(enc))
 
@@ -61,17 +62,17 @@ SMSG_PL_HDR_LEN = 1 + 20 + 65 + 4  # Length of encrypted header in payload
 
 
 def smsgGetTimestamp(smsg_message: bytes) -> int:
-    assert len(smsg_message) > SMSG_HDR_LEN
+    ensure(len(smsg_message) > SMSG_HDR_LEN, "smsg_message shorter than header")
     return int.from_bytes(smsg_message[11 : 11 + 8], byteorder="little")
 
 
 def smsgGetTTL(smsg_message: bytes) -> int:
-    assert len(smsg_message) > SMSG_HDR_LEN
+    ensure(len(smsg_message) > SMSG_HDR_LEN, "smsg_message shorter than header")
     return int.from_bytes(smsg_message[19 : 19 + 4], byteorder="little")
 
 
 def smsgGetPOWHash(smsg_message: bytes) -> bytes:
-    assert len(smsg_message) > SMSG_HDR_LEN
+    ensure(len(smsg_message) > SMSG_HDR_LEN, "smsg_message shorter than header")
     ofs: int = 4
     nonce: bytes = smsg_message[ofs : ofs + 4]
     iv: bytes = nonce * 8
@@ -82,7 +83,7 @@ def smsgGetPOWHash(smsg_message: bytes) -> bytes:
 
 
 def smsgGetID(smsg_message: bytes) -> bytes:
-    assert len(smsg_message) > SMSG_HDR_LEN
+    ensure(len(smsg_message) > SMSG_HDR_LEN, "smsg_message shorter than header")
     smsg_timestamp = smsgGetTimestamp(smsg_message)
     return smsg_timestamp.to_bytes(8, byteorder="big") + ripemd160(smsg_message[8:])
 
@@ -100,7 +101,7 @@ def smsgEncrypt(
     # assert len(payload) < 128  # Requires lz4 if payload > 128 bytes
     # TODO: Add lz4 to match core smsg
     if deterministic:
-        assert smsg_timestamp is not None
+        ensure(smsg_timestamp is not None, "Missing smsg_timestamp")
         h = hashlib.sha256(b"smsg")
         h.update(privkey_from)
         h.update(pubkey_to)
@@ -159,8 +160,8 @@ def smsgEncrypt(
     smsg_version = bytes((2, 1))
     smsg_flags = bytes((0,))
 
-    assert len(R) == 33
-    assert len(mac) == 32
+    ensure(len(R) == 33, "Invalid R length")
+    ensure(len(mac) == 32, "Invalid MAC length")
 
     smsg_message: bytes = (
         smsg_hash
@@ -195,7 +196,7 @@ def smsgDecrypt(
 ) -> Union[bytes, Dict]:
     # Without lz4
 
-    assert len(encrypted_message) > SMSG_HDR_LEN
+    ensure(len(encrypted_message) > SMSG_HDR_LEN, "smsg_message shorter than header")
     smsg_timestamp = int.from_bytes(encrypted_message[11 : 11 + 8], byteorder="little")
     ofs: int = 23
     smsg_iv = encrypted_message[ofs : ofs + 16]
@@ -208,7 +209,7 @@ def smsgDecrypt(
     ciphertextlen = int.from_bytes(encrypted_message[ofs : ofs + 4], byteorder="little")
     ofs += 4
     ciphertext = encrypted_message[ofs:]
-    assert len(ciphertext) == ciphertextlen
+    ensure(len(ciphertext) == ciphertextlen, "Mismatched ciphertext length")
 
     p = PrivateKey(privkey_to).ecdh(R)
     H = hashlib.sha512(p).digest()
@@ -221,7 +222,7 @@ def smsgDecrypt(
     m.update(ciphertext)
     mac_calculated: bytes = m.digest()
 
-    assert mac == mac_calculated
+    ensure(mac == mac_calculated, "Mismatched MAC")
 
     plaintext = aes_decrypt(ciphertext, key_e, smsg_iv)
 
@@ -229,7 +230,7 @@ def smsgDecrypt(
     version = plaintext[0]
     if version == 249:
         compressed = plaintext[1]
-        assert compressed == 0
+        ensure(compressed == 0, "Compressed flag is set with version 249")
         ofs += 1
 
     ofs += 1
@@ -250,7 +251,7 @@ def smsgDecrypt(
     ).format()
 
     pkh_from_recovered: bytes = hash160(pubkey_signer)
-    assert pkh_from == pkh_from_recovered
+    ensure(pkh_from == pkh_from_recovered, "Mismatched pubkeyhash from")
 
     if output_dict:
         return {

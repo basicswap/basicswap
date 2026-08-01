@@ -383,7 +383,7 @@ class FIROInterface(BTCInterface):
         # P2SH
 
         script_hash = hash160(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
 
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
@@ -396,7 +396,7 @@ class FIROInterface(BTCInterface):
         return self.sh_to_address(script_hash)
 
     def getDestForScriptHash(self, script_hash):
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
     def getWalletSeedID(self):

@@ -338,7 +338,7 @@ class PARTInterfaceBlind(PARTInterface):
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = self.getNewRandomKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
-        assert len(ephemeral_pubkey) == 33
+        ensure(len(ephemeral_pubkey) == 33, "Invalid pubkey length")
         nonce = self.getScriptLockTxNonce(vkbv)
         p2wsh_addr = self.encode_p2wsh(self.getP2WSHScriptDest(script))
         inputs = []
@@ -366,7 +366,7 @@ class PARTInterfaceBlind(PARTInterface):
 
         tx_obj = self.rpc("decoderawtransaction", [tx_hex])
 
-        assert len(tx_obj["vout"]) == 1
+        ensure(len(tx_obj["vout"]) == 1, "tx must have one vout")
         txo = tx_obj["vout"][0]
         blinded_info = self.rpc(
             "rewindrangeproof", [txo["rangeproof"], txo["valueCommitment"], nonce.hex()]
@@ -401,11 +401,13 @@ class PARTInterfaceBlind(PARTInterface):
         vkbv,
     ):
         lock_tx_obj = self.rpc("decoderawtransaction", [tx_lock_bytes.hex()])
-        assert self.getTxid(tx_lock_bytes).hex() == lock_tx_obj["txid"]
+        ensure(
+            self.getTxid(tx_lock_bytes).hex() == lock_tx_obj["txid"], "Mismatched txid"
+        )
         # Nonce is derived from vkbv, ephemeral_key isn't used
         ephemeral_key = self.getNewRandomKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
-        assert len(ephemeral_pubkey) == 33
+        ensure(len(ephemeral_pubkey) == 33, "Invalid pubkey length")
         nonce = self.getScriptLockTxNonce(vkbv)
         output_nonce = self.getScriptLockRefundTxNonce(vkbv)
 
@@ -1299,7 +1301,7 @@ class PARTInterfaceBlind(PARTInterface):
         vkbv = self.getNewRandomKey()
         ephemeral_key = self.getNewRandomKey()
         ephemeral_pubkey = self.getPubkey(ephemeral_key)
-        assert len(ephemeral_pubkey) == 33
+        ensure(len(ephemeral_pubkey) == 33, "Invalid pubkey length")
         nonce = self.getScriptLockTxNonce(vkbv)
         inputs = []
         outputs = [
@@ -1317,7 +1319,7 @@ class PARTInterfaceBlind(PARTInterface):
         # self.fundSCLockTx
         tx_obj = self.rpc("decoderawtransaction", [tx_hex])
 
-        assert len(tx_obj["vout"]) == 1
+        ensure(len(tx_obj["vout"]) == 1, "tx must have one vout")
         txo = tx_obj["vout"][0]
         blinded_info = self.rpc(
             "rewindrangeproof", [txo["rangeproof"], txo["valueCommitment"], nonce.hex()]

@@ -1281,8 +1281,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     else:
                         with open(pidfilepath, "rb") as fp:
                             datadir_pid = int(fp.read().decode("UTF-8"))
-                        assert datadir_pid == cc["pid"], "Mismatched pid"
-                    assert os.path.exists(authcookiepath)
+                        ensure(datadir_pid == cc["pid"], "Mismatched pid")
+                    ensure(os.path.exists(authcookiepath), "Missing auth cookie file")
                     break
                 except Exception as e:
                     if self.debug:
@@ -1292,7 +1292,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if (
                     os.name != "nt" or cc["core_version_group"] > 17
                 ):  # Litecoin on windows doesn't write a pid file
-                    assert datadir_pid == cc["pid"], "Mismatched pid"
+                    ensure(datadir_pid == cc["pid"], "Mismatched pid")
                 with open(authcookiepath, "rb") as fp:
                     cc["rpcauth"] = escape_rpcauth(fp.read().decode("UTF-8"))
             except Exception as e:
@@ -6800,7 +6800,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Unknown curve")
 
             if kbsf:
-                assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
+                ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
             bid = Bid(
                 protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
@@ -7318,7 +7318,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
             xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
-            assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
+            ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
             dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
             msg_buf = ADSBidIntentAcceptMessage()
@@ -7467,7 +7467,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         txjs = ci.describeTx(txn_signed)
         vout = getVoutByAddress(txjs, addr_to)
-        assert vout is not None
+        ensure(vout is not None, "ITX vout not found")
 
         return txn_signed, vout
 
@@ -7666,7 +7666,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ),
                 cursor,
             )
-        assert addr_redeem_out is not None
+        ensure(addr_redeem_out is not None, "Failed to get redeem address")
 
         self.log.debug(f"addr_redeem_out {addr_redeem_out}")
 
@@ -8629,6 +8629,46 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.log.warning(
                                 f"Trying to publish coin a lock refund tx: {ex}"
                             )
+                            # TODO: Remove
+                            try:
+                                if ci_from.coin_type() != Coins.BCH:
+                                    sigl = ci_from.extractLeaderSig(
+                                        xmr_swap.a_lock_refund_tx
+                                    )
+                                    sigf = ci_from.extractFollowerSig(
+                                        xmr_swap.a_lock_refund_tx
+                                    )
+                                    self.log.debug(f"sigl hashtype {sigl[-1]}")
+                                    self.log.debug(f"sigf hashtype {sigf[-1]}")
+                                    try_fix: bool = False
+                                    if sigl[-1] != 1:
+                                        self.log.warning(
+                                            f"Trying to repair invalid leader hashtype for refund tx of bid {self.log.id(bid_id)}"
+                                        )
+                                        try_fix = True
+                                    if sigf[-1] != 1:
+                                        self.log.warning(
+                                            f"Trying to repair invalid follower hashtype for refund tx of bid {self.log.id(bid_id)}"
+                                        )
+                                        try_fix = True
+                                    if try_fix:
+                                        xmr_swap.al_lock_refund_tx_sig = sigl[
+                                            :-1
+                                        ] + bytes((1,))
+                                        xmr_swap.af_lock_refund_tx_sig = sigf[
+                                            :-1
+                                        ] + bytes((1,))
+                                        xmr_swap_1.addLockRefundSigs(
+                                            self, xmr_swap, ci_from
+                                        )
+                                        self.saveBidInSession(
+                                            bid_id, bid, cursor, xmr_swap
+                                        )
+                                        self.commitDB()
+                            except Exception as ex:
+                                self.log.error(
+                                    f"Trying to repair coin a lock refund tx: {ex}"
+                                )
 
             state = BidStates(bid.state)
             if state == BidStates.SWAP_COMPLETED:
@@ -13035,7 +13075,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.al_lock_spend_tx_sig,
                     xmr_swap.pkasf,
                 )
-            assert kbsf is not None
+                ensure(
+                    ci_to.getPubkey(kbsf) == xmr_swap.pkbsf,
+                    "Keyshare recovered from lock spend tx does not match expected pubkey",
+                )
+            ensure(kbsf is not None, "kbsf is not set")
 
             for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbsl = self.getPathKey(
@@ -13161,7 +13205,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             af_lock_refund_spend_tx_sig,
             xmr_swap.pkasl,
         )
-        assert kbsl is not None
+        ensure(
+            ci_to.getPubkey(kbsl) == xmr_swap.pkbsl,
+            "Keyshare recovered from lock refund spend tx does not match expected pubkey",
+        )
+        ensure(kbsl is not None, "kbsl is not set")
 
         for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(
