@@ -203,7 +203,7 @@ class BCHInterface(BTCInterface):
         return self.sh_to_address(script_hash)
 
     def sh_to_address(self, sh: bytes) -> str:
-        assert len(sh) == 20 or len(sh) == 32
+        ensure(len(sh) == 20 or len(sh) == 32, "Invalid script hash size")
         network = self._network.upper()
         address = None
         if len(sh) == 20:
@@ -412,7 +412,7 @@ class BCHInterface(BTCInterface):
 
     def pkh_to_address(self, pkh: bytes) -> str:
         # pkh is ripemd160(sha256(pk))
-        assert len(pkh) == 20
+        ensure(len(pkh) == 20, "Invalid pubkey hash size")
         network = self._network.upper()
         address = Address("P2PKH" if network == "MAINNET" else "P2PKH-" + network, pkh)
 
@@ -950,7 +950,7 @@ class BCHInterface(BTCInterface):
         ensure(_timelock == csv_val_expect, "timelock mismatch")
 
         fee_paid = locked_coin - mining_fee
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Non positive fee")
 
         size = self.getTxSize(tx)
         vsize = size
@@ -1016,7 +1016,7 @@ class BCHInterface(BTCInterface):
 
         tx_value = tx.vout[0].nValue
         fee_paid = tx_value - mining_fee
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Non positive fee")
 
         size = self.getTxSize(tx)
         vsize = size
@@ -1062,7 +1062,7 @@ class BCHInterface(BTCInterface):
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         fee_paid = locked_coin - tx.vout[0].nValue
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Non positive fee")
 
         size = self.getTxSize(tx)
         vsize = size

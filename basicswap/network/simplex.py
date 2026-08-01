@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (c) 2025 The Basicswap developers
+# Copyright (c) 2025-2026 The Basicswap developers
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,6 +22,7 @@ from basicswap.util.smsg import (
 from basicswap.chainparams import (
     Coins,
 )
+from basicswap.util import ensure
 from basicswap.util.address import (
     decodeWif,
 )
@@ -465,7 +466,10 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     if len(getResponseData(response, "groups")) < 1:
         sent_id = ws_thread.send_command("/c " + network_config["group_link"])
         response = waitForResponse(ws_thread, sent_id, self.delay_event)
-        assert "groupLinkId" in getResponseData(response, "connection")
+        ensure(
+            "groupLinkId" in getResponseData(response, "connection"),
+            "Missing groupLinkId",
+        )
 
     add_network = {
         "type": "simplex",

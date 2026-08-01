@@ -215,8 +215,8 @@ class XmrSwapInterface(ProtocolInterface):
         if hasattr(ci, "genScriptLockTxScript") and callable(ci.genScriptLockTxScript):
             return ci.genScriptLockTxScript(ci, Kal, Kaf, **kwargs)
 
-        assert len(Kal) == 33
-        assert len(Kaf) == 33
+        ensure(len(Kal) == 33, "Invalid Kal size")
+        ensure(len(Kaf) == 33, "Invalid Kaf size")
 
         return CScript([2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG)])
 

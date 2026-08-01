@@ -8,6 +8,7 @@ import logging
 import os
 import urllib.parse
 
+from basicswap.util import ensure
 from basicswap.interface.pivx.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
@@ -59,7 +60,7 @@ def downloadPIVXParams(output_dir, logger=None):
 
             file_hash = getFileHash(path)
             logger.info(f"{k} hash: {file_hash}")
-            assert file_hash == v
+            ensure(file_hash == v, "File hash mismatch")
     finally:
         popConnectionParameters()
 

@@ -1281,8 +1281,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     else:
                         with open(pidfilepath, "rb") as fp:
                             datadir_pid = int(fp.read().decode("UTF-8"))
-                        assert datadir_pid == cc["pid"], "Mismatched pid"
-                    assert os.path.exists(authcookiepath)
+                        ensure(datadir_pid == cc["pid"], "Mismatched pid")
+                    ensure(os.path.exists(authcookiepath), "Missing auth cookie file")
                     break
                 except Exception as e:
                     if self.debug:
@@ -1292,7 +1292,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if (
                     os.name != "nt" or cc["core_version_group"] > 17
                 ):  # Litecoin on windows doesn't write a pid file
-                    assert datadir_pid == cc["pid"], "Mismatched pid"
+                    ensure(datadir_pid == cc["pid"], "Mismatched pid")
                 with open(authcookiepath, "rb") as fp:
                     cc["rpcauth"] = escape_rpcauth(fp.read().decode("UTF-8"))
             except Exception as e:
@@ -6798,7 +6798,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Unknown curve")
 
             if kbsf:
-                assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
+                ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
             bid = Bid(
                 protocol_version=PROTOCOL_VERSION_ADAPTOR_SIG,
@@ -7316,7 +7316,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
             xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
-            assert xmr_swap.pkasf == ci_from.getPubkey(kbsf)
+            ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
             dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
             msg_buf = ADSBidIntentAcceptMessage()
@@ -7465,7 +7465,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         txjs = ci.describeTx(txn_signed)
         vout = getVoutByAddress(txjs, addr_to)
-        assert vout is not None
+        ensure(vout is not None, "ITX vout not found")
 
         return txn_signed, vout
 
@@ -7664,7 +7664,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ),
                 cursor,
             )
-        assert addr_redeem_out is not None
+        ensure(addr_redeem_out is not None, "Failed to get redeem address")
 
         self.log.debug(f"addr_redeem_out {addr_redeem_out}")
 
@@ -13069,7 +13069,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ci_to.getPubkey(kbsf) == xmr_swap.pkbsf,
                     "Keyshare recovered from lock spend tx does not match expected pubkey",
                 )
-            assert kbsf is not None
+            ensure(kbsf is not None, "kbsf is not set")
 
             for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
             kbsl = self.getPathKey(
@@ -13199,7 +13199,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci_to.getPubkey(kbsl) == xmr_swap.pkbsl,
             "Keyshare recovered from lock refund spend tx does not match expected pubkey",
         )
-        assert kbsl is not None
+        ensure(kbsl is not None, "kbsl is not set")
 
         for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(

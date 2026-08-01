@@ -755,7 +755,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return f"{purpose}h/{coin_type}h/{account}h"
 
     def initialiseWallet(self, key_bytes: bytes, restore_time: int = -1) -> None:
-        assert len(key_bytes) == 32
+        ensure(len(key_bytes) == 32, "Invalid key length")
         self._have_checked_seed = False
 
         if self._connection_type == "electrum":
@@ -1210,12 +1210,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 fee_rate: float = self.rpc_wallet("estimatesmartfee", [conf_target])[
                     "feerate"
                 ]
-                assert fee_rate > 0.0, "Negative feerate"
+                ensure(fee_rate > 0.0, "Negative feerate")
                 return fee_rate, "estimatesmartfee"
             except Exception:
                 try:
                     fee_rate: float = self.rpc_wallet("getwalletinfo")["paytxfee"]
-                    assert fee_rate > 0.0, "Non positive feerate"
+                    ensure(fee_rate > 0.0, "Non positive feerate")
                     return fee_rate, "paytxfee"
                 except Exception:
                     fee_rate: float = self.rpc("getnetworkinfo")["relayfee"]
@@ -1262,7 +1262,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return segwit_addr.encode(bech32_prefix, version, pkh)
 
     def encode_secret_extkey(self, ek_data: bytes, prefix=None) -> str:
-        assert len(ek_data) == 74
+        ensure(len(ek_data) == 74, "Invalid extkey size")
         if prefix is None:
             prefix = self.chainparams_network()["ext_secret_key_prefix"]
         data: bytes = prefix.to_bytes(4, "big") + ek_data
@@ -1270,7 +1270,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return b58encode(data + checksum[0:4])
 
     def encode_public_extkey(self, ek_data: bytes) -> str:
-        assert len(ek_data) == 74
+        ensure(len(ek_data) == 74, "Invalid extkey size")
         prefix = self.chainparams_network()["ext_public_key_prefix"]
         data: bytes = prefix.to_bytes(4, "big") + ek_data
         checksum = sha256(sha256(data))
@@ -1278,14 +1278,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def pkh_to_address(self, pkh: bytes) -> str:
         # pkh is ripemd160(sha256(pk))
-        assert len(pkh) == 20
+        ensure(len(pkh) == 20, "Invalid pubkeyhash size")
         prefix = self.chainparams_network()["pubkey_address"]
         data = bytes((prefix,)) + pkh
         checksum = sha256(sha256(data))
         return b58encode(data + checksum[0:4])
 
     def sh_to_address(self, sh: bytes) -> str:
-        assert len(sh) == 20
+        ensure(len(sh) == 20, "Invalid scripthash size")
         prefix = self.chainparams_network()["script_address"]
         data = bytes((prefix,)) + sh
         checksum = hashlib.sha256(hashlib.sha256(data).digest()).digest()
@@ -1328,7 +1328,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return pubkeyToAddress(self.chainparams_network()["script_address"], script)
 
     def pubkey_to_address(self, pk: bytes) -> str:
-        assert len(pk) == 33
+        ensure(len(pk) == 33, "Invalid compressed pubkey size")
         return self.pkh_to_address(hash160(pk))
 
     def getAddressHashFromKey(self, key: bytes) -> bytes:
@@ -1771,7 +1771,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             for txo in tx.vout:
                 outputs_value += txo.nValue
             fee_paid = inputs_value - outputs_value
-            assert fee_paid > 0
+            ensure(fee_paid > 0, "Zero or negative fee")
 
             vsize = self.getTxVSize(tx, add_bytes, add_witness_bytes)
             fee_rate_paid = fee_paid * 1000 // vsize
@@ -1976,7 +1976,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         fee_paid = locked_coin - tx.vout[0].nValue
-        assert fee_paid > 0
+        ensure(fee_paid > 0, "Zero or negative fee")
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(lock_tx_script)
         witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
@@ -2822,14 +2822,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def getP2SHP2WSHDest(self, script):
         script_hash = sha256(script)
-        assert len(script_hash) == 32
+        ensure(len(script_hash) == 32, "Invalid scripthash size")
         p2wsh_hash = hash160(CScript([OP_0, script_hash]))
-        assert len(p2wsh_hash) == 20
+        ensure(len(p2wsh_hash) == 20, "Invalid p2wsh size")
         return CScript([OP_HASH160, p2wsh_hash, OP_EQUAL])
 
     def getP2SHP2WSHScriptSig(self, script):
         script_hash = sha256(script)
-        assert len(script_hash) == 32
+        ensure(len(script_hash) == 32, "Invalid script hash size")
         return CScript(
             [
                 CScript(
@@ -3862,7 +3862,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         message_hash = sha256(bytes(message, "utf-8"))
         pubkey = PublicKey(K)
         rv = pubkey.verify_compact(sig, message_hash, hasher=None)
-        assert rv is True
+        ensure(rv is True, "Failed to verify compact pubkey")
 
     def verifySigAndRecover(self, sig, message: str) -> bytes:
         message_hash = sha256(bytes(message, "utf-8"))
@@ -4343,7 +4343,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 if descriptor["active"] is False or descriptor["internal"] is True:
                     continue
                 desc = descriptor["desc"]
-                assert desc.startswith("wpkh(")
+                ensure(desc.startswith("wpkh("), "Unexpected descriptor type")
                 ext_key = desc[5:].split(")")[0].split("/", 1)[0]
                 ext_key_data = decodeAddress(ext_key)[4:]
                 ci_part = self._sc.ci(Coins.PART)
@@ -4357,7 +4357,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 ek.decode(ext_key_data)
                 sign_for_address_key = self.encodeKey(ek._key)
                 break
-            assert sign_for_address_key is not None
+            ensure(sign_for_address_key is not None, "sign_for_address_key not found")
             signature = self.signMessageWithKey(sign_for_address_key, sign_message)
             del priv_keys
         else:
@@ -4778,7 +4778,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def get_p2sh_script_pubkey(self, script: bytearray) -> bytearray:
         script_hash = hash160(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash size")
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
     def get_p2wsh_script_pubkey(self, script: bytearray) -> bytearray:

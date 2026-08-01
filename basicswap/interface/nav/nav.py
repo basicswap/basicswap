@@ -136,7 +136,7 @@ class NAVInterface(BTCInterface):
 
         script = CScript([OP_0, pkh])
         script_hash = hash160(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
 
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
@@ -148,7 +148,7 @@ class NAVInterface(BTCInterface):
         # P2SH-p2wpkh
         script = CScript([OP_0, pkh])
         script_hash = hash160(script)
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
         return encodeAddress(
             bytes((self.chainparams_network()["script_address"],)) + script_hash
         )
@@ -681,7 +681,7 @@ class NAVInterface(BTCInterface):
         return self.getP2SHP2WSHDest(script)
 
     def getDestForScriptHash(self, script_hash):
-        assert len(script_hash) == 20
+        ensure(len(script_hash) == 20, "Invalid script hash length")
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:

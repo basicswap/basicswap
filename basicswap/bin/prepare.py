@@ -32,7 +32,7 @@ from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins, chainparams, getCoinIdFromName
 from basicswap.contrib.rpcauth import generate_salt
 from basicswap.ui.util import getCoinName
-from basicswap.util import toBool
+from basicswap.util import ensure, toBool
 from basicswap.util.network import urlretrieve, make_reporthook
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.bin.run import (
@@ -319,7 +319,7 @@ def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> 
         raise ValueError("Can't set wallet name for {}.".format(coin_params["ticker"]))
 
     wallet_name: str = os.getenv(env_var_name, default_name)
-    assert len(wallet_name) > 0
+    ensure(len(wallet_name) > 0, "Wallet name is blank")
     return wallet_name
 
 
@@ -476,7 +476,10 @@ def testTorConnection():
     logger.info("Testing TOR connection at: " + test_url)
 
     test_response = downloadBytes(test_url).decode("utf-8")
-    assert "Congratulations. This browser is configured to use Tor." in test_response
+    ensure(
+        "Congratulations. This browser is configured to use Tor." in test_response,
+        "Can't find Tor success string in page",
+    )
     logger.info("TOR is working.")
 
 
@@ -484,8 +487,10 @@ def testOnionLink():
     test_url = "http://jqyzxhjk6psc6ul5jnfwloamhtyh7si74b4743k2qgpskwwxrzhsxmad.onion"
     logger.info("Testing onion site: " + test_url)
     test_response = downloadBytes(test_url).decode("utf-8")
-    assert (
-        "The Tor Project's free software protects your privacy online." in test_response
+    ensure(
+        "The Tor Project's free software protects your privacy online."
+        in test_response,
+        "Can't find Tor success string in page",
     )
     logger.info("Onion links work.")
 
