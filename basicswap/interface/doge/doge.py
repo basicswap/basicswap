@@ -23,6 +23,9 @@ class DOGEInterface(BTCInterface):
     def coin_type():
         return Coins.DOGE
 
+    def max_money(self) -> int:
+        return 10000000000 * self.COIN()
+
     @staticmethod
     def est_lock_tx_vsize() -> int:
         return 192

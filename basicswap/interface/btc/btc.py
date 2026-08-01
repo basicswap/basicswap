@@ -1839,6 +1839,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         locked_n = findOutput(tx, script_pk)
         ensure(locked_n is not None, "Output not found in tx")
         locked_coin = tx.vout[locked_n].nValue
+        ensure(self.money_range(locked_coin), "Bad output value range")
 
         # Check script and values
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
@@ -1910,6 +1911,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(locked_n is not None, 'Output not found in lock refund spend tx')
         """
         tx_value = tx.vout[0].nValue
+        ensure(self.money_range(tx_value), "Bad output value range")
 
         fee_paid = prevout_value - tx_value
         ensure(fee_paid > 0, "negative fee_paid")
@@ -1975,6 +1977,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(tx.vout[0].scriptPubKey == expect_txo_script, "Bad output destination")
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
+        ensure(self.money_range(tx.vout[0].nValue), "Bad output value range")
         fee_paid = locked_coin - tx.vout[0].nValue
         ensure(fee_paid > 0, "Zero or negative fee")
 

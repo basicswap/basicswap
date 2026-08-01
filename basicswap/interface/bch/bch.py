@@ -953,6 +953,7 @@ class BCHInterface(BTCInterface):
         locked_n = findOutput(tx, script_pk)
         ensure(locked_n is not None, "Output not found in tx")
         locked_coin = tx.vout[locked_n].nValue
+        ensure(self.money_range(locked_coin), "Bad output value range")
 
         # Check script
         mining_fee: int = kwargs["mining_fee"] if "mining_fee" in kwargs else 1000
@@ -1044,6 +1045,8 @@ class BCHInterface(BTCInterface):
         ensure(timelock == _timelock, "timelock mismatch")
 
         tx_value = tx.vout[0].nValue
+        ensure(self.money_range(tx_value), "Bad output value range")
+
         fee_paid = prevout_value - tx_value
         ensure(
             fee_paid == mining_fee,
@@ -1096,6 +1099,7 @@ class BCHInterface(BTCInterface):
         mining_fee, _, _, _, _ = self.extractScriptLockScriptValues(lock_tx_script)
         ensure(mining_fee == feerate, "mining mismatch fee")
 
+        ensure(self.money_range(tx.vout[0].nValue), "Bad output value range")
         fee_paid = locked_coin - tx.vout[0].nValue
         ensure(
             fee_paid == mining_fee,

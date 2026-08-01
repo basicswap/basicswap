@@ -16,6 +16,9 @@ class LTCInterface(BTCInterface):
     def coin_type():
         return Coins.LTC
 
+    def max_money(self) -> int:
+        return 84000000 * self.COIN()
+
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
         super().__init__(
             coin_settings=coin_settings,

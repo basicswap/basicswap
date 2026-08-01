@@ -37,6 +37,9 @@ class FIROInterface(BTCInterface):
     def coin_type():
         return Coins.FIRO
 
+    def max_money(self) -> int:
+        return 21400000 * self.COIN()
+
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
         super().__init__(
             coin_settings=coin_settings,
