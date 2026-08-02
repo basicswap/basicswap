@@ -4069,33 +4069,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if swap_type == SwapTypes.XMR_SWAP:
                 reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
                 itx_coin_has_csv = coin_to_has_csv if reverse_bid else coin_from_has_csv
-                ensure(itx_coin_has_csv, "ITX coin needs CSV activated.")
+                ensure(itx_coin_has_csv, "ITX coin needs CSV activated")
             else:
                 ensure(
                     coin_from_has_csv and coin_to_has_csv,
-                    "Both coins need CSV activated.",
+                    "Both coins need CSV activated",
                 )
         elif lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
+            ensure(self.chain == "regtest", "SEQUENCE_LOCK_BLOCKS is for testing only")
             ensure(lock_value >= 5 and lock_value <= 1000, "Invalid lock_value blocks")
             if swap_type == SwapTypes.XMR_SWAP:
                 reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
                 itx_coin_has_csv = coin_to_has_csv if reverse_bid else coin_from_has_csv
-                ensure(itx_coin_has_csv, "ITX coin needs CSV activated.")
+                ensure(itx_coin_has_csv, "ITX coin needs CSV activated")
             else:
                 ensure(
                     coin_from_has_csv and coin_to_has_csv,
-                    "Both coins need CSV activated.",
+                    "Both coins need CSV activated",
                 )
         elif lock_type == TxLockTypes.ABS_LOCK_TIME:
             # TODO: range?
-            ensure(not coin_from_has_csv or not coin_to_has_csv, "Should use CSV.")
+            ensure(not coin_from_has_csv or not coin_to_has_csv, "Should use CSV")
             ensure(
                 lock_value >= 4 * 60 * 60 and lock_value <= 96 * 60 * 60,
                 "Invalid lock_value time",
             )
         elif lock_type == TxLockTypes.ABS_LOCK_BLOCKS:
             # TODO: range?
-            ensure(not coin_from_has_csv or not coin_to_has_csv, "Should use CSV.")
+            ensure(self.chain == "regtest", "ABS_LOCK_BLOCKS is for testing only")
+            ensure(not coin_from_has_csv or not coin_to_has_csv, "Should use CSV")
             ensure(lock_value >= 10 and lock_value <= 1000, "Invalid lock_value blocks")
         else:
             raise ValueError("Unknown locktype")

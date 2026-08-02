@@ -1270,6 +1270,99 @@ class Test(unittest.TestCase):
 
         del sc
 
+    def test_validateOfferLockValue(self):
+        logging.info("---------- Test validateOfferLockValue")
+        basicswap_dir = "/tmp/bsx_test_other"
+        if not os.path.exists(basicswap_dir):
+            os.makedirs(basicswap_dir)
+
+        k = PrivateKey()
+        settings = {
+            "network_key": toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret),
+            "network_pubkey": k.public_key.format().hex(),
+        }
+
+        sc = BasicSwap(
+            basicswap_dir,
+            settings,
+            "regtest",
+            log_name="bsx_test_other",
+        )
+
+        # use_csv is the only coin_clients entry validateOfferLockValue reads
+        sc.coin_clients[Coins.BTC] = {"use_csv": True}
+        sc.coin_clients[Coins.XMR] = {"use_csv": True}
+        sc.coin_clients[Coins.PIVX] = {"use_csv": False}
+
+        seq_time = (
+            SwapTypes.XMR_SWAP,
+            Coins.BTC,
+            Coins.XMR,
+            TxLockTypes.SEQUENCE_LOCK_TIME,
+        )
+        seq_blocks = (
+            SwapTypes.XMR_SWAP,
+            Coins.BTC,
+            Coins.XMR,
+            TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+        )
+        # The absolute lock types require at least one coin without CSV
+        abs_time = (
+            SwapTypes.SELLER_FIRST,
+            Coins.PIVX,
+            Coins.BTC,
+            TxLockTypes.ABS_LOCK_TIME,
+        )
+        abs_blocks = (
+            SwapTypes.SELLER_FIRST,
+            Coins.PIVX,
+            Coins.BTC,
+            TxLockTypes.ABS_LOCK_BLOCKS,
+        )
+
+        time_locks = [seq_time + (24 * 60 * 60,), abs_time + (24 * 60 * 60,)]
+        block_locks = [seq_blocks + (100,), abs_blocks + (100,)]
+
+        for case in time_locks + block_locks:
+            sc.validateOfferLockValue(*case)
+
+        out_of_range = [
+            seq_time + (sc.min_sequence_lock_seconds - 1,),
+            seq_time + (sc.max_sequence_lock_seconds + 1,),
+            seq_blocks + (4,),
+            seq_blocks + (1001,),
+            abs_time + (4 * 60 * 60 - 1,),
+            abs_time + (96 * 60 * 60 + 1,),
+            abs_blocks + (9,),
+            abs_blocks + (1001,),
+        ]
+        for case in out_of_range:
+            self.assertRaises(ValueError, sc.validateOfferLockValue, *case)
+
+        self.assertRaises(
+            ValueError,
+            sc.validateOfferLockValue,
+            SwapTypes.XMR_SWAP,
+            Coins.BTC,
+            Coins.XMR,
+            0,
+            100,
+        )
+
+        # Block count lock types are only valid on regtest
+        sc.chain = "mainnet"
+        for case in time_locks:
+            sc.validateOfferLockValue(*case)
+        for case in block_locks:
+            self.assertRaisesRegex(
+                ValueError,
+                "for testing only",
+                sc.validateOfferLockValue,
+                *case,
+            )
+
+        del sc
+
     def test_jsonrpc(self):
         logging.info("---------- Test Jsonrpc")
         host = "127.0.0.1"
