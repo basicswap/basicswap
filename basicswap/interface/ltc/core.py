@@ -14,7 +14,7 @@ from basicswap.interface.prepare_util import (
     getOSDirNames,
 )
 
-LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.5")
+LITECOIN_VERSION = os.getenv("LITECOIN_VERSION", "0.21.5.6")
 LITECOIN_VERSION_TAG = os.getenv("LITECOIN_VERSION_TAG", "")
 litecoin_signers = {"davidburkett38": ("D35621D53A1CC6A3456758D03620E9D387E55666",)}
 
