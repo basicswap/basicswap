@@ -12165,25 +12165,37 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(msg["to"] == addr_to, "Received on incorrect address")
         ensure(msg["from"] == addr_from, "Sent from incorrect address")
 
+        allowed_states = [
+            BidStates.BID_SENT,
+            BidStates.BID_RECEIVED,
+            BidStates.BID_REQUEST_ACCEPTED,
+        ]
+        if bid.was_sent and offer.was_sent:
+            allowed_states.append(
+                BidStates.BID_ACCEPTED
+            )  # TODO: Split BID_ACCEPTED into received and sent
+        ensure(
+            bid.state in allowed_states,
+            f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
+        )
+
         try:
-            xmr_swap.pkal = msg_data.pkal
-            xmr_swap.vkbvl = msg_data.kbvl
-            ensure(ci_to.verifyKey(xmr_swap.vkbvl), "Invalid key, vkbvl")
-            xmr_swap.vkbv = ci_to.sumKeys(xmr_swap.vkbvl, xmr_swap.vkbvf)
-            ensure(ci_to.verifyKey(xmr_swap.vkbv), "Invalid key, vkbv")
+            pkal: bytes = msg_data.pkal
+            vkbvl: bytes = msg_data.kbvl
+            ensure(ci_to.verifyKey(vkbvl), "Invalid key, vkbvl")
+            vkbv: bytes = ci_to.sumKeys(vkbvl, xmr_swap.vkbvf)
+            ensure(ci_to.verifyKey(vkbv), "Invalid key, vkbv")
 
-            xmr_swap.pkbvl = ci_to.getPubkey(msg_data.kbvl)
-            xmr_swap.kbsl_dleag = msg_data.kbsl_dleag
+            pkbvl: bytes = ci_to.getPubkey(msg_data.kbvl)
+            kbsl_dleag: bytes = msg_data.kbsl_dleag
 
-            xmr_swap.a_lock_tx = msg_data.a_lock_tx
-            xmr_swap.a_lock_tx_script = msg_data.a_lock_tx_script
-            xmr_swap.a_lock_refund_tx = msg_data.a_lock_refund_tx
-            xmr_swap.a_lock_refund_tx_script = msg_data.a_lock_refund_tx_script
-            xmr_swap.a_lock_refund_spend_tx = msg_data.a_lock_refund_spend_tx
-            xmr_swap.a_lock_refund_spend_tx_id = ci_from.getTxid(
-                xmr_swap.a_lock_refund_spend_tx
-            )
-            xmr_swap.al_lock_refund_tx_sig = msg_data.al_lock_refund_tx_sig
+            a_lock_tx: bytes = msg_data.a_lock_tx
+            a_lock_tx_script: bytes = msg_data.a_lock_tx_script
+            a_lock_refund_tx: bytes = msg_data.a_lock_refund_tx
+            a_lock_refund_tx_script: bytes = msg_data.a_lock_refund_tx_script
+            a_lock_refund_spend_tx: bytes = msg_data.a_lock_refund_spend_tx
+            a_lock_refund_spend_tx_id: bytes = ci_from.getTxid(a_lock_refund_spend_tx)
+            al_lock_refund_tx_sig: bytes = msg_data.al_lock_refund_tx_sig
 
             refundExtraArgs = dict()
             lockExtraArgs = dict()
@@ -12194,7 +12206,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bch_ci = self.ci(Coins.BCH)
 
                 mining_fee, out_1, out_2, public_key, timelock = (
-                    bch_ci.extractScriptLockScriptValues(xmr_swap.a_lock_tx_script)
+                    bch_ci.extractScriptLockScriptValues(a_lock_tx_script)
                 )
                 ensure(
                     out_1 == bch_ci.getScriptForPubkeyHash(xmr_swap.dest_af),
@@ -12202,9 +12214,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 ensure(
                     out_2
-                    == bch_ci.scriptToP2SH32LockingBytecode(
-                        xmr_swap.a_lock_refund_tx_script
-                    ),
+                    == bch_ci.scriptToP2SH32LockingBytecode(a_lock_refund_tx_script),
                     "Invalid BCH lock tx script out_2",
                 )
                 ensure(
@@ -12212,7 +12222,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "Invalid BCH lock tx script timelock",
                 )
                 ensure(
-                    public_key == xmr_swap.pkal,
+                    public_key == pkal,
                     "Invalid BCH lock tx script public_key",
                 )
 
@@ -12223,9 +12233,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 lockExtraArgs["timelock"] = timelock
 
                 mining_fee, out_1, out_2, public_key, timelock = (
-                    bch_ci.extractScriptLockScriptValues(
-                        xmr_swap.a_lock_refund_tx_script
-                    )
+                    bch_ci.extractScriptLockScriptValues(a_lock_refund_tx_script)
                 )
                 ensure(
                     out_2 == bch_ci.getScriptForPubkeyHash(xmr_swap.dest_af),
@@ -12249,15 +12257,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # TODO: check_lock_tx_inputs without txindex
             check_a_lock_tx_inputs = False
             try:
-                xmr_swap.a_lock_tx_id, xmr_swap.a_lock_tx_vout = ci_from.verifySCLockTx(
-                    xmr_swap.a_lock_tx,
-                    xmr_swap.a_lock_tx_script,
+                a_lock_tx_id, a_lock_tx_vout = ci_from.verifySCLockTx(
+                    a_lock_tx,
+                    a_lock_tx_script,
                     bid.amount,
-                    xmr_swap.pkal,
+                    pkal,
                     xmr_swap.pkaf,
                     a_fee_rate,
                     check_a_lock_tx_inputs,
-                    xmr_swap.vkbv,
+                    vkbv,
                     **lockExtraArgs,
                 )
             except Exception as e:
@@ -12270,64 +12278,69 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise
 
             (
-                xmr_swap.a_lock_refund_tx_id,
-                xmr_swap.a_swap_refund_value,
+                a_lock_refund_tx_id,
+                a_swap_refund_value,
                 lock_refund_vout,
             ) = ci_from.verifySCLockRefundTx(
-                xmr_swap.a_lock_refund_tx,
-                xmr_swap.a_lock_tx,
-                xmr_swap.a_lock_refund_tx_script,
-                xmr_swap.a_lock_tx_id,
-                xmr_swap.a_lock_tx_vout,
+                a_lock_refund_tx,
+                a_lock_tx,
+                a_lock_refund_tx_script,
+                a_lock_tx_id,
+                a_lock_tx_vout,
                 xmr_offer.lock_time_1,
-                xmr_swap.a_lock_tx_script,
-                xmr_swap.pkal,
+                a_lock_tx_script,
+                pkal,
                 xmr_swap.pkaf,
                 xmr_offer.lock_time_2,
                 bid.amount,
                 a_fee_rate,
-                xmr_swap.vkbv,
+                vkbv,
                 **refundExtraArgs,
             )
 
             ci_from.verifySCLockRefundSpendTx(
-                xmr_swap.a_lock_refund_spend_tx,
-                xmr_swap.a_lock_refund_tx,
-                xmr_swap.a_lock_refund_tx_id,
-                xmr_swap.a_lock_refund_tx_script,
-                xmr_swap.pkal,
+                a_lock_refund_spend_tx,
+                a_lock_refund_tx,
+                a_lock_refund_tx_id,
+                a_lock_refund_tx_script,
+                pkal,
                 lock_refund_vout,
-                xmr_swap.a_swap_refund_value,
+                a_swap_refund_value,
                 a_fee_rate,
-                xmr_swap.vkbv,
+                vkbv,
                 **refundExtraArgs,
             )
+
+            xmr_swap.pkal = pkal
+            xmr_swap.vkbvl = vkbvl
+            xmr_swap.vkbv = vkbv
+            xmr_swap.pkbvl = pkbvl
+            xmr_swap.kbsl_dleag = kbsl_dleag
+            xmr_swap.a_lock_tx = a_lock_tx
+            xmr_swap.a_lock_tx_id = a_lock_tx_id
+            xmr_swap.a_lock_tx_vout = a_lock_tx_vout
+            xmr_swap.a_lock_tx_script = a_lock_tx_script
+            xmr_swap.a_lock_refund_tx_id = a_lock_refund_tx_id
+            xmr_swap.a_lock_refund_tx_script = a_lock_refund_tx_script
+            xmr_swap.a_swap_refund_value = a_swap_refund_value
+            xmr_swap.a_lock_refund_spend_tx = a_lock_refund_spend_tx
+            xmr_swap.a_lock_refund_spend_tx_id = a_lock_refund_spend_tx_id
 
             self.log.info("Checking leader's lock refund tx signature.")
             prevout_amount = ci_from.getLockTxSwapOutputValue(bid, xmr_swap)
             v = ci_from.verifyTxSig(
-                xmr_swap.a_lock_refund_tx,
-                xmr_swap.al_lock_refund_tx_sig,
-                xmr_swap.pkal,
+                a_lock_refund_tx,
+                al_lock_refund_tx_sig,
+                pkal,
                 0,
-                xmr_swap.a_lock_tx_script,
+                a_lock_tx_script,
                 prevout_amount,
             )
             ensure(v, "Invalid coin A lock refund tx leader sig")
 
-            allowed_states = [
-                BidStates.BID_SENT,
-                BidStates.BID_RECEIVED,
-                BidStates.BID_REQUEST_ACCEPTED,
-            ]
-            if bid.was_sent and offer.was_sent:
-                allowed_states.append(
-                    BidStates.BID_ACCEPTED
-                )  # TODO: Split BID_ACCEPTED into received and sent
-            ensure(
-                bid.state in allowed_states,
-                f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
-            )
+            xmr_swap.a_lock_refund_tx = a_lock_refund_tx
+            xmr_swap.al_lock_refund_tx_sig = al_lock_refund_tx_sig
+
             bid.setState(BidStates.BID_RECEIVING_ACC)
             self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
 
@@ -12340,7 +12353,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as ex:
             if self.debug:
                 self.log.error(traceback.format_exc())
-            self.setBidError(bid, str(ex), xmr_swap=xmr_swap)
+            self.setBidError(bid, str(ex))
 
     def watchXmrSwap(self, bid, offer, xmr_swap, cursor=None) -> None:
         self.log.debug(f"Adaptor-sig swap in progress, bid {self.log.id(bid.bid_id)}.")
