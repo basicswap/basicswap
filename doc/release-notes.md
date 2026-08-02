@@ -1,4 +1,35 @@
 
+0.17.9
+==============
+
+**Security / hardening**
+- Adaptor-sig swaps: check the bid state sooner.  A failed check no longer persists the message.
+- Swap timeouts: measure the lock transaction timeout from the bid's last state change
+  rather than from its expiry, so a bidder's chosen bid validity period can no longer
+  extend how long the other side waits.
+- Offers: block count based lock types are rejected outside regtest.
+
+**Fixes**
+- The default and maximum for `sc_lock_tx_timeout` and `sc_lock_tx_mempool_timeout` were
+  transposed, so both were clamped to the maximum instead of using the intended default.
+- Reduced the default and minimum lock transaction timeout to 20 minutes, so a stalled
+  counterparty is abandoned sooner.
+- Automation: fix the cumulative bid value cap on reversed offers.  It compared totals in
+  one chain's units against the offer amount in the other's, so the cap never triggered.
+- Queued actions: retry bid acceptance after a transient error instead of erroring the bid.
+- Treat socket errors, and timeouts other than read timeouts, as transient.
+
+**Daemon updates**
+- Litecoin bumped to v0.21.5.6.
+  - This release contains important security fixes.
+    - Please make sure to upgrade ASAP.
+
+**Upgrade note**
+- The lock transaction timeout now defaults to 20 minutes rather than several hours.  Bids
+  waiting on a counterparty's lock transaction will time out considerably sooner; raise
+  `sc_lock_tx_timeout` if you need the previous behaviour.
+
+
 0.17.8
 ==============
 
