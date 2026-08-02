@@ -11290,16 +11290,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             )
 
-    def getCompletedAndActiveBidsValue(self, offer, cursor):
+    def getCompletedAndActiveBidsValue(self, offer, cursor, reverse_bid: bool = False):
         bids = []
         total_value: int = 0
 
+        amount_col: str = "bids.amount_to" if reverse_bid else "bids.amount"
         q = cursor.execute(
-            """SELECT bid_id, amount, state FROM bids
+            f"""SELECT bids.bid_id, {amount_col}, bids.state FROM bids
                JOIN bidstates ON bidstates.state_id = bids.state AND (bidstates.state_id = :state_id OR bidstates.in_progress > 0)
                WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
                UNION
-               SELECT bid_id, amount, state FROM bids
+               SELECT bids.bid_id, {amount_col}, bids.state FROM bids
                JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND actions.action_type IN (:action_type_acc_bid, :action_type_acc_adp_bid, :action_type_acc_rev_bid)
                WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
             """,
@@ -11394,7 +11395,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid_amount: int = bid.amount
             bid_rate: int = bid.rate
 
-            if options.get("reverse_bid", False):
+            reverse_bid: bool = options.get("reverse_bid", False)
+            if reverse_bid:
                 bid_amount = bid.amount_to
                 bid_rate = options.get("bid_rate")
 
@@ -11434,7 +11436,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     raise AutomationConstraint("Rate outside acceptable tolerance")
 
             active_bids, total_bids_value = self.getCompletedAndActiveBidsValue(
-                offer, use_cursor
+                offer, use_cursor, reverse_bid
             )
 
             # Tracked offers are bounded by offer_budget_allows above.
