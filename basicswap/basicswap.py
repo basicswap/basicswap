@@ -10792,9 +10792,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
                     # Don't error the bid on a transient failure, keep the
                     # action alive and retry.
-                    if not accepting_bid and self.isBidTransientError(
-                        bid_id, ex, cursor
-                    ):
+                    if self.isBidTransientError(bid_id, ex, cursor):
                         self.log.warning(
                             f"Retrying action type {action_type} for bid {self.log.id(bid_id)} after transient error: {ex}"
                         )

@@ -307,7 +307,8 @@ class BaseApp(DBMethods):
         return out[0].decode("utf-8").strip()
 
     transient_error_markers = (
-        "read timed out",
+        "timed out",
+        "socket error",
         "no connection to daemon",
         # Connection-class faults, daemon restarting or briefly unreachable.
         "connection refused",
