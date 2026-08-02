@@ -513,10 +513,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
         self._sc_lock_tx_timeout = self.get_int_setting(
-            "sc_lock_tx_timeout", 48 * 3600, 3600, 6 * 3600
+            "sc_lock_tx_timeout", 1200, 1200, 48 * 3600
         )  # Seconds
         self._sc_lock_tx_mempool_timeout = self.get_int_setting(
-            "sc_lock_tx_mempool_timeout", 48 * 3600, 3600, 12 * 3600
+            "sc_lock_tx_mempool_timeout", 12 * 3600, 3600, 48 * 3600
         )  # Seconds
 
         self._max_logfile_bytes = self.settings.get(
@@ -10673,8 +10673,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         now: int = self.getTime()
         cursor = self.openDB()
 
-        respond_grace_period: int = 60 * 60
-        # Time for transaction to be mined into the chain
+        # Time for transaction to be mined into the chain, measured from the last
+        # state change so the bidder's chosen expiry can't extend it.
         # Only timeout waiting for the tx to be mined if not the sending the tx.
         tx_grace_period: int = self._sc_lock_tx_timeout
         tx_mempool_grace_period: int = self._sc_lock_tx_mempool_timeout
@@ -10683,16 +10683,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             query_str = (
                 "SELECT b.bid_id FROM bids AS b, bidstates AS s "
                 + "WHERE b.active_ind = 1 AND s.state_id = b.state "
-                + " AND ((b.state = :accepted_state AND b.expire_at + :respond_grace_period <= :now) "
-                + "  OR (s.can_timeout AND b.expire_at + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now)) "
+                + " AND s.can_timeout AND b.state_time + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now "
                 + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_sent_event_type)"
             )
             q = cursor.execute(
                 query_str,
                 {
-                    "accepted_state": int(BidStates.BID_ACCEPTED),
                     "now": now,
-                    "respond_grace_period": respond_grace_period,
                     "tx_grace_period": tx_grace_period,
                     "tx_mempool_grace_period": tx_mempool_grace_period,
                     "event_linked_type": int(Concepts.BID),
