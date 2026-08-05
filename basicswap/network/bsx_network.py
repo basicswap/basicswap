@@ -26,6 +26,12 @@ from basicswap.messages_npb import (
     MessagePortalOffer,
     MessagePortalSend,
 )
+from basicswap.network.nostr import (
+    forwardNostrMsg,
+    initialiseNostrNetwork,
+    readNostrMsgs,
+    sendNostrMsg,
+)
 from basicswap.network.simplex import (
     closeSimplexChat,
     encryptMsg,
@@ -49,6 +55,8 @@ def networkTypeToID(type: str) -> int:
         return MessageNetworks.SMSG
     elif type == "simplex":
         return MessageNetworks.SIMPLEX
+    elif type == "nostr":
+        return MessageNetworks.NOSTR
     raise RuntimeError(f"Unknown message network type: {type}")
 
 
@@ -58,6 +66,8 @@ def networkIDToType(id: int, bridged: bool = False) -> str:
         network_name = "smsg"
     elif id == MessageNetworks.SIMPLEX:
         network_name = "simplex"
+    elif id == MessageNetworks.NOSTR:
+        network_name = "nostr"
     else:
         raise RuntimeError(f"Unknown message network id: {id}")
     return ("b." if bridged else "") + network_name
@@ -106,6 +116,11 @@ class BSXNetwork:
         self.num_group_simplex_messages_sent = 0
         self.num_direct_simplex_messages_received = 0
         self.num_direct_simplex_messages_sent = 0
+
+        self.num_nostr_messages_received = 0
+        self.num_nostr_messages_sent = 0
+        self.num_direct_nostr_messages_received = 0
+        self.num_direct_nostr_messages_sent = 0
 
         self.num_smsg_messages_received = 0
         self.num_smsg_messages_sent = 0
@@ -170,6 +185,8 @@ class BSXNetwork:
                 self.active_networks.append(add_network)
             elif network["type"] == "simplex":
                 initialiseSimplexNetwork(self, network)
+            elif network["type"] == "nostr":
+                initialiseNostrNetwork(self, network)
 
         if have_smsg:
             self._have_smsg_rpc = True
@@ -358,7 +375,9 @@ class BSXNetwork:
 
     def getActiveNetworkInterface(self, network_id: int):
         network = self.getActiveNetwork(network_id)
-        return network["ws_thread"]
+        if "ws_thread" in network:
+            return network["ws_thread"]
+        return network["client"]
 
     def getMessageNetsString(self, with_bridged: bool = False) -> str:
         if self._smsg_payload_version < 2:
@@ -496,12 +515,13 @@ class BSXNetwork:
                 self.closeDB(use_cursor)
 
     def setMsgSplitInfo(self, xmr_swap) -> None:
+        small_split_networks = ("simplex", "nostr")
         for network in self.active_networks:
-            if network["type"] == "simplex":
+            if network["type"] in small_split_networks:
                 xmr_swap.msg_split_info = "9000:11000"
                 return
             for bridged_network in network.get("bridged", []):
-                if bridged_network["type"] == "simplex":
+                if bridged_network["type"] in small_split_networks:
                     xmr_swap.msg_split_info = "9000:11000"
                     return
         xmr_swap.msg_split_info = "16000:17000"
@@ -527,6 +547,30 @@ class BSXNetwork:
         # Empty list means send to all networks
         networks_list = active_networks_list + bridged_networks_list
         networks_sent_to = set()
+
+        # Direct message routes over nostr
+        message_route = self.getMessageRoute(
+            int(MessageNetworks.NOSTR), addr_from, addr_to, cursor=cursor
+        )
+        if message_route:
+            route_data = json.loads(message_route.route_data.decode("UTF-8"))
+            remote_pubkey = route_data.get("remote_pubkey", None)
+            if remote_pubkey is not None:
+                network = self.getActiveNetwork(MessageNetworks.NOSTR)
+                message_id = sendNostrMsg(
+                    self,
+                    network,
+                    addr_from,
+                    addr_to,
+                    bytes.fromhex(payload_hex),
+                    msg_valid,
+                    cursor,
+                    timestamp,
+                    deterministic,
+                    to_pubkey=remote_pubkey,
+                )
+                return message_id
+            # Route is not yet established, fall through to broadcast networks
 
         # Message routes work only with simplex messages for now.
         message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
@@ -638,6 +682,23 @@ class BSXNetwork:
                     forwardSimplexMsg(self, network, smsg_msg)
                 else:
                     net_message_id, smsg_msg = sendSimplexMsg(
+                        self,
+                        network,
+                        addr_from,
+                        addr_to,
+                        bytes.fromhex(payload_hex),
+                        msg_valid,
+                        cursor,
+                        timestamp,
+                        deterministic,
+                        return_msg=True,
+                        difficulty_target=smsg_difficulty,
+                    )
+            elif network_type == MessageNetworks.NOSTR:
+                if smsg_msg:
+                    forwardNostrMsg(self, network, smsg_msg)
+                else:
+                    net_message_id, smsg_msg = sendNostrMsg(
                         self,
                         network,
                         addr_from,
@@ -790,12 +851,14 @@ class BSXNetwork:
             self.closeDB(cursor)
 
     def closeMessageRoute(self, record_id, network_id, route_data, cursor):
-        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
+        if network_id == MessageNetworks.SIMPLEX:
+            net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
 
-        connId = route_data["pccConnId"]
+            connId = route_data["pccConnId"]
 
-        self.log.info(f"Closing Simplex chat, id: {connId}")
-        closeSimplexChat(self, net_i, connId)
+            self.log.info(f"Closing Simplex chat, id: {connId}")
+            closeSimplexChat(self, net_i, connId)
+        # Nostr routes have no connection to close
 
         self.log.debug(f"Removing direct message route: {record_id}.")
         cursor.execute(
@@ -869,13 +932,18 @@ class BSXNetwork:
             net_message_id = self.sendSmsg(
                 addr_portal, addr_to, payload_hex, msg_valid, cursor=cursor
             )
-        elif network_from_id == MessageNetworks.SIMPLEX:
-            network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
+        elif network_from_id in (MessageNetworks.SIMPLEX, MessageNetworks.NOSTR):
+            network = self.getActiveNetwork(network_from_id)
+            send_func = (
+                sendSimplexMsg
+                if network_from_id == MessageNetworks.SIMPLEX
+                else sendNostrMsg
+            )
 
             deterministic: bool = True
             cursor = self.openDB()
             try:
-                net_message_id = sendSimplexMsg(
+                net_message_id = send_func(
                     self,
                     network,
                     addr_portal,
@@ -924,9 +992,17 @@ class BSXNetwork:
                 net_message_id = self.sendSmsg(
                     addr_portal, addr_to, payload_hex, msg_valid, cursor=cursor
                 )
-            elif portal.network_from == MessageNetworks.SIMPLEX:
-                network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
-                net_message_id = sendSimplexMsg(
+            elif portal.network_from in (
+                MessageNetworks.SIMPLEX,
+                MessageNetworks.NOSTR,
+            ):
+                network = self.getActiveNetwork(portal.network_from)
+                send_func = (
+                    sendSimplexMsg
+                    if portal.network_from == MessageNetworks.SIMPLEX
+                    else sendNostrMsg
+                )
+                net_message_id = send_func(
                     self,
                     network,
                     addr_portal,
@@ -963,10 +1039,15 @@ class BSXNetwork:
             net_message_id = self.sendSmsg(
                 addr_from, addr_to, payload_hex, msg_valid, cursor=cursor
             )
-        elif portal.network_from == MessageNetworks.SIMPLEX:
-            network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
+        elif portal.network_from in (MessageNetworks.SIMPLEX, MessageNetworks.NOSTR):
+            network = self.getActiveNetwork(portal.network_from)
+            send_func = (
+                sendSimplexMsg
+                if portal.network_from == MessageNetworks.SIMPLEX
+                else sendNostrMsg
+            )
 
-            net_message_id = sendSimplexMsg(
+            net_message_id = send_func(
                 self,
                 network,
                 addr_from,
@@ -1121,6 +1202,9 @@ class BSXNetwork:
         elif network_to_id == MessageNetworks.SIMPLEX:
             network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
             forwardSimplexMsg(self, network, portal_msg.message_bytes)
+        elif network_to_id == MessageNetworks.NOSTR:
+            network = self.getActiveNetwork(MessageNetworks.NOSTR)
+            forwardNostrMsg(self, network, portal_msg.message_bytes)
         else:
             raise ValueError(f"Unknown network ID {network_to_id}")
 
@@ -1192,6 +1276,8 @@ class BSXNetwork:
             for network in self.active_networks:
                 if network["type"] == "simplex":
                     readSimplexMsgs(self, network)
+                elif network["type"] == "nostr":
+                    readNostrMsgs(self, network)
 
         except Exception as ex:
             self.logException(f"updateNetwork {ex}")

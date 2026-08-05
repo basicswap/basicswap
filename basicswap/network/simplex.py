@@ -183,10 +183,12 @@ def encryptMsg(
     timestamp=None,
     deterministic=False,
     difficulty_target=0x1EFFFFFF,
+    pubkey_to: bytes = None,
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
+    if pubkey_to is None:
+        pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
     privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
     payload_format: int = 2

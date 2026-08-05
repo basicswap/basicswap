@@ -39,6 +39,9 @@
       <button class="tab-button border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="coins" id="coins-tab">
        Coins
       </button>
+      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="networks" id="networks-tab">
+       Networks
+      </button>
       <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="general" id="general-tab">
        General
       </button>
@@ -468,6 +471,150 @@
        </div>
       </div>
 
+     </div>
+     {% endfor %}
+    </div>
+    <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
+  </div>
+
+  <div class="tab-content hidden" id="networks" role="tabpanel" aria-labelledby="networks-tab">
+   <form method="post" id="networks-form">
+    <div class="space-y-6">
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl overflow-hidden">
+      <div class="px-6 py-4">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Network Bridging</h3>
+      </div>
+      <div class="px-6 py-6">
+       <div class="py-2">
+        <div class="flex items-center">
+         <input type="checkbox" id="bridge_networks" name="bridge_networks" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if networks_global.bridge_networks %} checked{% endif %}{% if not networks_global.can_bridge %} disabled{% endif %}>
+         <label for="bridge_networks" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Act as a bridge between networks</label>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Relay messages between message networks for other nodes. Not required to send and receive on multiple networks yourself. Uses extra bandwidth by forwarding encrypted traffic from third parties.</p>
+        {% if not networks_global.can_bridge %}
+        <p class="text-xs text-yellow-600 dark:text-yellow-400 ml-7 mt-1">At least two networks must be enabled to bridge.</p>
+        {% endif %}
+       </div>
+       <div class="flex justify-end items-center gap-4 pt-4">
+        <button name="apply_networks_bridge" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
+       </div>
+      </div>
+     </div>
+     {% for n in networks %}
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl overflow-hidden">
+      <div class="px-6 py-4">
+       <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ n.display_name }}</h3>
+        <div class="flex items-center space-x-4">
+         {% if n.active %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+          Active
+         </span>
+         {% elif n.enabled %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+          Enabled (restart required)
+         </span>
+         {% else %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+          Disabled
+         </span>
+         {% endif %}
+        </div>
+       </div>
+      </div>
+
+      <div class="px-6 py-6">
+       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700 dark:text-gray-300">
+         <div>Messages received: <span class="font-medium">{{ n.messages_received }}</span></div>
+         <div>Messages sent: <span class="font-medium">{{ n.messages_sent }}</span></div>
+         {% if n.bridged %}
+         <div>Bridged to: <span class="font-medium">{{ n.bridged|join(', ') }}</span></div>
+         {% endif %}
+        </div>
+       </div>
+
+       {% if n.type == 'nostr' %}
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Relays (one per line)</label>
+         <textarea rows="4" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_relays" placeholder="wss://relay.example.com">{{ n.relays_text }}</textarea>
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proof of Work Target (bits)</label>
+         <input type="number" min="0" max="32" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_pow_target" value="{{ n.pow_target }}">
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">NIP-13 difficulty for outgoing events, 0 to disable</p>
+        </div>
+        {% if n.pubkey %}
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Public Key</label>
+         <input type="text" readonly class="bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 text-sm rounded-lg block w-full p-2.5" value="{{ n.pubkey }}">
+        </div>
+        {% endif %}
+        {% if n.relay_status %}
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Relay Status</label>
+         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-1 text-sm">
+          {% for r in n.relay_status %}
+          <div class="flex items-center justify-between text-gray-700 dark:text-gray-300">
+           <span>{{ r.url }}</span>
+           {% if r.connected %}
+           <span class="text-green-600 dark:text-green-400">Connected</span>
+           {% else %}
+           <span class="text-red-600 dark:text-red-400">Disconnected</span>
+           {% endif %}
+          </div>
+          {% endfor %}
+         </div>
+        </div>
+        {% endif %}
+       </div>
+       <div class="flex justify-end items-center gap-4 pt-6 mt-6">
+        {% if n.enabled %}
+        <button name="disable_network_nostr" value="Disable" type="submit" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Disable</button>
+        {% else %}
+        <button name="enable_network_nostr" value="Enable" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
+        {% endif %}
+        <button name="apply_network_nostr" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
+       </div>
+       {% elif n.type == 'simplex' %}
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Server Address</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="simplex_server_address" value="{{ n.server_address }}" placeholder="smp://...">
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">WebSocket Port</label>
+         <input type="number" min="1" max="65535" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="simplex_ws_port" value="{{ n.ws_port }}">
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Group Link</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="simplex_group_link" value="{{ n.group_link }}">
+        </div>
+       </div>
+       <div class="flex justify-end items-center gap-4 pt-6 mt-6">
+        {% if n.enabled %}
+        <button name="disable_network_simplex" value="Disable" type="submit" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Disable</button>
+        {% else %}
+        <button name="enable_network_simplex" value="Enable" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
+        {% endif %}
+        <button name="apply_network_simplex" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
+       </div>
+       {% else %}
+       <p class="text-sm text-gray-600 dark:text-gray-300">Particl SMSG network, configured through the Particl core wallet.</p>
+       <div class="flex justify-end items-center gap-4 pt-6 mt-6">
+        {% if n.enabled %}
+        <button name="disable_network_smsg" value="Disable" type="submit" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Disable</button>
+        {% else %}
+        <button name="enable_network_smsg" value="Enable" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
+        {% endif %}
+       </div>
+       {% endif %}
+      </div>
      </div>
      {% endfor %}
     </div>

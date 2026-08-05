@@ -174,8 +174,15 @@ SIMPLEX_SERVER_ADDRESS = os.getenv(
 SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "127.0.0.1:9150")
 SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", None)
 
+NOSTR_RELAYS = os.getenv(
+    "NOSTR_RELAYS",
+    "wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net",
+)
+NOSTR_POW_TARGET = int(os.getenv("NOSTR_POW_TARGET", "0"))
+NOSTR_SOCKS_PROXY = os.getenv("NOSTR_SOCKS_PROXY", None)
 
-known_networks = ["smsg", "simplex"]
+
+known_networks = ["smsg", "simplex", "nostr"]
 disabled_networks = []
 
 
@@ -1868,19 +1875,41 @@ def main():
                 simplex_settings["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
 
             found_network: bool = False
-            for network in network_config_list:
+            for i, network in enumerate(network_config_list):
                 network_type: str = network.get("type", "unknown")
                 if network_type == "simplex":
                     found_network = True
                     if network.get("enabled", False) is True:
                         logger.warning(f"Network {network_type} is already active.")
-                    network = simplex_settings
-                else:
-                    # TODO: Allow multiple active networks
-                    network["enabled"] = False
-                    logger.info(f"Disabling network {network_type}.")
+                    network_config_list[i] = simplex_settings
             if found_network is False:
                 network_config_list.append(simplex_settings)
+        elif network_name == "nostr":
+            from coincurve.keys import PrivateKey
+
+            nostr_settings = {
+                "type": "nostr",
+                "relays": [r.strip() for r in NOSTR_RELAYS.split(",") if r.strip()],
+                "private_key": PrivateKey().to_hex(),
+                "pow_target": NOSTR_POW_TARGET,
+                "enabled": True,
+            }
+            if NOSTR_SOCKS_PROXY is not None:
+                nostr_settings["socks_proxy_override"] = NOSTR_SOCKS_PROXY
+
+            found_network: bool = False
+            for i, network in enumerate(network_config_list):
+                network_type: str = network.get("type", "unknown")
+                if network_type == "nostr":
+                    found_network = True
+                    if network.get("enabled", False) is True:
+                        logger.warning(f"Network {network_type} is already active.")
+                    # Keep the existing key if there is one
+                    if len(network.get("private_key", "")) == 64:
+                        nostr_settings["private_key"] = network["private_key"]
+                    network_config_list[i] = nostr_settings
+            if found_network is False:
+                network_config_list.append(nostr_settings)
         elif network_name == "smsg":
             found_network: bool = False
             for network in network_config_list:
@@ -1891,10 +1920,6 @@ def main():
                         logger.warning(f"Network {network_type} is already active.")
                     else:
                         network["enabled"] = True
-                else:
-                    # TODO: Allow multiple active networks
-                    network["enabled"] = False
-                    logger.info(f"Disabling network {network_type}.")
             if found_network is False:
                 network_config_list.append({"type": "smsg", "enabled": True})
         else:
@@ -1916,6 +1941,26 @@ def main():
         if len(network_config_list) < 1:
             network_config_list = [{"type": "smsg", "enabled": True}]
 
+        found_network: bool = False
+        num_enabled: int = 0
+        for network in network_config_list:
+            if network.get("enabled", True) is True:
+                num_enabled += 1
+        for network in network_config_list:
+            network_type: str = network.get("type", "unknown")
+            if network_type == network_name:
+                found_network = True
+                if network.get("enabled", True) is False:
+                    logger.warning(f"Network {network_type} is already disabled.")
+                elif num_enabled <= 1:
+                    exitWithError("Cannot disable the last enabled network.")
+                else:
+                    network["enabled"] = False
+        if found_network is False:
+            exitWithError(f"Network {network_name} not found in config.")
+
+        settings["networks"] = network_config_list
+        save_config(config_path, settings)
         logger.info(f"Done. Network {network_name} successfully disabled.")
         return 0
 
