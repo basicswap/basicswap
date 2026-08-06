@@ -97,6 +97,19 @@ _wallet_info_cache = {}
 _fee_reserve_cache = {}
 
 
+def revoke_offer(offer_id, args, refuse_if_negotiating: bool = False) -> bool:
+    result = read_json_api(
+        f"revokeoffer/{offer_id}", {"refuse_if_negotiating": refuse_if_negotiating}
+    )
+    if args.debug:
+        print("revokeoffer", result)
+    error = result.get("error") if isinstance(result, dict) else None
+    if error:
+        print(f"Offer {offer_id} not revoked: {error}")
+        return False
+    return True
+
+
 def get_wallet_info(coin_ticker):
     if coin_ticker not in _wallet_info_cache:
         _wallet_info_cache[coin_ticker] = read_json_api_wallet(f"wallets/{coin_ticker}")
@@ -893,17 +906,14 @@ def process_offers(args, config, script_state) -> None:
                     print(
                         f"Revoking offer {offer_id}, offer amount {offer_amount_from:.8f} > wallet balance {wallet_balance:.8f}"
                     )
-                    result = read_json_api(f"revokeoffer/{offer_id}", {})
-                    if args.debug:
-                        print("revokeoffer", result)
-                    else:
+                    if revoke_offer(offer_id, args):
                         print("Offer revoked, will repost with accurate amount")
-                    for i, prev_offer in enumerate(prev_template_offers):
-                        if prev_offer.get("offer_id") == offer_id:
-                            del prev_template_offers[i]
-                            break
-                    write_state(args.statefile, script_state)
-                    offers_found -= 1
+                        for i, prev_offer in enumerate(prev_template_offers):
+                            if prev_offer.get("offer_id") == offer_id:
+                                del prev_template_offers[i]
+                                break
+                        write_state(args.statefile, script_state)
+                        offers_found -= 1
                 elif template_fixed_remaining is not None and (
                     float(offer.get("tracking_filled_amount", 0))
                     + float(offer.get("tracking_in_flight_amount", 0))
@@ -916,20 +926,15 @@ def process_offers(args, config, script_state) -> None:
                         f"Revoking offer {offer_id}, budget changed, "
                         f"reposting with remaining {template_fixed_remaining:.8f}"
                     )
-                    result = read_json_api(f"revokeoffer/{offer_id}", {})
-                    if args.debug:
-                        print("revokeoffer", result)
-                    offers_found -= 1
+                    if revoke_offer(offer_id, args, refuse_if_negotiating=True):
+                        offers_found -= 1
                 elif wallet_balance <= min_coin_from_amt:
                     print(
                         "Revoking offer {}, wallet from balance below minimum".format(
                             offer_id
                         )
                     )
-                    result = read_json_api(f"revokeoffer/{offer_id}", {})
-                    if args.debug:
-                        print("revokeoffer", result)
-                    else:
+                    if revoke_offer(offer_id, args):
                         print("Offer revoked successfully")
             else:
                 coin_from_match = offer.get("coin_from") == coin_from_data["id"]

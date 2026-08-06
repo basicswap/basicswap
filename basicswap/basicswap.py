@@ -77,6 +77,7 @@ from .offer_tracking import (
     get_offer_tracking,
     init_offer_tracking,
     offer_budget_allows,
+    offer_has_negotiating_bid,
     offer_in_flight_amount,
     offer_tracking_is_exhausted,
     offer_tracking_remaining,
@@ -4483,7 +4484,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         return offer_id
 
-    def revokeOffer(self, offer_id, security_token=None) -> None:
+    def revokeOffer(
+        self, offer_id, security_token=None, refuse_if_negotiating: bool = False
+    ) -> None:
         self.log.info(f"Revoking offer {self.log.id(offer_id)}")
 
         cursor = self.openDB()
@@ -4492,6 +4495,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(offer, f"Offer not found: {self.log.id(offer_id)}.")
             ensure(offer.expire_at > self.getTime(), "Offer has expired")
             ensure(offer.active_ind == 1, "Offer not active")
+            # Don't revoke if negotiating
+            if refuse_if_negotiating:
+                ensure(
+                    offer_has_negotiating_bid(cursor, offer_id) is False,
+                    "Offer has a bid in negotiation",
+                )
 
             if (
                 offer.security_token is not None
