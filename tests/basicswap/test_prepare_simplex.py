@@ -81,9 +81,7 @@ class TestSimplexVerify(unittest.TestCase):
             return prepare.prepareSimplexClient(self.bin_dir, extra_opts={})
 
     def test_verify_release_hash_ok(self):
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         self.writeClient(GOOD_BINARY)
         with mock.patch.object(prepare, "SKIP_GPG_VALIDATION", True):
             release_hash = prepare.verifySimplexRelease(
@@ -92,9 +90,7 @@ class TestSimplexVerify(unittest.TestCase):
         assert release_hash == sha256hex(GOOD_BINARY)
 
     def test_verify_release_hash_mismatch(self):
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         self.writeClient(BAD_BINARY)
         with mock.patch.object(prepare, "SKIP_GPG_VALIDATION", True):
             with self.assertRaises(ValueError):
@@ -103,9 +99,7 @@ class TestSimplexVerify(unittest.TestCase):
                 )
 
     def test_fresh_download(self):
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         client_path = self.preparePatched()
 
         assert client_path == self.client_path
@@ -120,9 +114,7 @@ class TestSimplexVerify(unittest.TestCase):
         assert metadata["sha256"] == sha256hex(GOOD_BINARY)
 
     def test_existing_binary_verified(self):
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         self.writeClient(GOOD_BINARY)
         client_path = self.preparePatched()
 
@@ -132,9 +124,7 @@ class TestSimplexVerify(unittest.TestCase):
         assert os.path.isfile(os.path.join(self.simplex_dir, ".verified"))
 
     def test_existing_binary_mismatch_redownloads(self):
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         self.writeClient(BAD_BINARY)
         client_path = self.preparePatched()
 
@@ -159,9 +149,7 @@ class TestSimplexVerify(unittest.TestCase):
         assert not os.path.isfile(os.path.join(self.simplex_dir, ".verified"))
 
     def test_force_download(self):
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         self.writeClient(GOOD_BINARY)
         self.download_calls = []
         with (
@@ -176,9 +164,7 @@ class TestSimplexVerify(unittest.TestCase):
     def test_gpg_invalid_signature_rejected(self):
         if shutil.which("gpg") is None:
             raise unittest.SkipTest("gpg binary not found")
-        writeSumsFile(
-            self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)]
-        )
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         # Garbage detached signature must be rejected
         with open(os.path.join(self.release_dir, "_sha256sums.asc"), "wb") as fp:
             fp.write(b"not a signature")
