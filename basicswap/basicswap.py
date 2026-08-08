@@ -5567,7 +5567,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "Fixed-rate offer bids should set amount to instead of bid rate."
                 )
         else:
-            amount_to: int = offer.amount_to
+            amount_to: int = (
+                offer.amount_to
+                if amount == offer.amount_from
+                else (amount * offer.rate) // ci_from.COIN()
+            )
         bid_rate: int = ci_from.make_int(amount_to / amount, r=1)
 
         if offer.amount_negotiable and not offer.rate_negotiable:
