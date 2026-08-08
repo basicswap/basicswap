@@ -38,7 +38,7 @@ Environment variables read by prepare:
 - `SIMPLEX_GROUP_LINK`: **Required** when adding SimpleX.  The official
   link is given above.
 - `SIMPLEX_CHAT_VERSION`: `simplex-chat` release to download, default
-  `6.3.5`.
+  `7.0.0`.
 - `SIMPLEX_WS_PORT`: Local WebSocket port, default `5225`.
 - `SIMPLEX_SERVER_ADDRESS`: SMP server address.  Default:
   `smp://u2dS9sG8nMNURyZwqASV4yROM28Er0luVTx5X1CsMrU=@smp4.simplex.im`
@@ -47,15 +47,18 @@ Environment variables read by prepare:
   is used automatically unless this override is set.
 
 On macOS, prepare downloads the native build for your CPU (`aarch64` on
-Apple Silicon, `x86-64` on Intel).
+Apple Silicon, `x86-64` on Intel).  On Linux, prepare downloads the
+Ubuntu 24.04 build (`x86_64` on v7+, `x86-64` on v6).
 
 ## Binary verification
 
 The `simplex-chat` binary is verified the same way coin cores are: its
 SHA-256 hash must be listed in the release `_sha256sums` manifest, and
-the detached PGP signature over that manifest must verify against the
-bundled SimpleX Chat release key
-(`FB44AF81A45BDE327319797C85107E357D4A17FC`).
+the detached PGP signature over that manifest must verify against a
+SimpleX Chat release key.  Releases before v7 use
+`FB44AF81A45BDE327319797C85107E357D4A17FC`; v7 and later use
+`BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA` (`build@simplex.chat`).  The
+v7 key is bundled locally or fetched from a keyserver on first prepare.
 
 An existing binary at `bin/simplex/simplex-chat` is re-verified against
 the manifest for `SIMPLEX_CHAT_VERSION` each time prepare adds the
@@ -94,6 +97,7 @@ This adds a section to `basicswap.json`:
             "type": "simplex",
             "server_address": "smp://u2dS9sG8nMNURyZwqASV4yROM28Er0luVTx5X1CsMrU=@smp4.simplex.im",
             "client_path": "~/coinswaps/bin/simplex/simplex-chat",
+            "client_version": "7.0.0",
             "ws_port": 5225,
             "group_link": "https://smp4.simplex.im/g#6wTyP9neyb9ki_J8ntUqjL3q7CWWqPk3Z-o5bpuvfXg",
             "enabled": true

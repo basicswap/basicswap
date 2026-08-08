@@ -191,9 +191,26 @@ class TestSimplexVerify(unittest.TestCase):
         extra_opts = {"prepare_ctx": prepare_ctx}
 
         with mock.patch.object(prepare, "SKIP_GPG_VALIDATION", False):
-            with self.assertRaises(ValueError):
-                prepare.verifySimplexRelease(
-                    self.client_path, self.release_dir, extra_opts
+            with mock.patch.object(prepare, "ensureSimplexPubkeys", lambda gpg: None):
+                with self.assertRaises(ValueError):
+                    prepare.verifySimplexRelease(
+                        self.client_path, self.release_dir, extra_opts
+                    )
+
+    def test_linux_release_filename_v7(self):
+        with mock.patch.object(prepare, "USE_PLATFORM", "Linux"):
+            with mock.patch.object(prepare.platform, "machine", return_value="x86_64"):
+                assert (
+                    prepare.getSimplexClientReleaseFilename("7.0.0")
+                    == "simplex-chat-ubuntu-24_04-x86_64"
+                )
+
+    def test_linux_release_filename_v6(self):
+        with mock.patch.object(prepare, "USE_PLATFORM", "Linux"):
+            with mock.patch.object(prepare.platform, "machine", return_value="x86_64"):
+                assert (
+                    prepare.getSimplexClientReleaseFilename("6.3.5")
+                    == "simplex-chat-ubuntu-24_04-x86-64"
                 )
 
 

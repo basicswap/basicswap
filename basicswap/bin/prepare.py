@@ -165,10 +165,10 @@ disabled_coins = [
 ]
 
 # Network clients
-SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "6.3.5")
+SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "7.0.0")
 SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", 5225))
 SIMPLEX_SERVER_ADDRESS = os.getenv(
-    "SIMPLEX_CHAT_VERSION",
+    "SIMPLEX_SERVER_ADDRESS",
     "smp://u2dS9sG8nMNURyZwqASV4yROM28Er0luVTx5X1CsMrU=@smp4.simplex.im",
 )
 SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "127.0.0.1:9150")
@@ -197,7 +197,10 @@ expected_key_ids = {
         "015B4C837B245509E4AC8995223FDA69DEBEA82D",
         "7121BDE3555D9BE06BDDC68162FE85647DEDDA2E",
     ),
-    "SimpleX_Chat": ("FB44AF81A45BDE327319797C85107E357D4A17FC",),
+    "SimpleX_Chat": (
+        "FB44AF81A45BDE327319797C85107E357D4A17FC",  # v6 and earlier
+        "BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",  # v7+ (build@simplex.chat)
+    ),
 }
 
 GUIX_SSL_CERT_DIR = None
@@ -482,8 +485,24 @@ def importPubkey(gpg, pubkey_filename, pubkeyurls):
             logging.warning(f"Import from url failed: {e}")
 
 
-def getSimplexClientReleaseFilename() -> str:
+def parseSimplexMajorVersion(version: str) -> int:
+    parts = version.lstrip("v").split(".")
+    try:
+        return int(parts[0])
+    except (ValueError, IndexError):
+        return 0
+
+
+def getSimplexClientReleaseFilename(version: str = None) -> str:
+    version = version or SIMPLEX_CHAT_VERSION
+    major = parseSimplexMajorVersion(version)
+
     if USE_PLATFORM == "Linux":
+        machine = platform.machine()
+        if major >= 7:
+            if "arm" in machine or "aarch64" in machine:
+                return "simplex-chat-ubuntu-24_04-aarch64"
+            return "simplex-chat-ubuntu-24_04-x86_64"
         return "simplex-chat-ubuntu-24_04-x86-64"
     if USE_PLATFORM == "Darwin":
         if platform.machine() == "arm64":
@@ -492,6 +511,27 @@ def getSimplexClientReleaseFilename() -> str:
     if USE_PLATFORM == "Windows":
         return "simplex-chat-windows-x86-64"
     raise ValueError(f"Unknown platform {USE_PLATFORM}")
+
+
+SIMPLEX_BUILD_KEY_URLS = (
+    "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xBBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",
+    "https://keys.openpgp.org/vks/v1/by-fingerprint/BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",
+)
+
+
+def ensureSimplexPubkeys(gpg) -> None:
+    if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
+        importPubkey(gpg, "SimpleX_Chat.pgp", [])
+    if parseSimplexMajorVersion(SIMPLEX_CHAT_VERSION) >= 7:
+        build_key_id = expected_key_ids["SimpleX_Chat"][1]
+        if not havePubkey(gpg, build_key_id):
+            importPubkey(gpg, "SimpleX_Chat_build.pgp", list(SIMPLEX_BUILD_KEY_URLS))
+            if not havePubkey(gpg, build_key_id):
+                raise ValueError(
+                    "SimpleX v7 release signing key not found. "
+                    "Add basicswap/pgp/keys/SimpleX_Chat_build.pgp or allow "
+                    "prepare to fetch it from a keyserver."
+                )
 
 
 def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
@@ -526,8 +566,7 @@ def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
         downloadFile(assert_sig_url, assert_sig_path)
 
     gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
-    if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
-        importPubkey(gpg, "SimpleX_Chat.pgp", [])
+    ensureSimplexPubkeys(gpg)
     with open(assert_sig_path, "rb") as fp:
         verified = gpg.verify_file(fp, assert_path)
     ensureValidSignatureBy(
