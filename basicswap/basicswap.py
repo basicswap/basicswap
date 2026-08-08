@@ -15676,6 +15676,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 info["server_address"] = network.get("server_address", "")
                 info["ws_port"] = network.get("ws_port", "")
                 info["group_link"] = network.get("group_link", "")
+                if "client_version" in network:
+                    info["client_version"] = network["client_version"]
+                if "verify_status" in network:
+                    info["verify_status"] = network["verify_status"]
                 info["messages_received"] = (
                     self.num_group_simplex_messages_received
                     + self.num_direct_simplex_messages_received

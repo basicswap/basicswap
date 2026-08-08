@@ -173,6 +173,10 @@ SIMPLEX_SERVER_ADDRESS = os.getenv(
 )
 SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "127.0.0.1:9150")
 SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", None)
+# Trust an existing simplex-chat binary without hash/signature checks
+SIMPLEX_SKIP_VERIFY = toBool(os.getenv("SIMPLEX_SKIP_VERIFY", False))
+# Replace any existing simplex-chat binary with a fresh, verified download
+SIMPLEX_FORCE_DOWNLOAD = toBool(os.getenv("SIMPLEX_FORCE_DOWNLOAD", False))
 
 NOSTR_RELAYS = os.getenv(
     "NOSTR_RELAYS",
@@ -476,6 +480,137 @@ def importPubkey(gpg, pubkey_filename, pubkeyurls):
             break
         except Exception as e:
             logging.warning(f"Import from url failed: {e}")
+
+
+def getSimplexClientReleaseFilename() -> str:
+    if USE_PLATFORM == "Linux":
+        return "simplex-chat-ubuntu-24_04-x86-64"
+    if USE_PLATFORM == "Darwin":
+        if platform.machine() == "arm64":
+            return "simplex-chat-macos-aarch64"
+        return "simplex-chat-macos-x86-64"
+    if USE_PLATFORM == "Windows":
+        return "simplex-chat-windows-x86-64"
+    raise ValueError(f"Unknown platform {USE_PLATFORM}")
+
+
+def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
+    """Verify a simplex-chat binary against the upstream release manifest.
+
+    Ensures the file's SHA-256 is listed in the release _sha256sums file and
+    verifies the detached PGP signature over that manifest, mirroring the
+    coin core verification flow.  Honours SKIP_GPG_VALIDATION the same way
+    coin cores do: the hash is always checked, only the signature is skipped.
+
+    Returns the file hash on success, raises ValueError on failure.
+    """
+    assert_filename = "_sha256sums"
+    assert_path = os.path.join(release_dir, assert_filename)
+    assert_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{assert_filename}"
+    if not os.path.exists(assert_path):
+        downloadFile(assert_url, assert_path)
+
+    release_hash: str = getFileHash(file_path)
+    logger.info(f"{os.path.basename(file_path)} hash: {release_hash}")
+    ensureFileHashInFile(release_hash, assert_path, logger)
+
+    if SKIP_GPG_VALIDATION:
+        logger.warning(
+            "Skipping binary signature check as SKIP_GPG_VALIDATION env var is set."
+        )
+        return release_hash
+
+    assert_sig_path = assert_path + ".asc"
+    assert_sig_url = assert_url + ".asc"
+    if not os.path.exists(assert_sig_path):
+        downloadFile(assert_sig_url, assert_sig_path)
+
+    gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
+    if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
+        importPubkey(gpg, "SimpleX_Chat.pgp", [])
+    with open(assert_sig_path, "rb") as fp:
+        verified = gpg.verify_file(fp, assert_path)
+    ensureValidSignatureBy(
+        verified,
+        "SimpleX_Chat",
+        expected_key_ids,
+        logger,
+        filepath=assert_path,
+    )
+    return release_hash
+
+
+def writeSimplexVerifiedMetadata(simplex_chat_bin_dir: str, release_hash: str) -> None:
+    metadata_path = os.path.join(simplex_chat_bin_dir, ".verified")
+    metadata = {
+        "version": SIMPLEX_CHAT_VERSION,
+        "sha256": release_hash,
+        "verified_at": int(time.time()),
+    }
+    with open(metadata_path, "w") as fp:
+        json.dump(metadata, fp, indent=4)
+    logger.info(f"Wrote verification metadata: {metadata_path}")
+
+
+def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
+    """Download and/or verify the simplex-chat client binary.
+
+    An existing binary at the client path is verified against the release
+    manifest for SIMPLEX_CHAT_VERSION and redownloaded if it doesn't match,
+    unless SIMPLEX_SKIP_VERIFY is set.  SIMPLEX_FORCE_DOWNLOAD always
+    replaces an existing binary with a fresh, verified download.
+
+    Returns the path to the client binary.
+    """
+    simplex_chat_bin_dir = os.path.join(bin_dir, "simplex")
+    simplex_chat_client_path = os.path.join(simplex_chat_bin_dir, "simplex-chat")
+    simplex_chat_release_dir = os.path.join(simplex_chat_bin_dir, SIMPLEX_CHAT_VERSION)
+    if not os.path.exists(simplex_chat_release_dir):
+        os.makedirs(simplex_chat_release_dir)
+
+    if os.path.isfile(simplex_chat_client_path):
+        if SIMPLEX_FORCE_DOWNLOAD:
+            logger.info(
+                f"SIMPLEX_FORCE_DOWNLOAD is set, replacing existing Simplex client: {simplex_chat_client_path}"
+            )
+            os.remove(simplex_chat_client_path)
+        elif SIMPLEX_SKIP_VERIFY:
+            logger.warning(
+                f"SIMPLEX_SKIP_VERIFY is set, using existing Simplex client without verification: {simplex_chat_client_path}"
+            )
+            return simplex_chat_client_path
+        else:
+            logger.info(
+                f"Verifying existing Simplex client: {simplex_chat_client_path}"
+            )
+            try:
+                release_hash = verifySimplexRelease(
+                    simplex_chat_client_path, simplex_chat_release_dir, extra_opts
+                )
+                writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
+                return simplex_chat_client_path
+            except ValueError as e:
+                logger.warning(
+                    f"Existing Simplex client failed verification for v{SIMPLEX_CHAT_VERSION}: {e}"
+                )
+                logger.info("Redownloading Simplex client.")
+                os.remove(simplex_chat_client_path)
+
+    simplex_chat_release_file = getSimplexClientReleaseFilename()
+    simplex_chat_release_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{simplex_chat_release_file}"
+    simplex_chat_release_path = os.path.join(
+        simplex_chat_release_dir, simplex_chat_release_file
+    )
+    downloadRelease(simplex_chat_release_url, simplex_chat_release_path, extra_opts)
+
+    release_hash = verifySimplexRelease(
+        simplex_chat_release_path, simplex_chat_release_dir, extra_opts
+    )
+
+    shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
+    os.chmod(simplex_chat_client_path, 0o755)
+    writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
+    return simplex_chat_client_path
 
 
 def testTorConnection():
@@ -1807,66 +1942,13 @@ def main():
             if SIMPLEX_GROUP_LINK is None:
                 raise ValueError("SIMPLEX_GROUP_LINK must be set.")
 
-            simplex_chat_bin_dir = os.path.join(bin_dir, "simplex")
-            simplex_chat_client_path = os.path.join(
-                simplex_chat_bin_dir, "simplex-chat"
-            )
-            simplex_chat_release_dir = os.path.join(
-                simplex_chat_bin_dir, SIMPLEX_CHAT_VERSION
-            )
-            if not os.path.exists(simplex_chat_release_dir):
-                os.makedirs(simplex_chat_release_dir)
-
-            if USE_PLATFORM == "Linux":
-                simplex_chat_release_file = "simplex-chat-ubuntu-24_04-x86-64"
-            elif USE_PLATFORM == "Darwin":
-                simplex_chat_release_file = "simplex-chat-macos-x86-64"
-            elif USE_PLATFORM == "Windows":
-                simplex_chat_release_file = "simplex-chat-windows-x86-64"
-            else:
-                raise ValueError(f"Unknown platform {USE_PLATFORM}")
-
-            simplex_chat_release_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{simplex_chat_release_file}"
-            simplex_chat_release_path = os.path.join(
-                simplex_chat_release_dir, simplex_chat_release_file
-            )
-            downloadRelease(
-                simplex_chat_release_url, simplex_chat_release_path, extra_opts
-            )
-
-            assert_filename = "_sha256sums"
-            assert_path = os.path.join(simplex_chat_release_dir, assert_filename)
-            assert_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/_sha256sums"
-            if not os.path.exists(assert_path):
-                downloadFile(assert_url, assert_path)
-
-            release_hash: str = getFileHash(simplex_chat_release_path)
-            logger.info(f"{simplex_chat_release_file} hash: {release_hash}")
-            ensureFileHashInFile(release_hash, assert_path, logger)
-
-            assert_sig_filename = assert_filename + ".asc"
-            assert_sig_url = assert_url + ".asc"
-            assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
-            if not os.path.exists(assert_sig_path):
-                downloadFile(assert_sig_url, assert_sig_path)
-
-            gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
-            pubkey_filename = "SimpleX_Chat.pgp"
-            pubkeyurls = []
-            if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
-                importPubkey(gpg, pubkey_filename, pubkeyurls)
-            with open(assert_sig_path, "rb") as fp:
-                verified = gpg.verify_file(fp, assert_path)
-            ensureValidSignatureBy(
-                verified, "SimpleX_Chat", expected_key_ids, logger, filepath=assert_path
-            )
-
-            shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
+            simplex_chat_client_path = prepareSimplexClient(bin_dir, extra_opts)
 
             simplex_settings = {
                 "type": "simplex",
                 "server_address": SIMPLEX_SERVER_ADDRESS,
                 "client_path": simplex_chat_client_path,
+                "client_version": SIMPLEX_CHAT_VERSION,
                 "ws_port": SIMPLEX_WS_PORT,
                 "group_link": SIMPLEX_GROUP_LINK,
                 "enabled": True,
