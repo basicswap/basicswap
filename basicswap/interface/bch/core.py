@@ -13,7 +13,7 @@ from basicswap.interface.prepare_util import (
     ensurePubkey,
 )
 
-BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "29.0.0")
+BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "29.1.0")
 BITCOINCASH_VERSION_TAG = os.getenv("BITCOINCASH_VERSION_TAG", "")
 bitcoincash_signers = {"Calin_Culianu": ("D465135F97D0047E18E99DC321810A542031C02C",)}
 
