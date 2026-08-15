@@ -55,9 +55,7 @@ class BCHPrepare(CoinPrepareModule):
 
     def getReleaseFilename(self, ctx: PrepareContext, arch_name: str) -> str:
         versions = self.version.split(".")
-        if int(versions[0]) > 29 or (
-            int(versions[0]) == 29 and int(versions[1]) >= 1
-        ):
+        if int(versions[0]) > 29 or (int(versions[0]) == 29 and int(versions[1]) >= 1):
             os_name, _ = getOSDirNames(ctx.bin_arch)
             if os_name == "osx":
                 if platform.machine() == "arm64":
