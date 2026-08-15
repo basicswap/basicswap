@@ -884,7 +884,11 @@ def js_revokeoffer(self, url_split, post_string, is_json) -> bytes:
     swap_client.checkSystemStatus()
     offer_id = bytes.fromhex(url_split[3])
     ensure(len(offer_id) == 28, "Invalid offer id size")
-    swap_client.revokeOffer(offer_id)
+    post_data = {} if post_string == "" else getFormData(post_string, is_json)
+    refuse_if_negotiating: bool = toBool(
+        get_data_entry_or(post_data, "refuse_if_negotiating", False)
+    )
+    swap_client.revokeOffer(offer_id, refuse_if_negotiating=refuse_if_negotiating)
     return bytes(json.dumps({"revoked_offer": offer_id.hex()}), "UTF-8")
 
 

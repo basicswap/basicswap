@@ -8,7 +8,21 @@ import time
 
 from enum import IntEnum
 
+from .basicswap_util import ActionTypes, BidStates
 from .db import OfferTracking
+
+# Accepted, but the counterparty can still walk away without committing anything.
+NEGOTIATING_STATES = (
+    BidStates.BID_ACCEPTED,
+    BidStates.SWAP_DELAYING,
+    BidStates.BID_REQUEST_ACCEPTED,
+)
+
+ACCEPT_ACTION_TYPES = (
+    ActionTypes.ACCEPT_BID,
+    ActionTypes.ACCEPT_XMR_BID,
+    ActionTypes.ACCEPT_AS_REV_BID,
+)
 
 
 class OfferTrackingModes(IntEnum):
@@ -178,6 +192,21 @@ def offer_in_flight_amount(
             continue
         total += amount if amount else 0
     return total
+
+
+def offer_has_negotiating_bid(cursor, offer_id: bytes) -> bool:
+    state_in = ", ".join(str(int(s)) for s in NEGOTIATING_STATES)
+    action_in = ", ".join(str(int(a)) for a in ACCEPT_ACTION_TYPES)
+    query = f"""SELECT 1 FROM bids
+           WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
+           AND bids.state IN ({state_in})
+           UNION
+           SELECT 1 FROM bids
+           JOIN actions ON actions.linked_id = bids.bid_id AND actions.active_ind = 1 AND actions.action_type IN ({action_in})
+           WHERE bids.active_ind = 1 AND bids.offer_id = :offer_id
+           LIMIT 1
+        """
+    return cursor.execute(query, {"offer_id": offer_id}).fetchone() is not None
 
 
 def complete_offer_fill(self, offer_id: bytes, amount: int, cursor) -> bool:
