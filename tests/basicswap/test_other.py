@@ -97,6 +97,59 @@ class Test(unittest.TestCase):
         xmr_coin_settings.update(REQUIRED_SETTINGS)
         return XMRInterface(xmr_coin_settings, "regtest")
 
+    def test_btc_wallet_info_balance_compatibility(self):
+        ci = self.ci_btc()
+
+        # Bitcoin Core < 30: getwalletinfo still returns balance fields.
+        calls = []
+
+        def legacy_rpc(method, params=None):
+            calls.append(method)
+            if method == "getwalletinfo":
+                return {
+                    "balance": 1.25,
+                    "unconfirmed_balance": 0.5,
+                    "immature_balance": 0.25,
+                }
+            if method == "listlockunspent":
+                return []
+            raise ValueError(f"Unexpected RPC call: {method}")
+
+        ci.rpc_wallet = legacy_rpc
+        wallet_info = ci.getWalletInfo()
+
+        assert wallet_info["balance"] == 1.25
+        assert wallet_info["unconfirmed_balance"] == 0.5
+        assert wallet_info["immature_balance"] == 0.25
+        assert "getbalances" not in calls
+
+        # Bitcoin Core >= 30: balance fields moved to getbalances.
+        calls.clear()
+
+        def core30_rpc(method, params=None):
+            calls.append(method)
+            if method == "getwalletinfo":
+                return {"walletname": "bsx_wallet"}
+            if method == "getbalances":
+                return {
+                    "mine": {
+                        "trusted": 1.25,
+                        "untrusted_pending": 0.5,
+                        "immature": 0.25,
+                    }
+                }
+            if method == "listlockunspent":
+                return []
+            raise ValueError(f"Unexpected RPC call: {method}")
+
+        ci.rpc_wallet = core30_rpc
+        wallet_info = ci.getWalletInfo()
+
+        assert wallet_info["balance"] == 1.25
+        assert wallet_info["unconfirmed_balance"] == 0.5
+        assert wallet_info["immature_balance"] == 0.25
+        assert calls.count("getbalances") == 1
+
     def test_serialise_num(self):
         def test_case(v, nb=None):
             b = SerialiseNum(v)

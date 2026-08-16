@@ -902,6 +902,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             }
 
         rv = self.rpc_wallet("getwalletinfo")
+        if self.coin_type() == Coins.BTC and any(
+            field not in rv
+            for field in ("balance", "unconfirmed_balance", "immature_balance")
+        ):
+            # Bitcoin Core 30 removed these fields from getwalletinfo.
+            balances = self.rpc_wallet("getbalances")["mine"]
+            rv.setdefault("balance", balances["trusted"])
+            rv.setdefault(
+                "unconfirmed_balance", balances["untrusted_pending"]
+            )
+            rv.setdefault("immature_balance", balances["immature"])
+
         rv["encrypted"] = "unlocked_until" in rv
         rv["locked"] = rv.get("unlocked_until", 1) <= 0
         rv["locked_utxos"] = len(self.rpc_wallet("listlockunspent"))
