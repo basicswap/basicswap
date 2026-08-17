@@ -19,6 +19,22 @@ from basicswap.util import TemporaryError
 CERT_PINS_FILENAME = "electrum_cert_pins.json"
 
 
+def _is_private_address(host: str) -> bool:
+    try:
+        import ipaddress
+
+        addr = ipaddress.ip_address(host)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return host == "localhost"
+
+
+def _is_authenticated_transport(host: str) -> bool:
+    # A .onion address authenticates the endpoint by itself, and a LAN server
+    # is inside the operator's own trust boundary.
+    return host.endswith(".onion") or _is_private_address(host)
+
+
 def _close_socket_safe(sock):
     if sock:
         try:
@@ -136,21 +152,11 @@ class ElectrumConnection:
         self._proxy_host = proxy_host
         self._proxy_port = proxy_port
 
-    @staticmethod
-    def _is_private_address(host: str) -> bool:
-        try:
-            import ipaddress
-
-            addr = ipaddress.ip_address(host)
-            return addr.is_private or addr.is_loopback or addr.is_link_local
-        except ValueError:
-            return host == "localhost"
-
     def _open_socket(self):
         use_proxy = (
             self._proxy_host
             and self._proxy_port
-            and not self._is_private_address(self._host)
+            and not _is_private_address(self._host)
         )
         if use_proxy:
             import socks
@@ -217,10 +223,7 @@ class ElectrumConnection:
         try:
             sock = self._open_socket()
             if not self._use_ssl:
-                if self._log and not (
-                    self._host.endswith(".onion")
-                    or self._is_private_address(self._host)
-                ):
+                if self._log and not _is_authenticated_transport(self._host):
                     self._log.warning(
                         f"Electrum connection to {self._host}:{self._port} is unencrypted"
                     )
@@ -607,15 +610,37 @@ def scripthash_from_address(address, network_params):
     raise ValueError(f"Unable to decode address: {address}")
 
 
+SSL_MARKERS = ("s", "ssl", "true", "1", "yes")
+PLAINTEXT_MARKERS = ("t", "tcp", "false", "0", "no")
+
+
 def _parse_server_string(server_str):
-    parts = server_str.strip().split(":")
-    host = parts[0]
-    port = int(parts[1]) if len(parts) > 1 else 50002
-    if len(parts) > 2:
-        ssl_str = parts[2].lower()
-        use_ssl = ssl_str in ("true", "1", "yes", "ssl")
+    # host:port[:s|t]. The port never implies the transport: an entry without a
+    # marker is TLS unless the transport is authenticated some other way.
+    remainder = server_str.strip()
+    host = ""
+    if remainder.startswith("[") and "]" in remainder:
+        host_end = remainder.index("]")
+        host = remainder[1:host_end]
+        remainder = remainder[host_end + 1 :]
+    parts = remainder.rsplit(":", 2)
+    host = host or parts[0]
+    if not host:
+        raise ValueError(f"No host in Electrum server entry: {server_str}")
+
+    marker = parts[2].lower() if len(parts) > 2 else None
+    if marker is None:
+        use_ssl = not _is_authenticated_transport(host)
+    elif marker in SSL_MARKERS:
+        use_ssl = True
+    elif marker in PLAINTEXT_MARKERS:
+        use_ssl = False
     else:
-        use_ssl = port != 50001
+        raise ValueError(f"Unknown Electrum transport marker: {server_str}")
+
+    port = (
+        int(parts[1]) if len(parts) > 1 and parts[1] else (50002 if use_ssl else 50001)
+    )
     return {"host": host, "port": port, "ssl": use_ssl}
 
 
@@ -681,21 +706,8 @@ class ElectrumServer:
 
         use_tor = proxy_host is not None and proxy_port is not None
 
-        user_clearnet = []
-        if clearnet_servers:
-            for srv in clearnet_servers:
-                if isinstance(srv, str):
-                    user_clearnet.append(_parse_server_string(srv))
-                elif isinstance(srv, dict):
-                    user_clearnet.append(srv)
-
-        user_onion = []
-        if onion_servers:
-            for srv in onion_servers:
-                if isinstance(srv, str):
-                    user_onion.append(_parse_server_string(srv))
-                elif isinstance(srv, dict):
-                    user_onion.append(srv)
+        user_clearnet = self._parse_servers(clearnet_servers)
+        user_onion = self._parse_servers(onion_servers)
 
         final_onion = (
             user_onion if user_onion else DEFAULT_ONION_SERVERS.get(coin_name, [])
@@ -729,6 +741,24 @@ class ElectrumServer:
                 self._log.info(
                     f"ElectrumServer {coin_name}: {len(final_clearnet)} clearnet servers"
                 )
+
+    def _parse_servers(self, servers) -> list:
+        parsed = []
+        errors = []
+        for srv in servers if servers else []:
+            if isinstance(srv, dict):
+                parsed.append(srv)
+                continue
+            if not isinstance(srv, str):
+                errors.append(f"{srv!r} is not a server string")
+                continue
+            try:
+                parsed.append(_parse_server_string(srv))
+            except ValueError as e:
+                errors.append(str(e))
+        if errors:
+            raise ValueError("Invalid Electrum server config: " + "; ".join(errors))
+        return parsed
 
     def _get_server(self, index):
         if not self._servers:
