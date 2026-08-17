@@ -6,6 +6,7 @@
 
 import hashlib
 import json
+import os
 import queue
 import select
 import socket
@@ -14,6 +15,8 @@ import threading
 import time
 
 from basicswap.util import TemporaryError
+
+CERT_PINS_FILENAME = "electrum_cert_pins.json"
 
 
 def _close_socket_safe(sock):
@@ -26,6 +29,52 @@ def _close_socket_safe(sock):
             sock.close()
         except Exception:
             pass
+
+
+class CertPinStore:
+    # Fingerprints of servers no CA vouches for, trusted on first use.
+    # A corrupt store raises rather than falling back to trusting anything.
+
+    def __init__(self, path=None):
+        self._path = path
+        self._lock = threading.Lock()
+        self._pins = {}
+        self._loaded = False
+
+    def _load(self):
+        if self._loaded:
+            return
+        if self._path and os.path.exists(self._path):
+            with open(self._path) as fp:
+                loaded = json.load(fp)
+            if not isinstance(loaded, dict) or not all(
+                isinstance(pins, dict) for pins in loaded.values()
+            ):
+                raise ValueError(f"Malformed cert pin store: {self._path}")
+            self._pins = loaded
+        self._loaded = True
+
+    def _save(self):
+        if not self._path:
+            return
+        tmp_path = self._path + ".tmp"
+        with open(tmp_path, "w") as fp:
+            json.dump(self._pins, fp, indent=1, sort_keys=True)
+        os.replace(tmp_path, self._path)
+
+    def get(self, coin_name: str, key: str):
+        with self._lock:
+            self._load()
+            return self._pins.get(coin_name, {}).get(key)
+
+    def set(self, coin_name: str, key: str, fingerprint: str):
+        with self._lock:
+            self._load()
+            coin_pins = self._pins.setdefault(coin_name, {})
+            if coin_pins.get(key) == fingerprint:
+                return
+            coin_pins[key] = fingerprint
+            self._save()
 
 
 DEFAULT_ELECTRUM_SERVERS = {
@@ -64,11 +113,15 @@ class ElectrumConnection:
         log=None,
         proxy_host=None,
         proxy_port=None,
+        cert_pins=None,
+        coin_name="",
     ):
         self._host = host
         self._port = port
         self._use_ssl = use_ssl
         self._timeout = timeout
+        self._coin_name = coin_name
+        self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
         self._socket = None
         self._request_id = 0
         self._lock = threading.Lock()
@@ -93,41 +146,106 @@ class ElectrumConnection:
         except ValueError:
             return host == "localhost"
 
+    def _open_socket(self):
+        use_proxy = (
+            self._proxy_host
+            and self._proxy_port
+            and not self._is_private_address(self._host)
+        )
+        if use_proxy:
+            import socks
+
+            sock = socks.socksocket()
+            sock.set_proxy(socks.SOCKS5, self._proxy_host, self._proxy_port, rdns=True)
+            sock.settimeout(self._timeout)
+            sock.connect((self._host, self._port))
+            if self._log:
+                self._log.debug(
+                    f"Electrum connecting via proxy {self._proxy_host}:{self._proxy_port} to {self._host}:{self._port}"
+                )
+            return sock
+        sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
+        if self._log and self._proxy_host and self._proxy_port:
+            self._log.debug(
+                f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
+            )
+        return sock
+
+    def server_key(self) -> str:
+        return f"{self._host}:{self._port}"
+
+    @staticmethod
+    def _fingerprint(ssock) -> str:
+        return hashlib.sha256(ssock.getpeercert(True)).hexdigest()
+
+    def _wrap_pinned(self, sock):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        ssock = context.wrap_socket(sock, server_hostname=self._host)
+        fingerprint = self._fingerprint(ssock)
+        key = self.server_key()
+        try:
+            pinned = self._cert_pins.get(self._coin_name, key)
+        except Exception as store_error:
+            _close_socket_safe(ssock)
+            raise ValueError(
+                f"no CA vouches for {key} and its pin cannot be read: {store_error}. "
+                f"Fix or delete {CERT_PINS_FILENAME}"
+            )
+        if pinned is None:
+            self._cert_pins.set(self._coin_name, key, fingerprint)
+            if self._log:
+                self._log.warning(
+                    f"Electrum server {key} presented a certificate no CA vouches for, "
+                    f"pinned sha256:{fingerprint}"
+                )
+        elif pinned != fingerprint:
+            _close_socket_safe(ssock)
+            if self._log:
+                self._log.error(
+                    f"Electrum server {key} certificate changed, refusing to connect"
+                )
+            raise ValueError(
+                f"certificate mismatch, pinned sha256:{pinned} got sha256:{fingerprint}. "
+                f"Remove {self._coin_name} / {key} from {CERT_PINS_FILENAME} to trust "
+                "the new certificate"
+            )
+        return ssock
+
     def connect(self):
         try:
-            use_proxy = (
-                self._proxy_host
-                and self._proxy_port
-                and not self._is_private_address(self._host)
-            )
-            if use_proxy:
-                import socks
-
-                sock = socks.socksocket()
-                sock.set_proxy(
-                    socks.SOCKS5, self._proxy_host, self._proxy_port, rdns=True
-                )
-                sock.settimeout(self._timeout)
-                sock.connect((self._host, self._port))
-                if self._log:
-                    self._log.debug(
-                        f"Electrum connecting via proxy {self._proxy_host}:{self._proxy_port} to {self._host}:{self._port}"
+            sock = self._open_socket()
+            if not self._use_ssl:
+                if self._log and not (
+                    self._host.endswith(".onion")
+                    or self._is_private_address(self._host)
+                ):
+                    self._log.warning(
+                        f"Electrum connection to {self._host}:{self._port} is unencrypted"
                     )
-            else:
-                sock = socket.create_connection(
-                    (self._host, self._port), timeout=self._timeout
-                )
-                if self._log and self._proxy_host and self._proxy_port:
-                    self._log.debug(
-                        f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
-                    )
-            if self._use_ssl:
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                self._socket = context.wrap_socket(sock, server_hostname=self._host)
-            else:
                 self._socket = sock
+                self._connected = True
+                return
+            try:
+                context = ssl.create_default_context()
+                ssock = context.wrap_socket(sock, server_hostname=self._host)
+                # Recorded so a CA-backed server cannot later be downgraded to
+                # an unvouched-for certificate by trust-on-first-use.
+                try:
+                    self._cert_pins.set(
+                        self._coin_name, self.server_key(), self._fingerprint(ssock)
+                    )
+                except Exception as store_error:
+                    if self._log:
+                        self._log.warning(
+                            f"Cannot record certificate pin for {self.server_key()}: "
+                            f"{store_error}"
+                        )
+                self._socket = ssock
+            except ssl.SSLCertVerificationError:
+                _close_socket_safe(sock)
+                self._socket = self._wrap_pinned(self._open_socket())
             self._connected = True
         except Exception as e:
             self._connected = False
@@ -510,9 +628,11 @@ class ElectrumServer:
         log=None,
         proxy_host=None,
         proxy_port=None,
+        cert_pins=None,
     ):
         self._coin_name = coin_name
         self._log = log
+        self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
         self._connection = None
         self._current_server_idx = 0
         self._lock = threading.Lock()
@@ -625,6 +745,8 @@ class ElectrumServer:
                 log=self._log,
                 proxy_host=self._proxy_host,
                 proxy_port=self._proxy_port,
+                cert_pins=self._cert_pins,
+                coin_name=self._coin_name,
             )
             conn.connect()
             connect_time = (time.time() - start_time) * 1000
@@ -1259,6 +1381,8 @@ class ElectrumServer:
                 log=self._log,
                 proxy_host=self._proxy_host,
                 proxy_port=self._proxy_port,
+                cert_pins=self._cert_pins,
+                coin_name=self._coin_name,
             )
             test_conn.connect()
             latency = test_conn.ping()

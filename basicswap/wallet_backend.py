@@ -160,6 +160,7 @@ class ElectrumBackend(WalletBackend):
         chain="mainnet",
         proxy_host=None,
         proxy_port=None,
+        cert_pins=None,
     ):
         from basicswap.interface.electrumx import ElectrumServer
         from basicswap.chainparams import Coins, chainparams
@@ -188,6 +189,7 @@ class ElectrumBackend(WalletBackend):
             log=log,
             proxy_host=proxy_host,
             proxy_port=proxy_port,
+            cert_pins=cert_pins,
         )
 
         self._realtime_callback = None
