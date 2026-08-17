@@ -51,7 +51,6 @@ class WalletManager:
     }
 
     GAP_LIMIT = 50
-    ELECTRUM_GAP_LIMIT = 20
 
     def __init__(self, swap_client, log):
         self._gap_limits: dict[Coins, int] = {}
@@ -166,8 +165,8 @@ class WalletManager:
     def _findReusableAddress(self, coin_type: Coins, internal: bool, cursor):
         query = (
             "SELECT derivation_index, address FROM wallet_addresses"
-            " WHERE coin_type = ? AND is_internal = ? AND is_funded = 0"
-            " AND ever_used = 0"
+            " WHERE coin_type = ? AND is_internal = ? AND ever_used = 0"
+            " AND COALESCE(cached_balance, 0) = 0"
             " ORDER BY derivation_index ASC LIMIT 1"
         )
         cursor.execute(query, (int(coin_type), internal))
@@ -176,21 +175,31 @@ class WalletManager:
             return row[0], row[1]
         return None, None
 
-    def _trailingUnusedGap(
-        self, coin_type: Coins, internal: bool, next_index: int, cursor
-    ) -> int:
+    def _nextUnusedIndex(self, coin_type: Coins, internal: bool, cursor) -> int:
         cursor.execute(
-            "SELECT derivation_index, ever_used FROM wallet_addresses"
-            " WHERE coin_type = ? AND is_internal = ? AND derivation_index < ?"
-            " ORDER BY derivation_index DESC",
-            (int(coin_type), internal, next_index),
+            "SELECT MAX(derivation_index) FROM wallet_addresses"
+            " WHERE coin_type = ? AND is_internal = ?",
+            (int(coin_type), internal),
         )
-        gap = 0
-        for _, ever_used in cursor.fetchall():
-            if ever_used:
-                break
-            gap += 1
-        return gap
+        row = cursor.fetchone()
+        return 0 if row is None or row[0] is None else row[0] + 1
+
+    def _setHighWaterIndex(self, state, internal: bool, index: int, cursor) -> None:
+        # last_*_index is the highest index derived, used to extend the pool and
+        # to build the subscription window. It is not an allocation cursor.
+        if state is None:
+            return
+        current = (
+            state.last_internal_index if internal else state.last_external_index
+        ) or 0
+        if index <= current:
+            return
+        if internal:
+            state.last_internal_index = index
+        else:
+            state.last_external_index = index
+        state.updated_at = int(time.time())
+        self._swap_client.updateDB(state, cursor, constraints=["coin_type"])
 
     def getNewAddress(
         self, coin_type: Coins, internal: bool = False, label: str = "", cursor=None
@@ -219,64 +228,25 @@ class WalletManager:
                     ),
                     use_cursor,
                 )
-            else:
-                if internal:
-                    next_index = (state.last_internal_index or 0) + 1
-                else:
-                    next_index = (state.last_external_index or 0) + 1
-
-            trailing_gap = self._trailingUnusedGap(
-                coin_type, internal, next_index, use_cursor
+            # Always hand out the lowest index never handed out, and only derive
+            # past the pool once every index in it has been. Skipping an index
+            # strands every later address behind a gap a restoring wallet stops
+            # scanning at.
+            reuse_index, reuse_addr = self._findReusableAddress(
+                coin_type, internal, use_cursor
             )
-            if trailing_gap + 1 >= self.ELECTRUM_GAP_LIMIT:
-                reuse_index, reuse_addr = self._findReusableAddress(
-                    coin_type, internal, use_cursor
-                )
-                if reuse_addr is not None:
-                    self._log.debug(
-                        f"Reusing unfunded address at index {reuse_index}"
-                        f" (next would be {next_index},"
-                        f" trailing unused gap {trailing_gap},"
-                        f" electrum gap limit {self.ELECTRUM_GAP_LIMIT})"
-                    )
-                    use_cursor.execute(
-                        "UPDATE wallet_addresses SET ever_used = 1"
-                        " WHERE coin_type = ? AND derivation_index = ?"
-                        " AND is_internal = ?",
-                        (int(coin_type), reuse_index, internal),
-                    )
-                    self._swap_client.commitDB()
-                    return reuse_addr
-
-            existing = self._swap_client.queryOne(
-                WalletAddress,
-                use_cursor,
-                {
-                    "coin_type": int(coin_type),
-                    "derivation_index": next_index,
-                    "is_internal": internal,
-                },
-            )
-
-            if existing:
-                address = existing.address
+            if reuse_addr is not None:
                 use_cursor.execute(
                     "UPDATE wallet_addresses SET ever_used = 1"
                     " WHERE coin_type = ? AND derivation_index = ?"
                     " AND is_internal = ?",
-                    (int(coin_type), next_index, internal),
+                    (int(coin_type), reuse_index, internal),
                 )
-                if state:
-                    if internal:
-                        state.last_internal_index = next_index
-                    else:
-                        state.last_external_index = next_index
-                    state.updated_at = int(time.time())
-                    self._swap_client.updateDB(
-                        state, use_cursor, constraints=["coin_type"]
-                    )
+                self._setHighWaterIndex(state, internal, reuse_index, use_cursor)
                 self._swap_client.commitDB()
-                return address
+                return reuse_addr
+
+            next_index = self._nextUnusedIndex(coin_type, internal, use_cursor)
 
             address, scripthash, pubkey = self._deriveAddress(
                 coin_type, next_index, internal
@@ -301,13 +271,7 @@ class WalletManager:
                 use_cursor,
             )
 
-            if state:
-                if internal:
-                    state.last_internal_index = next_index
-                else:
-                    state.last_external_index = next_index
-                state.updated_at = now
-                self._swap_client.updateDB(state, use_cursor, constraints=["coin_type"])
+            self._setHighWaterIndex(state, internal, next_index, use_cursor)
 
             self._swap_client.commitDB()
             return address
@@ -488,56 +452,6 @@ class WalletManager:
             return row[0] if row and row[0] else None
         except Exception:
             return None
-
-    def getNewInternalAddress(self, coin_type: Coins) -> str | None:
-        if coin_type not in self._initialized:
-            return None
-
-        cursor = None
-        try:
-            cursor = self._swap_client.openDB()
-
-            cursor.execute(
-                "SELECT MAX(derivation_index) FROM wallet_addresses WHERE coin_type = ? AND is_internal = 1",
-                (int(coin_type),),
-            )
-            row = cursor.fetchone()
-            next_index = (row[0] or -1) + 1
-
-            address, scripthash, pubkey = self._deriveAddress(
-                coin_type, next_index, internal=True
-            )
-            path = f"84h/{self.BIP84_COIN_TYPES.get(coin_type, 0)}h/0h/1/{next_index}"
-
-            now = int(time.time())
-            self._swap_client.add(
-                WalletAddress(
-                    coin_type=int(coin_type),
-                    derivation_index=next_index,
-                    is_internal=True,
-                    derivation_path=path,
-                    address=address,
-                    scripthash=scripthash,
-                    pubkey=pubkey,
-                    is_funded=False,
-                    ever_used=True,
-                    created_at=now,
-                ),
-                cursor,
-            )
-            self._swap_client.commitDB()
-
-            self._log.debug(
-                f"Generated new internal address for {coin_type.name}: {address[:16]}..."
-            )
-            return address
-        except Exception as e:
-            self._log.warning(f"Failed to generate new internal address: {e}")
-            self._swap_client.rollbackDB()
-            return None
-        finally:
-            if cursor:
-                self._swap_client.closeDB(cursor, commit=False)
 
     def getAddressInfo(self, coin_type: Coins, address: str) -> dict | None:
         try:

@@ -2567,8 +2567,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dust_limit = self.getdustlimit()
 
         if rough_change > dust_limit:
-            change_addr = wm.getNewInternalAddress(self.coin_type())
-            if not change_addr:
+            try:
+                change_addr = wm.getNewAddress(self.coin_type(), internal=True)
+            except Exception as e:
+                self._log.warning(f"Failed to generate new internal address: {e}")
                 change_addr = wm.getExistingInternalAddress(self.coin_type())
             if not change_addr:
                 change_addr = selected_utxos[0].get("address")

@@ -62,7 +62,7 @@ class FundTxElectrumTest(unittest.TestCase):
         wm.getFundedAddresses.return_value = {self.addr: sh}
         wm.getSignableAddresses.return_value = {self.addr: sh}
         wm.getInternalAddresses.return_value = set(internal)
-        wm.getNewInternalAddress.return_value = self.addr
+        wm.getNewAddress.return_value = self.addr
         wm.isUTXOLocked.return_value = False
         self.ci._backend = FakeBackend()
         self.ci.getWalletManager = lambda: wm
