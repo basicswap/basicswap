@@ -2085,6 +2085,7 @@ def js_electrum_discover(self, url_split, post_string, is_json) -> bytes:
             temp_server = ElectrumServer(
                 coin_name,
                 log=swap_client.log,
+                cert_pins=swap_client.getElectrumCertPins(),
             )
             temp_server.connect()
             current_server = temp_server.get_current_server_info()

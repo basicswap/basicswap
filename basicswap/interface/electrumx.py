@@ -6,6 +6,7 @@
 
 import hashlib
 import json
+import os
 import queue
 import select
 import socket
@@ -14,6 +15,24 @@ import threading
 import time
 
 from basicswap.util import TemporaryError
+
+CERT_PINS_FILENAME = "electrum_cert_pins.json"
+
+
+def _is_private_address(host: str) -> bool:
+    try:
+        import ipaddress
+
+        addr = ipaddress.ip_address(host)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return host == "localhost"
+
+
+def _is_authenticated_transport(host: str) -> bool:
+    # A .onion address authenticates the endpoint by itself, and a LAN server
+    # is inside the operator's own trust boundary.
+    return host.endswith(".onion") or _is_private_address(host)
 
 
 def _close_socket_safe(sock):
@@ -26,6 +45,52 @@ def _close_socket_safe(sock):
             sock.close()
         except Exception:
             pass
+
+
+class CertPinStore:
+    # Fingerprints of servers no CA vouches for, trusted on first use.
+    # A corrupt store raises rather than falling back to trusting anything.
+
+    def __init__(self, path=None):
+        self._path = path
+        self._lock = threading.Lock()
+        self._pins = {}
+        self._loaded = False
+
+    def _load(self):
+        if self._loaded:
+            return
+        if self._path and os.path.exists(self._path):
+            with open(self._path) as fp:
+                loaded = json.load(fp)
+            if not isinstance(loaded, dict) or not all(
+                isinstance(pins, dict) for pins in loaded.values()
+            ):
+                raise ValueError(f"Malformed cert pin store: {self._path}")
+            self._pins = loaded
+        self._loaded = True
+
+    def _save(self):
+        if not self._path:
+            return
+        tmp_path = self._path + ".tmp"
+        with open(tmp_path, "w") as fp:
+            json.dump(self._pins, fp, indent=1, sort_keys=True)
+        os.replace(tmp_path, self._path)
+
+    def get(self, coin_name: str, key: str):
+        with self._lock:
+            self._load()
+            return self._pins.get(coin_name, {}).get(key)
+
+    def set(self, coin_name: str, key: str, fingerprint: str):
+        with self._lock:
+            self._load()
+            coin_pins = self._pins.setdefault(coin_name, {})
+            if coin_pins.get(key) == fingerprint:
+                return
+            coin_pins[key] = fingerprint
+            self._save()
 
 
 DEFAULT_ELECTRUM_SERVERS = {
@@ -64,11 +129,15 @@ class ElectrumConnection:
         log=None,
         proxy_host=None,
         proxy_port=None,
+        cert_pins=None,
+        coin_name="",
     ):
         self._host = host
         self._port = port
         self._use_ssl = use_ssl
         self._timeout = timeout
+        self._coin_name = coin_name
+        self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
         self._socket = None
         self._request_id = 0
         self._lock = threading.Lock()
@@ -83,51 +152,103 @@ class ElectrumConnection:
         self._proxy_host = proxy_host
         self._proxy_port = proxy_port
 
-    @staticmethod
-    def _is_private_address(host: str) -> bool:
-        try:
-            import ipaddress
+    def _open_socket(self):
+        use_proxy = (
+            self._proxy_host
+            and self._proxy_port
+            and not _is_private_address(self._host)
+        )
+        if use_proxy:
+            import socks
 
-            addr = ipaddress.ip_address(host)
-            return addr.is_private or addr.is_loopback or addr.is_link_local
-        except ValueError:
-            return host == "localhost"
+            sock = socks.socksocket()
+            sock.set_proxy(socks.SOCKS5, self._proxy_host, self._proxy_port, rdns=True)
+            sock.settimeout(self._timeout)
+            sock.connect((self._host, self._port))
+            if self._log:
+                self._log.debug(
+                    f"Electrum connecting via proxy {self._proxy_host}:{self._proxy_port} to {self._host}:{self._port}"
+                )
+            return sock
+        sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
+        if self._log and self._proxy_host and self._proxy_port:
+            self._log.debug(
+                f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
+            )
+        return sock
+
+    def server_key(self) -> str:
+        return f"{self._host}:{self._port}"
+
+    @staticmethod
+    def _fingerprint(ssock) -> str:
+        return hashlib.sha256(ssock.getpeercert(True)).hexdigest()
+
+    def _wrap_pinned(self, sock):
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        ssock = context.wrap_socket(sock, server_hostname=self._host)
+        fingerprint = self._fingerprint(ssock)
+        key = self.server_key()
+        try:
+            pinned = self._cert_pins.get(self._coin_name, key)
+        except Exception as store_error:
+            _close_socket_safe(ssock)
+            raise ValueError(
+                f"no CA vouches for {key} and its pin cannot be read: {store_error}. "
+                f"Fix or delete {CERT_PINS_FILENAME}"
+            )
+        if pinned is None:
+            self._cert_pins.set(self._coin_name, key, fingerprint)
+            if self._log:
+                self._log.warning(
+                    f"Electrum server {key} presented a certificate no CA vouches for, "
+                    f"pinned sha256:{fingerprint}"
+                )
+        elif pinned != fingerprint:
+            _close_socket_safe(ssock)
+            if self._log:
+                self._log.error(
+                    f"Electrum server {key} certificate changed, refusing to connect"
+                )
+            raise ValueError(
+                f"certificate mismatch, pinned sha256:{pinned} got sha256:{fingerprint}. "
+                f"Remove {self._coin_name} / {key} from {CERT_PINS_FILENAME} to trust "
+                "the new certificate"
+            )
+        return ssock
 
     def connect(self):
         try:
-            use_proxy = (
-                self._proxy_host
-                and self._proxy_port
-                and not self._is_private_address(self._host)
-            )
-            if use_proxy:
-                import socks
-
-                sock = socks.socksocket()
-                sock.set_proxy(
-                    socks.SOCKS5, self._proxy_host, self._proxy_port, rdns=True
-                )
-                sock.settimeout(self._timeout)
-                sock.connect((self._host, self._port))
-                if self._log:
-                    self._log.debug(
-                        f"Electrum connecting via proxy {self._proxy_host}:{self._proxy_port} to {self._host}:{self._port}"
+            sock = self._open_socket()
+            if not self._use_ssl:
+                if self._log and not _is_authenticated_transport(self._host):
+                    self._log.warning(
+                        f"Electrum connection to {self._host}:{self._port} is unencrypted"
                     )
-            else:
-                sock = socket.create_connection(
-                    (self._host, self._port), timeout=self._timeout
-                )
-                if self._log and self._proxy_host and self._proxy_port:
-                    self._log.debug(
-                        f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
-                    )
-            if self._use_ssl:
-                context = ssl.create_default_context()
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-                self._socket = context.wrap_socket(sock, server_hostname=self._host)
-            else:
                 self._socket = sock
+                self._connected = True
+                return
+            try:
+                context = ssl.create_default_context()
+                ssock = context.wrap_socket(sock, server_hostname=self._host)
+                # Recorded so a CA-backed server cannot later be downgraded to
+                # an unvouched-for certificate by trust-on-first-use.
+                try:
+                    self._cert_pins.set(
+                        self._coin_name, self.server_key(), self._fingerprint(ssock)
+                    )
+                except Exception as store_error:
+                    if self._log:
+                        self._log.warning(
+                            f"Cannot record certificate pin for {self.server_key()}: "
+                            f"{store_error}"
+                        )
+                self._socket = ssock
+            except ssl.SSLCertVerificationError:
+                _close_socket_safe(sock)
+                self._socket = self._wrap_pinned(self._open_socket())
             self._connected = True
         except Exception as e:
             self._connected = False
@@ -489,15 +610,37 @@ def scripthash_from_address(address, network_params):
     raise ValueError(f"Unable to decode address: {address}")
 
 
+SSL_MARKERS = ("s", "ssl", "true", "1", "yes")
+PLAINTEXT_MARKERS = ("t", "tcp", "false", "0", "no")
+
+
 def _parse_server_string(server_str):
-    parts = server_str.strip().split(":")
-    host = parts[0]
-    port = int(parts[1]) if len(parts) > 1 else 50002
-    if len(parts) > 2:
-        ssl_str = parts[2].lower()
-        use_ssl = ssl_str in ("true", "1", "yes", "ssl")
+    # host:port[:s|t]. The port never implies the transport: an entry without a
+    # marker is TLS unless the transport is authenticated some other way.
+    remainder = server_str.strip()
+    host = ""
+    if remainder.startswith("[") and "]" in remainder:
+        host_end = remainder.index("]")
+        host = remainder[1:host_end]
+        remainder = remainder[host_end + 1 :]
+    parts = remainder.rsplit(":", 2)
+    host = host or parts[0]
+    if not host:
+        raise ValueError(f"No host in Electrum server entry: {server_str}")
+
+    marker = parts[2].lower() if len(parts) > 2 else None
+    if marker is None:
+        use_ssl = not _is_authenticated_transport(host)
+    elif marker in SSL_MARKERS:
+        use_ssl = True
+    elif marker in PLAINTEXT_MARKERS:
+        use_ssl = False
     else:
-        use_ssl = port != 50001
+        raise ValueError(f"Unknown Electrum transport marker: {server_str}")
+
+    port = (
+        int(parts[1]) if len(parts) > 1 and parts[1] else (50002 if use_ssl else 50001)
+    )
     return {"host": host, "port": port, "ssl": use_ssl}
 
 
@@ -510,9 +653,11 @@ class ElectrumServer:
         log=None,
         proxy_host=None,
         proxy_port=None,
+        cert_pins=None,
     ):
         self._coin_name = coin_name
         self._log = log
+        self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
         self._connection = None
         self._current_server_idx = 0
         self._lock = threading.Lock()
@@ -561,21 +706,8 @@ class ElectrumServer:
 
         use_tor = proxy_host is not None and proxy_port is not None
 
-        user_clearnet = []
-        if clearnet_servers:
-            for srv in clearnet_servers:
-                if isinstance(srv, str):
-                    user_clearnet.append(_parse_server_string(srv))
-                elif isinstance(srv, dict):
-                    user_clearnet.append(srv)
-
-        user_onion = []
-        if onion_servers:
-            for srv in onion_servers:
-                if isinstance(srv, str):
-                    user_onion.append(_parse_server_string(srv))
-                elif isinstance(srv, dict):
-                    user_onion.append(srv)
+        user_clearnet = self._parse_servers(clearnet_servers)
+        user_onion = self._parse_servers(onion_servers)
 
         final_onion = (
             user_onion if user_onion else DEFAULT_ONION_SERVERS.get(coin_name, [])
@@ -610,6 +742,24 @@ class ElectrumServer:
                     f"ElectrumServer {coin_name}: {len(final_clearnet)} clearnet servers"
                 )
 
+    def _parse_servers(self, servers) -> list:
+        parsed = []
+        errors = []
+        for srv in servers if servers else []:
+            if isinstance(srv, dict):
+                parsed.append(srv)
+                continue
+            if not isinstance(srv, str):
+                errors.append(f"{srv!r} is not a server string")
+                continue
+            try:
+                parsed.append(_parse_server_string(srv))
+            except ValueError as e:
+                errors.append(str(e))
+        if errors:
+            raise ValueError("Invalid Electrum server config: " + "; ".join(errors))
+        return parsed
+
     def _get_server(self, index):
         if not self._servers:
             raise ValueError(f"No Electrum servers configured for {self._coin_name}")
@@ -625,6 +775,8 @@ class ElectrumServer:
                 log=self._log,
                 proxy_host=self._proxy_host,
                 proxy_port=self._proxy_port,
+                cert_pins=self._cert_pins,
+                coin_name=self._coin_name,
             )
             conn.connect()
             connect_time = (time.time() - start_time) * 1000
@@ -1259,6 +1411,8 @@ class ElectrumServer:
                 log=self._log,
                 proxy_host=self._proxy_host,
                 proxy_port=self._proxy_port,
+                cert_pins=self._cert_pins,
+                coin_name=self._coin_name,
             )
             test_conn.connect()
             latency = test_conn.ping()

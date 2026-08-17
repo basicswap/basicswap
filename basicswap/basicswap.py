@@ -621,6 +621,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             max_workers=4, thread_name_prefix="bsp"
         )
         self._electrum_spend_check_futures = {}
+        self._electrum_cert_pins = None
 
         # Encode key to match network
         wif_prefix = chainparams[Coins.PART][self.chain]["key_prefix"]
@@ -1129,6 +1130,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             raise ValueError(f"Unknown protocol_ind {protocol_ind}")
         return self.protocolInterfaces[protocol_ind]
 
+    def getElectrumCertPins(self):
+        # One store for every coin: separate stores would overwrite each
+        # other's pins when saving.
+        if self._electrum_cert_pins is None:
+            from .interface.electrumx import CERT_PINS_FILENAME, CertPinStore
+
+            self._electrum_cert_pins = CertPinStore(
+                os.path.join(self.data_dir, CERT_PINS_FILENAME)
+            )
+        return self._electrum_cert_pins
+
     def _initElectrumBackend(self, coin, interface) -> bool:
         from .wallet_backend import ElectrumBackend
 
@@ -1149,6 +1161,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 chain=self.chain,
                 proxy_host=proxy_host,
                 proxy_port=proxy_port,
+                cert_pins=self.getElectrumCertPins(),
             )
             interface.setBackend(backend)
             ticker = interface.ticker() if hasattr(interface, "ticker") else str(coin)
@@ -2705,6 +2718,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     chain=self.chain,
                     proxy_host=proxy_host,
                     proxy_port=proxy_port,
+                    cert_pins=self.getElectrumCertPins(),
                 )
             else:
                 backend = ci._backend
