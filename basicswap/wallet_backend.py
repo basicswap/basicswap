@@ -213,15 +213,11 @@ class ElectrumBackend(WalletBackend):
     def _call(self, method: str, params: list = None, timeout: int = 10):
         if self._background_mode and hasattr(self._server, "call_background"):
             return self._server.call_background(method, params, timeout)
-        if hasattr(self._server, "call_user"):
-            return self._server.call_user(method, params, timeout)
         return self._server.call(method, params, timeout)
 
     def _call_batch(self, calls: list, timeout: int = 15):
         if self._background_mode and hasattr(self._server, "call_batch_background"):
             return self._server.call_batch_background(calls, timeout)
-        if hasattr(self._server, "call_batch_user"):
-            return self._server.call_batch_user(calls, timeout)
         return self._server.call_batch(calls, timeout)
 
     def _is_server_stopping(self) -> bool:
