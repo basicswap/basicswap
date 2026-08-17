@@ -5,12 +5,14 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import platform
 
 from basicswap.interface.bch.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
     ensurePubkey,
+    getOSDirNames,
 )
 
 BITCOINCASH_VERSION = os.getenv("BITCOINCASH_VERSION", "29.1.0")
@@ -52,7 +54,21 @@ class BCHPrepare(CoinPrepareModule):
         return config
 
     def getReleaseFilename(self, ctx: PrepareContext, arch_name: str) -> str:
-        return f"bitcoin-cash-node-{self.version}-{ctx.bin_arch}.{ctx.file_ext}"
+        versions = self.version.split(".")
+        if int(versions[0]) > 29 or (int(versions[0]) == 29 and int(versions[1]) >= 1):
+            os_name, _ = getOSDirNames(ctx.bin_arch)
+            if os_name == "osx":
+                if platform.machine() == "arm64":
+                    arch_name = "aarch64-apple-darwin-codesigned"
+                else:
+                    arch_name = "x86_64-apple-darwin-codesigned"
+            elif os_name == "linux":
+                machine = platform.machine()
+                if "arm" in machine or "aarch64" in machine:
+                    arch_name = "aarch64-linux-gnu"
+                else:
+                    arch_name = "x86_64-linux-gnu"
+        return f"bitcoin-cash-node-{self.version}-{arch_name}.{ctx.file_ext}"
 
     def getReleaseUrl(self, ctx: PrepareContext, release_filename: str) -> str:
         return f"https://github.com/bitcoin-cash-node/bitcoin-cash-node/releases/download/v{self.version}/{release_filename}"
