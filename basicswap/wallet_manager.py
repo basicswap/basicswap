@@ -473,30 +473,6 @@ class WalletManager:
         except Exception:
             return []
 
-    def getFundedAddresses(self, coin_type: Coins) -> Dict[str, str]:
-        try:
-            conn = sqlite3.connect(self._swap_client.sqlite_file)
-            cursor = conn.cursor()
-            funded = {}
-            cursor.execute(
-                "SELECT address, scripthash FROM wallet_addresses WHERE coin_type = ? AND is_funded = 1",
-                (int(coin_type),),
-            )
-            funded.update(
-                {row[0]: row[1] for row in cursor.fetchall() if row[0] and row[1]}
-            )
-            cursor.execute(
-                "SELECT address, scripthash FROM wallet_watch_only WHERE coin_type = ? AND is_funded = 1 AND private_key_encrypted IS NOT NULL AND private_key_encrypted != ''",
-                (int(coin_type),),
-            )
-            funded.update(
-                {row[0]: row[1] for row in cursor.fetchall() if row[0] and row[1]}
-            )
-            conn.close()
-            return funded
-        except Exception:
-            return {}
-
     def getExistingInternalAddress(self, coin_type: Coins) -> Optional[str]:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
@@ -850,6 +826,16 @@ class WalletManager:
                 (int(coin_type),),
             )
             result = {row[0]: row[1] for row in cursor.fetchall() if row[0] and row[1]}
+            cursor.execute(
+                "SELECT address, scripthash FROM wallet_watch_only"
+                " WHERE coin_type = ?"
+                " AND private_key_encrypted IS NOT NULL"
+                " AND private_key_encrypted != ''",
+                (int(coin_type),),
+            )
+            result.update(
+                {row[0]: row[1] for row in cursor.fetchall() if row[0] and row[1]}
+            )
             conn.close()
             return result
         except Exception:
@@ -1480,146 +1466,6 @@ class WalletManager:
                 )
             )
             return result
-        finally:
-            self._swap_client.closeDB(cursor, commit=False)
-
-    def scanForFundedAddresses(
-        self, coin_type: Coins, backend, gap_limit: int = None
-    ) -> int:
-        if gap_limit is None:
-            gap_limit = self.getGapLimit(coin_type)
-        if not self.isInitialized(coin_type):
-            return 0
-
-        addresses_to_check = []
-        cursor = self._swap_client.openDB()
-        try:
-            bip44_coin = self.BIP84_COIN_TYPES.get(coin_type, 0)
-            now = int(time.time())
-
-            for internal in [False, True]:
-                chain_idx = 1 if internal else 0
-                for index in range(gap_limit):
-                    record = self._swap_client.queryOne(
-                        WalletAddress,
-                        cursor,
-                        {
-                            "coin_type": int(coin_type),
-                            "derivation_index": index,
-                            "is_internal": internal,
-                        },
-                    )
-                    if record is None:
-                        address, scripthash, pubkey = self._deriveAddress(
-                            coin_type, index, internal
-                        )
-                        record = WalletAddress(
-                            coin_type=int(coin_type),
-                            derivation_index=index,
-                            is_internal=internal,
-                            derivation_path=f"m/84'/{bip44_coin}'/0'/{chain_idx}/{index}",
-                            address=address,
-                            scripthash=scripthash,
-                            pubkey=pubkey,
-                            is_funded=False,
-                            ever_used=False,
-                            created_at=now,
-                        )
-                        self._swap_client.add(record, cursor)
-
-                    if not record.is_funded:
-                        addresses_to_check.append((record.address, index, internal))
-
-            self._swap_client.commitDB()
-        finally:
-            self._swap_client.closeDB(cursor, commit=False)
-
-        if not addresses_to_check:
-            return 0
-
-        funded_addresses = []
-        try:
-            addr_list = [a[0] for a in addresses_to_check]
-            balances = backend.getBalance(addr_list)
-            for addr, balance in balances.items():
-                if balance > 0:
-                    for check_addr, index, internal in addresses_to_check:
-                        if check_addr == addr:
-                            funded_addresses.append((addr, index, internal, balance))
-                            break
-        except Exception:
-            return 0
-
-        if not funded_addresses:
-            return 0
-
-        cursor = self._swap_client.openDB()
-        try:
-            found = 0
-            max_ext_index = max_int_index = None
-
-            for addr, index, internal, balance in funded_addresses:
-                record = self._swap_client.queryOne(
-                    WalletAddress,
-                    cursor,
-                    {"coin_type": int(coin_type), "address": addr},
-                )
-                if record and not record.is_funded:
-                    record.is_funded = True
-                    record.cached_balance = balance
-                    record.cached_balance_time = int(time.time())
-                    self._swap_client.updateDB(
-                        record, cursor, constraints=["coin_type", "address"]
-                    )
-                    found += 1
-
-                    if internal:
-                        max_int_index = max(max_int_index or 0, index)
-                    else:
-                        max_ext_index = max(max_ext_index or 0, index)
-
-            if max_ext_index is not None or max_int_index is not None:
-                state = self._swap_client.queryOne(
-                    WalletState, cursor, {"coin_type": int(coin_type)}
-                )
-                if state:
-                    if max_ext_index and (
-                        state.last_external_index is None
-                        or max_ext_index > state.last_external_index
-                    ):
-                        state.last_external_index = max_ext_index
-                    if max_int_index and (
-                        state.last_internal_index is None
-                        or max_int_index > state.last_internal_index
-                    ):
-                        state.last_internal_index = max_int_index
-                    state.updated_at = int(time.time())
-                    self._swap_client.updateDB(state, cursor, constraints=["coin_type"])
-
-            self._swap_client.commitDB()
-            return found
-        except Exception:
-            self._swap_client.rollbackDB()
-            return 0
-        finally:
-            self._swap_client.closeDB(cursor, commit=False)
-
-    def updateFundedStatus(
-        self, coin_type: Coins, address: str, is_funded: bool
-    ) -> bool:
-        cursor = self._swap_client.openDB()
-        try:
-            record = self._swap_client.queryOne(
-                WalletAddress, cursor, {"coin_type": int(coin_type), "address": address}
-            )
-            if record and record.is_funded != is_funded:
-                record.is_funded = is_funded
-                self._swap_client.updateDB(
-                    record, cursor, constraints=["coin_type", "address"]
-                )
-                self._swap_client.commitDB()
-                return True
-            return False
         finally:
             self._swap_client.closeDB(cursor, commit=False)
 

@@ -8,6 +8,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
+from .util import TemporaryError
+
 
 class WalletBackend(ABC):
 
@@ -758,57 +760,40 @@ class ElectrumBackend(WalletBackend):
         except Exception:
             return []
 
-    def getBatchBalance(self, scripthashes: List[str]) -> Dict[str, int]:
-        result = {}
-        for sh in scripthashes:
-            result[sh] = 0
-
-        try:
-            calls = [("blockchain.scripthash.get_balance", [sh]) for sh in scripthashes]
-            responses = self._call_batch(calls)
-            for sh, balance in zip(scripthashes, responses):
-                if balance:
-                    confirmed = balance.get("confirmed", 0)
-                    unconfirmed = balance.get("unconfirmed", 0)
-                    result[sh] = confirmed + unconfirmed
-        except Exception as e:
-            self._log.warning(f"ElectrumBackend.getBatchBalance error: {e}")
-
-        return result
-
     def getBatchUnspent(
         self, scripthashes: List[str], min_confirmations: int = 0
     ) -> Dict[str, List[dict]]:
+        # A partial or failed result must never read as "no UTXOs": callers size
+        # spends against this and would treat it as an empty wallet.
+        if not scripthashes:
+            return {}
+
+        current_height = self.getBlockHeight()
+        responses = self._split_batch_call(
+            scripthashes, "blockchain.scripthash.listunspent"
+        )
+        if len(responses) != len(scripthashes):
+            raise TemporaryError(
+                f"listunspent returned {len(responses)} of {len(scripthashes)} results"
+            )
+
         result = {}
-        for sh in scripthashes:
+        for sh, utxos in zip(scripthashes, responses):
+            if utxos is None:
+                raise TemporaryError(f"listunspent failed for scripthash {sh}")
             result[sh] = []
-
-        try:
-            current_height = self.getBlockHeight()
-
-            calls = [("blockchain.scripthash.listunspent", [sh]) for sh in scripthashes]
-            responses = self._call_batch(calls)
-            for sh, utxos in zip(scripthashes, responses):
-                if utxos:
-                    for utxo in utxos:
-                        height = utxo.get("height", 0)
-                        if height <= 0:
-                            confirmations = 0
-                        else:
-                            confirmations = current_height - height + 1
-
-                        if confirmations >= min_confirmations:
-                            result[sh].append(
-                                {
-                                    "txid": utxo.get("tx_hash"),
-                                    "vout": utxo.get("tx_pos"),
-                                    "value": utxo.get("value", 0),
-                                    "confirmations": confirmations,
-                                }
-                            )
-        except Exception as e:
-            self._log.warning(f"ElectrumBackend.getBatchUnspent error: {e}")
-
+            for utxo in utxos:
+                height = utxo.get("height", 0)
+                confirmations = 0 if height <= 0 else current_height - height + 1
+                if confirmations >= min_confirmations:
+                    result[sh].append(
+                        {
+                            "txid": utxo.get("tx_hash"),
+                            "vout": utxo.get("tx_pos"),
+                            "value": utxo.get("value", 0),
+                            "confirmations": confirmations,
+                        }
+                    )
         return result
 
     def enableRealtimeNotifications(self, callback) -> None:

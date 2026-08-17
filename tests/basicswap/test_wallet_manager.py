@@ -28,6 +28,7 @@ def _make_db() -> str:
     cursor.execute("""CREATE TABLE wallet_addresses (
             coin_type INTEGER,
             address TEXT,
+            scripthash TEXT,
             is_internal INTEGER DEFAULT 0,
             is_funded INTEGER DEFAULT 0,
             cached_balance INTEGER DEFAULT 0,
@@ -36,6 +37,7 @@ def _make_db() -> str:
     cursor.execute("""CREATE TABLE wallet_watch_only (
             coin_type INTEGER,
             address TEXT,
+            scripthash TEXT,
             is_funded INTEGER DEFAULT 0,
             cached_balance INTEGER DEFAULT 0,
             private_key_encrypted BLOB
@@ -94,6 +96,58 @@ class TestWalletManagerBalance(unittest.TestCase):
         # and address subscription are unaffected.
         watched = self.wm.getAllAddresses(Coins.BTC)
         self.assertIn("swap_lock_addr", watched)
+
+
+class TestWalletManagerSignableAddresses(unittest.TestCase):
+    """Coin selection must consider every address we can sign for, regardless of
+    the is_funded flag. Change addresses are inserted unfunded and only a full
+    balance sync ever flips the flag, so selecting on it strands the change."""
+
+    def setUp(self):
+        self.db_path = _make_db()
+        coin = int(Coins.BTC)
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO wallet_addresses (coin_type, address, scripthash, is_internal, is_funded, cached_balance, derivation_index) VALUES (?, ?, ?, 0, 1, ?, 0)",
+            (coin, "funded_addr", "sh_funded", 100_000_000),
+        )
+        # Freshly derived change address: holds the change output but is still
+        # flagged unfunded until a balance sync catches up.
+        cursor.execute(
+            "INSERT INTO wallet_addresses (coin_type, address, scripthash, is_internal, is_funded, cached_balance, derivation_index) VALUES (?, ?, ?, 1, 0, 0, 7)",
+            (coin, "fresh_change_addr", "sh_change"),
+        )
+        cursor.execute(
+            "INSERT INTO wallet_watch_only (coin_type, address, scripthash, is_funded, cached_balance, private_key_encrypted) VALUES (?, ?, ?, 0, 0, ?)",
+            (coin, "imported_with_key", "sh_imported", b"encrypted-key"),
+        )
+        cursor.execute(
+            "INSERT INTO wallet_watch_only (coin_type, address, scripthash, is_funded, cached_balance, private_key_encrypted) VALUES (?, ?, ?, 1, ?, NULL)",
+            (coin, "swap_lock_addr", "sh_lock", 500_000_000),
+        )
+        conn.commit()
+        conn.close()
+
+        self.wm = WalletManager(FakeSwapClient(self.db_path), logging.getLogger())
+
+    def tearDown(self):
+        os.remove(self.db_path)
+
+    def test_unfunded_change_address_is_signable(self):
+        signable = self.wm.getSignableAddresses(Coins.BTC)
+        self.assertIn("fresh_change_addr", signable)
+        self.assertEqual(signable["fresh_change_addr"], "sh_change")
+
+    def test_includes_imported_watch_only_holding_key(self):
+        signable = self.wm.getSignableAddresses(Coins.BTC)
+        self.assertIn("imported_with_key", signable)
+
+    def test_excludes_keyless_watch_only(self):
+        # No private key means nothing to sign the input with, so a swap lock
+        # output must never be selected as a funding source.
+        signable = self.wm.getSignableAddresses(Coins.BTC)
+        self.assertNotIn("swap_lock_addr", signable)
 
 
 if __name__ == "__main__":

@@ -2132,12 +2132,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         parsed_tx = self.loadTx(tx, allow_witness=False)
         total_output = sum(out.nValue for out in parsed_tx.vout)
 
-        funded_addresses = wm.getFundedAddresses(self.coin_type())
-        addr_to_sh = (
-            funded_addresses
-            if funded_addresses
-            else wm.getSignableAddresses(self.coin_type())
-        )
+        addr_to_sh = wm.getSignableAddresses(self.coin_type())
 
         if not addr_to_sh:
             raise ValueError("No addresses available")
