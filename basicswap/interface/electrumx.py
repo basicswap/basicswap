@@ -7,6 +7,7 @@
 import hashlib
 import json
 import queue
+import select
 import socket
 import ssl
 import threading
@@ -71,6 +72,7 @@ class ElectrumConnection:
         self._socket = None
         self._request_id = 0
         self._lock = threading.Lock()
+        self._io_lock = threading.Lock()
         self._connected = False
         self._response_queues = {}
         self._notification_callbacks = {}
@@ -163,15 +165,26 @@ class ElectrumConnection:
             self._listener_thread.join(timeout=2)
             self._listener_thread = None
 
+    def _readable(self, sock, timeout: float) -> bool:
+        if getattr(sock, "pending", None) and sock.pending() > 0:
+            return True
+        try:
+            return bool(select.select([sock], [], [], timeout)[0])
+        except (OSError, ValueError):
+            return False
+
     def _listener_loop(self):
         buffer = b""
         while self._listener_running and self._connected and self._socket:
             try:
-                self._socket.settimeout(1.0)
-                try:
-                    data = self._socket.recv(4096)
-                except socket.timeout:
+                sock = self._socket
+                if not self._readable(sock, 1.0):
                     continue
+                with self._io_lock:
+                    try:
+                        data = sock.recv(4096)
+                    except (socket.timeout, BlockingIOError, ssl.SSLWantReadError):
+                        continue
                 if not data:
                     self._connected = False
                     break
@@ -245,7 +258,8 @@ class ElectrumConnection:
             "params": params,
         }
         request_data = json.dumps(request) + "\n"
-        self._socket.sendall(request_data.encode())
+        with self._io_lock:
+            self._socket.sendall(request_data.encode())
         return request_id
 
     def _receive_response_sync(self, expected_id, timeout=30):
@@ -253,7 +267,8 @@ class ElectrumConnection:
         self._socket.settimeout(timeout)
         while True:
             try:
-                data = self._socket.recv(4096)
+                with self._io_lock:
+                    data = self._socket.recv(4096)
                 if not data:
                     raise TemporaryError("Connection closed")
                 buffer += data
@@ -298,7 +313,8 @@ class ElectrumConnection:
 
         while pending_ids:
             try:
-                data = self._socket.recv(4096)
+                with self._io_lock:
+                    data = self._socket.recv(4096)
                 if not data:
                     raise TemporaryError("Connection closed")
                 buffer += data
@@ -363,7 +379,8 @@ class ElectrumConnection:
                         "method": method,
                         "params": params if params else [],
                     }
-                    self._socket.sendall((json.dumps(request) + "\n").encode())
+                    with self._io_lock:
+                        self._socket.sendall((json.dumps(request) + "\n").encode())
                 result = self._receive_response_async(request_id, timeout=timeout)
                 return result
             else:
@@ -394,7 +411,8 @@ class ElectrumConnection:
                             "method": method,
                             "params": params if params else [],
                         }
-                        self._socket.sendall((json.dumps(req) + "\n").encode())
+                        with self._io_lock:
+                            self._socket.sendall((json.dumps(req) + "\n").encode())
             else:
                 for method, params in requests:
                     request_id = self._send_request(method, params if params else [])
