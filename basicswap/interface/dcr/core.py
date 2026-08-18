@@ -16,7 +16,7 @@ from basicswap.interface.prepare_util import (
     exitWithError,
 )
 
-DCR_VERSION = os.getenv("DCR_VERSION", "2.1.5")
+DCR_VERSION = os.getenv("DCR_VERSION", "2.1.6")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 decred_signers = {"decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",)}
 
