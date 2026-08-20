@@ -8,7 +8,6 @@ import importlib
 import os
 import unittest
 
-
 MODULES = (
     ("basicswap.interface.xmr.core", "XMR_WALLET_RPC_PWD", "xmr_wallet_pwd"),
     ("basicswap.interface.wow.core", "WOW_WALLET_RPC_PWD", "wow_wallet_pwd"),
