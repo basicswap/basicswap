@@ -824,8 +824,21 @@ class WalletManager:
                 conn.close()
                 return None
             encrypted_key = row[0]
-            private_key = self._decryptPrivateKey(encrypted_key, coin_type)
+            try:
+                private_key = self._decryptPrivateKey(encrypted_key, coin_type)
+            except Exception as e:
+                conn.close()
+                self._log.error(
+                    f"Failed to decrypt imported key for {address}: {e}. The record may be corrupt or tampered with."
+                )
+                return None
             if not self._isAEADImportKey(encrypted_key):
+                if not self._verifyKeyForAddress(coin_type, address, private_key):
+                    conn.close()
+                    self._log.error(
+                        f"Legacy imported key for {address} does not match the address, not migrating."
+                    )
+                    return None
                 cursor.execute(
                     "UPDATE wallet_watch_only SET private_key_encrypted = ? WHERE coin_type = ? AND address = ?",
                     (
@@ -838,7 +851,8 @@ class WalletManager:
                 self._log.info("Migrated legacy imported key to AEAD format")
             conn.close()
             return private_key
-        except Exception:
+        except Exception as e:
+            self._log.debug(f"getPrivateKey failed for {address}: {e}")
             return None
 
     def getSignableAddresses(self, coin_type: Coins) -> Dict[str, str]:
@@ -913,14 +927,7 @@ class WalletManager:
         label: str = "",
         source: str = "import",
     ) -> bool:
-        try:
-            pubkey = PublicKey.from_secret(private_key).format()
-            if (
-                segwit_addr.encode(self._getHRP(coin_type), 0, hash160(pubkey))
-                != address
-            ):
-                return False
-        except Exception:
+        if not self._verifyKeyForAddress(coin_type, address, private_key):
             return False
 
         cursor = self._swap_client.openDB()
@@ -1070,6 +1077,18 @@ class WalletManager:
             return None
         except Exception:
             return None
+
+    def _verifyKeyForAddress(
+        self, coin_type: Coins, address: str, private_key: bytes
+    ) -> bool:
+        try:
+            pubkey = PublicKey.from_secret(private_key).format()
+            return (
+                segwit_addr.encode(self._getHRP(coin_type), 0, hash160(pubkey))
+                == address
+            )
+        except Exception:
+            return False
 
     def _getXorKey(self, coin_type: Coins) -> bytes:
         # Legacy per-coin XOR keystream. Retained only to decrypt rows
