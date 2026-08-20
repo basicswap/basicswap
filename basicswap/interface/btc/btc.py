@@ -4471,6 +4471,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def encryptWallet(self, password: str, check_seed: bool = True):
         if self._connection_type == "electrum":
+            self._log.warning(
+                f"{self.ticker()}: encryptWallet skipped, electrum mode has no wallet file to encrypt."
+            )
             return
         # Watchonly wallets are not encrypted
         # Workaround for https://github.com/bitcoin/bitcoin/issues/26607
@@ -4678,6 +4681,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self, old_password: str, new_password: str, check_seed_if_encrypt: bool = True
     ):
         self._log.info(f"changeWalletPassword - {self.ticker()}")
+        if self._connection_type == "electrum":
+            self._log.warning(
+                f"{self.ticker()}: changeWalletPassword skipped, electrum mode has no wallet file to encrypt."
+            )
+            return
         if old_password == "":
             if self.isWalletEncrypted():
                 raise ValueError("Old password must be set")
