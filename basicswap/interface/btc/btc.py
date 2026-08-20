@@ -1303,22 +1303,29 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def getDestForAddress(self, address: str) -> bytes:
         bech32_prefix: str | None = self.chainparams_network().get("hrp", None)
         if bech32_prefix and address.startswith(bech32_prefix + "1"):
-            _, witprog = segwit_addr.decode(bech32_prefix, address)
+            witver, witprog = segwit_addr.decode(bech32_prefix, address)
+            ensure(witver is not None, "Invalid segwit address")
+            ensure(witver == 0, "Unsupported witness version")
             return CScript([OP_0, bytes(witprog)])
 
         addr_data = decodeAddress(address)
+        ensure(addr_data is not None and len(addr_data) == 21, "Invalid address")
         prefix_byte = addr_data[0]
         addr_hash = addr_data[1:]
 
         script_address = self.chainparams_network().get("script_address")
         script_address2 = self.chainparams_network().get("script_address2")
+        pubkey_address = self.chainparams_network().get("pubkey_address")
 
         if prefix_byte == script_address or (
             script_address2 is not None and prefix_byte == script_address2
         ):
             return CScript([OP_HASH160, addr_hash, OP_EQUAL])
-        else:
-            return CScript([OP_DUP, OP_HASH160, addr_hash, OP_EQUALVERIFY, OP_CHECKSIG])
+        ensure(
+            pubkey_address is not None and prefix_byte == pubkey_address,
+            "Address version byte does not match network",
+        )
+        return CScript([OP_DUP, OP_HASH160, addr_hash, OP_EQUALVERIFY, OP_CHECKSIG])
 
     def addressToScripthash(self, address: str) -> str:
         script = self.getDestForAddress(address)
