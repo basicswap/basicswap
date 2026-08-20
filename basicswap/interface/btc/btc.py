@@ -2145,7 +2145,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         scripthashes = list(addr_to_sh.values())
         sh_to_addr = {sh: addr for addr, sh in addr_to_sh.items()}
 
-        batch_utxos = backend.getBatchUnspent(scripthashes)
+        batch_utxos = backend.getBatchUnspent(scripthashes, min_confirmations=1)
 
         utxos = []
         locked_count = 0
