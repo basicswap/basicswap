@@ -361,6 +361,12 @@ def readConfig(args, known_coins):
             offer_template["minrate"] = 0
             print(f"{offer_template['name']} Offer minrate missing. Setting to 0")
             num_changes += 1
+        if not offer_template.get("minrate") and offer_template.get(
+            "adjust_rates_based_on_market"
+        ) in ("only", "minrate"):
+            print(
+                f"WARNING: {offer_template['name']} uses market rates without a non-zero minrate, offers will be skipped when no reference rate is available"
+            )
         if "amount_step" not in offer_template:
             print(
                 f"Adding mandatory amount_step for {offer_template['name']} (privacy feature)"
@@ -543,6 +549,34 @@ def write_state(statefile, script_state):
         shutil.copyfile(statefile, statefile + ".last")
     with open(statefile, "w") as fp:
         json.dump(script_state, fp, indent=4)
+
+
+DEFAULT_MARKET_RATE_DEVIATION_PERCENT = 20.0
+
+
+def apply_market_rate_floor(market_rate, coingecko_rate, offer_template):
+    """Guard the orderbook-derived rate against poisoned offers.  A single
+    absurdly low offer becomes min(market_rates); floor it with the reference
+    price and the template minrate.  Returns None when no reference exists."""
+    deviation_percent = float(
+        offer_template.get(
+            "market_rate_deviation_percent", DEFAULT_MARKET_RATE_DEVIATION_PERCENT
+        )
+    )
+    min_rate = float(offer_template.get("minrate", 0) or 0)
+    floor = 0.0
+    if coingecko_rate:
+        floor = float(coingecko_rate) * (1.0 - deviation_percent / 100.0)
+    if min_rate > floor:
+        floor = min_rate
+    if floor <= 0.0:
+        return None
+    if market_rate < floor:
+        print(
+            f"Market rate {market_rate} is below the floor {floor}, using the floor rate"
+        )
+        return floor
+    return market_rate
 
 
 def attempt_pre_offer_bids(
@@ -1104,13 +1138,14 @@ def process_offers(args, config, script_state) -> None:
             )
 
         coingecko_rate = None
-        # Get CoinGecko rates if needed (for "true", "false", "all", and unknown modes)
+        # Get CoinGecko rates if needed (as the rate for "true", "false", "all"
+        # and unknown modes, as a reference floor for "only" and "minrate")
         if is_part_to_part:
             use_rate = 1.0
             print("Using fixed rate 1.0 for PART to PART (or variants)")
             offer_template["adjust_rates_based_on_market"] = "static"
 
-        elif adjust_rates_value not in ["only", "minrate", "static"]:
+        elif adjust_rates_value != "static":
             try:
                 rates = read_json_api(
                     "rates",
@@ -1320,7 +1355,18 @@ def process_offers(args, config, script_state) -> None:
         elif adjust_rates_value == "only":
             # Use orderbook only, fail if no market rates
             if market_rate:
-                use_rate = market_rate
+                checked_rate = apply_market_rate_floor(
+                    market_rate, coingecko_rate, offer_template
+                )
+                if checked_rate is None:
+                    print(
+                        f"ERROR: No reference rate to validate the market rate for {offer_template['name']}"
+                    )
+                    print(
+                        f"Skipping {offer_template['name']} - set a non-zero minrate to use market rates without CoinGecko"
+                    )
+                    continue
+                use_rate = checked_rate
                 print(f"Using market rate only: {use_rate}")
             else:
                 print(
@@ -1334,7 +1380,18 @@ def process_offers(args, config, script_state) -> None:
         elif adjust_rates_value == "minrate":
             # Use orderbook, fallback to minrate if no market rates
             if market_rate:
-                use_rate = market_rate
+                checked_rate = apply_market_rate_floor(
+                    market_rate, coingecko_rate, offer_template
+                )
+                if checked_rate is None:
+                    print(
+                        f"ERROR: No reference rate to validate the market rate for {offer_template['name']}"
+                    )
+                    print(
+                        f"Skipping {offer_template['name']} - set a non-zero minrate to use market rates without CoinGecko"
+                    )
+                    continue
+                use_rate = checked_rate
                 print(f"Using market rate only: {use_rate}")
             else:
                 use_rate = offer_template["minrate"]
@@ -1380,6 +1437,12 @@ def process_offers(args, config, script_state) -> None:
                 f"Calculated rate {use_rate} is below minimum rate {offer_template['minrate']}, using minimum"
             )
             use_rate = offer_template["minrate"]
+
+        if not use_rate or float(use_rate) <= 0.0:
+            print(
+                f"Calculated rate {use_rate} is not positive. Skipping {offer_template['name']}"
+            )
+            continue
 
         if args.debug:
             print(
