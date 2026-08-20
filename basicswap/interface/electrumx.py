@@ -35,6 +35,14 @@ def _is_authenticated_transport(host: str) -> bool:
     return host.endswith(".onion") or _is_private_address(host)
 
 
+def _resolves_to_private_address(host: str, port: int) -> bool:
+    try:
+        addr_infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return True
+    return any(_is_private_address(info[4][0]) for info in addr_infos)
+
+
 def _close_socket_safe(sock):
     if sock:
         try:
@@ -131,9 +139,11 @@ class ElectrumConnection:
         proxy_port=None,
         cert_pins=None,
         coin_name="",
+        allow_lan_bypass=True,
     ):
         self._host = host
         self._port = port
+        self._allow_lan_bypass = allow_lan_bypass
         self._use_ssl = use_ssl
         self._timeout = timeout
         self._coin_name = coin_name
@@ -156,7 +166,7 @@ class ElectrumConnection:
         use_proxy = (
             self._proxy_host
             and self._proxy_port
-            and not _is_private_address(self._host)
+            and not (self._allow_lan_bypass and _is_private_address(self._host))
         )
         if use_proxy:
             import socks
@@ -1344,6 +1354,15 @@ class ElectrumServer:
                 host = hostname if hostname else ip_addr
                 is_onion = host.endswith(".onion")
 
+                if _is_private_address(str(ip_addr)) or _is_private_address(
+                    str(hostname)
+                ):
+                    if self._log:
+                        self._log.debug(
+                            f"discover_peers: dropping private/local peer {host}"
+                        )
+                    continue
+
                 ssl_port = None
                 tcp_port = None
 
@@ -1403,6 +1422,17 @@ class ElectrumServer:
             return []
 
     def ping_server(self, host, port, ssl=True, timeout=5):
+        if _is_private_address(str(host)):
+            if self._log:
+                self._log.debug(f"ping_server: refusing private/local host {host}")
+            return None
+        use_proxy = self._proxy_host and self._proxy_port
+        if not use_proxy and _resolves_to_private_address(host, port):
+            if self._log:
+                self._log.debug(
+                    f"ping_server: {host} resolves to a private/local address, refusing"
+                )
+            return None
         try:
             test_conn = ElectrumConnection(
                 host,
@@ -1413,6 +1443,7 @@ class ElectrumServer:
                 proxy_port=self._proxy_port,
                 cert_pins=self._cert_pins,
                 coin_name=self._coin_name,
+                allow_lan_bypass=False,
             )
             test_conn.connect()
             latency = test_conn.ping()
