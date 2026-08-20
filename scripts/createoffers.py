@@ -280,13 +280,6 @@ def findCoin(coin: str, known_coins) -> str:
     return coin
 
 
-def get_bid_template_max_rate(bid_template):
-    max_rate = bid_template.get("maxrate")
-    if max_rate is None:
-        max_rate = bid_template.get("max_rate")
-    return max_rate
-
-
 def readConfig(args, known_coins):
     config_path: str = args.configfile
     num_changes: int = 0
@@ -498,14 +491,15 @@ def readConfig(args, known_coins):
             bid_template["address"] = "auto"
             num_changes += 1
 
-        max_rate = get_bid_template_max_rate(bid_template)
-        if max_rate is None:
+        if "maxrate" in bid_template:
+            print("Renaming maxrate to max_rate for bid template", bid_template["name"])
+            bid_template["max_rate"] = bid_template.pop("maxrate")
+            num_changes += 1
+
+        if bid_template.get("max_rate") is None:
             print(
                 f"Bid template {bid_template['name']} has no max_rate set, it will not bid"
             )
-        elif bid_template.get("maxrate") is None:
-            bid_template["maxrate"] = max_rate
-            num_changes += 1
 
         if bid_template.get("enabled", True) is False:
             continue
@@ -1768,7 +1762,7 @@ def process_bids(args, config, script_state) -> None:
                         print(f"Bid amount too high for offer {offer_id}")
                     continue
 
-            bid_max_rate = get_bid_template_max_rate(bid_template)
+            bid_max_rate = bid_template.get("max_rate")
             if bid_max_rate is None:
                 if args.debug:
                     print(
