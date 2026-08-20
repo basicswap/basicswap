@@ -6,7 +6,7 @@
 
 import os
 import platform
-import random
+import secrets
 import threading
 
 from basicswap.interface.dcr.chainparams import params
@@ -26,11 +26,9 @@ DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
 DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
 DCR_WALLET_RPC_HOST = os.getenv("DCR_WALLET_RPC_HOST", "127.0.0.1")
 DCR_WALLET_RPC_PORT = int(os.getenv("DCR_WALLET_RPC_PORT", 9209))
-DCR_WALLET_PWD = os.getenv(
-    "DCR_WALLET_PWD", random.randbytes(random.randint(14, 18)).hex()
-)
+DCR_WALLET_PWD = os.getenv("DCR_WALLET_PWD", "") or secrets.token_hex(16)
 DCR_RPC_USER = os.getenv("DCR_RPC_USER", "user")
-DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", random.randbytes(random.randint(14, 18)).hex())
+DCR_RPC_PWD = os.getenv("DCR_RPC_PWD", "") or secrets.token_hex(16)
 
 
 class DCRPrepare(CoinPrepareModule):
