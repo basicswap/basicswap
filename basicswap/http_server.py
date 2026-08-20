@@ -9,6 +9,7 @@ import os
 import gzip
 import hmac
 import json
+import time
 import shlex
 import hashlib
 import secrets
@@ -204,6 +205,43 @@ def json_requires_post(url_split) -> bool:
     if route == "offers" and len(url_split) > 3 and url_split[3] == "new":
         return True
     return False
+
+
+LOGIN_MAX_FREE_ATTEMPTS = 3
+LOGIN_LOCKOUT_MAX_SECONDS = 300
+_login_failures = {}
+_login_failures_lock = threading.Lock()
+
+
+def login_attempt_delay(client_ip: str, now: float) -> float:
+    """Seconds the client must wait before another login attempt is evaluated."""
+    with _login_failures_lock:
+        record = _login_failures.get(client_ip)
+        if record is None:
+            return 0.0
+        count, last_attempt = record
+        if count < LOGIN_MAX_FREE_ATTEMPTS:
+            return 0.0
+        delay: float = min(
+            2.0 ** (count - LOGIN_MAX_FREE_ATTEMPTS + 1), LOGIN_LOCKOUT_MAX_SECONDS
+        )
+        return max(0.0, last_attempt + delay - now)
+
+
+def login_attempt_failed(client_ip: str, now: float) -> None:
+    with _login_failures_lock:
+        if len(_login_failures) >= 1000 and client_ip not in _login_failures:
+            for ip in list(_login_failures.keys()):
+                _, last_attempt = _login_failures[ip]
+                if last_attempt + LOGIN_LOCKOUT_MAX_SECONDS < now:
+                    del _login_failures[ip]
+        count, _ = _login_failures.get(client_ip, (0, 0.0))
+        _login_failures[client_ip] = (count + 1, now)
+
+
+def login_attempt_succeeded(client_ip: str) -> None:
+    with _login_failures_lock:
+        _login_failures.pop(client_ip, None)
 
 
 class HttpHandler(BaseHTTPRequestHandler):
@@ -598,57 +636,76 @@ class HttpHandler(BaseHTTPRequestHandler):
                 err_messages.append(security_warning)
 
         if post_string:
-            password = None
-            if is_json_request:
-                try:
-                    json_data = json.loads(post_string.decode("utf-8"))
-                    password = json_data.get("password")
-                except Exception as e:
-                    swap_client.log.error(f"Error parsing JSON login data: {e}")
-            else:
-                try:
-                    form_data = parse.parse_qs(post_string.decode("utf-8"))
-                    password = form_data.get("password", [None])[0]
-                except Exception as e:
-                    swap_client.log.error(f"Error parsing form login data: {e}")
-
-            client_auth_hash = swap_client.settings.get("client_auth_hash")
-
-            if (
-                client_auth_hash
-                and password is not None
-                and verify_rfc2440_password(client_auth_hash, password)
-            ):
-                session_id, cookie_header = self._create_session()
-
+            client_ip: str = self.client_address[0]
+            now: float = time.time()
+            wait_seconds: float = login_attempt_delay(client_ip, now)
+            if wait_seconds > 0.0:
+                swap_client.log.warning(
+                    f"Login attempt from {client_ip} throttled for {wait_seconds:.0f} seconds."
+                )
+                retry_msg: str = (
+                    f"Too many failed attempts. Try again in {int(wait_seconds) + 1} seconds."
+                )
                 if is_json_request:
-                    response_data = {"success": True, "session_id": session_id}
-                    if security_warning:
-                        response_data["warning"] = security_warning
-                    self.putHeaders(
-                        200, "application/json", extra_headers=[cookie_header]
-                    )
-                    return json.dumps(response_data).encode("utf-8")
-                else:
-                    self.send_response(302)
-                    self.send_header(
-                        "Location",
-                        self._safe_next_path(self._get_login_next_cookie())
-                        or "/offers",
-                    )
-                    self.send_header(cookie_header[0], cookie_header[1])
-                    clear_next = self._clear_login_next_cookie()
-                    self.send_header(clear_next[0], clear_next[1])
-                    self.end_headers()
-                    return b""
+                    self.putHeaders(429, "application/json")
+                    return json.dumps({"error": retry_msg}).encode("utf-8")
+                err_messages.append(retry_msg)
+                clear_cookie_header = self._clear_session_cookie()
+                extra_headers.append(clear_cookie_header)
             else:
+                password = None
                 if is_json_request:
-                    self.putHeaders(401, "application/json")
-                    return json.dumps({"error": "Invalid password"}).encode("utf-8")
+                    try:
+                        json_data = json.loads(post_string.decode("utf-8"))
+                        password = json_data.get("password")
+                    except Exception as e:
+                        swap_client.log.error(f"Error parsing JSON login data: {e}")
                 else:
-                    err_messages.append("Invalid password.")
-                    clear_cookie_header = self._clear_session_cookie()
-                    extra_headers.append(clear_cookie_header)
+                    try:
+                        form_data = parse.parse_qs(post_string.decode("utf-8"))
+                        password = form_data.get("password", [None])[0]
+                    except Exception as e:
+                        swap_client.log.error(f"Error parsing form login data: {e}")
+
+                client_auth_hash = swap_client.settings.get("client_auth_hash")
+
+                if (
+                    client_auth_hash
+                    and password is not None
+                    and verify_rfc2440_password(client_auth_hash, password)
+                ):
+                    login_attempt_succeeded(client_ip)
+                    session_id, cookie_header = self._create_session()
+
+                    if is_json_request:
+                        response_data = {"success": True, "session_id": session_id}
+                        if security_warning:
+                            response_data["warning"] = security_warning
+                        self.putHeaders(
+                            200, "application/json", extra_headers=[cookie_header]
+                        )
+                        return json.dumps(response_data).encode("utf-8")
+                    else:
+                        self.send_response(302)
+                        self.send_header(
+                            "Location",
+                            self._safe_next_path(self._get_login_next_cookie())
+                            or "/offers",
+                        )
+                        self.send_header(cookie_header[0], cookie_header[1])
+                        clear_next = self._clear_login_next_cookie()
+                        self.send_header(clear_next[0], clear_next[1])
+                        self.end_headers()
+                        return b""
+                else:
+                    login_attempt_failed(client_ip, now)
+                    if is_json_request:
+                        self.putHeaders(401, "application/json")
+                        return json.dumps({"error": "Invalid password"}).encode("utf-8")
+                    else:
+                        err_messages.append("Invalid password.")
+                        clear_cookie_header = self._clear_session_cookie()
+                        extra_headers.append(clear_cookie_header)
 
         if (
             not is_json_request
