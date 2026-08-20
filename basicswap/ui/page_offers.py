@@ -1113,18 +1113,16 @@ def page_offer(self, url_split: List[str], post_string: str) -> bytes:
         data["tracking_ticker"] = ci_from.ticker()
 
     if show_bid_form:
-        coin_to_id = int(ci_to.coin_type())
-        wallet_coin_to_id = coin_to_id
-        if coin_to_id in (Coins.PART_ANON, Coins.PART_BLIND):
-            wallet_coin_to_id = Coins.PART
+        coin_to_variant = Coins(offer.coin_to)
+        wallet_coin_to_id = int(ci_to.coin_type())
 
         swap_client.updateWalletsInfo(only_coin=wallet_coin_to_id)
         coin_to_wallet = swap_client.getCachedWalletsInfo(
             {"coin_id": wallet_coin_to_id}
         )[wallet_coin_to_id]
-        if coin_to_id == Coins.PART_ANON:
+        if coin_to_variant == Coins.PART_ANON:
             balance_key = "anon_balance"
-        elif coin_to_id == Coins.PART_BLIND:
+        elif coin_to_variant == Coins.PART_BLIND:
             balance_key = "blind_balance"
         else:
             balance_key = "balance"
@@ -1133,7 +1131,9 @@ def page_offer(self, url_split: List[str], post_string: str) -> bytes:
         bid_can_subfee: bool = True
         if offer.swap_type != SwapTypes.XMR_SWAP:
             bid_can_subfee = False
-        if coin_to_id in swap_client.xmr_based_coins:
+        if coin_to_variant in swap_client.xmr_based_coins:
+            bid_can_subfee = False
+        if not reverse_bid and coin_to_variant in (Coins.PART_ANON, Coins.PART_BLIND):
             bid_can_subfee = False
         if offer.amount_negotiable is False:
             bid_can_subfee = False

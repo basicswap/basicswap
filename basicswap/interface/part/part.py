@@ -298,6 +298,9 @@ class PARTInterfaceBlind(PARTInterface):
     def coin_name(self) -> str:
         return super().coin_name() + " Blind"
 
+    def ticker(self) -> str:
+        return super().ticker() + " Blind"
+
     def getScriptLockTxNonce(self, data):
         return hashlib.sha256(data + bytes("locktx", "utf-8")).digest()
 
@@ -1413,6 +1416,9 @@ class PARTInterfaceAnon(PARTInterface):
 
     def coin_name(self) -> str:
         return super().coin_name() + " Anon"
+
+    def ticker(self) -> str:
+        return super().ticker() + " Anon"
 
     def publishBLockTx(
         self,

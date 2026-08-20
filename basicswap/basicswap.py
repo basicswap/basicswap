@@ -4180,7 +4180,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self.log.debug(f"Ensuring wallet can send {balance_msg}.")
         try:
-            if ci.interface_type() in self.scriptless_coins:
+            if (
+                ci.interface_type() in self.scriptless_coins
+                or ci.interface_type() == Coins.PART_BLIND
+            ):
                 ci.ensureFunds(ensure_balance + estimated_fee)
             elif ci.useBackend():
                 self.log.debug(
@@ -5685,14 +5688,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             offer.amount_negotiable,
             f"Offer amounts are final: {self.log.id(offer_id)}.",
         )
-        if offer.coin_to in self.xmr_based_coins:
-            raise ValueError("TODO")
         if offer.swap_type != SwapTypes.XMR_SWAP:
             raise ValueError("TODO")
         ci_to = self.ci(offer.coin_to)
         ci_from = self.ci(offer.coin_from)
         pi = self.pi(SwapTypes.XMR_SWAP)
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+
+        if not reverse_bid and offer.coin_to in self.xmr_based_coins + (
+            Coins.PART_ANON,
+            Coins.PART_BLIND,
+        ):
+            raise ValueError("TODO")
 
         feerate: int = xmr_offer.b_fee_rate
         if reverse_bid:
