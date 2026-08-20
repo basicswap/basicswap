@@ -35,12 +35,17 @@ from basicswap.network.simplex import (
     readSimplexMsgs,
     sendSimplexMsg,
 )
+from basicswap.contrib.test_framework.messages import uint256_from_compact
 from basicswap.util import ensure
 from basicswap.util.address import (
     b58decode,
 )
 from basicswap.util.logging import LogCategories as LC
 from basicswap.util.smsg import smsgGetID
+
+PORTAL_DIFFICULTY_DEFAULT = 0x1EFFFFFF
+PORTAL_DIFFICULTY_MAX_WORK_SHIFT = 3
+PORTAL_MAX_TIME_VALID_HOURS = 48
 
 
 def networkTypeToID(type: str) -> int:
@@ -983,6 +988,31 @@ class BSXNetwork:
             f"Sending through portal {portal.address_from} {portal.network_from} -> {portal.network_to}, {self.logIDM(net_message_id)}",
         )
 
+    def clampPortalDifficulty(self, smsg_difficulty: int) -> int:
+        try:
+            target: int = uint256_from_compact(smsg_difficulty)
+        except Exception:
+            target = -1
+        default_target: int = uint256_from_compact(PORTAL_DIFFICULTY_DEFAULT)
+        if target < default_target >> PORTAL_DIFFICULTY_MAX_WORK_SHIFT:
+            self.log.warning(
+                f"Clamping portal smsg_difficulty {smsg_difficulty:#x}, target too hard."
+            )
+            return PORTAL_DIFFICULTY_DEFAULT
+        if target > default_target:
+            self.log.warning(
+                f"Clamping portal smsg_difficulty {smsg_difficulty:#x}, target too easy."
+            )
+            return PORTAL_DIFFICULTY_DEFAULT
+        return smsg_difficulty
+
+    def clampPortalTimeValid(self, time_valid: int) -> int:
+        max_time_valid: int = PORTAL_MAX_TIME_VALID_HOURS * self.SMSG_SECONDS_IN_HOUR
+        if time_valid > max_time_valid:
+            self.log.warning(f"Clamping portal time_valid {time_valid}.")
+            return max_time_valid
+        return max(time_valid, self.SMSG_SECONDS_IN_HOUR)
+
     def processPortalOffer(self, msg) -> None:
         self.log.debug(
             "Processing network portal offer {}.".format(self.log.id(msg["msgid"]))
@@ -1025,7 +1055,9 @@ class BSXNetwork:
             return
 
         now: int = self.getTime()
-        if time_start + portal_data.time_valid < now:
+        portal_time_valid: int = self.clampPortalTimeValid(portal_data.time_valid)
+        portal_difficulty: int = self.clampPortalDifficulty(portal_data.smsg_difficulty)
+        if time_start + portal_time_valid < now:
             self.log.warning("Offered portal is expired.")
             return
 
@@ -1042,7 +1074,7 @@ class BSXNetwork:
                 received_portal = NetworkPortal()
                 received_portal.set(
                     time_start,
-                    portal_data.time_valid,
+                    portal_time_valid,
                     portal_data.network_type_from,
                     portal_data.network_type_to,
                     addr_portal,
@@ -1051,9 +1083,9 @@ class BSXNetwork:
                 received_portal.created_at = now
             else:
                 received_portal.num_refreshes += 1
-            received_portal.smsg_difficulty = portal_data.smsg_difficulty
+            received_portal.smsg_difficulty = portal_difficulty
             received_portal.time_start = time_start
-            received_portal.time_valid = portal_data.time_valid
+            received_portal.time_valid = portal_time_valid
 
             self.add(received_portal, cursor, upsert=True)
 
