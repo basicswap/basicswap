@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import secrets
 
 from basicswap.interface.xmr.chainparams import params
 from basicswap.interface.prepare_util import (
@@ -29,7 +30,7 @@ XMR_ZMQ_PORT = int(os.getenv("XMR_ZMQ_PORT", 30898))
 XMR_WALLET_RPC_PORT = int(os.getenv("XMR_WALLET_RPC_PORT", 29998))
 XMR_WALLET_RPC_HOST = os.getenv("XMR_WALLET_RPC_HOST", "127.0.0.1")
 XMR_WALLET_RPC_USER = os.getenv("XMR_WALLET_RPC_USER", "xmr_wallet_user")
-XMR_WALLET_RPC_PWD = os.getenv("XMR_WALLET_RPC_PWD", "xmr_wallet_pwd")
+XMR_WALLET_RPC_PWD = os.getenv("XMR_WALLET_RPC_PWD", "") or secrets.token_hex(16)
 XMR_RPC_USER = os.getenv("XMR_RPC_USER", "")
 XMR_RPC_PWD = os.getenv("XMR_RPC_PWD", "")
 DEFAULT_XMR_RESTORE_HEIGHT = int(os.getenv("DEFAULT_XMR_RESTORE_HEIGHT", 2245107))
