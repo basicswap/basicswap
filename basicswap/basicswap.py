@@ -9510,16 +9510,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if coin_type in (Coins.DCR,):
                 script_sig = spend_in["scriptSig"]["asm"].split(" ")
                 ensure(len(script_sig) == 5, "Bad witness size")
-                return bytes.fromhex(script_sig[2])
+                secret = bytes.fromhex(script_sig[2])
             elif (
                 coin_type in (Coins.PART,) or self.coin_clients[coin_type]["use_segwit"]
             ):
                 ensure(len(spend_in["txinwitness"]) == 5, "Bad witness size")
-                return bytes.fromhex(spend_in["txinwitness"][2])
+                secret = bytes.fromhex(spend_in["txinwitness"][2])
             else:
                 script_sig = spend_in["scriptSig"]["asm"].split(" ")
                 ensure(len(script_sig) == 5, "Bad witness size")
-                return bytes.fromhex(script_sig[2])
+                secret = bytes.fromhex(script_sig[2])
+
+            expected_hash = None
+            for swap_tx in (bid.initiate_tx, bid.participate_tx):
+                if swap_tx is not None and swap_tx.script is not None:
+                    expected_hash = bytes(
+                        atomic_swap_1.extractScriptSecretHash(swap_tx.script)
+                    )
+                    break
+            if expected_hash is not None and sha256(secret) != expected_hash:
+                self.log.warning(
+                    f"Extracted secret does not match the contract hashlock for bid {self.log.id(bid.bid_id)}."
+                )
+                return None
+            return secret
         except Exception:
             return None
 
