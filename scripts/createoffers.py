@@ -545,6 +545,36 @@ def write_state(statefile, script_state):
         json.dump(script_state, fp, indent=4)
 
 
+def get_local_identity(addr_from, debug=False):
+    try:
+        identity = read_json_api("identities/{}".format(addr_from))
+        if isinstance(identity, dict) and "address" in identity:
+            return identity
+    except Exception as e:
+        if debug:
+            print(f"Error getting identity for {addr_from}: {e}")
+    return {}
+
+
+def is_locally_trusted_offer(offer, debug=False):
+    """The offer's automation_strat_id is set by the remote peer and can't be
+    trusted.  Decide from the local identity record instead."""
+    addr_from = offer.get("addr_from")
+    if not addr_from:
+        return False
+    identity = get_local_identity(addr_from, debug)
+    automation_override = identity.get("automation_override", 0)
+    if automation_override == 2:
+        return False
+    if automation_override == 1:
+        return True
+    successful_sent_bids = identity.get("num_sent_bids_successful", 0)
+    failed_sent_bids = identity.get("num_sent_bids_failed", 0)
+    if successful_sent_bids < 1:
+        return False
+    return not (failed_sent_bids > 3 and failed_sent_bids > successful_sent_bids)
+
+
 def attempt_pre_offer_bids(
     offer_template, use_rate, amount_to_offer, coin_from_data, coin_to_data, debug=False
 ):
@@ -624,7 +654,7 @@ def filter_biddable_offers(offers, offer_template, our_rate, debug=False):
 
             if offer_rate <= max_acceptable_rate:
                 # Apply strategy-specific filtering
-                if should_bid_on_offer(offer, strategy):
+                if should_bid_on_offer(offer, strategy, debug):
                     filtered.append(offer)
 
         except (ValueError, KeyError) as e:
@@ -716,17 +746,21 @@ def place_bid_on_offer(offer, bid_amount, offer_template, debug=False):
         return False
 
 
-def should_bid_on_offer(offer, strategy):
+def should_bid_on_offer(offer, strategy, debug=False):
     """Determine if we should bid on this offer based on strategy"""
     if strategy == "aggressive":
         # Bid on all compatible offers
         return True
     elif strategy == "conservative":
-        # Only bid on offers with auto-accept enabled
-        return offer.get("automation_strat_id") in [1, 2]
+        return offer.get("automation_strat_id") in [
+            1,
+            2,
+        ] and is_locally_trusted_offer(offer, debug)
     elif strategy == "auto_accept_only":
-        # Only bid on auto-accept offers (best rates from auto-accept only)
-        return offer.get("automation_strat_id") in [1, 2]
+        return offer.get("automation_strat_id") in [
+            1,
+            2,
+        ] and is_locally_trusted_offer(offer, debug)
     elif strategy == "balanced":
         # Bid on auto-accept offers and some manual offers
         return True  # For now same as aggressive (TODO)
@@ -1211,20 +1245,21 @@ def process_offers(args, config, script_state) -> None:
                             )
                             print(f"Automation strategy ID: {offer_strat_id}")
 
-                        if template_strategy == "accept_all" and offer_strat_id == 1:
-                            auto_accept_offers.append(offer)
-                            if args.debug:
+                        if (
+                            template_strategy == "accept_all" and offer_strat_id == 1
+                        ) or (
+                            template_strategy == "accept_known"
+                            and offer_strat_id in [1, 2]
+                        ):
+                            if is_locally_trusted_offer(offer, args.debug):
+                                auto_accept_offers.append(offer)
+                                if args.debug:
+                                    print(
+                                        f"Using {template_strategy}. Offer strategy = {offer_strat_id}. Added offer: {offer_id}"
+                                    )
+                            elif args.debug:
                                 print(
-                                    f"Using {template_strategy}. Offer strategy = {offer_strat_id}. Added offer: {offer_id}"
-                                )
-                        elif template_strategy == "accept_known" and offer_strat_id in [
-                            1,
-                            2,
-                        ]:
-                            auto_accept_offers.append(offer)
-                            if args.debug:
-                                print(
-                                    f"Using {template_strategy}. Offer strategy = {offer_strat_id}. Added offer: {offer_id}"
+                                    f"Offer {offer_id} claims auto-accept but is not locally trusted. Skipping."
                                 )
                         elif template_strategy == "none" or not template_strategy:
                             auto_accept_offers.append(offer)
