@@ -87,9 +87,7 @@ def make_handler(password, form=False):
         handler.statuses.append(status)
     )
     handler._create_session = lambda: ("sid", ("Set-Cookie", "session=sid"))
-    handler._clear_session_cookie = MagicMock(
-        return_value=("Set-Cookie", "session=")
-    )
+    handler._clear_session_cookie = MagicMock(return_value=("Set-Cookie", "session="))
     handler.render_template = MagicMock(return_value=b"login page")
     handler.is_authenticated = lambda: False
     if form:
