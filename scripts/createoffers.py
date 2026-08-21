@@ -361,12 +361,6 @@ def readConfig(args, known_coins):
             offer_template["minrate"] = 0
             print(f"{offer_template['name']} Offer minrate missing. Setting to 0")
             num_changes += 1
-        if not offer_template.get("minrate") and offer_template.get(
-            "adjust_rates_based_on_market"
-        ) in ("only", "minrate", "static"):
-            print(
-                f"WARNING: {offer_template['name']} uses market rates without a non-zero minrate, offers will be skipped"
-            )
         if "amount_step" not in offer_template:
             print(
                 f"Adding mandatory amount_step for {offer_template['name']} (privacy feature)"
@@ -1109,15 +1103,8 @@ def process_offers(args, config, script_state) -> None:
                 f"Adjust rates mode for {offer_template['name']}: {adjust_rates_value}"
             )
 
-        if adjust_rates_value == "only":
-            print(
-                f"WARNING: 'only' mode is deprecated for {offer_template['name']}, using 'minrate'"
-            )
-            adjust_rates_value = "minrate"
-
-        if adjust_rates_value in ("minrate", "static"):
-            template_minrate = offer_template.get("minrate")
-            if template_minrate is None or float(template_minrate) <= 0.0:
+        if adjust_rates_value in ("minrate", "static", "true", "only"):
+            if float(offer_template.get("minrate") or 0) <= 0.0:
                 print(
                     f"Skipping {offer_template['name']} - minrate must be > 0 for {adjust_rates_value} mode"
                 )
@@ -1130,7 +1117,7 @@ def process_offers(args, config, script_state) -> None:
             print("Using fixed rate 1.0 for PART to PART (or variants)")
             offer_template["adjust_rates_based_on_market"] = "static"
 
-        elif adjust_rates_value not in ["minrate", "static"]:
+        elif adjust_rates_value not in ["only", "minrate", "static"]:
             try:
                 rates = read_json_api(
                     "rates",
@@ -1337,14 +1324,19 @@ def process_offers(args, config, script_state) -> None:
                 )
                 continue
 
-        elif adjust_rates_value == "minrate":
+        elif adjust_rates_value in ["minrate", "only"]:
             # Use orderbook, fallback to minrate if no market rates
             if market_rate:
                 use_rate = market_rate
                 print(f"Using market rate: {use_rate}")
-            else:
+            elif adjust_rates_value == "minrate":
                 use_rate = offer_template["minrate"]
                 print(f"No market data available. Using minrate: {use_rate}")
+            elif adjust_rates_value == "only":
+                print(
+                    f"Skipping {offer_template['name']}, market-only requires existing offers"
+                )
+                continue
 
         elif adjust_rates_value == "static":
             # Use static / fixed rate + tweak
@@ -1386,12 +1378,6 @@ def process_offers(args, config, script_state) -> None:
                 f"Calculated rate {use_rate} is below minimum rate {offer_template['minrate']}, using minimum"
             )
             use_rate = offer_template["minrate"]
-
-        if not use_rate or float(use_rate) <= 0.0:
-            print(
-                f"Calculated rate {use_rate} is not positive. Skipping {offer_template['name']}"
-            )
-            continue
 
         if args.debug:
             print(
