@@ -109,7 +109,8 @@ def verifyContractScript(
     pkh_refund = script[o : o + 20]
     o += 20
     if (
-        script[o] != OpCodes.OP_ENDIF
+        len(script) != o + 3
+        or script[o] != OpCodes.OP_ENDIF
         or script[o + 1] != OpCodes.OP_EQUALVERIFY
         or script[o + 2] != OpCodes.OP_CHECKSIG
     ):
