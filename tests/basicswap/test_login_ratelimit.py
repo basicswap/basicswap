@@ -69,9 +69,9 @@ class LoginAttemptTrackingTest(unittest.TestCase):
         self.assertEqual(login_attempt_delay("5.6.7.8", now), 0.0)
 
 
-def make_handler(password):
+def make_handler(password, form=False):
     handler = HttpHandler.__new__(HttpHandler)
-    handler.headers = {"Content-Type": "application/json"}
+    handler.headers = {} if form else {"Content-Type": "application/json"}
     handler.client_address = ("1.2.3.4", 12345)
     handler.server = SimpleNamespace(
         swap_client=SimpleNamespace(
@@ -87,8 +87,15 @@ def make_handler(password):
         handler.statuses.append(status)
     )
     handler._create_session = lambda: ("sid", ("Set-Cookie", "session=sid"))
-    handler._clear_session_cookie = lambda: ("Set-Cookie", "session=")
-    post_string = json.dumps({"password": password}).encode("utf-8")
+    handler._clear_session_cookie = MagicMock(
+        return_value=("Set-Cookie", "session=")
+    )
+    handler.render_template = MagicMock(return_value=b"login page")
+    handler.is_authenticated = lambda: False
+    if form:
+        post_string = f"password={password}".encode("utf-8")
+    else:
+        post_string = json.dumps({"password": password}).encode("utf-8")
     return handler, post_string
 
 
@@ -126,6 +133,19 @@ class PageLoginRateLimitTest(unittest.TestCase):
         self.assertEqual(handler.statuses, [200])
         self.assertTrue(json.loads(rv)["success"])
         self.assertEqual(login_attempt_delay("1.2.3.4", time.time()), 0.0)
+
+    def test_throttled_form_login_does_not_clear_session(self):
+        now = time.time()
+        for _ in range(4):
+            login_attempt_failed("1.2.3.4", now)
+        handler, post = make_handler("wrong-password", form=True)
+        handler.page_login([], post)
+        handler._clear_session_cookie.assert_not_called()
+
+    def test_failed_form_login_clears_session(self):
+        handler, post = make_handler("wrong-password", form=True)
+        handler.page_login([], post)
+        handler._clear_session_cookie.assert_called_once()
 
 
 if __name__ == "__main__":

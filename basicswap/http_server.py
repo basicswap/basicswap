@@ -650,8 +650,6 @@ class HttpHandler(BaseHTTPRequestHandler):
                     self.putHeaders(429, "application/json")
                     return json.dumps({"error": retry_msg}).encode("utf-8")
                 err_messages.append(retry_msg)
-                clear_cookie_header = self._clear_session_cookie()
-                extra_headers.append(clear_cookie_header)
             else:
                 password = None
                 if is_json_request:
