@@ -2145,10 +2145,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         scripthashes = list(addr_to_sh.values())
         sh_to_addr = {sh: addr for addr, sh in addr_to_sh.items()}
 
-        batch_utxos = backend.getBatchUnspent(scripthashes, min_confirmations=1)
+        batch_utxos = backend.getBatchUnspent(scripthashes)
 
         utxos = []
         locked_count = 0
+        unconfirmed_count = 0
         for sh, sh_utxos in batch_utxos.items():
             addr = sh_to_addr.get(sh, "")
             if not addr:
@@ -2162,6 +2163,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             f"_fundTxElectrum: scripthash mismatch for {addr}: "
                             f"stored={sh}, computed={computed_sh}"
                         )
+                if utxo.get("confirmations", 0) < 1:
+                    unconfirmed_count += 1
+                    continue
                 if wm.isUTXOLocked(
                     self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
                 ):
@@ -2170,9 +2174,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 utxos.append(utxo)
 
         if not utxos:
-            if locked_count > 0:
+            if locked_count > 0 or unconfirmed_count > 0:
                 raise ValueError(
-                    f"No UTXOs available ({locked_count} locked for pending swaps)"
+                    f"No spendable UTXOs ({locked_count} locked for pending swaps, "
+                    f"{unconfirmed_count} awaiting confirmation)"
                 )
             raise ValueError("No UTXOs available")
 

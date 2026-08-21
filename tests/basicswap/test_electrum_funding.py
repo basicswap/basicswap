@@ -7,12 +7,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from basicswap.contrib.test_framework.messages import (
-    COutPoint,
-    CTransaction,
-    CTxIn,
-    CTxOut,
-)
+from basicswap.contrib.test_framework.messages import CTransaction, CTxOut
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.wallet_backend import ElectrumBackend
 from tests.basicswap.util.common import REQUIRED_SETTINGS
@@ -34,58 +29,58 @@ def make_backend():
 
 class GetBatchUnspentTest(unittest.TestCase):
     def test_default_includes_unconfirmed(self):
-        backend = make_backend()
-        rv = backend.getBatchUnspent(["sh1"])
+        rv = make_backend().getBatchUnspent(["sh1"])
         self.assertEqual(len(rv["sh1"]), 3)
 
     def test_min_confirmations_filters_unconfirmed(self):
-        backend = make_backend()
-        rv = backend.getBatchUnspent(["sh1"], min_confirmations=1)
-        txids = [utxo["txid"] for utxo in rv["sh1"]]
-        self.assertEqual(txids, ["aa" * 32, "cc" * 32])
-
-    def test_min_confirmations_two_excludes_tip(self):
-        backend = make_backend()
-        rv = backend.getBatchUnspent(["sh1"], min_confirmations=2)
-        txids = [utxo["txid"] for utxo in rv["sh1"]]
-        self.assertEqual(txids, ["aa" * 32])
-
-
-class SentinelError(Exception):
-    pass
+        rv = make_backend().getBatchUnspent(["sh1"], min_confirmations=1)
+        self.assertEqual([u["txid"] for u in rv["sh1"]], ["aa" * 32, "cc" * 32])
 
 
 class FundTxElectrumTest(unittest.TestCase):
-    def test_funding_requires_confirmed_utxos(self):
+    def setUp(self):
         settings = dict(REQUIRED_SETTINGS)
         settings.update(
-            {
-                "rpcport": 0,
-                "rpcauth": "none",
-                "connection_type": "electrum",
-            }
+            {"rpcport": 0, "rpcauth": "none", "connection_type": "electrum"}
         )
-        ci = BTCInterface(settings, "regtest")
+        self.ci = BTCInterface(settings, "regtest")
+        self.ci._log = MagicMock()
+        self.addr = self.ci.encodeSegwitAddress(b"\x11" * 20)
 
-        calls = []
+    def _fund(self, utxos):
+        sh = self.ci.addressToScripthash(self.addr)
 
-        class RecordingBackend:
+        class FakeBackend:
             def getBatchUnspent(self, scripthashes, min_confirmations=0):
-                calls.append(min_confirmations)
-                raise SentinelError()
+                return {
+                    sh: [u for u in utxos if u["confirmations"] >= min_confirmations]
+                }
 
         wm = MagicMock()
-        wm.getFundedAddresses.return_value = {"addr1": "sh1"}
-        ci._backend = RecordingBackend()
-        ci.getWalletManager = lambda: wm
+        wm.getFundedAddresses.return_value = {self.addr: sh}
+        wm.isUTXOLocked.return_value = False
+        self.ci._backend = FakeBackend()
+        self.ci.getWalletManager = lambda: wm
 
         tx = CTransaction()
-        tx.vin.append(CTxIn(COutPoint(1, 0)))
         tx.vout.append(CTxOut(10000, bytes([0x00, 0x14]) + b"\x11" * 20))
+        funded = self.ci.loadTx(
+            self.ci._fundTxElectrum(tx.serialize_without_witness(), 1000)
+        )
+        return {
+            txin.prevout.hash.to_bytes(32, "little")[::-1].hex() for txin in funded.vin
+        }
 
-        with self.assertRaises(SentinelError):
-            ci._fundTxElectrum(tx.serialize_without_witness(), 10000)
-        self.assertEqual(calls, [1])
+    def test_unconfirmed_utxos_are_not_spent(self):
+        confirmed = {"txid": "aa" * 32, "vout": 0, "value": 10750, "confirmations": 3}
+        unconfirmed = {"txid": "bb" * 32, "vout": 0, "value": 99000, "confirmations": 0}
+        self.assertEqual(self._fund([unconfirmed, confirmed]), {"aa" * 32})
+
+    def test_only_unconfirmed_reports_why(self):
+        unconfirmed = {"txid": "bb" * 32, "vout": 0, "value": 99000, "confirmations": 0}
+        with self.assertRaises(ValueError) as e:
+            self._fund([unconfirmed])
+        self.assertIn("awaiting confirmation", str(e.exception))
 
 
 if __name__ == "__main__":
