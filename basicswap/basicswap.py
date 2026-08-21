@@ -10049,24 +10049,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def processFoundScript(
         self, coin_type, watched_script, txid: bytes, vout: int
     ) -> None:
+        bid_in_progress = self.swaps_in_progress.get(watched_script.bid_id, None)
+        if bid_in_progress is None:
+            self.log.warning(
+                f"Could not find active bid for found watched script: {self.logIDB(watched_script.bid_id)}."
+            )
+            self.removeWatchedScript(
+                coin_type, watched_script.bid_id, watched_script.script
+            )
+            return
+        bid = bid_in_progress[0]
+
         if watched_script.tx_type == TxTypes.PTX:
-            if watched_script.bid_id in self.swaps_in_progress:
-                bid = self.swaps_in_progress[watched_script.bid_id][0]
+            bid.participate_tx.txid = txid
+            bid.participate_tx.vout = vout
+            bid.setPTxState(TxStates.TX_IN_CHAIN)
 
-                bid.participate_tx.txid = txid
-                bid.participate_tx.vout = vout
-                bid.setPTxState(TxStates.TX_IN_CHAIN)
-
-                self.saveBid(watched_script.bid_id, bid)
-            else:
-                self.log.warning(
-                    f"Could not find active bid for found watched script: {self.logIDB(watched_script.bid_id)}."
-                )
+            self.saveBid(watched_script.bid_id, bid)
         elif watched_script.tx_type == TxTypes.XMR_SWAP_A_LOCK:
             self.log.info(
                 f"Found chain A lock txid {self.log.id(txid)} for bid: {self.log.id(watched_script.bid_id)}."
             )
-            bid = self.swaps_in_progress[watched_script.bid_id][0]
             if bid.xmr_a_lock_tx.txid != txid:
                 self.log.debug(
                     f"Updating xmr_a_lock_tx from {self.log.id(bid.xmr_a_lock_tx.txid)} to {self.log.id(txid)}."
@@ -10081,7 +10084,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.info(
                 f"Found chain B lock txid {self.log.id(txid)} for bid: {self.log.id(watched_script.bid_id)}."
             )
-            bid = self.swaps_in_progress[watched_script.bid_id][0]
             bid.xmr_b_lock_tx = SwapTx(
                 bid_id=watched_script.bid_id,
                 tx_type=TxTypes.XMR_SWAP_B_LOCK,
