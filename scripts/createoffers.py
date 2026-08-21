@@ -1340,7 +1340,7 @@ def process_offers(args, config, script_state) -> None:
         elif adjust_rates_value == "minrate":
             # Use orderbook, fallback to minrate if no market rates
             if market_rate:
-                use_rate = max(market_rate, offer_template["minrate"])
+                use_rate = market_rate
                 print(f"Using market rate: {use_rate}")
             else:
                 use_rate = offer_template["minrate"]
