@@ -4,4 +4,4 @@ Jinja2==3.1.6
 pycryptodome==3.23.0
 PySocks==1.7.1
 websocket-client==1.9.0
-coincurve@https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.3.zip
+coincurve@https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.4.zip

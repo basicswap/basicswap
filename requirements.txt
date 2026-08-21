@@ -4,8 +4,8 @@
 #
 #    pip-compile --generate-hashes --output-file=requirements.txt requirements.in
 #
-coincurve @ https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.3.zip \
-    --hash=sha256:41e40a335994112938984097b089142acceb24324d76a7e35d8b9d14c2cfa8b5
+coincurve @ https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.4.zip \
+    --hash=sha256:5a96faeeaf202c69ec8c1807086d5139541048dddf8b7f19a144ea9100a2f0be
     # via -r requirements.in
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
