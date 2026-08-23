@@ -10227,6 +10227,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if cursor is None:
                 self.closeDB(use_cursor)
 
+    def checkWatched(self) -> None:
+        for k, c in self.coin_clients.items():
+            if k in (Coins.PART_ANON, Coins.PART_BLIND, Coins.LTC_MWEB):
+                continue
+            if len(c["watched_outputs"]) < 1 and len(c["watched_scripts"]) < 1:
+                continue
+
+            if c.get("connection_type") == "electrum":
+                if (
+                    k not in self._electrum_spend_check_futures
+                    or self._electrum_spend_check_futures[k].done()
+                ):
+                    self._electrum_spend_check_futures[k] = self.thread_pool.submit(
+                        self._fetchSpendsElectrum,
+                        k,
+                        list(c["watched_outputs"]),
+                        list(c["watched_scripts"]),
+                    )
+                continue
+
+            try:
+                self.checkForSpends(k, c)
+            except Exception as ex:
+                if self.debug:
+                    self.log.error("checkForSpends %s", traceback.format_exc())
+                if self.is_transient_error(ex):
+                    self.log.warning(f"checkForSpends {Coins(k).name} {ex}.")
+                else:
+                    self.log.error(f"checkForSpends {Coins(k).name} {ex}.")
+
     def checkForSpends(self, coin_type, c):
         # assert (self.mxDB.locked())
         self.log.debug(f"checkForSpends {Coins(coin_type).name}.")
@@ -14497,30 +14527,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self._last_checked_progress = now
 
             if now - self._last_checked_watched >= self.check_watched_seconds:
-                for k, c in self.coin_clients.items():
-                    if (
-                        k == Coins.PART_ANON
-                        or k == Coins.PART_BLIND
-                        or k == Coins.LTC_MWEB
-                    ):
-                        continue
-                    if len(c["watched_outputs"]) > 0 or len(c["watched_scripts"]):
-                        if c.get("connection_type") == "electrum":
-                            if (
-                                k not in self._electrum_spend_check_futures
-                                or self._electrum_spend_check_futures[k].done()
-                            ):
-                                self._electrum_spend_check_futures[k] = (
-                                    self.thread_pool.submit(
-                                        self._fetchSpendsElectrum,
-                                        k,
-                                        list(c["watched_outputs"]),
-                                        list(c["watched_scripts"]),
-                                    )
-                                )
-                        else:
-                            self.checkForSpends(k, c)
-                self._last_checked_watched = now
+                try:
+                    self.checkWatched()
+                except Exception as ex:
+                    self.logException(f"checkWatched {ex}")
+                finally:
+                    self._last_checked_watched = now
 
             if now - self._last_checked_expired >= self.check_expired_seconds:
                 self.expireMessages()
