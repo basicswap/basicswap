@@ -1113,6 +1113,13 @@ def process_offers(args, config, script_state) -> None:
                 f"Adjust rates mode for {offer_template['name']}: {adjust_rates_value}"
             )
 
+        if adjust_rates_value in ("minrate", "static", "true", "only"):
+            if float(offer_template.get("minrate") or 0) <= 0.0:
+                print(
+                    f"Skipping {offer_template['name']} - minrate must be > 0 for {adjust_rates_value} mode"
+                )
+                continue
+
         coingecko_rate = None
         # Get CoinGecko rates if needed (for "true", "false", "all", and unknown modes)
         if is_part_to_part:
@@ -1327,28 +1334,19 @@ def process_offers(args, config, script_state) -> None:
                 )
                 continue
 
-        elif adjust_rates_value == "only":
-            # Use orderbook only, fail if no market rates
-            if market_rate:
-                use_rate = market_rate
-                print(f"Using market rate only: {use_rate}")
-            else:
-                print(
-                    f"ERROR: No market data available for 'only' mode for {offer_template['name']}"
-                )
-                print(
-                    f"Skipping {offer_template['name']} - market-only mode requires existing offers"
-                )
-                continue
-
-        elif adjust_rates_value == "minrate":
+        elif adjust_rates_value in ["minrate", "only"]:
             # Use orderbook, fallback to minrate if no market rates
             if market_rate:
                 use_rate = market_rate
-                print(f"Using market rate only: {use_rate}")
-            else:
+                print(f"Using market rate: {use_rate}")
+            elif adjust_rates_value == "minrate":
                 use_rate = offer_template["minrate"]
                 print(f"No market data available. Using minrate: {use_rate}")
+            elif adjust_rates_value == "only":
+                print(
+                    f"Skipping {offer_template['name']}, market-only requires existing offers"
+                )
+                continue
 
         elif adjust_rates_value == "static":
             # Use static / fixed rate + tweak
