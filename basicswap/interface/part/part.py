@@ -289,7 +289,7 @@ class PARTInterfaceBlind(PARTInterface):
     @staticmethod
     def compareFeeRates(actual: int, expected: int) -> bool:
         # Allow the fee to be up to 10% larger than expected
-        if actual < expected - 20:
+        if actual < expected:
             return False
         if actual > expected + expected * 0.1:
             return False

@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from math import ceil
+
 from basicswap.contrib.test_framework.messages import COIN
 from basicswap.db import (
     Concepts,
@@ -131,6 +133,16 @@ class FeeValidator:
             if "relayfee" in networkinfo:
                 return networkinfo["relayfee"], "relayfee_rpc"
         return None, None
+
+    @staticmethod
+    def compareFeeRates(actual: int, expected: int) -> bool:
+        if actual < expected:
+            return False
+        return actual - expected < 20
+
+    @staticmethod
+    def feeForVSize(fee_rate: int, vsize: int) -> int:
+        return ceil(fee_rate * vsize / 1000)
 
     def validateFeeRate(
         self, feerate: int, concept_type: int, force_bypass: bool = False

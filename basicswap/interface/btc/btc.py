@@ -1501,7 +1501,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee: int = round(tx_fee_rate * vsize / 1000)
+        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -1559,7 +1559,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
         witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee: int = round(tx_fee_rate * vsize / 1000)
+        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -1629,7 +1629,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = round(tx_fee_rate * vsize / 1000)
+        pay_fee = self.feeForVSize(tx_fee_rate, vsize)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         tx.rehash()
@@ -1678,7 +1678,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee: int = round(tx_fee_rate * vsize / 1000)
+        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
         tx.vout[0].nValue = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee
