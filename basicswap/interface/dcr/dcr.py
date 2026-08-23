@@ -1249,7 +1249,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
         size += 1
-        pay_fee = round(tx_fee_rate * size / 1000)
+        pay_fee = self.feeForVSize(tx_fee_rate, size)
         tx.vout[0].value = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee
@@ -1301,7 +1301,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
         size += 1
-        pay_fee = round(tx_fee_rate * size / 1000)
+        pay_fee = self.feeForVSize(tx_fee_rate, size)
         tx.vout[0].value = locked_coin - pay_fee
 
         self._log.info(
@@ -1353,7 +1353,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         )
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
         size += 1
-        pay_fee = round(tx_fee_rate * size / 1000)
+        pay_fee = self.feeForVSize(tx_fee_rate, size)
         tx.vout[0].value = locked_coin - pay_fee
 
         self._log.info(
@@ -1700,7 +1700,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             script_lock_refund
         )
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
-        pay_fee = round(tx_fee_rate * size / 1000)
+        pay_fee = self.feeForVSize(tx_fee_rate, size)
         tx.vout[0].value = locked_amount - pay_fee
 
         self._log.info(

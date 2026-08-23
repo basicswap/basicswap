@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from math import ceil
+
 from basicswap.contrib.test_framework.messages import COIN
 from basicswap.db import (
     Concepts,
@@ -130,35 +132,50 @@ class FeeValidator:
             networkinfo = self.rpc("getnetworkinfo")
             if "relayfee" in networkinfo:
                 return networkinfo["relayfee"], "relayfee_rpc"
+        elif self._connection_type == "electrum":
+            return 0.00001, "relayfee_electrum_default"
         return None, None
+
+    @staticmethod
+    def compareFeeRates(actual: int, expected: int) -> bool:
+        if actual < expected:
+            return False
+        return actual - expected < 20
+
+    @staticmethod
+    def feeForVSize(fee_rate: int, vsize: int) -> int:
+        return ceil(fee_rate * vsize / 1000)
 
     def validateFeeRate(
         self, feerate: int, concept_type: int, force_bypass: bool = False
     ) -> None:
+        hard_min_feerate_float, hard_min_feerate_src = self.getHardMinFee()
+        hard_min_feerate = (
+            None
+            if hard_min_feerate_float is None
+            else self.make_int(hard_min_feerate_float)
+        )
+
         if self._low_feerate > 0:
             min_feerate, min_feerate_src = (self._low_feerate, "set_value")
-            hard_min_feerate, hard_min_feerate_src = (None, None)
         else:
             min_feerate_float, min_feerate_src = self.get_fee_rate(
                 self._low_fee_conf_target
             )
             min_feerate = self.make_int(min_feerate_float)
-            hard_min_feerate_float, hard_min_feerate_src = self.getHardMinFee()
-            hard_min_feerate = (
-                None
-                if hard_min_feerate_float is None
-                else self.make_int(hard_min_feerate_float)
-            )
 
-        # If the hard minfeerate is known reduce the minfeerate
-        if hard_min_feerate is not None and min_feerate_src in (
-            "estimatesmartfee",
-            "electrum",
-        ):
-            min_feerate = max(
-                hard_min_feerate,
-                int(min_feerate * self._low_estimated_feerate_multiplier),
-            )
+        if hard_min_feerate is not None:
+            # If the hard minfeerate is known reduce the minfeerate
+            if min_feerate_src in (
+                "estimatesmartfee",
+                "electrum",
+            ):
+                min_feerate = max(
+                    hard_min_feerate,
+                    int(min_feerate * self._low_estimated_feerate_multiplier),
+                )
+            elif min_feerate < hard_min_feerate:
+                min_feerate, min_feerate_src = (hard_min_feerate, hard_min_feerate_src)
 
         if self._high_estimated_feerate_multiplier >= 1.0:
             max_feerate, max_feerate_src = self.get_fee_rate()

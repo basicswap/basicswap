@@ -47,10 +47,6 @@ class CoinInterface:
         return False
 
     @staticmethod
-    def compareFeeRates(a, b) -> bool:
-        return abs(a - b) < 20
-
-    @staticmethod
     def getVoutValue(vout) -> int:
         return vout.nValue
 
