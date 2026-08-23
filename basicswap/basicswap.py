@@ -8631,46 +8631,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.log.warning(
                                 f"Trying to publish coin a lock refund tx: {ex}"
                             )
-                            # TODO: Remove
-                            try:
-                                if ci_from.coin_type() != Coins.BCH:
-                                    sigl = ci_from.extractLeaderSig(
-                                        xmr_swap.a_lock_refund_tx
-                                    )
-                                    sigf = ci_from.extractFollowerSig(
-                                        xmr_swap.a_lock_refund_tx
-                                    )
-                                    self.log.debug(f"sigl hashtype {sigl[-1]}")
-                                    self.log.debug(f"sigf hashtype {sigf[-1]}")
-                                    try_fix: bool = False
-                                    if sigl[-1] != 1:
-                                        self.log.warning(
-                                            f"Trying to repair invalid leader hashtype for refund tx of bid {self.log.id(bid_id)}"
-                                        )
-                                        try_fix = True
-                                    if sigf[-1] != 1:
-                                        self.log.warning(
-                                            f"Trying to repair invalid follower hashtype for refund tx of bid {self.log.id(bid_id)}"
-                                        )
-                                        try_fix = True
-                                    if try_fix:
-                                        xmr_swap.al_lock_refund_tx_sig = sigl[
-                                            :-1
-                                        ] + bytes((1,))
-                                        xmr_swap.af_lock_refund_tx_sig = sigf[
-                                            :-1
-                                        ] + bytes((1,))
-                                        xmr_swap_1.addLockRefundSigs(
-                                            self, xmr_swap, ci_from
-                                        )
-                                        self.saveBidInSession(
-                                            bid_id, bid, cursor, xmr_swap
-                                        )
-                                        self.commitDB()
-                            except Exception as ex:
-                                self.log.error(
-                                    f"Trying to repair coin a lock refund tx: {ex}"
-                                )
 
             state = BidStates(bid.state)
             if state == BidStates.SWAP_COMPLETED:
