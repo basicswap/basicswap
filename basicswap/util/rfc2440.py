@@ -49,12 +49,13 @@ def verify_rfc2440_password(stored_hash, provided_password):
             return False
 
         salt_hex_plus_hash_hex = parts[1]
-        separator_index = salt_hex_plus_hash_hex.find("60")
-        if separator_index != 16:
+        if len(salt_hex_plus_hash_hex) != 58:
+            return False
+        if salt_hex_plus_hash_hex[16:18] != "60":
             return False
 
-        salt_hex = salt_hex_plus_hash_hex[:separator_index]
-        expected_hash_hex = salt_hex_plus_hash_hex[separator_index + 2 :]
+        salt_hex = salt_hex_plus_hash_hex[:16]
+        expected_hash_hex = salt_hex_plus_hash_hex[18:]
 
         salt = bytes.fromhex(salt_hex)
     except (ValueError, IndexError):
