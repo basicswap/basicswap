@@ -1,3 +1,64 @@
+0.18.0
+==============
+
+**Security / hardening**
+- Secret-hash contracts: reject scripts with trailing opcodes.
+- Adaptor-sig swaps: transaction fee verification no longer accepts a rate slightly below the one
+  agreed in the offer.  The comparison allowed 19 sat/kvB of leeway in either direction.
+  Fees are now rounded up when building transactions, so a transaction always meets the
+  rate it was built for.
+- Fee validation: apply a relay-fee floor on Electrum connections, where there is no daemon
+  to query for one, and apply the floor to a configured `low_feerate` as well.
+- Electrum: pin server TLS certificates.
+- Electrum: server entries use TLS unless explicitly downgraded with a `:t` marker; the
+  port no longer implies the transport.  An unmarked entry is treated as plaintext only for
+  .onion, LAN and loopback hosts, which authenticate the endpoint by other means.
+- Electrum: require confirmed UTXOs when funding swap transactions.
+- Decred: generate passwords with `secrets` rather than `random`.
+
+**Fixes**
+- Password verification rejected valid hashes when the salt contained "60".
+- Bids: fix subfee bids on PART blind.
+- Bids: clamp to the offer rate when the bid amount is omitted.  A partial bid on a
+  fixed-rate offer took the offer's full amount for the other side.
+- Offers: fix early revoke of an in-flight offer.
+- Queued actions: a failed spend check no longer blocks the queue.
+- Guard against a missing bid in processFoundScript.
+
+**Electrum**
+- Select coins from every signable address.
+- Serialise socket reads and writes.
+- Fix connection churn.
+
+**AMM**
+- Fix rate poisoning: modes that derive a rate from the orderbook now require `minrate` to
+  be greater than zero, so a manipulated orderbook cannot pull an offer's rate down without
+  a floor.
+- Fix a KeyError caused by a max_rate/maxrate template key mismatch.  Configurations are
+  standardised on `max_rate` and legacy `maxrate` entries are migrated.
+
+**Daemon updates**
+- Decred bumped to v2.1.6 [mandatory]
+- Firo bumped to v0.14.17.2 [mandatory]
+- Dash bumped to v23.1.8
+- Bitcoin Cash bumped to v29.1.0
+
+**Prepare**
+- Fix Bitcoin Cash 29.1.0 prepare on macOS, which changed its release asset names.
+
+**Other**
+- coincurve raised to v04.
+
+**Upgrade note**
+- Fee verification is stricter in both directions: transactions are built with the fee
+  rounded up, and a rate below the one agreed in the offer is rejected.  Peers on earlier
+  versions round the fee to nearest when building, which lands a satoshi low roughly half
+  the time, so swaps against them can fail fee verification.
+- Electrum server entries without a transport marker are now TLS.  Existing plaintext
+  entries that are not .onion, LAN or loopback need an explicit `:t` marker added.
+- AMM templates using `maxrate` are migrated to `max_rate` automatically.  Templates using
+  an orderbook-derived rate mode are skipped unless `minrate` is set above zero.
+
 
 0.17.9
 ==============
