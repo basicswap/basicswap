@@ -32,7 +32,7 @@
 (define libsecp256k1-basicswap
   (package
     (name "libsecp256k1-basicswap")
-    (version "basicswap_v0.2")
+    (version "basicswap_v0.3")
     (source (origin
       (method git-fetch)
       (uri (git-reference
@@ -40,7 +40,7 @@
         (commit version)))
       (sha256
        (base32
-        "0zvqgswmy1q46nmpjn388pljvl65x3y2k4caw742m3j121jqmfgx"))
+        "1hi6cb2i1pnqlizrwd51i5v19y3dxq9a0zgm74vk622cagb0pnyk"))
       (file-name (git-file-name name version))))
     (build-system gnu-build-system)
     (arguments
@@ -90,7 +90,7 @@
 (define python-coincurve-basicswap
   (package
     (name "python-coincurve-basicswap")
-    (version "basicswap_v0.3")
+    (version "basicswap_v0.4")
     (source
      (origin
        (method git-fetch)
@@ -101,7 +101,7 @@
        (file-name
         (git-file-name name version))
        (sha256
-        (base32 "08bc8175v4d479lgavkcclc0kkh3icxm9i0i26wqd1g3bv0is8cm"))))
+        (base32 "0l2zpr5hdr7w5paxqn4vvn543rjc1sy01d1jdjnz6cr5ly5wvbq2"))))
     (build-system pyproject-build-system)
     (arguments
      `(#:phases
