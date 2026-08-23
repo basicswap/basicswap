@@ -21,6 +21,9 @@ env:
   BASE_COINS: particl,bitcoin,monero
   BIN_DIR: /tmp/cached_bin
   TEST_RELOAD_PATH: /tmp/test_basicswap
+  ELECTRUMX_SRC_DIR: /tmp/electrumx
+  # Pinned: electrumx master requires Bitcoin Core >= 31.0
+  ELECTRUMX_VERSION: "1.20.0"
   BSX_SELENIUM_DRIVER: firefox-ci
   XMR_RPC_USER: xmr_user
   XMR_RPC_PWD: xmr_pwd
@@ -201,6 +204,25 @@ jobs:
               export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
               export XMR_BINDIR="$BIN_DIR/monero"
               pytest -x tests/basicswap/test_btc_xmr.py::TestBTC -k "test_003_api or test_02_a_leader_recover_a_lock_tx or test_03_a_follower_recover_a_lock_tx or test_11_fee_validation"
+          - name: test_electrum
+            electrumx: "true"
+            command: |
+              export PYTHONPATH=$(pwd)
+              export TEST_PATH=/tmp/test_electrum
+              export TEST_COINS_LIST=bitcoin,monero
+              export EXTRA_CONFIG_JSON='{"btc0":["txindex=1","rpcworkqueue=1100"]}'
+              mkdir -p ${TEST_PATH}/bin
+              cp -r $BIN_DIR/* ${TEST_PATH}/bin/
+              pytest -x tests/basicswap/test_electrum.py -k "test_01_b_full_swap_xmr or test_01_c_full_swap_xmr_reverse or test_02_a_leader_recover_a_lock_tx or test_02_b_leader_recover_a_lock_tx_reverse or test_03_a_follower_recover_a_lock_tx or test_03_b_follower_recover_a_lock_tx_reverse or test_04_a_follower_recover_b_lock_tx or test_04_b_follower_recover_b_lock_tx_reverse"
+            failure_logs: |
+              for logfile in /tmp/electrumx_*/electrumx.log; do
+                echo "=== $logfile ==="
+                tail -n 200 "$logfile" || true
+              done
+              for logfile in /tmp/test_electrum/client*/*.log; do
+                echo "=== $logfile ==="
+                tail -n 100 "$logfile" || true
+              done
           - name: test_encrypted_xmr_reload
             command: |
               export PYTHONPATH=$(pwd)
@@ -269,6 +291,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y firefox gnupg
         fi
+    - name: Install ElectrumX dependencies
+      if: ${{ matrix.electrumx == 'true' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libleveldb-dev
+    - name: Cache ElectrumX
+      if: ${{ matrix.electrumx == 'true' }}
+      id: cache-electrumx
+      uses: actions/cache@v6
+      with:
+        path: ${{ env.ELECTRUMX_SRC_DIR }}
+        key: electrumx-${{ env.ELECTRUMX_VERSION }}-${{ runner.os }}-py${{ env.PYTHON_VERSION }}
+    - if: ${{ matrix.electrumx == 'true' && steps.cache-electrumx.outputs.cache-hit != 'true' }}
+      name: Install ElectrumX
+      run: |
+        git clone --depth 1 --branch "$ELECTRUMX_VERSION" https://github.com/spesmilo/electrumx.git "$ELECTRUMX_SRC_DIR"
+        cd "$ELECTRUMX_SRC_DIR"
+        python -m venv venv
+        . venv/bin/activate
+        pip install ".[ujson,leveldb]"
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
