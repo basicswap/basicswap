@@ -491,6 +491,16 @@ def readConfig(args, known_coins):
             bid_template["address"] = "auto"
             num_changes += 1
 
+        if "maxrate" in bid_template:
+            print("Renaming maxrate to max_rate for bid template", bid_template["name"])
+            bid_template["max_rate"] = bid_template.pop("maxrate")
+            num_changes += 1
+
+        if bid_template.get("max_rate") is None:
+            print(
+                f"Bid template {bid_template['name']} has no max_rate set, it will not bid"
+            )
+
         if bid_template.get("enabled", True) is False:
             continue
         try:
@@ -1752,9 +1762,16 @@ def process_bids(args, config, script_state) -> None:
                         print(f"Bid amount too high for offer {offer_id}")
                     continue
 
-            if offer_rate > bid_template["maxrate"]:
+            bid_max_rate = bid_template.get("max_rate")
+            if bid_max_rate is None:
                 if args.debug:
-                    print(f"Bid rate too low for offer {offer_id}")
+                    print(
+                        f"No max_rate set for template {bid_template['name']}, skipping offer {offer_id}"
+                    )
+                continue
+            if offer_rate > bid_max_rate:
+                if args.debug:
+                    print(f"Offer rate above bid max_rate for offer {offer_id}")
                 continue
 
             try:

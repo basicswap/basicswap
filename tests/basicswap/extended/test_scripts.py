@@ -283,7 +283,7 @@ class Test(unittest.TestCase):
                     "coin_from": "PART",
                     "coin_to": "XMR",
                     "amount": 10,
-                    "maxrate": 0.04,
+                    "max_rate": 0.04,
                     "amount_variable": True,
                     "address": -1,
                     "min_swap_amount": 0.1,
@@ -396,7 +396,7 @@ class Test(unittest.TestCase):
                     "coin_from": "PART",
                     "coin_to": "XMR",
                     "amount": 10,
-                    "maxrate": 0.06,
+                    "max_rate": 0.06,
                     "amount_variable": True,
                     "address": addr_bid_from,
                     "min_swap_amount": 0.1,
@@ -409,7 +409,7 @@ class Test(unittest.TestCase):
                     "coin_from": "PART",
                     "coin_to": "XMR",
                     "amount": 10,
-                    "maxrate": 0.04,
+                    "max_rate": 0.04,
                     "amount_variable": True,
                     "address": -1,
                     "min_swap_amount": 0.1,
@@ -449,7 +449,7 @@ class Test(unittest.TestCase):
         assert count_lines_with(rv_stdout, "Already bidding on offer") == 1
 
         logging.info("Modifying node1 config")
-        node1_test1_config["bids"][0]["maxrate"] = 0.07
+        node1_test1_config["bids"][0]["max_rate"] = 0.07
         node1_test1_config["bids"][0]["max_coin_from_balance"] = 100
         node1_test1_config["bids"][0]["min_coin_to_balance"] = 100
         node1_test1_config["bids"][0]["min_swap_amount"] = 9
@@ -767,7 +767,7 @@ class Test(unittest.TestCase):
                     "coin_from": "PART",
                     "coin_to": "XMR",
                     "amount": 50,
-                    "maxrate": 0.08,
+                    "max_rate": 0.08,
                     "amount_variable": False,
                     "address": addr_bid_from,
                     "min_swap_amount": 1,
