@@ -135,15 +135,15 @@
 (define-public basicswap
 (package
   (name "basicswap")
-  (version "0.18.0")
+  (version "0.18.1")
   (source (origin
     (method git-fetch)
     (uri (git-reference
       (url "https://github.com/basicswap/basicswap")
-      (commit "a1bf610b5f0a87fc1b3a7f425784d77dc5e7e108")))
+      (commit "cd4aa4d224b81e4b90b21d769ce59e744724c404")))
     (sha256
       (base32
-        "03w1bw1m7z4kkb7yr0hnrkh23k35d7a9nhq7ypcm9m5p0m7k5ahc"))
+        "0mjmw7c64irci0fbgssii50v20gwdz0cg2k1mk3lbaa6gn10f43k"))
     (file-name (git-file-name name version))))
   (build-system pyproject-build-system)
 
