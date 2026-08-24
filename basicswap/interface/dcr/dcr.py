@@ -2142,6 +2142,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         parent_block_time: Optional[int],
         chain_height: Optional[int] = None,
         chain_mtp: Optional[int] = None,
+        coin_mtp: Optional[int] = None,
     ) -> bool:
         if parent_block_height is None or parent_block_height < 1:
             return False
@@ -2153,9 +2154,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if parent_block_time is None or parent_block_time < 1:
                 return False
+            if coin_mtp is None:
+                coin_mtp = self.getMedianTimePastAtHeight(
+                    max(parent_block_height - 1, 0)
+                )
+            if coin_mtp is None:
+                return False
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
-            return chain_mtp >= parent_block_time + lock_value
+            if chain_mtp is None:
+                return False
+            return chain_mtp >= coin_mtp + lock_value
         raise ValueError(f"Unknown lock type {lock_type}")
 
     def isAbsLockTimeMature(
@@ -2172,6 +2181,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             return chain_height + 1 >= nlocktime
         if chain_mtp is None:
             chain_mtp = self.getChainMedianTime()
+        if chain_mtp is None:
+            return False
         return chain_mtp >= nlocktime
 
     def getTxOutInfo(

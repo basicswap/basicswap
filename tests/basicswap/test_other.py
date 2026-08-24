@@ -160,6 +160,7 @@ class Test(unittest.TestCase):
                 parent_height,
                 parent_time,
                 chain_mtp=parent_time,
+                coin_mtp=parent_time,
             )
             == lock_value
         )
@@ -170,6 +171,7 @@ class Test(unittest.TestCase):
                 parent_height,
                 parent_time,
                 chain_mtp=parent_time + lock_value,
+                coin_mtp=parent_time,
             )
             == 0
         )
@@ -183,6 +185,7 @@ class Test(unittest.TestCase):
                 parent_height,
                 parent_time,
                 chain_mtp=chain_mtp,
+                coin_mtp=parent_time,
             )
             assert (remaining <= 0) == ci.isCsvLockMature(
                 TxLockTypes.SEQUENCE_LOCK_TIME,
@@ -190,6 +193,7 @@ class Test(unittest.TestCase):
                 parent_height,
                 parent_time,
                 chain_mtp=chain_mtp,
+                coin_mtp=parent_time,
             )
 
         # Unknown until the lock tx is in a block
@@ -233,6 +237,7 @@ class Test(unittest.TestCase):
                 parent_height,
                 parent_time,
                 chain_mtp=chain_mtp,
+                coin_mtp=parent_time,
             )
 
         # Exactly at the margin must still publish, one second under must not
@@ -249,6 +254,7 @@ class Test(unittest.TestCase):
                 parent_height,
                 parent_time,
                 chain_mtp=parent_time + offset,
+                coin_mtp=parent_time,
             )
 
         # An honest leader releases well before its own margin, even on the shortest offer

@@ -563,9 +563,13 @@ def describeBid(
                     offer.lock_type, offer.lock_value
                 )
                 seconds_locked = ci_leader.decodeSequence(raw_sequence)
-                data["coin_a_lock_refund_tx_est_final"] = (
-                    bid.xmr_a_lock_tx.block_time + seconds_locked
+                # Measured from the median time past of the block before the lock tx's,
+                # as BIP68 does, not from the lock tx's block header time
+                coin_mtp = ci_leader.getMedianTimePastAtHeight(
+                    max(bid.xmr_a_lock_tx.block_height - 1, 0)
                 )
+                if coin_mtp is not None:
+                    data["coin_a_lock_refund_tx_est_final"] = coin_mtp + seconds_locked
                 data["coin_a_last_median_time"] = swap_client.coin_clients[
                     offer.coin_from
                 ]["chain_median_time"]
@@ -577,9 +581,13 @@ def describeBid(
                         offer.lock_type, offer.lock_value
                     )
                     seconds_locked = ci_leader.decodeSequence(raw_sequence)
-                    data["coin_a_lock_refund_swipe_tx_est_final"] = (
-                        refund_tx.block_time + seconds_locked
+                    refund_mtp = ci_leader.getMedianTimePastAtHeight(
+                        max(refund_tx.block_height - 1, 0)
                     )
+                    if refund_mtp is not None:
+                        data["coin_a_lock_refund_swipe_tx_est_final"] = (
+                            refund_mtp + seconds_locked
+                        )
 
         if view_tx_ind:
             data["view_tx_ind"] = view_tx_ind

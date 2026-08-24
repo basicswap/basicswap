@@ -549,8 +549,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self._median_time_cache = mtp
             return mtp
         except Exception as e:
+            # A stale value overstates csvLockRemaining by the length of the outage
             self._log.warning(f"getChainMedianTime rpc error: {e}")
-            return self._median_time_cache
+            return None
 
     def _getChainMedianTimeElectrum(self) -> Optional[int]:
         import struct
@@ -558,7 +559,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         backend = self.getBackend()
         if not backend:
             self._log.warning("getChainMedianTime: no electrum backend available")
-            return self._median_time_cache
+            return None
         try:
             height = backend.getBlockHeight()
             if (
@@ -584,7 +585,34 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return mtp
         except Exception as e:
             self._log.warning(f"getChainMedianTime electrum error: {e}")
-            return self._median_time_cache
+            return None
+
+    def _getMedianTimePastAtHeight(self, height: int) -> Optional[int]:
+        if self._connection_type != "electrum":
+            return super()._getMedianTimePastAtHeight(height)
+
+        import struct
+
+        backend = self.getBackend()
+        if not backend:
+            self._log.warning("getMedianTimePastAtHeight: no electrum backend")
+            return None
+        try:
+            start = max(0, height - 10)
+            count = height - start + 1
+            result = backend._server.call("blockchain.block.headers", [start, count])
+            header_bytes = bytes.fromhex(result["hex"])
+            returned = min(result.get("count", count), len(header_bytes) // 80)
+            if returned < 1:
+                raise ValueError("No headers returned")
+            times = sorted(
+                struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
+                for i in range(returned)
+            )
+            return times[len(times) // 2]
+        except Exception as e:
+            self._log.warning(f"getMedianTimePastAtHeight electrum error: {e}")
+            return None
 
     def isCsvLockMature(
         self,
@@ -594,6 +622,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         parent_block_time: Optional[int],
         chain_height: Optional[int] = None,
         chain_mtp: Optional[int] = None,
+        coin_mtp: Optional[int] = None,
     ) -> bool:
         if parent_block_height is None or parent_block_height < 1:
             return False
@@ -605,11 +634,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if parent_block_time is None or parent_block_time < 1:
                 return False
+            if coin_mtp is None:
+                coin_mtp = self.getMedianTimePastAtHeight(
+                    max(parent_block_height - 1, 0)
+                )
+            if coin_mtp is None:
+                return False
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
             if chain_mtp is None:
                 return False
-            return chain_mtp >= parent_block_time + lock_value
+            return chain_mtp >= coin_mtp + lock_value
         raise ValueError(f"Unknown lock type {lock_type}")
 
     def isAbsLockTimeMature(
