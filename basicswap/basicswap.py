@@ -12042,6 +12042,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
+        ensure(
+            offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+            "Incompatible offer protocol version",
+        )
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ensure(reverse_bid is False, f"Offer: {self.log.id(offer_id)} is reversed")
 
@@ -13912,6 +13916,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
+        ensure(
+            offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+            "Incompatible offer protocol version",
+        )
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ensure(reverse_bid is True, f"Offer: {self.log.id(offer_id)} not reversed")
 
