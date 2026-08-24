@@ -31,10 +31,10 @@ const BidExporter = {
                 `"${bid.offer_id}"`,
                 `"${bid.addr_from}"`,
                 ...(isAllTab ? [`"${bid.source}"`] : []),
-                isSent ? bid.amount_from : bid.amount_to,
-                `"${isSent ? bid.coin_from : bid.coin_to}"`,
                 isSent ? bid.amount_to : bid.amount_from,
                 `"${isSent ? bid.coin_to : bid.coin_from}"`,
+                isSent ? bid.amount_from : bid.amount_to,
+                `"${isSent ? bid.coin_from : bid.coin_to}"`,
                 `"${bid.bid_state}"`,
                 bid.created_at,
                 bid.expire_at
