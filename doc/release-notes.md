@@ -4,8 +4,10 @@
 **Security / hardening**
 - Adaptor-sig swaps: don't publish the chain A lock spend tx when the refund timelock is
   close to expiring.
-- Default the `min_relay_fee` setting to 0.00001 for Bitcoin, matching the default
-  `-minrelaytxfee` of Bitcoin Core 29.
+- Default the `min_relay_fee` setting to 0.00001 for Bitcoin.  Bitcoin Core lowered its own
+  `-minrelaytxfee` default from 1000 to 100 sat/kvB in v29.1, so this is the more
+  conservative of the two: offers below 1000 sat/kvB are refused even where the node would
+  relay them.
 
 
 0.18.1

@@ -822,6 +822,7 @@ class PARTInterfaceBlind(PARTInterface):
         tx_fee_rate: int,
         vkbv: bytes,
         fee_info={},
+        tx_lock_refund_bytes=None,  # Unused, the daemon sets the fee
     ) -> bytes:
         lock_tx_obj = self.rpc("decoderawtransaction", [tx_lock_bytes.hex()])
         lock_txid_hex = lock_tx_obj["txid"]
@@ -912,7 +913,14 @@ class PARTInterfaceBlind(PARTInterface):
         return bytes.fromhex(lock_spend_tx_hex)
 
     def verifySCLockSpendTx(
-        self, tx_bytes, lock_tx_bytes, lock_tx_script, a_pk_f, feerate, vkbv
+        self,
+        tx_bytes,
+        lock_tx_bytes,
+        lock_tx_script,
+        a_pk_f,
+        feerate,
+        vkbv,
+        tx_lock_refund_bytes=None,  # Unused, the daemon sets the fee
     ):
         lock_spend_tx_obj = self.rpc("decoderawtransaction", [tx_bytes.hex()])
         lock_spend_txid_hex = lock_spend_tx_obj["txid"]

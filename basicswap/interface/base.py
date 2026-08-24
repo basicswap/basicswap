@@ -224,6 +224,14 @@ class AdaptorSigInterface:
     def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [bytes(72), b"", bytes(len(script))]
 
+    def getLockRefundTxFee(self, locked_coin: int, tx_lock_refund_bytes: bytes) -> int:
+        # The lock refund tx spends the lock tx output to its own single output
+        tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
+        ensure(len(tx_lock_refund.vout) == 1, "Lock refund tx doesn't have one output")
+        fee_paid: int = locked_coin - self.getVoutValue(tx_lock_refund.vout[0])
+        ensure(fee_paid > 0, "Zero or negative lock refund tx fee")
+        return fee_paid
+
     def getLockRefundVout(self, lock_refund_tx_data: bytes, vbkv: bytes) -> int:
         return 0
 

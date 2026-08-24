@@ -19,6 +19,11 @@ from .chainparams import (
     Fiat,
 )
 
+# The chain a lock spend tx must pay more than the lock refund tx, or the refund tx can
+# replace it by RBF once the spend tx has been broadcast.  Reachable from Bitcoin Core v29.1,
+# which lowered the incremental relay fee to 100 sat/kvB
+ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER = 12  # sats
+
 
 class TxLockTypes(IntEnum):
     SEQUENCE_LOCK_BLOCKS = 1

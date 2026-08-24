@@ -98,7 +98,10 @@ from basicswap.contrib.test_framework.script import (
     SIGHASH_ALL,
     SegwitV0SignatureHash,
 )
-from basicswap.basicswap_util import TxLockTypes
+from basicswap.basicswap_util import (
+    ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
+    TxLockTypes,
+)
 
 from basicswap.chainparams import Coins
 from basicswap.rpc import make_rpc_func, openrpc
@@ -1647,7 +1650,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return tx.serialize()
 
     def createSCLockSpendTx(
-        self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None, fee_info={}
+        self,
+        tx_lock_bytes,
+        script_lock,
+        pkh_dest,
+        tx_fee_rate,
+        vkbv=None,
+        fee_info={},
+        tx_lock_refund_bytes=None,
     ):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = self.getScriptDest(script_lock)
@@ -1678,7 +1688,13 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
+        if tx_lock_refund_bytes is None:
+            pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
+        else:
+            pay_fee: int = (
+                self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+                + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+            )
         tx.vout[0].nValue = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee
@@ -1933,7 +1949,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return True
 
     def verifySCLockSpendTx(
-        self, tx_bytes, lock_tx_bytes, lock_tx_script, a_pkhash_f, feerate, vkbv=None
+        self,
+        tx_bytes,
+        lock_tx_bytes,
+        lock_tx_script,
+        a_pkhash_f,
+        feerate,
+        vkbv=None,
+        tx_lock_refund_bytes=None,
     ):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence
@@ -1993,8 +2016,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             fee_rate_paid,
         )
 
-        if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError(f"Bad fee rate, expected: {feerate}")
+        if tx_lock_refund_bytes is None:
+            if not self.compareFeeRates(fee_rate_paid, feerate):
+                raise ValueError(f"Bad fee rate, expected: {feerate}")
+            return True
+
+        expect_fee: int = (
+            self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+            + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+        )
+        if fee_paid != expect_fee:
+            raise ValueError(f"Bad fee, expected: {expect_fee}, paid: {fee_paid}")
 
         return True
 

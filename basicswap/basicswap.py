@@ -192,8 +192,8 @@ import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
-PROTOCOL_VERSION_ADAPTOR_SIG = 4
-MINPROTO_VERSION_ADAPTOR_SIG = 4
+PROTOCOL_VERSION_ADAPTOR_SIG = 5
+MINPROTO_VERSION_ADAPTOR_SIG = 5
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
@@ -12596,6 +12596,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.dest_af,
             a_fee_rate,
             xmr_swap.vkbv,
+            tx_lock_refund_bytes=xmr_swap.a_lock_refund_tx,
         )
 
         xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
@@ -13684,6 +13685,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.dest_af,
                 a_fee_rate,
                 xmr_swap.vkbv,
+                tx_lock_refund_bytes=xmr_swap.a_lock_refund_tx,
             )
 
             ci_from.verifyCompactSig(

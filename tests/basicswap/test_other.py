@@ -48,6 +48,7 @@ from basicswap.util_xmr import (
     encode_address as xmr_encode_address,
 )
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
 from tests.basicswap.util.mnemonics import mnemonics
 from tests.basicswap.util.common import (
@@ -55,7 +56,10 @@ from tests.basicswap.util.common import (
     PREFIX_SECRET_KEY_REGTEST,
 )
 
-from basicswap.basicswap_util import TxLockTypes
+from basicswap.basicswap_util import (
+    ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
+    TxLockTypes,
+)
 from basicswap.util import (
     make_int,
     SerialiseNum,
@@ -68,7 +72,9 @@ from basicswap.messages_npb import (
     BidMessage,
 )
 from basicswap.contrib.test_framework.script import (
+    CScript,
     hash160 as hash160_btc,
+    OP_CHECKMULTISIG,
     SegwitV0SignatureHash,
     SIGHASH_ALL,
 )
@@ -89,7 +95,10 @@ class Test(unittest.TestCase):
     def ci_btc():
         btc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
         btc_coin_settings.update(REQUIRED_SETTINGS)
-        return BTCInterface(btc_coin_settings, "regtest")
+        ci = BTCInterface(btc_coin_settings, "regtest")
+        # Without a swap client _log is the logging module, which has no id()
+        ci._log = BSXLogger("test")
+        return ci
 
     @staticmethod
     def ci_xmr():
@@ -247,6 +256,92 @@ class Test(unittest.TestCase):
         assert margin <= release_margin
         # min_sequence_lock_seconds less the wait for the coin b lock to be spendable
         assert (2 * 60 * 60) - (10 * 120) >= margin
+
+    def test_lock_spend_tx_fee(self):
+        # The lock spend tx must pay more than the lock refund tx, else the refund tx
+        # can replace it by RBF once the spend tx has been broadcast
+        ci = self.ci_btc()
+
+        Kal = ci.getPubkey(ci.getNewRandomKey())
+        Kaf = ci.getPubkey(ci.getNewRandomKey())
+        script_lock = CScript([2, Kal, Kaf, 2, OP_CHECKMULTISIG])
+        pkh_dest = ci.pkh(Kaf)
+
+        locked_coin: int = ci.make_int(0.1)
+        lock_tx = CTransaction()
+        lock_tx.nVersion = ci.txVersion()
+        lock_tx.vin.append(
+            CTxIn(COutPoint(uint256_from_str(secrets.token_bytes(32)), 0))
+        )
+        lock_tx.vout.append(CTxOut(locked_coin, ci.getScriptDest(script_lock)))
+        lock_tx.rehash()
+        lock_tx_bytes = lock_tx.serialize()
+
+        lock1_value = ci.getExpectedSequence(
+            TxLockTypes.SEQUENCE_LOCK_TIME, 2 * 60 * 60
+        )
+        csv_val = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, 2 * 60 * 60)
+
+        for fee_rate in (1000, 1013, 2500, 10000, 59999):
+            refund_tx, _, refund_value = ci.createSCLockRefundTx(
+                lock_tx_bytes,
+                script_lock,
+                Kal,
+                Kaf,
+                lock1_value,
+                csv_val,
+                fee_rate,
+            )
+            refund_fee: int = locked_coin - refund_value
+
+            spend_tx = ci.createSCLockSpendTx(
+                lock_tx_bytes,
+                script_lock,
+                pkh_dest,
+                fee_rate,
+                tx_lock_refund_bytes=refund_tx,
+            )
+            spend_fee: int = locked_coin - ci.loadTx(spend_tx).vout[0].nValue
+
+            assert spend_fee == refund_fee + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+            # RBF rule 3 rejects the refund tx as a replacement while this holds
+            assert spend_fee > refund_fee
+
+            ci.verifySCLockSpendTx(
+                spend_tx,
+                lock_tx_bytes,
+                script_lock,
+                pkh_dest,
+                fee_rate,
+                tx_lock_refund_bytes=refund_tx,
+            )
+
+            # A spend tx paying the refund tx's fee must be rejected
+            tx = ci.loadTx(spend_tx)
+            tx.vout[0].nValue += ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+            tx.rehash()
+            try:
+                ci.verifySCLockSpendTx(
+                    tx.serialize(),
+                    lock_tx_bytes,
+                    script_lock,
+                    pkh_dest,
+                    fee_rate,
+                    tx_lock_refund_bytes=refund_tx,
+                )
+                assert False, "Should fail"
+            except Exception as e:
+                assert "Bad fee" in str(e)
+
+    def test_compare_fee_rates(self):
+        # compareFeeRates must accept every fee feeForVSize can produce
+        ci = self.ci_btc()
+
+        for vsize in range(110, 400):
+            for expected in range(500, 20000, 7):
+                paid_rate: int = ci.feeForVSize(expected, vsize) * 1000 // vsize
+                assert ci.compareFeeRates(paid_rate, expected)
+                assert ci.compareFeeRates(expected - 1, expected) is False
 
     def test_make_int(self):
         def test_case(vs, vf, expect_int):

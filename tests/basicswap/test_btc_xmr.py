@@ -2773,6 +2773,23 @@ class BasicSwapTest(TestFunctions):
         ci1_from = swap_clients[1].ci(coin_from)
         ci1_to = swap_clients[1].ci(coin_to)
 
+        ci_from_settings = swap_clients[0].getChainClientSettings(coin_from)
+        ci1_from_settings = swap_clients[1].getChainClientSettings(coin_from)
+        old_override_feerate = ci_from_settings.get("override_feerate", None)
+        old_override_feerate1 = ci1_from_settings.get("override_feerate", None)
+        old_min_relay_fee = ci_from_settings.get("min_relay_fee", None)
+        old_min_relay_fee1 = ci1_from_settings.get("min_relay_fee", None)
+
+        networkinfo = ci_from.rpc("getnetworkinfo")
+        # BTC v29.1 relayfee dropped to 100
+        assert ci_from.make_int(networkinfo["relayfee"]) == 100
+        # The default min_relay_fee setting would floor every rate below at 1000
+        ci_from_settings["min_relay_fee"] = networkinfo["relayfee"]
+        ci1_from_settings["min_relay_fee"] = networkinfo["relayfee"]
+        assert ci_from.make_int(networkinfo["relayfee"]) == ci_from.make_int(
+            ci_from.get_fee_rate()[0]
+        )
+
         amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
         rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
 
@@ -2795,15 +2812,6 @@ class BasicSwapTest(TestFunctions):
             SwapTypes.XMR_SWAP,
         )
 
-        ci_from_settings = swap_clients[0].getChainClientSettings(coin_from)
-        old_override_feerate = ci_from_settings.get("override_feerate", None)
-        ci1_from_settings = swap_clients[1].getChainClientSettings(coin_from)
-        old_override_feerate1 = ci1_from_settings.get("override_feerate", None)
-
-        networkinfo = ci_from.rpc("getnetworkinfo")
-        assert ci_from.make_int(networkinfo["relayfee"]) == ci_from.make_int(
-            ci_from.get_fee_rate()[0]
-        )
         try:
             # Set override_feerate to increase feerate from get_fee_rate()
             ci_from_settings["override_feerate"] = ci_from.format_amount(120)
@@ -2914,6 +2922,8 @@ class BasicSwapTest(TestFunctions):
         finally:
             ci_from_settings["override_feerate"] = old_override_feerate
             ci1_from_settings["override_feerate"] = old_override_feerate1
+            ci_from_settings["min_relay_fee"] = old_min_relay_fee
+            ci1_from_settings["min_relay_fee"] = old_min_relay_fee1
 
 
 class TestBTC(BasicSwapTest):
