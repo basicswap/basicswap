@@ -1,3 +1,18 @@
+0.18.1
+==============
+
+**Security / hardening**
+- Adaptor-sig swaps: don't send the chain A lock release secret when the refund timelock
+  is close to expiring.  Releasing late leaves the follower's lock spend tx and the
+  leader's refund tx able to reach the mempool at the same time.  The margin is set by
+  `sc_lock_release_min_margin`, one hour by default.
+- Raise the default minimum sequence lock to two hours, so that an offer at the minimum
+  lock value still leaves room to release the secret ahead of the margin above.
+
+**Refactors**
+- Remove the temporary repair for invalid lock tx A refund tx sighash types.
+
+
 0.18.0
 ==============
 
