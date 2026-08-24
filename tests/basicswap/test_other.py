@@ -207,6 +207,47 @@ class Test(unittest.TestCase):
             == 4
         )
 
+    def test_lock_spend_margin(self):
+        # The margin the follower applies before publishing the lock spend tx
+        ci = self.ci_btc()
+
+        parent_height: int = 100
+        parent_time: int = 1700000000
+        margin: int = 3600
+        encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, 48 * 60 * 60)
+        lock_value: int = ci.decodeSequence(encoded)
+
+        def remaining_at(chain_mtp: int) -> int:
+            return ci.csvLockRemaining(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_mtp=chain_mtp,
+            )
+
+        # Exactly at the margin must still publish, one second under must not
+        assert remaining_at(parent_time + lock_value - margin) == margin
+        assert remaining_at(parent_time + lock_value - margin) >= margin
+        assert remaining_at(parent_time + lock_value - margin + 1) < margin
+
+        # An expired lock must always be caught by the same comparison
+        for offset in range(lock_value, lock_value + 2048, 499):
+            assert remaining_at(parent_time + offset) < margin
+            assert ci.isCsvLockMature(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_mtp=parent_time + offset,
+            )
+
+        # An honest leader releases well before its own margin, even on the shortest offer
+        release_margin: int = 3600
+        assert margin <= release_margin
+        # min_sequence_lock_seconds less the wait for the coin b lock to be spendable
+        assert (2 * 60 * 60) - (10 * 120) >= margin
+
     def test_make_int(self):
         def test_case(vs, vf, expect_int):
             i = make_int(vs)
