@@ -519,6 +519,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._sc_lock_tx_mempool_timeout = self.get_int_setting(
             "sc_lock_tx_mempool_timeout", 12 * 3600, 3600, 48 * 3600
         )  # Seconds
+        self._sc_lock_release_min_margin = self.get_int_setting(
+            "sc_lock_release_min_margin", 3600, 600, 24 * 3600
+        )  # Seconds
 
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
@@ -595,7 +598,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         self.min_sequence_lock_seconds = self.get_int_setting(
-            "min_sequence_lock_seconds", 60 if self.debug else (1 * 60 * 60)
+            "min_sequence_lock_seconds", 60 if self.debug else (2 * 60 * 60)
         )
         self.max_sequence_lock_seconds = self.get_int_setting(
             "max_sequence_lock_seconds", 96 * 60 * 60
@@ -12890,6 +12893,37 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+
+        # Block count locks are regtest only and have no comparable margin
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            ci_from = self.ci(Coins(offer.coin_to if reverse_bid else offer.coin_from))
+            lock_remaining = (
+                None
+                if bid.xmr_a_lock_tx is None
+                else ci_from.csvLockRemaining(
+                    offer.lock_type,
+                    xmr_offer.lock_time_1,
+                    bid.xmr_a_lock_tx.block_height,
+                    bid.xmr_a_lock_tx.block_time,
+                )
+            )
+            if lock_remaining is None:
+                raise TemporaryError(
+                    f"Can't determine the coin a lock refund timelock for bid {self.log.id(bid_id)}."
+                )
+            if lock_remaining < self._sc_lock_release_min_margin:
+                # Releasing now would let the lock spend and refund txs be broadcast together
+                self.log.error(
+                    f"Not releasing the lock tx secret for bid {self.log.id(bid_id)}, "
+                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_release_min_margin}."
+                )
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.LOCK_RELEASE_ABANDONED_LOCK_CLOSE,
+                    "",
+                    cursor,
+                )
+                return
 
         msg_buf = XmrBidLockReleaseMessage(
             bid_msg_id=bid_id, al_lock_spend_tx_esig=xmr_swap.al_lock_spend_tx_esig

@@ -9,8 +9,11 @@ import socks
 import threading
 
 from enum import IntEnum
-from typing import List
+from typing import List, Optional
 
+from basicswap.basicswap_util import (
+    TxLockTypes,
+)
 from basicswap.chainparams import (
     chainparams,
 )
@@ -266,6 +269,35 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
     def isValidAddressHash(self, address_hash: bytes) -> bool:
         if len(address_hash) == 20:
             return True
+
+    def csvLockRemaining(
+        self,
+        lock_type: int,
+        encoded_sequence: int,
+        parent_block_height: Optional[int],
+        parent_block_time: Optional[int],
+        chain_height: Optional[int] = None,
+        chain_mtp: Optional[int] = None,
+    ) -> Optional[int]:
+        # Blocks or seconds until the lock matures, None if it can't be determined
+        if parent_block_height is None or parent_block_height < 1:
+            return None
+        lock_value: int = self.decodeSequence(encoded_sequence)
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_BLOCKS:
+            if chain_height is None:
+                chain_height = self.getChainHeight()
+            if chain_height is None:
+                return None
+            return (parent_block_height + lock_value) - (chain_height + 1)
+        if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            if parent_block_time is None or parent_block_time < 1:
+                return None
+            if chain_mtp is None:
+                chain_mtp = self.getChainMedianTime()
+            if chain_mtp is None:
+                return None
+            return (parent_block_time + lock_value) - chain_mtp
+        raise ValueError(f"Unknown lock type {lock_type}")
 
     def verifySig(self, pubkey: bytes, signed_hash: bytes, sig: bytes) -> bool:
         pubkey = PublicKey(pubkey)

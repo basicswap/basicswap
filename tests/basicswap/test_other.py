@@ -136,6 +136,77 @@ class Test(unittest.TestCase):
         decoded = ci.decodeSequence(encoded)
         assert decoded == blocks_val
 
+    def test_csv_lock_remaining(self):
+        ci = self.ci_btc()
+
+        parent_height: int = 100
+        parent_time: int = 1700000000
+        encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, 4 * 60 * 60)
+        lock_value: int = ci.decodeSequence(encoded)
+
+        assert (
+            ci.csvLockRemaining(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_mtp=parent_time,
+            )
+            == lock_value
+        )
+        assert (
+            ci.csvLockRemaining(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_mtp=parent_time + lock_value,
+            )
+            == 0
+        )
+
+        # A remaining value at or below zero must mean the lock has matured
+        for offset in range(0, lock_value + 1024, 499):
+            chain_mtp: int = parent_time + offset
+            remaining = ci.csvLockRemaining(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_mtp=chain_mtp,
+            )
+            assert (remaining <= 0) == ci.isCsvLockMature(
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_mtp=chain_mtp,
+            )
+
+        # Unknown until the lock tx is in a block
+        assert (
+            ci.csvLockRemaining(TxLockTypes.SEQUENCE_LOCK_TIME, encoded, None, None)
+            is None
+        )
+        assert (
+            ci.csvLockRemaining(
+                TxLockTypes.SEQUENCE_LOCK_TIME, encoded, parent_height, None
+            )
+            is None
+        )
+
+        encoded = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_BLOCKS, 10)
+        assert (
+            ci.csvLockRemaining(
+                TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+                encoded,
+                parent_height,
+                parent_time,
+                chain_height=parent_height + 5,
+            )
+            == 4
+        )
+
     def test_make_int(self):
         def test_case(vs, vf, expect_int):
             i = make_int(vs)
