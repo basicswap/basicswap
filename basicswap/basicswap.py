@@ -522,6 +522,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._sc_lock_release_min_margin = self.get_int_setting(
             "sc_lock_release_min_margin", 3600, 600, 24 * 3600
         )  # Seconds
+        self._sc_lock_spend_min_margin = self.get_int_setting(
+            "sc_lock_spend_min_margin", 3600, 600, 24 * 3600
+        )  # Seconds
 
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
@@ -12990,6 +12993,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
+
+        # Block count locks are regtest only and have no comparable margin
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            lock_remaining = (
+                None
+                if bid.xmr_a_lock_tx is None
+                else ci_from.csvLockRemaining(
+                    offer.lock_type,
+                    xmr_offer.lock_time_1,
+                    bid.xmr_a_lock_tx.block_height,
+                    bid.xmr_a_lock_tx.block_time,
+                )
+            )
+            if lock_remaining is None:
+                raise TemporaryError(
+                    f"Can't determine the coin a lock refund timelock for bid {self.log.id(bid_id)}."
+                )
+            if lock_remaining < self._sc_lock_spend_min_margin:
+                # Publishing now would reveal the coin b keyshare with too little time to confirm
+                self.log.error(
+                    f"Not publishing the lock spend tx for bid {self.log.id(bid_id)}, "
+                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_spend_min_margin}."
+                )
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.LOCK_SPEND_ABANDONED_LOCK_CLOSE,
+                    "",
+                    cursor,
+                )
+                return
 
         for_ed25519: bool = True if ci_to.curve_type() == Curves.ed25519 else False
         kbsf = self.getPathKey(
