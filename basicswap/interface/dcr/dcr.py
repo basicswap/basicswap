@@ -28,6 +28,7 @@ from basicswap.interface.utils import FeeValidator
 from basicswap.interface.btc.btc import (
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
+    scriptLockRefundHasSpendDelay,
 )
 from basicswap.util import (
     ensure,
@@ -1599,6 +1600,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(self.money_range(locked_coin), "Bad output value range")
 
         # Check script and values
+        # TODO: revert, unnecessary once the parser requires the spend delay
+        ensure(
+            scriptLockRefundHasSpendDelay(script_out),
+            "Missing lock refund tx spend delay",
+        )
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")
         ensure(B == Kaf, "Bad script pubkey")

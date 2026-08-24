@@ -35,6 +35,7 @@ from basicswap.interface.btc.btc import (
     BTCInterface,
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
+    scriptLockRefundHasSpendDelay,
 )
 
 from basicswap.chainparams import Coins, chainparams
@@ -674,6 +675,11 @@ class PARTInterfaceBlind(PARTInterface):
         )
         script_pk = self.getP2WSHScriptDest(script_out)
         ensure(lock_refund_txo_scriptpk == script_pk, "Bad output script")
+        # TODO: revert, unnecessary once the parser requires the spend delay
+        ensure(
+            scriptLockRefundHasSpendDelay(script_out),
+            "Missing lock refund tx spend delay",
+        )
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")
         ensure(B == Kaf, "Bad script pubkey")

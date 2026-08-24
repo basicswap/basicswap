@@ -12599,7 +12599,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.dest_af,
             a_fee_rate,
             xmr_swap.vkbv,
-            tx_lock_refund_bytes=xmr_swap.a_lock_refund_tx,
+            # TODO: revert, swaps started before protocol version 5 set the fee
+            # from the rate alone
+            tx_lock_refund_bytes=(
+                xmr_swap.a_lock_refund_tx
+                if offer.protocol_version >= PROTOCOL_VERSION_ADAPTOR_SIG
+                else None
+            ),
         )
 
         xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
@@ -13688,7 +13694,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.dest_af,
                 a_fee_rate,
                 xmr_swap.vkbv,
-                tx_lock_refund_bytes=xmr_swap.a_lock_refund_tx,
+                # TODO: revert, swaps started before protocol version 5 set the
+                # fee from the rate alone
+                tx_lock_refund_bytes=(
+                    xmr_swap.a_lock_refund_tx
+                    if offer.protocol_version >= PROTOCOL_VERSION_ADAPTOR_SIG
+                    else None
+                ),
             )
 
             ci_from.verifyCompactSig(
