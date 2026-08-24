@@ -82,6 +82,7 @@ from basicswap.contrib.test_framework.script import (
     CScript,
     CScriptOp,
     OP_0,
+    OP_1,
     OP_2,
     OP_CHECKMULTISIG,
     OP_CHECKSEQUENCEVERIFY,
@@ -161,17 +162,20 @@ def extractScriptLockScriptValues(script_bytes: bytes) -> (bytes, bytes):
 
 def extractScriptLockRefundScriptValues(script_bytes: bytes):
     script_len = len(script_bytes)
-    ensure(script_len > 73, "Bad script length")
+    ensure(script_len > 76, "Bad script length")
     ensure_op(script_bytes[0] == OP_IF)
-    ensure_op(script_bytes[1] == OP_2)
-    ensure_op(script_bytes[2] == 33)
-    pk1 = script_bytes[3 : 3 + 33]
-    ensure_op(script_bytes[36] == 33)
-    pk2 = script_bytes[37 : 37 + 33]
-    ensure_op(script_bytes[70] == OP_2)
-    ensure_op(script_bytes[71] == OP_CHECKMULTISIG)
-    ensure_op(script_bytes[72] == OP_ELSE)
-    o = 73
+    ensure_op(script_bytes[1] == OP_1)
+    ensure_op(script_bytes[2] == OP_CHECKSEQUENCEVERIFY)
+    ensure_op(script_bytes[3] == OP_DROP)
+    ensure_op(script_bytes[4] == OP_2)
+    ensure_op(script_bytes[5] == 33)
+    pk1 = script_bytes[6 : 6 + 33]
+    ensure_op(script_bytes[39] == 33)
+    pk2 = script_bytes[40 : 40 + 33]
+    ensure_op(script_bytes[73] == OP_2)
+    ensure_op(script_bytes[74] == OP_CHECKMULTISIG)
+    ensure_op(script_bytes[75] == OP_ELSE)
+    o = 76
     csv_val, nb = decodeScriptNum(script_bytes, o)
     o += nb
 
@@ -1405,6 +1409,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # fmt: off
         return CScript([
             CScriptOp(OP_IF),
+            1, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
             2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG),
             CScriptOp(OP_ELSE),
             csv_val, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
@@ -1548,7 +1553,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vin.append(
             CTxIn(
                 COutPoint(tx_lock_refund_hash_int, locked_n),
-                nSequence=0,
+                nSequence=1,
                 scriptSig=self.getScriptScriptSig(script_lock_refund),
             )
         )
@@ -1907,7 +1912,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(tx.nLockTime == 0, "nLockTime not 0")
         ensure(len(tx.vin) == 1, "tx doesn't have one input")
 
-        ensure(tx.vin[0].nSequence == 0, "Bad input nSequence")
+        ensure(tx.vin[0].nSequence == 1, "Bad input nSequence")
         ensure(
             tx.vin[0].scriptSig == self.getScriptScriptSig(prevout_script),
             "Input scriptsig mismatch",

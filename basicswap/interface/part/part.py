@@ -506,7 +506,7 @@ class PARTInterfaceBlind(PARTInterface):
             {
                 "txid": tx_lock_refund_id,
                 "vout": spend_n,
-                "sequence": 0,
+                "sequence": 1,
                 "blindingfactor": input_blinded_info["blind"],
             }
         ]
@@ -742,7 +742,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(len(lock_refund_spend_tx_obj["vin"]) == 1, "tx doesn't have one input")
 
         txin = lock_refund_spend_tx_obj["vin"][0]
-        ensure(txin["sequence"] == 0, "Bad input nSequence")
+        ensure(txin["sequence"] == 1, "Bad input nSequence")
         ensure(txin["scriptSig"]["hex"] == "", "Input scriptsig not empty")
         ensure(
             txin["txid"] == lock_refund_tx_id.hex() and txin["vout"] == prevout_n,

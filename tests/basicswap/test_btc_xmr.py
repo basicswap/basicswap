@@ -17,6 +17,7 @@ from basicswap.basicswap import (
     SwapTypes,
 )
 from basicswap.basicswap_util import (
+    ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
     TxLockTypes,
     EventLogTypes,
 )
@@ -1788,6 +1789,119 @@ class BasicSwapTest(TestFunctions):
         expect_vsize: int = ci.xmr_swap_b_lock_spend_tx_vsize()
         assert expect_vsize >= lock_tx_b_spend_decoded["vsize"]
         assert expect_vsize - lock_tx_b_spend_decoded["vsize"] <= 10
+
+    def test_017_lock_spend_not_replaceable(self):
+        # The pre-refund tx must not be able to replace a broadcast lock spend tx,
+        # alone (RBF rule 3) or paired with the refund spend tx (package RBF)
+        logging.info(
+            "---------- Test {} lock spend tx not replaceable".format(
+                self.test_coin_from.name
+            )
+        )
+        if self.test_coin_from != Coins.BTC:
+            return  # submitpackage
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[0].ci(self.test_coin_from)
+        pi = swap_clients[0].pi(SwapTypes.XMR_SWAP)
+
+        amount: int = ci.make_int(random.uniform(0.1, 2.0), r=1)
+        a = ci.getNewRandomKey()
+        b = ci.getNewRandomKey()
+        A = ci.getPubkey(a)
+        B = ci.getPubkey(b)
+        lock_tx_script = pi.genScriptLockTxScript(ci, A, B)
+
+        lock_tx = ci.createSCLockTx(amount, lock_tx_script)
+        lock_tx = ci.fundSCLockTx(lock_tx, self.test_fee_rate)
+        lock_tx = ci.signTxWithWallet(lock_tx)
+
+        lock_value: int = 8
+        seq = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_BLOCKS, lock_value)
+        refund_tx, refund_script, refund_value = ci.createSCLockRefundTx(
+            lock_tx, lock_tx_script, A, B, seq, seq, self.test_fee_rate
+        )
+
+        addr_out = ci.getNewAddress(True)
+        pkh_out = ci.decodeAddress(addr_out)
+        refund_spend_tx = ci.createSCLockRefundSpendTx(
+            refund_tx, refund_script, pkh_out, self.test_fee_rate
+        )
+        lock_spend_tx = ci.createSCLockSpendTx(
+            lock_tx,
+            lock_tx_script,
+            pkh_out,
+            self.test_fee_rate,
+            tx_lock_refund_bytes=refund_tx,
+        )
+
+        refund_fee: int = amount - refund_value
+        spend_fee: int = amount - ci.loadTx(lock_spend_tx).vout[0].nValue
+        logging.info(
+            f"Lock refund tx fee: {refund_fee}, lock spend tx fee: {spend_fee}"
+        )
+        assert spend_fee == refund_fee + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+
+        def sign_2of2(tx, script, prevout_value, branch=None):
+            witness_stack = [
+                b"",
+                ci.signTx(a, tx, 0, script, prevout_value),
+                ci.signTx(b, tx, 0, script, prevout_value),
+            ]
+            if branch is not None:
+                witness_stack.append(branch)
+            witness_stack.append(script)
+            return ci.setTxSignature(tx, witness_stack)
+
+        lock_spend_tx = sign_2of2(lock_spend_tx, lock_tx_script, amount)
+        refund_tx = sign_2of2(refund_tx, lock_tx_script, amount)
+        refund_spend_tx = sign_2of2(
+            refund_spend_tx, refund_script, refund_value, bytes((1,))
+        )
+
+        self.pauseMining()
+        try:
+            ci.rpc("sendrawtransaction", [lock_tx.hex()])
+            # Confirm the lock tx and mature the pre-refund tx's csv
+            self.callnoderpc("generatetoaddress", [lock_value + 2, self.old_btc_addr])
+
+            # The follower claims, the lock spend tx is now in the mempool
+            ci.rpc("sendrawtransaction", [lock_spend_tx.hex()])
+
+            # Alone the pre-refund tx pays less than the lock spend tx, rbf rule 3
+            try:
+                ci.rpc("sendrawtransaction", [refund_tx.hex()])
+            except Exception as e:
+                logging.info(f"Lock refund tx alone rejected: {e}")
+                assert "insufficient fee" in str(e)
+            else:
+                assert False, "Should fail"
+
+            # Together they would pay more, but the refund spend tx's csv keeps it out
+            # of the mempool until the lock refund tx has confirmed, so the pair can
+            # never be submitted as a package
+            tx_errors = []
+            try:
+                rv = ci.rpc(
+                    "submitpackage",
+                    [[refund_tx.hex(), refund_spend_tx.hex()]],
+                )
+                package_msg = rv["package_msg"]
+                # Per tx failures are reported in tx-results, not package_msg
+                for tx_result in rv.get("tx-results", {}).values():
+                    if "error" in tx_result:
+                        tx_errors.append(tx_result["error"])
+            except Exception as e:
+                package_msg = str(e)
+            assert package_msg != "success", package_msg
+            reasons: str = " ".join([package_msg] + tx_errors)
+            logging.info(f"Lock refund tx package rejected: {reasons}")
+            assert "non-BIP68-final" in reasons or "feerate diagram" in reasons, reasons
+
+            # The lock spend tx is still the one in the mempool
+            assert ci.getTxid(lock_spend_tx).hex() in ci.rpc("getrawmempool")
+        finally:
+            self.continueMining()
 
     def test_011_p2sh(self):
         # Not used in bsx for native-segwit coins

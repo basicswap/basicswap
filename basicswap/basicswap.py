@@ -8424,9 +8424,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
-                            if refund_tx_depth < ci_from.blocks_confirmed:
+                            # The refund spend tx has a one block csv, it can't be mined
+                            # until the lock refund tx has confirmed
+                            min_refund_tx_depth: int = max(ci_from.blocks_confirmed, 1)
+                            if refund_tx_depth < min_refund_tx_depth:
                                 raise TemporaryError(
-                                    f"Waiting for lock refund tx to reach depth {ci_from.blocks_confirmed}, currently {refund_tx_depth}"
+                                    f"Waiting for lock refund tx to reach depth {min_refund_tx_depth}, currently {refund_tx_depth}"
                                 )
                             if self.haveDebugInd(
                                 bid.bid_id,

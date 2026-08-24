@@ -1218,6 +1218,9 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         script = bytearray()
         script += bytes((OP_IF,))
+        push_script_data(script, bytes((1,)))
+        script += bytes((OP_CHECKSEQUENCEVERIFY,))
+        script += bytes((OP_DROP,))
         push_script_data(script, bytes((2,)))
         push_script_data(script, Kal)
         push_script_data(script, Kaf)
@@ -1358,7 +1361,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx = CTransaction()
         tx.version = self.txVersion()
         tx.vin.append(
-            CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n, 0), sequence=0)
+            CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n, 0), sequence=1)
         )
 
         tx.vout.append(
@@ -1643,7 +1646,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(tx.expiry == 0, "Bad expiry")
         ensure(len(tx.vin) == 1, "tx doesn't have one input")
 
-        ensure(tx.vin[0].sequence == 0, "Bad input sequence")
+        ensure(tx.vin[0].sequence == 1, "Bad input sequence")
         ensure(len(tx.vin[0].signature_script) == 0, "Input sig not empty")
         ensure(
             i2b(tx.vin[0].prevout.hash) == lock_refund_tx_id

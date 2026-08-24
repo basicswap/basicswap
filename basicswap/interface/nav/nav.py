@@ -901,7 +901,7 @@ class NAVInterface(BTCInterface):
         tx.vin.append(
             CTxIn(
                 COutPoint(tx_lock_refund_hash_int, locked_n),
-                nSequence=0,
+                nSequence=1,
                 scriptSig=self.getScriptScriptSig(script_lock_refund),
             )
         )
