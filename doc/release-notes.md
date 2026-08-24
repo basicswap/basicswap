@@ -1,3 +1,13 @@
+0.18.2
+==============
+
+**Security / hardening**
+- Adaptor-sig swaps: don't publish the chain A lock spend tx when the refund timelock is
+  close to expiring.
+- Default the `min_relay_fee` setting to 0.00001 for Bitcoin, matching the default
+  `-minrelaytxfee` of Bitcoin Core 29.
+
+
 0.18.1
 ==============
 
