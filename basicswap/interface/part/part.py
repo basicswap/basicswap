@@ -1078,8 +1078,8 @@ class PARTInterfaceBlind(PARTInterface):
             outputs.append({"type": "data", "amount": 0, "data": mercy_data.hex()})
         else:
             self._log.debug(
-                "Not attaching mercy output, have kbsf {}.".format(
-                    "true" if kbsf else "false"
+                "Not attaching mercy output: {}.".format(
+                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
                 )
             )
         params = [inputs, outputs]

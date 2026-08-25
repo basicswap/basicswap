@@ -176,7 +176,8 @@ class Test(TestFunctions):
                 mnemonics[i] if i < len(mnemonics) else None,
                 num_nodes=NUM_NODES,
                 use_rpcauth=True,
-                extra_settings={"min_sequence_lock_seconds": 10},
+                # do_test_03_follower_recover_a_lock_tx needs the swipe tx mercy output
+                extra_settings={"min_sequence_lock_seconds": 10, "altruistic": True},
                 port_ofs=PORT_OFS,
                 extra_args=extra_args,
             )

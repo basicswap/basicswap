@@ -289,7 +289,12 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
         self._sc = swap_client
         self._log = self._sc.log if self._sc and self._sc.log else logging
-        super().__init__(coin_settings=coin_settings, network=network, **kwargs)
+        super().__init__(
+            coin_settings=coin_settings,
+            network=network,
+            swap_client=swap_client,
+            **kwargs,
+        )
         self._rpc_host = coin_settings.get("rpchost", "127.0.0.1")
         self._rpcport = coin_settings["rpcport"]
         self._rpcauth = coin_settings["rpcauth"]
@@ -307,7 +312,6 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         self._use_segwit = True  # Decred is natively segwit
         self._connection_type = coin_settings["connection_type"]
-        self._altruistic = coin_settings.get("altruistic", True)
 
         if "wallet_name" in coin_settings:
             raise ValueError(f"Invalid setting for {self.coin_name()}: wallet_name")
@@ -1733,8 +1737,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             tx.vout.append(self.txoType()(0, bytes(mercy_script)))
         else:
             self._log.debug(
-                "Not attaching mercy output, have kbsf {}.".format(
-                    "true" if kbsf else "false"
+                "Not attaching mercy output: {}.".format(
+                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
                 )
             )
 

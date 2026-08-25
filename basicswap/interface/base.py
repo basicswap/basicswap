@@ -77,7 +77,10 @@ class CoinInterface:
         # Keyed by height, the median time past of a block only changes in a reorg
         self._mtp_at_height_cache = {}
         self._mx_wallet = threading.Lock()
-        self._altruistic = True
+        coin_settings = kwargs.get("coin_settings", {})
+        swap_client = kwargs.get("swap_client")
+        base_altruistic = swap_client.getBaseAltruistic() if swap_client else False
+        self._altruistic = coin_settings.get("altruistic", base_altruistic)
         self._core_version = None  # Set in getDaemonVersion()
 
     def interface_type(self) -> int:

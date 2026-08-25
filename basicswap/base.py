@@ -176,6 +176,9 @@ class BaseApp(DBMethods):
         except Exception:
             return {}
 
+    def getBaseAltruistic(self) -> bool:
+        return bool(self.settings.get("altruistic", False))
+
     def getElectrumAddressIndex(self, coin_name: str) -> tuple:
         try:
             chain_settings = self.settings["chainclients"].get(coin_name, {})
