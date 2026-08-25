@@ -4873,23 +4873,25 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def get_p2wsh_script_pubkey(self, script: bytearray) -> bytearray:
         return CScript([OP_0, sha256(script)])
 
-    def findTxnByHash(self, txid_hex: str):
+    def findConfirmedTxnByHash(self, txid_hex: str):
+        # Returns None below blocks_confirmed and on any lookup failure, callers
+        # gate fund movements on it
         if self._connection_type == "electrum":
-            return self._findTxnByHashElectrum(txid_hex)
+            return self._findConfirmedTxnByHashElectrum(txid_hex)
 
         # Only works for wallet txns
         try:
             rv = self.rpc_wallet("gettransaction", [txid_hex])
         except Exception as e:  # noqa: F841
             self._log.debug(
-                "findTxnByHash getrawtransaction failed: {}".format(txid_hex)
+                "findConfirmedTxnByHash getrawtransaction failed: {}".format(txid_hex)
             )
             return None
         if "confirmations" in rv and rv["confirmations"] >= self.blocks_confirmed:
             return {"txid": txid_hex, "amount": 0, "height": rv["blockheight"]}
         return None
 
-    def _findTxnByHashElectrum(self, txid_hex: str):
+    def _findConfirmedTxnByHashElectrum(self, txid_hex: str):
         backend = self.getBackend()
         if not backend:
             return None
@@ -4939,20 +4941,20 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             continue
                 except Exception as e:
                     self._log.debug(
-                        f"_findTxnByHashElectrum address fallback failed: {e}"
+                        f"_findConfirmedTxnByHashElectrum address fallback failed: {e}"
                     )
 
             if block_height > 0:
                 confirmations = max(0, chain_height - block_height + 1)
                 if confirmations >= self.blocks_confirmed:
                     self._log.debug(
-                        f"_findTxnByHashElectrum found tx {txid_hex[:16]}... "
+                        f"_findConfirmedTxnByHashElectrum found tx {txid_hex[:16]}... "
                         f"height={block_height}, confirmations={confirmations}"
                     )
                     return {"txid": txid_hex, "amount": 0, "height": block_height}
 
         except Exception as e:
-            self._log.debug(f"_findTxnByHashElectrum failed: {e}")
+            self._log.debug(f"_findConfirmedTxnByHashElectrum failed: {e}")
         return None
 
     def createRedeemTxn(
@@ -5163,7 +5165,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 "block_time": tx_info["blocktime"],
             }
         except Exception as e:
-            self._log.debug(f"_findTxnByHashElectrum failed: {e}")
+            self._log.debug(f"_findConfirmedTxnByHashElectrum failed: {e}")
         return None
 
     def getTxOutInfo(

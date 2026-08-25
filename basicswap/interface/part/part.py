@@ -1288,14 +1288,14 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_wallet("sendtypeto", params)
         return bytes.fromhex(rv["txid"])
 
-    def findTxnByHash(self, txid_hex):
+    def findConfirmedTxnByHash(self, txid_hex):
         # txindex is enabled for Particl
 
         try:
             rv = self.rpc("getrawtransaction", [txid_hex, True])
         except Exception as e:  # noqa: F841
             self._log.debug(
-                f"findTxnByHash getrawtransaction failed: {self._log.id(txid_hex)}"
+                f"findConfirmedTxnByHash getrawtransaction failed: {self._log.id(txid_hex)}"
             )
             return None
 
@@ -1598,14 +1598,14 @@ class PARTInterfaceAnon(PARTInterface):
         rv = self.rpc_wallet("sendtypeto", params)
         return bytes.fromhex(rv["txid"])
 
-    def findTxnByHash(self, txid_hex: str):
+    def findConfirmedTxnByHash(self, txid_hex: str):
         # txindex is enabled for Particl
 
         try:
             rv = self.rpc("getrawtransaction", [txid_hex, True])
         except Exception as e:  # noqa: F841
             self._log.debug(
-                "findTxnByHash getrawtransaction failed: {}".format(txid_hex)
+                "findConfirmedTxnByHash getrawtransaction failed: {}".format(txid_hex)
             )
             return None
 

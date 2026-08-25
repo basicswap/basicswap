@@ -8554,7 +8554,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if BidStates(bid.state) == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
                     txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
 
-                    found_tx = ci_to.findTxnByHash(txid_hex)
+                    found_tx = ci_to.findConfirmedTxnByHash(txid_hex)
                     if found_tx is not None:
                         self.log.info(
                             f"Found coin b lock recover tx bid {self.log.id(bid_id)}"
@@ -9020,7 +9020,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
                 txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
 
-                found_tx = ci_to.findTxnByHash(txid_hex)
+                found_tx = ci_to.findConfirmedTxnByHash(txid_hex)
                 if found_tx is not None:
                     self.log.info(
                         f"Found coin b lock spend tx bid {self.log.id(bid_id)}"
@@ -13527,7 +13527,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE)
         ensure(swipe_tx, f"Swipe tx not found for bid {self.log.id(bid_id)}.")
 
-        found_tx = ci_from.findTxnByHash(swipe_tx.txid.hex())
+        found_tx = ci_from.findConfirmedTxnByHash(swipe_tx.txid.hex())
         if found_tx is None:
             raise TemporaryError(
                 f"Swipe tx not yet confirmed for bid {self.log.id(bid_id)}."

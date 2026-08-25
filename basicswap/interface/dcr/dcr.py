@@ -2099,7 +2099,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         return bytes.fromhex(self.publishTx(b_lock_spend_tx))
 
-    def findTxnByHash(self, txid_hex: str):
+    def findConfirmedTxnByHash(self, txid_hex: str):
         try:
             txout = self.rpc("gettxout", [txid_hex, 0, 0, True])
         except Exception as e:  # noqa: F841

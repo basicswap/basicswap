@@ -629,7 +629,7 @@ class XMRInterface(CoinInterface):
                         rv = -1
             return rv
 
-    def findTxnByHash(self, txid: str):
+    def findConfirmedTxnByHash(self, txid: str):
         # TODO: Use get_transfer_by_txid and sending wallet when destination address is not owned
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
@@ -639,7 +639,7 @@ class XMRInterface(CoinInterface):
             try:
                 current_height: int = self.getChainHeight()
                 self._log.info(
-                    f"findTxnByHash {self.ticker_str()} current_height {current_height}\nhash: {txid}"
+                    f"findConfirmedTxnByHash {self.ticker_str()} current_height {current_height}\nhash: {txid}"
                 )
             except Exception as e:
                 self._log.info("rpc failed %s", str(e))
