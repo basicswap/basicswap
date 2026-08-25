@@ -363,7 +363,15 @@ def page_settings(self, url_split, post_string):
         else:
             chains_formatted[-1]["conf_target"] = c.get("conf_target", 2)
 
-        chains_formatted[-1]["altruistic"] = c.get("altruistic", False)
+        try:
+            chains_formatted[-1]["altruistic"] = swap_client.ci(
+                swap_client.getCoinIdFromName(name)
+            ).altruistic()
+        except Exception:
+            # Disabled coins have no interface to read the resolved setting from
+            chains_formatted[-1]["altruistic"] = c.get(
+                "altruistic", swap_client.getBaseAltruistic()
+            )
 
         if name == "particl":
             chains_formatted[-1]["anon_tx_ring_size"] = c.get("anon_tx_ring_size", 12)
