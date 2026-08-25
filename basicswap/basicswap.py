@@ -192,8 +192,8 @@ import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
-PROTOCOL_VERSION_ADAPTOR_SIG = 4
-MINPROTO_VERSION_ADAPTOR_SIG = 4
+PROTOCOL_VERSION_ADAPTOR_SIG = 5
+MINPROTO_VERSION_ADAPTOR_SIG = 5
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
@@ -8424,9 +8424,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                     if TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns:
                         try:
-                            if refund_tx_depth < ci_from.blocks_confirmed:
+                            # The refund spend tx has a one block csv, it can't be mined
+                            # until the lock refund tx has confirmed
+                            min_refund_tx_depth: int = max(ci_from.blocks_confirmed, 1)
+                            if refund_tx_depth < min_refund_tx_depth:
                                 raise TemporaryError(
-                                    f"Waiting for lock refund tx to reach depth {ci_from.blocks_confirmed}, currently {refund_tx_depth}"
+                                    f"Waiting for lock refund tx to reach depth {min_refund_tx_depth}, currently {refund_tx_depth}"
                                 )
                             if self.haveDebugInd(
                                 bid.bid_id,
@@ -12039,6 +12042,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
+        ensure(
+            offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+            "Incompatible offer protocol version",
+        )
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ensure(reverse_bid is False, f"Offer: {self.log.id(offer_id)} is reversed")
 
@@ -12596,6 +12603,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.dest_af,
             a_fee_rate,
             xmr_swap.vkbv,
+            # TODO: revert, swaps started before protocol version 5 set the fee
+            # from the rate alone
+            tx_lock_refund_bytes=(
+                xmr_swap.a_lock_refund_tx
+                if offer.protocol_version >= PROTOCOL_VERSION_ADAPTOR_SIG
+                else None
+            ),
         )
 
         xmr_swap.a_lock_spend_tx_id = ci_from.getTxid(xmr_swap.a_lock_spend_tx)
@@ -13684,6 +13698,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.dest_af,
                 a_fee_rate,
                 xmr_swap.vkbv,
+                # TODO: revert, swaps started before protocol version 5 set the
+                # fee from the rate alone
+                tx_lock_refund_bytes=(
+                    xmr_swap.a_lock_refund_tx
+                    if offer.protocol_version >= PROTOCOL_VERSION_ADAPTOR_SIG
+                    else None
+                ),
             )
 
             ci_from.verifyCompactSig(
@@ -13895,6 +13916,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
+        ensure(
+            offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+            "Incompatible offer protocol version",
+        )
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ensure(reverse_bid is True, f"Offer: {self.log.id(offer_id)} not reversed")
 

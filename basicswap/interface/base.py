@@ -45,6 +45,8 @@ class Curves(IntEnum):
 
 
 class CoinInterface:
+    _max_mtp_cache_entries: int = 1000
+
     @staticmethod
     def watch_blocks_for_scripts() -> bool:
         return False
@@ -72,6 +74,8 @@ class CoinInterface:
     def __init__(self, network, **kwargs):
         self.setDefaults()
         self._network = network
+        # Keyed by height, the median time past of a block only changes in a reorg
+        self._mtp_at_height_cache = {}
         self._mx_wallet = threading.Lock()
         self._altruistic = True
         self._core_version = None  # Set in getDaemonVersion()
@@ -224,6 +228,14 @@ class AdaptorSigInterface:
     def getScriptLockRefundSwipeTxDummyWitness(self, script: bytes) -> List[bytes]:
         return [bytes(72), b"", bytes(len(script))]
 
+    def getLockRefundTxFee(self, locked_coin: int, tx_lock_refund_bytes: bytes) -> int:
+        # The lock refund tx spends the lock tx output to its own single output
+        tx_lock_refund = self.loadTx(tx_lock_refund_bytes)
+        ensure(len(tx_lock_refund.vout) == 1, "Lock refund tx doesn't have one output")
+        fee_paid: int = locked_coin - self.getVoutValue(tx_lock_refund.vout[0])
+        ensure(fee_paid > 0, "Zero or negative lock refund tx fee")
+        return fee_paid
+
     def getLockRefundVout(self, lock_refund_tx_data: bytes, vbkv: bytes) -> int:
         return 0
 
@@ -270,6 +282,28 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         if len(address_hash) == 20:
             return True
 
+    def getMedianTimePastAtHeight(self, height: int) -> Optional[int]:
+        # BIP68 measures time based relative locks from the median time past of the
+        # block before the one containing the output being spent, not its header time
+        if height < 0:
+            return None
+        cached = self._mtp_at_height_cache.get(height, None)
+        if cached is not None:
+            return cached
+        mtp = self._getMedianTimePastAtHeight(height)
+        if mtp is not None:
+            if len(self._mtp_at_height_cache) >= self._max_mtp_cache_entries:
+                self._mtp_at_height_cache.pop(next(iter(self._mtp_at_height_cache)))
+            self._mtp_at_height_cache[height] = mtp
+        return mtp
+
+    def _getMedianTimePastAtHeight(self, height: int) -> Optional[int]:
+        try:
+            return self.getBlockHeaderFromHeight(height)["mediantime"]
+        except Exception as e:
+            self._log.warning(f"getMedianTimePastAtHeight failed: {e}")
+            return None
+
     def csvLockRemaining(
         self,
         lock_type: int,
@@ -278,6 +312,7 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         parent_block_time: Optional[int],
         chain_height: Optional[int] = None,
         chain_mtp: Optional[int] = None,
+        coin_mtp: Optional[int] = None,
     ) -> Optional[int]:
         # Blocks or seconds until the lock matures, None if it can't be determined
         if parent_block_height is None or parent_block_height < 1:
@@ -292,11 +327,17 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if parent_block_time is None or parent_block_time < 1:
                 return None
+            if coin_mtp is None:
+                coin_mtp = self.getMedianTimePastAtHeight(
+                    max(parent_block_height - 1, 0)
+                )
+            if coin_mtp is None:
+                return None
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
             if chain_mtp is None:
                 return None
-            return (parent_block_time + lock_value) - chain_mtp
+            return (coin_mtp + lock_value) - chain_mtp
         raise ValueError(f"Unknown lock type {lock_type}")
 
     def verifySig(self, pubkey: bytes, signed_hash: bytes, sig: bytes) -> bool:

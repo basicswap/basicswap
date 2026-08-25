@@ -13,6 +13,7 @@ from coincurve.keys import (
     PublicKey,
     PrivateKey,
 )
+from basicswap.basicswap_util import ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
 from basicswap.interface.btc.btc import (
     BTCInterface,
     extractScriptLockRefundScriptValues,
@@ -900,7 +901,7 @@ class NAVInterface(BTCInterface):
         tx.vin.append(
             CTxIn(
                 COutPoint(tx_lock_refund_hash_int, locked_n),
-                nSequence=0,
+                nSequence=1,
                 scriptSig=self.getScriptScriptSig(script_lock_refund),
             )
         )
@@ -992,7 +993,14 @@ class NAVInterface(BTCInterface):
         return tx.serialize()
 
     def createSCLockSpendTx(
-        self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None, fee_info={}
+        self,
+        tx_lock_bytes,
+        script_lock,
+        pkh_dest,
+        tx_fee_rate,
+        vkbv=None,
+        fee_info={},
+        tx_lock_refund_bytes=None,
     ):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = self.getScriptDest(script_lock)
@@ -1019,7 +1027,13 @@ class NAVInterface(BTCInterface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = self.feeForVSize(tx_fee_rate, vsize)
+        if tx_lock_refund_bytes is None:
+            pay_fee = self.feeForVSize(tx_fee_rate, vsize)
+        else:
+            pay_fee = (
+                self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+                + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+            )
         tx.vout[0].nValue = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee

@@ -140,7 +140,7 @@ class FeeValidator:
     def compareFeeRates(actual: int, expected: int) -> bool:
         if actual < expected:
             return False
-        return actual - expected < 20
+        return actual - expected < 10
 
     @staticmethod
     def feeForVSize(fee_rate: int, vsize: int) -> int:

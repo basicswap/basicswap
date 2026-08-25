@@ -1062,7 +1062,14 @@ class BCHInterface(BTCInterface):
         return True
 
     def verifySCLockSpendTx(
-        self, tx_bytes, lock_tx_bytes, lock_tx_script, a_pkhash_f, feerate, vkbv=None
+        self,
+        tx_bytes,
+        lock_tx_bytes,
+        lock_tx_script,
+        a_pkhash_f,
+        feerate,
+        vkbv=None,
+        tx_lock_refund_bytes=None,  # Unused, the covenant fixes the fee
     ):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence

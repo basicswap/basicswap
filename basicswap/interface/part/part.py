@@ -35,6 +35,7 @@ from basicswap.interface.btc.btc import (
     BTCInterface,
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
+    scriptLockRefundHasSpendDelay,
 )
 
 from basicswap.chainparams import Coins, chainparams
@@ -506,7 +507,7 @@ class PARTInterfaceBlind(PARTInterface):
             {
                 "txid": tx_lock_refund_id,
                 "vout": spend_n,
-                "sequence": 0,
+                "sequence": 1,
                 "blindingfactor": input_blinded_info["blind"],
             }
         ]
@@ -674,6 +675,11 @@ class PARTInterfaceBlind(PARTInterface):
         )
         script_pk = self.getP2WSHScriptDest(script_out)
         ensure(lock_refund_txo_scriptpk == script_pk, "Bad output script")
+        # TODO: revert, unnecessary once the parser requires the spend delay
+        ensure(
+            scriptLockRefundHasSpendDelay(script_out),
+            "Missing lock refund tx spend delay",
+        )
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")
         ensure(B == Kaf, "Bad script pubkey")
@@ -742,7 +748,7 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(len(lock_refund_spend_tx_obj["vin"]) == 1, "tx doesn't have one input")
 
         txin = lock_refund_spend_tx_obj["vin"][0]
-        ensure(txin["sequence"] == 0, "Bad input nSequence")
+        ensure(txin["sequence"] == 1, "Bad input nSequence")
         ensure(txin["scriptSig"]["hex"] == "", "Input scriptsig not empty")
         ensure(
             txin["txid"] == lock_refund_tx_id.hex() and txin["vout"] == prevout_n,
@@ -822,6 +828,7 @@ class PARTInterfaceBlind(PARTInterface):
         tx_fee_rate: int,
         vkbv: bytes,
         fee_info={},
+        tx_lock_refund_bytes=None,  # Unused, the daemon sets the fee
     ) -> bytes:
         lock_tx_obj = self.rpc("decoderawtransaction", [tx_lock_bytes.hex()])
         lock_txid_hex = lock_tx_obj["txid"]
@@ -912,7 +919,14 @@ class PARTInterfaceBlind(PARTInterface):
         return bytes.fromhex(lock_spend_tx_hex)
 
     def verifySCLockSpendTx(
-        self, tx_bytes, lock_tx_bytes, lock_tx_script, a_pk_f, feerate, vkbv
+        self,
+        tx_bytes,
+        lock_tx_bytes,
+        lock_tx_script,
+        a_pk_f,
+        feerate,
+        vkbv,
+        tx_lock_refund_bytes=None,  # Unused, the daemon sets the fee
     ):
         lock_spend_tx_obj = self.rpc("decoderawtransaction", [tx_bytes.hex()])
         lock_spend_txid_hex = lock_spend_tx_obj["txid"]

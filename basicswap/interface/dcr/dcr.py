@@ -14,7 +14,11 @@ import traceback
 
 from typing import List, Optional
 
-from basicswap.basicswap_util import getVoutByScriptPubKey, TxLockTypes
+from basicswap.basicswap_util import (
+    ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
+    getVoutByScriptPubKey,
+    TxLockTypes,
+)
 from basicswap.chainparams import Coins
 from basicswap.contrib.test_framework.script import (
     CScriptNum,
@@ -24,6 +28,7 @@ from basicswap.interface.utils import FeeValidator
 from basicswap.interface.btc.btc import (
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
+    scriptLockRefundHasSpendDelay,
 )
 from basicswap.util import (
     ensure,
@@ -1214,6 +1219,9 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         script = bytearray()
         script += bytes((OP_IF,))
+        push_script_data(script, bytes((1,)))
+        script += bytes((OP_CHECKSEQUENCEVERIFY,))
+        script += bytes((OP_DROP,))
         push_script_data(script, bytes((2,)))
         push_script_data(script, Kal)
         push_script_data(script, Kaf)
@@ -1231,7 +1239,14 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return script
 
     def createSCLockSpendTx(
-        self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None, fee_info={}
+        self,
+        tx_lock_bytes,
+        script_lock,
+        pkh_dest,
+        tx_fee_rate,
+        vkbv=None,
+        fee_info={},
+        tx_lock_refund_bytes=None,
     ):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = self.getScriptDest(script_lock)
@@ -1249,7 +1264,13 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         size = len(self.setTxSignature(tx.serialize(), dummy_witness_stack))
         size += 1
-        pay_fee = self.feeForVSize(tx_fee_rate, size)
+        if tx_lock_refund_bytes is None:
+            pay_fee = self.feeForVSize(tx_fee_rate, size)
+        else:
+            pay_fee = (
+                self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+                + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+            )
         tx.vout[0].value = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee
@@ -1341,7 +1362,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx = CTransaction()
         tx.version = self.txVersion()
         tx.vin.append(
-            CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n, 0), sequence=0)
+            CTxIn(COutPoint(tx_lock_refund_hash_int, locked_n, 0), sequence=1)
         )
 
         tx.vout.append(
@@ -1458,7 +1479,14 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return txid, locked_n
 
     def verifySCLockSpendTx(
-        self, tx_bytes, lock_tx_bytes, lock_tx_script, a_pkhash_f, feerate, vkbv=None
+        self,
+        tx_bytes,
+        lock_tx_bytes,
+        lock_tx_script,
+        a_pkhash_f,
+        feerate,
+        vkbv=None,
+        tx_lock_refund_bytes=None,
     ):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence
@@ -1510,8 +1538,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             fee_rate_paid,
         )
 
-        if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError(f"Bad fee rate, expected: {feerate}")
+        if tx_lock_refund_bytes is None:
+            if not self.compareFeeRates(fee_rate_paid, feerate):
+                raise ValueError(f"Bad fee rate, expected: {feerate}")
+            return True
+
+        expect_fee: int = (
+            self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+            + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+        )
+        if fee_paid != expect_fee:
+            raise ValueError(f"Bad fee, expected: {expect_fee}, paid: {fee_paid}")
 
         return True
 
@@ -1563,6 +1600,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(self.money_range(locked_coin), "Bad output value range")
 
         # Check script and values
+        # TODO: revert, unnecessary once the parser requires the spend delay
+        ensure(
+            scriptLockRefundHasSpendDelay(script_out),
+            "Missing lock refund tx spend delay",
+        )
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")
         ensure(B == Kaf, "Bad script pubkey")
@@ -1610,7 +1652,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(tx.expiry == 0, "Bad expiry")
         ensure(len(tx.vin) == 1, "tx doesn't have one input")
 
-        ensure(tx.vin[0].sequence == 0, "Bad input sequence")
+        ensure(tx.vin[0].sequence == 1, "Bad input sequence")
         ensure(len(tx.vin[0].signature_script) == 0, "Input sig not empty")
         ensure(
             i2b(tx.vin[0].prevout.hash) == lock_refund_tx_id
@@ -2106,6 +2148,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         parent_block_time: Optional[int],
         chain_height: Optional[int] = None,
         chain_mtp: Optional[int] = None,
+        coin_mtp: Optional[int] = None,
     ) -> bool:
         if parent_block_height is None or parent_block_height < 1:
             return False
@@ -2117,9 +2160,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if parent_block_time is None or parent_block_time < 1:
                 return False
+            if coin_mtp is None:
+                coin_mtp = self.getMedianTimePastAtHeight(
+                    max(parent_block_height - 1, 0)
+                )
+            if coin_mtp is None:
+                return False
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
-            return chain_mtp >= parent_block_time + lock_value
+            if chain_mtp is None:
+                return False
+            return chain_mtp >= coin_mtp + lock_value
         raise ValueError(f"Unknown lock type {lock_type}")
 
     def isAbsLockTimeMature(
@@ -2136,6 +2187,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             return chain_height + 1 >= nlocktime
         if chain_mtp is None:
             chain_mtp = self.getChainMedianTime()
+        if chain_mtp is None:
+            return False
         return chain_mtp >= nlocktime
 
     def getTxOutInfo(

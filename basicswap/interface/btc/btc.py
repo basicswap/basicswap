@@ -82,6 +82,7 @@ from basicswap.contrib.test_framework.script import (
     CScript,
     CScriptOp,
     OP_0,
+    OP_1,
     OP_2,
     OP_CHECKMULTISIG,
     OP_CHECKSEQUENCEVERIFY,
@@ -98,7 +99,10 @@ from basicswap.contrib.test_framework.script import (
     SIGHASH_ALL,
     SegwitV0SignatureHash,
 )
-from basicswap.basicswap_util import TxLockTypes
+from basicswap.basicswap_util import (
+    ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
+    TxLockTypes,
+)
 
 from basicswap.chainparams import Coins
 from basicswap.rpc import make_rpc_func, openrpc
@@ -156,19 +160,32 @@ def extractScriptLockScriptValues(script_bytes: bytes) -> (bytes, bytes):
     return pk1, pk2
 
 
+def scriptLockRefundHasSpendDelay(script_bytes: bytes) -> bool:
+    # TODO: revert with the pre protocol version 5 compatibility
+    # The one block csv on the 2 of 2 branch, added with protocol version 5
+    return len(script_bytes) > 3 and script_bytes[1] == OP_1
+
+
 def extractScriptLockRefundScriptValues(script_bytes: bytes):
     script_len = len(script_bytes)
     ensure(script_len > 73, "Bad script length")
     ensure_op(script_bytes[0] == OP_IF)
-    ensure_op(script_bytes[1] == OP_2)
-    ensure_op(script_bytes[2] == 33)
-    pk1 = script_bytes[3 : 3 + 33]
-    ensure_op(script_bytes[36] == 33)
-    pk2 = script_bytes[37 : 37 + 33]
-    ensure_op(script_bytes[70] == OP_2)
-    ensure_op(script_bytes[71] == OP_CHECKMULTISIG)
-    ensure_op(script_bytes[72] == OP_ELSE)
-    o = 73
+    o = 1
+    # TODO: revert, swaps started before protocol version 5 have no spend delay
+    if script_bytes[o] == OP_1:
+        ensure_op(script_bytes[o + 1] == OP_CHECKSEQUENCEVERIFY)
+        ensure_op(script_bytes[o + 2] == OP_DROP)
+        o += 3
+        ensure(script_len > o + 71, "Bad script length")
+    ensure_op(script_bytes[o] == OP_2)
+    ensure_op(script_bytes[o + 1] == 33)
+    pk1 = script_bytes[o + 2 : o + 2 + 33]
+    ensure_op(script_bytes[o + 35] == 33)
+    pk2 = script_bytes[o + 36 : o + 36 + 33]
+    ensure_op(script_bytes[o + 69] == OP_2)
+    ensure_op(script_bytes[o + 70] == OP_CHECKMULTISIG)
+    ensure_op(script_bytes[o + 71] == OP_ELSE)
+    o += 72
     csv_val, nb = decodeScriptNum(script_bytes, o)
     o += nb
 
@@ -542,8 +559,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self._median_time_cache = mtp
             return mtp
         except Exception as e:
+            # A stale value overstates csvLockRemaining by the length of the outage
             self._log.warning(f"getChainMedianTime rpc error: {e}")
-            return self._median_time_cache
+            return None
 
     def _getChainMedianTimeElectrum(self) -> Optional[int]:
         import struct
@@ -551,7 +569,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         backend = self.getBackend()
         if not backend:
             self._log.warning("getChainMedianTime: no electrum backend available")
-            return self._median_time_cache
+            return None
         try:
             height = backend.getBlockHeight()
             if (
@@ -577,7 +595,34 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return mtp
         except Exception as e:
             self._log.warning(f"getChainMedianTime electrum error: {e}")
-            return self._median_time_cache
+            return None
+
+    def _getMedianTimePastAtHeight(self, height: int) -> Optional[int]:
+        if self._connection_type != "electrum":
+            return super()._getMedianTimePastAtHeight(height)
+
+        import struct
+
+        backend = self.getBackend()
+        if not backend:
+            self._log.warning("getMedianTimePastAtHeight: no electrum backend")
+            return None
+        try:
+            start = max(0, height - 10)
+            count = height - start + 1
+            result = backend._server.call("blockchain.block.headers", [start, count])
+            header_bytes = bytes.fromhex(result["hex"])
+            returned = min(result.get("count", count), len(header_bytes) // 80)
+            if returned < 1:
+                raise ValueError("No headers returned")
+            times = sorted(
+                struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
+                for i in range(returned)
+            )
+            return times[len(times) // 2]
+        except Exception as e:
+            self._log.warning(f"getMedianTimePastAtHeight electrum error: {e}")
+            return None
 
     def isCsvLockMature(
         self,
@@ -587,6 +632,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         parent_block_time: Optional[int],
         chain_height: Optional[int] = None,
         chain_mtp: Optional[int] = None,
+        coin_mtp: Optional[int] = None,
     ) -> bool:
         if parent_block_height is None or parent_block_height < 1:
             return False
@@ -598,11 +644,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
             if parent_block_time is None or parent_block_time < 1:
                 return False
+            if coin_mtp is None:
+                coin_mtp = self.getMedianTimePastAtHeight(
+                    max(parent_block_height - 1, 0)
+                )
+            if coin_mtp is None:
+                return False
             if chain_mtp is None:
                 chain_mtp = self.getChainMedianTime()
             if chain_mtp is None:
                 return False
-            return chain_mtp >= parent_block_time + lock_value
+            return chain_mtp >= coin_mtp + lock_value
         raise ValueError(f"Unknown lock type {lock_type}")
 
     def isAbsLockTimeMature(
@@ -1402,6 +1454,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # fmt: off
         return CScript([
             CScriptOp(OP_IF),
+            1, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
             2, Kal, Kaf, 2, CScriptOp(OP_CHECKMULTISIG),
             CScriptOp(OP_ELSE),
             csv_val, CScriptOp(OP_CHECKSEQUENCEVERIFY), CScriptOp(OP_DROP),
@@ -1545,7 +1598,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vin.append(
             CTxIn(
                 COutPoint(tx_lock_refund_hash_int, locked_n),
-                nSequence=0,
+                nSequence=1,
                 scriptSig=self.getScriptScriptSig(script_lock_refund),
             )
         )
@@ -1647,7 +1700,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return tx.serialize()
 
     def createSCLockSpendTx(
-        self, tx_lock_bytes, script_lock, pkh_dest, tx_fee_rate, vkbv=None, fee_info={}
+        self,
+        tx_lock_bytes,
+        script_lock,
+        pkh_dest,
+        tx_fee_rate,
+        vkbv=None,
+        fee_info={},
+        tx_lock_refund_bytes=None,
     ):
         tx_lock = self.loadTx(tx_lock_bytes)
         output_script = self.getScriptDest(script_lock)
@@ -1678,7 +1738,13 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes: int = self.getWitnessStackSerialisedLength(dummy_witness_stack)
         vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
+        if tx_lock_refund_bytes is None:
+            pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
+        else:
+            pay_fee: int = (
+                self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+                + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+            )
         tx.vout[0].nValue = locked_coin - pay_fee
 
         fee_info["fee_paid"] = pay_fee
@@ -1842,6 +1908,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(self.money_range(locked_coin), "Bad output value range")
 
         # Check script and values
+        # TODO: revert, unnecessary once the parser requires the spend delay
+        ensure(
+            scriptLockRefundHasSpendDelay(script_out),
+            "Missing lock refund tx spend delay",
+        )
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")
         ensure(B == Kaf, "Bad script pubkey")
@@ -1891,7 +1962,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(tx.nLockTime == 0, "nLockTime not 0")
         ensure(len(tx.vin) == 1, "tx doesn't have one input")
 
-        ensure(tx.vin[0].nSequence == 0, "Bad input nSequence")
+        ensure(tx.vin[0].nSequence == 1, "Bad input nSequence")
         ensure(
             tx.vin[0].scriptSig == self.getScriptScriptSig(prevout_script),
             "Input scriptsig mismatch",
@@ -1933,7 +2004,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return True
 
     def verifySCLockSpendTx(
-        self, tx_bytes, lock_tx_bytes, lock_tx_script, a_pkhash_f, feerate, vkbv=None
+        self,
+        tx_bytes,
+        lock_tx_bytes,
+        lock_tx_script,
+        a_pkhash_f,
+        feerate,
+        vkbv=None,
+        tx_lock_refund_bytes=None,
     ):
         # Verify:
         #   Must have only one input with correct prevout (n is always 0) and sequence
@@ -1993,8 +2071,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             fee_rate_paid,
         )
 
-        if not self.compareFeeRates(fee_rate_paid, feerate):
-            raise ValueError(f"Bad fee rate, expected: {feerate}")
+        if tx_lock_refund_bytes is None:
+            if not self.compareFeeRates(fee_rate_paid, feerate):
+                raise ValueError(f"Bad fee rate, expected: {feerate}")
+            return True
+
+        expect_fee: int = (
+            self.getLockRefundTxFee(locked_coin, tx_lock_refund_bytes)
+            + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+        )
+        if fee_paid != expect_fee:
+            raise ValueError(f"Bad fee, expected: {expect_fee}, paid: {fee_paid}")
 
         return True
 
