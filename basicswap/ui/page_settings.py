@@ -363,6 +363,8 @@ def page_settings(self, url_split, post_string):
         else:
             chains_formatted[-1]["conf_target"] = c.get("conf_target", 2)
 
+        chains_formatted[-1]["altruistic"] = c.get("altruistic", False)
+
         if name == "particl":
             chains_formatted[-1]["anon_tx_ring_size"] = c.get("anon_tx_ring_size", 12)
         else:
