@@ -1,3 +1,23 @@
+0.18.4
+==============
+
+**Security / hardening**
+- Mercy outputs are temporarily opt-in.  When a swap fails and the follower swipes the
+  chain A lock refund output, a mercy output reveals the follower's chain B keyshare so
+  that the leader can still recover their coin.  Sending one is no longer automatic and
+  must be enabled explicitly.
+
+**Fixes**
+- Bids CSV export: the from and to amount and coin columns were written in the opposite
+  order to their headers.
+
+**UI**
+- The settings page shows whether mercy outputs are enabled for each coin.
+
+**Dependencies**
+- pyzmq 27.1.0 -> 27.2.0
+
+
 0.18.3
 ==============
 
