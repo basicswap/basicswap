@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 from typing import Optional
 
 CURRENT_DB_VERSION = 37
-CURRENT_DB_DATA_VERSION = 9
+CURRENT_DB_DATA_VERSION = 10
 
 
 class Concepts(IntEnum):

@@ -41,6 +41,7 @@ const BidPage = {
     'Bid Scriptless tx recovered': null,
     'Bid Failed, refunded': 'Swap failed but your coins have been refunded',
     'Bid Failed, swiped': 'Swap failed due to an unexpected issue. Please check the event log for details',
+    'Bid Failed, swiped, sending mercy': 'Swap failed. Sending the other party the keyshare they need to recover their coin',
     'Bid Failed': 'Swap failed. Check events for details',
     'Bid Delaying': 'Brief delay between swap steps to ensure network propagation',
     'Bid Timed-out': 'Swap timed out waiting for the other party',
@@ -241,7 +242,8 @@ const BidPage = {
       'Delaying': 20, 'Timed-out': 21, 'Abandoned': 22, 'Error': 23,
       'Rejected': 25, 'Exchanged script lock tx sigs msg': 27,
       'Exchanged script lock spend tx msg': 28, 'Request sent': 29,
-      'Request accepted': 30, 'Expired': 31
+      'Request accepted': 30, 'Expired': 31,
+      'Failed, swiped, sending mercy': 39
     };
 
     for (const [key, value] of Object.entries(stateMap)) {

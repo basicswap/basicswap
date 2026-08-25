@@ -57,6 +57,7 @@ const STATE_MAP = {
     16: ['Scriptless tx recovered'],
     17: ['Failed, refunded'],
     18: ['Failed, swiped'],
+    39: ['Failed, swiped, sending mercy'],
     19: ['Failed'],
     20: ['Delaying'],
     21: ['Timed-out', 'Expired'],

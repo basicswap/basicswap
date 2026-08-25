@@ -41,6 +41,7 @@ const getStatusClass = (status, tx_a, tx_b) => {
         case 'Failed, refunded':
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
         case 'InProgress':
+        case 'Failed, swiped, sending mercy':
         case 'Script coin locked':
         case 'Scriptless coin locked':
         case 'Script coin lock released':

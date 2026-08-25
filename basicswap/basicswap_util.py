@@ -133,6 +133,7 @@ class BidStates(IntEnum):
     BID_AACCEPT_DELAY = 32
     BID_AACCEPT_FAIL = 33
     CONNECT_REQ_SENT = 34
+    XMR_SWAP_FAILED_SWIPED_SENDING_MERCY = 39
 
 
 class TxStates(IntEnum):
@@ -182,6 +183,7 @@ class ActionTypes(IntEnum):
     SEND_XMR_SWAP_LOCK_SPEND_MSG = auto()
     REDEEM_ITX = auto()
     ACCEPT_AS_REV_BID = auto()
+    SEND_MERCY_TX = auto()
 
 
 class EventLogTypes(IntEnum):
@@ -365,6 +367,8 @@ def strBidState(state):
         return "Failed, refunded"
     if state == BidStates.XMR_SWAP_FAILED_SWIPED:
         return "Failed, swiped"
+    if state == BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY:
+        return "Failed, swiped, sending mercy"
     if state == BidStates.XMR_SWAP_FAILED:
         return "Failed"
     if state == BidStates.SWAP_DELAYING:
@@ -682,6 +686,7 @@ def isActiveBidState(state):
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
         BidStates.XMR_SWAP_FAILED,
+        BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY,
         BidStates.BID_REQUEST_ACCEPTED,
     )
 
@@ -701,6 +706,7 @@ def isFailingBidState(state):
         BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED,
         BidStates.XMR_SWAP_FAILED_REFUNDED,
         BidStates.XMR_SWAP_FAILED_SWIPED,
+        BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY,
         BidStates.XMR_SWAP_FAILED,
     )
 
