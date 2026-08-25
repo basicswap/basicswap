@@ -543,7 +543,7 @@ class TestFunctions(BaseTestWithPrepare):
         assert rv["bid_state"] in ("Accepted", "Request accepted")
 
         expect_state = (
-            (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED)
+            BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY
             if with_mercy
             else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )

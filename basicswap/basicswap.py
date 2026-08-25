@@ -8531,6 +8531,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 bid_id=bid_id,
                                 tx_type=TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE,
                                 txid=bytes.fromhex(txid),
+                                chain_height=ci_from.getChainHeight(),
                             )
                             if self.isBchXmrSwap(offer) and ci_from.altruistic():
                                 delay = self.get_delay_event_seconds()
@@ -8655,6 +8656,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif state == BidStates.XMR_SWAP_FAILED_REFUNDED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
+                rv = True  # Remove from swaps_in_progress
+            elif state == BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY:
+                rv = True  # Remove from swaps_in_progress
+            elif state == BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
                 if bid.xmr_b_lock_tx is None:
@@ -9033,6 +9038,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                     self.commitDB()
                     self.notify(NT.SWAP_COMPLETED, {"bid_id": bid_id.hex()})
+            elif state == BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY:
+                if (
+                    bid.xmr_b_lock_tx is not None
+                    and bid.xmr_b_lock_tx.spend_txid is not None
+                ):
+                    txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
+                    found_tx = ci_to.findConfirmedTxnByHash(txid_hex)
+                    if found_tx is not None:
+                        self.log.info(
+                            f"Found coin b lock spend tx bid {self.log.id(bid_id)}"
+                        )
+                        self.logBidEvent(
+                            bid.bid_id,
+                            EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN,
+                            "",
+                            cursor,
+                        )
+                        rv = True  # Remove from swaps_in_progress
+                        bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY)
+                        self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+                        self.commitDB()
             elif state == BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND:
                 if TxTypes.XMR_SWAP_A_LOCK_REFUND in bid.txns:
                     refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
@@ -9103,11 +9129,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # replacing it with a swipe would leave nothing looking for the
             # mercy tx that follows.
             refund_spend_depth: int = chain_height - refund_spend_tx.chain_height
-            if refund_spend_depth >= ci_from.blocks_confirmed:
-                self.removeWatchedScript(
-                    ci_from.coin_type(), bid.bid_id, None, TxTypes.BCH_MERCY
-                )
-            return False
+            if refund_spend_depth < ci_from.blocks_confirmed:
+                return False
+            self.removeWatchedScript(
+                ci_from.coin_type(), bid.bid_id, None, TxTypes.BCH_MERCY
+            )
+            bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
+            return True
 
         swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, None)
         if swipe_tx is None or swipe_tx.chain_height is None:
@@ -10003,7 +10031,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 if was_received:
                     if not was_sent:  # Self bids
-                        bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
+                        if (
+                            self.isBchXmrSwap(offer)
+                            and TxTypes.BCH_MERCY not in bid.txns
+                        ):
+                            # Held until the refund spend is buried, a reorg
+                            # replacing it with a swipe would leave nothing
+                            # watching for the mercy tx that follows
+                            pass
+                        else:
+                            bid.setState(BidStates.XMR_SWAP_FAILED_REFUNDED)
 
             else:
                 self.log.info(
@@ -10018,6 +10055,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         pass
                     else:
                         # Look for a mercy output
+                        mercy_unusable: bool = False
                         try:
                             mercy_keyshare = ci_from.inspectSwipeTx(spend_txn)
                             if mercy_keyshare is None:
@@ -10030,9 +10068,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.log.warning(
                                 f"Could not extract mercy output from swipe tx: {self.log.id(spend_txid_hex)}, {e}."
                             )
+                            # An output was there but can't be spent from
+                            mercy_unusable = mercy_keyshare is not None
+                            mercy_keyshare = None
 
-                        if mercy_keyshare is None:
+                        if mercy_unusable:
+                            bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
+                        elif mercy_keyshare is None:
                             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
+                        elif bid.xmr_b_lock_tx is None:
+                            self.log.info(
+                                f"Mercy output for bid {self.log.id(bid_id)} has no lock tx b to spend."
+                            )
+                            bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
                         else:
                             delay = self.get_delay_event_seconds()
                             self.log.info("Found mercy output.")
@@ -10045,6 +10093,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 bid_id,
                                 cursor,
                             )
+                            bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY)
                 else:
                     if (
                         self.countQueuedActions(
@@ -10207,13 +10256,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 txid=txid,
                 tx_data=mercy_keyshare,
             )
-            self.saveBid(bid_id, bid)
 
-            delay = self.get_delay_event_seconds()
-            self.log.info(
-                f"Redeeming coin b lock tx for bid {self.logIDB(bid_id)} in {delay} seconds."
-            )
-            self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id)
+            if bid.xmr_b_lock_tx is None:
+                self.log.info(
+                    f"Mercy tx for bid {self.logIDB(bid_id)} has no lock tx b to spend."
+                )
+                bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
+                self.saveBid(bid_id, bid)
+            else:
+                bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY)
+                self.saveBid(bid_id, bid)
+
+                delay = self.get_delay_event_seconds()
+                self.log.info(
+                    f"Redeeming coin b lock tx for bid {self.logIDB(bid_id)} in {delay} seconds."
+                )
+                self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id)
 
         self.removeWatchedScript(coin_type, bid_id, watched_script.script)
 
@@ -13356,13 +13414,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         bid.xmr_b_lock_tx.spend_txid = txid
-        bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
+        # A swipe took chain a, so only chain b comes back.  Hold in
+        # XMR_SWAP_FAILED_SWIPED_USING_MERCY until the spend confirms.
+        using_mercy: bool = bid.state == BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY
+        if not using_mercy:
+            bid.setState(BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED)
         if bid.xmr_b_lock_tx:
             bid.xmr_b_lock_tx.setState(TxStates.TX_REDEEMED)
 
         if not is_redeem_address_owned:
-            bid.setState(BidStates.SWAP_COMPLETED)
-            self.notify(NT.SWAP_COMPLETED, {"bid_id": bid_id.hex()})
+            # The spend won't be seen in the wallet, there is nothing to wait for
+            if using_mercy:
+                bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY)
+            else:
+                bid.setState(BidStates.SWAP_COMPLETED)
+                self.notify(NT.SWAP_COMPLETED, {"bid_id": bid_id.hex()})
 
         # TODO: Why does using bid.txns error here?
         self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)

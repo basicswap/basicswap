@@ -18,7 +18,7 @@ const BidPage = {
   coinTo: null,
   previousStateInd: null,
 
-  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
+  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31, 36, 38], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
 
   DELAYING_STATE: 20,
 
@@ -42,6 +42,9 @@ const BidPage = {
     'Bid Failed, refunded': 'Swap failed but your coins have been refunded',
     'Bid Failed, swiped': 'Swap failed due to an unexpected issue. Please check the event log for details',
     'Bid Failed, swiped, sending mercy': 'Swap failed. Sending the other party the keyshare they need to recover their coin',
+    'Bid Failed, swiped, recovering': 'Swap failed, but the other party sent a keyshare. Recovering your coin',
+    'Bid Failed, swiped, recovered': 'Swap failed, but the other party sent a keyshare and your coin was recovered',
+    'Bid Failed, swiped, mercy unused': 'Swap failed. A keyshare was sent but could not be used. Check the event log for details',
     'Bid Failed': 'Swap failed. Check events for details',
     'Bid Delaying': 'Brief delay between swap steps to ensure network propagation',
     'Bid Timed-out': 'Swap timed out waiting for the other party',
@@ -243,7 +246,10 @@ const BidPage = {
       'Rejected': 25, 'Exchanged script lock tx sigs msg': 27,
       'Exchanged script lock spend tx msg': 28, 'Request sent': 29,
       'Request accepted': 30, 'Expired': 31,
-      'Failed, swiped, sending mercy': 39
+      'Failed, swiped, sending mercy': 39,
+      'Failed, swiped, recovering': 37,
+      'Failed, swiped, recovered': 36,
+      'Failed, swiped, mercy unused': 38
     };
 
     for (const [key, value] of Object.entries(stateMap)) {

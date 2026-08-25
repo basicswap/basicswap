@@ -133,6 +133,9 @@ class BidStates(IntEnum):
     BID_AACCEPT_DELAY = 32
     BID_AACCEPT_FAIL = 33
     CONNECT_REQ_SENT = 34
+    XMR_SWAP_FAILED_SWIPED_USED_MERCY = 36
+    XMR_SWAP_FAILED_SWIPED_USING_MERCY = 37
+    XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED = 38
     XMR_SWAP_FAILED_SWIPED_SENDING_MERCY = 39
 
 
@@ -369,6 +372,12 @@ def strBidState(state):
         return "Failed, swiped"
     if state == BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY:
         return "Failed, swiped, sending mercy"
+    if state == BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY:
+        return "Failed, swiped, recovering"
+    if state == BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY:
+        return "Failed, swiped, recovered"
+    if state == BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED:
+        return "Failed, swiped, mercy unused"
     if state == BidStates.XMR_SWAP_FAILED:
         return "Failed"
     if state == BidStates.SWAP_DELAYING:
@@ -639,6 +648,8 @@ inactive_states = [
     BidStates.SWAP_TIMEDOUT,
     BidStates.BID_ABANDONED,
     BidStates.BID_EXPIRED,
+    BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
+    BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
 ]
 
 
@@ -687,6 +698,7 @@ def isActiveBidState(state):
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
         BidStates.XMR_SWAP_FAILED,
         BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY,
+        BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY,
         BidStates.BID_REQUEST_ACCEPTED,
     )
 
@@ -695,6 +707,7 @@ def isErrorBidState(state):
     return state in (
         BidStates.BID_STALLED_FOR_TEST,
         BidStates.BID_ERROR,
+        BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
     )
 
 
@@ -707,6 +720,9 @@ def isFailingBidState(state):
         BidStates.XMR_SWAP_FAILED_REFUNDED,
         BidStates.XMR_SWAP_FAILED_SWIPED,
         BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY,
+        BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
+        BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY,
+        BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
         BidStates.XMR_SWAP_FAILED,
     )
 

@@ -1118,7 +1118,7 @@ class TestBCH(BasicSwapTest):
             test_delay_event,
             bid_id,
             leader_sc,
-            (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED),
+            BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
             swap_clients[id_follower],
             BidStates.XMR_SWAP_FAILED_SWIPED,
             wait_for=(self.extra_wait_time + 240),
