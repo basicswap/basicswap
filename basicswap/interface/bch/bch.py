@@ -4,7 +4,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from typing import Optional, Union
+from typing import Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
 from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
@@ -1187,36 +1187,8 @@ class BCHInterface(BTCInterface):
     def isTxExistsError(self, err_str: str) -> bool:
         return "transaction already in block chain" in err_str
 
-    def getRefundOutputScript(self, xmr_swap) -> bytes:
-        _, out_1, _, _, _ = self.extractScriptLockScriptValues(
-            xmr_swap.a_lock_refund_tx_script
-        )
-        return out_1
-
     def lockNonSegwitPrevouts(self) -> None:
         pass
-
-    def isMercyTx(self, tx: dict, vout: int) -> Optional[bytes]:
-        # Returns the keyshare if tx matches the mercy tx format created by
-        # createMercyTx: an OP_RETURN "XBSW" keyshare output at vout 0 and a
-        # dust limit output paying the watched script.
-        if len(tx["vout"]) < 2:
-            return None
-        if self.make_int(tx["vout"][vout]["value"]) != 546:
-            return None
-        try:
-            op_return_script = bytes.fromhex(tx["vout"][0]["scriptPubKey"]["hex"])
-            if (
-                len(op_return_script) == 39
-                and op_return_script[:6] == bytes((0x6A, 0x04)) + b"XBSW"
-                and op_return_script[6] == 0x20
-            ):
-                keyshare = op_return_script[7:]
-                if self.verifyKey(keyshare):
-                    return keyshare
-        except Exception as e:
-            self._log.debug(f"isMercyTx check failed: {e}")
-        return None
 
     def createMercyTx(
         self,
@@ -1224,38 +1196,31 @@ class BCHInterface(BTCInterface):
         refund_swipe_tx_id: bytes,
         lock_refund_tx_script: bytes,
         keyshare: bytes,
+        tx_fee_rate: int,
     ) -> str:
         refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
         refund_output_value = refund_swipe_tx.vout[0].nValue
         refund_output_script = refund_swipe_tx.vout[0].scriptPubKey
 
-        # Mercy transaction size consisting of one input of freshly received funds,
-        # one op_return with mercy information, a dust output to the leader and change back to the follower
+        # One input of freshly received funds, an op_return with the keyshare
+        # and change back to the follower.  The leader finds it by watching the
+        # input for a spend, so no output paying them is needed.
         tx_size = 275
         dust_limit = 546
 
-        outValue = refund_output_value - tx_size - dust_limit
-
-        _, out_1, _, _, _ = self.extractScriptLockScriptValues(lock_refund_tx_script)
+        pay_fee: int = self.feeForVSize(tx_fee_rate, tx_size)
+        outValue = refund_output_value - pay_fee
+        ensure(outValue > dust_limit, "Swipe output too small to send a mercy tx")
 
         tx = CTransaction()
         tx.nVersion = self.txVersion()
-        tx.vin.append(
-            CTxIn(
-                COutPoint(b2i(refund_swipe_tx_id), 0),
-                nSequence=0,
-                scriptSig=CScript(out_1),
-            )
-        )
+        tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0), nSequence=0))
 
         tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
-        tx.vout.append(self.txoType()(dust_limit, CScript(out_1)))
         tx.vout.append(self.txoType()(outValue, refund_output_script))
 
         size = tx_size
         vsize = size
-
-        pay_fee = size
         rate_used: int = pay_fee * 1000 // size
 
         tx.rehash()

@@ -1027,6 +1027,12 @@ class PARTInterfaceBlind(PARTInterface):
 
         return True
 
+    def canSendMercyTx(self) -> bool:
+        # The swipe pays to a blind output, the inherited implementation builds
+        # a plain tx spending a plain one.  Send nothing rather than fall back
+        # to putting the keyshare on the swipe.
+        return False
+
     def createSCLockRefundSpendToFTx(
         self,
         tx_lock_refund_bytes,
@@ -1072,16 +1078,6 @@ class PARTInterfaceBlind(PARTInterface):
                 "pubkey": output_pubkey_hex,
             }
         ]
-
-        if self.altruistic() and kbsf:
-            mercy_data = bytes((OP_RETURN,)) + b"XBSW" + kbsf
-            outputs.append({"type": "data", "amount": 0, "data": mercy_data.hex()})
-        else:
-            self._log.debug(
-                "Not attaching mercy output: {}.".format(
-                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
-                )
-            )
         params = [inputs, outputs]
         rv = self.rpc_wallet("createrawparttransaction", params)
 
@@ -1382,6 +1378,10 @@ class PARTInterfaceBlind(PARTInterface):
         return spend_n
 
     def inspectSwipeTx(self, tx: dict):
+        # The keyshare rode on the swipe itself before it became a tx of its own
+        return self.extractMercyKeyshare(tx)
+
+    def extractMercyKeyshare(self, tx: dict):
         find_tag: bytes = bytes((OP_RETURN,)) + b"XBSW"
         for vout in tx["vout"]:
             if vout["type"] != "data":
@@ -1396,7 +1396,7 @@ class PARTInterfaceBlind(PARTInterface):
                     raise ValueError("Unexpected mercy output data length")
                 return data[len(find_tag) : len(find_tag) + 32]
             except Exception as e:
-                self._log.debug(f"inspectSwipeTx vout {vout}, error: {e}")
+                self._log.debug(f"extractMercyKeyshare vout {vout}, error: {e}")
 
         return None
 

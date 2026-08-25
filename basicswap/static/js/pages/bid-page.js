@@ -138,8 +138,8 @@ const BidPage = {
     'Participate tx published': 'Secret-hash swap: Participate transaction broadcast',
     'Participate tx redeem tx published': 'Secret-hash swap: Participate transaction claimed',
     'Participate tx refund tx published': 'Secret-hash swap: Participate transaction refunded',
-    'BCH mercy tx found': 'BCH specific: Mercy transaction detected',
-    'Lock tx B mercy tx published': 'BCH specific: Mercy transaction broadcast',
+    'Mercy tx found': 'The other party sent the keyshare needed to recover your coin',
+    'Mercy tx published': 'Sent the other party the keyshare they need to recover their coin',
     'Auto accepting': 'Automation is accepting this bid',
     'Failed auto accepting': 'Automation constraints prevented accepting this bid',
     'Debug tweak applied': 'Debug mode: A test tweak was applied'

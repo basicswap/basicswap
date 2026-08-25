@@ -1666,16 +1666,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest))
         )
 
-        if self.altruistic() and kbsf:
-            # Add mercy_keyshare
-            tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", kbsf])))
-        else:
-            self._log.debug(
-                "Not attaching mercy output: {}.".format(
-                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
-                )
-            )
-
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(
             script_lock_refund
         )
@@ -2547,6 +2537,43 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 self._log.debug("UTXO already locked")
             else:
                 self._log.warning(f"Error locking UTXOs: {e}")
+
+    def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if not wm:
+                raise ValueError("WalletManager not available")
+            wm.lockUTXO(
+                self.coin_type(),
+                txid_hex,
+                vout,
+                bid_id=bid_id,
+                expires_in=86400,
+                cursor=cursor,
+            )
+            return
+
+        # Core keeps these in memory only, so a daemon restart drops them
+        try:
+            self.rpc_wallet("lockunspent", [False, [{"txid": txid_hex, "vout": vout}]])
+        except Exception as e:
+            if "already locked" not in str(e):
+                raise
+
+    def unlockOutput(self, txid_hex: str, vout: int, cursor=None) -> None:
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if not wm:
+                raise ValueError("WalletManager not available")
+            wm.unlockUTXO(self.coin_type(), txid_hex, vout, cursor=cursor)
+            return
+
+        try:
+            self.rpc_wallet("lockunspent", [True, [{"txid": txid_hex, "vout": vout}]])
+        except Exception as e:
+            # Spending the output releases the lock with it
+            if "expected unspent output" not in str(e):
+                raise
 
     def signTxWithWallet(self, tx: bytes) -> bytes:
         if self.useBackend():
@@ -5025,15 +5052,68 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             "amount": txjs["vout"][n]["value"],
         }
 
+    def canSendMercyTx(self) -> bool:
+        return True
+
+    def createMercyTx(
+        self,
+        refund_swipe_tx_bytes: bytes,
+        refund_swipe_tx_id: bytes,
+        lock_refund_tx_script: bytes,
+        keyshare: bytes,
+        tx_fee_rate: int,
+    ) -> bytes:
+        # Hands the keyshare to the leader in a tx of its own, spending the
+        # swipe's payout output.
+        refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
+        prevout_value: int = refund_swipe_tx.vout[0].nValue
+        prevout_script: bytes = refund_swipe_tx.vout[0].scriptPubKey
+
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0)))
+        tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
+        tx.vout.append(self.txoType()(0, prevout_script))
+
+        witness_bytes: int = self.getWitnessStackSerialisedLength(
+            self.getP2WPKHDummyWitness()
+        )
+        vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
+        change: int = prevout_value - pay_fee
+        ensure(
+            change > self.getdustlimit(),
+            "Swipe output too small to send a mercy tx",
+        )
+        tx.vout[1].nValue = change
+
+        tx.rehash()
+        self._log.info(
+            "createMercyTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
+        )
+        return self.signTxWithWallet(tx.serialize())
+
     def inspectSwipeTx(self, tx: dict):
+        # The keyshare rode on the swipe itself before it became a tx of its own
+        return self.extractMercyKeyshare(tx)
+
+    def extractMercyKeyshare(self, tx: dict) -> Optional[bytes]:
+        # OP_RETURN, a 4 byte push of XBSW, then a 32 byte push of the keyshare
+        find_tag: bytes = bytes((OP_RETURN, 0x04)) + b"XBSW"
         for vout in tx["vout"]:
             script_bytes = bytes.fromhex(vout["scriptPubKey"]["hex"])
-            if len(script_bytes) < 39:
+            if len(script_bytes) != 39:
                 continue
-            if script_bytes[0] != OP_RETURN:
+            if script_bytes[:6] != find_tag or script_bytes[6] != 0x20:
                 continue
-            script_bytes[0]
-            return script_bytes[7 : 7 + 32]
+            return script_bytes[7:]
         return None
 
     def isTxExistsError(self, err_str: str) -> bool:

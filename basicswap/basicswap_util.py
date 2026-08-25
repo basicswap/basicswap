@@ -168,7 +168,7 @@ class TxTypes(IntEnum):
 
     ITX_PRE_FUNDED = auto()
 
-    BCH_MERCY = auto()
+    MERCY = auto()
 
     PTX_PRE_FUNDED = auto()
 
@@ -220,8 +220,8 @@ class EventLogTypes(IntEnum):
     PTX_REDEEM_PUBLISHED = auto()
     PTX_REFUND_PUBLISHED = auto()
     LOCK_TX_B_IN_MEMPOOL = auto()
-    BCH_MERCY_TX_PUBLISHED = auto()
-    BCH_MERCY_TX_FOUND = auto()
+    MERCY_TX_PUBLISHED = auto()
+    MERCY_TX_FOUND = auto()
     LOCK_TX_A_IN_MEMPOOL = auto()
     LOCK_TX_A_CONFLICTS = auto()
     LOCK_TX_B_RPC_ERROR = auto()
@@ -263,6 +263,7 @@ class DebugTypes(IntEnum):
     BID_DONT_SPEND_COIN_A_LOCK = auto()
     DONT_SEND_COIN_B_LOCK = auto()
     DONT_RELEASE_COIN_A_LOCK = auto()
+    MAKE_INVALID_MERCY_TX = auto()
 
 
 class NotificationTypes(IntEnum):
@@ -436,8 +437,8 @@ def strTxType(tx_type):
         return "Chain B Lock Tx"
     if tx_type == TxTypes.ITX_PRE_FUNDED:
         return "Funded mock initiate Tx"
-    if tx_type == TxTypes.BCH_MERCY:
-        return "BCH Mercy Tx"
+    if tx_type == TxTypes.MERCY:
+        return "Mercy Tx"
     return "Unknown"
 
 
@@ -536,10 +537,10 @@ def describeEventEntry(event_type, event_msg):
         return "Participate tx redeem tx published"
     if event_type == EventLogTypes.PTX_REFUND_PUBLISHED:
         return "Participate tx refund tx published"
-    if event_type == EventLogTypes.BCH_MERCY_TX_FOUND:
-        return "BCH mercy tx found"
-    if event_type == EventLogTypes.BCH_MERCY_TX_PUBLISHED:
-        return "Lock tx B mercy tx published"
+    if event_type == EventLogTypes.MERCY_TX_FOUND:
+        return "Mercy tx found"
+    if event_type == EventLogTypes.MERCY_TX_PUBLISHED:
+        return "Mercy tx published"
     if event_type == EventLogTypes.LOCK_TX_A_SPEND_TX_SEEN:
         return "Lock tx A spend tx seen in chain"
     if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN:

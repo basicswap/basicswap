@@ -558,9 +558,8 @@ class TestFunctions(BaseTest):
             else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
         )
 
-        chain_a_coin = coin_to if reverse_bid else coin_from
-        if with_mercy is False and chain_a_coin == Coins.BCH:
-            # When using BCH, can't set XMR_SWAP_FAILED_SWIPED as should wait for mercy tx
+        if with_mercy is False:
+            # Can't set XMR_SWAP_FAILED_SWIPED, the leader waits for a mercy tx
             expect_state = expect_state + (BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,)
 
         wait_for_bid_states(
@@ -2453,6 +2452,8 @@ class BasicSwapTest(TestFunctions):
     def test_02_b_leader_recover_a_lock_tx_reverse(self):
         if not self.has_segwit:
             return
+        # Reversed, so the bidder funds the bid in coin_from
+        self.prepare_balance(self.test_coin_from, 100.0, 1801, 1800)
         self.prepare_balance(Coins.XMR, 100.0, 1800, 1801)
         self.do_test_02_leader_recover_a_lock_tx(Coins.XMR, self.test_coin_from)
 
