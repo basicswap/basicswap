@@ -1,3 +1,37 @@
+0.18.3
+==============
+
+**Security / hardening**
+- Adaptor-sig swaps: the chain A lock spend tx now pays a higher absolute fee than the
+  pre-refund tx.  Both spend the same lock output, so a leader could let the follower
+  broadcast the lock spend tx and then replace it with the pre-refund tx by RBF once the
+  timelock matured, taking both legs.  The pre-refund tx pays to a p2wsh output and was
+  the larger of the two, so at the agreed rate it paid the larger fee; Bitcoin Core v29.1
+  lowered the incremental relay fee to 100 sat/kvB, which brought the replacement within
+  reach.
+- Adaptor-sig swaps: the lock refund script now carries a one block sequence lock on its
+  2 of 2 branch.  Without it the pre-refund tx and the refund spend tx could be submitted
+  together as a package that outpaid the lock spend tx, reaching the same replacement by
+  another route.
+- Adaptor-sig swaps: BIP68 relative time locks are measured from the median time past of
+  the block before the one holding the lock tx, as consensus does, rather than from that
+  block's header time.  The header time runs ahead of the median time past, so the margins
+  that gate releasing the lock secret and publishing the lock spend tx could read the
+  refund timelock as further away than it was.
+- The chain median time no longer falls back to the last value fetched when the daemon or
+  Electrum server cannot be reached.  A stale value overstates the time remaining on a
+  refund timelock by the length of the outage, in the direction that lets those margins
+  pass when they should hold.
+- Fee rate verification allows 10 sat/kvB above the agreed rate rather than 20.
+
+**Upgrade note**
+- The adaptor-sig protocol version is raised to 5, and the minimum accepted version with
+  it.  This release will not accept adaptor-sig offers or bids from 0.18.2 and earlier.
+  Secret-hash swaps are unchanged.
+- Adaptor-sig swaps already in progress when the node is upgraded keep verifying the lock
+  spend tx fee under the previous rule, so upgrading mid-swap does not strand them.
+
+
 0.18.2
 ==============
 
