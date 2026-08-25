@@ -28,6 +28,7 @@ from basicswap.basicswap import (
     BasicSwap,
     SwapTypes,
 )
+from basicswap.base import BaseApp
 from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.db import create_db_, DBMethods, KnownIdentity
 from basicswap.util import h2b
@@ -89,6 +90,20 @@ from basicswap.contrib.test_framework.messages import (
 logger = logging.getLogger()
 
 
+class _FakeSwapClient:
+    # Use the real lookup, BaseApp can't be instantiated without a datadir
+    getBaseAltruistic = BaseApp.getBaseAltruistic
+
+    def __init__(self, settings=None):
+        self.settings = {"chainclients": {}}
+        if settings:
+            self.settings.update(settings)
+        self.log = BSXLogger("test")
+
+    def getChainClientSettings(self, coin):
+        return {}
+
+
 class Test(unittest.TestCase):
 
     @staticmethod
@@ -105,6 +120,63 @@ class Test(unittest.TestCase):
         xmr_coin_settings = {"rpcport": 0, "walletrpcport": 0, "walletrpcauth": "none"}
         xmr_coin_settings.update(REQUIRED_SETTINGS)
         return XMRInterface(xmr_coin_settings, "regtest")
+
+    def test_altruistic_setting(self):
+        def ci_btc_with(coin_setting=None, swap_client=None):
+            coin_settings = {"rpcport": 0, "rpcauth": "none"}
+            coin_settings.update(REQUIRED_SETTINGS)
+            if coin_setting is not None:
+                coin_settings["altruistic"] = coin_setting
+            ci = BTCInterface(coin_settings, "regtest", swap_client=swap_client)
+            ci._log = BSXLogger("test")
+            return ci
+
+        sc_unset = _FakeSwapClient()
+        sc_on = _FakeSwapClient({"altruistic": True})
+        sc_off = _FakeSwapClient({"altruistic": False})
+
+        # No swap client, no coin key → default off
+        assert ci_btc_with()._altruistic is False
+
+        # Base unset or off, no coin key → off
+        assert ci_btc_with(swap_client=sc_unset)._altruistic is False
+        assert ci_btc_with(swap_client=sc_off)._altruistic is False
+
+        # Base on, no coin key → on
+        assert ci_btc_with(swap_client=sc_on)._altruistic is True
+
+        # Coin key wins over base, both directions
+        assert ci_btc_with(False, sc_on)._altruistic is False
+        assert ci_btc_with(True, sc_off)._altruistic is True
+
+    def test_altruistic_coin_setting_passthrough(self):
+        logging.info("---------- Test altruistic coin setting passthrough")
+        basicswap_dir = "/tmp/bsx_test_other"
+        if not os.path.exists(basicswap_dir):
+            os.makedirs(basicswap_dir)
+
+        k = PrivateKey()
+        settings = {
+            "network_key": toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret),
+            "network_pubkey": k.public_key.format().hex(),
+            "chainclients": {
+                "bitcoin": {"altruistic": True},
+                "decred": {"altruistic": False},
+            },
+        }
+
+        sc = BasicSwap(
+            basicswap_dir,
+            settings,
+            "regtest",
+            log_name="bsx_test_other",
+        )
+        # setCoinConnectParams must forward the key, the interfaces read coin_clients
+        assert sc.coin_clients[Coins.BTC]["altruistic"] is True
+        assert sc.coin_clients[Coins.DCR]["altruistic"] is False
+        assert "altruistic" not in sc.coin_clients[Coins.LTC]
+
+        del sc
 
     def test_serialise_num(self):
         def test_case(v, nb=None):

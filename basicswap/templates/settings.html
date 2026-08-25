@@ -419,12 +419,31 @@
            </div>
            {% endif %}
 
-           {% if c.name == 'particl' %}
+            {% if c.name == 'particl' %}
            <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Anon Tx Ring Size</label>
             <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="rct_ring_size_{{ c.name }}" min="3" max="32" value="{{ c.anon_tx_ring_size }}" placeholder="12">
            </div>
            {% endif %}
+
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Altruistic (Mercy Tx)</label>
+            {% if c.altruistic %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+             <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8">
+              <circle cx="4" cy="4" r="3"/>
+             </svg>
+             On
+            </span>
+            {% else %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+             <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8">
+              <circle cx="4" cy="4" r="3"/>
+             </svg>
+             Off
+            </span>
+            {% endif %}
+           </div>
 
           </div>
          </div>

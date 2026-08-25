@@ -337,7 +337,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._use_segwit = coin_settings["use_segwit"]
         self._connection_type = coin_settings["connection_type"]
         self._expect_seedid_hex = None
-        self._altruistic = coin_settings.get("altruistic", True)
         self._use_descriptors = coin_settings.get("use_descriptors", False)
         # Use hardened account indices to match existing wallet keys, only applies when use_descriptors is True
         self._use_legacy_key_paths = coin_settings.get("use_legacy_key_paths", False)
@@ -1672,8 +1671,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", kbsf])))
         else:
             self._log.debug(
-                "Not attaching mercy output, have kbsf {}.".format(
-                    "true" if kbsf else "false"
+                "Not attaching mercy output: {}.".format(
+                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
                 )
             )
 

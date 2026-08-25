@@ -917,6 +917,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Passthrough settings
         for setting_name in (
+            "altruistic",
             "use_descriptors",
             "use_legacy_key_paths",
             "wallet_name",
