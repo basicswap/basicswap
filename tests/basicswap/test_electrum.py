@@ -1289,6 +1289,7 @@ def make_median_time_interface(backend):
     ci._backend = backend
     ci._median_time_cache = None
     ci._median_time_cache_height = None
+    ci._mtp_at_height_cache = {}
     return ci
 
 
@@ -1546,18 +1547,21 @@ class TestElectrumMedianTime(unittest.TestCase):
         ci = make_median_time_interface(backend)
         self.assertIsNone(ci.getChainMedianTime())
 
-    def test_server_error_returns_cached_value(self):
+    def test_server_error_returns_none_despite_stale_cache(self):
+        # The cache is only good for the height it was taken at.  A stale value
+        # overstates csvLockRemaining by the length of the outage.
         backend = StubBackend(HeadersStubServer(raise_on_call=True), height=100)
         ci = make_median_time_interface(backend)
         ci._median_time_cache = 1005
         ci._median_time_cache_height = 99
-        self.assertEqual(ci.getChainMedianTime(), 1005)
+        self.assertIsNone(ci.getChainMedianTime())
 
-    def test_height_error_returns_cached_value(self):
+    def test_height_error_returns_none_despite_cache(self):
+        # Without the height the cache can't be shown to still apply
         backend = StubBackend(HeadersStubServer(), height=100, raise_on_height=True)
         ci = make_median_time_interface(backend)
         ci._median_time_cache = 1005
-        self.assertEqual(ci.getChainMedianTime(), 1005)
+        self.assertIsNone(ci.getChainMedianTime())
 
     def test_no_backend_returns_none(self):
         ci = make_median_time_interface(None)
