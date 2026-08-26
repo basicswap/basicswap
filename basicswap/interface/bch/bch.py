@@ -625,7 +625,6 @@ class BCHInterface(BTCInterface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
-        kbsf=None,
     ):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -1219,9 +1218,7 @@ class BCHInterface(BTCInterface):
         tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
         tx.vout.append(self.txoType()(outValue, refund_output_script))
 
-        size = tx_size
-        vsize = size
-        rate_used: int = pay_fee * 1000 // size
+        rate_used: int = pay_fee * 1000 // tx_size
 
         tx.rehash()
         self._log.info(
@@ -1230,7 +1227,7 @@ class BCHInterface(BTCInterface):
                 (
                     ""
                     if self._log.safe_logs
-                    else f":\n    fee_rate, vsize, fee: {rate_used}, {vsize}, {pay_fee}"
+                    else f":\n    fee_rate, vsize, fee: {rate_used}, {tx_size}, {pay_fee}"
                 ),
             )
         )

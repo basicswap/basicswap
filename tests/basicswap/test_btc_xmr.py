@@ -607,6 +607,10 @@ class TestFunctions(BaseTest):
             coin_to if reverse_bid else coin_from
         )._altruistic = with_mercy
 
+        # A leader that is never sent a mercy tx holds the bid open until the
+        # watch times out, don't wait out the default for it here.
+        swap_clients[id_leader]._mercy_watch_timeout_blocks = 100 if with_mercy else 6
+
         amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
         rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
         offer_id = swap_clients[id_offerer].postOffer(
@@ -686,12 +690,23 @@ class TestFunctions(BaseTest):
         # amount_from = float(format_amount(amt_swap, 8))
         # assert (node1_from_after - node1_from_before > (amount_from - 0.02))
 
+        if invalid_mercy:
+            assert self._has_bid_event(
+                swap_clients[id_leader], bid_id, EventLogTypes.MERCY_TX_UNUSABLE
+            ), "Leader did not record the unusable mercy tx"
+
         swap_clients[id_offerer].abandonBid(bid_id)
 
         wait_for_none_active(test_delay_event, 1800 + id_offerer)
         wait_for_none_active(test_delay_event, 1800 + id_bidder)
 
-        if with_mercy is False:
+        if with_mercy is False and id_leader != id_offerer:
+            # Only when the leader isn't the bid abandoned above, that tears the
+            # watch down before it can time out.
+            assert self._has_bid_event(
+                swap_clients[id_leader], bid_id, EventLogTypes.MERCY_TX_NOT_FOUND
+            ), "Leader did not record giving up on the mercy tx"
+
             # Test manually redeeming the no-script lock tx
             offerer_key = read_json_api(
                 1800 + id_offerer,

@@ -1635,7 +1635,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
-        kbsf=None,
     ):
         # Lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -2580,6 +2579,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return self._signTxWithWalletElectrum(tx)
 
         rv = self.rpc_wallet("signrawtransactionwithwallet", [tx.hex()])
+        ensure(
+            rv.get("complete", False),
+            "Wallet could not sign tx: {}".format(rv.get("errors", "")),
+        )
         return bytes.fromhex(rv["hex"])
 
     def _signTxWithWalletElectrum(self, tx: bytes) -> bytes:

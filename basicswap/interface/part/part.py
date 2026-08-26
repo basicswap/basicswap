@@ -1091,7 +1091,6 @@ class PARTInterfaceBlind(PARTInterface):
         pkh_dest,
         tx_fee_rate,
         vkbv,
-        kbsf=None,
     ):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower

@@ -232,6 +232,9 @@ class EventLogTypes(IntEnum):
     LOCK_TX_A_REFUND_TX_CONFIRMED = auto()
     LOCK_RELEASE_ABANDONED_LOCK_CLOSE = auto()
     LOCK_SPEND_ABANDONED_LOCK_CLOSE = auto()
+    MERCY_TX_NOT_FOUND = auto()
+    MERCY_TX_NOT_SENT = auto()
+    MERCY_TX_UNUSABLE = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -541,6 +544,12 @@ def describeEventEntry(event_type, event_msg):
         return "Mercy tx found"
     if event_type == EventLogTypes.MERCY_TX_PUBLISHED:
         return "Mercy tx published"
+    if event_type == EventLogTypes.MERCY_TX_NOT_FOUND:
+        return "Gave up waiting for a mercy tx"
+    if event_type == EventLogTypes.MERCY_TX_NOT_SENT:
+        return "Mercy tx not sent"
+    if event_type == EventLogTypes.MERCY_TX_UNUSABLE:
+        return "Mercy tx can't be used"
     if event_type == EventLogTypes.LOCK_TX_A_SPEND_TX_SEEN:
         return "Lock tx A spend tx seen in chain"
     if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN:
