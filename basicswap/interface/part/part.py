@@ -1027,11 +1027,62 @@ class PARTInterfaceBlind(PARTInterface):
 
         return True
 
-    def canSendMercyTx(self) -> bool:
-        # The swipe pays to a blind output, the inherited implementation builds
-        # a plain tx spending a plain one.  Send nothing rather than fall back
-        # to putting the keyshare on the swipe.
-        return False
+    def getMercyWatchVouts(self, swipe_txid_hex: str, swipe_tx=None) -> List[int]:
+        # fundrawtransactionfrom reorders the outputs, and the payout is blinded
+        # to an address the leader never sees, so it can't pick out the one the
+        # mercy tx will spend.
+        if swipe_tx is None:
+            swipe_tx = self.rpc("getrawtransaction", [swipe_txid_hex, True])
+        return [txo["n"] for txo in swipe_tx["vout"] if txo["type"] == "blind"]
+
+    def getMercyPrevout(self, swipe_txid_hex: str, swipe_tx=None) -> int:
+        # Either output would do, the leader watches both, so take the one the
+        # wallet owns.  The other is the zero value change to a throwaway key.
+        # Not listunspentblind, it hides the payout once it has been locked.
+        if swipe_tx is None:
+            swipe_tx = self.rpc("getrawtransaction", [swipe_txid_hex, True])
+        for txo in swipe_tx["vout"]:
+            if txo["type"] != "blind":
+                continue
+            script_pubkey = txo.get("scriptPubKey", {})
+            addrs = list(script_pubkey.get("addresses", []))
+            if "address" in script_pubkey:
+                addrs.append(script_pubkey["address"])
+            for addr in addrs:
+                try:
+                    if self.rpc_wallet("getaddressinfo", [addr])["ismine"]:
+                        return txo["n"]
+                except Exception as e:
+                    self._log.debug(f"getaddressinfo {addr} failed: {e}")
+        raise ValueError("Swipe payout output not found")
+
+    def createMercyTx(
+        self,
+        refund_swipe_tx_bytes: bytes,
+        refund_swipe_tx_id: bytes,
+        lock_refund_tx_script: bytes,
+        keyshare: bytes,
+        tx_fee_rate: int,
+    ) -> bytes:
+        # Hands the keyshare to the leader in a tx of its own, spending the
+        # swipe's payout output.
+        swipe_txid_hex: str = refund_swipe_tx_id.hex()
+        swipe_tx = self.rpc("decoderawtransaction", [refund_swipe_tx_bytes.hex()])
+
+        payout_n: int = self.getMercyPrevout(swipe_txid_hex, swipe_tx)
+
+        mercy_data = bytes((OP_RETURN,)) + b"XBSW" + keyshare
+        inputs = [{"txid": swipe_txid_hex, "vout": payout_n}]
+        outputs = [{"type": "data", "amount": 0, "data": mercy_data.hex()}]
+        rv = self.rpc_wallet("createrawparttransaction", [inputs, outputs])
+
+        # No changepubkey, unlike the zero change outputs elsewhere the change
+        # here is the swipe payout less the fee and has to stay spendable.
+        options = {"feeRate": self.format_amount(tx_fee_rate)}
+        rv = self.rpc_wallet(
+            "fundrawtransactionfrom", ["blind", rv["hex"], {}, rv["amounts"], options]
+        )
+        return self.signTxWithWallet(bytes.fromhex(rv["hex"]))
 
     def createSCLockRefundSpendToFTx(
         self,
@@ -1376,10 +1427,6 @@ class PARTInterfaceBlind(PARTInterface):
         # Find the output of the lock refund tx to spend
         spend_n, input_blinded_info = self.findOutputByNonce(lock_refund_tx_obj, nonce)
         return spend_n
-
-    def inspectSwipeTx(self, tx: dict):
-        # The keyshare rode on the swipe itself before it became a tx of its own
-        return self.extractMercyKeyshare(tx)
 
     def extractMercyKeyshare(self, tx: dict):
         find_tag: bytes = bytes((OP_RETURN,)) + b"XBSW"

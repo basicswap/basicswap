@@ -5100,10 +5100,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
         return self.signTxWithWallet(tx.serialize())
 
-    def inspectSwipeTx(self, tx: dict):
-        # The keyshare rode on the swipe itself before it became a tx of its own
-        return self.extractMercyKeyshare(tx)
-
     def extractMercyKeyshare(self, tx: dict) -> Optional[bytes]:
         # OP_RETURN, a 4 byte push of XBSW, then a 32 byte push of the keyshare
         find_tag: bytes = bytes((OP_RETURN, 0x04)) + b"XBSW"

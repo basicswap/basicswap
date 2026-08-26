@@ -9149,7 +9149,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if swipe_tx is None:
             return
         try:
-            ci_from.lockOutput(swipe_tx.txid.hex(), 0, bid_id=bid.bid_id, cursor=cursor)
+            txid_hex: str = swipe_tx.txid.hex()
+            ci_from.lockOutput(
+                txid_hex,
+                ci_from.getMercyPrevout(txid_hex),
+                bid_id=bid.bid_id,
+                cursor=cursor,
+            )
         except Exception as e:
             self.log.debug(f"Locking mercy prevout failed: {e}")
 
@@ -9158,7 +9164,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if swipe_tx is None:
             return
         try:
-            ci_from.unlockOutput(swipe_tx.txid.hex(), 0, cursor=cursor)
+            txid_hex: str = swipe_tx.txid.hex()
+            ci_from.unlockOutput(
+                txid_hex, ci_from.getMercyPrevout(txid_hex), cursor=cursor
+            )
         except Exception as e:
             self.log.debug(f"Unlocking mercy prevout failed: {e}")
 
@@ -9636,8 +9645,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         watched.append(WatchedOutput(bid_id, txid_hex, vout, tx_type, swap_type))
 
-    def removeWatchedOutput(self, coin_type, bid_id: bytes, txid_hex: str) -> None:
-        # Remove all for bid if txid is None
+    def removeWatchedOutput(
+        self, coin_type, bid_id: bytes, txid_hex: str, vout=None
+    ) -> None:
+        # Remove all for bid if txid is None, all vouts if vout is None
         self.log.debug(
             f"Removing watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.logIDT(txid_hex)}"
         )
@@ -9645,7 +9656,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         old_len = len(watched)
         for i in range(old_len - 1, -1, -1):
             wo = watched[i]
-            if wo.bid_id == bid_id and (txid_hex is None or wo.txid_hex == txid_hex):
+            if (
+                wo.bid_id == bid_id
+                and (txid_hex is None or wo.txid_hex == txid_hex)
+                and (vout is None or wo.vout == vout)
+            ):
                 del watched[i]
                 self.log.debug(
                     f"Removed watched output {Coins(coin_type).name} {self.log.id(bid_id)} {self.logIDT(wo.txid_hex)}"
@@ -9960,7 +9975,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
             coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
-            coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
             was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
             was_received: bool = bid.was_sent if reverse_bid else bid.was_received
 
@@ -10045,57 +10059,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     f"Coin a lock refund spent by unknown tx, bid {self.log.id(bid_id)}, txid {self.logIDT(spending_txid)}."
                 )
 
-                mercy_keyshare = None
                 if was_received:
-                    # The keyshare rides on the swipe for peers on older
-                    # versions, otherwise it arrives in a tx of its own
-                    mercy_unusable: bool = False
-                    try:
-                        mercy_keyshare = ci_from.extractMercyKeyshare(spend_txn)
-                        if mercy_keyshare is not None:
-                            ensure(
-                                self.ci(coin_to).verifyKey(mercy_keyshare),
-                                "Invalid keyshare",
-                            )
-                    except Exception as e:
-                        self.log.warning(
-                            f"Could not extract mercy output from swipe tx: {self.log.id(spend_txid_hex)}, {e}."
-                        )
-                        # An output was there but can't be spent from
-                        mercy_unusable = mercy_keyshare is not None
-                        mercy_keyshare = None
-
-                    if mercy_unusable:
-                        bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
-                    elif mercy_keyshare is None:
-                        # A mercy tx of its own may still arrive, held back
+                    if ci_from.canSendMercyTx():
+                        # The keyshare arrives in a tx of its own, held back
                         # until the swipe it spends has confirmed
-                        self.addWatchedOutput(
-                            coin_from,
-                            bid_id,
-                            spend_txid_hex,
-                            0,
-                            TxTypes.MERCY,
-                            SwapTypes.XMR_SWAP,
-                        )
-                    elif bid.xmr_b_lock_tx is None:
-                        self.log.info(
-                            f"Mercy output for bid {self.log.id(bid_id)} has no lock tx b to spend."
-                        )
-                        bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
+                        for mercy_vout in ci_from.getMercyWatchVouts(
+                            spend_txid_hex, spend_txn
+                        ):
+                            self.addWatchedOutput(
+                                coin_from,
+                                bid_id,
+                                spend_txid_hex,
+                                mercy_vout,
+                                TxTypes.MERCY,
+                                SwapTypes.XMR_SWAP,
+                            )
                     else:
-                        delay = self.get_delay_event_seconds()
-                        self.log.info("Found mercy output.")
-                        self.log.info(
-                            f"Redeeming coin b lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
-                        )
-                        self.createActionInSession(
-                            delay,
-                            ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B,
-                            bid_id,
-                            cursor,
-                        )
-                        bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY)
+                        # Nothing can arrive to watch for, don't hold the bid
+                        # open until the watch times out.
+                        bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
                 else:
                     if (
                         self.countQueuedActions(
@@ -10114,10 +10096,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         txid=spending_txid,
                         chain_height=ci_from.getChainHeight(),
                     )
-                    if mercy_keyshare:
-                        bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE].tx_data = (
-                            mercy_keyshare
-                        )
 
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
         except Exception as ex:
@@ -10149,9 +10127,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     watched_output.bid_id, spend_txid_hex, spend_txn
                 )
             elif watched_output.tx_type == TxTypes.MERCY:
-                self.process_MERCY_tx(
-                    coin_type, watched_output.bid_id, spend_txid_hex, spend_txn
-                )
+                if (
+                    self.process_MERCY_tx(
+                        coin_type, watched_output.bid_id, spend_txid_hex, spend_txn
+                    )
+                    is False
+                ):
+                    # Another output of the swipe was spent, the mercy tx may
+                    # still be to come on one of the others.
+                    self.removeWatchedOutput(
+                        coin_type,
+                        watched_output.bid_id,
+                        watched_output.txid_hex,
+                        watched_output.vout,
+                    )
+                    return
 
             self.removeWatchedOutput(
                 coin_type, watched_output.bid_id, watched_output.txid_hex
@@ -10233,31 +10223,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def process_MERCY_tx(
         self, coin_type, bid_id: bytes, spend_txid_hex: str, spend_txn
-    ) -> None:
+    ) -> bool:
         # The swiper spends its own swipe payout to hand over the keyshare,
-        # once that swipe has confirmed
-        ci = self.ci(coin_type)
-        try:
-            mercy_keyshare = ci.extractMercyKeyshare(spend_txn)
-        except Exception as e:
-            self.log.debug(f"extractMercyKeyshare failed: {e}")
-            return
-        if mercy_keyshare is None:
-            self.log.info(
-                f"Swipe payout spent by a tx with no keyshare for bid: {self.log.id(bid_id)}."
-            )
-            return
-
+        # once that swipe has confirmed.
+        # Returns False if the spend was not a mercy tx.
         if bid_id not in self.swaps_in_progress:
             self.log.warning(
                 f"Could not find active bid for found mercy tx: {self.logIDB(bid_id)}."
             )
-            return
+            return True
         bid, offer = self.swaps_in_progress[bid_id]
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+        # Not coin_type, the watched outputs of the PART balance types are held
+        # against the base coin
+        coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
         ci_to = self.ci(coin_to)
+
+        try:
+            mercy_keyshare = self.ci(coin_from).extractMercyKeyshare(spend_txn)
+        except Exception as e:
+            self.log.debug(f"extractMercyKeyshare failed: {e}")
+            return False
+        if mercy_keyshare is None:
+            self.log.info(
+                f"Swipe payout spent by a tx with no keyshare for bid: {self.log.id(bid_id)}."
+            )
+            return False
         # A swiper can publish whatever it likes, it is Kbf or it is nothing
         keyshare_valid: bool = False
         try:
@@ -10275,7 +10268,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
             self.saveBid(bid_id, bid)
-            return
+            return True
 
         self.log.info(f"Found mercy tx for bid: {self.log.id(bid_id)}.")
         self.logBidEvent(
@@ -10294,7 +10287,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
             self.saveBid(bid_id, bid)
-            return
+            return True
 
         bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY)
         self.saveBid(bid_id, bid)
@@ -10304,6 +10297,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             f"Redeeming coin b lock tx for bid {self.logIDB(bid_id)} in {delay} seconds."
         )
         self.createAction(delay, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, bid_id)
+        return True
 
     def haveCheckedPrevBlock(self, ci, c, block, cursor=None) -> bool:
         previousblockhash = bytes.fromhex(block["previousblockhash"])
@@ -12587,16 +12581,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             and swipe_tx is not None
             and TxTypes.MERCY not in bid.txns
             and TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND not in bid.txns
+            and self.ci(coin_from).canSendMercyTx()
         ):
             # Watched outputs only exist in memory
-            self.addWatchedOutput(
-                coin_from,
-                bid.bid_id,
-                swipe_tx.txid.hex(),
-                0,
-                TxTypes.MERCY,
-                SwapTypes.XMR_SWAP,
-            )
+            try:
+                mercy_vouts = self.ci(coin_from).getMercyWatchVouts(swipe_tx.txid.hex())
+            except Exception as e:
+                self.log.warning(f"Could not find mercy prevouts to watch: {e}")
+                mercy_vouts = []
+            for mercy_vout in mercy_vouts:
+                self.addWatchedOutput(
+                    coin_from,
+                    bid.bid_id,
+                    swipe_tx.txid.hex(),
+                    mercy_vout,
+                    TxTypes.MERCY,
+                    SwapTypes.XMR_SWAP,
+                )
 
     def sendXmrBidTxnSigsFtoL(self, bid_id, cursor) -> None:
         # F -> L: Sending MSG3L
@@ -13338,14 +13339,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ensure(
                     pkbsf == xmr_swap.pkbsf,
                     "Keyshare from mercy tx does not match expected pubkey",
-                )
-            elif TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE in bid.txns:
-                self.log.info("Using keyshare from swipe tx.")
-                kbsf = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE].tx_data
-                pkbsf = ci_to.getPubkey(kbsf)
-                ensure(
-                    pkbsf == xmr_swap.pkbsf,
-                    "Keyshare from swipe tx does not match expected pubkey",
                 )
             else:
                 # Extract the leader's decrypted signature and use it to recover the follower's privatekey
