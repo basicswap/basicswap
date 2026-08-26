@@ -20,6 +20,7 @@ from basicswap.basicswap_util import (
     ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
     TxLockTypes,
     EventLogTypes,
+    TxTypes,
 )
 from basicswap.db import Concepts
 from basicswap.util import make_int
@@ -480,8 +481,101 @@ class TestFunctions(BaseTest):
             wait_for=(self.extra_wait_time + 180),
         )
 
+    def _has_bid_event(self, swap_client, bid_id, event_type) -> bool:
+        return any(
+            e.event_type == event_type
+            for e in swap_client.getEvents(Concepts.BID, bid_id)
+        )
+
+    def _assert_mercy_waits_for_swipe(
+        self, bid_id, id_leader: int, id_follower: int, chain_a_coin
+    ) -> None:
+        # The keyshare must not be published while the swipe can still be
+        # replaced.  Assert nothing is sent until the swipe has confirmed.
+        swap_clients = self.swap_clients
+        follower = swap_clients[id_follower]
+        ci_from = follower.ci(chain_a_coin)
+
+        wait_for_event(
+            test_delay_event,
+            follower,
+            Concepts.BID,
+            bid_id,
+            event_type=EventLogTypes.LOCK_TX_A_REFUND_SWIPE_TX_PUBLISHED,
+            wait_for=(self.extra_wait_time + 240),
+        )
+
+        bid, xmr_swap = follower.getXmrBid(bid_id)
+        swipe_txid: str = ci_from.getTxid(xmr_swap.a_lock_refund_swipe_tx).hex()
+
+        # The swipe must not carry the keyshare itself any more
+        swipe_raw = self.callnoderpc(
+            "getrawtransaction", [swipe_txid, True], None, id_follower
+        )
+        assert (
+            ci_from.extractMercyKeyshare(swipe_raw) is None
+        ), "Swipe tx still carries the keyshare"
+
+        # Hold the swipe unconfirmed.  Without this the swipe confirms sooner
+        # than the send action's own delay, so nothing would be observed even
+        # with the gate removed.
+        self.pauseMining()
+        try:
+            for _i in range(75):
+                if test_delay_event.is_set():
+                    raise ValueError("Test stopped.")
+                raw = self.callnoderpc(
+                    "getrawtransaction", [swipe_txid, True], None, id_follower
+                )
+                assert (
+                    raw.get("confirmations", 0) < ci_from.blocks_confirmed
+                ), "Swipe confirmed while mining was paused, test can't conclude"
+                assert not self._has_bid_event(
+                    follower, bid_id, EventLogTypes.MERCY_TX_PUBLISHED
+                ), "Mercy tx sent before the swipe confirmed"
+                bid, _ = follower.getXmrBid(bid_id)
+                assert (
+                    TxTypes.MERCY not in bid.txns
+                ), "Mercy tx recorded before the swipe confirmed"
+                test_delay_event.wait(1)
+        finally:
+            self.continueMining()
+
+        # Once confirmed the keyshare is sent, and reaches the leader
+        wait_for_event(
+            test_delay_event,
+            follower,
+            Concepts.BID,
+            bid_id,
+            event_type=EventLogTypes.MERCY_TX_PUBLISHED,
+            wait_for=(self.extra_wait_time + 180),
+        )
+        wait_for_event(
+            test_delay_event,
+            swap_clients[id_leader],
+            Concepts.BID,
+            bid_id,
+            event_type=EventLogTypes.MERCY_TX_FOUND,
+            wait_for=(self.extra_wait_time + 180),
+        )
+
+        # It spends the swipe's payout, which is what makes the send gateable
+        # and how the leader finds it
+        bid, xmr_swap = follower.getXmrBid(bid_id)
+        mercy_txid: str = bid.txns[TxTypes.MERCY].txid.hex()
+        mercy_raw = self.callnoderpc(
+            "getrawtransaction", [mercy_txid, True], None, id_follower
+        )
+        assert mercy_raw["vin"][0]["txid"] == swipe_txid
+        assert mercy_raw["vin"][0]["vout"] == 0
+
     def do_test_03_follower_recover_a_lock_tx(
-        self, coin_from, coin_to, lock_value: int = 32, with_mercy: bool = False
+        self,
+        coin_from,
+        coin_to,
+        lock_value: int = 32,
+        with_mercy: bool = False,
+        invalid_mercy: bool = False,
     ):
         logging.info(
             "---------- Test {} to {} follower recovers coin a lock tx{}".format(
@@ -540,6 +634,10 @@ class TestFunctions(BaseTest):
         swap_clients[id_leader].setBidDebugInd(
             bid_id, DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND2
         )
+        if invalid_mercy:
+            swap_clients[id_follower].setBidDebugInd(
+                bid_id, DebugTypes.MAKE_INVALID_MERCY_TX, False
+            )
         debug_type = DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
         swap_clients[id_follower].setBidDebugInd(bid_id, debug_type)
 
@@ -552,10 +650,19 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
+        if with_mercy and not invalid_mercy:
+            self._assert_mercy_waits_for_swipe(
+                bid_id, id_leader, id_follower, coin_to if reverse_bid else coin_from
+            )
+
         expect_state = (
-            BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY
-            if with_mercy
-            else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
+            BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED
+            if invalid_mercy
+            else (
+                BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY
+                if with_mercy
+                else (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED)
+            )
         )
 
         if with_mercy is False:
@@ -2493,6 +2600,13 @@ class BasicSwapTest(TestFunctions):
 
     def test_03_d_follower_recover_a_lock_tx_from_part(self):
         self.do_test_03_follower_recover_a_lock_tx(Coins.PART, self.test_coin_from)
+
+    def test_03_g_follower_recover_a_lock_tx_invalid_mercy(self):
+        if not self.has_segwit:
+            return
+        self.do_test_03_follower_recover_a_lock_tx(
+            self.test_coin_from, Coins.XMR, with_mercy=True, invalid_mercy=True
+        )
 
     def test_03_e_follower_recover_a_lock_tx_mercy_release(self):
         if not self.has_segwit:
