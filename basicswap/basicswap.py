@@ -16636,7 +16636,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     volume_24h = v.get(f"{ticker_to}_24h_vol")
                     price_change_24h = v.get(f"{ticker_to}_24h_change")
                     cursor.execute(
-                        "INSERT OR REPLACE INTO coinvolume (coin_id, volume_24h, price_change_24h, source, last_updated) VALUES (:coin_id, :volume_24h, :price_change_24h, :rate_source, :last_updated)",
+                        "DELETE FROM coinvolume WHERE coin_id = :coin_id AND source = :rate_source",
+                        {
+                            "coin_id": coin_id,
+                            "rate_source": rate_source,
+                        },
+                    )
+                    cursor.execute(
+                        "INSERT INTO coinvolume (coin_id, volume_24h, price_change_24h, source, last_updated) VALUES (:coin_id, :volume_24h, :price_change_24h, :rate_source, :last_updated)",
                         {
                             "coin_id": coin_id,
                             "volume_24h": (
