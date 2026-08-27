@@ -165,6 +165,15 @@ def upgradeDatabaseData(self, data_version):
                 "UPDATE wallet_addresses SET ever_used = 0 WHERE ever_used IS NULL"
             )
 
+        if data_version > 0 and data_version < 10:
+            for state in (
+                BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
+                BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY,
+                BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
+                BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY,
+            ):
+                addBidState(self, state, now, cursor)
+
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
         self.commitDB()

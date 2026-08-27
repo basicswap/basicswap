@@ -178,7 +178,7 @@ class TestRecoveredKeyshareCheckLeader(unittest.TestCase):
 
     def test_redeem_errors_bid_on_wrong_key(self):
         sc, bid = self.make_client(WRONG_KEY)
-        self.assertNotIn(TxTypes.BCH_MERCY, bid.txns)
+        self.assertNotIn(TxTypes.MERCY, bid.txns)
 
         sc.redeemXmrBidCoinBLockTx(BID_ID, object())
 

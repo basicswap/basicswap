@@ -1625,7 +1625,7 @@ class Test(BaseTest):
             test_delay_event,
             swap_clients[0],
             bid_id,
-            (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED),
+            BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
             wait_for=220,
         )
         wait_for_bid(

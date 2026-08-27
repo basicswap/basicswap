@@ -35,12 +35,16 @@ const getStatusClass = (status, tx_a, tx_b) => {
         case 'Timed-out':
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
         case 'Error':
+        case 'Failed, swiped, mercy unused':
         case 'Failed':
             return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed, swiped':
+        case 'Failed, swiped, recovered':
         case 'Failed, refunded':
             return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
         case 'InProgress':
+        case 'Failed, swiped, sending mercy':
+        case 'Failed, swiped, recovering':
         case 'Script coin locked':
         case 'Scriptless coin locked':
         case 'Script coin lock released':

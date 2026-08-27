@@ -1625,7 +1625,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
-        kbsf=None,
     ):
         # Lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -1655,16 +1654,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(
             self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest))
         )
-
-        if self.altruistic() and kbsf:
-            # Add mercy_keyshare
-            tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", kbsf])))
-        else:
-            self._log.debug(
-                "Not attaching mercy output: {}.".format(
-                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
-                )
-            )
 
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(
             script_lock_refund
@@ -2533,11 +2522,52 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             else:
                 self._log.warning(f"Error locking UTXOs: {e}")
 
+    def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if not wm:
+                raise ValueError("WalletManager not available")
+            wm.lockUTXO(
+                self.coin_type(),
+                txid_hex,
+                vout,
+                bid_id=bid_id,
+                expires_in=86400,
+                cursor=cursor,
+            )
+            return
+
+        # Core keeps these in memory only, so a daemon restart drops them
+        try:
+            self.rpc_wallet("lockunspent", [False, [{"txid": txid_hex, "vout": vout}]])
+        except Exception as e:
+            if "already locked" not in str(e):
+                raise
+
+    def unlockOutput(self, txid_hex: str, vout: int, cursor=None) -> None:
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if not wm:
+                raise ValueError("WalletManager not available")
+            wm.unlockUTXO(self.coin_type(), txid_hex, vout, cursor=cursor)
+            return
+
+        try:
+            self.rpc_wallet("lockunspent", [True, [{"txid": txid_hex, "vout": vout}]])
+        except Exception as e:
+            # Spending the output releases the lock with it
+            if "expected unspent output" not in str(e):
+                raise
+
     def signTxWithWallet(self, tx: bytes) -> bytes:
         if self.useBackend():
             return self._signTxWithWalletElectrum(tx)
 
         rv = self.rpc_wallet("signrawtransactionwithwallet", [tx.hex()])
+        ensure(
+            rv.get("complete", False),
+            "Wallet could not sign tx: {}".format(rv.get("errors", "")),
+        )
         return bytes.fromhex(rv["hex"])
 
     def _signTxWithWalletElectrum(self, tx: bytes) -> bytes:
@@ -4858,23 +4888,25 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def get_p2wsh_script_pubkey(self, script: bytearray) -> bytearray:
         return CScript([OP_0, sha256(script)])
 
-    def findTxnByHash(self, txid_hex: str):
+    def findConfirmedTxnByHash(self, txid_hex: str):
+        # Returns None below blocks_confirmed and on any lookup failure, callers
+        # gate fund movements on it
         if self._connection_type == "electrum":
-            return self._findTxnByHashElectrum(txid_hex)
+            return self._findConfirmedTxnByHashElectrum(txid_hex)
 
         # Only works for wallet txns
         try:
             rv = self.rpc_wallet("gettransaction", [txid_hex])
         except Exception as e:  # noqa: F841
             self._log.debug(
-                "findTxnByHash getrawtransaction failed: {}".format(txid_hex)
+                "findConfirmedTxnByHash getrawtransaction failed: {}".format(txid_hex)
             )
             return None
         if "confirmations" in rv and rv["confirmations"] >= self.blocks_confirmed:
             return {"txid": txid_hex, "amount": 0, "height": rv["blockheight"]}
         return None
 
-    def _findTxnByHashElectrum(self, txid_hex: str):
+    def _findConfirmedTxnByHashElectrum(self, txid_hex: str):
         backend = self.getBackend()
         if not backend:
             return None
@@ -4924,20 +4956,20 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             continue
                 except Exception as e:
                     self._log.debug(
-                        f"_findTxnByHashElectrum address fallback failed: {e}"
+                        f"_findConfirmedTxnByHashElectrum address fallback failed: {e}"
                     )
 
             if block_height > 0:
                 confirmations = max(0, chain_height - block_height + 1)
                 if confirmations >= self.blocks_confirmed:
                     self._log.debug(
-                        f"_findTxnByHashElectrum found tx {txid_hex[:16]}... "
+                        f"_findConfirmedTxnByHashElectrum found tx {txid_hex[:16]}... "
                         f"height={block_height}, confirmations={confirmations}"
                     )
                     return {"txid": txid_hex, "amount": 0, "height": block_height}
 
         except Exception as e:
-            self._log.debug(f"_findTxnByHashElectrum failed: {e}")
+            self._log.debug(f"_findConfirmedTxnByHashElectrum failed: {e}")
         return None
 
     def createRedeemTxn(
@@ -5008,15 +5040,64 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             "amount": txjs["vout"][n]["value"],
         }
 
-    def inspectSwipeTx(self, tx: dict):
+    def canSendMercyTx(self) -> bool:
+        return True
+
+    def createMercyTx(
+        self,
+        refund_swipe_tx_bytes: bytes,
+        refund_swipe_tx_id: bytes,
+        lock_refund_tx_script: bytes,
+        keyshare: bytes,
+        tx_fee_rate: int,
+    ) -> bytes:
+        # Hands the keyshare to the leader in a tx of its own, spending the
+        # swipe's payout output.
+        refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
+        prevout_value: int = refund_swipe_tx.vout[0].nValue
+        prevout_script: bytes = refund_swipe_tx.vout[0].scriptPubKey
+
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0)))
+        tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
+        tx.vout.append(self.txoType()(0, prevout_script))
+
+        witness_bytes: int = self.getWitnessStackSerialisedLength(
+            self.getP2WPKHDummyWitness()
+        )
+        vsize: int = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
+        pay_fee: int = self.feeForVSize(tx_fee_rate, vsize)
+        change: int = prevout_value - pay_fee
+        ensure(
+            change > self.getdustlimit(),
+            "Swipe output too small to send a mercy tx",
+        )
+        tx.vout[1].nValue = change
+
+        tx.rehash()
+        self._log.info(
+            "createMercyTx {}{}.".format(
+                self._log.id(i2b(tx.sha256)),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, vsize, fee: {tx_fee_rate}, {vsize}, {pay_fee}"
+                ),
+            )
+        )
+        return self.signTxWithWallet(tx.serialize())
+
+    def extractMercyKeyshare(self, tx: dict) -> Optional[bytes]:
+        # OP_RETURN, a 4 byte push of XBSW, then a 32 byte push of the keyshare
+        find_tag: bytes = bytes((OP_RETURN, 0x04)) + b"XBSW"
         for vout in tx["vout"]:
             script_bytes = bytes.fromhex(vout["scriptPubKey"]["hex"])
-            if len(script_bytes) < 39:
+            if len(script_bytes) != 39:
                 continue
-            if script_bytes[0] != OP_RETURN:
+            if script_bytes[:6] != find_tag or script_bytes[6] != 0x20:
                 continue
-            script_bytes[0]
-            return script_bytes[7 : 7 + 32]
+            return script_bytes[7:]
         return None
 
     def isTxExistsError(self, err_str: str) -> bool:
@@ -5148,7 +5229,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 "block_time": tx_info["blocktime"],
             }
         except Exception as e:
-            self._log.debug(f"_findTxnByHashElectrum failed: {e}")
+            self._log.debug(f"_findConfirmedTxnByHashElectrum failed: {e}")
         return None
 
     def getTxOutInfo(

@@ -1696,7 +1696,6 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
-        kbsf=None,
     ):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -1723,19 +1722,6 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         tx.vout.append(self.txoType()(locked_amount, self.getPubkeyHashDest(pkh_dest)))
 
-        if self.altruistic() and kbsf:
-            # Add mercy_keyshare
-            mercy_script = bytearray((OP_RETURN,))
-            push_script_data(mercy_script, b"XBSW")
-            push_script_data(mercy_script, kbsf)
-            tx.vout.append(self.txoType()(0, bytes(mercy_script)))
-        else:
-            self._log.debug(
-                "Not attaching mercy output: {}.".format(
-                    "altruistic is disabled" if not self.altruistic() else "no kbsf"
-                )
-            )
-
         dummy_witness_stack = self.getScriptLockRefundSwipeTxDummyWitness(
             script_lock_refund
         )
@@ -1756,15 +1742,85 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         return tx.serialize(TxSerializeType.NoWitness)
 
-    def inspectSwipeTx(self, tx: dict):
+    def extractMercyKeyshare(self, tx: dict):
+        # OP_RETURN, a 4 byte push of XBSW, then a 32 byte push of the keyshare
+        find_tag: bytes = bytes((OP_RETURN, 0x04)) + b"XBSW"
         for vout in tx["vout"]:
             script_bytes = bytes.fromhex(vout["scriptPubKey"]["hex"])
-            if len(script_bytes) < 39:
+            if len(script_bytes) != 39:
                 continue
-            if script_bytes[0] != OP_RETURN:
+            if script_bytes[:6] != find_tag or script_bytes[6] != 0x20:
                 continue
-            return script_bytes[7 : 7 + 32]
+            return script_bytes[7:]
         return None
+
+    def canSendMercyTx(self) -> bool:
+        return True
+
+    def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
+        try:
+            self.rpc_wallet(
+                "lockunspent", [False, [{"txid": txid_hex, "vout": vout, "tree": 0}]]
+            )
+        except Exception as e:
+            if "already locked" not in str(e):
+                raise
+
+    def unlockOutput(self, txid_hex: str, vout: int, cursor=None) -> None:
+        try:
+            self.rpc_wallet(
+                "lockunspent", [True, [{"txid": txid_hex, "vout": vout, "tree": 0}]]
+            )
+        except Exception as e:
+            if "expected unspent output" not in str(e):
+                raise
+
+    def createMercyTx(
+        self,
+        refund_swipe_tx_bytes: bytes,
+        refund_swipe_tx_id: bytes,
+        lock_refund_tx_script: bytes,
+        keyshare: bytes,
+        tx_fee_rate: int,
+    ) -> bytes:
+        # Hands the keyshare to the leader in a tx of its own, spending the
+        # swipe's payout output, so it can be held back until the swipe has
+        # confirmed.  The leader watches that output for a spend.
+        refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
+        prevout_value: int = refund_swipe_tx.vout[0].value
+        prevout_script: bytes = refund_swipe_tx.vout[0].script_pubkey
+
+        tx = CTransaction()
+        tx.version = self.txVersion()
+        tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0, 0)))
+
+        mercy_script = bytearray((OP_RETURN,))
+        push_script_data(mercy_script, b"XBSW")
+        push_script_data(mercy_script, keyshare)
+        tx.vout.append(self.txoType()(0, bytes(mercy_script)))
+        tx.vout.append(self.txoType()(0, prevout_script))
+
+        # A p2pkh signature script: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
+        size: int = len(tx.serialize()) + 108
+        pay_fee: int = self.feeForVSize(tx_fee_rate, size)
+        change: int = prevout_value - pay_fee
+        # dcrd dust threshold for a P2PKH output at the default relay fee
+        ensure(change > 6030, "Swipe output too small to send a mercy tx")
+        tx.vout[1].value = change
+
+        self._log.info(
+            "createMercyTx {}{}.".format(
+                self._log.id(tx.TxHash()),
+                (
+                    ""
+                    if self._log.safe_logs
+                    else f":\n    fee_rate, size, fee: {tx_fee_rate}, {size}, {pay_fee}"
+                ),
+            )
+        )
+        # Full serialisation, NoWitness leaves signrawtransaction nowhere to
+        # write the signature script
+        return self.signTxWithWallet(tx.serialize())
 
     def signTxOtVES(
         self,
@@ -2093,7 +2149,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
         return bytes.fromhex(self.publishTx(b_lock_spend_tx))
 
-    def findTxnByHash(self, txid_hex: str):
+    def findConfirmedTxnByHash(self, txid_hex: str):
         try:
             txout = self.rpc("gettxout", [txid_hex, 0, 0, True])
         except Exception as e:  # noqa: F841

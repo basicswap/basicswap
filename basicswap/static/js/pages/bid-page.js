@@ -18,7 +18,7 @@ const BidPage = {
   coinTo: null,
   previousStateInd: null,
 
-  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
+  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31, 36, 38], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
 
   DELAYING_STATE: 20,
 
@@ -41,6 +41,10 @@ const BidPage = {
     'Bid Scriptless tx recovered': null,
     'Bid Failed, refunded': 'Swap failed but your coins have been refunded',
     'Bid Failed, swiped': 'Swap failed due to an unexpected issue. Please check the event log for details',
+    'Bid Failed, swiped, sending mercy': 'Swap failed. Sending the other party the keyshare they need to recover their coin',
+    'Bid Failed, swiped, recovering': 'Swap failed, but the other party sent a keyshare. Recovering your coin',
+    'Bid Failed, swiped, recovered': 'Swap failed, but the other party sent a keyshare and your coin was recovered',
+    'Bid Failed, swiped, mercy unused': 'Swap failed. A keyshare was sent but could not be used. Check the event log for details',
     'Bid Failed': 'Swap failed. Check events for details',
     'Bid Delaying': 'Brief delay between swap steps to ensure network propagation',
     'Bid Timed-out': 'Swap timed out waiting for the other party',
@@ -134,8 +138,8 @@ const BidPage = {
     'Participate tx published': 'Secret-hash swap: Participate transaction broadcast',
     'Participate tx redeem tx published': 'Secret-hash swap: Participate transaction claimed',
     'Participate tx refund tx published': 'Secret-hash swap: Participate transaction refunded',
-    'BCH mercy tx found': 'BCH specific: Mercy transaction detected',
-    'Lock tx B mercy tx published': 'BCH specific: Mercy transaction broadcast',
+    'Mercy tx found': 'The other party sent the keyshare needed to recover your coin',
+    'Mercy tx published': 'Sent the other party the keyshare they need to recover their coin',
     'Auto accepting': 'Automation is accepting this bid',
     'Failed auto accepting': 'Automation constraints prevented accepting this bid',
     'Debug tweak applied': 'Debug mode: A test tweak was applied'
@@ -241,7 +245,11 @@ const BidPage = {
       'Delaying': 20, 'Timed-out': 21, 'Abandoned': 22, 'Error': 23,
       'Rejected': 25, 'Exchanged script lock tx sigs msg': 27,
       'Exchanged script lock spend tx msg': 28, 'Request sent': 29,
-      'Request accepted': 30, 'Expired': 31
+      'Request accepted': 30, 'Expired': 31,
+      'Failed, swiped, sending mercy': 39,
+      'Failed, swiped, recovering': 37,
+      'Failed, swiped, recovered': 36,
+      'Failed, swiped, mercy unused': 38
     };
 
     for (const [key, value] of Object.entries(stateMap)) {

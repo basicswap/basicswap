@@ -216,6 +216,30 @@ class CoinInterface:
     def altruistic(self) -> bool:
         return self._altruistic
 
+    def canSendMercyTx(self) -> bool:
+        # Whether a standalone mercy tx spending the swipe's payout can be built.
+        # A coin that can't must not fall back to putting the keyshare on the
+        # swipe, that publishes it while the swipe can still be replaced.
+        return False
+
+    def getMercyWatchVouts(self, swipe_txid_hex: str, swipe_tx=None) -> List[int]:
+        # Which outputs of the swipe a mercy tx could spend.  The leader has to
+        # watch each one, it can't tell which the swiper will use.
+        return [0]
+
+    def getMercyPrevout(self, swipe_txid_hex: str, swipe_tx=None) -> int:
+        # The swiper's side of getMercyWatchVouts: the one output the mercy tx
+        # spends, and which must stay locked until it is sent.
+        return 0
+
+    def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
+        # Keep an output out of coin selection.  Locks are not durable, callers
+        # must re-assert them for as long as the output must stay unspent.
+        self._log.debug(f"lockOutput not implemented for {self.coin_name()}")
+
+    def unlockOutput(self, txid_hex: str, vout: int, cursor=None) -> None:
+        pass
+
 
 class AdaptorSigInterface:
     def getP2WPKHDummyWitness(self, verifying: bool = True) -> List[bytes]:

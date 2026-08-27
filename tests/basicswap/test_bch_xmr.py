@@ -1012,10 +1012,10 @@ class TestBCH(BasicSwapTest):
         run_test_ads_both_refund(self, Coins.BCH, Coins.XMR, lock_value=20)
 
     def test_15_mercy_watch_rearmed_after_restart(self):
-        # Regression: the BCH_MERCY watched script only exists in memory.  If the
-        # leader restarts while the bid is in the pre-refund state, watchXmrSwap
-        # must re-arm the watch or the mercy tx would arrive unseen and the
-        # leader would never recover coin b.
+        # Regression: the mercy watch only exists in memory.  If the leader
+        # restarts after the swipe is seen, watchXmrSwap must re-arm the watch
+        # or the mercy tx would arrive unseen and the leader would never
+        # recover coin b.
         coin_from = Coins.BCH
         coin_to = Coins.XMR
         logging.info(
@@ -1088,11 +1088,11 @@ class TestBCH(BasicSwapTest):
 
         def have_mercy_watch() -> bool:
             return any(
-                ws.bid_id == bid_id and ws.tx_type == TxTypes.BCH_MERCY
-                for ws in leader_sc.coin_clients[coin_from]["watched_scripts"]
+                ws.bid_id == bid_id and ws.tx_type == TxTypes.MERCY
+                for ws in leader_sc.coin_clients[coin_from]["watched_outputs"]
             )
 
-        for _i in range(30):
+        for _i in range(self.extra_wait_time + 240):
             if test_delay_event.is_set():
                 raise ValueError("Test stopped.")
             if have_mercy_watch():
@@ -1118,7 +1118,7 @@ class TestBCH(BasicSwapTest):
             test_delay_event,
             bid_id,
             leader_sc,
-            (BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED, BidStates.SWAP_COMPLETED),
+            BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
             swap_clients[id_follower],
             BidStates.XMR_SWAP_FAILED_SWIPED,
             wait_for=(self.extra_wait_time + 240),

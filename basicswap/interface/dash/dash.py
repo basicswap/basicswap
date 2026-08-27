@@ -104,13 +104,13 @@ class DASHInterface(BTCInterface):
         )
         return pay_fee
 
-    def findTxnByHash(self, txid_hex: str):
+    def findConfirmedTxnByHash(self, txid_hex: str):
         # Only works for wallet txns
         try:
             rv = self.rpc_wallet("gettransaction", [txid_hex])
         except Exception as e:  # noqa: F841
             self._log.debug(
-                "findTxnByHash getrawtransaction failed: {}".format(txid_hex)
+                "findConfirmedTxnByHash getrawtransaction failed: {}".format(txid_hex)
             )
             return None
         if "confirmations" in rv and rv["confirmations"] >= self.blocks_confirmed:
