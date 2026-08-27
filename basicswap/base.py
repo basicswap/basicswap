@@ -177,7 +177,9 @@ class BaseApp(DBMethods):
             return {}
 
     def getBaseAltruistic(self) -> bool:
-        return bool(self.settings.get("altruistic", False))
+        from basicswap.config import DEFAULT_ALTRUISTIC
+
+        return bool(self.settings.get("altruistic", DEFAULT_ALTRUISTIC))
 
     def getElectrumAddressIndex(self, coin_name: str) -> tuple:
         try:

@@ -17,6 +17,7 @@ from basicswap.basicswap_util import (
 from basicswap.chainparams import (
     chainparams,
 )
+from basicswap.config import DEFAULT_ALTRUISTIC
 from basicswap.util import (
     ensure,
     i2b,
@@ -79,7 +80,9 @@ class CoinInterface:
         self._mx_wallet = threading.Lock()
         coin_settings = kwargs.get("coin_settings", {})
         swap_client = kwargs.get("swap_client")
-        base_altruistic = swap_client.getBaseAltruistic() if swap_client else False
+        base_altruistic = (
+            swap_client.getBaseAltruistic() if swap_client else DEFAULT_ALTRUISTIC
+        )
         self._altruistic = coin_settings.get("altruistic", base_altruistic)
         self._core_version = None  # Set in getDaemonVersion()
 
