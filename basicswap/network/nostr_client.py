@@ -34,6 +34,7 @@ BSX_NOSTR_KIND: int = 4859  # Regular (stored) custom kind
 DEFAULT_BROADCAST_TAG: str = "bsx"
 MAX_SEEN_EVENT_IDS: int = 10000
 MAX_EVENT_CONTENT_LEN: int = 65536
+MAX_POW_TARGET_BITS: int = 32
 
 
 def eventSerialize(
@@ -97,13 +98,17 @@ def verifyEvent(event: dict) -> bool:
         return False
 
 
-def mineEventPow(privkey: bytes, event: dict, target_bits: int) -> dict:
+def mineEventPow(
+    privkey: bytes, event: dict, target_bits: int, abort_event=None
+) -> dict:
     """NIP-13: append a nonce tag and grind until the id has target_bits leading zero bits."""
     k = PrivateKey(privkey)
     pubkey_hex: str = k.public_key_xonly.format().hex()
     base_tags = [t for t in event["tags"] if len(t) < 1 or t[0] != "nonce"]
     nonce: int = 0
     while True:
+        if abort_event is not None and nonce % 4096 == 0 and abort_event.is_set():
+            raise ValueError("Nostr PoW mining aborted.")
         tags = base_tags + [["nonce", str(nonce), str(target_bits)]]
         event_id: bytes = eventID(
             pubkey_hex, event["created_at"], event["kind"], tags, event["content"]
@@ -235,13 +240,15 @@ class NostrClient:
         pow_target: int = 0,
         socks_proxy: str = None,
         subscribe_since_seconds: int = 48 * 3600,
+        abort_event=None,
     ):
         self.log = logger
         self.privkey: bytes = privkey
         self.pubkey: str = PrivateKey(privkey).public_key_xonly.format().hex()
         self.broadcast_tag: str = broadcast_tag
-        self.pow_target: int = pow_target
+        self.pow_target: int = max(0, min(int(pow_target), MAX_POW_TARGET_BITS))
         self.subscribe_since_seconds: int = subscribe_since_seconds
+        self.abort_event = abort_event if abort_event is not None else threading.Event()
 
         self.socks_proxy_host = None
         self.socks_proxy_port = None
@@ -266,6 +273,7 @@ class NostrClient:
             relay.start()
 
     def stop(self) -> None:
+        self.abort_event.set()
         for relay in self.relays:
             relay.stop()
 
@@ -366,7 +374,9 @@ class NostrClient:
             "content": content,
         }
         if self.pow_target > 0:
-            event = mineEventPow(self.privkey, event, self.pow_target)
+            event = mineEventPow(
+                self.privkey, event, self.pow_target, abort_event=self.abort_event
+            )
         return signEvent(self.privkey, event)
 
     def publishEvent(

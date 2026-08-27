@@ -126,6 +126,29 @@ class TestNostrPrimitives(unittest.TestCase):
         assert getEventPow(event) == 10
         assert getTagValue(event, "nonce") is not None
 
+    def test_pow_abort(self):
+        privkey = PrivateKey().secret
+        event = {
+            "created_at": int(time.time()),
+            "kind": BSX_NOSTR_KIND,
+            "tags": [["t", "bsx"]],
+            "content": "cG93YWJvcnQ=",
+        }
+        abort_event = threading.Event()
+        abort_event.set()
+        with self.assertRaises(ValueError):
+            mineEventPow(privkey, event, 32, abort_event=abort_event)
+
+    def test_pow_target_clamped(self):
+        client = NostrClient(
+            ["ws://127.0.0.1:1"], PrivateKey().secret, logger, pow_target=64
+        )
+        assert client.pow_target == 32
+        client = NostrClient(
+            ["ws://127.0.0.1:1"], PrivateKey().secret, logger, pow_target=-1
+        )
+        assert client.pow_target == 0
+
     def test_filter_matching(self):
         event = {
             "id": "ab" * 32,

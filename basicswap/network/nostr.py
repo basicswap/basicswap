@@ -56,6 +56,7 @@ def initialiseNostrNetwork(self, network_config) -> None:
         broadcast_tag=network_config.get("broadcast_tag", DEFAULT_BROADCAST_TAG),
         pow_target=int(network_config.get("pow_target", 0)),
         socks_proxy=socks_proxy,
+        abort_event=self.delay_event,
     )
     client.start()
     self.threads.append(client)  # Stopped and joined in finalise
