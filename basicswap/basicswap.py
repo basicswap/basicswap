@@ -16886,7 +16886,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             for coin_id, price_data in new_values.items():
                 cursor.execute(
-                    "INSERT OR REPLACE INTO coinhistory (coin_id, days, price_data, source, last_updated) VALUES (:coin_id, :days, :price_data, :rate_source, :last_updated)",
+                    "DELETE FROM coinhistory WHERE coin_id = :coin_id AND days = :days AND source = :rate_source",
+                    {
+                        "coin_id": coin_id,
+                        "days": days,
+                        "rate_source": rate_source,
+                    },
+                )
+                cursor.execute(
+                    "INSERT INTO coinhistory (coin_id, days, price_data, source, last_updated) VALUES (:coin_id, :days, :price_data, :rate_source, :last_updated)",
                     {
                         "coin_id": coin_id,
                         "days": days,
