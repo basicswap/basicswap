@@ -10083,11 +10083,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
                 if was_received:
-                    # Search for mercy utxo for backwards compatibility
+                    # Search for mercy utxo for backwards compatibility.
                     # TODO: Remove
                     mercy_keyshare = None
                     try:
-                        found_keyshare = ci_from.extractMercyKeyshare(spend_txn)
+                        found_keyshare = (
+                            None
+                            if bid.protocol_version >= 6
+                            else ci_from.extractMercyKeyshare(spend_txn)
+                        )
                         if found_keyshare is not None:
                             ci_to = self.ci(
                                 offer.coin_from if reverse_bid else offer.coin_to
