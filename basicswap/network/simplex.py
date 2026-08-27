@@ -7,12 +7,17 @@
 
 import base64
 import json
+import logging
 import threading
 import traceback
 import websocket
 
 
 from queue import Queue, Empty
+
+# The websocket library logs every connection error to its own logger,
+# duplicating the on_error callbacks.
+logging.getLogger("websocket").setLevel(logging.CRITICAL)
 
 from basicswap.util.smsg import (
     smsgEncrypt,
@@ -56,6 +61,7 @@ class WebSocketThread(threading.Thread):
         self.ignore_events: bool = False
 
         self.num_messages_received: int = 0
+        self.last_error_str: str = ""
 
     def disable_debug_mode(self):
         self.ignore_events = False
@@ -91,14 +97,23 @@ class WebSocketThread(threading.Thread):
             return None
 
     def on_error(self, ws, error):
+        error_str = str(error)
+        # Repeated errors, eg reconnect attempts while the client is down,
+        # are logged at debug to avoid spamming the log.
+        repeated: bool = error_str == self.last_error_str
+        self.last_error_str = error_str
         if self.logger:
-            self.logger.error(f"Simplex ws - {error}")
+            log_func = self.logger.debug if repeated else self.logger.error
+            log_func(f"Simplex ws - {error}")
         else:
             print(f"{self.tag} - Error: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
+        was_connected: bool = self.connected
+        self.connected = False
         if self.logger:
-            self.logger.info(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
+            log_func = self.logger.info if was_connected else self.logger.debug
+            log_func(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
         else:
             print(f"{self.tag} - Closed: {close_status_code}, {close_msg}")
 
@@ -108,6 +123,7 @@ class WebSocketThread(threading.Thread):
         else:
             print(f"{self.tag}: WebSocket connection opened")
         self.connected = True
+        self.last_error_str = ""
 
     def send_command(self, cmd_str: str):
         with self.mutex:
