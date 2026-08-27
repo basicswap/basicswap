@@ -15,10 +15,6 @@ import websocket
 
 from queue import Queue, Empty
 
-# The websocket library logs every connection error to its own logger,
-# duplicating the on_error callbacks.
-logging.getLogger("websocket").setLevel(logging.CRITICAL)
-
 from basicswap.util.smsg import (
     smsgEncrypt,
     smsgDecrypt,
@@ -32,6 +28,10 @@ from basicswap.util.address import (
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes
+
+# The websocket library logs every connection error to its own logger,
+# duplicating the on_error callbacks.
+logging.getLogger("websocket").setLevel(logging.CRITICAL)
 
 
 def encode_base64(data: bytes) -> str:
