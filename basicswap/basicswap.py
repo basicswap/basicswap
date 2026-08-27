@@ -543,6 +543,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._historical_cache = {}
         self._pending_bid_notifications = set()
         self._price_cache_lock = threading.Lock()
+        self._rate_limit_backoff_until = 0
+        self._rate_limit_backoff_step = 1
         self._price_fetch_thread = None
         self._price_fetch_running = False
         self._last_price_fetch = 0
@@ -16483,16 +16485,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         return chainparams[use_coinid]["name"]
 
-    def _backgroundPriceFetchLoop(self):
-        backoff_until = 0
-        backoff_multiplier = 1
+    def isRateLimitError(self, e) -> bool:
+        error_str = str(e)
+        return "429" in error_str or "Too Many Requests" in error_str
 
+    def rateSourceBackoffRemaining(self) -> int:
+        with self._price_cache_lock:
+            return max(0, self._rate_limit_backoff_until - int(time.time()))
+
+    def noteRateSourceLimited(self) -> int:
+        with self._price_cache_lock:
+            backoff_seconds: int = min(20 * self._rate_limit_backoff_step, 120)
+            self._rate_limit_backoff_until = int(time.time()) + backoff_seconds
+            self._rate_limit_backoff_step = min(self._rate_limit_backoff_step + 1, 6)
+        return backoff_seconds
+
+    def clearRateSourceBackoff(self) -> None:
+        with self._price_cache_lock:
+            self._rate_limit_backoff_until = 0
+            self._rate_limit_backoff_step = 1
+
+    def _backgroundPriceFetchLoop(self):
         while self._price_fetch_running:
             try:
                 now = int(time.time())
 
-                if now < backoff_until:
-                    for _ in range(60):
+                backoff_remaining: int = self.rateSourceBackoffRemaining()
+                if backoff_remaining > 0:
+                    for _ in range(backoff_remaining):
                         if not self._price_fetch_running:
                             break
                         time.sleep(1)
@@ -16503,13 +16523,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self._fetchPricesAndVolumeBackground()
                         self._last_price_fetch = now
                         self._last_volume_fetch = now
-                        backoff_multiplier = 1
+                        self.clearRateSourceBackoff()
                     except Exception as e:
-                        error_str = str(e)
-                        if "429" in error_str or "Too Many Requests" in error_str:
-                            backoff_seconds = min(120 * backoff_multiplier, 960)
-                            backoff_until = now + backoff_seconds
-                            backoff_multiplier = min(backoff_multiplier * 2, 8)
+                        if self.isRateLimitError(e):
+                            backoff_seconds: int = self.noteRateSourceLimited()
                             self.log.warning(
                                 f"CoinGecko rate limited, backing off for {backoff_seconds}s"
                             )
@@ -16992,6 +17009,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if len(need_coins) < 1:
                 return return_data
 
+            backoff_remaining: int = self.rateSourceBackoffRemaining()
+            if backoff_remaining > 0:
+                self.log.debug(
+                    f"Skipping historical data fetch, rate limited for {backoff_remaining}s"
+                )
+                for coin_id in need_coins:
+                    return_data[coin_id] = []
+                return return_data
+
             if rate_source == "coingecko.com":
                 api_key: str = get_api_key_setting(
                     self.settings,
@@ -17014,11 +17040,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         if "prices" in js:
                             return_data[coin_id] = js["prices"]
                             new_values[coin_id] = js["prices"]
+                        self.clearRateSourceBackoff()
                     except Exception as e:
                         self.log.warning(
                             f"Could not fetch historical data for {Coins(coin_id).name}: {e}"
                         )
                         return_data[coin_id] = []
+                        if self.isRateLimitError(e):
+                            backoff_seconds: int = self.noteRateSourceLimited()
+                            self.log.warning(
+                                f"CoinGecko rate limited, backing off for {backoff_seconds}s"
+                            )
+                            for remaining_id in need_coins:
+                                if remaining_id not in return_data:
+                                    return_data[remaining_id] = []
+                            break
             else:
                 raise ValueError(f"Unknown rate source {rate_source}")
 
