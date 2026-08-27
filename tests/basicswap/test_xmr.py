@@ -1443,11 +1443,21 @@ class Test(BaseTest):
         assert compare_bid_states(offerer_states, self.states_offerer[0]) is True
         assert compare_bid_states(bidder_states, self.states_bidder[0]) is True
 
-        # Test remove_expired_data
+        # remove_expired_data clears bid-less expired offers but keeps offers with bid history
+        empty_offer_id = swap_clients[0].postOffer(
+            Coins.PART,
+            Coins.XMR,
+            100 * COIN,
+            0.11 * XMR_COIN,
+            100 * COIN,
+            SwapTypes.XMR_SWAP,
+        )
         remove_expired_data(
             swap_clients[0], -swap_clients[0]._expire_db_records_after * 2
         )
         offers = swap_clients[0].listOffers(filters={"offer_id": offer_id})
+        assert len(offers) == 1
+        offers = swap_clients[0].listOffers(filters={"offer_id": empty_offer_id})
         assert len(offers) == 0
 
     def test_02_leader_recover_a_lock_tx(self):
