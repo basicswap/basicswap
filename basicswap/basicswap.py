@@ -540,7 +540,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._tx_cache = {}
         self._price_cache = {}
         self._volume_cache = {}
-        self._historical_cache = {}
         self._pending_bid_notifications = set()
         self._price_cache_lock = threading.Lock()
         self._rate_limit_backoff_until = 0
@@ -548,12 +547,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._price_fetch_thread = None
         self._price_fetch_running = False
         self._last_price_fetch = 0
-        self._last_volume_fetch = 0
         self.price_fetch_interval = self.get_int_setting(
             "price_fetch_interval", 5 * 60, 60, 60 * 60
-        )
-        self.volume_fetch_interval = self.get_int_setting(
-            "volume_fetch_interval", 5 * 60, 60, 60 * 60
         )
 
         self._max_transient_errors = self.settings.get(
@@ -16522,7 +16517,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     try:
                         self._fetchPricesAndVolumeBackground()
                         self._last_price_fetch = now
-                        self._last_volume_fetch = now
                         self.clearRateSourceBackoff()
                     except Exception as e:
                         if self.isRateLimitError(e):
@@ -16549,177 +16543,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         for rate_source in ["coingecko.com"]:
             self._fetchPricesAndVolumeForSource(all_coins, rate_source, Fiat.USD)
-
-    def _fetchPricesBackground(self):
-        all_coins = [c for c in Coins if c in chainparams]
-        if not all_coins:
-            return
-
-        for rate_source in ["coingecko.com"]:
-            try:
-                self._fetchPricesForSource(all_coins, rate_source, Fiat.USD)
-            except Exception as e:
-                self.log.warning(
-                    f"Background price fetch from {rate_source} failed: {e}"
-                )
-
-    def _fetchVolumeBackground(self):
-        all_coins = [c for c in Coins if c in chainparams]
-        if not all_coins:
-            return
-
-        for rate_source in ["coingecko.com"]:
-            try:
-                self._fetchVolumeForSource(all_coins, rate_source)
-            except Exception as e:
-                self.log.warning(
-                    f"Background volume fetch from {rate_source} failed: {e}"
-                )
-
-    def _fetchPricesForSource(self, coins_list, rate_source, currency_to):
-        now = int(time.time())
-        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
-
-        exchange_name_map = {}
-        coin_ids = ""
-        for coin_id in coins_list:
-            if len(coin_ids) > 0:
-                coin_ids += ","
-            exchange_name = self.getExchangeName(coin_id, rate_source)
-            coin_ids += exchange_name
-            exchange_name_map[exchange_name] = coin_id
-
-        if rate_source == "coingecko.com":
-            ticker_to = fiatTicker(currency_to).lower()
-            api_key = get_api_key_setting(
-                self.settings,
-                "coingecko_api_key",
-                default_coingecko_api_key,
-                escape=True,
-            )
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies={ticker_to}"
-            if api_key != "":
-                url += f"&api_key={api_key}"
-
-            js = json.loads(self.readURL(url, timeout=3, headers=headers))
-
-            with self._price_cache_lock:
-                for k, v in js.items():
-                    coin_id = exchange_name_map[k]
-                    cache_key = (coin_id, currency_to, rate_source)
-                    self._price_cache[cache_key] = {
-                        "rate": v[ticker_to],
-                        "timestamp": now,
-                    }
-
-            cursor = self.openDB()
-            try:
-                update_query = """
-                    UPDATE coinrates SET
-                        rate=:rate,
-                        last_updated=:last_updated
-                    WHERE currency_from = :currency_from AND currency_to = :currency_to AND source = :rate_source
-                    """
-
-                insert_query = """INSERT INTO coinrates(currency_from, currency_to, rate, source, last_updated)
-                        VALUES(:currency_from, :currency_to, :rate, :rate_source, :last_updated)"""
-
-                for k, v in js.items():
-                    coin_id = exchange_name_map[k]
-                    cursor.execute(
-                        update_query,
-                        {
-                            "currency_from": coin_id,
-                            "currency_to": currency_to,
-                            "rate": v[ticker_to],
-                            "rate_source": rate_source,
-                            "last_updated": now,
-                        },
-                    )
-                    if cursor.rowcount < 1:
-                        cursor.execute(
-                            insert_query,
-                            {
-                                "currency_from": coin_id,
-                                "currency_to": currency_to,
-                                "rate": v[ticker_to],
-                                "rate_source": rate_source,
-                                "last_updated": now,
-                            },
-                        )
-                self.commitDB()
-            finally:
-                self.closeDB(cursor, commit=False)
-
-    def _fetchVolumeForSource(self, coins_list, rate_source):
-        now = int(time.time())
-        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
-
-        exchange_name_map = {}
-        coin_ids = ""
-        for coin_id in coins_list:
-            if len(coin_ids) > 0:
-                coin_ids += ","
-            exchange_name = self.getExchangeName(coin_id, rate_source)
-            coin_ids += exchange_name
-            exchange_name_map[exchange_name] = coin_id
-
-        if rate_source == "coingecko.com":
-            api_key = get_api_key_setting(
-                self.settings,
-                "coingecko_api_key",
-                default_coingecko_api_key,
-                escape=True,
-            )
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies=usd&include_24hr_vol=true&include_24hr_change=true"
-            if api_key != "":
-                url += f"&api_key={api_key}"
-
-            js = json.loads(self.readURL(url, timeout=3, headers=headers))
-
-            with self._price_cache_lock:
-                for k, v in js.items():
-                    coin_id = exchange_name_map[k]
-                    cache_key = (coin_id, rate_source)
-                    volume_24h = v.get("usd_24h_vol")
-                    price_change_24h = v.get("usd_24h_change")
-                    self._volume_cache[cache_key] = {
-                        "volume_24h": (
-                            float(volume_24h) if volume_24h is not None else None
-                        ),
-                        "price_change_24h": (
-                            float(price_change_24h)
-                            if price_change_24h is not None
-                            else 0.0
-                        ),
-                        "timestamp": now,
-                    }
-
-            cursor = self.openDB()
-            try:
-                for k, v in js.items():
-                    coin_id = exchange_name_map[k]
-                    volume_24h = v.get("usd_24h_vol")
-                    price_change_24h = v.get("usd_24h_change")
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO coinvolume (coin_id, volume_24h, price_change_24h, source, last_updated) VALUES (:coin_id, :volume_24h, :price_change_24h, :rate_source, :last_updated)",
-                        {
-                            "coin_id": coin_id,
-                            "volume_24h": (
-                                str(volume_24h) if volume_24h is not None else "None"
-                            ),
-                            "price_change_24h": (
-                                str(price_change_24h)
-                                if price_change_24h is not None
-                                else "0.0"
-                            ),
-                            "rate_source": rate_source,
-                            "last_updated": now,
-                        },
-                    )
-                self.commitDB()
-            finally:
-                self.closeDB(cursor, commit=False)
 
     def _fetchPricesAndVolumeForSource(self, coins_list, rate_source, currency_to):
         now = int(time.time())
