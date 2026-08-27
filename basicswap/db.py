@@ -12,7 +12,7 @@ import time
 from enum import IntEnum, auto
 from typing import Optional
 
-CURRENT_DB_VERSION = 37
+CURRENT_DB_VERSION = 38
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -409,6 +409,8 @@ class XmrOffer(Table):
     # Delay before the follower can spend from the chain a lock refund tx
     lock_time_2 = Column("integer")
 
+    index = Index("offer_id_index", "offer_id")
+
 
 class XmrSwap(Table):
     __tablename__ = "xmr_swaps"
@@ -699,6 +701,8 @@ class MessageNetworkLink(Table):
     network_id = Column("string")
     link_type = Column("integer")  # MessageNetworkLinkTypes
     created_at = Column("integer")
+
+    index = Index("network_linked_index", "linked_type", "linked_id")
 
 
 class DirectMessageRoute(Table):
