@@ -509,7 +509,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self._keep_notifications = self.settings.get("keep_notifications", 50)
         self._show_notifications = self.settings.get("show_notifications", 10)
-        self._expire_db_records = self.settings.get("expire_db_records", False)
+        self._expire_db_records = self.settings.get("expire_db_records", True)
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 31 * 86400
         )  # Seconds
@@ -15054,7 +15054,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     isinstance(new_value, bool),
                     "New expire_db_records value not boolean",
                 )
-                if settings_copy.get("expire_db_records", False) != new_value:
+                if settings_copy.get("expire_db_records", True) != new_value:
                     self._expire_db_records = new_value
                     settings_copy["expire_db_records"] = new_value
                     settings_changed = True
