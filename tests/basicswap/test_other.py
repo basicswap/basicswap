@@ -57,6 +57,7 @@ from tests.basicswap.util.common import (
     PREFIX_SECRET_KEY_REGTEST,
 )
 
+from basicswap.config import DEFAULT_ALTRUISTIC
 from basicswap.basicswap_util import (
     ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
     TxLockTypes,
@@ -135,11 +136,11 @@ class Test(unittest.TestCase):
         sc_on = _FakeSwapClient({"altruistic": True})
         sc_off = _FakeSwapClient({"altruistic": False})
 
-        # No swap client, no coin key → default off
-        assert ci_btc_with()._altruistic is False
+        # No swap client or base unset, no coin key → the shared default
+        assert ci_btc_with()._altruistic is DEFAULT_ALTRUISTIC
+        assert ci_btc_with(swap_client=sc_unset)._altruistic is DEFAULT_ALTRUISTIC
 
-        # Base unset or off, no coin key → off
-        assert ci_btc_with(swap_client=sc_unset)._altruistic is False
+        # Base off, no coin key → off
         assert ci_btc_with(swap_client=sc_off)._altruistic is False
 
         # Base on, no coin key → on
