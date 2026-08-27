@@ -312,9 +312,9 @@ class NostrClient:
             with self.mutex:
                 if event_id in self._seen_event_ids:
                     return
-                self._seen_event_ids[event_id] = True
-                while len(self._seen_event_ids) > MAX_SEEN_EVENT_IDS:
-                    self._seen_event_ids.popitem(last=False)
+            # Only verified events enter the seen-cache, or a relay could
+            # suppress an event on all relays by sending a corrupted copy
+            # of it first.
             if not verifyEvent(event):
                 self.log.debug(f"Nostr event failed verification: {event_id}")
                 return
@@ -325,6 +325,12 @@ class NostrClient:
                         return
                 except ValueError:
                     return
+            with self.mutex:
+                if event_id in self._seen_event_ids:
+                    return
+                self._seen_event_ids[event_id] = True
+                while len(self._seen_event_ids) > MAX_SEEN_EVENT_IDS:
+                    self._seen_event_ids.popitem(last=False)
             self.num_messages_received += 1
             self.recv_queue.put(event)
         except Exception as e:
@@ -376,6 +382,11 @@ class NostrClient:
             except Empty:
                 break
 
+        # Mark own event as seen before sending so the subscription echo
+        # is ignored even if a relay echoes it back immediately.
+        with self.mutex:
+            self._seen_event_ids[event["id"]] = True
+
         event_json: str = json.dumps(["EVENT", event], separators=(",", ":"))
         num_sent: int = 0
         for relay in self.relays:
@@ -384,10 +395,6 @@ class NostrClient:
                 num_sent += 1
         if num_sent < 1:
             raise ValueError("No connected Nostr relays.")
-
-        # Mark own event as seen so the subscription echo is ignored
-        with self.mutex:
-            self._seen_event_ids[event["id"]] = True
 
         num_accepted: int = 0
         deadline: float = time.time() + wait_seconds

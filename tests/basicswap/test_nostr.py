@@ -249,6 +249,29 @@ class TestNostrClientRelay(unittest.TestCase):
             client_a.stop()
             client_b.stop()
 
+    def test_corrupted_copy_does_not_block_event(self):
+        # A corrupted copy must not block the genuine event that follows it
+        client_a = self.makeClient()
+        client_b = self.makeClient()
+        try:
+            event = client_a.buildEvent("cG9pc29u", expiration=int(time.time()) + 600)
+            corrupted = dict(event)
+            corrupted["sig"] = "00" * 64
+            client_b.receiveEvent(self.relay.url(), corrupted)
+            assert client_b.queue_get() is None
+
+            client_b.receiveEvent(self.relay.url(), event)
+            received = client_b.queue_get()
+            assert received is not None
+            assert received["id"] == event["id"]
+
+            # Verified events are still deduplicated
+            client_b.receiveEvent(self.relay.url(), event)
+            assert client_b.queue_get() is None
+        finally:
+            client_a.stop()
+            client_b.stop()
+
     def test_backlog_on_subscribe(self):
         client_a = self.makeClient()
         try:
