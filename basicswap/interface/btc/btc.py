@@ -160,32 +160,22 @@ def extractScriptLockScriptValues(script_bytes: bytes) -> (bytes, bytes):
     return pk1, pk2
 
 
-def scriptLockRefundHasSpendDelay(script_bytes: bytes) -> bool:
-    # TODO: revert with the pre protocol version 5 compatibility
-    # The one block csv on the 2 of 2 branch, added with protocol version 5
-    return len(script_bytes) > 3 and script_bytes[1] == OP_1
-
-
 def extractScriptLockRefundScriptValues(script_bytes: bytes):
     script_len = len(script_bytes)
-    ensure(script_len > 73, "Bad script length")
+    ensure(script_len > 76, "Bad script length")
     ensure_op(script_bytes[0] == OP_IF)
-    o = 1
-    # TODO: revert, swaps started before protocol version 5 have no spend delay
-    if script_bytes[o] == OP_1:
-        ensure_op(script_bytes[o + 1] == OP_CHECKSEQUENCEVERIFY)
-        ensure_op(script_bytes[o + 2] == OP_DROP)
-        o += 3
-        ensure(script_len > o + 71, "Bad script length")
-    ensure_op(script_bytes[o] == OP_2)
-    ensure_op(script_bytes[o + 1] == 33)
-    pk1 = script_bytes[o + 2 : o + 2 + 33]
-    ensure_op(script_bytes[o + 35] == 33)
-    pk2 = script_bytes[o + 36 : o + 36 + 33]
-    ensure_op(script_bytes[o + 69] == OP_2)
-    ensure_op(script_bytes[o + 70] == OP_CHECKMULTISIG)
-    ensure_op(script_bytes[o + 71] == OP_ELSE)
-    o += 72
+    ensure_op(script_bytes[1] == OP_1)
+    ensure_op(script_bytes[2] == OP_CHECKSEQUENCEVERIFY)
+    ensure_op(script_bytes[3] == OP_DROP)
+    ensure_op(script_bytes[4] == OP_2)
+    ensure_op(script_bytes[5] == 33)
+    pk1 = script_bytes[6 : 6 + 33]
+    ensure_op(script_bytes[39] == 33)
+    pk2 = script_bytes[40 : 40 + 33]
+    ensure_op(script_bytes[73] == OP_2)
+    ensure_op(script_bytes[74] == OP_CHECKMULTISIG)
+    ensure_op(script_bytes[75] == OP_ELSE)
+    o = 76
     csv_val, nb = decodeScriptNum(script_bytes, o)
     o += nb
 
@@ -1907,11 +1897,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(self.money_range(locked_coin), "Bad output value range")
 
         # Check script and values
-        # TODO: revert, unnecessary once the parser requires the spend delay
-        ensure(
-            scriptLockRefundHasSpendDelay(script_out),
-            "Missing lock refund tx spend delay",
-        )
         A, B, csv_val, C = extractScriptLockRefundScriptValues(script_out)
         ensure(A == Kal, "Bad script pubkey")
         ensure(B == Kaf, "Bad script pubkey")
