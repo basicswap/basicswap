@@ -16,7 +16,7 @@ from basicswap.interface.prepare_util import (
     generate_salt,
 )
 
-FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.17.2")
+FIRO_VERSION = os.getenv("FIRO_VERSION", "0.14.18.0")
 FIRO_VERSION_TAG = os.getenv("FIRO_VERSION_TAG", "")
 firo_signers = {"reuben": ("0186454D63E83D85EF91DE4E1290A1D0FA7EE109",)}
 
