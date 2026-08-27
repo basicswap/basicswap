@@ -42,6 +42,9 @@ def page_settings(self, url_split, post_string):
                 data = {
                     "debug": toBool(get_data_entry(form_data, "debugmode")),
                     "debug_ui": toBool(get_data_entry(form_data, "debugui")),
+                    "expire_unused_offers": toBool(
+                        get_data_entry(form_data, "expire_unused_offers")
+                    ),
                     "expire_db_records": toBool(
                         get_data_entry(form_data, "expire_db_records")
                     ),
@@ -393,6 +396,7 @@ def page_settings(self, url_split, post_string):
     general_settings = {
         "debug": swap_client.debug,
         "debug_ui": swap_client.debug_ui,
+        "expire_unused_offers": swap_client._expire_unused_offers,
         "expire_db_records": swap_client._expire_db_records,
         "check_updates": swap_client.settings.get("check_updates", True),
     }

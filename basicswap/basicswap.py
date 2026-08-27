@@ -509,9 +509,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self._keep_notifications = self.settings.get("keep_notifications", 50)
         self._show_notifications = self.settings.get("show_notifications", 10)
+        self._expire_unused_offers = self.settings.get("expire_unused_offers", True)
+        self._expire_unused_offers_after = self.get_int_setting(
+            "expire_unused_offers_after", 7 * 86400, 0, 315600000
+        )  # Seconds
         self._expire_db_records = self.settings.get("expire_db_records", False)
         self._expire_db_records_after = self.get_int_setting(
-            "expire_db_records_after", 7 * 86400, 0, 31 * 86400
+            "expire_db_records_after", 7 * 86400, 0, 315600000
         )  # Seconds
         self._sc_lock_tx_timeout = self.get_int_setting(
             "sc_lock_tx_timeout", 1200, 1200, 48 * 3600
@@ -10872,9 +10876,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if self._is_locked is True:
             self.log.debug("Not expiring database records while system locked.")
             return
-        if not self._expire_db_records:
-            return
-        remove_expired_data(self, self._expire_db_records_after)
+        if self._expire_unused_offers:
+            remove_expired_data(
+                self, self._expire_unused_offers_after, unused_offers_only=True
+            )
+        if self._expire_db_records:
+            remove_expired_data(self, self._expire_db_records_after)
 
     def checkAcceptedBids(self) -> None:
         # Check for bids stuck as accepted (not yet in-progress)
@@ -15046,6 +15053,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if settings_copy.get("debug_ui", False) != new_value:
                     self.debug_ui = new_value
                     settings_copy["debug_ui"] = new_value
+                    settings_changed = True
+
+            if "expire_unused_offers" in data:
+                new_value = data["expire_unused_offers"]
+                ensure(
+                    isinstance(new_value, bool),
+                    "New expire_unused_offers value not boolean",
+                )
+                if settings_copy.get("expire_unused_offers", False) != new_value:
+                    self._expire_unused_offers = new_value
+                    settings_copy["expire_unused_offers"] = new_value
                     settings_changed = True
 
             if "expire_db_records" in data:

@@ -2729,6 +2729,56 @@ class Test(BaseTest):
             sent=True,
         )
 
+    def test_18_expire_offers(self):
+        logging.info("---------- Test pruning expired offers")
+        swap_clients = self.swap_clients
+        offerer = swap_clients[0]
+
+        unused_offer_ids = []
+        for i in range(3):
+            amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
+            rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)
+            unused_offer_ids.append(
+                offerer.postOffer(
+                    Coins.PART,
+                    Coins.XMR,
+                    amt_swap,
+                    rate_swap,
+                    amt_swap,
+                    SwapTypes.XMR_SWAP,
+                )
+            )
+
+        amt_swap = make_int(random.uniform(0.1, 2.0), scale=8, r=1)
+        rate_swap = make_int(random.uniform(2.0, 20.0), scale=12, r=1)
+        bid_offer_id = offerer.postOffer(
+            Coins.PART, Coins.XMR, amt_swap, rate_swap, amt_swap, SwapTypes.XMR_SWAP
+        )
+        wait_for_offer(test_delay_event, swap_clients[1], bid_offer_id)
+        bid_id = swap_clients[1].postXmrBid(bid_offer_id, amt_swap)
+        wait_for_bid(
+            test_delay_event,
+            offerer,
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        # Negative offset so every offer counts as expired.
+        expire_all: int = -offerer._expire_db_records_after * 2
+
+        remove_expired_data(offerer, expire_all, unused_offers_only=True)
+        for offer_id in unused_offer_ids:
+            assert len(offerer.listOffers(filters={"offer_id": offer_id})) == 0
+        assert len(offerer.listOffers(filters={"offer_id": bid_offer_id})) == 1
+        assert len(offerer.listBids(filters={"bid_id": bid_id})) == 1
+
+        # The offer is only pruned once no bid on it is active.
+        offerer.manualBidUpdate(bid_id, {"bid_state": int(BidStates.BID_ABANDONED)})
+        remove_expired_data(offerer, expire_all)
+        assert len(offerer.listOffers(filters={"offer_id": bid_offer_id})) == 0
+        assert len(offerer.listBids(filters={"bid_id": bid_id})) == 0
+
     def test_97_withdraw_all(self):
         logging.info("---------- Test XMR withdrawal all")
 
