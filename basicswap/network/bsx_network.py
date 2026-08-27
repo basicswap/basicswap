@@ -555,8 +555,15 @@ class BSXNetwork:
         if message_route:
             route_data = json.loads(message_route.route_data.decode("UTF-8"))
             remote_pubkey = route_data.get("remote_pubkey", None)
+            network = None
             if remote_pubkey is not None:
-                network = self.getActiveNetwork(MessageNetworks.NOSTR)
+                try:
+                    network = self.getActiveNetwork(MessageNetworks.NOSTR)
+                except RuntimeError:
+                    self.log.warning(
+                        "Nostr direct message route exists but the nostr network is not active, falling back to broadcast."
+                    )
+            if remote_pubkey is not None and network is not None:
                 message_id = sendNostrMsg(
                     self,
                     network,
@@ -570,7 +577,7 @@ class BSXNetwork:
                     to_pubkey=remote_pubkey,
                 )
                 return message_id
-            # Route is not yet established, fall through to broadcast networks
+            # Route not established or network inactive, fall through to broadcast
 
         # Message routes work only with simplex messages for now.
         message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)

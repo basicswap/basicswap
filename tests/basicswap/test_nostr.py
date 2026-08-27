@@ -371,6 +371,26 @@ class TestNetworkSettings(unittest.TestCase):
         del self.sc
         shutil.rmtree(self.basicswap_dir, ignore_errors=True)
 
+    def test_send_with_nostr_route_but_network_inactive(self):
+        # An established nostr route must not break sendMessage when the
+        # nostr network is inactive, it should fall back to broadcast.
+        from unittest import mock
+        from basicswap.basicswap_util import MessageNetworks
+
+        fake_route = mock.Mock()
+        fake_route.route_data = json.dumps({"remote_pubkey": "ab" * 32}).encode("UTF-8")
+
+        def fake_get_route(network_id, addr_from, addr_to, cursor=None):
+            if network_id == int(MessageNetworks.NOSTR):
+                return fake_route
+            return None
+
+        self.sc.active_networks = []  # Started node with nostr disabled
+        with mock.patch.object(self.sc, "getMessageRoute", side_effect=fake_get_route):
+            # No active networks, must not raise "Network not found."
+            message_id = self.sc.sendMessage("addr_a", "addr_b", "00", 3600, None)
+        assert message_id is None
+
     def test_networks_info(self):
         info = self.sc.getNetworksInfo()
         assert len(info) == 2
