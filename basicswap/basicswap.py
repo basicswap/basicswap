@@ -10083,7 +10083,74 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
                 if was_received:
-                    if ci_from.canSendMercyTx():
+                    # Search for mercy utxo for backwards compatibility
+                    # TODO: Remove
+                    mercy_keyshare = None
+                    try:
+                        found_keyshare = ci_from.extractMercyKeyshare(spend_txn)
+                        if found_keyshare is not None:
+                            ci_to = self.ci(
+                                offer.coin_from if reverse_bid else offer.coin_to
+                            )
+                            # It is Kbf or it is nothing
+                            if (
+                                ci_to.verifyKey(found_keyshare)
+                                and ci_to.getPubkey(found_keyshare) == xmr_swap.pkbsf
+                            ):
+                                mercy_keyshare = found_keyshare
+                            else:
+                                self.log.warning(
+                                    f"Invalid keyshare on swipe tx for bid {self.log.id(bid_id)}."
+                                )
+                                self.logBidEvent(
+                                    bid_id,
+                                    EventLogTypes.MERCY_TX_UNUSABLE,
+                                    "Keyshare is not kbsf",
+                                    cursor,
+                                )
+                                bid.setState(
+                                    BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED
+                                )
+                    except Exception as e:
+                        self.log.debug(f"extractMercyKeyshare failed: {e}")
+
+                    if mercy_keyshare is not None:
+                        self.logBidEvent(
+                            bid_id,
+                            EventLogTypes.MERCY_TX_FOUND,
+                            spend_txid_hex,
+                            cursor,
+                        )
+                        bid.txns[TxTypes.MERCY] = SwapTx(
+                            bid_id=bid_id,
+                            tx_type=TxTypes.MERCY,
+                            txid=spending_txid,
+                            tx_data=mercy_keyshare,
+                        )
+                        if bid.xmr_b_lock_tx is None:
+                            self.log.info(
+                                f"Keyshare on swipe tx for bid {self.log.id(bid_id)} has no lock tx b to spend."
+                            )
+                            self.logBidEvent(
+                                bid_id,
+                                EventLogTypes.MERCY_TX_UNUSABLE,
+                                "No lock tx b to spend",
+                                cursor,
+                            )
+                            bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED)
+                        else:
+                            delay = self.get_delay_event_seconds()
+                            self.log.info(
+                                f"Found keyshare on swipe tx, redeeming coin b lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
+                            )
+                            self.createActionInSession(
+                                delay,
+                                ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B,
+                                bid_id,
+                                cursor,
+                            )
+                            bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY)
+                    elif ci_from.canSendMercyTx():
                         # The keyshare arrives in a tx of its own, held back
                         # until the swipe it spends has confirmed
                         for mercy_vout in ci_from.getMercyWatchVouts(
