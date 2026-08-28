@@ -109,17 +109,6 @@ SESSION_COOKIE_NAME = "basicswap_session_id"
 LOGIN_NEXT_COOKIE_NAME = "basicswap_login_next"
 SESSION_DURATION_MINUTES = 15
 
-MINIMAL_404_PATHS = frozenset(
-    {
-        "favicon.ico",
-        "robots.txt",
-        "apple-touch-icon.png",
-        "apple-touch-icon-precomposed.png",
-        "browserconfig.xml",
-        "site.webmanifest",
-    }
-)
-
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
     autoescape=select_autoescape(["html", "xml"]),
@@ -987,11 +976,6 @@ class HttpHandler(BaseHTTPRequestHandler):
         return b""
 
     def page_404(self, url_split):
-        path = url_split[1] if len(url_split) > 1 else ""
-        if path in MINIMAL_404_PATHS or path.startswith(".well-known/"):
-            self.send_response(404)
-            self.end_headers()
-            return b""
         swap_client = self.server.swap_client
         summary = get_page_summary(swap_client)
         template = env.get_template("404.html")
