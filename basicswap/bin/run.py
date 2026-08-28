@@ -336,8 +336,23 @@ def checkSimplexClientBinary(client_path: str, network: dict, logger) -> bool:
     metadata file are allowed through with a warning.
 
     Sets network["verify_status"] to one of:
-    ok, unverified, missing, hash_mismatch.
+    ok, unverified, missing, hash_mismatch, unsupported_version.
     """
+    configured_version = network.get("client_version")
+    if configured_version is not None:
+        try:
+            major_version = int(str(configured_version).lstrip("v").split(".")[0])
+        except ValueError:
+            major_version = 0
+        if major_version < 7:
+            network["verify_status"] = "unsupported_version"
+            logger.error(
+                f"Unsupported simplex-chat version {configured_version}, the minimum "
+                "supported version is 7.0.0. "
+                "Re-run basicswap-prepare --addnetwork=simplex to update."
+            )
+            return False
+
     if not os.path.isfile(client_path) or not os.access(client_path, os.X_OK):
         network["verify_status"] = "missing"
         logger.error(f"Simplex client missing or not executable: {client_path}")

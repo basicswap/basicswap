@@ -43,11 +43,12 @@ def decode_base64(encoded_data: str) -> bytes:
 
 
 class WebSocketThread(threading.Thread):
-    def __init__(self, url: str, tag: str = None, logger=None):
+    def __init__(self, url: str, tag: str = None, logger=None, shutdown_event=None):
         super().__init__()
         self.url: str = url
         self.tag = tag
         self.logger = logger
+        self.shutdown_event = shutdown_event
         self.ws = None
         self.mutex = threading.Lock()
         self.corrId: int = 0
@@ -62,6 +63,14 @@ class WebSocketThread(threading.Thread):
 
         self.num_messages_received: int = 0
         self.last_error_str: str = ""
+        self._stopping: bool = False
+
+    def _should_stop(self) -> bool:
+        if self._stopping or self.delay_event.is_set():
+            return True
+        if self.shutdown_event is not None and self.shutdown_event.is_set():
+            return True
+        return False
 
     def disable_debug_mode(self):
         self.ignore_events = False
@@ -97,9 +106,9 @@ class WebSocketThread(threading.Thread):
             return None
 
     def on_error(self, ws, error):
+        if self._should_stop():
+            return
         error_str = str(error)
-        # Repeated errors, eg reconnect attempts while the client is down,
-        # are logged at debug to avoid spamming the log.
         repeated: bool = error_str == self.last_error_str
         self.last_error_str = error_str
         if self.logger:
@@ -111,6 +120,8 @@ class WebSocketThread(threading.Thread):
     def on_close(self, ws, close_status_code, close_msg):
         was_connected: bool = self.connected
         self.connected = False
+        if self._should_stop():
+            return
         if self.logger:
             log_func = self.logger.info if was_connected else self.logger.debug
             log_func(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
@@ -158,14 +169,22 @@ class WebSocketThread(threading.Thread):
             on_open=self.on_open,
             on_close=self.on_close,
         )
-        while not self.delay_event.is_set():
+        while not self._should_stop():
             self.ws.run_forever()
+            if self._should_stop():
+                break
             self.delay_event.wait(0.5)
 
     def stop(self):
+        if self._stopping:
+            return
+        self._stopping = True
         self.delay_event.set()
         if self.ws:
-            self.ws.close()
+            try:
+                self.ws.close()
+            except Exception:
+                pass
 
 
 def waitForResponse(ws_thread, sent_id, delay_event):
@@ -454,17 +473,11 @@ def getResponseData(data, tag=None):
 
 
 def getNewSimplexLink(data):
-    response_data = getResponseData(data)
-    if "connLinkContact" in response_data:
-        return response_data["connLinkContact"]["connFullLink"]
-    return response_data["connReqContact"]
+    return getResponseData(data)["connLinkContact"]["connFullLink"]
 
 
 def getJoinedSimplexLink(data):
-    response_data = getResponseData(data)
-    if "connLinkInvitation" in response_data:
-        return response_data["connLinkInvitation"]["connFullLink"]
-    return response_data["connReqInvitation"]
+    return getResponseData(data)["connLinkInvitation"]["connFullLink"]
 
 
 def initialiseSimplexNetwork(self, network_config) -> None:
@@ -473,7 +486,11 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     client_host: str = network_config.get("client_host", "127.0.0.1")
     ws_port: str = network_config.get("ws_port")
 
-    ws_thread = WebSocketThread(f"ws://{client_host}:{ws_port}", logger=self.log)
+    ws_thread = WebSocketThread(
+        f"ws://{client_host}:{ws_port}",
+        logger=self.log,
+        shutdown_event=self.delay_event,
+    )
     self.threads.append(ws_thread)
     ws_thread.start()
     waitForConnected(ws_thread, self.delay_event)

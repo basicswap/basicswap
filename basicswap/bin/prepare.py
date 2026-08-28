@@ -17,6 +17,7 @@ import shutil
 import signal
 import socket
 import socks
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -177,6 +178,10 @@ SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", None)
 SIMPLEX_SKIP_VERIFY = toBool(os.getenv("SIMPLEX_SKIP_VERIFY", False))
 # Replace any existing simplex-chat binary with a fresh, verified download
 SIMPLEX_FORCE_DOWNLOAD = toBool(os.getenv("SIMPLEX_FORCE_DOWNLOAD", False))
+# Try the Ubuntu 24.04 simplex-chat build on unsupported Linux distributions
+SIMPLEX_ALLOW_UNSUPPORTED_DISTRO = toBool(
+    os.getenv("SIMPLEX_ALLOW_UNSUPPORTED_DISTRO", False)
+)
 
 NOSTR_RELAYS = os.getenv(
     "NOSTR_RELAYS",
@@ -197,10 +202,7 @@ expected_key_ids = {
         "015B4C837B245509E4AC8995223FDA69DEBEA82D",
         "7121BDE3555D9BE06BDDC68162FE85647DEDDA2E",
     ),
-    "SimpleX_Chat": (
-        "FB44AF81A45BDE327319797C85107E357D4A17FC",  # v6 and earlier
-        "BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",  # v7+ (build@simplex.chat)
-    ),
+    "SimpleX_Chat": ("BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",),  # build@simplex.chat
 }
 
 GUIX_SSL_CERT_DIR = None
@@ -493,17 +495,59 @@ def parseSimplexMajorVersion(version: str) -> int:
         return 0
 
 
-def getSimplexClientReleaseFilename(version: str = None) -> str:
-    version = version or SIMPLEX_CHAT_VERSION
-    major = parseSimplexMajorVersion(version)
+def readOsRelease() -> dict:
+    info = {}
+    try:
+        with open("/etc/os-release") as fp:
+            for line in fp:
+                line = line.strip()
+                if "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                info[key] = value.strip('"')
+    except OSError:
+        pass
+    return info
 
+
+def getSimplexLinuxBuildTag() -> str:
+    os_info = readOsRelease()
+    distro_id: str = os_info.get("ID", "").lower()
+    id_like: str = os_info.get("ID_LIKE", "").lower()
+
+    if distro_id == "ubuntu":
+        try:
+            release_major = int(os_info.get("VERSION_ID", "").split(".")[0])
+        except ValueError:
+            release_major = 0
+        return "ubuntu-22_04" if 0 < release_major < 24 else "ubuntu-24_04"
+
+    if distro_id == "debian" or "debian" in id_like or "ubuntu" in id_like:
+        logger.warning(
+            f"Linux distribution {distro_id or 'unknown'} is untested with the "
+            "simplex-chat Ubuntu builds, continuing with the Ubuntu 24.04 build."
+        )
+        return "ubuntu-24_04"
+
+    if SIMPLEX_ALLOW_UNSUPPORTED_DISTRO:
+        logger.warning(
+            "SIMPLEX_ALLOW_UNSUPPORTED_DISTRO is set, trying the Ubuntu 24.04 "
+            f"simplex-chat build on {distro_id or 'unknown'}."
+        )
+        return "ubuntu-24_04"
+
+    raise ValueError(
+        f"No simplex-chat build available for Linux distribution {distro_id or 'unknown'}. "
+        "Install a working simplex-chat binary manually and set SIMPLEX_SKIP_VERIFY=1, "
+        "or set SIMPLEX_ALLOW_UNSUPPORTED_DISTRO=1 to try the Ubuntu 24.04 build."
+    )
+
+
+def getSimplexClientReleaseFilename() -> str:
     if USE_PLATFORM == "Linux":
         machine = platform.machine()
-        if major >= 7:
-            if "arm" in machine or "aarch64" in machine:
-                return "simplex-chat-ubuntu-24_04-aarch64"
-            return "simplex-chat-ubuntu-24_04-x86_64"
-        return "simplex-chat-ubuntu-24_04-x86-64"
+        arch = "aarch64" if ("arm" in machine or "aarch64" in machine) else "x86_64"
+        return f"simplex-chat-{getSimplexLinuxBuildTag()}-{arch}"
     if USE_PLATFORM == "Darwin":
         if platform.machine() == "arm64":
             return "simplex-chat-macos-aarch64"
@@ -520,18 +564,56 @@ SIMPLEX_BUILD_KEY_URLS = (
 
 
 def ensureSimplexPubkeys(gpg) -> None:
-    if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
-        importPubkey(gpg, "SimpleX_Chat.pgp", [])
-    if parseSimplexMajorVersion(SIMPLEX_CHAT_VERSION) >= 7:
-        build_key_id = expected_key_ids["SimpleX_Chat"][1]
+    build_key_id = expected_key_ids["SimpleX_Chat"][0]
+    if not havePubkey(gpg, build_key_id):
+        importPubkey(gpg, "SimpleX_Chat_build.pgp", list(SIMPLEX_BUILD_KEY_URLS))
         if not havePubkey(gpg, build_key_id):
-            importPubkey(gpg, "SimpleX_Chat_build.pgp", list(SIMPLEX_BUILD_KEY_URLS))
-            if not havePubkey(gpg, build_key_id):
-                raise ValueError(
-                    "SimpleX v7 release signing key not found. "
-                    "Add basicswap/pgp/keys/SimpleX_Chat_build.pgp or allow "
-                    "prepare to fetch it from a keyserver."
-                )
+            raise ValueError(
+                "SimpleX release signing key not found. "
+                "Add basicswap/pgp/keys/SimpleX_Chat_build.pgp or allow "
+                "prepare to fetch it from a keyserver."
+            )
+
+
+def fetchSimplexReleaseBodyHash(release_file: str) -> str | None:
+    api_url = (
+        "https://api.github.com/repos/simplex-chat/simplex-chat/releases/tags/"
+        f"v{SIMPLEX_CHAT_VERSION}"
+    )
+    try:
+        release_data = json.loads(downloadBytes(api_url).decode("utf-8"))
+    except Exception as e:
+        logger.warning(f"Unable to fetch SimpleX release notes: {e}")
+        return None
+    prefix = f"SHA2-256({release_file})="
+    for line in release_data.get("body", "").splitlines():
+        line = line.strip()
+        if line.startswith(prefix):
+            return line.split("=", 1)[1].strip().split()[0]
+    return None
+
+
+def ensureSimplexReleaseHash(
+    release_hash: str, release_file: str, assert_path: str
+) -> None:
+    try:
+        ensureFileHashInFile(release_hash, assert_path, logger)
+        return
+    except ValueError:
+        if USE_PLATFORM not in ("Darwin", "Windows"):
+            raise
+    expected_hash = fetchSimplexReleaseBodyHash(release_file)
+    if expected_hash is None:
+        raise ValueError(
+            f"Release hash {release_hash} not found in assert file and "
+            f"no hash for {release_file} in release notes."
+        )
+    if release_hash != expected_hash:
+        raise ValueError(
+            f"Release hash mismatch for {release_file}: "
+            f"{release_hash} != {expected_hash}"
+        )
+    logger.info(f"Found release hash for {release_file} in release notes.")
 
 
 def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
@@ -552,7 +634,8 @@ def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
 
     release_hash: str = getFileHash(file_path)
     logger.info(f"{os.path.basename(file_path)} hash: {release_hash}")
-    ensureFileHashInFile(release_hash, assert_path, logger)
+    release_file = getSimplexClientReleaseFilename()
+    ensureSimplexReleaseHash(release_hash, release_file, assert_path)
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
@@ -591,6 +674,26 @@ def writeSimplexVerifiedMetadata(simplex_chat_bin_dir: str, release_hash: str) -
     logger.info(f"Wrote verification metadata: {metadata_path}")
 
 
+def smokeTestSimplexClient(client_path: str) -> None:
+    """Run the binary once so a non-working download fails at prepare time."""
+    try:
+        result = subprocess.run(
+            [client_path, "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise ValueError(f"Simplex client failed to run ({client_path}): {e}")
+    output = result.stdout.decode("utf-8", errors="replace").strip()
+    if result.returncode != 0:
+        raise ValueError(
+            f"Simplex client smoke test failed with exit code {result.returncode}: {output}"
+        )
+    first_line = output.splitlines()[0] if output else ""
+    logger.info(f"Simplex client smoke test passed: {first_line}")
+
+
 def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
     """Download and/or verify the simplex-chat client binary.
 
@@ -601,6 +704,12 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
 
     Returns the path to the client binary.
     """
+    if parseSimplexMajorVersion(SIMPLEX_CHAT_VERSION) < 7:
+        raise ValueError(
+            f"Unsupported SIMPLEX_CHAT_VERSION {SIMPLEX_CHAT_VERSION}, "
+            "the minimum supported simplex-chat version is 7.0.0."
+        )
+
     simplex_chat_bin_dir = os.path.join(bin_dir, "simplex")
     simplex_chat_client_path = os.path.join(simplex_chat_bin_dir, "simplex-chat")
     simplex_chat_release_dir = os.path.join(simplex_chat_bin_dir, SIMPLEX_CHAT_VERSION)
@@ -626,6 +735,7 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
                 release_hash = verifySimplexRelease(
                     simplex_chat_client_path, simplex_chat_release_dir, extra_opts
                 )
+                smokeTestSimplexClient(simplex_chat_client_path)
                 writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
                 return simplex_chat_client_path
             except ValueError as e:
@@ -648,6 +758,7 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
 
     shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
     os.chmod(simplex_chat_client_path, 0o755)
+    smokeTestSimplexClient(simplex_chat_client_path)
     writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
     return simplex_chat_client_path
 

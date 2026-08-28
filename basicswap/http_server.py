@@ -79,9 +79,46 @@ from .ui.page_identity import page_identity
 from .ui.page_smsgaddresses import page_smsgaddresses
 from .ui.page_debug import page_debug
 
+
+def get_page_summary(swap_client):
+    try:
+        return swap_client.getSummary()
+    except Exception as e:
+        swap_client.log.debug(f"Page summary unavailable: {e}")
+        num_watched_outputs = 0
+        for c, v in swap_client.coin_clients.items():
+            if c in (Coins.PART_ANON, Coins.PART_BLIND):
+                continue
+            num_watched_outputs += len(v["watched_outputs"])
+        return {
+            "network": swap_client.chain,
+            "num_swapping": len(swap_client.swaps_in_progress),
+            "num_network_offers": 0,
+            "num_sent_offers": 0,
+            "num_sent_active_offers": 0,
+            "num_recv_bids": 0,
+            "num_sent_bids": 0,
+            "num_sent_active_bids": 0,
+            "num_recv_active_bids": 0,
+            "num_available_bids": 0,
+            "num_watched_outputs": num_watched_outputs,
+        }
+
+
 SESSION_COOKIE_NAME = "basicswap_session_id"
 LOGIN_NEXT_COOKIE_NAME = "basicswap_login_next"
 SESSION_DURATION_MINUTES = 15
+
+MINIMAL_404_PATHS = frozenset(
+    {
+        "favicon.ico",
+        "robots.txt",
+        "apple-touch-icon.png",
+        "apple-touch-icon-precomposed.png",
+        "browserconfig.xml",
+        "site.webmanifest",
+    }
+)
 
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
@@ -561,7 +598,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_info(self, info_str, post_string=None, extra_headers=None):
         template = env.get_template("info.html")
         swap_client = self.server.swap_client
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
         return self.render_template(
             template,
             {
@@ -573,9 +610,14 @@ class HttpHandler(BaseHTTPRequestHandler):
         )
 
     def page_error(self, error_str, post_string=None):
-        template = env.get_template("error.html")
+        try:
+            template = env.get_template("error.html")
+        except OSError:
+            self.send_response(500)
+            self.end_headers()
+            return error_str.encode("utf-8")
         swap_client = self.server.swap_client
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
         return self.render_template(
             template,
             {
@@ -688,7 +730,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_explorers(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
 
         result = None
         explorer = -1
@@ -738,7 +780,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_rpc(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
 
         result = None
         cmd = ""
@@ -848,7 +890,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
         active_swaps = swap_client.listSwapsInProgress()
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
 
         template = env.get_template("active.html")
         return self.render_template(
@@ -872,7 +914,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
         watched_outputs, last_scanned = swap_client.listWatchedOutputs()
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
 
         template = env.get_template("watched.html")
         return self.render_template(
@@ -926,7 +968,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def page_donation(self, url_split, post_string):
         swap_client = self.server.swap_client
         swap_client.checkSystemStatus()
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
 
         template = env.get_template("donation.html")
         return self.render_template(
@@ -945,8 +987,13 @@ class HttpHandler(BaseHTTPRequestHandler):
         return b""
 
     def page_404(self, url_split):
+        path = url_split[1] if len(url_split) > 1 else ""
+        if path in MINIMAL_404_PATHS or path.startswith(".well-known/"):
+            self.send_response(404)
+            self.end_headers()
+            return b""
         swap_client = self.server.swap_client
-        summary = swap_client.getSummary()
+        summary = get_page_summary(swap_client)
         template = env.get_template("404.html")
         return self.render_template(
             template,

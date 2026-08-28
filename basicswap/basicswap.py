@@ -16045,6 +16045,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             num_watched_outputs += len(v["watched_outputs"])
 
         now: int = self.getTime()
+        cached = getattr(self, "_summary_cache", None)
+        if cached is not None and now - cached[0] < 2:
+            return cached[1]
+
         q_bids_str: str = """SELECT
                COUNT(CASE WHEN b.was_sent THEN 1 ELSE NULL END) AS count_sent,
                COUNT(CASE WHEN b.was_sent AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now AND o.expire_at > :now)) THEN 1 ELSE NULL END) AS count_sent_active,
@@ -16062,6 +16066,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                COUNT(CASE WHEN was_sent AND expire_at > :now THEN 1 ELSE NULL END) AS count_sent_active
                FROM offers WHERE active_ind = 1"""
 
+        cursor = None
         try:
             cursor = self.openDB()
             q = cursor.execute(q_bids_str, {"now": now}).fetchone()
@@ -16076,7 +16081,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             num_sent_offers = q[1]
             num_sent_active_offers = q[2]
         finally:
-            self.closeDB(cursor, commit=False)
+            if cursor is not None:
+                self.closeDB(cursor, commit=False)
 
         rv = {
             "network": self.chain,
@@ -16091,6 +16097,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "num_available_bids": bids_available,
             "num_watched_outputs": num_watched_outputs,
         }
+        self._summary_cache = (now, rv)
         return rv
 
     def getBlockchainInfo(self, coin):

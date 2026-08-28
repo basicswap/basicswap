@@ -77,6 +77,7 @@ class TestSimplexVerify(unittest.TestCase):
         with (
             mock.patch.object(prepare, "SKIP_GPG_VALIDATION", True),
             mock.patch.object(prepare, "downloadRelease", self.fakeDownloadRelease),
+            mock.patch.object(prepare, "smokeTestSimplexClient", lambda path: None),
         ):
             return prepare.prepareSimplexClient(self.bin_dir, extra_opts={})
 
@@ -156,10 +157,17 @@ class TestSimplexVerify(unittest.TestCase):
             mock.patch.object(prepare, "SKIP_GPG_VALIDATION", True),
             mock.patch.object(prepare, "SIMPLEX_FORCE_DOWNLOAD", True),
             mock.patch.object(prepare, "downloadRelease", self.fakeDownloadRelease),
+            mock.patch.object(prepare, "smokeTestSimplexClient", lambda path: None),
         ):
             prepare.prepareSimplexClient(self.bin_dir, extra_opts={})
 
         assert len(self.download_calls) == 1
+
+    def test_version_floor(self):
+        with mock.patch.object(prepare, "SIMPLEX_CHAT_VERSION", "6.3.5"):
+            with self.assertRaises(ValueError) as cm:
+                prepare.prepareSimplexClient(self.bin_dir, extra_opts={})
+        assert "minimum supported" in str(cm.exception)
 
     def test_gpg_invalid_signature_rejected(self):
         if shutil.which("gpg") is None:
@@ -183,21 +191,79 @@ class TestSimplexVerify(unittest.TestCase):
                         self.client_path, self.release_dir, extra_opts
                     )
 
-    def test_linux_release_filename_v7(self):
-        with mock.patch.object(prepare, "USE_PLATFORM", "Linux"):
-            with mock.patch.object(prepare.platform, "machine", return_value="x86_64"):
-                assert (
-                    prepare.getSimplexClientReleaseFilename("7.0.0")
-                    == "simplex-chat-ubuntu-24_04-x86_64"
-                )
+    def linuxFilename(self, os_release: dict, machine: str = "x86_64") -> str:
+        with (
+            mock.patch.object(prepare, "USE_PLATFORM", "Linux"),
+            mock.patch.object(prepare.platform, "machine", return_value=machine),
+            mock.patch.object(prepare, "readOsRelease", lambda: os_release),
+        ):
+            return prepare.getSimplexClientReleaseFilename()
 
-    def test_linux_release_filename_v6(self):
-        with mock.patch.object(prepare, "USE_PLATFORM", "Linux"):
-            with mock.patch.object(prepare.platform, "machine", return_value="x86_64"):
-                assert (
-                    prepare.getSimplexClientReleaseFilename("6.3.5")
-                    == "simplex-chat-ubuntu-24_04-x86-64"
-                )
+    def test_linux_ubuntu_24_04(self):
+        assert (
+            self.linuxFilename({"ID": "ubuntu", "VERSION_ID": "24.04"})
+            == "simplex-chat-ubuntu-24_04-x86_64"
+        )
+
+    def test_linux_ubuntu_22_04(self):
+        assert (
+            self.linuxFilename({"ID": "ubuntu", "VERSION_ID": "22.04"})
+            == "simplex-chat-ubuntu-22_04-x86_64"
+        )
+
+    def test_linux_ubuntu_aarch64(self):
+        assert (
+            self.linuxFilename({"ID": "ubuntu", "VERSION_ID": "24.04"}, "aarch64")
+            == "simplex-chat-ubuntu-24_04-aarch64"
+        )
+
+    def test_linux_debian_family_warns_and_proceeds(self):
+        assert (
+            self.linuxFilename({"ID": "linuxmint", "ID_LIKE": "ubuntu debian"})
+            == "simplex-chat-ubuntu-24_04-x86_64"
+        )
+
+    def test_linux_unsupported_distro_fails(self):
+        with self.assertRaises(ValueError) as cm:
+            self.linuxFilename({"ID": "arch"})
+        assert "SIMPLEX_ALLOW_UNSUPPORTED_DISTRO" in str(cm.exception)
+
+    def test_linux_unsupported_distro_override(self):
+        with mock.patch.object(prepare, "SIMPLEX_ALLOW_UNSUPPORTED_DISTRO", True):
+            assert (
+                self.linuxFilename({"ID": "arch"}) == "simplex-chat-ubuntu-24_04-x86_64"
+            )
+
+
+class TestSmokeTest(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp(prefix="bsx_simplex_smoke_")
+        self.client_path = os.path.join(self.test_dir, "simplex-chat")
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def writeScript(self, body: str) -> None:
+        with open(self.client_path, "w") as fp:
+            fp.write("#!/bin/sh\n" + body)
+        os.chmod(self.client_path, 0o755)
+
+    def test_working_binary_passes(self):
+        self.writeScript('echo "SimpleX Chat v7.0.1"\nexit 0\n')
+        prepare.smokeTestSimplexClient(self.client_path)
+
+    def test_failing_binary_raises(self):
+        self.writeScript('echo "error while loading shared libraries" >&2\nexit 127\n')
+        with self.assertRaises(ValueError) as cm:
+            prepare.smokeTestSimplexClient(self.client_path)
+        assert "exit code 127" in str(cm.exception)
+
+    def test_non_executable_file_raises(self):
+        with open(self.client_path, "wb") as fp:
+            fp.write(b"not a binary")
+        os.chmod(self.client_path, 0o755)
+        with self.assertRaises(ValueError):
+            prepare.smokeTestSimplexClient(self.client_path)
 
 
 class TestStartupCheck(unittest.TestCase):
@@ -257,6 +323,13 @@ class TestStartupCheck(unittest.TestCase):
         network = {"client_version": TEST_VERSION}
         assert checkSimplexClientBinary(self.client_path, network, logger) is True
         assert network["verify_status"] == "ok"
+
+    def test_unsupported_configured_version_refused(self):
+        self.writeClient(GOOD_BINARY)
+        self.writeMetadata(sha256hex(GOOD_BINARY), version="6.3.5")
+        network = {"client_version": "6.3.5"}
+        assert checkSimplexClientBinary(self.client_path, network, logger) is False
+        assert network["verify_status"] == "unsupported_version"
 
 
 if __name__ == "__main__":
