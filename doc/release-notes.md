@@ -1,3 +1,44 @@
+0.18.5
+==============
+
+**Security / hardening**
+- The mercy keyshare is sent in a transaction of its own instead of as an extra output on
+  the swipe tx. The mercy tx is only sent once the swipe tx has confirmed.
+- The node gives up watching for a mercy tx after a bounded number of blocks and records
+  why, rather than leaving the bid waiting for a tx that will never arrive.
+- Sending a mercy is enabled by default again, reversing the temporary opt-in of 0.18.4.
+  One setting now controls the default for every coin.
+
+**Fixes**
+- Price lookups no longer spam a rate-limited source.  The backoff is shorter and every
+  caller now respects it.
+
+**Database**
+- New setting `expire_unused_offers`, on by default, removes expired offers that never
+  received a bid.  Offers that carry bid history are left to `expire_db_records`, which is
+  unchanged and still off by default.
+- The expiry prune runs as set-based deletes in batches, with a cap on the work done per
+  pass so a large backlog drains over several main loop cycles rather than holding the
+  database lock for the whole run.
+- Old coinhistory and coinvolume rows are trimmed.
+- Indices added on `bids.offer_id`, `xmr_offers.offer_id` and
+  `message_network_links(linked_type, linked_id)`.
+
+**UI**
+- The bid debug header is only shown in debug UI mode.
+
+**Dependencies**
+- Firo 0.14.17.2 -> 0.14.18.0
+
+**Upgrade note**
+- The adaptor-sig protocol version is raised to 6, and the minimum accepted version with
+  it.  This release will not accept adaptor-sig offers or bids from 0.18.4 and earlier.
+  Secret-hash swaps are unchanged.
+- `expire_unused_offers` defaults to on, so expired offers with no bids are removed on the
+  first expiry pass after upgrading.  Set it to false before starting if you want to keep
+  them.
+
+
 0.18.4
 ==============
 
