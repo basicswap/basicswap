@@ -60,7 +60,25 @@ def initialiseNostrNetwork(self, network_config) -> None:
     )
     client.start()
     self.threads.append(client)  # Stopped and joined in finalise
-    client.waitForConnected(self.delay_event)
+    try:
+        client.waitForConnected(self.delay_event)
+    except ValueError:
+        # A relay outage must not stop the node from servicing swaps on
+        # other networks.  Relay threads keep retrying in the background,
+        # only fail startup if nostr is the sole enabled network.
+        enabled_networks = [
+            n for n in self.settings.get("networks", []) if n.get("enabled", True)
+        ]
+        if len(enabled_networks) <= 1:
+            self.log.error(
+                "No Nostr relay connected and no other message network is enabled."
+            )
+            client.stop()
+            raise
+        self.log.warning(
+            "No Nostr relay connected yet, continuing startup. "
+            "Relay connections are retried in the background."
+        )
 
     add_network = {
         "type": "nostr",

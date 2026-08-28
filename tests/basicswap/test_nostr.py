@@ -416,6 +416,49 @@ class TestNetworkSettings(unittest.TestCase):
             message_id = self.sc.sendMessage("addr_a", "addr_b", "00", 3600, None)
         assert message_id is None
 
+    def test_startup_continues_without_relay(self):
+        # A relay outage at startup must not stop the node when another
+        # message network is enabled (CR-N02).
+        from unittest import mock
+        from basicswap.network.nostr import initialiseNostrNetwork
+
+        self.sc.active_networks = []
+        nostr_config = next(
+            n for n in self.sc.settings["networks"] if n["type"] == "nostr"
+        )
+        with mock.patch("basicswap.network.nostr.NostrClient") as mock_client_cls:
+            mock_client = mock_client_cls.return_value
+            mock_client.waitForConnected.side_effect = ValueError(
+                "Nostr waitForConnected timed-out."
+            )
+            initialiseNostrNetwork(self.sc, nostr_config)
+
+        assert any(n["type"] == "nostr" for n in self.sc.active_networks)
+        assert mock_client in self.sc.threads
+        mock_client.stop.assert_not_called()
+
+    def test_startup_fails_if_nostr_is_only_network(self):
+        from unittest import mock
+        from basicswap.network.nostr import initialiseNostrNetwork
+
+        self.sc.active_networks = []
+        for network in self.sc.settings["networks"]:
+            if network["type"] != "nostr":
+                network["enabled"] = False
+        nostr_config = next(
+            n for n in self.sc.settings["networks"] if n["type"] == "nostr"
+        )
+        with mock.patch("basicswap.network.nostr.NostrClient") as mock_client_cls:
+            mock_client = mock_client_cls.return_value
+            mock_client.waitForConnected.side_effect = ValueError(
+                "Nostr waitForConnected timed-out."
+            )
+            with self.assertRaises(ValueError):
+                initialiseNostrNetwork(self.sc, nostr_config)
+
+        assert not any(n["type"] == "nostr" for n in self.sc.active_networks)
+        mock_client.stop.assert_called_once()
+
     def test_networks_info(self):
         info = self.sc.getNetworksInfo()
         assert len(info) == 2
