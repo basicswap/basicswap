@@ -30,6 +30,8 @@ from coincurve.keys import PrivateKey, PublicKeyXOnly
 
 import websocket
 
+from basicswap.util import TemporaryError
+
 BSX_NOSTR_KIND: int = 4859  # Regular (stored) custom kind
 DEFAULT_BROADCAST_TAG: str = "bsx"
 MAX_SEEN_EVENT_IDS: int = 10000
@@ -108,7 +110,7 @@ def mineEventPow(
     nonce: int = 0
     while True:
         if abort_event is not None and nonce % 4096 == 0 and abort_event.is_set():
-            raise ValueError("Nostr PoW mining aborted.")
+            raise TemporaryError("Nostr PoW mining aborted.")
         tags = base_tags + [["nonce", str(nonce), str(target_bits)]]
         event_id: bytes = eventID(
             pubkey_hex, event["created_at"], event["kind"], tags, event["content"]
@@ -404,7 +406,7 @@ class NostrClient:
                 relay.num_events_sent += 1
                 num_sent += 1
         if num_sent < 1:
-            raise ValueError("No connected Nostr relays.")
+            raise TemporaryError("No connected Nostr relays.")
 
         num_accepted: int = 0
         deadline: float = time.time() + wait_seconds
@@ -419,7 +421,7 @@ class NostrClient:
                 num_accepted += 1
                 break
         if num_accepted < 1:
-            raise ValueError("No Nostr relay accepted the event.")
+            raise TemporaryError("No Nostr relay accepted the event.")
         self.num_messages_sent += 1
         return num_accepted
 

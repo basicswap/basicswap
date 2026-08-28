@@ -24,6 +24,7 @@ import unittest
 
 from coincurve.keys import PrivateKey, PublicKeyXOnly
 
+from basicswap.util import TemporaryError
 from basicswap.network.nostr_client import (
     BSX_NOSTR_KIND,
     NostrClient,
@@ -136,7 +137,8 @@ class TestNostrPrimitives(unittest.TestCase):
         }
         abort_event = threading.Event()
         abort_event.set()
-        with self.assertRaises(ValueError):
+        # Must be transient so an abort during shutdown doesn't error the bid
+        with self.assertRaises(TemporaryError):
             mineEventPow(privkey, event, 32, abort_event=abort_event)
 
     def test_pow_target_clamped(self):
@@ -198,6 +200,29 @@ class TestNostrClientRelay(unittest.TestCase):
                 return event
             time.sleep(0.05)
         raise TimeoutError("No event received")
+
+    def test_send_failure_is_transient(self):
+        # Send failures must raise TemporaryError so checkQueuedActions
+        # retries the queued swap action instead of latching BID_ERROR.
+        client = NostrClient([self.relay.url()], PrivateKey().secret, logger)
+        event = client.buildEvent("dHJhbnNpZW50", expiration=int(time.time()) + 600)
+
+        # Not started: no connected relays
+        with self.assertRaises(TemporaryError):
+            client.publishEvent(event, delay_event=self.delay_event)
+
+        # Connected, but no relay OK arrives before the deadline
+        client_b = self.makeClient()
+        try:
+            event_b = client_b.buildEvent(
+                "dHJhbnNpZW50Mg==", expiration=int(time.time()) + 600
+            )
+            with self.assertRaises(TemporaryError):
+                client_b.publishEvent(
+                    event_b, delay_event=self.delay_event, wait_seconds=0.0
+                )
+        finally:
+            client_b.stop()
 
     def test_broadcast(self):
         client_a = self.makeClient()
