@@ -169,6 +169,79 @@ class TestNostrPrimitives(unittest.TestCase):
         assert not eventMatchesFilter(event, {"since": 1700000001})
 
 
+class TestNostrInboundGates(unittest.TestCase):
+    """Inbound event gates: kind, PoW, and SMSG replay dedup (CR-N03)."""
+
+    def makeClient(self, **kwargs) -> NostrClient:
+        return NostrClient(["ws://127.0.0.1:1"], PrivateKey().secret, logger, **kwargs)
+
+    def makeEvent(self, kind=BSX_NOSTR_KIND, content="dGVzdA==", pow_bits=0) -> dict:
+        privkey = PrivateKey().secret
+        event = {
+            "created_at": int(time.time()),
+            "kind": kind,
+            "tags": [["t", "bsx"]],
+            "content": content,
+        }
+        if pow_bits > 0:
+            event = mineEventPow(privkey, event, pow_bits)
+        return signEvent(privkey, event)
+
+    def test_wrong_kind_dropped(self):
+        # Relays are not obliged to honour REQ filters
+        client = self.makeClient()
+        client.receiveEvent("test", self.makeEvent(kind=1))
+        assert client.queue_get() is None
+
+        client.receiveEvent("test", self.makeEvent())
+        assert client.queue_get() is not None
+
+    def test_inbound_pow_enforced(self):
+        client = self.makeClient(pow_target=8)
+
+        # No committed PoW
+        client.receiveEvent("test", self.makeEvent())
+        assert client.queue_get() is None
+
+        # Fake claimed id with leading zeros passes the gate but fails verify
+        event = self.makeEvent()
+        event["tags"].append(["nonce", "0", "8"])
+        event["id"] = "00" * 32
+        client.receiveEvent("test", event)
+        assert client.queue_get() is None
+
+        # Genuinely mined event is accepted
+        client.receiveEvent("test", self.makeEvent(pow_bits=8))
+        assert client.queue_get() is not None
+
+    def test_smsg_replay_dropped(self):
+        # The same SMSG blob wrapped in a fresh event must not trigger
+        # another trial decryption.
+        import base64
+        from types import SimpleNamespace
+        from unittest import mock
+        from basicswap.network.nostr import parseNostrEvent
+
+        client = self.makeClient()
+        network = {"client": client}
+        fake_self = SimpleNamespace(
+            num_nostr_messages_received=0,
+            num_direct_nostr_messages_received=0,
+        )
+
+        content = base64.b64encode(bytes(200)).decode("utf-8")
+        event_a = self.makeEvent(content=content)
+        event_b = self.makeEvent(content=content)
+        assert event_a["id"] != event_b["id"]
+
+        with mock.patch(
+            "basicswap.network.nostr.decryptNostrMsg", return_value={"payload": b"x"}
+        ) as mock_decrypt:
+            assert parseNostrEvent(fake_self, network, event_a) is not None
+            assert parseNostrEvent(fake_self, network, event_b) is None
+        assert mock_decrypt.call_count == 1
+
+
 class TestNostrClientRelay(unittest.TestCase):
     """Integration tests against the in-process mini relay."""
 

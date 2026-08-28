@@ -262,6 +262,7 @@ class NostrClient:
         self.recv_queue = Queue()
         self.ok_queue = Queue()
         self._seen_event_ids = OrderedDict()
+        self._seen_smsg_ids = OrderedDict()
 
         self.num_messages_received: int = 0
         self.num_messages_sent: int = 0
@@ -310,6 +311,20 @@ class NostrClient:
             },
         ]
 
+    def haveSeenSmsgId(self, smsg_id: bytes) -> bool:
+        """Check and mark an SMSG payload id.  Deduplicates replays of the
+        same SMSG blob wrapped in fresh nostr events before the expensive
+        trial decryption.  Safe to call before decryption as the id commits
+        to the whole message, a corrupted copy hashes to a different id.
+        """
+        with self.mutex:
+            if smsg_id in self._seen_smsg_ids:
+                return True
+            self._seen_smsg_ids[smsg_id] = True
+            while len(self._seen_smsg_ids) > MAX_SEEN_EVENT_IDS:
+                self._seen_smsg_ids.popitem(last=False)
+            return False
+
     def receiveEvent(self, relay_url: str, event: dict) -> None:
         try:
             event_id: str = event["id"]
@@ -319,9 +334,18 @@ class NostrClient:
                 return
             if len(event["content"]) > MAX_EVENT_CONTENT_LEN:
                 return
+            # Relays are not obliged to honour REQ filters
+            if event.get("kind") != BSX_NOSTR_KIND:
+                return
             with self.mutex:
                 if event_id in self._seen_event_ids:
                     return
+            # Gate on the committed PoW before the expensive signature
+            # verification.  The claimed id is bound by verifyEvent below,
+            # a faked id passes this gate but is dropped unverified.
+            if self.pow_target > 0 and getEventPow(event) < self.pow_target:
+                self.log.debug(f"Nostr event below PoW target: {event_id}")
+                return
             # Only verified events enter the seen-cache, or a relay could
             # suppress an event on all relays by sending a corrupted copy
             # of it first.

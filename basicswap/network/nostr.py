@@ -164,7 +164,13 @@ def parseNostrEvent(self, network, event):
 
     try:
         msg_data: bytes = decode_base64(event["content"])
+        smsg_id: bytes = smsgGetID(msg_data)
     except Exception:
+        return None
+
+    # Same SMSG blob wrapped in a fresh event must not trigger another
+    # trial decryption.
+    if client.haveSeenSmsgId(smsg_id):
         return None
 
     decrypted_msg = decryptNostrMsg(self, msg_data)
