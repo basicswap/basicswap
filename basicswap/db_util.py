@@ -27,7 +27,7 @@ def remove_expired_data(
             offers_filter = f"0 = (SELECT COUNT(*) FROM bids b2 WHERE b2.offer_id = o.offer_id AND {active_bids_insert})"
 
         batch_size: int = 500
-        max_batches: int = 20
+        max_batches: int = 100
         query_data = {
             "offer_type_ind": int(Concepts.OFFER),
             "bid_type_ind": int(Concepts.BID),

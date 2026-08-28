@@ -266,6 +266,8 @@ class Bid(Table, StateRows):
 
     reject_code = Column("integer")
 
+    index = Index("bid_offer_id_index", "offer_id")
+
     initiate_tx = None
     participate_tx = None
     xmr_a_lock_tx = None

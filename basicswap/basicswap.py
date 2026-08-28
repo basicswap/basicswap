@@ -15061,7 +15061,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     isinstance(new_value, bool),
                     "New expire_unused_offers value not boolean",
                 )
-                if settings_copy.get("expire_unused_offers", False) != new_value:
+                if settings_copy.get("expire_unused_offers", True) != new_value:
                     self._expire_unused_offers = new_value
                     settings_copy["expire_unused_offers"] = new_value
                     settings_changed = True
