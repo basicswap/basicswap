@@ -178,6 +178,7 @@ from .explorers import (
     ExplorerChainz,
 )
 from .network.nostr import sendNostrMsg
+from .network.nostr_client import MAX_POW_TARGET_BITS
 from .network.simplex import (
     encryptMsg,
     getJoinedSimplexLink,
@@ -15566,7 +15567,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     ensure(
                         isinstance(new_value, int), "New pow_target value not integer"
                     )
-                    ensure(0 <= new_value <= 32, "pow_target must be between 0 and 32")
+                    ensure(
+                        0 <= new_value <= MAX_POW_TARGET_BITS,
+                        f"pow_target must be between 0 and {MAX_POW_TARGET_BITS}",
+                    )
                     if network.get("pow_target", 0) != new_value:
                         network["pow_target"] = new_value
                         settings_changed = True

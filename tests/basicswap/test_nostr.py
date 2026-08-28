@@ -27,6 +27,7 @@ from coincurve.keys import PrivateKey, PublicKeyXOnly
 from basicswap.util import TemporaryError
 from basicswap.network.nostr_client import (
     BSX_NOSTR_KIND,
+    MAX_POW_TARGET_BITS,
     NostrClient,
     countLeadingZeroBits,
     eventID,
@@ -142,10 +143,11 @@ class TestNostrPrimitives(unittest.TestCase):
             mineEventPow(privkey, event, 32, abort_event=abort_event)
 
     def test_pow_target_clamped(self):
+        assert MAX_POW_TARGET_BITS <= 12
         client = NostrClient(
             ["ws://127.0.0.1:1"], PrivateKey().secret, logger, pow_target=64
         )
-        assert client.pow_target == 32
+        assert client.pow_target == MAX_POW_TARGET_BITS
         client = NostrClient(
             ["ws://127.0.0.1:1"], PrivateKey().secret, logger, pow_target=-1
         )
@@ -489,9 +491,83 @@ class TestNetworkSettings(unittest.TestCase):
             message_id = self.sc.sendMessage("addr_a", "addr_b", "00", 3600, None)
         assert message_id is None
 
+    def test_send_failure_retries_queued_action(self):
+        from unittest import mock
+        from basicswap.basicswap_util import ActionTypes, BidStates
+        from basicswap.db import Action, Bid
+
+        bid_id = bytes.fromhex("aa" * 28)
+        now = self.sc.getTime()
+        try:
+            cursor = self.sc.openDB()
+            bid = Bid(
+                bid_id=bid_id,
+                offer_id=bytes(28),
+                active_ind=1,
+                created_at=now,
+                expire_at=now + 3600,
+                was_sent=True,
+            )
+            bid.setState(BidStates.SWAP_DELAYING)
+            self.sc.add(bid, cursor)
+            self.sc.add(
+                Action(
+                    active_ind=1,
+                    created_at=now,
+                    trigger_at=now,
+                    action_type=int(ActionTypes.SEND_XMR_SWAP_LOCK_TX_A),
+                    linked_id=bid_id,
+                ),
+                cursor,
+            )
+        finally:
+            self.sc.closeDB(cursor)
+
+        # The real failure mode: publishing with no connected relays
+        client = NostrClient(["ws://127.0.0.1:1"], PrivateKey().secret, logger)
+
+        def fail_send(bid_id_arg, cursor_arg):
+            event = client.buildEvent("dGVzdA==", expiration=int(time.time()) + 600)
+            client.publishEvent(event, delay_event=threading.Event())
+
+        def read_state():
+            try:
+                cursor = self.sc.openDB()
+                action_row = cursor.execute(
+                    "SELECT active_ind FROM actions WHERE linked_id = :bid_id",
+                    {"bid_id": bid_id},
+                ).fetchone()
+                bid_state = cursor.execute(
+                    "SELECT state FROM bids WHERE bid_id = :bid_id",
+                    {"bid_id": bid_id},
+                ).fetchone()[0]
+            finally:
+                self.sc.closeDB(cursor)
+            return action_row, bid_state
+
+        with mock.patch.object(self.sc, "isSystemUnlocked", return_value=True):
+            with mock.patch.object(
+                self.sc, "sendXmrBidCoinALockTx", side_effect=fail_send
+            ):
+                self.sc.checkQueuedActions()
+
+            action_row, bid_state = read_state()
+            assert action_row is not None and action_row[0] == 1  # Kept for retry
+            assert bid_state != BidStates.BID_ERROR
+
+            # A non-transient failure must still error the bid
+            with mock.patch.object(
+                self.sc,
+                "sendXmrBidCoinALockTx",
+                side_effect=ValueError("permanent failure"),
+            ):
+                self.sc.checkQueuedActions()
+
+            action_row, bid_state = read_state()
+            assert action_row is None or action_row[0] != 1
+            assert bid_state == BidStates.BID_ERROR
+
     def test_startup_continues_without_relay(self):
-        # A relay outage at startup must not stop the node when another
-        # message network is enabled (CR-N02).
         from unittest import mock
         from basicswap.network.nostr import initialiseNostrNetwork
 
@@ -572,6 +648,12 @@ class TestNetworkSettings(unittest.TestCase):
             ValueError, self.sc.editNetworkSettings, "nostr", {"pow_target": 100}
         )
         self.assertRaises(
+            ValueError,
+            self.sc.editNetworkSettings,
+            "nostr",
+            {"pow_target": MAX_POW_TARGET_BITS + 1},
+        )
+        self.assertRaises(
             ValueError, self.sc.editNetworkSettings, "badnet", {"enabled": True}
         )
 
@@ -585,12 +667,12 @@ class TestNetworkSettings(unittest.TestCase):
     def test_settings_persisted(self):
         import basicswap.config as cfg
 
-        self.sc.editNetworkSettings("nostr", {"pow_target": 16})
+        self.sc.editNetworkSettings("nostr", {"pow_target": 11})
         settings_path = os.path.join(self.basicswap_dir, cfg.CONFIG_FILENAME)
         with open(settings_path) as fp:
             saved = json.load(fp)
         nostr_net = next(n for n in saved["networks"] if n["type"] == "nostr")
-        assert nostr_net["pow_target"] == 16
+        assert nostr_net["pow_target"] == 11
 
     def test_bridge_networks_setting(self):
         import basicswap.config as cfg

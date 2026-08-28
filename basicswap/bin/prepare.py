@@ -187,7 +187,7 @@ NOSTR_RELAYS = os.getenv(
     "NOSTR_RELAYS",
     "wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net",
 )
-NOSTR_POW_TARGET = max(0, min(int(os.getenv("NOSTR_POW_TARGET", "0")), 32))
+NOSTR_POW_TARGET = max(0, min(int(os.getenv("NOSTR_POW_TARGET", "0")), 12))
 NOSTR_SOCKS_PROXY = os.getenv("NOSTR_SOCKS_PROXY", None)
 
 

@@ -4,7 +4,10 @@ BasicSwap can use the [Nostr](https://nostr.com) protocol as a message
 transport, alongside or instead of SMSG and SimpleX.
 
 All messages remain end-to-end encrypted with the SMSG payload format
-regardless of the transport.  Nostr relays only ever see encrypted blobs.
+regardless of the transport.  Relays cannot read message contents, but
+as with any nostr client they can see event metadata (sender pubkey,
+recipient tag, timing and size).  Events are signed with a persistent
+key, generate a new `private_key` to unlink from earlier activity.
 
 ## How it works
 
@@ -17,7 +20,9 @@ regardless of the transport.  Nostr relays only ever see encrypted blobs.
 - Events carry a NIP-40 `expiration` tag matching the SMSG TTL, so relays
   can prune them automatically.
 - Optionally, outgoing events can commit NIP-13 proof of work
-  (`pow_target` setting) for relays that require it.
+  (`pow_target` setting, 0-12 bits) for relays that require it.
+  Mining runs on the send path, so higher targets delay outgoing
+  messages.  Leave at `0` unless a relay demands it.
 
 ## Enabling
 
@@ -29,7 +34,8 @@ Environment variables read by prepare:
 
 - `NOSTR_RELAYS`: Comma separated relay urls.
   Default: `wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net`
-- `NOSTR_POW_TARGET`: NIP-13 difficulty bits for outgoing events, default `0`.
+- `NOSTR_POW_TARGET`: NIP-13 difficulty bits for outgoing events,
+  default `0`, max `12`.
 - `NOSTR_SOCKS_PROXY`: Optional `host:port` SOCKS5 proxy override.
 
 This adds a section to `basicswap.json`:

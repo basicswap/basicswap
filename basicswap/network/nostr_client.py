@@ -36,7 +36,7 @@ BSX_NOSTR_KIND: int = 4859  # Regular (stored) custom kind
 DEFAULT_BROADCAST_TAG: str = "bsx"
 MAX_SEEN_EVENT_IDS: int = 10000
 MAX_EVENT_CONTENT_LEN: int = 65536
-MAX_POW_TARGET_BITS: int = 32
+MAX_POW_TARGET_BITS: int = 12
 
 
 def eventSerialize(
@@ -314,7 +314,7 @@ class NostrClient:
     def haveSeenSmsgId(self, smsg_id: bytes) -> bool:
         """Check and mark an SMSG payload id.  Deduplicates replays of the
         same SMSG blob wrapped in fresh nostr events before the expensive
-        trial decryption.  Safe to call before decryption as the id commits
+        trial decryption. Safe to call before decryption as the id commits
         to the whole message, a corrupted copy hashes to a different id.
         """
         with self.mutex:

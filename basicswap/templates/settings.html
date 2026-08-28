@@ -546,7 +546,7 @@
         </div>
         <div>
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proof of Work Target (bits)</label>
-         <input type="number" min="0" max="32" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_pow_target" value="{{ n.pow_target }}">
+         <input type="number" min="0" max="12" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_pow_target" value="{{ n.pow_target }}">
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">NIP-13 difficulty for outgoing events, 0 to disable</p>
         </div>
         {% if n.pubkey %}
