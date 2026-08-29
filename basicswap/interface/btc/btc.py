@@ -4511,18 +4511,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     )
                     return total
                 except Exception as e:
-                    self._log.warning(
-                        f"Electrum balance check failed: {e}, skipping balance verification"
-                    )
-                    return 10**18
+                    self._log.warning(f"Electrum balance check failed: {e}")
+                    raise ValueError("Proof of funds balance check failed") from e
 
         try:
             return self.getUTXOBalance(address)
         except Exception as e:
-            self._log.warning(
-                f"scantxoutset failed: {e}, skipping balance verification (signature valid)"
-            )
-            return 10**18
+            self._log.warning(f"scantxoutset failed: {e}")
+            raise ValueError("Proof of funds balance check failed") from e
 
     def isWalletEncrypted(self) -> bool:
         if self._connection_type == "electrum":
