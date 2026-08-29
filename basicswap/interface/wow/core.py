@@ -6,6 +6,7 @@
 
 import os
 import platform
+import secrets
 
 from basicswap.interface.wow.chainparams import params
 from basicswap.interface.xmr.core import XMRPrepare
@@ -26,7 +27,7 @@ WOW_ZMQ_PORT = int(os.getenv("WOW_ZMQ_PORT", 34698))
 WOW_WALLET_RPC_PORT = int(os.getenv("WOW_WALLET_RPC_PORT", 34798))
 WOW_WALLET_RPC_HOST = os.getenv("WOW_WALLET_RPC_HOST", "127.0.0.1")
 WOW_WALLET_RPC_USER = os.getenv("WOW_WALLET_RPC_USER", "wow_wallet_user")
-WOW_WALLET_RPC_PWD = os.getenv("WOW_WALLET_RPC_PWD", "wow_wallet_pwd")
+WOW_WALLET_RPC_PWD = os.getenv("WOW_WALLET_RPC_PWD", "") or secrets.token_hex(16)
 WOW_RPC_USER = os.getenv("WOW_RPC_USER", "")
 WOW_RPC_PWD = os.getenv("WOW_RPC_PWD", "")
 DEFAULT_WOW_RESTORE_HEIGHT = int(os.getenv("DEFAULT_WOW_RESTORE_HEIGHT", 450000))
