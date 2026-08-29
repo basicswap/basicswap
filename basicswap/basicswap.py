@@ -932,6 +932,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "electrum_host",
             "electrum_port",
             "electrum_ssl",
+            "electrum_poll_interval",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -15794,6 +15795,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 rv["blind_balance"] = walletinfo["blind_balance"]
                 rv["blind_unconfirmed"] = walletinfo["unconfirmed_blind"]
+                # Coinstake outputs still maturing.  Held apart from immature,
+                # which only counts coinbase credit.
+                rv["staked"] = walletinfo.get("staked_balance", 0)
             elif coin in self.xmr_based_coins:
                 rv["main_address"] = self.getCachedMainWalletAddress(ci)
             elif coin == Coins.NAV:
