@@ -614,7 +614,10 @@ def page_wallet(self, url_split, post_string):
                 raw_txs = all_txs[skip : skip + count] if all_txs else []
                 transactions = format_transactions(ci, raw_txs, coin_id)
             else:
-                if coin_id in (Coins.BTC, Coins.LTC):
+                if (
+                    coin_id in (Coins.BTC, Coins.LTC)
+                    and swap_client._check_electrum_legacy_funds
+                ):
                     legacy_funds_info = swap_client.getElectrumLegacyFundsInfo(coin_id)
         except Exception as e:
             swap_client.log.warning(f"Failed to fetch transactions for {ticker}: {e}")

@@ -513,6 +513,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._expire_unused_offers_after = self.get_int_setting(
             "expire_unused_offers_after", 7 * 86400, 0, 315600000
         )  # Seconds
+        self._check_electrum_legacy_funds = self.settings.get(
+            "check_electrum_legacy_funds", False
+        )
         self._expire_db_records = self.settings.get("expire_db_records", False)
         self._expire_db_records_after = self.get_int_setting(
             "expire_db_records_after", 7 * 86400, 0, 315600000
@@ -3222,17 +3225,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci = self.ci(coin_type)
             hrp = ci.chainparams_network().get("hrp", "bc")
 
-            unspent_by_addr = ci.getUnspentsByAddr()
-            if not unspent_by_addr:
+            # Legacy addresses only enter the wallet through a full node wallet
+            # migration.  Filter before querying, a wallet with none needs no
+            # electrum traffic at all.
+            addresses = self._wallet_manager.getAllAddresses(coin_type)
+            legacy_addresses = [
+                addr for addr in addresses if not addr.startswith(hrp + "1")
+            ]
+            if not legacy_addresses:
                 return {"has_legacy_funds": False}
 
-            legacy_balance_sats = 0
-            legacy_addresses = []
+            backend = ci.getBackend()
+            if not backend:
+                return {"has_legacy_funds": False}
 
-            for addr, balance_sats in unspent_by_addr.items():
-                if not addr.startswith(hrp + "1"):
-                    legacy_balance_sats += balance_sats
-                    legacy_addresses.append(addr)
+            balances = backend.getBalance(legacy_addresses)
+            legacy_balance_sats = sum(v for v in balances.values() if v)
 
             if legacy_balance_sats > 0:
                 return {
