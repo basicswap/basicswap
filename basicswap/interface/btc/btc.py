@@ -5044,6 +5044,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def canSendMercyTx(self) -> bool:
         return True
 
+    def swipePaysKey(
+        self, swipe_tx_bytes: bytes, swipe_txid_hex: str, key: bytes
+    ) -> bool:
+        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
+        swipe_tx = self.loadTx(swipe_tx_bytes)
+        dest: bytes = self.getScriptForPubkeyHash(self.pkh(self.getPubkey(key)))
+        return bytes(swipe_tx.vout[0].scriptPubKey) == bytes(dest)
+
     def createMercyTx(
         self,
         refund_swipe_tx_bytes: bytes,

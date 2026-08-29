@@ -1776,6 +1776,14 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             if "expected unspent output" not in str(e):
                 raise
 
+    def swipePaysKey(
+        self, swipe_tx_bytes: bytes, swipe_txid_hex: str, key: bytes
+    ) -> bool:
+        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
+        swipe_tx = self.loadTx(swipe_tx_bytes)
+        dest: bytes = self.getPubkeyHashDest(self.pkh(self.getPubkey(key)))
+        return bytes(swipe_tx.vout[0].script_pubkey) == bytes(dest)
+
     def createMercyTx(
         self,
         refund_swipe_tx_bytes: bytes,

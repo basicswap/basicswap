@@ -1050,6 +1050,24 @@ class PARTInterfaceBlind(PARTInterface):
                     self._log.debug(f"getaddressinfo {addr} failed: {e}")
         raise ValueError("Swipe payout output not found")
 
+    def swipePaysKey(
+        self, swipe_tx_bytes: bytes, swipe_txid_hex: str, key: bytes
+    ) -> bool:
+        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
+        # A blind output hides its value, not its address.
+        addr_key: str = self.pkh_to_address(self.pkh(self.getPubkey(key)))
+        swipe_tx = self.rpc("decoderawtransaction", [swipe_tx_bytes.hex()])
+        for txo in swipe_tx["vout"]:
+            if txo["type"] != "blind":
+                continue
+            script_pubkey = txo.get("scriptPubKey", {})
+            addrs = list(script_pubkey.get("addresses", []))
+            if "address" in script_pubkey:
+                addrs.append(script_pubkey["address"])
+            if addr_key in addrs:
+                return True
+        return False
+
     def prepareMercySpend(self, key: bytes, rescan_from: int) -> None:
         # Spending a blind output needs its blinding factor, which the wallet
         # derives once it holds the key.  Imported here rather than when the
