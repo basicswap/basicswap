@@ -133,6 +133,8 @@ def modify_config(cls, test_path, i):
             "max_delay_retry": 10,
         }
     )
+    for coin_settings in settings["chainclients"].values():
+        coin_settings["electrum_poll_interval"] = 5
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)
 
@@ -704,7 +706,8 @@ class Test(TestFunctions):
             "ELECTRUMX_VENV", os.path.join(ELECTRUMX_SRC_DIR, "venv")
         )
         ELECTRUMX_DATADIR = os.getenv(
-            f"ELECTRUMX_DATADIR_{ticker}", f"/tmp/electrumx_{ticker_lc}"
+            f"ELECTRUMX_DATADIR_{ticker}",
+            os.path.join(TEST_PATH, f"electrumx_{ticker_lc}"),
         )
         SSL_CERTFILE = f"{ELECTRUMX_DATADIR}/certfile.crt"
         SSL_KEYFILE = f"{ELECTRUMX_DATADIR}/keyfile.key"
@@ -752,6 +755,7 @@ class Test(TestFunctions):
             "BANNER_FILE": f"{ELECTRUMX_DATADIR}/banner",
             "DAEMON_POLL_INTERVAL_BLOCKS": "1000",
             "DAEMON_POLL_INTERVAL_MEMPOOL": "1000",
+            "LOG_FORMAT": "%(asctime)s %(levelname)s:%(name)s:%(message)s",
         }
         stdout_dest = open(f"{ELECTRUMX_DATADIR}/electrumx.log", "w")
         stderr_dest = stdout_dest
