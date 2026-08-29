@@ -206,6 +206,34 @@ def json_requires_post(url_split) -> bool:
     return False
 
 
+AMM_API_ALLOWED_ENDPOINTS = frozenset(
+    (
+        "bids",
+        "coins",
+        "identities",
+        "offerfeeestimate",
+        "offers",
+        "rates",
+        "revokeoffer",
+        "sentbids",
+        "sentoffers",
+        "validateamount",
+        "wallets",
+    )
+)
+
+
+def amm_endpoint_allowed(url_split) -> bool:
+    if len(url_split) < 3 or url_split[1] != "json":
+        return False
+    endpoint = url_split[2]
+    if endpoint not in AMM_API_ALLOWED_ENDPOINTS:
+        return False
+    if endpoint == "wallets" and len(url_split) > 4:
+        return False
+    return True
+
+
 class HttpHandler(BaseHTTPRequestHandler):
     def _get_session_cookie(self):
         if "Cookie" in self.headers:
@@ -981,6 +1009,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         exempt_pages = ["login", "static", "error", "info"]
         auth_header = self.headers.get("Authorization")
         basic_auth_ok = False
+        amm_scoped_auth = False
 
         if auth_header and auth_header.startswith("Basic "):
             try:
@@ -992,6 +1021,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                 client_auth_hash = swap_client.settings.get("client_auth_hash")
                 if amm_token and hmac.compare_digest(password, amm_token):
                     basic_auth_ok = True
+                    amm_scoped_auth = True
                 elif client_auth_hash and verify_rfc2440_password(
                     client_auth_hash, password
                 ):
@@ -1017,6 +1047,12 @@ class HttpHandler(BaseHTTPRequestHandler):
                     json.dumps({"error": "Malformed Basic Auth header"}).encode("utf-8")
                 )
                 return b""
+
+        if basic_auth_ok and amm_scoped_auth and not amm_endpoint_allowed(url_split):
+            self.putHeaders(403, "application/json")
+            return json.dumps(
+                {"error": "AMM API token is not authorized for this endpoint"}
+            ).encode("utf-8")
 
         if not basic_auth_ok and page not in exempt_pages:
             if not self.is_authenticated():
