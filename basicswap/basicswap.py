@@ -10758,6 +10758,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 found = ci.checkWatchedScript(s.script)
                 if found:
+                    if found.get("height", 0) <= 0:
+                        self.log.debug(
+                            f"Waiting for watched script tx to confirm for bid {self.log.id(s.bid_id)}: {self.logIDT(bytes.fromhex(found['txid']))}"
+                        )
+                        continue
                     results["scripts"].append((s, found))
             except Exception as e:
                 self.log.debug(f"_fetchSpendsElectrum checkWatchedScript error: {e}")

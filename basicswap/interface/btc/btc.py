@@ -3816,10 +3816,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                         inp_txid = f"{inp.prevout.hash:064x}"
                         if inp_txid == txid_hex and inp.prevout.n == vout:
                             self._log.debug(f"  Found spend in {tx_entry['tx_hash']}")
+                            height = tx_entry.get("height", 0)
+                            if height > 0:
+                                verified = self._verifyTxMerkleElectrum(
+                                    backend, tx_entry["tx_hash"], height
+                                )
+                                if verified is False:
+                                    self._log.error(
+                                        f"Ignoring watched output spend {tx_entry['tx_hash']}, merkle proof failed"
+                                    )
+                                    return None
+                                if verified is None:
+                                    height = 0
                             return {
                                 "txid": tx_entry["tx_hash"],
                                 "vin": i,
-                                "height": tx_entry.get("height", 0),
+                                "height": height,
                             }
         except Exception as e:
             error_msg = str(e).lower()
@@ -3851,10 +3863,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 tx = self.loadTx(bytes.fromhex(tx_hex))
                 for i, out in enumerate(tx.vout):
                     if out.scriptPubKey == script:
+                        height = tx_entry.get("height", 0)
+                        if height > 0:
+                            verified = self._verifyTxMerkleElectrum(
+                                backend, tx_entry["tx_hash"], height
+                            )
+                            if verified is False:
+                                self._log.error(
+                                    f"Ignoring watched script tx {tx_entry['tx_hash']}, merkle proof failed"
+                                )
+                                return None
+                            if verified is None:
+                                height = 0
                         return {
                             "txid": tx_entry["tx_hash"],
                             "vout": i,
-                            "height": tx_entry.get("height", 0),
+                            "height": height,
                         }
         except Exception as e:
             self._log.debug(f"_findOutputSpendingScript electrum error: {e}")
