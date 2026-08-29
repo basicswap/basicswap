@@ -269,6 +269,11 @@ class CoinInterface:
     def unlockOutput(self, txid_hex: str, vout: int, cursor=None) -> None:
         pass
 
+    def getRedeemFeeRate(self):
+        """Rate per kB a redeem will pay, when the offer's committed rate does
+        not size it. None leaves the caller on the committed rate."""
+        return None
+
 
 class AdaptorSigInterface:
     def getP2WPKHDummyWitness(self, verifying: bool = True) -> List[bytes]:

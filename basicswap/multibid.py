@@ -252,23 +252,28 @@ def live_redeem_fee(ci) -> int:
 
 
 def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -> dict:
-    """Per-offer fee to redeem the received coin_from, mirroring the lock-spend
-    fee the offer page shows. Adaptor-sig swaps spend the lock at the offer's
-    committed rate; secret-hash swaps spend the HTLC at the live rate. When
-    coin_from is the follower (a reverse bid) the coin B lock-spend and the
-    matching committed rate apply, otherwise the coin A lock-spend."""
+    """Per-offer fee to redeem the received coin_from. Adaptor-sig swaps spend
+    the lock at the offer's committed rate; secret-hash swaps spend the HTLC at
+    the live rate. When coin_from is the follower (a reverse bid) it is the coin
+    B lock that is spent, otherwise the coin A lock. Either way the fee is paid
+    in coin_from, so it is a_fee_rate that sizes it: the offer stores
+    a_fee_rate/b_fee_rate as the from/to rates, not as the chain A/B rates.
+
+    A coin that sets its own redeem fee overrides that with the rate it will
+    actually pay."""
     reverse_bid = swap_client.is_reverse_ads_bid(coin_from, coin_to)
     redeem_vsize = (
         ci_from.xmr_swap_b_lock_spend_tx_vsize()
         if reverse_bid
         else ci_from.xmr_swap_a_lock_spend_tx_vsize()
     )
+    wallet_rate = ci_from.getRedeemFeeRate() if candidates else None
     live_fee = None
     fees = {}
     for c in candidates:
         _, xmr_offer = swap_client.getXmrOffer(c.offer_id)
         if xmr_offer:
-            rate = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
+            rate = wallet_rate if wallet_rate is not None else xmr_offer.a_fee_rate
             fees[c.offer_id] = redeem_fee(rate or 0, redeem_vsize)
         else:
             if live_fee is None:

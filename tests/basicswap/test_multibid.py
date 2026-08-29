@@ -57,12 +57,23 @@ def exclusions(plan):
 
 
 class FakeCI:
-    def __init__(self, coin_type, name: str, balance: int = 0, fee_rate: float = 0.0):
+    def __init__(
+        self,
+        coin_type,
+        name: str,
+        balance: int = 0,
+        fee_rate: float = 0.0,
+        redeem_fee_rate=None,
+    ):
         self._coin_type = coin_type
         self._exp = EXP[coin_type]
         self._name = name
         self._balance = balance
         self._fee_rate = fee_rate
+        self._redeem_fee_rate = redeem_fee_rate
+
+    def getRedeemFeeRate(self):
+        return self._redeem_fee_rate
 
     def max_batched_lock_outputs(self):
         return 15 if self._coin_type == Coins.XMR else None
@@ -136,7 +147,12 @@ class FakeOffer:
 
 class FakeSwapClient:
     def __init__(
-        self, offers=(), market_rate=None, balance: int = 10**12, fee_rate=0.0
+        self,
+        offers=(),
+        market_rate=None,
+        balance: int = 10**12,
+        fee_rate=0.0,
+        redeem_fee_rate=None,
     ):
         self.offers = list(offers)
         self.market_rate = market_rate
@@ -147,7 +163,13 @@ class FakeSwapClient:
         self.kv = {}
         self.fail_offers = set()
         self._cis = {
-            Coins.XMR: FakeCI(Coins.XMR, "Monero", balance=balance, fee_rate=fee_rate),
+            Coins.XMR: FakeCI(
+                Coins.XMR,
+                "Monero",
+                balance=balance,
+                fee_rate=fee_rate,
+                redeem_fee_rate=redeem_fee_rate,
+            ),
             Coins.LTC: FakeCI(
                 Coins.LTC, "Litecoin", balance=balance, fee_rate=fee_rate
             ),
@@ -262,8 +284,8 @@ class TestPlanMultiBid(unittest.TestCase):
     def test_skips_offers_too_small_for_the_redeem_fee(self):
         # floor = 20 * 5e8 * 100 // 1000 = 0.001 XMR; DUST is below it.
         book = [
-            FakeOffer(b"BIG", 4, 0.42, min_bid_amount=0.1, b_fee_rate=500_000_000),
-            FakeOffer(b"DUST", 0.0001, 0.42, b_fee_rate=500_000_000),
+            FakeOffer(b"BIG", 4, 0.42, min_bid_amount=0.1, a_fee_rate=500_000_000),
+            FakeOffer(b"DUST", 0.0001, 0.42, a_fee_rate=500_000_000),
         ]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
 
@@ -277,7 +299,7 @@ class TestPlanMultiBid(unittest.TestCase):
     def test_a_big_offer_is_not_bid_below_its_redeem_floor(self):
         # BIG could fill 1, but the target is under its 0.001 redeem floor, so
         # taking that sliver would be mostly fee - leave it unused, unfilled.
-        book = [FakeOffer(b"BIG", 1, 0.42, b_fee_rate=500_000_000)]
+        book = [FakeOffer(b"BIG", 1, 0.42, a_fee_rate=500_000_000)]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
 
         plan, _, _ = planMultiBid(
@@ -309,8 +331,8 @@ class TestPlanMultiBid(unittest.TestCase):
         self.assertEqual([leg.offer_id for leg in plan.legs], [b"BIG"])
 
     def test_normal_bid_uses_the_stored_leader_fee(self):
-        # Buying a scripted coin redeems the coin A lock at the offer's a_fee_rate
-        # (b_fee_rate is left unset), so a leg too small to clear it is skipped.
+        # Buying a scripted coin redeems the coin A lock, sized by the same
+        # a_fee_rate, so a leg too small to clear it is skipped.
         common = dict(coin_from=Coins.LTC, coin_to=Coins.XMR)
         book = [
             FakeOffer(
@@ -327,11 +349,46 @@ class TestPlanMultiBid(unittest.TestCase):
         self.assertIn((b"DUST", REASON_FEE_TOO_HIGH), exclusions(plan))
         self.assertEqual([leg.offer_id for leg in plan.legs], [b"BIG"])
 
+    def test_reverse_bid_uses_the_coin_from_fee(self):
+        # The coin B lock-spend is paid in coin_from, so it is sized by
+        # a_fee_rate; b_fee_rate belongs to the coin_to chain.
+        book = [
+            FakeOffer(
+                b"A",
+                4,
+                0.42,
+                min_bid_amount=0.1,
+                a_fee_rate=100_000_000,
+                b_fee_rate=1_000,
+            )
+        ]
+        swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
+
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.XMR, Coins.LTC, FILL_RECEIVE, xmr(1)
+        )
+
+        self.assertEqual(plan.fees, 10_000_000)
+
+    def test_the_wallet_redeem_rate_overrides_the_offer_rate(self):
+        # Monero sweeps at its own priority, so that rate sizes the redeem
+        # instead of the one the offer committed to.
+        book = [FakeOffer(b"A", 4, 0.42, min_bid_amount=0.1, a_fee_rate=1_000)]
+        swap_client = FakeSwapClient(
+            book, market_rate=ltc(0.43), redeem_fee_rate=100_000_000
+        )
+
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.XMR, Coins.LTC, FILL_RECEIVE, xmr(1)
+        )
+
+        self.assertEqual(plan.fees, 10_000_000)
+
     def test_does_not_split_across_equal_rate_offers(self):
         # Three offers at one rate, the first big enough for the whole buy;
         # splitting would only add redeem fees, so expect a single leg.
         book = [
-            FakeOffer(o, 5, 0.42, min_bid_amount=0.1, b_fee_rate=100_000_000)
+            FakeOffer(o, 5, 0.42, min_bid_amount=0.1, a_fee_rate=100_000_000)
             for o in (b"A", b"B", b"C")
         ]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
@@ -346,7 +403,7 @@ class TestPlanMultiBid(unittest.TestCase):
     def test_receive_mode_grosses_up_for_the_redeem_fee(self):
         # fee = 1e8 * 100 // 1000 = 1e7 per leg, deducted when the leg is
         # redeemed, so buy that much extra to net the requested target.
-        book = [FakeOffer(b"A", 4, 0.42, min_bid_amount=0.1, b_fee_rate=100_000_000)]
+        book = [FakeOffer(b"A", 4, 0.42, min_bid_amount=0.1, a_fee_rate=100_000_000)]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
 
         plan, _, _ = planMultiBid(
@@ -360,8 +417,8 @@ class TestPlanMultiBid(unittest.TestCase):
     def test_receive_mode_grosses_up_across_every_leg(self):
         # Two legs are needed to fill, so the gross-up covers both redeem fees.
         book = [
-            FakeOffer(b"A", 1, 0.42, amount_negotiable=False, b_fee_rate=100_000_000),
-            FakeOffer(b"B", 4, 0.43, min_bid_amount=0.1, b_fee_rate=100_000_000),
+            FakeOffer(b"A", 1, 0.42, amount_negotiable=False, a_fee_rate=100_000_000),
+            FakeOffer(b"B", 4, 0.43, min_bid_amount=0.1, a_fee_rate=100_000_000),
         ]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
 
@@ -376,7 +433,7 @@ class TestPlanMultiBid(unittest.TestCase):
     def test_spend_mode_takes_the_redeem_fee_out_of_what_is_received(self):
         # Spending a fixed budget, the redeem fee is not added to the target but
         # still comes out of the received amount, so it is reported net.
-        book = [FakeOffer(b"A", 4, 0.42, min_bid_amount=0.1, b_fee_rate=100_000_000)]
+        book = [FakeOffer(b"A", 4, 0.42, min_bid_amount=0.1, a_fee_rate=100_000_000)]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.43))
 
         plan, _, _ = planMultiBid(
@@ -387,7 +444,7 @@ class TestPlanMultiBid(unittest.TestCase):
         self.assertEqual(plan.total_receive - plan.fees, xmr(1) - 10_000_000)
 
     def test_a_picked_dust_offer_is_still_bid_on(self):
-        book = [FakeOffer(b"DUST", 0.0001, 0.42, b_fee_rate=500_000_000)]
+        book = [FakeOffer(b"DUST", 0.0001, 0.42, a_fee_rate=500_000_000)]
         swap_client = FakeSwapClient(book)
 
         plan, _, _ = planMultiBid(
@@ -924,7 +981,7 @@ class TestDescribePlan(unittest.TestCase):
         self.assertEqual(described["unfilled"], "0.000000000000")
 
     def test_reports_the_fees_and_the_net_received(self):
-        book = [FakeOffer(b"A", 4, 0.40, min_bid_amount=0.1, b_fee_rate=100_000_000)]
+        book = [FakeOffer(b"A", 4, 0.40, min_bid_amount=0.1, a_fee_rate=100_000_000)]
         swap_client = FakeSwapClient(book, market_rate=ltc(0.40))
 
         plan, market_rate, limit_rate = planMultiBid(

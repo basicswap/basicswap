@@ -1044,8 +1044,14 @@ def page_offer(self, url_split: List[str], post_string: str) -> bytes:
             if reverse_bid
             else ci_from.xmr_swap_a_lock_spend_tx_vsize()
         )
+        # Paid in coin_from, so sized by the offer's from rate, which is
+        # a_fee_rate whichever chain coin_from is on, unless coin_from sets its
+        # own redeem fee.
+        redeem_fee_rate = ci_from.getRedeemFeeRate()
+        if redeem_fee_rate is None:
+            redeem_fee_rate = xmr_offer.a_fee_rate
         lock_spend_tx_fee = ci_from.make_int(
-            chain_a_fee_rate * lock_spend_tx_vsize / 1000, r=1
+            redeem_fee_rate * lock_spend_tx_vsize / 1000, r=1
         )
         data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(
             lock_spend_tx_fee // ci_from.COIN()

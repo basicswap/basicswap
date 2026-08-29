@@ -452,6 +452,12 @@ class XMRInterface(CoinInterface):
 
         return float(self.format_amount(fee_per_k_bytes)), "get_fee_estimate"
 
+    def getRedeemFeeRate(self) -> int:
+        # A sweep ignores the offer's rate. Priority 0 is resolved by the
+        # wallet against the backlog, so assume the higher tier it can land on.
+        priority: int = self._fee_priority if self._fee_priority > 0 else 2
+        return self.rpc("get_fee_estimate")["fees"][priority - 1] * 1000
+
     def getNewRandomKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
         return i2b(9 + secrets.randbelow(ed25519_l - 9))
