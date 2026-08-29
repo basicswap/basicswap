@@ -225,6 +225,12 @@ class CoinInterface:
         # swipe, that publishes it while the swipe can still be replaced.
         return False
 
+    def prepareMercySpend(self, key: bytes, rescan_from: int) -> None:
+        # Called before building the mercy tx, for coins that can only spend the
+        # swipe payout through the wallet.  Nothing to do where the mercy tx is
+        # signed with the key directly.
+        pass
+
     def getMercyWatchVouts(self, swipe_txid_hex: str, swipe_tx=None) -> List[int]:
         # Which outputs of the swipe a mercy tx could spend.  The leader has to
         # watch each one, it can't tell which the swiper will use.

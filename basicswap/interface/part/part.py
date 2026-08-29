@@ -1050,6 +1050,18 @@ class PARTInterfaceBlind(PARTInterface):
                     self._log.debug(f"getaddressinfo {addr} failed: {e}")
         raise ValueError("Swipe payout output not found")
 
+    def prepareMercySpend(self, key: bytes, rescan_from: int) -> None:
+        # Spending a blind output needs its blinding factor, which the wallet
+        # derives once it holds the key.  Imported here rather than when the
+        # swipe was built, so the wallet cannot select the output until the
+        # mercy tx is the thing spending it.
+        addr: str = self.pkh_to_address(self.pkh(self.getPubkey(key)))
+        if self.rpc_wallet("getaddressinfo", [addr]).get("ismine", False):
+            return
+        self.rpc_wallet("importprivkey", [self.encodeKey(key), "swipe", False])
+        self._log.info(f"Rescanning {self.coin_name()} chain from {rescan_from}.")
+        self.rpc_wallet("rescanblockchain", [rescan_from])
+
     def createMercyTx(
         self,
         refund_swipe_tx_bytes: bytes,
@@ -1057,9 +1069,12 @@ class PARTInterfaceBlind(PARTInterface):
         lock_refund_tx_script: bytes,
         keyshare: bytes,
         tx_fee_rate: int,
+        key: bytes | None = None,
+        addr_to: str | None = None,
     ) -> bytes:
         # Hands the keyshare to the leader in a tx of its own, spending the
-        # swipe's payout output.
+        # swipe's payout output.  No local signing branch for key: a blind output
+        # is spent through the wallet, which prepareMercySpend has given the key.
         swipe_txid_hex: str = refund_swipe_tx_id.hex()
         swipe_tx = self.rpc("decoderawtransaction", [refund_swipe_tx_bytes.hex()])
 
@@ -1085,6 +1100,7 @@ class PARTInterfaceBlind(PARTInterface):
         pkh_dest,
         tx_fee_rate,
         vkbv,
+        pubkey_dest=None,
     ):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -1099,8 +1115,12 @@ class PARTInterfaceBlind(PARTInterface):
 
         tx_lock_refund_id = lock_refund_tx_obj["txid"]
         addr_out = self.pkh_to_address(pkh_dest)
-        addr_info = self.rpc_wallet("getaddressinfo", [addr_out])
-        output_pubkey_hex = addr_info["pubkey"]
+        if pubkey_dest is None:
+            addr_info = self.rpc_wallet("getaddressinfo", [addr_out])
+            output_pubkey_hex = addr_info["pubkey"]
+        else:
+            # A key derived for the swap, which the wallet cannot look up
+            output_pubkey_hex = pubkey_dest.hex()
 
         A, B, lock2_value, C = extractScriptLockRefundScriptValues(script_lock_refund)
 

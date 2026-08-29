@@ -1625,6 +1625,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
+        pubkey_dest=None,
     ):
         # Lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -5050,6 +5051,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_refund_tx_script: bytes,
         keyshare: bytes,
         tx_fee_rate: int,
+        key: bytes | None = None,
+        addr_to: str | None = None,
     ) -> bytes:
         # Hands the keyshare to the leader in a tx of its own, spending the
         # swipe's payout output.
@@ -5061,7 +5064,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0)))
         tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
-        tx.vout.append(self.txoType()(0, prevout_script))
+        # Back to the same script by default, which is the wallet's own.  A swipe
+        # paid to a key derived for the swap has to name a destination instead,
+        # or the coin stays on a key the wallet knows nothing about.
+        dest_script: bytes = (
+            prevout_script
+            if addr_to is None
+            else self.getScriptForPubkeyHash(self.decodeAddress(addr_to))
+        )
+        tx.vout.append(self.txoType()(0, dest_script))
 
         witness_bytes: int = self.getWitnessStackSerialisedLength(
             self.getP2WPKHDummyWitness()
@@ -5086,7 +5097,24 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 ),
             )
         )
-        return self.signTxWithWallet(tx.serialize())
+        if key is None:
+            # The swipe paid a pooled address the wallet holds
+            return self.signTxWithWallet(tx.serialize())
+
+        # A key derived for this swap instead, which the wallet does not hold, so
+        # nothing else can spend the output and it is signed here.
+        script_code = CScript(
+            [
+                OP_DUP,
+                OP_HASH160,
+                prevout_script[2:22],
+                OP_EQUALVERIFY,
+                OP_CHECKSIG,
+            ]
+        )
+        sig = self.signTx(key, tx.serialize(), 0, script_code, prevout_value)
+        pubkey: bytes = self.getPubkey(key)
+        return self.setTxSignature(tx.serialize(), [sig, pubkey])
 
     def extractMercyKeyshare(self, tx: dict) -> Optional[bytes]:
         # OP_RETURN, a 4 byte push of XBSW, then a 32 byte push of the keyshare

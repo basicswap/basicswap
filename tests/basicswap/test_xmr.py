@@ -168,6 +168,7 @@ def prepare_swapclient_dir(
                 "use_segwit": True,
                 "use_descriptors": BTC_USE_DESCRIPTORS,
                 "use_legacy_key_paths": BTC_USE_LEGACY_KEY_PATHS,
+                "blocks_confirmed": 3,
                 "wallet_name": "bsx_wallet",
             },
         },
@@ -213,6 +214,7 @@ def prepare_swapclient_dir(
             "datadir": os.path.join(datadir, "ltc_" + str(node_id)),
             "bindir": cfg.LITECOIN_BINDIR,
             "use_segwit": True,
+            "blocks_confirmed": 3,
             "wallet_name": "bsx_wallet",
         }
 

@@ -3607,11 +3607,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if cursor is None:
             self.saveBid(bid.bid_id, bid)
 
-        # Remove locked mercy outputs
-        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
-        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
-        self._unlockMercyPrevout(ci_from, bid, cursor)
-
         # Remove any watched outputs
         self.removeWatchedOutput(Coins(offer.coin_from), bid.bid_id, None)
         self.removeWatchedOutput(Coins(offer.coin_to), bid.bid_id, None)
@@ -8540,9 +8535,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 chain_height=ci_from.getChainHeight(),
                             )
                             if ci_from.altruistic() and ci_from.canSendMercyTx():
-                                # The mercy tx spends this output, keep it out of
-                                # coin selection until it has been sent
-                                self._lockMercyPrevout(ci_from, bid, cursor)
+                                # No prevout lock: the swipe paid a key derived for
+                                # the swap, which the wallet cannot select from.
                                 delay = self.get_delay_event_seconds()
                                 self.log.info(
                                     f"Queuing mercy tx for bid {self.log.id(bid_id)} in {delay} seconds."
@@ -9166,35 +9160,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
         return True
 
-    def _lockMercyPrevout(self, ci_from, bid, cursor) -> None:
-        # Locks are held in memory by the daemon and expire on the electrum
-        # backend, so this is re-asserted for as long as the mercy tx is owed
-        swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, None)
-        if swipe_tx is None:
-            return
-        try:
-            txid_hex: str = swipe_tx.txid.hex()
-            ci_from.lockOutput(
-                txid_hex,
-                ci_from.getMercyPrevout(txid_hex),
-                bid_id=bid.bid_id,
-                cursor=cursor,
-            )
-        except Exception as e:
-            self.log.debug(f"Locking mercy prevout failed: {e}")
-
-    def _unlockMercyPrevout(self, ci_from, bid, cursor) -> None:
-        swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, None)
-        if swipe_tx is None:
-            return
-        try:
-            txid_hex: str = swipe_tx.txid.hex()
-            ci_from.unlockOutput(
-                txid_hex, ci_from.getMercyPrevout(txid_hex), cursor=cursor
-            )
-        except Exception as e:
-            self.log.debug(f"Unlocking mercy prevout failed: {e}")
-
     def _checkMercySend(self, ci_from, bid, cursor) -> bool:
         # Returns True if the bid state changed
         swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, None)
@@ -9215,7 +9180,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.logBidEvent(
                 bid.bid_id, EventLogTypes.MERCY_TX_NOT_SENT, give_up_reason, cursor
             )
-            self._unlockMercyPrevout(ci_from, bid, cursor)
             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
             return True
 
@@ -13740,7 +13704,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.logBidEvent(
                 bid_id, EventLogTypes.MERCY_TX_NOT_SENT, skip_reason, cursor
             )
-            self._unlockMercyPrevout(ci_from, bid, cursor)
             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
             return
@@ -13748,14 +13711,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE)
         ensure(swipe_tx, f"Swipe tx not found for bid {self.log.id(bid_id)}.")
 
-        # Retried here until the swipe confirms, covering a wallet that hadn't
-        # picked the output up when the lock was first taken
-        self._lockMercyPrevout(ci_from, bid, cursor)
-
-        found_tx = ci_from.findConfirmedTxnByHash(swipe_tx.txid.hex())
-        if found_tx is None:
+        # The keyshare must not go out while the swipe can still be replaced: a
+        # leader whose refund spend wins that race would take both legs.  Read
+        # from the utxo set rather than the wallet, which does not hold the
+        # derived swipe payout.
+        # Any output of the swipe carries its depth.  Not getMercyPrevout: that
+        # picks the output the wallet owns, and it does not own this one yet.
+        swipe_n: int = ci_from.getMercyWatchVouts(swipe_tx.txid.hex())[0]
+        swipe_out = ci_from.getTxOutInfo(swipe_tx.txid, swipe_n)
+        swipe_depth: int = (
+            0
+            if swipe_out is None
+            else ci_from.getChainHeight() - swipe_out["block_height"] + 1
+        )
+        if swipe_depth < ci_from.blocks_confirmed:
             raise TemporaryError(
-                f"Swipe tx not yet confirmed for bid {self.log.id(bid_id)}."
+                f"Swipe tx not yet confirmed for bid {self.log.id(bid_id)}, "
+                f"depth {swipe_depth}."
             )
 
         ci_to = self.ci(coin_to)
@@ -13773,6 +13745,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(f"Bid {self.log.id(bid_id)}: Sending an invalid keyshare.")
             kbsf = ci_to.getNewRandomKey()
 
+        ka_swipe = self.getPathKey(
+            coin_from,
+            coin_to,
+            bid.created_at,
+            xmr_swap.contract_count,
+            KeyTypes.KA_SWIPE,
+        )
+        # A no-op where the mercy tx is signed with ka_swipe directly.
+        ci_from.prepareMercySpend(ka_swipe, swipe_out["block_height"])
+
+        # The swipe paid a key derived for the swap, so the mercy tx is also what
+        # moves the coin into the wallet.
+        addr_to: str = self.getReceiveAddressFromPool(
+            coin_from, bid_id, TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, cursor
+        )
+
         a_fee_rate: int = xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
         mercy_tx = ci_from.createMercyTx(
             xmr_swap.a_lock_refund_swipe_tx,
@@ -13780,6 +13768,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.a_lock_refund_tx_script,
             kbsf,
             a_fee_rate,
+            ka_swipe,
+            addr_to,
         )
         txid_hex: str = ci_from.publishTx(mercy_tx)
         bid.txns[TxTypes.MERCY] = SwapTx(
@@ -15794,6 +15784,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 rv["blind_balance"] = walletinfo["blind_balance"]
                 rv["blind_unconfirmed"] = walletinfo["unconfirmed_blind"]
+                # Coinstake outputs still maturing.  Held apart from immature,
+                # which only counts coinbase credit.
+                rv["staked"] = walletinfo.get("staked_balance", 0)
             elif coin in self.xmr_based_coins:
                 rv["main_address"] = self.getCachedMainWalletAddress(ci)
             elif coin == Coins.NAV:
@@ -16722,13 +16715,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
 
-        pkh_dest = ci.decodeAddress(self.getReceiveAddressForCoin(ci.coin_type()))
+        pubkey_dest = None
+        if ci.altruistic() and ci.canSendMercyTx():
+            # Derived per swap rather than taken from the address pool: the mercy
+            # tx spends this output, and a pooled address is one the coin wallet
+            # could spend first.
+            ka_swipe = self.getPathKey(
+                coin_from,
+                coin_to,
+                bid.created_at,
+                xmr_swap.contract_count,
+                KeyTypes.KA_SWIPE,
+            )
+            pubkey_dest = ci.getPubkey(ka_swipe)
+            pkh_dest = ci.pkh(pubkey_dest)
+        else:
+            pkh_dest = ci.decodeAddress(self.getReceiveAddressForCoin(ci.coin_type()))
         spend_tx = ci.createSCLockRefundSpendToFTx(
             xmr_swap.a_lock_refund_tx,
             xmr_swap.a_lock_refund_tx_script,
             pkh_dest,
             a_fee_rate,
             xmr_swap.vkbv,
+            pubkey_dest,
         )
 
         vkaf = self.getPathKey(

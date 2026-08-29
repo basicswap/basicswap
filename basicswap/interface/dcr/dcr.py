@@ -1696,6 +1696,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
+        pubkey_dest=None,
     ):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -1782,6 +1783,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         lock_refund_tx_script: bytes,
         keyshare: bytes,
         tx_fee_rate: int,
+        key: bytes | None = None,
+        addr_to: str | None = None,
     ) -> bytes:
         # Hands the keyshare to the leader in a tx of its own, spending the
         # swipe's payout output, so it can be held back until the swipe has
@@ -1798,7 +1801,15 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         push_script_data(mercy_script, b"XBSW")
         push_script_data(mercy_script, keyshare)
         tx.vout.append(self.txoType()(0, bytes(mercy_script)))
-        tx.vout.append(self.txoType()(0, prevout_script))
+        # Back to the same script by default, which is the wallet's own.  A swipe
+        # paid to a key derived for the swap has to name a destination instead,
+        # or the coin stays on a key the wallet knows nothing about.
+        dest_script: bytes = (
+            prevout_script
+            if addr_to is None
+            else self.getPubkeyHashDest(self.decodeAddress(addr_to))
+        )
+        tx.vout.append(self.txoType()(0, dest_script))
 
         # A p2pkh signature script: OP_DATA_73 <sig> OP_DATA_33 <pubkey>
         size: int = len(tx.serialize()) + 108
@@ -1818,9 +1829,16 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 ),
             )
         )
-        # Full serialisation, NoWitness leaves signrawtransaction nowhere to
-        # write the signature script
-        return self.signTxWithWallet(tx.serialize())
+        if key is None:
+            # The swipe paid a pooled address the wallet holds.
+            # Full serialisation, NoWitness leaves signrawtransaction nowhere to
+            # write the signature script
+            return self.signTxWithWallet(tx.serialize())
+
+        # A key derived for this swap instead, which the wallet does not hold, so
+        # nothing else can spend the output and it is signed here.
+        sig = self.signTx(key, tx.serialize(), 0, prevout_script, prevout_value)
+        return self.setTxSignature(tx.serialize(), [sig, self.getPubkey(key)])
 
     def signTxOtVES(
         self,
