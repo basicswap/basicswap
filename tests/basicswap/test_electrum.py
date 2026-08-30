@@ -369,7 +369,7 @@ class TestFunctions(BaseTestWithPrepare):
         coin_to: Coins,
         port_node_from: int = port_node_0,
         port_node_to: int = port_node_1,
-        lock_value: int = 12,
+        lock_value: int = 18,
     ) -> None:
         logger.info(
             f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) leader recovers coin a lock tx"
@@ -445,7 +445,7 @@ class TestFunctions(BaseTestWithPrepare):
         coin_to: Coins,
         port_node_from: int = port_node_0,
         port_node_to: int = port_node_1,
-        lock_value: int = 12,
+        lock_value: int = 18,
         with_mercy: bool = True,
     ) -> None:
         logger.info(
@@ -584,7 +584,7 @@ class TestFunctions(BaseTestWithPrepare):
         coin_to: Coins,
         port_node_from: int = port_node_0,
         port_node_to: int = port_node_1,
-        lock_value: int = 16,
+        lock_value: int = 18,
     ) -> None:
         logger.info(
             f"---------- Test {coin_from.name} ({port_node_from}) to {coin_to.name} ({port_node_to}) follower recovers coin b lock tx"
