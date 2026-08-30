@@ -498,7 +498,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._cached_electrum_legacy_funds = {}
 
         self.check_updates_seconds = self.get_int_setting(
-            "check_updates_seconds", 24 * 60 * 60, 60 * 60, 7 * 24 * 60 * 60
+            "check_updates_seconds", 4 * 60 * 60, 60 * 60, 7 * 24 * 60 * 60
         )
         self._last_checked_updates = 0
         self._latest_version = None
@@ -15322,6 +15322,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 if settings_copy.get("check_updates", True) != new_value:
                     settings_copy["check_updates"] = new_value
+                    settings_changed = True
+
+            if "check_updates_seconds" in data:
+                new_value = data["check_updates_seconds"]
+                ensure(
+                    isinstance(new_value, int),
+                    "New check_updates_seconds value not integer",
+                )
+                ensure(
+                    60 * 60 <= new_value <= 7 * 24 * 60 * 60,
+                    "check_updates_seconds must be between 3600 and 604800 seconds",
+                )
+                if settings_copy.get("check_updates_seconds", 4 * 60 * 60) != new_value:
+                    self.check_updates_seconds = new_value
+                    settings_copy["check_updates_seconds"] = new_value
                     settings_changed = True
 
             if settings_changed:

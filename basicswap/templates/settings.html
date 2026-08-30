@@ -738,6 +738,40 @@
       <div class="px-6 pb-6 space-y-6">
 
        <div>
+        <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Software Updates</h4>
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+         <div class="py-2">
+          <div class="flex items-center">
+           <input type="checkbox" id="check_updates" name="check_updates" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.check_updates %} checked{% endif %}>
+           <label for="check_updates" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Update Notifications</label>
+           <button type="button" data-check-updates class="ml-3 text-xs bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 rounded transition-colors focus:outline-none">
+            Check Now
+           </button>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Check for BasicSwap updates and show notifications when available</p>
+         </div>
+         <div class="mt-4">
+          <label for="check_updates_seconds" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Check Interval</label>
+          <div class="relative w-48">
+           <select id="check_updates_seconds" name="check_updates_seconds" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+            <option value="3600"{% if notification_settings.check_updates_seconds == 3600 %} selected{% endif %}>1 hour</option>
+            <option value="14400"{% if notification_settings.check_updates_seconds == 14400 %} selected{% endif %}>4 hours</option>
+            <option value="43200"{% if notification_settings.check_updates_seconds == 43200 %} selected{% endif %}>12 hours</option>
+            <option value="86400"{% if notification_settings.check_updates_seconds == 86400 %} selected{% endif %}>1 day</option>
+            {#<option value="259200"{% if notification_settings.check_updates_seconds == 259200 %} selected{% endif %}>3 days</option>#}
+            {#<option value="604800"{% if notification_settings.check_updates_seconds == 604800 %} selected{% endif %}>7 days</option>#}
+           </select>
+           <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+           </div>
+          </div>
+         </div>
+        </div>
+       </div>
+
+       <div>
         <h4 class="text-sm font-medium text-gray-900 dark:text-white mb-4">Notification Types</h4>
         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
          <div class="space-y-4">
@@ -789,19 +823,6 @@
            </div>
            <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Show notifications when swaps complete successfully</p>
           </div>
-
-          <div class="py-2">
-           <div class="flex items-center">
-            <input type="checkbox" id="check_updates" name="check_updates" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if notification_settings.check_updates %} checked{% endif %}>
-            <label for="check_updates" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Update Notifications</label>
-            <button type="button" data-check-updates class="ml-3 text-xs bg-gray-600 hover:bg-gray-700 text-white font-medium py-1 px-3 rounded transition-colors focus:outline-none">
-             Check Now
-            </button>
-           </div>
-           <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Check for BasicSwap updates and show notifications when available</p>
-          </div>
-
-
 
          </div>
         </div>
