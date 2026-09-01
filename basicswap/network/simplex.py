@@ -23,7 +23,7 @@ from basicswap.util.smsg import (
 from basicswap.chainparams import (
     Coins,
 )
-from basicswap.util import ensure
+from basicswap.util import ensure, TemporaryError
 from basicswap.util.address import (
     decodeWif,
 )
@@ -476,8 +476,74 @@ def getNewSimplexLink(data):
     return getResponseData(data)["connLinkContact"]["connFullLink"]
 
 
+def formatSimplexChatError(chat_error) -> str:
+    if not chat_error:
+        return "unknown error"
+    error_type = chat_error.get("errorType")
+    if isinstance(error_type, dict):
+        if error_type.get("message"):
+            return error_type["message"]
+        if error_type.get("type"):
+            return error_type["type"]
+    agent_error = chat_error.get("agentError")
+    if isinstance(agent_error, dict):
+        broker_err = agent_error.get("brokerErr")
+        if isinstance(broker_err, dict):
+            network_error = broker_err.get("networkError")
+            if isinstance(network_error, dict):
+                if network_error.get("connectError"):
+                    return network_error["connectError"]
+                if network_error.get("type"):
+                    return network_error["type"]
+            if broker_err.get("type"):
+                return broker_err["type"]
+        if agent_error.get("brokerAddress"):
+            return "{} ({})".format(
+                agent_error.get("type", "agent error"), agent_error["brokerAddress"]
+            )
+        if agent_error.get("type"):
+            return agent_error["type"]
+    if chat_error.get("type"):
+        return chat_error["type"]
+    return json.dumps(chat_error)
+
+
 def getJoinedSimplexLink(data):
-    return getResponseData(data)["connLinkInvitation"]["connFullLink"]
+    response_data = getResponseData(data)
+    # SimpleX responds with connLinkInvitation for one-time invitations
+    # and connLinkContact for contact addresses.
+    for link_tag in ("connLinkInvitation", "connLinkContact"):
+        if link_tag in response_data:
+            return response_data[link_tag]["connFullLink"]
+    resp_type = response_data.get("type", "unknown")
+    if resp_type == "chatCmdError":
+        detail = formatSimplexChatError(response_data.get("chatError"))
+        raise TemporaryError("SimpleX /connect failed: {}".format(detail))
+    raise ValueError("Unexpected SimpleX response type: {}".format(resp_type))
+
+
+def createSimplexConnectInvitation(
+    ws_thread, delay_event, logger=None, num_tries: int = 3
+):
+    last_error = None
+    for attempt in range(num_tries):
+        cmd_id = ws_thread.send_command("/connect")
+        response = ws_thread.wait_for_command_response(cmd_id)
+        try:
+            conn_link = getJoinedSimplexLink(response)
+            pccConnId = getResponseData(response, "connection")["pccConnId"]
+            return conn_link, pccConnId
+        except TemporaryError as ex:
+            last_error = ex
+            if logger:
+                logger.warning(
+                    "SimpleX /connect failed (attempt {}/{}): {}".format(
+                        attempt + 1, num_tries, ex
+                    )
+                )
+            if attempt + 1 < num_tries:
+                delay_event.wait(2.0)
+    raise last_error
 
 
 def initialiseSimplexNetwork(self, network_config) -> None:

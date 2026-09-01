@@ -24,6 +24,12 @@ from unittest import mock
 
 import basicswap.bin.prepare as prepare
 from basicswap.bin.run import checkSimplexClientBinary
+from basicswap.network.simplex import (
+    createSimplexConnectInvitation,
+    formatSimplexChatError,
+    getJoinedSimplexLink,
+)
+from basicswap.util import TemporaryError
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -47,6 +53,126 @@ def writeSumsFile(release_dir: str, hashes) -> str:
         for file_hash, filename in hashes:
             fp.write(f"{file_hash}  {filename}\n")
     return sums_path
+
+
+class TestSimplexLinkParsing(unittest.TestCase):
+    # Response shapes from simplex-chat v7.0.0.11
+    def test_connect_invitation(self):
+        response = {
+            "corrId": "1",
+            "resp": {
+                "type": "invitation",
+                "connLinkInvitation": {
+                    "connFullLink": "simplex:/invitation#/?v=2-7&smp=test",
+                    "connShortLink": "https://smp5.simplex.im/i#test",
+                },
+                "connection": {"pccConnId": 1},
+            },
+        }
+        self.assertEqual(
+            getJoinedSimplexLink(response), "simplex:/invitation#/?v=2-7&smp=test"
+        )
+
+    def test_connect_contact(self):
+        response = {
+            "corrId": "1",
+            "resp": {
+                "type": "userContactLinkCreated",
+                "connLinkContact": {
+                    "connFullLink": "simplex:/contact#/?v=2-7&smp=test",
+                    "connShortLink": "https://smp5.simplex.im/c#test",
+                },
+            },
+        }
+        self.assertEqual(
+            getJoinedSimplexLink(response), "simplex:/contact#/?v=2-7&smp=test"
+        )
+
+    def test_connect_error(self):
+        response = {
+            "corrId": "1",
+            "resp": {
+                "type": "chatCmdError",
+                "chatError": {
+                    "type": "error",
+                    "errorType": {
+                        "type": "agentError",
+                        "message": "SMP server unreachable",
+                    },
+                },
+            },
+        }
+        with self.assertRaises(TemporaryError) as cm:
+            getJoinedSimplexLink(response)
+        self.assertIn("SMP server unreachable", str(cm.exception))
+
+    def test_format_chat_error(self):
+        chat_error = {
+            "type": "error",
+            "errorType": {"type": "commandError", "message": "invalid request"},
+        }
+        self.assertEqual(formatSimplexChatError(chat_error), "invalid request")
+
+    def test_format_agent_broker_error(self):
+        chat_error = {
+            "type": "errorAgent",
+            "agentError": {
+                "type": "BROKER",
+                "brokerAddress": "smp://test@smp5.simplex.im,test.onion",
+                "brokerErr": {
+                    "type": "NETWORK",
+                    "networkError": {
+                        "type": "connectError",
+                        "connectError": "Connection refused",
+                    },
+                },
+            },
+        }
+        self.assertEqual(formatSimplexChatError(chat_error), "Connection refused")
+
+    def test_connect_retries_on_transient_error(self):
+        class FakeWs:
+            def __init__(self):
+                self.calls = 0
+
+            def send_command(self, cmd):
+                self.calls += 1
+                return self.calls
+
+            def wait_for_command_response(self, cmd_id):
+                if cmd_id == 1:
+                    return {
+                        "corrId": "1",
+                        "resp": {
+                            "type": "chatCmdError",
+                            "chatError": {
+                                "type": "error",
+                                "errorType": {"message": "SMP server unreachable"},
+                            },
+                        },
+                    }
+                return {
+                    "corrId": "2",
+                    "resp": {
+                        "type": "invitation",
+                        "connLinkInvitation": {
+                            "connFullLink": "simplex:/invitation#/?v=2-7&smp=test",
+                        },
+                        "connection": {"pccConnId": 2},
+                    },
+                }
+
+        class FakeDelay:
+            def wait(self, _seconds):
+                pass
+
+        ws = FakeWs()
+        conn_link, pcc_conn_id = createSimplexConnectInvitation(
+            ws, FakeDelay(), num_tries=3
+        )
+        self.assertEqual(conn_link, "simplex:/invitation#/?v=2-7&smp=test")
+        self.assertEqual(pcc_conn_id, 2)
+        self.assertEqual(ws.calls, 2)
 
 
 class TestSimplexVerify(unittest.TestCase):

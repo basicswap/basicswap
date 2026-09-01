@@ -180,8 +180,8 @@ from .explorers import (
 from .network.nostr import sendNostrMsg
 from .network.nostr_client import MAX_POW_TARGET_BITS
 from .network.simplex import (
+    createSimplexConnectInvitation,
     encryptMsg,
-    getJoinedSimplexLink,
     getResponseData,
 )
 from .network.bsx_network import BSXNetwork, networkTypeToID
@@ -5890,7 +5890,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.saveBidInSession(bid_id, bid, cursor)
 
-            self.log.info(f"Sent BID {self.log.id(bid_id)}")
+            if bid.state == BidStates.CONNECT_REQ_SENT:
+                self.log.info(
+                    f"BID {self.log.id(bid_id)} waiting for direct message route"
+                )
+            else:
+                self.log.info(f"Sent BID {self.log.id(bid_id)}")
             return bid_id
         finally:
             self.closeDB(cursor)
@@ -6539,10 +6544,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             req_data["nostr_pubkey"] = net_i.pubkey
             route_data["local_pubkey"] = net_i.pubkey
         else:
-            cmd_id = net_i.send_command("/connect")
-            response = net_i.wait_for_command_response(cmd_id)
-            connReqInvitation = getJoinedSimplexLink(response)
-            pccConnId = getResponseData(response, "connection")["pccConnId"]
+            connReqInvitation, pccConnId = createSimplexConnectInvitation(
+                net_i, self.delay_event, logger=self.log
+            )
             req_data["connection_req"] = connReqInvitation
             route_data["connection_req"] = connReqInvitation
             route_data["pccConnId"] = pccConnId
@@ -6770,7 +6774,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
                 self.commitDB()
 
-                self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
+                if bid.state == BidStates.CONNECT_REQ_SENT:
+                    self.log.info(
+                        f"ADS_BID_LF {self.logIDB(xmr_swap.bid_id)} waiting for direct message route"
+                    )
+                else:
+                    self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
                 return xmr_swap.bid_id
 
             xmr_swap = XmrSwap()
@@ -6939,7 +6948,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
-            self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
+            if bid.state == BidStates.CONNECT_REQ_SENT:
+                self.log.info(
+                    f"XMR_BID_FL {self.logIDB(xmr_swap.bid_id)} waiting for direct message route"
+                )
+            else:
+                self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
             return xmr_swap.bid_id
         finally:
             self.closeDB(cursor)
