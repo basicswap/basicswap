@@ -389,8 +389,10 @@ class NostrClient:
         tags = []
         if to_pubkey is not None:
             tags.append(["p", to_pubkey])
-        else:
-            tags.append(["t", self.broadcast_tag])
+        # Always include the broadcast tag.  Public relays often accept
+        # #p-only events (OK) without delivering them on #p subscriptions,
+        # which stalls CONNECT_REQ ACK and later swap messages.
+        tags.append(["t", self.broadcast_tag])
         if expiration is not None:
             tags.append(["expiration", str(int(expiration))])
         event = {

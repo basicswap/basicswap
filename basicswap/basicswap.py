@@ -6514,6 +6514,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return None, False
 
+        existing_pending_route = None
         if network_id == MessageNetworks.NOSTR:
             message_route = self.getMessageRoute(
                 int(MessageNetworks.NOSTR), addr_from, addr_to, cursor=cursor
@@ -6522,8 +6523,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if message_route.active_ind == 1:
                     self.log.debug(f"Using active message route: {message_route}")
                     return message_route.record_id, True
-                self.log.debug(f"Waiting for message route: {message_route}")
-                return message_route.record_id, False
+                now_pending: int = self.getTime()
+                if now_pending - int(message_route.created_at or 0) < 30:
+                    self.log.debug(f"Waiting for message route: {message_route}")
+                    return message_route.record_id, False
+                existing_pending_route = message_route
+                self.log.info(
+                    f"Resending CONNECT_REQ for pending nostr route {message_route.record_id}"
+                )
         else:
             # Look for active route
             message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
@@ -6572,6 +6579,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         now: int = self.getTime()
         route_data["connect_req_msgid"] = connect_req_msgid.hex()
+        if existing_pending_route is not None:
+            cursor.execute(
+                "UPDATE direct_message_routes SET route_data = :route_data, "
+                "created_at = :created_at WHERE record_id = :record_id",
+                {
+                    "route_data": json.dumps(route_data).encode("UTF-8"),
+                    "created_at": now,
+                    "record_id": existing_pending_route.record_id,
+                },
+            )
+            self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
+            return existing_pending_route.record_id, False
+
         message_route = DirectMessageRoute(
             active_ind=2,
             network_id=network_id,

@@ -153,6 +153,12 @@ class TestNostrPrimitives(unittest.TestCase):
         )
         assert client.pow_target == 0
 
+    def test_direct_event_also_has_broadcast_tag(self):
+        client = NostrClient(["ws://127.0.0.1:1"], PrivateKey().secret, logger)
+        event = client.buildEvent("ZGlyZWN0", to_pubkey="ab" * 32)
+        assert getTagValue(event, "p") == "ab" * 32
+        assert getTagValue(event, "t") == "bsx"
+
     def test_filter_matching(self):
         event = {
             "id": "ab" * 32,
@@ -334,10 +340,12 @@ class TestNostrClientRelay(unittest.TestCase):
             received = self.waitForEvent(client_b)
             assert received["id"] == event["id"]
             assert getTagValue(received, "p") == client_b.pubkey
+            assert getTagValue(received, "t") == "bsx"
 
-            # Not tagged for client_c, must not arrive there
-            time.sleep(0.5)
-            assert client_c.queue_get() is None
+            # DMs also carry #t so public relays deliver them; client_c
+            # is subscribed to the broadcast tag and therefore receives too.
+            received_c = self.waitForEvent(client_c)
+            assert received_c["id"] == event["id"]
         finally:
             client_a.stop()
             client_b.stop()

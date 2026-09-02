@@ -16,7 +16,9 @@ key, generate a new `private_key` to unlink from earlier activity.
 - Broadcast messages (offers) are tagged `["t", "bsx"]`.  All BSX nodes
   subscribe to this tag.
 - Direct messages (bids and swap messages after a direct route is
-  established) are tagged `["p", <recipient pubkey>]` instead.
+  established) are tagged `["p", <recipient pubkey>]` and also
+  `["t", "bsx"]`.  Public relays often accept `#p`-only events without
+  delivering them, so the broadcast tag is required for two-node swaps.
 - Events carry a NIP-40 `expiration` tag matching the SMSG TTL, so relays
   can prune them automatically.
 - Optionally, outgoing events can commit NIP-13 proof of work
