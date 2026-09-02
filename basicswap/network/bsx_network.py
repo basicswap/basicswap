@@ -574,7 +574,6 @@ class BSXNetwork:
                     cursor,
                     timestamp,
                     deterministic,
-                    to_pubkey=remote_pubkey,
                 )
                 return message_id
             # Route not established or network inactive, fall through to broadcast

@@ -14688,7 +14688,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bytes.fromhex(payload_hex),
             self.SMSG_SECONDS_IN_HOUR,
             cursor,
-            to_pubkey=remote_nostr_pubkey,
             pubkey_to=pubkey_to,
         )
         self.log.info(f"Sent CONNECT_REQ ACK {self.logIDB(ack_msgid)}")
