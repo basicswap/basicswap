@@ -169,13 +169,15 @@ def parseNostrEvent(self, network, event):
         return None
 
     # Same SMSG blob wrapped in a fresh event must not trigger another
-    # trial decryption.
-    if client.haveSeenSmsgId(smsg_id):
+    # trial decryption. Only mark after a successful decrypt so a CONNECT_REQ
+    # ACK that arrives before the bid address is queryable is not burned.
+    if client.haveSeenSmsgId(smsg_id, mark=False):
         return None
 
     decrypted_msg = decryptNostrMsg(self, msg_data)
     if decrypted_msg is None:
         return None
+    client.haveSeenSmsgId(smsg_id, mark=True)
     if is_direct:
         self.num_direct_nostr_messages_received += 1
     else:

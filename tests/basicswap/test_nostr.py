@@ -249,6 +249,32 @@ class TestNostrInboundGates(unittest.TestCase):
             assert parseNostrEvent(fake_self, network, event_b) is None
         assert mock_decrypt.call_count == 1
 
+    def test_failed_decrypt_does_not_burn_smsg_id(self):
+        # A CONNECT_REQ ACK can arrive before the bid address is queryable.
+        # A decrypt miss must not permanently drop that SMSG id.
+        import base64
+        from types import SimpleNamespace
+        from unittest import mock
+        from basicswap.network.nostr import parseNostrEvent
+
+        client = self.makeClient()
+        network = {"client": client}
+        fake_self = SimpleNamespace(
+            num_nostr_messages_received=0,
+            num_direct_nostr_messages_received=0,
+        )
+
+        content = base64.b64encode(bytes(200)).decode("utf-8")
+        event = self.makeEvent(content=content)
+
+        with mock.patch(
+            "basicswap.network.nostr.decryptNostrMsg",
+            side_effect=[None, {"payload": b"x"}],
+        ) as mock_decrypt:
+            assert parseNostrEvent(fake_self, network, event) is None
+            assert parseNostrEvent(fake_self, network, event) is not None
+        assert mock_decrypt.call_count == 2
+
 
 class TestNostrClientRelay(unittest.TestCase):
     """Integration tests against the in-process mini relay."""

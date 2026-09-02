@@ -311,15 +311,17 @@ class NostrClient:
             },
         ]
 
-    def haveSeenSmsgId(self, smsg_id: bytes) -> bool:
-        """Check and mark an SMSG payload id.  Deduplicates replays of the
-        same SMSG blob wrapped in fresh nostr events before the expensive
-        trial decryption. Safe to call before decryption as the id commits
-        to the whole message, a corrupted copy hashes to a different id.
+    def haveSeenSmsgId(self, smsg_id: bytes, mark: bool = True) -> bool:
+        """Check, and optionally mark, an SMSG payload id. Deduplicates
+        replays of the same SMSG blob wrapped in fresh nostr events.
+        Call with mark=False before trial decryption so a decrypt miss
+        (e.g. ACK before the bid address is saved) can be retried.
         """
         with self.mutex:
             if smsg_id in self._seen_smsg_ids:
                 return True
+            if not mark:
+                return False
             self._seen_smsg_ids[smsg_id] = True
             while len(self._seen_smsg_ids) > MAX_SEEN_EVENT_IDS:
                 self._seen_smsg_ids.popitem(last=False)

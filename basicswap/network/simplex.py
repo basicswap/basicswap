@@ -328,7 +328,9 @@ def decryptSimplexMsg(self, msg_data):
     except Exception as e:  # noqa: F841
         pass
 
-    # Try with all active bid/offer addresses
+    # Try with all active bid/offer addresses. Include BID/OFFER rows in
+    # smsgaddresses so a CONNECT_REQ ACK can decrypt after prepareSMSGAddress
+    # and before the bid row is committed.
     query: str = """SELECT DISTINCT address FROM (
         SELECT b.bid_addr AS address FROM bids b
                JOIN bidstates s ON b.state = s.state_id
@@ -337,7 +339,9 @@ def decryptSimplexMsg(self, msg_data):
         UNION
         SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
         UNION
-        SELECT addr AS address FROM smsgaddresses WHERE active_ind = 1 AND use_type = :local_portal
+        SELECT addr AS address FROM smsgaddresses
+               WHERE active_ind = 1 AND use_type IN (
+                   :local_portal, :bid, :offer, :recv_offer, :send_offer)
         )"""
 
     now: int = self.getTime()
@@ -345,7 +349,15 @@ def decryptSimplexMsg(self, msg_data):
     try:
         cursor = self.openDB()
         addr_rows = cursor.execute(
-            query, {"now": now, "local_portal": AddressTypes.PORTAL_LOCAL}
+            query,
+            {
+                "now": now,
+                "local_portal": AddressTypes.PORTAL_LOCAL,
+                "bid": AddressTypes.BID,
+                "offer": AddressTypes.OFFER,
+                "recv_offer": AddressTypes.RECV_OFFER,
+                "send_offer": AddressTypes.SEND_OFFER,
+            },
         ).fetchall()
         decrypted = None
         for row in addr_rows:
