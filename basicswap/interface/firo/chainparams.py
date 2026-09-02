@@ -10,7 +10,7 @@ params = {
     "name": "firo",
     "ticker": "FIRO",
     "message_magic": "Zcoin Signed Message:\n",
-    "blocks_target": 60 * 10,
+    "blocks_target": 150,
     "decimal_places": 8,
     "has_cltv": False,
     "has_csv": False,

@@ -12,6 +12,7 @@ params = {
     "name": "monero",
     "ticker": "XMR",
     "client": "xmr",
+    "blocks_target": 60 * 2,
     "decimal_places": 12,
     "mainnet": {
         "rpcport": 18081,
