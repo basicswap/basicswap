@@ -10,7 +10,7 @@ params = {
     "name": "litecoin",
     "ticker": "LTC",
     "message_magic": "Litecoin Signed Message:\n",
-    "blocks_target": 60 * 1,
+    "blocks_target": 150,
     "decimal_places": 8,
     "mainnet": {
         "rpcport": 9332,
