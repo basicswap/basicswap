@@ -833,7 +833,18 @@ class Test(TestFunctions):
                 use_rpcauth=True,
                 # do_test_03_follower_recover_a_lock_tx needs the swipe tx mercy output
                 extra_settings={
-                    "min_sequence_lock_seconds": 10,
+                    # An electrum client sees new blocks on a poll tick
+                    # (electrum_poll_interval, 10s jittered to 15s) not a zmq
+                    # push, and cannot publish the lock refund spend before it
+                    # has observed the refund tx, so a window narrower than one
+                    # tick loses to the counterparty swipe. 10s fails for BCH;
+                    # 60s, as test_persistent.py already uses, passes.
+                    "min_sequence_lock_seconds": int(
+                        os.getenv(
+                            "TEST_MIN_SEQUENCE_LOCK_SECONDS",
+                            60 if cls.test_coin_b_name == "bitcoincash" else 10,
+                        )
+                    ),
                     "altruistic": True,
                     # A fresh regtest node can still report initial-block-download
                     # when the wallet is seeded, so sethdseed fails and the wallet
