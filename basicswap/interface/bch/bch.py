@@ -122,6 +122,14 @@ class BCHInterface(BTCInterface):
 
     def getUnspentsByAddr(self):
         unspent_addr = dict()
+        if self.useBackend():
+            wm = self.getWalletManager()
+            if wm:
+                addresses = wm.getAllAddresses(self.coin_type())
+                if addresses:
+                    return self._backend.getBalance(addresses)
+            return unspent_addr
+
         unspent = self.rpc_wallet("listunspent")
         for u in unspent:
             if u.get("spendable", False) is False:
@@ -186,10 +194,13 @@ class BCHInterface(BTCInterface):
         address = self.encodeScriptDest(lock_tx_dest)
 
         if not self.isAddressMine(address, or_watch_only=True):
-            # Expects P2WSH nested in BIP16_P2SH
-            self.rpc_wallet(
-                "importaddress", [lock_tx_dest.hex(), "bid lock", False, True]
-            )
+            if self.useBackend():
+                self.importWatchOnlyAddress(address, "bid lock")
+            else:
+                # Expects P2WSH nested in BIP16_P2SH
+                self.rpc_wallet(
+                    "importaddress", [lock_tx_dest.hex(), "bid lock", False, True]
+                )
 
         return address
 
@@ -198,8 +209,10 @@ class BCHInterface(BTCInterface):
             wm = self.getWalletManager()
             if wm:
                 # Compute scripthash explicitly; _computeScripthash is bech32-only.
-                script = self.getScriptForPubkeyHash(self.decodeAddress(address))
-                scripthash = sha256(bytes(script))[::-1].hex()
+                # Must dispatch on the cashaddr type: swap lock addresses are
+                # P2SH, and hashing a P2PKH script for them would watch the
+                # wrong scripthash and never see the lock confirm.
+                scripthash = sha256(self._destScriptForAddress(address))[::-1].hex()
                 wm.importWatchOnlyAddress(
                     self.coin_type(),
                     address,
@@ -307,6 +320,15 @@ class BCHInterface(BTCInterface):
             return CScript([OP_HASH256, script_hash, OP_EQUAL])
 
     def withdrawCoin(self, value: float, addr_to: str, subfee: bool):
+        if self.useBackend():
+            # Build and sign through the BCH paths (cashaddr funding, FORKID
+            # signer) rather than btc.py's segwit-oriented electrum withdraw.
+            tx_hex = self.createRawFundedTransaction(
+                addr_to, self.make_int(value), sub_fee=subfee
+            )
+            signed_tx = self.signTxWithWallet(bytes.fromhex(tx_hex))
+            return self._backend.broadcastTransaction(signed_tx.hex())
+
         params = [addr_to, value, "", "", subfee, 0, False]
         return self.rpc_wallet("sendtoaddress", params)
 
@@ -332,6 +354,26 @@ class BCHInterface(BTCInterface):
         lock_tx_vout: int,
         script_pk: bytes,
     ) -> (int, int):
+        if self.useBackend():
+            locked_n = None
+            actual_value = None
+            tx_hex = self.getBackend().getTransactionRaw(chain_b_lock_txid.hex())
+            if tx_hex:
+                lock_tx = self.loadTx(bytes.fromhex(tx_hex))
+                locked_n = findOutput(lock_tx, script_pk)
+                if locked_n is not None:
+                    actual_value = lock_tx.vout[locked_n].nValue
+                else:
+                    self._log.error(
+                        f"getBLockTxo: Output not found in tx {self._log.id(chain_b_lock_txid)}, "
+                        f"script_pk={script_pk.hex()}, num_outputs={len(lock_tx.vout)}"
+                    )
+            else:
+                self._log.warning(
+                    f"getBLockTxo: Failed to fetch tx {self._log.id(chain_b_lock_txid)} from backend"
+                )
+            return locked_n, actual_value
+
         txout = self.rpc("gettxout", [chain_b_lock_txid.hex(), lock_tx_vout, True])
         actual_value = self.make_int(txout["value"])
         return lock_tx_vout, actual_value
@@ -522,6 +564,12 @@ class BCHInterface(BTCInterface):
         )
 
     def getSpendableBalance(self) -> int:
+        if self.useBackend():
+            cached = getattr(self, "_cached_wallet_info", None)
+            if cached is not None:
+                return self.make_int(cached.get("balance", 0))
+            return 0
+
         return self.make_int(self.rpc_wallet("getbalance", ["*", 1, False]))
 
     def getScriptDest(self, script):

@@ -116,7 +116,6 @@ DEFAULT_ELECTRUM_SERVERS = {
         {"host": "bch.imaginary.cash", "port": 50002, "ssl": True},
         {"host": "bch0.kister.net", "port": 50002, "ssl": True},
         {"host": "bch.loping.net", "port": 50002, "ssl": True},
-        {"host": "bch.soul-dev.com", "port": 50002, "ssl": True},
         {"host": "blackie.c3-soft.com", "port": 50002, "ssl": True},
         {"host": "electron.jochen-hoenicke.de", "port": 51002, "ssl": True},
         {"host": "electroncash.dk", "port": 50002, "ssl": True},
