@@ -1549,6 +1549,7 @@ def main():
     electrum_supported_coins = {
         "bitcoin": "btc",
         "litecoin": "ltc",
+        "bitcoincash": "bch",
     }
 
     for coin_name, coin_prefix in electrum_supported_coins.items():

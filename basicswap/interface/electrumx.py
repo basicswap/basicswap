@@ -111,11 +111,28 @@ DEFAULT_ELECTRUM_SERVERS = {
         {"host": "electrum-ltc.petrkr.net", "port": 60002, "ssl": True},
         {"host": "electrum.jochen-hoenicke.de", "port": 50004, "ssl": True},
     ],
+    # Sourced from Electron Cash servers.json, live-verified.
+    "bitcoincash": [
+        {"host": "bch.imaginary.cash", "port": 50002, "ssl": True},
+        {"host": "bch0.kister.net", "port": 50002, "ssl": True},
+        {"host": "bch.loping.net", "port": 50002, "ssl": True},
+        {"host": "bch.soul-dev.com", "port": 50002, "ssl": True},
+        {"host": "blackie.c3-soft.com", "port": 50002, "ssl": True},
+        {"host": "electron.jochen-hoenicke.de", "port": 51002, "ssl": True},
+        {"host": "electroncash.dk", "port": 50002, "ssl": True},
+        {"host": "electrum.imaginary.cash", "port": 50002, "ssl": True},
+        {"host": "bch.cyberbits.eu", "port": 50002, "ssl": True},
+        {"host": "cashnode.bch.ninja", "port": 50002, "ssl": True},
+        {"host": "fulcrum.criptolayer.net", "port": 50002, "ssl": True},
+        {"host": "fulcrum.jettscythe.xyz", "port": 50002, "ssl": True},
+        {"host": "fulcrum.aglauck.com", "port": 50002, "ssl": True},
+    ],
 }
 
 DEFAULT_ONION_SERVERS = {
     "bitcoin": [],
     "litecoin": [],
+    "bitcoincash": [],
 }
 
 
@@ -583,6 +600,23 @@ def scripthash_from_address(address, network_params):
         OP_0,
         OP_EQUAL,
     )
+
+    # CashAddr (BCH) - neither base58 nor bech32, handle before the try block.
+    cashaddr_prefixes = ("bitcoincash", "bchtest", "bchreg")
+    if ":" in address and address.split(":", 1)[0].lower() in cashaddr_prefixes:
+        from basicswap.interface.bch.contrib.cashaddress import Address
+
+        decoded = Address.from_string(address)
+        payload = bytes(decoded.payload)
+        if decoded.version.startswith("P2PKH"):
+            script = CScript([OP_DUP, OP_HASH160, payload, OP_EQUALVERIFY, OP_CHECKSIG])
+        elif len(payload) == 32:
+            from basicswap.contrib.test_framework.script import OP_HASH256
+
+            script = CScript([OP_HASH256, payload, OP_EQUAL])
+        else:
+            script = CScript([OP_HASH160, payload, OP_EQUAL])
+        return scripthash_from_script(bytes(script))
 
     try:
         addr_data = decodeAddress(address)

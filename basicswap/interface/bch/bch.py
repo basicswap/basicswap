@@ -6,7 +6,7 @@
 
 from typing import Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
-from basicswap.util import b2i, ensure, i2b
+from basicswap.util import b2i, ensure, i2b, i2h
 from basicswap.util.script import decodePushData, decodeScriptNum
 from basicswap.interface.btc.btc import BTCInterface, ensure_op, findOutput
 from basicswap.chainparams import Coins
@@ -43,7 +43,11 @@ from basicswap.interface.bch.contrib.script import (
     OP_CHECKSIG,
     OP_HASH256,
 )
-from basicswap.contrib.test_framework.script import OP_RETURN, CScript
+from basicswap.contrib.test_framework.script import (
+    OP_RETURN,
+    CScript,
+    SegwitV0SignatureHash,
+)
 from coincurve.keys import (
     PrivateKey,
     PublicKey,
@@ -54,6 +58,10 @@ from coincurve.ecdsaotves import (
     ecdsaotves_dec_sig,
     ecdsaotves_rec_enc_key,
 )
+
+# SIGHASH_ALL | SIGHASH_FORKID -- BCH replay-protection sighash type.
+# https://github.com/bitcoincashorg/bitcoincash.org/blob/master/spec/replay-protected-sighash.md
+BCH_SIGHASH_FORKID = 0x41
 
 
 class BCHInterface(BTCInterface):
@@ -77,9 +85,10 @@ class BCHInterface(BTCInterface):
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 302
 
-    @staticmethod
-    def watch_blocks_for_scripts() -> bool:
-        # TODO: BCH Watchonly: Remove when BCH watchonly works.
+    def watch_blocks_for_scripts(self) -> bool:
+        # Electrum mode uses scripthash subscriptions; no block scanning needed.
+        if self._connection_type == "electrum":
+            return False
         return True
 
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
@@ -101,6 +110,13 @@ class BCHInterface(BTCInterface):
     def getNewAddress(
         self, use_segwit: bool = False, label: str = "swap_receive"
     ) -> str:
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm:
+                return wm.getNewAddress(self.coin_type(), internal=False, label=label)
+            raise ValueError(
+                f"{self.coin_name()} wallet not initialized (electrum mode)"
+            )
         args = [label]
         return self.rpc_wallet("getnewaddress", args)
 
@@ -118,6 +134,8 @@ class BCHInterface(BTCInterface):
         return unspent_addr
 
     def createWallet(self, wallet_name: str, password: str = ""):
+        if self._connection_type == "electrum":
+            return
         self.rpc("createwallet", [wallet_name, False])
         if password != "":
             self.rpc(
@@ -129,6 +147,8 @@ class BCHInterface(BTCInterface):
             )
 
     def newKeypool(self) -> None:
+        if self._connection_type == "electrum":
+            return
         self._log.debug("Refreshing keypool.")
 
         # Use up current keypool
@@ -152,6 +172,15 @@ class BCHInterface(BTCInterface):
     def decodeSegwitAddress(self, addr):
         raise ValueError("Segwit not supported")
 
+    def getDestForAddress(self, address: str) -> bytes:
+        # Override: inherited bech32/base58 dispatch fails on cashaddr.
+        # Branch on the decoded cashaddr version for P2PKH vs P2SH.
+        decoded = Address.from_string(address)
+        payload = bytes(decoded.payload)
+        if decoded.version.startswith("P2PKH"):
+            return self.getScriptForPubkeyHash(payload)
+        return self.getDestForScriptHash(payload)
+
     def getSCLockScriptAddress(self, lock_script: bytes) -> str:
         lock_tx_dest = self.getScriptDest(lock_script)
         address = self.encodeScriptDest(lock_tx_dest)
@@ -165,7 +194,29 @@ class BCHInterface(BTCInterface):
         return address
 
     def importWatchOnlyAddress(self, address: str, label: str):
+        if self._connection_type == "electrum":
+            wm = self.getWalletManager()
+            if wm:
+                # Compute scripthash explicitly; _computeScripthash is bech32-only.
+                script = self.getScriptForPubkeyHash(self.decodeAddress(address))
+                scripthash = sha256(bytes(script))[::-1].hex()
+                wm.importWatchOnlyAddress(
+                    self.coin_type(),
+                    address,
+                    scripthash=scripthash,
+                    label=label,
+                    source="swap",
+                )
+            return
         self.rpc_wallet("importaddress", [address, label, False, True])
+
+    def _destScriptForAddress(self, address: str) -> bytes:
+        # Branch on cashaddr version to produce the correct scriptPubKey.
+        parsed = Address.from_string(address)
+        payload = bytes(parsed.payload)
+        if parsed.version.startswith("P2SH"):
+            return bytes(self.getDestForScriptHash(payload))
+        return bytes(self.getScriptForPubkeyHash(payload))
 
     def createRawFundedTransaction(
         self,
@@ -175,6 +226,25 @@ class BCHInterface(BTCInterface):
         lock_unspents: bool = True,
         feerate: int = None,
     ) -> str:
+        if self._connection_type == "electrum":
+            # Electrum mode: build and fund a wallet-send tx.
+            if not feerate:
+                feerate, _fee_src = self.get_fee_rate(self._conf_target)
+            script = (
+                addr_to
+                if isinstance(addr_to, bytes)
+                else self._destScriptForAddress(addr_to)
+            )
+            tx = CTransaction()
+            tx.nVersion = self.txVersion()
+            tx.vout.append(self.txoType()(amount, script))
+            funded_tx = self.fundTx(
+                tx.serialize_without_witness(),
+                feerate,
+                lock_unspents=lock_unspents,
+                subfee=sub_fee,
+            )
+            return funded_tx.hex()
 
         if isinstance(addr_to, bytes):
             # addr_to is script_pubkey
@@ -267,6 +337,8 @@ class BCHInterface(BTCInterface):
         return lock_tx_vout, actual_value
 
     def findConfirmedTxnByHash(self, txid_hex: str):
+        if self._connection_type == "electrum":
+            return self._findConfirmedTxnByHashElectrum(txid_hex)
         # Only works for wallet txns
         try:
             rv = self.rpc("gettransaction", [txid_hex])
@@ -290,6 +362,10 @@ class BCHInterface(BTCInterface):
         vout: int = -1,
         return_invalid_txids: bool = False,
     ) -> dict | None:
+        if self._connection_type == "electrum":
+            return self._getLockTxHeightElectrum(
+                txid, dest_address, bid_amount, rescan_from, find_index, vout
+            )
         # Currently, for BCH, importing the watchonly address only works if rescanblockchain is run on every iteration
         if txid is None:
             self._log.debug("TODO: getLockTxHeight")
@@ -459,6 +535,12 @@ class BCHInterface(BTCInterface):
                 OP_EQUAL,
             ]
         )
+
+    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None) -> bytes:
+        # Override: BCH has no segwit, so the inherited require_segwit_inputs
+        # filter rejects all BCH UTXOs. The covenant's confirmed-outpoint
+        # spend model also makes the malleability guard unnecessary.
+        return self.fundTx(tx_bytes, feerate, bid_id=bid_id)
 
     def createSCLockTx(
         self, value: int, script: bytearray, vkbv: bytes = None
@@ -707,6 +789,137 @@ class BCHInterface(BTCInterface):
 
     def setTxSignature(self, tx_bytes: bytes, stack) -> bytes:
         return tx_bytes
+
+    def _signTxWithWalletElectrum(self, tx: bytes) -> bytes:
+        # BCH electrum signing: P2PKH inputs with SIGHASH_FORKID preimage.
+        # Uses SegwitV0SignatureHash with the FORKID bit (0x41) -- same
+        # preimage structure, different hashtype from BTC/LTC's witness path.
+        wm = self.getWalletManager()
+        backend = self.getBackend()
+        if not wm or not backend:
+            raise ValueError("Electrum backend or WalletManager not available")
+
+        parsed_tx = self.loadTx(tx)
+
+        utxos = self._getPendingUtxos(parsed_tx)
+        if not utxos or len(utxos) != len(parsed_tx.vin):
+            utxos = []
+            txids_to_fetch = [i2h(vin.prevout.hash) for vin in parsed_tx.vin]
+
+            tx_batch = {}
+            if hasattr(backend, "getTransactionBatch"):
+                tx_batch = backend.getTransactionBatch(txids_to_fetch)
+
+            needs_raw = any(
+                tx_batch.get(t) is None or not isinstance(tx_batch.get(t), dict)
+                for t in txids_to_fetch
+            )
+
+            if needs_raw:
+                if hasattr(backend, "getTransactionBatchRaw"):
+                    tx_batch_raw = backend.getTransactionBatchRaw(txids_to_fetch)
+                else:
+                    tx_batch_raw = {
+                        t: backend.getTransactionRaw(t) for t in txids_to_fetch
+                    }
+
+                for vin in parsed_tx.vin:
+                    txid_hex = i2h(vin.prevout.hash)
+                    vout_n = vin.prevout.n
+                    prev_tx_hex = tx_batch_raw.get(txid_hex)
+                    if prev_tx_hex:
+                        prev_tx = self.loadTx(bytes.fromhex(prev_tx_hex))
+                        if vout_n < len(prev_tx.vout):
+                            prev_out = prev_tx.vout[vout_n]
+                            addr = self.getAddressFromScriptPubKey(
+                                prev_out.scriptPubKey
+                            )
+                            utxos.append(
+                                {
+                                    "address": addr,
+                                    "value": prev_out.nValue,
+                                    "txid": txid_hex,
+                                    "vout": vout_n,
+                                }
+                            )
+            else:
+                for vin in parsed_tx.vin:
+                    txid_hex = i2h(vin.prevout.hash)
+                    vout = vin.prevout.n
+                    prev_tx = tx_batch.get(txid_hex)
+                    if prev_tx and "vout" in prev_tx:
+                        vouts = prev_tx["vout"]
+                        if vout >= len(vouts):
+                            self._log.warning(
+                                f"_signTxWithWalletElectrum: vout {vout} out of range for {txid_hex[:16]}..."
+                            )
+                            continue
+                        prev_out = vouts[vout]
+                        if "scriptPubKey" in prev_out:
+                            addr = prev_out["scriptPubKey"].get(
+                                "address",
+                                prev_out["scriptPubKey"].get("addresses", [None])[0],
+                            )
+                            value = int(prev_out.get("value", 0) * 100000000)
+                            utxos.append(
+                                {
+                                    "address": addr,
+                                    "value": value,
+                                    "txid": txid_hex,
+                                    "vout": vout,
+                                }
+                            )
+
+        for i, (vin, utxo) in enumerate(zip(parsed_tx.vin, utxos)):
+            address = utxo.get("address")
+            if not address:
+                raise ValueError(f"Cannot find address for input {i}")
+
+            priv_key = wm.getPrivateKey(self.coin_type(), address)
+            if not priv_key:
+                if wm.importAddress(self.coin_type(), address, max_scan_index=2000):
+                    priv_key = wm.getPrivateKey(self.coin_type(), address)
+            if not priv_key:
+                addr_info = wm.getAddressInfo(self.coin_type(), address)
+                if addr_info and addr_info.get("is_watch_only"):
+                    self._log.error(
+                        f"_signTxWithWalletElectrum: Address {address} is watch-only without private key. "
+                        f"This UTXO cannot be spent. label={addr_info.get('label', 'unknown')}"
+                    )
+                else:
+                    self._log.error(
+                        f"_signTxWithWalletElectrum: Cannot find private key for address {address}, "
+                        f"txid={utxo.get('txid', 'unknown')[:16]}..., vout={utxo.get('vout', -1)}"
+                    )
+                raise ValueError(f"Cannot find private key for address {address}")
+
+            pk = PrivateKey(priv_key)
+            pubkey = pk.public_key.format()
+
+            expected_pkh = self.decodeAddress(address)
+            actual_pkh = hash160(pubkey)
+            if expected_pkh != actual_pkh:
+                self._log.error(
+                    f"Private key mismatch for address {address}: "
+                    f"expected pkh {expected_pkh.hex()}, got {actual_pkh.hex()}"
+                )
+                raise ValueError(f"Private key does not match address {address}")
+
+            script_code = self.getScriptForPubkeyHash(expected_pkh)
+            value = utxo.get("value", 0)
+
+            sighash = SegwitV0SignatureHash(
+                script_code, parsed_tx, i, BCH_SIGHASH_FORKID, value
+            )
+            der_sig = pk.sign(sighash, hasher=None)
+            sig = der_sig + bytes((BCH_SIGHASH_FORKID & 0xFF,))
+            parsed_tx.vin[i].scriptSig = CScript([sig, pubkey])
+
+        self._log.debug(f"_signTxWithWalletElectrum: signed {len(utxos)} inputs")
+
+        self._clearPendingUtxos(parsed_tx)
+
+        return parsed_tx.serialize_without_witness()
 
     def extractScriptLockScriptValuesFromScriptSig(self, script_bytes):
         signature, nb = decodePushData(script_bytes, 0)
@@ -1184,6 +1397,14 @@ class BCHInterface(BTCInterface):
         return spend_tx.vin[0].nSequence == 0 and signature is not None
 
     def isTxExistsError(self, err_str: str) -> bool:
+        if self._connection_type == "electrum":
+            # Fulcrum/BCHN relay-reject strings.
+            err_lower = err_str.lower()
+            return (
+                "txn-already-known" in err_lower
+                or "already have transaction" in err_lower
+                or "transaction already in block chain" in err_lower
+            )
         return "transaction already in block chain" in err_str
 
     def lockNonSegwitPrevouts(self) -> None:
