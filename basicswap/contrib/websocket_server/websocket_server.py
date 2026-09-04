@@ -465,23 +465,27 @@ class WebSocketHandler(StreamRequestHandler):
     def read_http_headers(self):
         headers = {}
         # first line should be HTTP GET
-        http_get = self.rfile.readline().decode().strip()
-        assert http_get.upper().startswith('GET')
+        http_get = self.rfile.readline().decode(errors="replace").strip()
+        if not http_get.upper().startswith('GET'):
+            return None
         # remaining should be headers
         while True:
-            header = self.rfile.readline().decode().strip()
+            header = self.rfile.readline().decode(errors="replace").strip()
             if not header:
                 break
-            head, value = header.split(':', 1)
+            head, sep, value = header.partition(':')
+            if not sep:
+                continue
             headers[head.lower().strip()] = value.strip()
         return headers
 
     def handshake(self):
         headers = self.read_http_headers()
+        if headers is None:
+            self.keep_alive = False
+            return
 
-        try:
-            assert headers['upgrade'].lower() == 'websocket'
-        except AssertionError:
+        if headers.get('upgrade', '').lower() != 'websocket':
             self.keep_alive = False
             return
 

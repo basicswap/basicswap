@@ -1171,6 +1171,41 @@ class Test(unittest.TestCase):
         for headers, settings, expected in cases:
             assert check(Stub(settings), headers) is expected, (headers, settings)
 
+    def test_ws_handshake_bad_request(self):
+        # Anything that is not a websocket handshake (port scans, a client that
+        # closes before sending, a TLS hello) must close the connection instead
+        # of raising out of the request handler.
+        import io
+        from basicswap.contrib.websocket_server.websocket_server import (
+            WebSocketHandler,
+        )
+
+        def make_handler(data: bytes):
+            handler = WebSocketHandler.__new__(WebSocketHandler)
+            handler.rfile = io.BytesIO(data)
+            handler.keep_alive = True
+            handler.handshake_done = False
+            handler.valid_client = False
+            return handler
+
+        for data in (
+            b"",
+            b"\r\n",
+            b"\x16\x03\x01\x00\xa5\x01\x00\x00\xa1\x03\x03",
+            b"POST / HTTP/1.1\r\nUpgrade: websocket\r\n\r\n",
+        ):
+            handler = make_handler(data)
+            assert handler.read_http_headers() is None
+            handler.handshake()
+            assert handler.keep_alive is False
+
+        # A plain GET without the upgrade header is parsed, then rejected.
+        handler = make_handler(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nbroken\r\n\r\n")
+        assert handler.read_http_headers() == {"host": "127.0.0.1"}
+        handler = make_handler(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        handler.handshake()
+        assert handler.keep_alive is False
+
     def test_is_allowed_host(self):
         from basicswap.http_server import HttpHandler
 
