@@ -841,8 +841,10 @@ def printHelp():
     )
     print("--btc-mode=MODE          Set BTC connection mode: rpc, electrum, or remote.")
     print("--ltc-mode=MODE          Set LTC connection mode: rpc, electrum, or remote.")
+    print("--bch-mode=MODE          Set BCH connection mode: rpc, electrum, or remote.")
     print("--btc-electrum-server=   Custom Electrum server for BTC (host:port:ssl).")
     print("--ltc-electrum-server=   Custom Electrum server for LTC (host:port:ssl).")
+    print("--bch-electrum-server=   Custom Electrum server for BCH (host:port:ssl).")
 
     active_coins = []
     for coin_name in known_coins.keys():
