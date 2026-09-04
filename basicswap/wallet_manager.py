@@ -38,11 +38,12 @@ _AEAD_MAC_LEN = 16
 
 class WalletManager:
 
-    SUPPORTED_COINS = {Coins.BTC, Coins.LTC}
+    SUPPORTED_COINS = {Coins.BTC, Coins.LTC, Coins.BCH}
 
     BIP84_COIN_TYPES = {
         Coins.BTC: 0,
         Coins.LTC: 2,
+        Coins.BCH: 145,
     }
 
     HRP = {
@@ -122,12 +123,29 @@ class WalletManager:
         )
         return chain.derive(index)._key
 
+    def _bchAddress(self, pkh: bytes) -> str:
+        # BCH uses cashaddr, not bech32.
+        from basicswap.interface.bch.contrib.cashaddress import Address
+
+        suffix = {"mainnet": "", "testnet": "-TESTNET", "regtest": "-REGTEST"}.get(
+            self._swap_client.chain, ""
+        )
+        return Address(f"P2PKH{suffix}", list(pkh)).cash_address()
+
+    @staticmethod
+    def _bchScripthash(pkh: bytes) -> str:
+        # BCH has no segwit, so funds sit on P2PKH, not P2WPKH.
+        script = bytes([0x76, 0xA9, 0x14]) + pkh + bytes([0x88, 0xAC])
+        return sha256(script)[::-1].hex()
+
     def _deriveAddress(
         self, coin_type: Coins, index: int, internal: bool = False
     ) -> Tuple[str, str, bytes]:
         key = self._deriveKey(coin_type, index, internal)
         pubkey = PublicKey.from_secret(key).format()
         pkh = hash160(pubkey)
+        if coin_type == Coins.BCH:
+            return self._bchAddress(pkh), self._bchScripthash(pkh), pubkey
         address = segwit_addr.encode(self._getHRP(coin_type), 0, pkh)
         scripthash = sha256(bytes([0x00, 0x14]) + pkh)[::-1].hex()
         return address, scripthash, pubkey
@@ -901,7 +919,10 @@ class WalletManager:
     ) -> bool:
         try:
             pubkey = PublicKey.from_secret(private_key).format()
-            if (
+            if coin_type == Coins.BCH:
+                if self._bchAddress(hash160(pubkey)) != address:
+                    return False
+            elif (
                 segwit_addr.encode(self._getHRP(coin_type), 0, hash160(pubkey))
                 != address
             ):
@@ -1102,6 +1123,10 @@ class WalletManager:
         return bytes(a ^ b for a, b in zip(encrypted_key, self._getXorKey(coin_type)))
 
     def _computeScripthash(self, coin_type: Coins, address: str) -> str:
+        if coin_type == Coins.BCH:
+            from basicswap.interface.bch.contrib.cashaddress import Address
+
+            return self._bchScripthash(bytes(Address.from_string(address).payload))
         _, data = segwit_addr.decode(self._getHRP(coin_type), address)
         if data is None:
             return ""

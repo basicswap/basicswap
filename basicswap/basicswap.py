@@ -1208,7 +1208,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         elif coin == Coins.BCH:
             from .interface.bch.bch import BCHInterface
 
-            return BCHInterface(self.coin_clients[coin], self.chain, self)
+            connection_type = self.coin_clients[coin].get("connection_type", "rpc")
+            interface = BCHInterface(self.coin_clients[coin], self.chain, self)
+
+            if connection_type == "electrum":
+                self._initElectrumBackend(coin, interface)
+
+            return interface
         elif coin == Coins.LTC:
             from .interface.ltc.ltc import LTCInterface, LTCInterfaceMWEB
 

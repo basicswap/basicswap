@@ -83,7 +83,10 @@ from tests.basicswap.util.common import (
     stopDaemons,
     post_json_api,
     read_json_api,
+    BTC_BASE_RPC_PORT,
+    LTC_BASE_RPC_PORT,
 )
+from tests.basicswap.test_bch_xmr import BCH_BASE_RPC_PORT
 from tests.basicswap.util.harness import run_prepare, TEST_PATH
 from tests.basicswap.test_persistent import (
     BaseTestWithPrepare,
@@ -778,7 +781,12 @@ class Test(TestFunctions):
 
     @classmethod
     def setUpClass(cls):
-        core_port: int = 32793 if cls.test_coin_b_name == "bitcoin" else 35793
+        rpc_port_base: int = {
+            "bitcoin": BTC_BASE_RPC_PORT,
+            "litecoin": LTC_BASE_RPC_PORT,
+            "bitcoincash": BCH_BASE_RPC_PORT,
+        }.get(cls.test_coin_b_name, BTC_BASE_RPC_PORT)
+        core_port: int = rpc_port_base + PORT_OFS
         cls.addElectrumxDaemon(cls.test_coin_b_name, core_port, cls.electrumx_port)
         super().setUpClass()
 
@@ -801,16 +809,15 @@ class Test(TestFunctions):
 
             extra_args = []
             if i == 1:
-                if cls.test_coin_b_name == "litecoin":
-                    extra_args = [
-                        "--ltc-mode=electrum",
-                        "--ltc-electrum-server=127.0.0.1:50001",
-                    ]
-                else:
-                    extra_args = [
-                        "--btc-mode=electrum",
-                        "--btc-electrum-server=127.0.0.1:50001",
-                    ]
+                coin_b_prefix = {
+                    "bitcoin": "btc",
+                    "litecoin": "ltc",
+                    "bitcoincash": "bch",
+                }.get(cls.test_coin_b_name, "btc")
+                extra_args = [
+                    f"--{coin_b_prefix}-mode=electrum",
+                    f"--{coin_b_prefix}-electrum-server=127.0.0.1:50001",
+                ]
             wallets_password: str = os.getenv("TEST_WALLET_ENCRYPTION_PWD", None)
             if wallets_password is not None:
                 assert isinstance(wallets_password, str)
@@ -825,7 +832,26 @@ class Test(TestFunctions):
                 num_nodes=NUM_NODES,
                 use_rpcauth=True,
                 # do_test_03_follower_recover_a_lock_tx needs the swipe tx mercy output
-                extra_settings={"min_sequence_lock_seconds": 10, "altruistic": True},
+                extra_settings={
+                    # An electrum client sees new blocks on a poll tick
+                    # (electrum_poll_interval, 10s jittered to 15s) not a zmq
+                    # push, and cannot publish the lock refund spend before it
+                    # has observed the refund tx, so a window narrower than one
+                    # tick loses to the counterparty swipe. 10s fails for BCH;
+                    # 60s, as test_persistent.py already uses, passes.
+                    "min_sequence_lock_seconds": int(
+                        os.getenv(
+                            "TEST_MIN_SEQUENCE_LOCK_SECONDS",
+                            60 if cls.test_coin_b_name == "bitcoincash" else 10,
+                        )
+                    ),
+                    "altruistic": True,
+                    # A fresh regtest node can still report initial-block-download
+                    # when the wallet is seeded, so sethdseed fails and the wallet
+                    # keeps an unexpected seed. Other test modules (test_xmr.py,
+                    # extended/test_dash.py) relax the same check for this reason.
+                    "restrict_unknown_seed_wallets": False,
+                },
                 port_ofs=PORT_OFS,
                 extra_args=extra_args,
             )
