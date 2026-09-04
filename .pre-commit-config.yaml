@@ -24,7 +24,7 @@ repos:
     rev: 7.3.0
     hooks:
     - id: flake8
-      args: ["--ignore=E203,E501,W503", "--exclude=basicswap/contrib,basicswap/interface/contrib,.eggs,.tox,bin/install_certifi.py"]
+      exclude: ^(basicswap/contrib/|basicswap/interface/[^/]+/contrib/|bin/install_certifi\.py$)
 
   # ESLint - Lint Javascript and fix issues where possible
   - repo: https://github.com/pre-commit/mirrors-eslint
