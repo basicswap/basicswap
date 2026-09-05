@@ -328,9 +328,7 @@ def decryptSimplexMsg(self, msg_data):
     except Exception as e:  # noqa: F841
         pass
 
-    # Try with all active bid/offer addresses. Include BID/OFFER rows in
-    # smsgaddresses so a CONNECT_REQ ACK can decrypt after prepareSMSGAddress
-    # and before the bid row is committed.
+    # Try with all active bid/offer addresses
     query: str = """SELECT DISTINCT address FROM (
         SELECT b.bid_addr AS address FROM bids b
                JOIN bidstates s ON b.state = s.state_id

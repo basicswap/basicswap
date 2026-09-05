@@ -548,7 +548,6 @@ class BSXNetwork:
         networks_list = active_networks_list + bridged_networks_list
         networks_sent_to = set()
 
-        # Direct message routes over nostr
         message_route = self.getMessageRoute(
             int(MessageNetworks.NOSTR), addr_from, addr_to, cursor=cursor
         )
@@ -864,7 +863,6 @@ class BSXNetwork:
 
             self.log.info(f"Closing Simplex chat, id: {connId}")
             closeSimplexChat(self, net_i, connId)
-        # Nostr routes have no connection to close
 
         self.log.debug(f"Removing direct message route: {record_id}.")
         cursor.execute(

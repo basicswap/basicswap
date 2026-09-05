@@ -63,9 +63,6 @@ def initialiseNostrNetwork(self, network_config) -> None:
     try:
         client.waitForConnected(self.delay_event)
     except ValueError:
-        # A relay outage must not stop the node from servicing swaps on
-        # other networks.  Relay threads keep retrying in the background,
-        # only fail startup if nostr is the sole enabled network.
         enabled_networks = [
             n for n in self.settings.get("networks", []) if n.get("enabled", True)
         ]
@@ -168,9 +165,6 @@ def parseNostrEvent(self, network, event):
     except Exception:
         return None
 
-    # Same SMSG blob wrapped in a fresh event must not trigger another
-    # trial decryption. Only mark after a successful decrypt so a CONNECT_REQ
-    # ACK that arrives before the bid address is queryable is not burned.
     if client.haveSeenSmsgId(smsg_id, mark=False):
         return None
 

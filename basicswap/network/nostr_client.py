@@ -5,17 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-"""
-Minimal Nostr relay client used as a BSX message transport.
-
-Events carry base64 encoded SMSG encrypted payloads:
- - Broadcast messages are tagged ["t", <broadcast_tag>], the shared channel
-   all BSX nodes subscribe to (analogue of the Simplex #bsx group).
- - Direct messages are tagged ["p", <recipient xonly pubkey hex>] with no
-   broadcast tag.  Payload confidentiality comes from the SMSG layer.
- - Events carry a NIP-40 ["expiration", ts] tag derived from the SMSG TTL.
- - Optional NIP-13 proof of work (["nonce", n, target]).
-"""
+"""Minimal Nostr relay client used as a BSX message transport."""
 
 import hashlib
 import json
@@ -312,11 +302,7 @@ class NostrClient:
         ]
 
     def haveSeenSmsgId(self, smsg_id: bytes, mark: bool = True) -> bool:
-        """Check, and optionally mark, an SMSG payload id. Deduplicates
-        replays of the same SMSG blob wrapped in fresh nostr events.
-        Call with mark=False before trial decryption so a decrypt miss
-        (e.g. ACK before the bid address is saved) can be retried.
-        """
+        """Check, and optionally mark, an SMSG payload id."""
         with self.mutex:
             if smsg_id in self._seen_smsg_ids:
                 return True
@@ -391,9 +377,6 @@ class NostrClient:
         tags = []
         if to_pubkey is not None:
             tags.append(["p", to_pubkey])
-        # Always include the broadcast tag.  Public relays often accept
-        # #p-only events (OK) without delivering them on #p subscriptions,
-        # which stalls CONNECT_REQ ACK and later swap messages.
         tags.append(["t", self.broadcast_tag])
         if expiration is not None:
             tags.append(["expiration", str(int(expiration))])

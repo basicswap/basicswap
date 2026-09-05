@@ -6,17 +6,15 @@ transport, alongside or instead of SMSG and SimpleX.
 All messages remain end-to-end encrypted with the SMSG payload format
 regardless of the transport.  Relays cannot read message contents, but
 as with any nostr client they can see event metadata (sender pubkey,
-recipient tag, timing and size).  Events are signed with a persistent
-key, generate a new `private_key` to unlink from earlier activity.
+timing and size).  Events are signed with a persistent key, generate a
+new `private_key` to unlink from earlier activity.
 
 ## How it works
 
 - Messages are published as Nostr events of kind `4859` to all configured
   relays, signed with a dedicated BIP-340 key (not linked to any wallet key).
-- Broadcast messages (offers) are tagged `["t", "bsx"]`.  All BSX nodes
-  subscribe to this tag.
-- Handshake and swap messages use the same `["t", "bsx"]` broadcast tag
-  as offers.  Payloads remain encrypted to the recipient's smsg address.
+- Every BSX event is tagged `["t", "bsx"]` (offers, handshake, and swap
+  messages).  Payloads stay encrypted to the recipient's smsg address.
 - Events carry a NIP-40 `expiration` tag matching the SMSG TTL, so relays
   can prune them automatically.
 - Optionally, outgoing events can commit NIP-13 proof of work

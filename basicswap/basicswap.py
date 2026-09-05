@@ -6547,7 +6547,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         req_data["bsx_address"] = addr_from
         route_data = {}
         if network_id == MessageNetworks.NOSTR:
-            # net_i is the NostrClient, share this node's pubkey with the peer
             req_data["nostr_pubkey"] = net_i.pubkey
             route_data["local_pubkey"] = net_i.pubkey
         else:
@@ -14639,9 +14638,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.add(message_route_link, cursor)
 
             if network_id == MessageNetworks.NOSTR:
-                # Reply with this node's nostr pubkey so the bidder can DM back.
-                # The bidder's smsg pubkey is not in the DB yet, recover it
-                # from the connect request message.
                 self.sendConnectRequestAck(
                     offer_id,
                     offer.addr_from,
