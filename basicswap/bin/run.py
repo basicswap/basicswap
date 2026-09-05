@@ -20,6 +20,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import chainparams, Coins, isKnownCoinName
+from basicswap.interface.prepare_util import getFileHash
 from basicswap.network.simplex_chat import startSimplexClient
 from basicswap.ui.util import getCoinName
 from basicswap.util.daemon import Daemon
@@ -326,6 +327,76 @@ def getCoreBinArgs(coin_id: int, coin_settings, prepare=False, use_tor_proxy=Fal
     return extra_args
 
 
+def checkSimplexClientBinary(client_path: str, network: dict, logger) -> bool:
+    """Sanity check the simplex-chat binary before launching it.
+
+    Compares the on-disk binary hash against the metadata written by
+    basicswap-prepare (bin/simplex/.verified).  Returns False if the binary
+    is missing or doesn't match the verified hash.  Installs predating the
+    metadata file are allowed through with a warning.
+
+    Sets network["verify_status"] to one of:
+    ok, unverified, missing, hash_mismatch, unsupported_version.
+    """
+    configured_version = network.get("client_version")
+    if configured_version is not None:
+        try:
+            major_version = int(str(configured_version).lstrip("v").split(".")[0])
+        except ValueError:
+            major_version = 0
+        if major_version < 7:
+            network["verify_status"] = "unsupported_version"
+            logger.error(
+                f"Unsupported simplex-chat version {configured_version}, the minimum "
+                "supported version is 7.0.0. "
+                "Re-run basicswap-prepare --addnetwork=simplex to update."
+            )
+            return False
+
+    if not os.path.isfile(client_path) or not os.access(client_path, os.X_OK):
+        network["verify_status"] = "missing"
+        logger.error(f"Simplex client missing or not executable: {client_path}")
+        return False
+
+    metadata_path = os.path.join(os.path.dirname(client_path), ".verified")
+    if not os.path.isfile(metadata_path):
+        network["verify_status"] = "unverified"
+        logger.warning(
+            f"No verification metadata found for Simplex client ({metadata_path}), "
+            "re-run basicswap-prepare --addnetwork=simplex to verify the binary."
+        )
+        return True
+
+    try:
+        with open(metadata_path) as fp:
+            metadata = json.load(fp)
+        expected_hash: str = metadata["sha256"]
+    except Exception as e:
+        network["verify_status"] = "unverified"
+        logger.warning(f"Could not read Simplex verification metadata: {e}")
+        return True
+
+    binary_hash: str = getFileHash(client_path)
+    if binary_hash != expected_hash:
+        network["verify_status"] = "hash_mismatch"
+        logger.error(
+            f"Simplex client hash mismatch: {client_path} has changed since it "
+            f"was verified ({binary_hash} != {expected_hash}). "
+            "Re-run basicswap-prepare --addnetwork=simplex."
+        )
+        return False
+
+    verified_version = metadata.get("version")
+    expected_version = network.get("client_version")
+    if expected_version is not None and verified_version != expected_version:
+        logger.warning(
+            f"Simplex client version mismatch: verified {verified_version}, "
+            f"configured {expected_version}."
+        )
+    network["verify_status"] = "ok"
+    return True
+
+
 def mainLoop(daemons, update: bool = True):
     while not swap_client.delay_event.wait(0.5):
         if update:
@@ -409,6 +480,15 @@ def runClient(
                     continue
                 network_type: str = network.get("type", "unknown")
                 if network_type == "simplex":
+                    if not checkSimplexClientBinary(
+                        network["client_path"], network, swap_client.log
+                    ):
+                        swap_client.log.error(
+                            "Not starting the Simplex network, client binary failed verification."
+                        )
+                        # In-memory only, so startNetworks skips it. Not saved to disk.
+                        network["enabled"] = False
+                        continue
                     simplex_dir = os.path.join(data_dir, "simplex")
                     log_level = "debug" if swap_client.debug else "info"
                     socks_proxy = None

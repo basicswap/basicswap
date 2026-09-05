@@ -155,6 +155,83 @@ def page_settings(self, url_split, post_string):
                 raise ValueError(
                     "TODO: If running in docker see doc/tor.md to enable/disable tor."
                 )
+            elif have_data_entry(form_data, "apply_network_nostr"):
+                active_tab = "networks"
+                relays_text = get_data_entry_or(form_data, "nostr_relays", "")
+                relays = [
+                    line.strip()
+                    for line in html.unescape(relays_text).splitlines()
+                    if line.strip()
+                ]
+                data = {
+                    "relays": relays,
+                    "pow_target": int(
+                        get_data_entry_or(form_data, "nostr_pow_target", "0")
+                    ),
+                }
+                settings_changed, suggest_reboot = swap_client.editNetworkSettings(
+                    "nostr", data
+                )
+                if settings_changed:
+                    messages.append("Nostr settings applied.")
+                if suggest_reboot:
+                    messages.append("Please restart BasicSwap.")
+            elif have_data_entry(form_data, "apply_network_simplex"):
+                active_tab = "networks"
+                data = {
+                    "server_address": html.unescape(
+                        get_data_entry_or(form_data, "simplex_server_address", "")
+                    ).strip(),
+                    "ws_port": int(
+                        get_data_entry_or(form_data, "simplex_ws_port", "5225")
+                    ),
+                    "group_link": html.unescape(
+                        get_data_entry_or(form_data, "simplex_group_link", "")
+                    ).strip(),
+                }
+                settings_changed, suggest_reboot = swap_client.editNetworkSettings(
+                    "simplex", data
+                )
+                if settings_changed:
+                    messages.append("SimpleX settings applied.")
+                if suggest_reboot:
+                    messages.append("Please restart BasicSwap.")
+            elif have_data_entry(form_data, "apply_networks_bridge"):
+                active_tab = "networks"
+                enable_bridge: bool = toBool(
+                    get_data_entry_or(form_data, "bridge_networks", "false")
+                )
+                settings_changed, suggest_reboot = (
+                    swap_client.editBridgeNetworksSetting(enable_bridge)
+                )
+                if settings_changed:
+                    messages.append(
+                        "Network bridging {}.".format(
+                            "enabled" if enable_bridge else "disabled"
+                        )
+                    )
+                if suggest_reboot:
+                    messages.append("Please restart BasicSwap.")
+
+            for network_type in ("smsg", "simplex", "nostr"):
+                if have_data_entry(form_data, "enable_network_" + network_type):
+                    active_tab = "networks"
+                    settings_changed, _ = swap_client.editNetworkSettings(
+                        network_type, {"enabled": True}
+                    )
+                    if settings_changed:
+                        messages.append(
+                            f"Network {network_type} enabled, please restart BasicSwap."
+                        )
+                elif have_data_entry(form_data, "disable_network_" + network_type):
+                    active_tab = "networks"
+                    settings_changed, _ = swap_client.editNetworkSettings(
+                        network_type, {"enabled": False}
+                    )
+                    if settings_changed:
+                        messages.append(
+                            f"Network {network_type} disabled, please restart BasicSwap."
+                        )
 
             electrum_supported_coins = (
                 "bitcoin",
@@ -456,6 +533,26 @@ def page_settings(self, url_split, post_string):
         "control_port": swap_client.tor_control_port,
     }
 
+    networks_formatted = []
+    network_display_names = {
+        "smsg": "SMSG",
+        "simplex": "SimpleX",
+        "nostr": "Nostr",
+    }
+    for network in swap_client.getNetworksInfo():
+        network["display_name"] = network_display_names.get(
+            network["type"], network["type"]
+        )
+        if network["type"] == "nostr":
+            network["relays_text"] = "\n".join(network.get("relays", []))
+        networks_formatted.append(network)
+
+    num_enabled_networks: int = sum(1 for n in networks_formatted if n["enabled"])
+    networks_global = {
+        "bridge_networks": swap_client.settings.get("bridge_networks", False),
+        "can_bridge": num_enabled_networks >= 2,
+    }
+
     template = server.env.get_template("settings.html")
     return self.render_template(
         template,
@@ -469,6 +566,8 @@ def page_settings(self, url_split, post_string):
             "security_settings": security_settings,
             "notification_settings": notification_settings,
             "tor_settings": tor_settings,
+            "networks": networks_formatted,
+            "networks_global": networks_global,
             "active_tab": active_tab,
         },
         extra_headers=extra_headers,

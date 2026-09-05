@@ -17,6 +17,7 @@ import shutil
 import signal
 import socket
 import socks
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -165,17 +166,32 @@ disabled_coins = [
 ]
 
 # Network clients
-SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "6.3.5")
+SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "7.0.0")
 SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", 5225))
 SIMPLEX_SERVER_ADDRESS = os.getenv(
-    "SIMPLEX_CHAT_VERSION",
+    "SIMPLEX_SERVER_ADDRESS",
     "smp://u2dS9sG8nMNURyZwqASV4yROM28Er0luVTx5X1CsMrU=@smp4.simplex.im",
 )
 SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "127.0.0.1:9150")
 SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", None)
+# Trust an existing simplex-chat binary without hash/signature checks
+SIMPLEX_SKIP_VERIFY = toBool(os.getenv("SIMPLEX_SKIP_VERIFY", False))
+# Replace any existing simplex-chat binary with a fresh, verified download
+SIMPLEX_FORCE_DOWNLOAD = toBool(os.getenv("SIMPLEX_FORCE_DOWNLOAD", False))
+# Try the Ubuntu 24.04 simplex-chat build on unsupported Linux distributions
+SIMPLEX_ALLOW_UNSUPPORTED_DISTRO = toBool(
+    os.getenv("SIMPLEX_ALLOW_UNSUPPORTED_DISTRO", False)
+)
+
+NOSTR_RELAYS = os.getenv(
+    "NOSTR_RELAYS",
+    "wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net",
+)
+NOSTR_POW_TARGET = max(0, min(int(os.getenv("NOSTR_POW_TARGET", "0")), 12))
+NOSTR_SOCKS_PROXY = os.getenv("NOSTR_SOCKS_PROXY", None)
 
 
-known_networks = ["smsg", "simplex"]
+known_networks = ["smsg", "simplex", "nostr"]
 disabled_networks = []
 
 
@@ -186,7 +202,7 @@ expected_key_ids = {
         "015B4C837B245509E4AC8995223FDA69DEBEA82D",
         "7121BDE3555D9BE06BDDC68162FE85647DEDDA2E",
     ),
-    "SimpleX_Chat": ("FB44AF81A45BDE327319797C85107E357D4A17FC",),
+    "SimpleX_Chat": ("BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",),  # build@simplex.chat
 }
 
 GUIX_SSL_CERT_DIR = None
@@ -469,6 +485,282 @@ def importPubkey(gpg, pubkey_filename, pubkeyurls):
             break
         except Exception as e:
             logging.warning(f"Import from url failed: {e}")
+
+
+def parseSimplexMajorVersion(version: str) -> int:
+    parts = version.lstrip("v").split(".")
+    try:
+        return int(parts[0])
+    except (ValueError, IndexError):
+        return 0
+
+
+def readOsRelease() -> dict:
+    info = {}
+    try:
+        with open("/etc/os-release") as fp:
+            for line in fp:
+                line = line.strip()
+                if "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                info[key] = value.strip('"')
+    except OSError:
+        pass
+    return info
+
+
+def getSimplexLinuxBuildTag() -> str:
+    os_info = readOsRelease()
+    distro_id: str = os_info.get("ID", "").lower()
+    id_like: str = os_info.get("ID_LIKE", "").lower()
+
+    if distro_id == "ubuntu":
+        try:
+            release_major = int(os_info.get("VERSION_ID", "").split(".")[0])
+        except ValueError:
+            release_major = 0
+        return "ubuntu-22_04" if 0 < release_major < 24 else "ubuntu-24_04"
+
+    if distro_id == "debian" or "debian" in id_like or "ubuntu" in id_like:
+        logger.warning(
+            f"Linux distribution {distro_id or 'unknown'} is untested with the "
+            "simplex-chat Ubuntu builds, continuing with the Ubuntu 24.04 build."
+        )
+        return "ubuntu-24_04"
+
+    if SIMPLEX_ALLOW_UNSUPPORTED_DISTRO:
+        logger.warning(
+            "SIMPLEX_ALLOW_UNSUPPORTED_DISTRO is set, trying the Ubuntu 24.04 "
+            f"simplex-chat build on {distro_id or 'unknown'}."
+        )
+        return "ubuntu-24_04"
+
+    raise ValueError(
+        f"No simplex-chat build available for Linux distribution {distro_id or 'unknown'}. "
+        "Install a working simplex-chat binary manually and set SIMPLEX_SKIP_VERIFY=1, "
+        "or set SIMPLEX_ALLOW_UNSUPPORTED_DISTRO=1 to try the Ubuntu 24.04 build."
+    )
+
+
+def getSimplexClientReleaseFilename() -> str:
+    if USE_PLATFORM == "Linux":
+        machine = platform.machine()
+        arch = "aarch64" if ("arm" in machine or "aarch64" in machine) else "x86_64"
+        return f"simplex-chat-{getSimplexLinuxBuildTag()}-{arch}"
+    if USE_PLATFORM == "Darwin":
+        if platform.machine() == "arm64":
+            return "simplex-chat-macos-aarch64"
+        return "simplex-chat-macos-x86-64"
+    if USE_PLATFORM == "Windows":
+        return "simplex-chat-windows-x86-64"
+    raise ValueError(f"Unknown platform {USE_PLATFORM}")
+
+
+SIMPLEX_BUILD_KEY_URLS = (
+    "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xBBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",
+    "https://keys.openpgp.org/vks/v1/by-fingerprint/BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA",
+)
+
+
+def ensureSimplexPubkeys(gpg) -> None:
+    build_key_id = expected_key_ids["SimpleX_Chat"][0]
+    if not havePubkey(gpg, build_key_id):
+        importPubkey(gpg, "SimpleX_Chat_build.pgp", list(SIMPLEX_BUILD_KEY_URLS))
+        if not havePubkey(gpg, build_key_id):
+            raise ValueError(
+                "SimpleX release signing key not found. "
+                "Add basicswap/pgp/keys/SimpleX_Chat_build.pgp or allow "
+                "prepare to fetch it from a keyserver."
+            )
+
+
+def fetchSimplexReleaseBodyHash(release_file: str) -> str | None:
+    api_url = (
+        "https://api.github.com/repos/simplex-chat/simplex-chat/releases/tags/"
+        f"v{SIMPLEX_CHAT_VERSION}"
+    )
+    try:
+        release_data = json.loads(downloadBytes(api_url).decode("utf-8"))
+    except Exception as e:
+        logger.warning(f"Unable to fetch SimpleX release notes: {e}")
+        return None
+    prefix = f"SHA2-256({release_file})="
+    for line in release_data.get("body", "").splitlines():
+        line = line.strip()
+        if line.startswith(prefix):
+            return line.split("=", 1)[1].strip().split()[0]
+    return None
+
+
+def ensureSimplexReleaseHash(
+    release_hash: str, release_file: str, assert_path: str
+) -> None:
+    try:
+        ensureFileHashInFile(release_hash, assert_path, logger)
+        return
+    except ValueError:
+        if USE_PLATFORM not in ("Darwin", "Windows"):
+            raise
+    expected_hash = fetchSimplexReleaseBodyHash(release_file)
+    if expected_hash is None:
+        raise ValueError(
+            f"Release hash {release_hash} not found in assert file and "
+            f"no hash for {release_file} in release notes."
+        )
+    if release_hash != expected_hash:
+        raise ValueError(
+            f"Release hash mismatch for {release_file}: "
+            f"{release_hash} != {expected_hash}"
+        )
+    logger.info(f"Found release hash for {release_file} in release notes.")
+
+
+def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
+    """Verify a simplex-chat binary against the upstream release manifest.
+
+    Ensures the file's SHA-256 is listed in the release _sha256sums file and
+    verifies the detached PGP signature over that manifest, mirroring the
+    coin core verification flow.  Honours SKIP_GPG_VALIDATION the same way
+    coin cores do: the hash is always checked, only the signature is skipped.
+
+    Returns the file hash on success, raises ValueError on failure.
+    """
+    assert_filename = "_sha256sums"
+    assert_path = os.path.join(release_dir, assert_filename)
+    assert_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{assert_filename}"
+    if not os.path.exists(assert_path):
+        downloadFile(assert_url, assert_path)
+
+    release_hash: str = getFileHash(file_path)
+    logger.info(f"{os.path.basename(file_path)} hash: {release_hash}")
+    release_file = getSimplexClientReleaseFilename()
+    ensureSimplexReleaseHash(release_hash, release_file, assert_path)
+
+    if SKIP_GPG_VALIDATION:
+        logger.warning(
+            "Skipping binary signature check as SKIP_GPG_VALIDATION env var is set."
+        )
+        return release_hash
+
+    assert_sig_path = assert_path + ".asc"
+    assert_sig_url = assert_url + ".asc"
+    if not os.path.exists(assert_sig_path):
+        downloadFile(assert_sig_url, assert_sig_path)
+
+    gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
+    ensureSimplexPubkeys(gpg)
+    with open(assert_sig_path, "rb") as fp:
+        verified = gpg.verify_file(fp, assert_path)
+    ensureValidSignatureBy(
+        verified,
+        "SimpleX_Chat",
+        expected_key_ids,
+        logger,
+        filepath=assert_path,
+    )
+    return release_hash
+
+
+def writeSimplexVerifiedMetadata(simplex_chat_bin_dir: str, release_hash: str) -> None:
+    metadata_path = os.path.join(simplex_chat_bin_dir, ".verified")
+    metadata = {
+        "version": SIMPLEX_CHAT_VERSION,
+        "sha256": release_hash,
+        "verified_at": int(time.time()),
+    }
+    with open(metadata_path, "w") as fp:
+        json.dump(metadata, fp, indent=4)
+    logger.info(f"Wrote verification metadata: {metadata_path}")
+
+
+def smokeTestSimplexClient(client_path: str) -> None:
+    """Run the binary once so a non-working download fails at prepare time."""
+    try:
+        result = subprocess.run(
+            [client_path, "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise ValueError(f"Simplex client failed to run ({client_path}): {e}")
+    output = result.stdout.decode("utf-8", errors="replace").strip()
+    if result.returncode != 0:
+        raise ValueError(
+            f"Simplex client smoke test failed with exit code {result.returncode}: {output}"
+        )
+    first_line = output.splitlines()[0] if output else ""
+    logger.info(f"Simplex client smoke test passed: {first_line}")
+
+
+def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
+    """Download and/or verify the simplex-chat client binary.
+
+    An existing binary at the client path is verified against the release
+    manifest for SIMPLEX_CHAT_VERSION and redownloaded if it doesn't match,
+    unless SIMPLEX_SKIP_VERIFY is set.  SIMPLEX_FORCE_DOWNLOAD always
+    replaces an existing binary with a fresh, verified download.
+
+    Returns the path to the client binary.
+    """
+    if parseSimplexMajorVersion(SIMPLEX_CHAT_VERSION) < 7:
+        raise ValueError(
+            f"Unsupported SIMPLEX_CHAT_VERSION {SIMPLEX_CHAT_VERSION}, "
+            "the minimum supported simplex-chat version is 7.0.0."
+        )
+
+    simplex_chat_bin_dir = os.path.join(bin_dir, "simplex")
+    simplex_chat_client_path = os.path.join(simplex_chat_bin_dir, "simplex-chat")
+    simplex_chat_release_dir = os.path.join(simplex_chat_bin_dir, SIMPLEX_CHAT_VERSION)
+    if not os.path.exists(simplex_chat_release_dir):
+        os.makedirs(simplex_chat_release_dir)
+
+    if os.path.isfile(simplex_chat_client_path):
+        if SIMPLEX_FORCE_DOWNLOAD:
+            logger.info(
+                f"SIMPLEX_FORCE_DOWNLOAD is set, replacing existing Simplex client: {simplex_chat_client_path}"
+            )
+            os.remove(simplex_chat_client_path)
+        elif SIMPLEX_SKIP_VERIFY:
+            logger.warning(
+                f"SIMPLEX_SKIP_VERIFY is set, using existing Simplex client without verification: {simplex_chat_client_path}"
+            )
+            return simplex_chat_client_path
+        else:
+            logger.info(
+                f"Verifying existing Simplex client: {simplex_chat_client_path}"
+            )
+            try:
+                release_hash = verifySimplexRelease(
+                    simplex_chat_client_path, simplex_chat_release_dir, extra_opts
+                )
+                smokeTestSimplexClient(simplex_chat_client_path)
+                writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
+                return simplex_chat_client_path
+            except ValueError as e:
+                logger.warning(
+                    f"Existing Simplex client failed verification for v{SIMPLEX_CHAT_VERSION}: {e}"
+                )
+                logger.info("Redownloading Simplex client.")
+                os.remove(simplex_chat_client_path)
+
+    simplex_chat_release_file = getSimplexClientReleaseFilename()
+    simplex_chat_release_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{simplex_chat_release_file}"
+    simplex_chat_release_path = os.path.join(
+        simplex_chat_release_dir, simplex_chat_release_file
+    )
+    downloadRelease(simplex_chat_release_url, simplex_chat_release_path, extra_opts)
+
+    release_hash = verifySimplexRelease(
+        simplex_chat_release_path, simplex_chat_release_dir, extra_opts
+    )
+
+    shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
+    os.chmod(simplex_chat_client_path, 0o755)
+    smokeTestSimplexClient(simplex_chat_client_path)
+    writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
+    return simplex_chat_client_path
 
 
 def testTorConnection():
@@ -1800,66 +2092,13 @@ def main():
             if SIMPLEX_GROUP_LINK is None:
                 raise ValueError("SIMPLEX_GROUP_LINK must be set.")
 
-            simplex_chat_bin_dir = os.path.join(bin_dir, "simplex")
-            simplex_chat_client_path = os.path.join(
-                simplex_chat_bin_dir, "simplex-chat"
-            )
-            simplex_chat_release_dir = os.path.join(
-                simplex_chat_bin_dir, SIMPLEX_CHAT_VERSION
-            )
-            if not os.path.exists(simplex_chat_release_dir):
-                os.makedirs(simplex_chat_release_dir)
-
-            if USE_PLATFORM == "Linux":
-                simplex_chat_release_file = "simplex-chat-ubuntu-24_04-x86-64"
-            elif USE_PLATFORM == "Darwin":
-                simplex_chat_release_file = "simplex-chat-macos-x86-64"
-            elif USE_PLATFORM == "Windows":
-                simplex_chat_release_file = "simplex-chat-windows-x86-64"
-            else:
-                raise ValueError(f"Unknown platform {USE_PLATFORM}")
-
-            simplex_chat_release_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/{simplex_chat_release_file}"
-            simplex_chat_release_path = os.path.join(
-                simplex_chat_release_dir, simplex_chat_release_file
-            )
-            downloadRelease(
-                simplex_chat_release_url, simplex_chat_release_path, extra_opts
-            )
-
-            assert_filename = "_sha256sums"
-            assert_path = os.path.join(simplex_chat_release_dir, assert_filename)
-            assert_url = f"https://github.com/simplex-chat/simplex-chat/releases/download/v{SIMPLEX_CHAT_VERSION}/_sha256sums"
-            if not os.path.exists(assert_path):
-                downloadFile(assert_url, assert_path)
-
-            release_hash: str = getFileHash(simplex_chat_release_path)
-            logger.info(f"{simplex_chat_release_file} hash: {release_hash}")
-            ensureFileHashInFile(release_hash, assert_path, logger)
-
-            assert_sig_filename = assert_filename + ".asc"
-            assert_sig_url = assert_url + ".asc"
-            assert_sig_path = os.path.join(bin_dir, assert_sig_filename)
-            if not os.path.exists(assert_sig_path):
-                downloadFile(assert_sig_url, assert_sig_path)
-
-            gpg = createGPG(gnupg, extra_opts["prepare_ctx"].gpg_homedir)
-            pubkey_filename = "SimpleX_Chat.pgp"
-            pubkeyurls = []
-            if not havePubkey(gpg, expected_key_ids["SimpleX_Chat"][0]):
-                importPubkey(gpg, pubkey_filename, pubkeyurls)
-            with open(assert_sig_path, "rb") as fp:
-                verified = gpg.verify_file(fp, assert_path)
-            ensureValidSignatureBy(
-                verified, "SimpleX_Chat", expected_key_ids, logger, filepath=assert_path
-            )
-
-            shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
+            simplex_chat_client_path = prepareSimplexClient(bin_dir, extra_opts)
 
             simplex_settings = {
                 "type": "simplex",
                 "server_address": SIMPLEX_SERVER_ADDRESS,
                 "client_path": simplex_chat_client_path,
+                "client_version": SIMPLEX_CHAT_VERSION,
                 "ws_port": SIMPLEX_WS_PORT,
                 "group_link": SIMPLEX_GROUP_LINK,
                 "enabled": True,
@@ -1868,19 +2107,41 @@ def main():
                 simplex_settings["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
 
             found_network: bool = False
-            for network in network_config_list:
+            for i, network in enumerate(network_config_list):
                 network_type: str = network.get("type", "unknown")
                 if network_type == "simplex":
                     found_network = True
                     if network.get("enabled", False) is True:
                         logger.warning(f"Network {network_type} is already active.")
-                    network = simplex_settings
-                else:
-                    # TODO: Allow multiple active networks
-                    network["enabled"] = False
-                    logger.info(f"Disabling network {network_type}.")
+                    network_config_list[i] = simplex_settings
             if found_network is False:
                 network_config_list.append(simplex_settings)
+        elif network_name == "nostr":
+            from coincurve.keys import PrivateKey
+
+            nostr_settings = {
+                "type": "nostr",
+                "relays": [r.strip() for r in NOSTR_RELAYS.split(",") if r.strip()],
+                "private_key": PrivateKey().to_hex(),
+                "pow_target": NOSTR_POW_TARGET,
+                "enabled": True,
+            }
+            if NOSTR_SOCKS_PROXY is not None:
+                nostr_settings["socks_proxy_override"] = NOSTR_SOCKS_PROXY
+
+            found_network: bool = False
+            for i, network in enumerate(network_config_list):
+                network_type: str = network.get("type", "unknown")
+                if network_type == "nostr":
+                    found_network = True
+                    if network.get("enabled", False) is True:
+                        logger.warning(f"Network {network_type} is already active.")
+                    # Keep the existing key if there is one
+                    if len(network.get("private_key", "")) == 64:
+                        nostr_settings["private_key"] = network["private_key"]
+                    network_config_list[i] = nostr_settings
+            if found_network is False:
+                network_config_list.append(nostr_settings)
         elif network_name == "smsg":
             found_network: bool = False
             for network in network_config_list:
@@ -1891,10 +2152,6 @@ def main():
                         logger.warning(f"Network {network_type} is already active.")
                     else:
                         network["enabled"] = True
-                else:
-                    # TODO: Allow multiple active networks
-                    network["enabled"] = False
-                    logger.info(f"Disabling network {network_type}.")
             if found_network is False:
                 network_config_list.append({"type": "smsg", "enabled": True})
         else:
@@ -1916,6 +2173,26 @@ def main():
         if len(network_config_list) < 1:
             network_config_list = [{"type": "smsg", "enabled": True}]
 
+        found_network: bool = False
+        num_enabled: int = 0
+        for network in network_config_list:
+            if network.get("enabled", True) is True:
+                num_enabled += 1
+        for network in network_config_list:
+            network_type: str = network.get("type", "unknown")
+            if network_type == network_name:
+                found_network = True
+                if network.get("enabled", True) is False:
+                    logger.warning(f"Network {network_type} is already disabled.")
+                elif num_enabled <= 1:
+                    exitWithError("Cannot disable the last enabled network.")
+                else:
+                    network["enabled"] = False
+        if found_network is False:
+            exitWithError(f"Network {network_name} not found in config.")
+
+        settings["networks"] = network_config_list
+        save_config(config_path, settings)
         logger.info(f"Done. Network {network_name} successfully disabled.")
         return 0
 

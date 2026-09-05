@@ -959,11 +959,15 @@ class DBMethods:
             return self._db_con.cursor()
 
         self.mxDB.acquire()
-        self._db_lock_depth = 1
-        self._db_con = sqlite3.connect(self.sqlite_file)
-
-        self._db_con.execute("PRAGMA busy_timeout = 30000")
-        return self._db_con.cursor()
+        try:
+            self._db_lock_depth = 1
+            self._db_con = sqlite3.connect(self.sqlite_file)
+            self._db_con.execute("PRAGMA busy_timeout = 30000")
+            return self._db_con.cursor()
+        except Exception:
+            self._db_lock_depth = 0
+            self.mxDB.release()
+            raise
 
     def getNewDBCursor(self):
         assert self._db_lock_held()

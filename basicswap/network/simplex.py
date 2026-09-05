@@ -7,6 +7,7 @@
 
 import base64
 import json
+import logging
 import threading
 import traceback
 import websocket
@@ -22,11 +23,15 @@ from basicswap.util.smsg import (
 from basicswap.chainparams import (
     Coins,
 )
-from basicswap.util import ensure
+from basicswap.util import ensure, TemporaryError
 from basicswap.util.address import (
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes
+
+# The websocket library logs every connection error to its own logger,
+# duplicating the on_error callbacks.
+logging.getLogger("websocket").setLevel(logging.CRITICAL)
 
 
 def encode_base64(data: bytes) -> str:
@@ -38,11 +43,12 @@ def decode_base64(encoded_data: str) -> bytes:
 
 
 class WebSocketThread(threading.Thread):
-    def __init__(self, url: str, tag: str = None, logger=None):
+    def __init__(self, url: str, tag: str = None, logger=None, shutdown_event=None):
         super().__init__()
         self.url: str = url
         self.tag = tag
         self.logger = logger
+        self.shutdown_event = shutdown_event
         self.ws = None
         self.mutex = threading.Lock()
         self.corrId: int = 0
@@ -56,6 +62,15 @@ class WebSocketThread(threading.Thread):
         self.ignore_events: bool = False
 
         self.num_messages_received: int = 0
+        self.last_error_str: str = ""
+        self._stopping: bool = False
+
+    def _should_stop(self) -> bool:
+        if self._stopping or self.delay_event.is_set():
+            return True
+        if self.shutdown_event is not None and self.shutdown_event.is_set():
+            return True
+        return False
 
     def disable_debug_mode(self):
         self.ignore_events = False
@@ -91,14 +106,25 @@ class WebSocketThread(threading.Thread):
             return None
 
     def on_error(self, ws, error):
+        if self._should_stop():
+            return
+        error_str = str(error)
+        repeated: bool = error_str == self.last_error_str
+        self.last_error_str = error_str
         if self.logger:
-            self.logger.error(f"Simplex ws - {error}")
+            log_func = self.logger.debug if repeated else self.logger.error
+            log_func(f"Simplex ws - {error}")
         else:
             print(f"{self.tag} - Error: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
+        was_connected: bool = self.connected
+        self.connected = False
+        if self._should_stop():
+            return
         if self.logger:
-            self.logger.info(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
+            log_func = self.logger.info if was_connected else self.logger.debug
+            log_func(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
         else:
             print(f"{self.tag} - Closed: {close_status_code}, {close_msg}")
 
@@ -108,6 +134,7 @@ class WebSocketThread(threading.Thread):
         else:
             print(f"{self.tag}: WebSocket connection opened")
         self.connected = True
+        self.last_error_str = ""
 
     def send_command(self, cmd_str: str):
         with self.mutex:
@@ -142,14 +169,22 @@ class WebSocketThread(threading.Thread):
             on_open=self.on_open,
             on_close=self.on_close,
         )
-        while not self.delay_event.is_set():
+        while not self._should_stop():
             self.ws.run_forever()
+            if self._should_stop():
+                break
             self.delay_event.wait(0.5)
 
     def stop(self):
+        if self._stopping:
+            return
+        self._stopping = True
         self.delay_event.set()
         if self.ws:
-            self.ws.close()
+            try:
+                self.ws.close()
+            except Exception:
+                pass
 
 
 def waitForResponse(ws_thread, sent_id, delay_event):
@@ -183,10 +218,12 @@ def encryptMsg(
     timestamp=None,
     deterministic=False,
     difficulty_target=0x1EFFFFFF,
+    pubkey_to: bytes = None,
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
+    if pubkey_to is None:
+        pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
     privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
     payload_format: int = 2
@@ -300,7 +337,9 @@ def decryptSimplexMsg(self, msg_data):
         UNION
         SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
         UNION
-        SELECT addr AS address FROM smsgaddresses WHERE active_ind = 1 AND use_type = :local_portal
+        SELECT addr AS address FROM smsgaddresses
+               WHERE active_ind = 1 AND use_type IN (
+                   :local_portal, :bid, :offer, :recv_offer, :send_offer)
         )"""
 
     now: int = self.getTime()
@@ -308,7 +347,15 @@ def decryptSimplexMsg(self, msg_data):
     try:
         cursor = self.openDB()
         addr_rows = cursor.execute(
-            query, {"now": now, "local_portal": AddressTypes.PORTAL_LOCAL}
+            query,
+            {
+                "now": now,
+                "local_portal": AddressTypes.PORTAL_LOCAL,
+                "bid": AddressTypes.BID,
+                "offer": AddressTypes.OFFER,
+                "recv_offer": AddressTypes.RECV_OFFER,
+                "send_offer": AddressTypes.SEND_OFFER,
+            },
         ).fetchall()
         decrypted = None
         for row in addr_rows:
@@ -436,17 +483,77 @@ def getResponseData(data, tag=None):
 
 
 def getNewSimplexLink(data):
-    response_data = getResponseData(data)
-    if "connLinkContact" in response_data:
-        return response_data["connLinkContact"]["connFullLink"]
-    return response_data["connReqContact"]
+    return getResponseData(data)["connLinkContact"]["connFullLink"]
+
+
+def formatSimplexChatError(chat_error) -> str:
+    if not chat_error:
+        return "unknown error"
+    error_type = chat_error.get("errorType")
+    if isinstance(error_type, dict):
+        if error_type.get("message"):
+            return error_type["message"]
+        if error_type.get("type"):
+            return error_type["type"]
+    agent_error = chat_error.get("agentError")
+    if isinstance(agent_error, dict):
+        broker_err = agent_error.get("brokerErr")
+        if isinstance(broker_err, dict):
+            network_error = broker_err.get("networkError")
+            if isinstance(network_error, dict):
+                if network_error.get("connectError"):
+                    return network_error["connectError"]
+                if network_error.get("type"):
+                    return network_error["type"]
+            if broker_err.get("type"):
+                return broker_err["type"]
+        if agent_error.get("brokerAddress"):
+            return "{} ({})".format(
+                agent_error.get("type", "agent error"), agent_error["brokerAddress"]
+            )
+        if agent_error.get("type"):
+            return agent_error["type"]
+    if chat_error.get("type"):
+        return chat_error["type"]
+    return json.dumps(chat_error)
 
 
 def getJoinedSimplexLink(data):
     response_data = getResponseData(data)
-    if "connLinkInvitation" in response_data:
-        return response_data["connLinkInvitation"]["connFullLink"]
-    return response_data["connReqInvitation"]
+    # SimpleX responds with connLinkInvitation for one-time invitations
+    # and connLinkContact for contact addresses.
+    for link_tag in ("connLinkInvitation", "connLinkContact"):
+        if link_tag in response_data:
+            return response_data[link_tag]["connFullLink"]
+    resp_type = response_data.get("type", "unknown")
+    if resp_type == "chatCmdError":
+        detail = formatSimplexChatError(response_data.get("chatError"))
+        raise TemporaryError("SimpleX /connect failed: {}".format(detail))
+    raise ValueError("Unexpected SimpleX response type: {}".format(resp_type))
+
+
+def createSimplexConnectInvitation(
+    ws_thread, delay_event, logger=None, num_tries: int = 3
+):
+    last_error = None
+    for attempt in range(num_tries):
+        cmd_id = ws_thread.send_command("/connect")
+        response = ws_thread.wait_for_command_response(cmd_id)
+        try:
+            conn_link = getJoinedSimplexLink(response)
+            pccConnId = getResponseData(response, "connection")["pccConnId"]
+            return conn_link, pccConnId
+        except TemporaryError as ex:
+            last_error = ex
+            if logger:
+                logger.warning(
+                    "SimpleX /connect failed (attempt {}/{}): {}".format(
+                        attempt + 1, num_tries, ex
+                    )
+                )
+            if attempt + 1 < num_tries:
+                delay_event.wait(2.0)
+    raise last_error
 
 
 def initialiseSimplexNetwork(self, network_config) -> None:
@@ -455,7 +562,11 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     client_host: str = network_config.get("client_host", "127.0.0.1")
     ws_port: str = network_config.get("ws_port")
 
-    ws_thread = WebSocketThread(f"ws://{client_host}:{ws_port}", logger=self.log)
+    ws_thread = WebSocketThread(
+        f"ws://{client_host}:{ws_port}",
+        logger=self.log,
+        shutdown_event=self.delay_event,
+    )
     self.threads.append(ws_thread)
     ws_thread.start()
     waitForConnected(ws_thread, self.delay_event)
