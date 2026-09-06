@@ -62,7 +62,7 @@
       {% endfor %}
 
       {% for m in err_messages %}
-      <div class="mb-4 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert">
+      <div class="mb-4 p-4 bg-red-50 border border-red-400 rounded-lg dark:bg-gray-500 dark:text-red-400" role="alert" data-alert="error">
         <div class="flex items-start">
           <div class="flex-shrink-0">
             <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -330,7 +330,7 @@
         if (bodyText) {
           try {
             const doc = new DOMParser().parseFromString(bodyText, 'text/html');
-            const alerts = doc.querySelectorAll('[role="alert"]:not(#offline-alert):not(#auth-error)');
+            const alerts = doc.querySelectorAll('[role="alert"][data-alert="error"]');
             const texts = [];
             alerts.forEach(function(el) {
               // Collapse the markup indentation the alert blocks carry.
