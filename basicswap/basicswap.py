@@ -6942,6 +6942,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info(f"Accepting adaptor-sig bid {self.log.id(bid_id)}")
 
         now: int = self.getTime()
+        funded_a_lock_tx = None
         try:
             use_cursor = self.openDB(cursor)
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
@@ -7099,6 +7100,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.a_lock_tx = ci_from.fundSCLockTx(
                     xmr_swap.a_lock_tx, a_fee_rate, xmr_swap.vkbv, bid_id=bid.bid_id
                 )
+                funded_a_lock_tx = xmr_swap.a_lock_tx
 
             xmr_swap.a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             (
@@ -7275,6 +7277,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Add to swaps_in_progress only when waiting on txns
             self.log.info(f"Sent XMR_BID_ACCEPT_LF {self.log.id(bid_id)}")
             return bid_id
+        except Exception:
+            if funded_a_lock_tx is not None:
+                # The bid rolls back, the wallet's coin locks would not
+                try:
+                    ci_from.unlockInputs(funded_a_lock_tx, cursor=use_cursor)
+                except Exception as e:
+                    self.log.warning(f"unlockInputs failed {e}")
+            raise
         finally:
             if cursor is None:
                 self.closeDB(use_cursor)
