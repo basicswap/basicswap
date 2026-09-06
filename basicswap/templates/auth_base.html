@@ -315,6 +315,52 @@
         }
       }
 
+      async function describeFailure(resp) {
+        // A failed submit is not always a bad password: the Host and Origin
+        // checks reject the POST with a 403 before the password is looked at.
+        // Report what the server actually said instead of guessing.
+        let bodyText = '';
+        try {
+          bodyText = await resp.text();
+        } catch (err) {
+          bodyText = '';
+        }
+
+        let detail = '';
+        if (bodyText) {
+          try {
+            const doc = new DOMParser().parseFromString(bodyText, 'text/html');
+            const alerts = doc.querySelectorAll('[role="alert"]:not(#offline-alert):not(#auth-error)');
+            const texts = [];
+            alerts.forEach(function(el) {
+              // Collapse the markup indentation the alert blocks carry.
+              const text = el.textContent.replace(/\s+/g, ' ').trim();
+              if (text) {
+                texts.push(text);
+              }
+            });
+            detail = texts.join(' ');
+            if (!detail) {
+              // The Host/Origin rejections are a bare string, not a page.
+              const stripped = (doc.body ? doc.body.textContent : '').replace(/\s+/g, ' ').trim();
+              if (stripped && stripped.length <= 200) {
+                detail = stripped;
+              }
+            }
+          } catch (err) {
+            detail = '';
+          }
+        }
+
+        if (!detail) {
+          return 'Login failed (HTTP ' + resp.status + ').';
+        }
+        if (resp.status === 403) {
+          return detail + ' - add the hostname you are browsing to (e.g. the .onion) to "allowed_hosts" in basicswap.json and restart.';
+        }
+        return detail;
+      }
+
       if (authForm) {
         authForm.addEventListener('submit', async function(e) {
           e.preventDefault();
@@ -336,8 +382,9 @@
               window.location.href = resp.url;
               return;
             }
+            const message = await describeFailure(resp);
             setSubmitting(false);
-            showAuthError('Invalid password.');
+            showAuthError(message);
           } catch (err) {
             setSubmitting(false);
             applyServerStatus(false);
