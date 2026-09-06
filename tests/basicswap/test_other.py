@@ -26,6 +26,7 @@ from coincurve.keys import PrivateKey
 from basicswap.basicswap import (
     Coins,
     BasicSwap,
+    CONTRACT_PATH_EPOCH_TIME,
     SwapTypes,
 )
 from basicswap.base import BaseApp
@@ -176,6 +177,75 @@ class Test(unittest.TestCase):
         assert sc.coin_clients[Coins.BTC]["altruistic"] is True
         assert sc.coin_clients[Coins.DCR]["altruistic"] is False
         assert "altruistic" not in sc.coin_clients[Coins.LTC]
+
+    def test_contract_key_path_date(self):
+        import datetime as dt
+
+        # Epoch scheme from the switch time on: day and second of the unix time
+        tv = CONTRACT_PATH_EPOCH_TIME + 5 * 86400 + 12345
+        assert BasicSwap.getContractKeyPathDate(None, tv) == "{}/{}".format(
+            tv // 86400, 12345
+        )
+        assert BasicSwap.getContractKeyPathDate(
+            None, CONTRACT_PATH_EPOCH_TIME
+        ) == "{}/0".format(CONTRACT_PATH_EPOCH_TIME // 86400)
+
+        # The local date before it, in-flight swaps keep their paths
+        tv = CONTRACT_PATH_EPOCH_TIME - 1
+        date = dt.datetime.fromtimestamp(tv).date()
+        assert BasicSwap.getContractKeyPathDate(None, tv) == "{}/{}/{}".format(
+            date.year, date.month, date.day
+        )
+
+        # The schemes can't collide, the legacy first component is a year
+        assert CONTRACT_PATH_EPOCH_TIME // 86400 > 9999
+
+    def test_contract_count_daily_reset(self):
+        class FakeCursor:
+            def execute(self, query, params=None):
+                pass
+
+        class FakeClient:
+            getNewContractId = BasicSwap.getNewContractId
+
+            def __init__(self):
+                self._contract_count = 100
+                self._contract_count_reset_time = 0
+                self._now = 0
+                self.kv = {}
+
+            def getTime(self) -> int:
+                return self._now
+
+            def setIntKV(self, str_key, int_val, cursor=None) -> None:
+                self.kv[str_key] = int_val
+
+        sc = FakeClient()
+        cursor = FakeCursor()
+
+        # Never resets before the switch, even across days
+        sc._now = CONTRACT_PATH_EPOCH_TIME - 86400
+        assert sc.getNewContractId(cursor) == 101
+        sc._now = CONTRACT_PATH_EPOCH_TIME - 1
+        assert sc.getNewContractId(cursor) == 102
+        assert "contract_count_reset_time" not in sc.kv
+
+        # The first id after the switch resets
+        sc._now = CONTRACT_PATH_EPOCH_TIME + 100
+        assert sc.getNewContractId(cursor) == 1
+        assert sc.kv["contract_count_reset_time"] == sc._now
+
+        # Same day increments
+        sc._now += 3600
+        assert sc.getNewContractId(cursor) == 2
+
+        # A new day resets
+        sc._now = CONTRACT_PATH_EPOCH_TIME + 86400 + 50
+        assert sc.getNewContractId(cursor) == 1
+
+        # A clock moving backwards must never reset
+        sc._now = CONTRACT_PATH_EPOCH_TIME + 100
+        assert sc.getNewContractId(cursor) == 2
 
         del sc
 

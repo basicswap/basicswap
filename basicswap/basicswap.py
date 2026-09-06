@@ -196,6 +196,12 @@ PROTOCOL_VERSION_ADAPTOR_SIG = 6
 MINPROTO_VERSION_ADAPTOR_SIG = 6
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
+
+# Contracts created from this time on derive their keys with the day and
+# second of the unix time in the path instead of the local date, and the
+# contract counter resets each day.  Derivation is local, in-flight swaps
+# keep the path of their created_at.  2026-10-01 UTC.
+CONTRACT_PATH_EPOCH_TIME: int = 1790812800
 MAXPROTO_VERSION = 10
 
 
@@ -658,6 +664,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.db_version = self.getIntKV("db_version", cursor, CURRENT_DB_VERSION)
             self.db_data_version = self.getIntKV("db_data_version", cursor, 0)
             self._contract_count = self.getIntKV("contract_count", cursor, 0)
+            self._contract_count_reset_time = self.getIntKV(
+                "contract_count_reset_time", cursor, 0
+            )
         finally:
             self.closeDB(cursor)
 
@@ -4914,7 +4923,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ]
         )
 
-    def getContractPubkey(self, date, contract_count):
+    def getContractKeyPathDate(self, time_val: int) -> str:
+        if time_val >= CONTRACT_PATH_EPOCH_TIME:
+            # The seconds separate instances sharing a key, which would
+            # otherwise derive the same contract keys once the counter resets.
+            days: int = time_val // 86400
+            return "{}/{}".format(days, time_val - days * 86400)
+        # The local date, swaps from before the switch must keep their paths.
+        date = dt.datetime.fromtimestamp(time_val).date()
+        return "{}/{}/{}".format(date.year, date.month, date.day)
+
+    def getContractPubkey(self, time_val: int, contract_count: int) -> bytes:
 
         # Derive an address to use for a contract
         evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
@@ -4923,7 +4942,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Should the coin path be included?
         path = "44445555h"
-        path += "/" + str(date.year) + "/" + str(date.month) + "/" + str(date.day)
+        path += "/" + self.getContractKeyPathDate(time_val)
         path += "/" + str(contract_count)
 
         extkey = self.callcoinrpc(Coins.PART, "extkey", ["info", evkey, path])[
@@ -4934,14 +4953,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ]
         return bytes.fromhex(pubkey)
 
-    def getContractPrivkey(self, date: dt.datetime, contract_count: int) -> bytes:
+    def getContractPrivkey(self, time_val: int, contract_count: int) -> bytes:
         # Derive an address to use for a contract
         evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
             "evkey"
         ]
 
         path = "44445555h"
-        path += "/" + str(date.year) + "/" + str(date.month) + "/" + str(date.day)
+        path += "/" + self.getContractKeyPathDate(time_val)
         path += "/" + str(contract_count)
 
         extkey = self.callcoinrpc(Coins.PART, "extkey", ["info", evkey, path])[
@@ -4955,14 +4974,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             raw = raw[:32]
         return raw
 
-    def getContractSecret(self, date: dt.datetime, contract_count: int) -> bytes:
+    def getContractSecret(self, time_val: int, contract_count: int) -> bytes:
         # Derive a key to use for a contract secret
         evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
             "evkey"
         ]
 
         path = "44445555h/99999"
-        path += "/" + str(date.year) + "/" + str(date.month) + "/" + str(date.day)
+        path += "/" + self.getContractKeyPathDate(time_val)
         path += "/" + str(contract_count)
 
         return sha256(
@@ -5350,6 +5369,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return found_height
 
     def getNewContractId(self, cursor):
+        # Reset the counter each day so recovering from a seed only has to
+        # search the ids used since the day began.  Key derivation paths embed
+        # the day and the counter, so counter values can repeat once the day
+        # has moved on.  Gated on the path switch: before it new contracts
+        # still use the local date in their paths, which rolls over at a
+        # different time, and a (date, counter) pair must never repeat.
+        # Strictly greater, a clock moving backwards must never reset.
+        now: int = self.getTime()
+        if (
+            now >= CONTRACT_PATH_EPOCH_TIME
+            and now // 86400 > self._contract_count_reset_time // 86400
+        ):
+            self._contract_count = 0
+            self._contract_count_reset_time = now
+            self.setIntKV("contract_count_reset_time", now, cursor)
         self._contract_count += 1
         cursor.execute(
             'UPDATE kv_int SET value = :value WHERE KEY="contract_count"',
@@ -5826,9 +5860,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
             contract_count = self.getNewContractId(cursor)
-            contract_pubkey = self.getContractPubkey(
-                dt.datetime.fromtimestamp(now).date(), contract_count
-            )
+            contract_pubkey = self.getContractPubkey(now, contract_count)
 
             bid = Bid(
                 protocol_version=PROTOCOL_VERSION_SECRET_HASH,
@@ -6096,12 +6128,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             coin_from = Coins(offer.coin_from)
             ci_from = self.ci(coin_from)
             ci_to = self.ci(offer.coin_to)
-            bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
 
-            secret = self.getContractSecret(bid_date, bid.contract_count)
+            secret = self.getContractSecret(bid.created_at, bid.contract_count)
             secret_hash = sha256(secret)
 
-            pubkey_refund = self.getContractPubkey(bid_date, bid.contract_count)
+            pubkey_refund = self.getContractPubkey(bid.created_at, bid.contract_count)
             pkhash_refund = ci_from.pkh(pubkey_refund)
 
             if coin_from in (Coins.DCR,):
@@ -7682,13 +7713,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "amount": ci.format_amount(prev_amount),
         }
 
-        bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-        privkey = self.getContractPrivkey(bid_date, bid.contract_count)
+        privkey = self.getContractPrivkey(bid.created_at, bid.contract_count)
         pubkey = ci.getPubkey(privkey)
 
         secret = bid.recovered_secret
         if secret is None:
-            secret = self.getContractSecret(bid_date, bid.contract_count)
+            secret = self.getContractSecret(bid.created_at, bid.contract_count)
         ensure(len(secret) == 32, "Bad secret length")
 
         if self.coin_clients[coin_type]["connection_type"] not in ("rpc", "electrum"):
@@ -7841,9 +7871,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "amount": txjs["vout"][vout]["value"],
             }
 
-        bid_date = dt.datetime.fromtimestamp(bid.created_at).date()
-
-        privkey = self.getContractPrivkey(bid_date, bid.contract_count)
+        privkey = self.getContractPrivkey(bid.created_at, bid.contract_count)
         pubkey = ci.getPubkey(privkey)
 
         lock_value = DeserialiseNum(txn_script, 64)
