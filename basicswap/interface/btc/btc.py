@@ -1027,13 +1027,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 except Exception:
                     pass
 
-                try:
-                    coin_type = self.coin_type()
-                    if coin_type in (Coins.BTC, Coins.LTC):
-                        result = self._sc._computeElectrumLegacyFundsInfo(coin_type)
-                        self._sc._cached_electrum_legacy_funds[int(coin_type)] = result
-                except Exception:
-                    pass
+                # The result feeds a banner from the cache, no need to refresh
+                # it more often than the full scans.
+                if do_full_scan and self._sc._check_electrum_legacy_funds:
+                    try:
+                        coin_type = self.coin_type()
+                        if coin_type in (Coins.BTC, Coins.LTC):
+                            result = self._sc._computeElectrumLegacyFundsInfo(coin_type)
+                            self._sc._cached_electrum_legacy_funds[int(coin_type)] = (
+                                result
+                            )
+                    except Exception:
+                        pass
             finally:
                 if hasattr(self._backend, "setBackgroundMode"):
                     self._backend.setBackgroundMode(False)
