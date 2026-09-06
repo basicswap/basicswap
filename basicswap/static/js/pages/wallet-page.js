@@ -351,6 +351,10 @@
       );
 
       matchingCoins.forEach(coinData => {
+        if (coinData.have_data === false || coinData.updating === true) {
+          return;
+        }
+
         const balanceElements = document.querySelectorAll('.coinname-value[data-coinname][data-balance-type]');
         balanceElements.forEach(element => {
           const elementCoinName = element.getAttribute('data-coinname');
@@ -377,21 +381,17 @@
     updatePendingForCoin: function(coinData) {
       const pendingAmount = parseFloat(coinData.pending || '0');
 
+      const badge = document.querySelector(
+        `[data-badge-type="pending"][data-coinname="${coinData.name}"]`
+      );
+      if (!badge) return;
 
-      const pendingElements = document.querySelectorAll('.inline-block.py-1.px-2.rounded-full.bg-green-100');
-
-      pendingElements.forEach(el => {
-        const text = el.textContent || '';
-
-        if (text.includes('Pending:') && text.includes(coinData.ticker)) {
-          if (pendingAmount > 0) {
-            el.textContent = `Pending: +${coinData.pending} ${coinData.ticker}`;
-            el.style.display = '';
-          } else {
-            el.style.display = 'none';
-          }
-        }
-      });
+      if (pendingAmount > 0) {
+        badge.textContent = `Pending: +${coinData.pending} ${coinData.ticker}`;
+        badge.style.display = '';
+      } else {
+        badge.style.display = 'none';
+      }
     },
 
     refreshTransactions: function() {

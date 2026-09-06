@@ -145,6 +145,13 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                 continue
             if v["connection_type"] in ("rpc", "electrum"):
 
+                have_data = False
+                updating = False
+                if k in wallets:
+                    w = wallets[k]
+                    have_data = "error" not in w and "no_data" not in w
+                    updating = bool(w.get("updating", False))
+
                 balance = "0.0"
                 if k in wallets:
                     w = wallets[k]
@@ -177,6 +184,8 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                     "pending": pending,
                     "ticker": chainparams[k]["ticker"],
                     "connection_type": v["connection_type"],
+                    "have_data": have_data,
+                    "updating": updating,
                 }
 
                 ci = swap_client.ci(k)
