@@ -388,7 +388,13 @@ class Test(BaseTest):
             test_delay_event,
             swap_clients[0],
             bid_id,
-            (BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED_SWIPED),
+            (
+                BidStates.BID_STALLED_FOR_TEST,
+                BidStates.XMR_SWAP_FAILED_SWIPED,
+                # The lock b tx above is invalid, so the mercy keyshare arrives
+                # with nothing to spend.
+                BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
+            ),
             wait_for=180,
         )
         wait_for_bid(

@@ -210,6 +210,7 @@ class TestBCH(BasicSwapTest):
             "datadir": os.path.join(datadir, "bch_" + str(node_id)),
             "bindir": BITCOINCASH_BINDIR,
             "use_segwit": False,
+            "blocks_confirmed": 3,
             "wallet_name": "bsx_wallet",
         }
 

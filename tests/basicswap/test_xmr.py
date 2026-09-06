@@ -168,6 +168,7 @@ def prepare_swapclient_dir(
                 "use_segwit": True,
                 "use_descriptors": BTC_USE_DESCRIPTORS,
                 "use_legacy_key_paths": BTC_USE_LEGACY_KEY_PATHS,
+                "blocks_confirmed": 3,
                 "wallet_name": "bsx_wallet",
             },
         },
@@ -175,6 +176,7 @@ def prepare_swapclient_dir(
         "check_watched_seconds": 4,
         "check_expired_seconds": 60,
         "check_events_seconds": 1,
+        "check_split_messages_seconds": 2,
         "check_xmr_swaps_seconds": 1,
         "min_delay_event": 1,
         "max_delay_event": 4,
@@ -213,6 +215,7 @@ def prepare_swapclient_dir(
             "datadir": os.path.join(datadir, "ltc_" + str(node_id)),
             "bindir": cfg.LITECOIN_BINDIR,
             "use_segwit": True,
+            "blocks_confirmed": 3,
             "wallet_name": "bsx_wallet",
         }
 

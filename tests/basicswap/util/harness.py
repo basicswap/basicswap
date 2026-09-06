@@ -581,6 +581,7 @@ def run_prepare(
     settings["check_watched_seconds"] = 5
     settings["check_expired_seconds"] = 60
     settings["check_events_seconds"] = 5
+    settings["check_split_messages_seconds"] = 5
     settings["check_xmr_swaps_seconds"] = 5
 
     recursive_update_dict(settings, extra_settings)
