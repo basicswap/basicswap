@@ -1044,6 +1044,49 @@ class Test(unittest.TestCase):
                 ["https://swap.example.com"],
                 False,
             ),
+            # "host:port" entry -> that host on that port, any scheme.
+            (
+                "http://abc.onion:12700",
+                "127.0.0.1",
+                12700,
+                ["abc.onion:12700"],
+                True,
+            ),
+            (
+                "https://abc.onion:12700",
+                "127.0.0.1",
+                12700,
+                ["abc.onion:12700"],
+                True,
+            ),
+            (
+                "http://abc.onion:8080",
+                "127.0.0.1",
+                12700,
+                ["abc.onion:12700"],
+                False,
+            ),
+            ("http://abc.onion", "127.0.0.1", 12700, ["abc.onion:12700"], False),
+            # A bracketed IPv6 entry keeps working, with and without a port.
+            ("http://[fd00::1]:12700", "127.0.0.1", 12700, ["[fd00::1]"], True),
+            (
+                "http://[fd00::1]:12700",
+                "127.0.0.1",
+                12700,
+                ["[fd00::1]:12700"],
+                True,
+            ),
+            (
+                "http://[fd00::1]:8080",
+                "127.0.0.1",
+                12700,
+                ["[fd00::1]:12700"],
+                False,
+            ),
+            # Unbracketed IPv6 has no port to split off.
+            ("http://[fd00::1]:8080", "127.0.0.1", 12700, ["fd00::1"], True),
+            # A malformed port matches nothing.
+            ("http://abc.onion", "127.0.0.1", 12700, ["abc.onion:nope"], False),
             # "*" is ignored by the origin check.
             ("http://evil.com", "127.0.0.1", 12700, ["*"], False),
             (

@@ -124,8 +124,10 @@ def is_origin_allowed(origin, html_host, html_port, allowed_hosts) -> bool:
         if scheme == "http" and port == int(html_port) and host in default_hosts:
             return True
 
-    # 2. Configured entries. An entry with a scheme is an exact origin; a bare
-    #    host matches that host on any scheme/port (the operator vouched for it).
+    # 2. Configured entries, in the forms allowed_entry_hostname accepts. An
+    #    entry with a scheme is an exact origin; "host:port" matches that host
+    #    on that port, any scheme; a bare host matches that host on any
+    #    scheme/port (the operator vouched for it).
     for entry in allowed_hosts or []:
         if entry == "*":
             continue
@@ -134,7 +136,16 @@ def is_origin_allowed(origin, html_host, html_port, allowed_hosts) -> bool:
             t = _normalize_origin(e)
             if t is not None and (scheme, host, port) == t:
                 return True
-        elif host == e.strip("[]"):
+            continue
+        try:
+            split = urllib.parse.urlsplit("//" + e)
+            entry_host, entry_port = split.hostname, split.port
+        except ValueError:
+            entry_host, entry_port = None, None
+        if entry_host is None:
+            # Unbracketed IPv6 ("::1") has no port to split off.
+            entry_host, entry_port = e.strip("[]"), None
+        if host == entry_host and entry_port in (None, port):
             return True
     return False
 
