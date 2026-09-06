@@ -39,6 +39,7 @@ class KeyTypes(IntEnum):
     KBVF = 4
     KBSF = 5
     KAF = 6
+    KA_SWIPE = 7
 
 
 class MessageNetworks(IntEnum):

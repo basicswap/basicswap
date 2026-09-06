@@ -625,6 +625,7 @@ class BCHInterface(BTCInterface):
         pkh_dest,
         tx_fee_rate,
         vkbv=None,
+        pubkey_dest=None,
     ):
         # lock refund swipe tx
         # Sends the coinA locked coin to the follower
@@ -1189,6 +1190,17 @@ class BCHInterface(BTCInterface):
     def lockNonSegwitPrevouts(self) -> None:
         pass
 
+    def prepareMercySpend(self, key: bytes, rescan_from: int) -> None:
+        # The swipe paid a key derived for the swap.  Imported here rather than
+        # when the swipe was built, so the wallet cannot select the output until
+        # the mercy tx is the thing spending it.
+        addr: str = self.pkh_to_address(self.pkh(self.getPubkey(key)))
+        if self.rpc_wallet("getaddressinfo", [addr]).get("ismine", False):
+            return
+        self.rpc_wallet("importprivkey", [self.encodeKey(key), "swipe", False])
+        self._log.info(f"Rescanning {self.coin_name()} chain from {rescan_from}.")
+        self.rpc_wallet("rescanblockchain", [rescan_from])
+
     def createMercyTx(
         self,
         refund_swipe_tx_bytes: bytes,
@@ -1196,6 +1208,8 @@ class BCHInterface(BTCInterface):
         lock_refund_tx_script: bytes,
         keyshare: bytes,
         tx_fee_rate: int,
+        key: bytes | None = None,
+        addr_to: str | None = None,
     ) -> str:
         refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
         refund_output_value = refund_swipe_tx.vout[0].nValue
@@ -1216,7 +1230,15 @@ class BCHInterface(BTCInterface):
         tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0), nSequence=0))
 
         tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
-        tx.vout.append(self.txoType()(outValue, refund_output_script))
+        # Back to the same script by default, which is the wallet's own.  A swipe
+        # paid to a key derived for the swap has to name a destination instead,
+        # or the coin stays on a key the wallet knows nothing about.
+        dest_script: bytes = (
+            refund_output_script
+            if addr_to is None
+            else self.getScriptForPubkeyHash(self.decodeAddress(addr_to))
+        )
+        tx.vout.append(self.txoType()(outValue, dest_script))
 
         rate_used: int = pay_fee * 1000 // tx_size
 
@@ -1233,6 +1255,9 @@ class BCHInterface(BTCInterface):
         )
 
         txHex = tx.serialize_without_witness()
+        # No local signing branch for key: signTx here signs the whole tx for the
+        # introspection contracts and can't produce a p2pkh input signature.
+        # prepareMercySpend has handed the key to the wallet by this point.
         return self.signTxWithWallet(txHex)
 
     def haveSignedLockRefundTx(self, xmr_swap) -> bool:
