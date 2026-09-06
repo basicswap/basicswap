@@ -291,6 +291,15 @@ def callrpc_xmr2(
     return r
 
 
+def make_socks_transport(proxy_host, proxy_port):
+    # Must be per call: a Transport caches its connection and callers are threaded.
+    if proxy_host is None:
+        return None
+    transport = SocksTransport()
+    transport.set_proxy(proxy_host, proxy_port)
+    return transport
+
+
 def make_xmr_rpc2_func(
     port,
     auth,
@@ -300,17 +309,6 @@ def make_xmr_rpc2_func(
     default_timeout=120,
     tag="",
 ):
-    port = port
-    auth = auth
-    host = host
-    transport = None
-    default_timeout = default_timeout
-    tag = tag
-
-    if proxy_host:
-        transport = SocksTransport()
-        transport.set_proxy(proxy_host, proxy_port)
-
     def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
         return callrpc_xmr2(
             port,
@@ -319,7 +317,7 @@ def make_xmr_rpc2_func(
             auth=auth,
             rpc_host=host,
             timeout=timeout,
-            transport=transport,
+            transport=make_socks_transport(proxy_host, proxy_port),
             tag=tag,
         )
 
@@ -335,17 +333,6 @@ def make_xmr_rpc_func(
     default_timeout=120,
     tag="",
 ):
-    port = port
-    auth = auth
-    host = host
-    transport = None
-    default_timeout = default_timeout
-    tag = tag
-
-    if proxy_host:
-        transport = SocksTransport()
-        transport.set_proxy(proxy_host, proxy_port)
-
     def rpc_func(method, params=None, wallet=None, timeout=default_timeout):
         return callrpc_xmr(
             port,
@@ -354,7 +341,7 @@ def make_xmr_rpc_func(
             rpc_host=host,
             auth=auth,
             timeout=timeout,
-            transport=transport,
+            transport=make_socks_transport(proxy_host, proxy_port),
             tag=tag,
         )
 
