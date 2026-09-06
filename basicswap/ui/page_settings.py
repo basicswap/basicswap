@@ -146,6 +146,11 @@ def page_settings(self, url_split, post_string):
                     "check_updates": toBool(
                         get_data_entry_or(form_data, "check_updates", "false")
                     ),
+                    "check_updates_seconds": int(
+                        get_data_entry_or(
+                            form_data, "check_updates_seconds", str(4 * 60 * 60)
+                        )
+                    ),
                 }
                 swap_client.editGeneralSettings(data)
                 messages.append("Notification settings applied.")
@@ -441,6 +446,7 @@ def page_settings(self, url_split, post_string):
             "notifications_duration", 20
         ),
         "check_updates": swap_client.settings.get("check_updates", True),
+        "check_updates_seconds": swap_client.check_updates_seconds,
     }
 
     tor_control_password = (
