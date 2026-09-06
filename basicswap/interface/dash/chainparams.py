@@ -10,7 +10,7 @@ params = {
     "name": "dash",
     "ticker": "DASH",
     "message_magic": "DarkCoin Signed Message:\n",
-    "blocks_target": 60 * 2.5,
+    "blocks_target": 150,
     "decimal_places": 8,
     "has_csv": True,
     "has_segwit": False,

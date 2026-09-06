@@ -12,6 +12,7 @@ params = {
     "name": "wownero",
     "ticker": "WOW",
     "client": "wow",
+    "blocks_target": 60 * 5,
     "decimal_places": 11,
     "mainnet": {
         "rpcport": 34568,
