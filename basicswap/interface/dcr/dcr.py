@@ -1130,6 +1130,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         lock_unspents: bool = True,
         subfee: bool = False,
         bid_id: bytes = None,
+        cursor=None,
     ) -> bytes:
         if subfee:
             # dcrwallet's fundrawtransaction has no subtractFeeFromOutputs option,
@@ -1213,8 +1214,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize()
 
-    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None):
-        return self.fundTx(tx_bytes, feerate)
+    def fundSCLockTx(
+        self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None, cursor=None
+    ):
+        return self.fundTx(tx_bytes, feerate, bid_id=bid_id, cursor=cursor)
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> bytes:
         ensure(len(Kal) == 33, "invalid Kal length")

@@ -7105,7 +7105,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.amount, xmr_swap.a_lock_tx_script, xmr_swap.vkbv
                 )
                 xmr_swap.a_lock_tx = ci_from.fundSCLockTx(
-                    xmr_swap.a_lock_tx, a_fee_rate, xmr_swap.vkbv, bid_id=bid.bid_id
+                    xmr_swap.a_lock_tx,
+                    a_fee_rate,
+                    xmr_swap.vkbv,
+                    bid_id=bid.bid_id,
+                    cursor=use_cursor,
                 )
                 funded_a_lock_tx = xmr_swap.a_lock_tx
 
