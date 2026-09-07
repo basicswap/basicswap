@@ -178,8 +178,8 @@ from .explorers import (
     ExplorerChainz,
 )
 from .network.simplex import (
+    createSimplexConnectInvitation,
     encryptMsg,
-    getJoinedSimplexLink,
     getResponseData,
 )
 from .network.bsx_network import BSXNetwork, networkTypeToID
@@ -6528,10 +6528,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if message_route:
             return message_route.record_id, False
 
-        cmd_id = net_i.send_command("/connect")
-        response = net_i.wait_for_command_response(cmd_id)
-        connReqInvitation = getJoinedSimplexLink(response)
-        pccConnId = getResponseData(response, "connection")["pccConnId"]
+        connReqInvitation, pccConnId = createSimplexConnectInvitation(
+            net_i, self.delay_event, logger=self.log
+        )
         req_data["bsx_address"] = addr_from
         req_data["connection_req"] = connReqInvitation
 
