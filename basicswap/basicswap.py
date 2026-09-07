@@ -177,6 +177,8 @@ from .explorers import (
     ExplorerBitAps,
     ExplorerChainz,
 )
+from .network.nostr import sendNostrMsg
+from .network.nostr_client import MAX_POW_TARGET_BITS
 from .network.simplex import (
     encryptMsg,
     getJoinedSimplexLink,
@@ -5897,7 +5899,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.saveBidInSession(bid_id, bid, cursor)
 
-            self.log.info(f"Sent BID {self.log.id(bid_id)}")
+            if bid.state == BidStates.CONNECT_REQ_SENT:
+                self.log.info(
+                    f"BID {self.log.id(bid_id)} waiting for direct message route"
+                )
+            else:
+                self.log.info(f"Sent BID {self.log.id(bid_id)}")
             return bid_id
         finally:
             self.closeDB(cursor)
@@ -6505,7 +6512,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # )
         else:
             network_id: int = networkTypeToID(message_nets)
-        if network_id not in (MessageNetworks.SIMPLEX,):
+        if network_id not in (MessageNetworks.SIMPLEX, MessageNetworks.NOSTR):
             return None, False
         try:
             net_i = self.getActiveNetworkInterface(network_id)
@@ -6515,6 +6522,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 f"Not using route - network interface not found for {network_id}.",
             )
             return None, False
+
+        if network_id == MessageNetworks.NOSTR:
+            return self.prepareNostrMessageRoute(
+                net_i,
+                req_data,
+                addr_from,
+                addr_to,
+                cursor,
+                valid_for_seconds,
+                message_nets,
+            )
 
         # Look for active route
         message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
@@ -6568,6 +6586,88 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "pccConnId": pccConnId,
                 }
             ).encode("UTF-8"),
+            created_at=now,
+        )
+        message_route_id = self.add(message_route, cursor)
+
+        self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
+        return message_route_id, False
+
+    def prepareNostrMessageRoute(
+        self,
+        net_i,
+        req_data,
+        addr_from: str,
+        addr_to: str,
+        cursor,
+        valid_for_seconds,
+        message_nets,
+    ) -> (int, bool):
+        # Nostr has no connection to open, a route is a pubkey exchange:
+        # CONNECT_REQ carries the local pubkey, the ACK returns the remote one.
+        existing_pending_route = None
+        message_route = self.getMessageRoute(
+            int(MessageNetworks.NOSTR), addr_from, addr_to, cursor=cursor
+        )
+        if message_route:
+            if message_route.active_ind == 1:
+                self.log.debug(f"Using active message route: {message_route}")
+                return message_route.record_id, True
+            now_pending: int = self.getTime()
+            if now_pending - int(message_route.created_at or 0) < 30:
+                self.log.debug(f"Waiting for message route: {message_route}")
+                return message_route.record_id, False
+            existing_pending_route = message_route
+            self.log.info(
+                f"Resending CONNECT_REQ for pending nostr route {message_route.record_id}"
+            )
+
+        req_data["bsx_address"] = addr_from
+        req_data["nostr_pubkey"] = net_i.pubkey
+        route_data = {"local_pubkey": net_i.pubkey}
+
+        msg_buf = ConnectReqMessage()
+        msg_buf.network_type = int(MessageNetworks.NOSTR)
+        msg_buf.network_data = b"bsx"
+        msg_buf.request_type = ConnectionRequestTypes.BID
+        msg_buf.request_data = json.dumps(req_data).encode("UTF-8")
+
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.CONNECT_REQ) + msg_buf.to_bytes().hex()
+        )
+
+        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+        connect_req_msgid = self.sendMessage(
+            addr_from,
+            addr_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets=message_nets,
+        )
+
+        now: int = self.getTime()
+        route_data["connect_req_msgid"] = connect_req_msgid.hex()
+        if existing_pending_route is not None:
+            cursor.execute(
+                "UPDATE direct_message_routes SET route_data = :route_data, "
+                "created_at = :created_at WHERE record_id = :record_id",
+                {
+                    "route_data": json.dumps(route_data).encode("UTF-8"),
+                    "created_at": now,
+                    "record_id": existing_pending_route.record_id,
+                },
+            )
+            self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
+            return existing_pending_route.record_id, False
+
+        message_route = DirectMessageRoute(
+            active_ind=2,
+            network_id=int(MessageNetworks.NOSTR),
+            linked_type=Concepts.OFFER,
+            smsg_addr_local=addr_from,
+            smsg_addr_remote=addr_to,
+            route_data=json.dumps(route_data).encode("UTF-8"),
             created_at=now,
         )
         message_route_id = self.add(message_route, cursor)
@@ -6763,7 +6863,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
                 self.commitDB()
 
-                self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
+                if bid.state == BidStates.CONNECT_REQ_SENT:
+                    self.log.info(
+                        f"ADS_BID_LF {self.logIDB(xmr_swap.bid_id)} waiting for direct message route"
+                    )
+                else:
+                    self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
                 return xmr_swap.bid_id
 
             xmr_swap = XmrSwap()
@@ -6932,7 +7037,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
-            self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
+            if bid.state == BidStates.CONNECT_REQ_SENT:
+                self.log.info(
+                    f"XMR_BID_FL {self.logIDB(xmr_swap.bid_id)} waiting for direct message route"
+                )
+            else:
+                self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
             return xmr_swap.bid_id
         finally:
             self.closeDB(cursor)
@@ -14079,7 +14189,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         max_dleag_proof_len: int = 48893  # coincurve.dleag.dleag_proof_len()
         network_type: str = msg.get("msg_net", "smsg")
-        if network_type == "simplex":
+        if network_type in ("simplex", "nostr"):
             max_data_size: int = 11000
             min_data_size: int = 9000
         else:
@@ -14462,10 +14572,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         req_data = json.loads(msg_data.request_data)
 
+        if msg_data.request_type == ConnectionRequestTypes.ACK:
+            self.processConnectRequestAck(msg, msg_data, req_data)
+            return
+
         offer_id = bytes.fromhex(req_data["offer_id"])
         bidder_addr = req_data["bsx_address"]
 
-        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
+        network_id: int = int(msg_data.network_type)
+        ensure(
+            network_id in (MessageNetworks.SIMPLEX, MessageNetworks.NOSTR),
+            f"Unsupported connect request network: {network_id}",
+        )
+        net_i = self.getActiveNetworkInterface(network_id)
         try:
             cursor = self.openDB()
             offer = self.getOffer(offer_id, cursor)
@@ -14477,50 +14596,91 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Opening direct message route from {offer.addr_from} to {bidder_addr}"
             )
-            message_route = self.getMessageRoute(
-                2, bidder_addr, offer.addr_from, cursor=cursor
-            )
-            if message_route:
-                raise ValueError("Direct message route already exists")
+            if network_id == MessageNetworks.NOSTR:
+                remote_pubkey = req_data["nostr_pubkey"]
+                ensure(isinstance(remote_pubkey, str), "Invalid nostr pubkey type")
+                ensure(len(remote_pubkey) == 64, "Invalid nostr pubkey length")
+                bytes.fromhex(remote_pubkey)  # Raises on invalid hex
 
-            connReqInvitation = req_data["connection_req"]
-            ensure(
-                isinstance(connReqInvitation, str), "Invalid connection request type"
-            )
-            ensure(
-                0 < len(connReqInvitation) <= 4096, "Invalid connection request length"
-            )
-            ensure(
-                all(33 <= ord(c) <= 126 for c in connReqInvitation),
-                "Invalid characters in connection request",
-            )
+                message_route = self.getMessageRoute(
+                    int(MessageNetworks.NOSTR),
+                    offer.addr_from,
+                    bidder_addr,
+                    cursor=cursor,
+                )
+                if message_route:
+                    route_data = json.loads(message_route.route_data.decode("UTF-8"))
+                    ensure(
+                        route_data.get("remote_pubkey") == remote_pubkey,
+                        "Direct message route already exists",
+                    )
+                    # The bidder resends CONNECT_REQ when the ACK did not arrive.
+                    self.checkConnectRequestRateLimit()
+                    self.log.info(
+                        f"Resending CONNECT_REQ ACK for route {message_route.record_id}"
+                    )
+                    self.sendConnectRequestAck(
+                        offer_id,
+                        offer.addr_from,
+                        bidder_addr,
+                        net_i.pubkey,
+                        getMsgPubkey(self, msg),
+                        cursor,
+                    )
+                    return
+            else:
+                message_route = self.getMessageRoute(
+                    2, bidder_addr, offer.addr_from, cursor=cursor
+                )
+                if message_route:
+                    raise ValueError("Direct message route already exists")
 
-            now_rl: int = self.getTime()
-            self._connect_request_times = [
-                t for t in self._connect_request_times if now_rl - t < 3600
-            ]
-            ensure(
-                len(self._connect_request_times) < self._max_connect_requests_per_hour,
-                "Connection request rate limit exceeded",
-            )
-            self._connect_request_times.append(now_rl)
+                connReqInvitation = req_data["connection_req"]
+                ensure(
+                    isinstance(connReqInvitation, str),
+                    "Invalid connection request type",
+                )
+                ensure(
+                    0 < len(connReqInvitation) <= 4096,
+                    "Invalid connection request length",
+                )
+                ensure(
+                    all(33 <= ord(c) <= 126 for c in connReqInvitation),
+                    "Invalid characters in connection request",
+                )
 
-            cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
-            response = net_i.wait_for_command_response(cmd_id)
-            pccConnId = getResponseData(response, "connection")["pccConnId"]
+            self.checkConnectRequestRateLimit()
 
             now: int = self.getTime()
-            message_route = DirectMessageRoute(
-                active_ind=2,
-                network_id=2,
-                linked_type=Concepts.OFFER,
-                smsg_addr_local=offer.addr_from,
-                smsg_addr_remote=bidder_addr,
-                route_data=json.dumps(
-                    {"connection_req": connReqInvitation, "pccConnId": pccConnId}
-                ).encode("UTF-8"),
-                created_at=now,
-            )
+            if network_id == MessageNetworks.NOSTR:
+                # No connection to establish, the route is usable immediately.
+                message_route = DirectMessageRoute(
+                    active_ind=1,
+                    network_id=int(MessageNetworks.NOSTR),
+                    linked_type=Concepts.OFFER,
+                    smsg_addr_local=offer.addr_from,
+                    smsg_addr_remote=bidder_addr,
+                    route_data=json.dumps(
+                        {"remote_pubkey": remote_pubkey, "local_pubkey": net_i.pubkey}
+                    ).encode("UTF-8"),
+                    created_at=now,
+                )
+            else:
+                cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
+                response = net_i.wait_for_command_response(cmd_id)
+                pccConnId = getResponseData(response, "connection")["pccConnId"]
+
+                message_route = DirectMessageRoute(
+                    active_ind=2,
+                    network_id=2,
+                    linked_type=Concepts.OFFER,
+                    smsg_addr_local=offer.addr_from,
+                    smsg_addr_remote=bidder_addr,
+                    route_data=json.dumps(
+                        {"connection_req": connReqInvitation, "pccConnId": pccConnId}
+                    ).encode("UTF-8"),
+                    created_at=now,
+                )
             message_route_id = self.add(message_route, cursor)
 
             message_route_link = DirectMessageRouteLink(
@@ -14532,6 +14692,128 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             self.add(message_route_link, cursor)
 
+            if network_id == MessageNetworks.NOSTR:
+                self.sendConnectRequestAck(
+                    offer_id,
+                    offer.addr_from,
+                    bidder_addr,
+                    net_i.pubkey,
+                    getMsgPubkey(self, msg),
+                    cursor,
+                )
+
+        finally:
+            self.closeDB(cursor)
+
+    def checkConnectRequestRateLimit(self) -> None:
+        now_rl: int = self.getTime()
+        self._connect_request_times = [
+            t for t in self._connect_request_times if now_rl - t < 3600
+        ]
+        ensure(
+            len(self._connect_request_times) < self._max_connect_requests_per_hour,
+            "Connection request rate limit exceeded",
+        )
+        self._connect_request_times.append(now_rl)
+
+    def sendConnectRequestAck(
+        self,
+        offer_id: bytes,
+        addr_from: str,
+        addr_to: str,
+        local_pubkey: str,
+        pubkey_to: bytes,
+        cursor,
+    ) -> None:
+        # Sent as a broadcast event, not p-tagged to the remote node, so relays
+        # and observers cannot link the two node pubkeys.  The payload is
+        # SMSG-encrypted to the bidder's address key.
+        ack_data = {
+            "offer_id": offer_id.hex(),
+            "bsx_address": addr_from,
+            "nostr_pubkey": local_pubkey,
+        }
+        msg_buf = ConnectReqMessage()
+        msg_buf.network_type = int(MessageNetworks.NOSTR)
+        msg_buf.network_data = b"bsx"
+        msg_buf.request_type = ConnectionRequestTypes.ACK
+        msg_buf.request_data = json.dumps(ack_data).encode("UTF-8")
+
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.CONNECT_REQ) + msg_buf.to_bytes().hex()
+        )
+        network = self.getActiveNetwork(MessageNetworks.NOSTR)
+        ack_msgid = sendNostrMsg(
+            self,
+            network,
+            addr_from,
+            addr_to,
+            bytes.fromhex(payload_hex),
+            self.SMSG_SECONDS_IN_HOUR,
+            cursor,
+            pubkey_to=pubkey_to,
+        )
+        self.log.info(f"Sent CONNECT_REQ ACK {self.logIDB(ack_msgid)}")
+
+    def processConnectRequestAck(self, msg, msg_data, req_data) -> None:
+        self.log.debug(
+            "Processing connection request ack msg {}.".format(
+                self.log.id(msg["msgid"])
+            )
+        )
+        ensure(
+            int(msg_data.network_type) == MessageNetworks.NOSTR,
+            "Unsupported connect request ack network",
+        )
+        remote_pubkey = req_data["nostr_pubkey"]
+        ensure(isinstance(remote_pubkey, str), "Invalid nostr pubkey type")
+        ensure(len(remote_pubkey) == 64, "Invalid nostr pubkey length")
+        bytes.fromhex(remote_pubkey)  # Raises on invalid hex
+
+        try:
+            cursor = self.openDB()
+            message_route = self.getMessageRoute(
+                int(MessageNetworks.NOSTR), msg["to"], msg["from"], cursor=cursor
+            )
+            ensure(message_route, "No matching direct message route for ack")
+            if message_route.active_ind == 1:
+                self.log.debug("Direct message route is already active.")
+                return
+
+            route_data = json.loads(message_route.route_data.decode("UTF-8"))
+            route_data["remote_pubkey"] = remote_pubkey
+            query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
+            cursor.execute(
+                query,
+                {
+                    "route_data": json.dumps(route_data).encode("UTF-8"),
+                    "record_id": message_route.record_id,
+                },
+            )
+            self.log.debug(
+                f"Direct message route established local: {msg['to']}, remote: {msg['from']}."
+            )
+
+            query_str = (
+                "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
+                + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
+            )
+            rows = cursor.execute(
+                query_str, {"route_id": message_route.record_id}
+            ).fetchall()
+            for row in rows:
+                record_id, linked_type, linked_id = row
+
+                if linked_type == Concepts.BID:
+                    self.routeEstablishedForBid(linked_id, cursor)
+                    query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
+                    cursor.execute(query, {"record_id": record_id})
+                elif linked_type == Concepts.OFFER:
+                    pass
+                else:
+                    self.log.warning(
+                        f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
+                    )
         finally:
             self.closeDB(cursor)
 
@@ -14643,8 +14925,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             network_type: str = msg.get("msg_net", "smsg")
             if network_type == "smsg":
                 self.num_smsg_messages_received += 1
-            elif network_type == "simplex":
-                pass  # Counted earlier, split between group and direct
+            elif network_type in ("simplex", "nostr"):
+                pass  # Counted earlier, split between group/broadcast and direct
             else:
                 self.log.warning(f"processMsg unknown network: {network_type}")
             msg_type: int = int(msg["hex"][:2], 16)
@@ -15331,6 +15613,211 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 shutil.move(settings_path_new, settings_path)
                 self.settings = settings_copy
         return settings_changed, suggest_reboot
+
+    def editNetworkSettings(self, network_type: str, data):
+        self.log.info(f"Updating network settings {network_type}.")
+        ensure(
+            network_type in ("smsg", "simplex", "nostr"),
+            f"Unknown network type {network_type}",
+        )
+        settings_changed = False
+        suggest_reboot = False
+        settings_copy = copy.deepcopy(self.settings)
+        with self.mxDB:
+            network_config_list = settings_copy.get("networks", [])
+            if len(network_config_list) < 1:
+                network_config_list = [{"type": "smsg", "enabled": True}]
+                settings_copy["networks"] = network_config_list
+
+            network = None
+            for n in network_config_list:
+                if n.get("type", "unknown") == network_type:
+                    network = n
+                    break
+            if network is None:
+                if network_type == "smsg":
+                    network = {"type": "smsg", "enabled": False}
+                    network_config_list.append(network)
+                else:
+                    raise ValueError(
+                        f"Network {network_type} is not configured. Use basicswap-prepare --addnetwork={network_type} first."
+                    )
+
+            if "enabled" in data:
+                new_value = data["enabled"]
+                ensure(isinstance(new_value, bool), "New enabled value not boolean")
+                if new_value is False:
+                    num_enabled: int = sum(
+                        1 for n in network_config_list if n.get("enabled", True)
+                    )
+                    if num_enabled <= 1 and network.get("enabled", True):
+                        raise ValueError("Cannot disable the last enabled network.")
+                if network.get("enabled", True) != new_value:
+                    network["enabled"] = new_value
+                    settings_changed = True
+                    suggest_reboot = True
+
+            if network_type == "nostr":
+                if "relays" in data:
+                    new_value = data["relays"]
+                    ensure(isinstance(new_value, list), "New relays value not a list")
+                    ensure(len(new_value) > 0, "At least one relay is required")
+                    for relay in new_value:
+                        ensure(
+                            isinstance(relay, str)
+                            and relay.startswith(("ws://", "wss://")),
+                            f"Invalid relay url: {relay}",
+                        )
+                    if network.get("relays", []) != new_value:
+                        network["relays"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "pow_target" in data:
+                    new_value = data["pow_target"]
+                    ensure(
+                        isinstance(new_value, int), "New pow_target value not integer"
+                    )
+                    ensure(
+                        0 <= new_value <= MAX_POW_TARGET_BITS,
+                        f"pow_target must be between 0 and {MAX_POW_TARGET_BITS}",
+                    )
+                    if network.get("pow_target", 0) != new_value:
+                        network["pow_target"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+            if network_type == "simplex":
+                if "server_address" in data:
+                    new_value = data["server_address"]
+                    ensure(
+                        isinstance(new_value, str) and new_value.startswith("smp://"),
+                        "Invalid server address",
+                    )
+                    if network.get("server_address", "") != new_value:
+                        network["server_address"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "ws_port" in data:
+                    new_value = data["ws_port"]
+                    ensure(isinstance(new_value, int), "New ws_port value not integer")
+                    ensure(1 <= new_value <= 65535, "Invalid ws_port")
+                    if network.get("ws_port", 0) != new_value:
+                        network["ws_port"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "group_link" in data:
+                    new_value = data["group_link"]
+                    ensure(isinstance(new_value, str), "Invalid group link")
+                    if network.get("group_link", "") != new_value:
+                        network["group_link"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+            if settings_changed:
+                settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+                settings_path_new = settings_path + ".new"
+                shutil.copyfile(settings_path, settings_path + ".last")
+                with open(settings_path_new, "w") as fp:
+                    json.dump(settings_copy, fp, indent=4)
+                shutil.move(settings_path_new, settings_path)
+                self.settings = settings_copy
+        return settings_changed, suggest_reboot
+
+    def editBridgeNetworksSetting(self, enabled: bool):
+        """Set the top-level "bridge_networks" setting.
+        When enabled and multiple networks are active, this node opens
+        portals and relays messages between networks for other nodes.
+        """
+        ensure(isinstance(enabled, bool), "New bridge_networks value not boolean")
+        self.log.info(f"Setting bridge_networks: {enabled}.")
+        settings_changed = False
+        suggest_reboot = False
+        settings_copy = copy.deepcopy(self.settings)
+        with self.mxDB:
+            if settings_copy.get("bridge_networks", False) != enabled:
+                if enabled:
+                    num_enabled: int = sum(
+                        1
+                        for n in settings_copy.get(
+                            "networks", [{"type": "smsg", "enabled": True}]
+                        )
+                        if n.get("enabled", True)
+                    )
+                    if num_enabled < 2:
+                        raise ValueError(
+                            "Bridging requires at least two enabled networks."
+                        )
+                settings_copy["bridge_networks"] = enabled
+                settings_changed = True
+                suggest_reboot = True
+
+                settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+                settings_path_new = settings_path + ".new"
+                shutil.copyfile(settings_path, settings_path + ".last")
+                with open(settings_path_new, "w") as fp:
+                    json.dump(settings_copy, fp, indent=4)
+                shutil.move(settings_path_new, settings_path)
+                self.settings = settings_copy
+        return settings_changed, suggest_reboot
+
+    def getNetworksInfo(self) -> list:
+        """Config plus runtime status for all message networks."""
+        network_config_list = self.settings.get("networks", [])
+        if len(network_config_list) < 1:
+            network_config_list = [{"type": "smsg", "enabled": True}]
+
+        active_by_type = {}
+        for network in getattr(self, "active_networks", []):
+            active_by_type[network.get("type", "unknown")] = network
+
+        rv = []
+        for network in network_config_list:
+            network_type: str = network.get("type", "unknown")
+            info = {
+                "type": network_type,
+                "enabled": network.get("enabled", True),
+                "active": network_type in active_by_type,
+                "bridged": [
+                    n.get("type", "unknown") for n in network.get("bridged", [])
+                ],
+            }
+            if network_type == "smsg":
+                info["messages_received"] = self.num_smsg_messages_received
+                info["messages_sent"] = self.num_smsg_messages_sent
+            elif network_type == "simplex":
+                info["server_address"] = network.get("server_address", "")
+                info["ws_port"] = network.get("ws_port", "")
+                info["group_link"] = network.get("group_link", "")
+                if "client_version" in network:
+                    info["client_version"] = network["client_version"]
+                info["messages_received"] = (
+                    self.num_group_simplex_messages_received
+                    + self.num_direct_simplex_messages_received
+                )
+                info["messages_sent"] = (
+                    self.num_group_simplex_messages_sent
+                    + self.num_direct_simplex_messages_sent
+                )
+            elif network_type == "nostr":
+                info["relays"] = network.get("relays", [])
+                info["pow_target"] = network.get("pow_target", 0)
+                info["messages_received"] = (
+                    self.num_nostr_messages_received
+                    + self.num_direct_nostr_messages_received
+                )
+                info["messages_sent"] = (
+                    self.num_nostr_messages_sent + self.num_direct_nostr_messages_sent
+                )
+                active_network = active_by_type.get("nostr")
+                if active_network is not None:
+                    client_info = active_network["client"].get_info()
+                    info["pubkey"] = client_info["pubkey"]
+                    info["relay_status"] = client_info["relays"]
+            rv.append(info)
+        return rv
 
     def editSettings(self, coin_name: str, data):
         self.log.info(f"Updating settings {coin_name}.")

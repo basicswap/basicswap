@@ -107,6 +107,11 @@ SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", "")
 SIMPLEX_CLIENT_PATH = os.path.expanduser(os.getenv("SIMPLEX_CLIENT_PATH", ""))
 SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "")
 
+# Comma separated list of message networks to enable: smsg,simplex,nostr
+# When empty, uses simplex if SIMPLEX_CLIENT_PATH is set, else the default (smsg).
+TEST_MESSAGE_NETWORKS = os.getenv("TEST_MESSAGE_NETWORKS", "")
+NOSTR_TEST_RELAYS = os.getenv("NOSTR_TEST_RELAYS", "ws://127.0.0.1:8765")
+
 logger = logging.getLogger()
 logger.level = logging.DEBUG
 if not len(logger.handlers):
@@ -523,25 +528,64 @@ def start_processes(self):
     assert particl_blocks >= num_blocks
 
 
+def getSimplexNetworkConfig(i):
+    simplex_options = {
+        "type": "simplex",
+        "server_address": SIMPLEX_SERVER_ADDRESS,
+        "client_path": SIMPLEX_CLIENT_PATH,
+        "ws_port": SIMPLEX_WS_PORT + i,
+        "group_link": SIMPLEX_GROUP_LINK,
+        "enabled": True,
+    }
+    if SIMPLEX_SERVER_SOCKS_PROXY != "":
+        simplex_options["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
+    return simplex_options
+
+
+def getNostrNetworkConfig(i):
+    from coincurve.keys import PrivateKey
+
+    return {
+        "type": "nostr",
+        "relays": [r.strip() for r in NOSTR_TEST_RELAYS.split(",") if r.strip()],
+        "private_key": PrivateKey().to_hex(),
+        "enabled": True,
+    }
+
+
+def applyMessageNetworksConfig(settings, i) -> bool:
+    """Set settings["networks"] from TEST_MESSAGE_NETWORKS, returns True if modified."""
+    network_names = [n.strip() for n in TEST_MESSAGE_NETWORKS.split(",") if n.strip()]
+    if len(network_names) < 1 and SIMPLEX_CLIENT_PATH != "":
+        # Legacy behaviour: Simplex only when a client path is set
+        network_names = ["simplex"]
+
+    if len(network_names) < 1:
+        return False
+
+    logging.info(f"Setting message networks: {network_names}")
+    networks = []
+    for name in network_names:
+        if name == "smsg":
+            networks.append({"type": "smsg", "enabled": True})
+        elif name == "simplex":
+            networks.append(getSimplexNetworkConfig(i))
+        elif name == "nostr":
+            networks.append(getNostrNetworkConfig(i))
+        else:
+            raise ValueError(f"Unknown message network: {name}")
+    settings["networks"] = networks
+    if len(networks) > 1:
+        settings["smsg_payload_version"] = 2
+    return True
+
+
 def modifyConfig(test_path, i):
     config_path = os.path.join(test_path, f"client{i}", cfg.CONFIG_FILENAME)
     with open(config_path) as fp:
         settings = json.load(fp)
 
-    if SIMPLEX_CLIENT_PATH != "":
-        logging.info("Adding Simplex config")
-        simplex_options = {
-            "type": "simplex",
-            "server_address": SIMPLEX_SERVER_ADDRESS,
-            "client_path": SIMPLEX_CLIENT_PATH,
-            "ws_port": SIMPLEX_WS_PORT + i,
-            "group_link": SIMPLEX_GROUP_LINK,
-            "enabled": True,
-        }
-        if SIMPLEX_SERVER_SOCKS_PROXY != "":
-            simplex_options["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
-
-        settings["networks"] = [simplex_options]
+    applyMessageNetworksConfig(settings, i)
 
     with open(config_path, "w") as fp:
         json.dump(settings, fp, indent=4)

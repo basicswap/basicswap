@@ -111,9 +111,13 @@ if not len(logger.handlers):
 
 
 def modify_config(cls, test_path, i):
+    from tests.basicswap.test_persistent import applyMessageNetworksConfig
+
     config_path = os.path.join(test_path, f"client{i}", cfg.CONFIG_FILENAME)
     with open(config_path) as fp:
         settings = json.load(fp)
+
+    applyMessageNetworksConfig(settings, i)
 
     if i == 1:
         settings["debug_ui"] = True
