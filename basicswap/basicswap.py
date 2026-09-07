@@ -8549,8 +8549,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 chain_height=ci_from.getChainHeight(),
                             )
                             if ci_from.altruistic() and ci_from.canSendMercyTx():
-                                # No prevout lock: the swipe paid a key derived for
-                                # the swap, which the wallet cannot select from.
+                                # Not all coins pay the swipe to a key derived for
+                                # the swap: the BCH covenant forces the output to a
+                                # wallet address the wallet can select from.  Lock
+                                # such outputs until the mercy tx has spent them.
+                                if not ci_from.swipePaysKey(
+                                    xmr_swap.a_lock_refund_swipe_tx,
+                                    txid,
+                                    self.getPathKey(
+                                        Coins(
+                                            offer.coin_to
+                                            if reverse_bid
+                                            else offer.coin_from
+                                        ),
+                                        Coins(
+                                            offer.coin_from
+                                            if reverse_bid
+                                            else offer.coin_to
+                                        ),
+                                        bid.created_at,
+                                        xmr_swap.contract_count,
+                                        KeyTypes.KA_SWIPE,
+                                    ),
+                                ):
+                                    self._lockMercyPrevout(ci_from, bid, cursor)
                                 delay = self.get_delay_event_seconds()
                                 self.log.info(
                                     f"Queuing mercy tx for bid {self.log.id(bid_id)} in {delay} seconds."
