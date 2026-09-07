@@ -183,10 +183,12 @@ def encryptMsg(
     timestamp=None,
     deterministic=False,
     difficulty_target=0x1EFFFFFF,
+    pubkey_to: bytes = None,
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
+    if pubkey_to is None:
+        pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
     privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
     payload_format: int = 2
@@ -300,7 +302,9 @@ def decryptSimplexMsg(self, msg_data):
         UNION
         SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
         UNION
-        SELECT addr AS address FROM smsgaddresses WHERE active_ind = 1 AND use_type = :local_portal
+        SELECT addr AS address FROM smsgaddresses
+               WHERE active_ind = 1 AND use_type IN (
+                   :local_portal, :bid, :offer, :recv_offer, :send_offer)
         )"""
 
     now: int = self.getTime()
@@ -308,7 +312,15 @@ def decryptSimplexMsg(self, msg_data):
     try:
         cursor = self.openDB()
         addr_rows = cursor.execute(
-            query, {"now": now, "local_portal": AddressTypes.PORTAL_LOCAL}
+            query,
+            {
+                "now": now,
+                "local_portal": AddressTypes.PORTAL_LOCAL,
+                "bid": AddressTypes.BID,
+                "offer": AddressTypes.OFFER,
+                "recv_offer": AddressTypes.RECV_OFFER,
+                "send_offer": AddressTypes.SEND_OFFER,
+            },
         ).fetchall()
         decrypted = None
         for row in addr_rows:
