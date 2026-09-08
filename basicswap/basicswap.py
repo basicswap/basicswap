@@ -14794,6 +14794,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         {"bid_id": bid_id, "new_state": new_state, "states": states},
                     )
                     bids_expired += 1
+
+                    # unlock inputs from inactive/expired
+                    query = "SELECT o.coin_to FROM bids AS b, offers AS o WHERE b.bid_id = :bid_id AND o.offer_id = b.offer_id"
+                    coin_rows = cursor.execute(query, {"bid_id": bid_id}).fetchall()
+                    if len(coin_rows) > 0:
+                        self.unlockPrefundedTxInputs(
+                            bid_id, Coins(coin_rows[0][0]), cursor
+                        )
             for offer_id in offers_to_expire:
                 query = "SELECT states FROM offers WHERE offer_id = :offer_id AND active_ind = 1 AND state IN (:offer_received, :offer_sent)"
                 rows = cursor.execute(
