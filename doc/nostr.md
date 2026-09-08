@@ -77,14 +77,46 @@ Tor SOCKS proxy unless `socks_proxy_override` is set for the network.
 
 ## Tests
 
+Unit and integration tests (no external infrastructure):
+
 ```
 export PYTHONPATH=$(pwd)
 pytest -v tests/basicswap/test_nostr.py
 ```
 
 The tests run against an in-process mini relay
-(`tests/basicswap/util/nostr_relay.py`) and require no external
-infrastructure.  For multi-node integration tests set
-`TEST_MESSAGE_NETWORKS=nostr` (or e.g. `smsg,nostr`) and point
-`NOSTR_TEST_RELAYS` at a reachable relay before running
-`test_persistent.py` based suites.
+(`tests/basicswap/util/nostr_relay.py`).
+
+### Regtest swap tests
+
+Full BTC↔XMR regtest swaps over Nostr (3 nodes, in-process relay):
+
+```
+export PYTHONPATH=$(pwd)
+pytest -v -s tests/basicswap/extended/test_nostr.py
+```
+
+Nostr ↔ SMSG bridge swaps:
+
+```
+pytest -v -s tests/basicswap/extended/test_multinet_nostr.py
+```
+
+All three networks (SMSG + SimpleX + Nostr) — requires SimpleX SMP server
+and `simplex-chat` binary (see `tests/basicswap/extended/test_simplex.py`):
+
+```
+pytest -v -s tests/basicswap/extended/test_multinet_all.py
+```
+
+Or use the regtest runner (copies coin binaries to `/tmp/test_basicswap_bin`):
+
+```
+scripts/run_nostr_regtest_tests.sh
+RUN_MULTINET_ALL=1 scripts/run_nostr_regtest_tests.sh   # include SimpleX tests
+```
+
+For multi-node integration tests in `test_persistent.py` based suites, set
+`TEST_MESSAGE_NETWORKS=nostr` (or e.g. `smsg,nostr`) and optionally
+`TEST_MESSAGE_NETWORKS_BRIDGE=smsg` to attach bridged networks.  Point
+`NOSTR_TEST_RELAYS` at a reachable relay (defaults to `ws://127.0.0.1:8765`).

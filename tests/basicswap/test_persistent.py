@@ -553,8 +553,13 @@ def getNostrNetworkConfig(i):
     }
 
 
-def applyMessageNetworksConfig(settings, i) -> bool:
-    """Set settings["networks"] from TEST_MESSAGE_NETWORKS, returns True if modified."""
+def applyMessageNetworksConfig(settings, i, bridges=None) -> bool:
+    """Set settings["networks"] from TEST_MESSAGE_NETWORKS, returns True if modified.
+
+    bridges: optional list of network types to attach as ``bridged`` on the first
+    configured network, e.g. ``["smsg"]``.  When omitted, reads
+    ``TEST_MESSAGE_NETWORKS_BRIDGE`` (comma-separated types).
+    """
     network_names = [n.strip() for n in TEST_MESSAGE_NETWORKS.split(",") if n.strip()]
     if len(network_names) < 1 and SIMPLEX_CLIENT_PATH != "":
         # Legacy behaviour: Simplex only when a client path is set
@@ -563,19 +568,29 @@ def applyMessageNetworksConfig(settings, i) -> bool:
     if len(network_names) < 1:
         return False
 
+    if bridges is None:
+        bridge_env = os.getenv("TEST_MESSAGE_NETWORKS_BRIDGE", "").strip()
+        if bridge_env:
+            bridges = [t.strip() for t in bridge_env.split(",") if t.strip()]
+
     logging.info(f"Setting message networks: {network_names}")
     networks = []
     for name in network_names:
         if name == "smsg":
-            networks.append({"type": "smsg", "enabled": True})
+            network = {"type": "smsg", "enabled": True}
         elif name == "simplex":
-            networks.append(getSimplexNetworkConfig(i))
+            network = getSimplexNetworkConfig(i)
         elif name == "nostr":
-            networks.append(getNostrNetworkConfig(i))
+            network = getNostrNetworkConfig(i)
         else:
             raise ValueError(f"Unknown message network: {name}")
+        networks.append(network)
+
+    if bridges and len(networks) > 0:
+        networks[0]["bridged"] = [{"type": t} for t in bridges]
+
     settings["networks"] = networks
-    if len(networks) > 1:
+    if len(networks) > 1 or bridges:
         settings["smsg_payload_version"] = 2
     return True
 
