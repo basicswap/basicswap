@@ -543,6 +543,9 @@
         <div class="md:col-span-2">
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Relays (one per line)</label>
          <textarea rows="4" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_relays" placeholder="wss://relay.example.com">{{ n.relays_text }}</textarea>
+         {% if n.plaintext_relays %}
+         <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Warning: unencrypted ws:// relay(s) without Tor expose your Nostr pubkey and message timing on the network. Use wss:// or enable Tor.</p>
+         {% endif %}
         </div>
         <div>
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proof of Work Target (bits)</label>
@@ -553,6 +556,7 @@
         <div>
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Public Key</label>
          <input type="text" readonly class="bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 text-sm rounded-lg block w-full p-2.5" value="{{ n.pubkey }}">
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Signs offers and other broadcasts. Swap messages use a fresh key per route.</p>
         </div>
         {% endif %}
         {% if n.relay_status %}
@@ -579,6 +583,7 @@
         {% else %}
         <button name="enable_network_nostr" value="Enable" type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
         {% endif %}
+        <button name="regenerate_key_nostr" value="Regenerate" type="submit" onclick="return confirm('Generate a new Nostr key? Requires a restart. Existing swaps are not affected.');" class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Regenerate Key</button>
         <button name="apply_network_nostr" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
        </div>
        {% elif n.type == 'simplex' %}

@@ -177,7 +177,7 @@ from .explorers import (
     ExplorerBitAps,
     ExplorerChainz,
 )
-from .network.nostr import sendNostrMsg
+from .network.nostr import newNostrRouteKey, sendNostrMsg
 from .network.nostr_client import MAX_POW_TARGET_BITS
 from .network.simplex import (
     encryptMsg,
@@ -6605,7 +6605,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     ) -> (int, bool):
         # Nostr has no connection to open, a route is a pubkey exchange:
         # CONNECT_REQ carries the local pubkey, the ACK returns the remote one.
+        # Each route uses its own signing key so relays can't link swaps to
+        # the node key or to each other.
         existing_pending_route = None
+        route_privkey_hex = None
+        route_pubkey = None
         message_route = self.getMessageRoute(
             int(MessageNetworks.NOSTR), addr_from, addr_to, cursor=cursor
         )
@@ -6618,13 +6622,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.debug(f"Waiting for message route: {message_route}")
                 return message_route.record_id, False
             existing_pending_route = message_route
+            existing_route_data = json.loads(message_route.route_data.decode("UTF-8"))
+            route_privkey_hex = existing_route_data.get("local_privkey")
+            route_pubkey = existing_route_data.get("local_pubkey")
             self.log.info(
                 f"Resending CONNECT_REQ for pending nostr route {message_route.record_id}"
             )
 
+        if route_privkey_hex is None or route_pubkey is None:
+            route_privkey_hex, route_pubkey = newNostrRouteKey()
+
         req_data["bsx_address"] = addr_from
-        req_data["nostr_pubkey"] = net_i.pubkey
-        route_data = {"local_pubkey": net_i.pubkey}
+        req_data["nostr_pubkey"] = route_pubkey
+        route_data = {"local_pubkey": route_pubkey, "local_privkey": route_privkey_hex}
 
         msg_buf = ConnectReqMessage()
         msg_buf.network_type = int(MessageNetworks.NOSTR)
@@ -6644,6 +6654,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             msg_valid,
             cursor,
             message_nets=message_nets,
+            sign_privkey=bytes.fromhex(route_privkey_hex),
         )
 
         now: int = self.getTime()
@@ -14623,11 +14634,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         offer_id,
                         offer.addr_from,
                         bidder_addr,
-                        net_i.pubkey,
+                        route_data["local_pubkey"],
                         getMsgPubkey(self, msg),
                         cursor,
+                        sign_privkey=bytes.fromhex(route_data["local_privkey"]),
                     )
                     return
+                route_privkey_hex, route_pubkey = newNostrRouteKey()
             else:
                 message_route = self.getMessageRoute(
                     2, bidder_addr, offer.addr_from, cursor=cursor
@@ -14661,7 +14674,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     smsg_addr_local=offer.addr_from,
                     smsg_addr_remote=bidder_addr,
                     route_data=json.dumps(
-                        {"remote_pubkey": remote_pubkey, "local_pubkey": net_i.pubkey}
+                        {
+                            "remote_pubkey": remote_pubkey,
+                            "local_pubkey": route_pubkey,
+                            "local_privkey": route_privkey_hex,
+                        }
                     ).encode("UTF-8"),
                     created_at=now,
                 )
@@ -14697,9 +14714,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     offer_id,
                     offer.addr_from,
                     bidder_addr,
-                    net_i.pubkey,
+                    route_pubkey,
                     getMsgPubkey(self, msg),
                     cursor,
+                    sign_privkey=bytes.fromhex(route_privkey_hex),
                 )
 
         finally:
@@ -14724,6 +14742,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         local_pubkey: str,
         pubkey_to: bytes,
         cursor,
+        sign_privkey: bytes = None,
     ) -> None:
         # Sent as a broadcast event, not p-tagged to the remote node, so relays
         # and observers cannot link the two node pubkeys.  The payload is
@@ -14752,6 +14771,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.SMSG_SECONDS_IN_HOUR,
             cursor,
             pubkey_to=pubkey_to,
+            sign_privkey=sign_privkey,
         )
         self.log.info(f"Sent CONNECT_REQ ACK {self.logIDB(ack_msgid)}")
 
@@ -15686,6 +15706,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         network["pow_target"] = new_value
                         settings_changed = True
                         suggest_reboot = True
+
+                if data.get("regenerate_key", False) is True:
+                    # Active routes have their own keys, only new broadcasts
+                    # are affected.
+                    network["private_key"] = newNostrRouteKey()[0]
+                    settings_changed = True
+                    suggest_reboot = True
 
             if network_type == "simplex":
                 if "server_address" in data:
@@ -17630,12 +17657,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 try:
                     if row[1] is not None and row[1] != "None":
                         volume_24h = float(row[1])
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
                 try:
                     if row[2] is not None and row[2] != "None":
                         price_change_24h = float(row[2])
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     pass
                 return_data[coin_id] = {
                     "volume_24h": volume_24h,

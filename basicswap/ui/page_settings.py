@@ -181,6 +181,15 @@ def page_settings(self, url_split, post_string):
                     messages.append("Nostr settings applied.")
                 if suggest_reboot:
                     messages.append("Please restart BasicSwap.")
+            elif have_data_entry(form_data, "regenerate_key_nostr"):
+                active_tab = "networks"
+                settings_changed, suggest_reboot = swap_client.editNetworkSettings(
+                    "nostr", {"regenerate_key": True}
+                )
+                if settings_changed:
+                    messages.append("Nostr key regenerated.")
+                if suggest_reboot:
+                    messages.append("Please restart BasicSwap.")
             elif have_data_entry(form_data, "apply_network_simplex"):
                 active_tab = "networks"
                 data = {
@@ -551,6 +560,11 @@ def page_settings(self, url_split, post_string):
         )
         if network["type"] == "nostr":
             network["relays_text"] = "\n".join(network.get("relays", []))
+            network["plaintext_relays"] = (
+                [r for r in network.get("relays", []) if r.startswith("ws://")]
+                if not swap_client.use_tor_proxy
+                else []
+            )
         networks_formatted.append(network)
 
     num_enabled_networks: int = sum(1 for n in networks_formatted if n["enabled"])

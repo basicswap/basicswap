@@ -8,6 +8,8 @@
 import base64
 import traceback
 
+from coincurve.keys import PrivateKey
+
 from basicswap.network.nostr_client import (
     DEFAULT_BROADCAST_TAG,
     NostrClient,
@@ -58,6 +60,12 @@ def initialiseNostrNetwork(self, network_config) -> None:
         socks_proxy=socks_proxy,
         abort_event=self.delay_event,
     )
+    plaintext_relays = client.getPlaintextRelays()
+    if len(plaintext_relays) > 0 and socks_proxy is None:
+        self.log.warning(
+            "Nostr relay(s) using unencrypted ws:// without a SOCKS proxy: "
+            + ", ".join(plaintext_relays)
+        )
     client.start()
     self.threads.append(client)  # Stopped and joined in finalise
     try:
@@ -87,11 +95,26 @@ def initialiseNostrNetwork(self, network_config) -> None:
     self.active_networks.append(add_network)
 
 
-def publishNostrSmsg(self, network, smsg_msg: bytes, to_pubkey: str = None) -> None:
+def newNostrRouteKey() -> (str, str):
+    """Returns (privkey_hex, pubkey_hex) for a per-route signing key."""
+    k = PrivateKey()
+    return k.to_hex(), k.public_key_xonly.format().hex()
+
+
+def publishNostrSmsg(
+    self,
+    network,
+    smsg_msg: bytes,
+    to_pubkey: str = None,
+    sign_privkey: bytes = None,
+) -> None:
     client: NostrClient = network["client"]
     expiration: int = smsgGetTimestamp(smsg_msg) + smsgGetTTL(smsg_msg)
     event = client.buildEvent(
-        encode_base64(smsg_msg), to_pubkey=to_pubkey, expiration=expiration
+        encode_base64(smsg_msg),
+        to_pubkey=to_pubkey,
+        expiration=expiration,
+        sign_privkey=sign_privkey,
     )
     client.publishEvent(event, delay_event=self.delay_event)
     if to_pubkey is not None:
@@ -114,6 +137,7 @@ def sendNostrMsg(
     return_msg: bool = False,
     difficulty_target=0x1EFFFFFF,
     pubkey_to: bytes = None,
+    sign_privkey: bytes = None,
 ) -> bytes:
     self.log.debug("sendNostrMsg")
 
@@ -131,7 +155,9 @@ def sendNostrMsg(
     )
     smsg_id = smsgGetID(smsg_msg)
 
-    publishNostrSmsg(self, network, smsg_msg, to_pubkey=to_pubkey)
+    publishNostrSmsg(
+        self, network, smsg_msg, to_pubkey=to_pubkey, sign_privkey=sign_privkey
+    )
 
     if return_msg:
         return smsg_id, smsg_msg

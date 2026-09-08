@@ -28,6 +28,7 @@ from basicswap.util import TemporaryError
 from basicswap.network.nostr_client import (
     BSX_NOSTR_KIND,
     MAX_POW_TARGET_BITS,
+    MAX_RELAY_MESSAGE_LEN,
     NostrClient,
     countLeadingZeroBits,
     eventID,
@@ -159,6 +160,63 @@ class TestNostrPrimitives(unittest.TestCase):
         event = client.buildEvent("ZGlyZWN0", to_pubkey="ab" * 32)
         assert getTagValue(event, "p") == "ab" * 32
         assert getTagValue(event, "t") == "bsx"
+
+    def test_build_event_sign_key_override(self):
+        client = NostrClient(["ws://127.0.0.1:1"], PrivateKey().secret, logger)
+        route_key = PrivateKey()
+
+        event = client.buildEvent("ZGVmYXVsdA==")
+        assert event["pubkey"] == client.pubkey
+        assert verifyEvent(event)
+
+        event = client.buildEvent("cm91dGU=", sign_privkey=route_key.secret)
+        assert event["pubkey"] == route_key.public_key_xonly.format().hex()
+        assert event["pubkey"] != client.pubkey
+        assert verifyEvent(event)
+
+        # PoW is mined against the override key too
+        client_pow = NostrClient(
+            ["ws://127.0.0.1:1"], PrivateKey().secret, logger, pow_target=6
+        )
+        event = client_pow.buildEvent("cG93", sign_privkey=route_key.secret)
+        assert event["pubkey"] == route_key.public_key_xonly.format().hex()
+        assert verifyEvent(event)
+        assert getEventPow(event) >= 6
+
+    def test_plaintext_relays(self):
+        client = NostrClient(
+            ["ws://127.0.0.1:1", "wss://relay.example.com", " ws://other:80 "],
+            PrivateKey().secret,
+            logger,
+        )
+        assert client.getPlaintextRelays() == ["ws://127.0.0.1:1", "ws://other:80"]
+        client = NostrClient(["wss://relay.example.com"], PrivateKey().secret, logger)
+        assert client.getPlaintextRelays() == []
+
+    def test_oversized_relay_message_dropped(self):
+        client = NostrClient(["ws://127.0.0.1:1"], PrivateKey().secret, logger)
+        relay = client.relays[0]
+        received = []
+        client.receiveEvent = lambda url, event: received.append(event)
+
+        privkey = PrivateKey().secret
+        event = signEvent(
+            privkey,
+            {
+                "created_at": int(time.time()),
+                "kind": BSX_NOSTR_KIND,
+                "tags": [["t", "bsx"]],
+                "content": "b2s=",
+            },
+        )
+        relay.on_message(None, json.dumps(["EVENT", "sub", event]))
+        assert len(received) == 1
+        assert relay.num_oversized_messages == 0
+
+        event["content"] = "A" * (MAX_RELAY_MESSAGE_LEN + 1)
+        relay.on_message(None, json.dumps(["EVENT", "sub", event]))
+        assert len(received) == 1
+        assert relay.num_oversized_messages == 1
 
     def test_filter_matching(self):
         event = {
@@ -749,6 +807,66 @@ class TestNetworkSettings(BasicSwapFixture):
         nostr_net = next(n for n in saved["networks"] if n["type"] == "nostr")
         assert nostr_net["pow_target"] == 11
 
+    def test_regenerate_key(self):
+        import basicswap.config as cfg
+
+        def current_key():
+            return next(
+                n for n in self.sc.settings["networks"] if n["type"] == "nostr"
+            )["private_key"]
+
+        old_key = current_key()
+        changed, reboot = self.sc.editNetworkSettings("nostr", {"regenerate_key": True})
+        assert changed and reboot
+        new_key = current_key()
+        assert new_key != old_key
+        assert len(new_key) == 64
+        bytes.fromhex(new_key)
+
+        settings_path = os.path.join(self.basicswap_dir, cfg.CONFIG_FILENAME)
+        with open(settings_path) as fp:
+            saved = json.load(fp)
+        nostr_net = next(n for n in saved["networks"] if n["type"] == "nostr")
+        assert nostr_net["private_key"] == new_key
+
+        # Not triggered by a falsy value
+        changed, _ = self.sc.editNetworkSettings("nostr", {"regenerate_key": False})
+        assert not changed
+        assert current_key() == new_key
+
+    def test_send_signs_with_route_key(self):
+        # Messages over an established nostr route are signed with the
+        # route key, not the node key.
+        from unittest import mock
+        from basicswap.basicswap_util import MessageNetworks
+
+        route_privkey = PrivateKey()
+        fake_route = mock.Mock()
+        fake_route.route_data = json.dumps(
+            {
+                "remote_pubkey": "ab" * 32,
+                "local_pubkey": route_privkey.public_key_xonly.format().hex(),
+                "local_privkey": route_privkey.to_hex(),
+            }
+        ).encode("UTF-8")
+
+        def fake_get_route(network_id, addr_from, addr_to, cursor=None):
+            if network_id == int(MessageNetworks.NOSTR):
+                return fake_route
+            return None
+
+        self.sc.active_networks = [{"type": "nostr", "client": None}]
+        with (
+            mock.patch.object(self.sc, "getMessageRoute", side_effect=fake_get_route),
+            mock.patch(
+                "basicswap.network.bsx_network.sendNostrMsg",
+                return_value=os.urandom(28),
+            ) as mock_send,
+        ):
+            self.sc.sendMessage("addr_a", "addr_b", "00", 3600, None)
+        assert mock_send.call_count == 1
+        assert mock_send.call_args.kwargs["sign_privkey"] == route_privkey.secret
+
     def test_bridge_networks_setting(self):
         import basicswap.config as cfg
 
@@ -872,27 +990,37 @@ class TestNostrHandshake(BasicSwapFixture):
             assert (local, remote) == (self.OFFER_ADDR, self.BIDDER_ADDR)
             route_data = json.loads(route_data.decode("UTF-8"))
             assert route_data["remote_pubkey"] == self.BIDDER_PUBKEY
-            assert route_data["local_pubkey"] == self.OFFERER_PUBKEY
+            # The route gets its own key, not the node key
+            route_pubkey = route_data["local_pubkey"]
+            route_privkey = bytes.fromhex(route_data["local_privkey"])
+            assert route_pubkey != self.OFFERER_PUBKEY
+            assert (
+                PrivateKey(route_privkey).public_key_xonly.format().hex()
+                == route_pubkey
+            )
             assert links == [(1, record_id, int(Concepts.OFFER), self.offer_id)]
 
             assert mock_send.call_count == 1
             ack = self.parseSentAck(mock_send.call_args)
             assert ack["offer_id"] == self.offer_id.hex()
             assert ack["bsx_address"] == self.OFFER_ADDR
-            assert ack["nostr_pubkey"] == self.OFFERER_PUBKEY
+            assert ack["nostr_pubkey"] == route_pubkey
             # ACK goes offer address -> bidder address, encrypted to the
-            # bidder's address key, and is not p-tagged.
+            # bidder's address key, signed with the route key, not p-tagged.
             assert mock_send.call_args.args[2:4] == (self.OFFER_ADDR, self.BIDDER_ADDR)
             assert mock_send.call_args.kwargs.get("pubkey_to") == bytes(33)
+            assert mock_send.call_args.kwargs.get("sign_privkey") == route_privkey
             assert "to_pubkey" not in mock_send.call_args.kwargs
 
             # The bidder resends CONNECT_REQ when the ACK was lost: the
-            # offerer must re-ACK instead of rejecting the duplicate.
+            # offerer must re-ACK with the same route key instead of
+            # rejecting the duplicate.
             self.sc.processConnectRequest(msg)
             assert mock_send.call_count == 2
             assert self.parseSentAck(mock_send.call_args)["nostr_pubkey"] == (
-                self.OFFERER_PUBKEY
+                route_pubkey
             )
+            assert mock_send.call_args.kwargs.get("sign_privkey") == route_privkey
             routes, _ = self.readRoutes()
             assert len(routes) == 1  # No duplicate route
 
@@ -950,9 +1078,16 @@ class TestNostrHandshake(BasicSwapFixture):
 
         net_i = SimpleNamespace(pubkey=self.BIDDER_PUBKEY)
         sent_msgids = []
+        sent_pubkeys = []
 
         def fake_send_message(
-            addr_from, addr_to, payload_hex, msg_valid, cursor, message_nets=""
+            addr_from,
+            addr_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets="",
+            sign_privkey=None,
         ):
             assert (addr_from, addr_to) == (self.BIDDER_ADDR, self.OFFER_ADDR)
             assert message_nets == "nostr"
@@ -961,8 +1096,14 @@ class TestNostrHandshake(BasicSwapFixture):
             assert msg_data.network_type == int(MessageNetworks.NOSTR)
             assert msg_data.request_type == ConnectionRequestTypes.BID
             req = json.loads(msg_data.request_data)
-            assert req["nostr_pubkey"] == self.BIDDER_PUBKEY
+            # CONNECT_REQ carries and is signed with a per-route key
+            assert req["nostr_pubkey"] != self.BIDDER_PUBKEY
+            assert (
+                PrivateKey(sign_privkey).public_key_xonly.format().hex()
+                == req["nostr_pubkey"]
+            )
             assert req["bsx_address"] == self.BIDDER_ADDR
+            sent_pubkeys.append(req["nostr_pubkey"])
             msgid = os.urandom(28)
             sent_msgids.append(msgid)
             return msgid
@@ -1016,6 +1157,8 @@ class TestNostrHandshake(BasicSwapFixture):
                 )
                 assert rv == (route_id, False)
                 assert len(sent_msgids) == 2
+                # The resend reuses the route key
+                assert sent_pubkeys[0] == sent_pubkeys[1]
             finally:
                 self.sc.closeDB(cursor)
 
@@ -1024,7 +1167,13 @@ class TestNostrHandshake(BasicSwapFixture):
             record_id, active_ind, network_id, local, remote, route_data = routes[0]
             assert (record_id, active_ind) == (route_id, 2)
             route_data = json.loads(route_data.decode("UTF-8"))
-            assert route_data["local_pubkey"] == self.BIDDER_PUBKEY
+            assert route_data["local_pubkey"] == sent_pubkeys[0]
+            assert (
+                PrivateKey(bytes.fromhex(route_data["local_privkey"]))
+                .public_key_xonly.format()
+                .hex()
+                == sent_pubkeys[0]
+            )
             assert route_data["connect_req_msgid"] == sent_msgids[-1].hex()
             assert "remote_pubkey" not in route_data
 
