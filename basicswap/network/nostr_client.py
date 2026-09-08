@@ -9,12 +9,14 @@
 
 import hashlib
 import json
+import socks
 import ssl
 import threading
 import time
 
 from collections import OrderedDict
 from queue import Queue, Empty
+from urllib.parse import urlsplit
 
 from coincurve.keys import PrivateKey, PublicKeyXOnly
 
@@ -27,6 +29,7 @@ DEFAULT_BROADCAST_TAG: str = "bsx"
 MAX_SEEN_EVENT_IDS: int = 10000
 MAX_EVENT_CONTENT_LEN: int = 65536
 MAX_POW_TARGET_BITS: int = 12
+SOCKS_CONNECT_TIMEOUT: int = 30
 
 
 def eventSerialize(
@@ -192,27 +195,47 @@ class RelayThread(threading.Thread):
             self.client.log.debug(f"Nostr relay {self.url} send error: {e}")
             return False
 
-    def run(self) -> None:
-        self.ws = websocket.WebSocketApp(
-            self.url,
-            on_open=self.on_open,
-            on_message=self.on_message,
-            on_error=self.on_error,
-            on_close=self.on_close,
+    def openProxiedSocket(self):
+        url = urlsplit(self.url)
+        is_secure: bool = url.scheme == "wss"
+        port: int = url.port or (443 if is_secure else 80)
+        sock = socks.socksocket()
+        sock.set_proxy(
+            socks.SOCKS5,
+            self.client.socks_proxy_host,
+            self.client.socks_proxy_port,
+            rdns=True,
         )
+        sock.settimeout(SOCKS_CONNECT_TIMEOUT)
+        sock.connect((url.hostname, port))
+        if is_secure:
+            ctx = ssl.create_default_context()
+            sock = ctx.wrap_socket(sock, server_hostname=url.hostname)
+        sock.settimeout(None)
+        return sock
+
+    def run(self) -> None:
         while not self.delay_event.is_set():
             try:
-                kwargs = {}
+                sock = None
                 if self.client.socks_proxy_host:
-                    kwargs["http_proxy_host"] = self.client.socks_proxy_host
-                    kwargs["http_proxy_port"] = self.client.socks_proxy_port
-                    kwargs["proxy_type"] = "socks5h"
-                self.ws.run_forever(
-                    sslopt={"cert_reqs": ssl.CERT_REQUIRED},
-                    **kwargs,
+                    sock = self.openProxiedSocket()
+                self.ws = websocket.WebSocketApp(
+                    self.url,
+                    on_open=self.on_open,
+                    on_message=self.on_message,
+                    on_error=self.on_error,
+                    on_close=self.on_close,
+                    socket=sock,
                 )
+                if self.delay_event.is_set():
+                    if sock is not None:
+                        sock.close()
+                    break
+                self.ws.run_forever(sslopt={"cert_reqs": ssl.CERT_REQUIRED})
             except Exception as e:
                 self.last_error = str(e)
+                self.client.log.debug(f"Nostr relay {self.url} error: {e}")
             self.connected = False
             self.delay_event.wait(5.0)
 
