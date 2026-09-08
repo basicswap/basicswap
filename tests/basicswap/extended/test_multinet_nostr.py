@@ -32,7 +32,6 @@ from tests.basicswap.util.common import (
     read_json_api,
 )
 from tests.basicswap.util.nostr_test_helpers import (
-    NostrRelayFixture,
     getNostrNetworkConfig,
     wait_for_portal,
 )

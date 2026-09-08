@@ -26,9 +26,7 @@ def getNostrNetworkConfig(
     config = {
         "type": "nostr",
         "relays": [
-            r.strip()
-            for r in (relay_url or NOSTR_TEST_RELAYS).split(",")
-            if r.strip()
+            r.strip() for r in (relay_url or NOSTR_TEST_RELAYS).split(",") if r.strip()
         ],
         "private_key": private_key or PrivateKey().to_hex(),
         "enabled": True,
