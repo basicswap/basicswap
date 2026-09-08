@@ -3607,6 +3607,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # TODO process addresspool if bid has previously been abandoned
 
+    def unlockPrefundedTxInputs(self, bid_id: bytes, coin_to, cursor) -> None:
+        for tx_type, type_str in (
+            (TxTypes.ITX_PRE_FUNDED, "ITx"),
+            (TxTypes.PTX_PRE_FUNDED, "PTx"),
+        ):
+            prefunded_tx = self.getPreFundedTx(
+                Concepts.BID, bid_id, tx_type, cursor=cursor
+            )
+            if prefunded_tx is None:
+                continue
+            try:
+                self.ci(coin_to).unlockInputs(prefunded_tx, cursor=cursor)
+            except Exception as e:
+                self.log.warning(f"Prefunded {type_str} unlockInputs failed {e}")
+
     def deactivateBid(self, cursor, offer, bid) -> None:
         # Remove from in progress
         self.log.debug(f"Removing bid from in-progress: {self.log.id(bid.bid_id)}")
@@ -3689,32 +3704,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 # Check prefunded txns
                 # The prefunded itx should already be unlocked above (a_lock_tx), repeat to catch edge cases
-                prefunded_itx = self.getPreFundedTx(
-                    Concepts.BID,
-                    bid.bid_id,
-                    TxTypes.ITX_PRE_FUNDED,
-                    cursor=use_cursor,
-                )
-                if prefunded_itx:
-                    try:
-                        self.ci(offer.coin_to).unlockInputs(
-                            prefunded_itx.tx_data, cursor=use_cursor
-                        )
-                    except Exception as e:
-                        self.log.warning(f"Prefunded ITx unlockInputs failed {e}")
-                prefunded_ptx = self.getPreFundedTx(
-                    Concepts.BID,
-                    bid.bid_id,
-                    TxTypes.PTX_PRE_FUNDED,
-                    cursor=use_cursor,
-                )
-                if prefunded_ptx:
-                    try:
-                        self.ci(offer.coin_to).unlockInputs(
-                            prefunded_ptx.tx_data, cursor=use_cursor
-                        )
-                    except Exception as e:
-                        self.log.warning(f"Prefunded PTx unlockInputs failed {e}")
+                self.unlockPrefundedTxInputs(bid.bid_id, offer.coin_to, use_cursor)
             elif SwapTypes.SELLER_FIRST:
                 pass  # No prevouts are locked
 
