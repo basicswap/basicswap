@@ -2208,6 +2208,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         batch_utxos = backend.getBatchUnspent(scripthashes)
 
+        # Our own change is spendable before it confirms, as the node wallet does.
+        internal_addrs = wm.getInternalAddresses(self.coin_type())
+
         utxos = []
         locked_count = 0
         unconfirmed_count = 0
@@ -2224,7 +2227,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             f"_fundTxElectrum: scripthash mismatch for {addr}: "
                             f"stored={sh}, computed={computed_sh}"
                         )
-                if utxo.get("confirmations", 0) < 1:
+                if utxo.get("confirmations", 0) < 1 and addr not in internal_addrs:
                     unconfirmed_count += 1
                     continue
                 if wm.isUTXOLocked(

@@ -817,6 +817,24 @@ class WalletManager:
         except Exception:
             return None
 
+    def getInternalAddresses(self, coin_type: Coins) -> set:
+        """Change addresses. Only we pay these, so an unconfirmed output on one
+        is our own change."""
+        try:
+            conn = sqlite3.connect(self._swap_client.sqlite_file)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT address FROM wallet_addresses"
+                " WHERE coin_type = ? AND is_internal = 1",
+                (int(coin_type),),
+            )
+            result = {row[0] for row in cursor.fetchall() if row[0]}
+            conn.close()
+            return result
+        except Exception:
+            # Treated as untrusted, so a failure here only costs a confirmation.
+            return set()
+
     def getSignableAddresses(self, coin_type: Coins) -> Dict[str, str]:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
