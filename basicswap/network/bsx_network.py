@@ -266,9 +266,13 @@ class BSXNetwork:
                     continue
 
                 if portal_data.own_portal == 1:
-                    self.own_portals.add(portal_data)
+                    self.own_portals.setdefault(portal_data.network_from, {})[
+                        portal_data.network_to
+                    ] = portal_data
                 else:
-                    self.known_portals.add(portal_data)
+                    self.known_portals.setdefault(
+                        portal_data.network_from, {}
+                    ).setdefault(portal_data.network_to, []).append(portal_data)
 
         finally:
             self.closeDB(cursor)
