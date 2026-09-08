@@ -38,6 +38,7 @@ from basicswap.network.nostr_client import (
     verifyEvent,
 )
 from tests.basicswap.util.nostr_relay import MiniNostrRelay, eventMatchesFilter
+from tests.basicswap.util.socks5_proxy import MiniSocks5Proxy
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -350,6 +351,42 @@ class TestNostrClientRelay(unittest.TestCase):
         finally:
             client_a.stop()
             client_b.stop()
+
+    def test_socks_proxy(self):
+        # Relay connections go through the configured SOCKS5 proxy
+        proxy = MiniSocks5Proxy()
+        proxy.start()
+        client_a = self.makeClient(socks_proxy=proxy.address())
+        client_b = self.makeClient()
+        try:
+            assert client_a.relays[0].connected
+            assert proxy.targets == [("127.0.0.1", self.relay.port)]
+
+            event = client_a.buildEvent(
+                "cHJveGllZA==", expiration=int(time.time()) + 600
+            )
+            client_a.publishEvent(event, delay_event=self.delay_event)
+            received = self.waitForEvent(client_b)
+            assert received["id"] == event["id"]
+        finally:
+            client_a.stop()
+            client_b.stop()
+            proxy.stop()
+
+        # An unreachable proxy must not fall back to a direct connection
+        client_c = NostrClient(
+            [self.relay.url()],
+            PrivateKey().secret,
+            logger,
+            socks_proxy=proxy.address(),
+        )
+        client_c.start()
+        try:
+            time.sleep(1.0)
+            assert not client_c.relays[0].connected
+            assert client_c.relays[0].last_error != ""
+        finally:
+            client_c.stop()
 
     def test_direct_message(self):
         client_a = self.makeClient()
