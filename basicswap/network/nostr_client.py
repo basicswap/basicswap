@@ -28,8 +28,11 @@ BSX_NOSTR_KIND: int = 4859  # Regular (stored) custom kind
 DEFAULT_BROADCAST_TAG: str = "bsx"
 MAX_SEEN_EVENT_IDS: int = 10000
 MAX_EVENT_CONTENT_LEN: int = 65536
+MAX_RELAY_MESSAGE_LEN: int = MAX_EVENT_CONTENT_LEN + 8192
 MAX_POW_TARGET_BITS: int = 12
 SOCKS_CONNECT_TIMEOUT: int = 30
+PING_INTERVAL_SECONDS: int = 30
+PING_TIMEOUT_SECONDS: int = 10
 
 
 def eventSerialize(
@@ -145,6 +148,7 @@ class RelayThread(threading.Thread):
         self.sub_id: str = "bsxsub"
         self.num_events_received: int = 0
         self.num_events_sent: int = 0
+        self.num_oversized_messages: int = 0
         self.last_error: str = ""
 
     def on_open(self, ws) -> None:
@@ -158,6 +162,12 @@ class RelayThread(threading.Thread):
 
     def on_message(self, ws, message) -> None:
         try:
+            if len(message) > MAX_RELAY_MESSAGE_LEN:
+                self.num_oversized_messages += 1
+                self.client.log.debug(
+                    f"Nostr relay {self.url} dropped oversized message: {len(message)} bytes"
+                )
+                return
             data = json.loads(message)
             if not isinstance(data, list) or len(data) < 2:
                 return
@@ -232,7 +242,11 @@ class RelayThread(threading.Thread):
                     if sock is not None:
                         sock.close()
                     break
-                self.ws.run_forever(sslopt={"cert_reqs": ssl.CERT_REQUIRED})
+                self.ws.run_forever(
+                    sslopt={"cert_reqs": ssl.CERT_REQUIRED},
+                    ping_interval=PING_INTERVAL_SECONDS,
+                    ping_timeout=PING_TIMEOUT_SECONDS,
+                )
             except Exception as e:
                 self.last_error = str(e)
                 self.client.log.debug(f"Nostr relay {self.url} error: {e}")
@@ -311,6 +325,12 @@ class NostrClient:
 
     def numConnected(self) -> int:
         return sum(1 for relay in self.relays if relay.connected)
+
+    def getPlaintextRelays(self) -> list:
+        """Relay urls using ws:// (unencrypted transport)."""
+        return [
+            relay.url for relay in self.relays if urlsplit(relay.url).scheme == "ws"
+        ]
 
     def getSubscriptionFilters(self) -> list:
         since: int = int(time.time()) - self.subscribe_since_seconds
@@ -398,8 +418,13 @@ class NostrClient:
             return None
 
     def buildEvent(
-        self, content: str, to_pubkey: str = None, expiration: int = None
+        self,
+        content: str,
+        to_pubkey: str = None,
+        expiration: int = None,
+        sign_privkey: bytes = None,
     ) -> dict:
+        privkey: bytes = self.privkey if sign_privkey is None else sign_privkey
         tags = []
         if to_pubkey is not None:
             tags.append(["p", to_pubkey])
@@ -414,9 +439,9 @@ class NostrClient:
         }
         if self.pow_target > 0:
             event = mineEventPow(
-                self.privkey, event, self.pow_target, abort_event=self.abort_event
+                privkey, event, self.pow_target, abort_event=self.abort_event
             )
-        return signEvent(self.privkey, event)
+        return signEvent(privkey, event)
 
     def publishEvent(
         self, event: dict, delay_event=None, wait_seconds: float = 10.0

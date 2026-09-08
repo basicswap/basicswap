@@ -543,6 +543,7 @@ class BSXNetwork:
         deterministic=False,
         message_nets=None,  # None|empty -> all
         payload_version=None,
+        sign_privkey: bytes = None,  # Nostr only, overrides the node key
     ) -> bytes:
         message_id: bytes = None
         active_networks_list, bridged_networks_list = self.expandMessageNets(
@@ -567,6 +568,9 @@ class BSXNetwork:
                         "Nostr direct message route exists but the nostr network is not active, falling back to broadcast."
                     )
             if remote_pubkey is not None and network is not None:
+                route_privkey_hex = route_data.get("local_privkey", None)
+                if route_privkey_hex is not None:
+                    sign_privkey = bytes.fromhex(route_privkey_hex)
                 message_id = sendNostrMsg(
                     self,
                     network,
@@ -577,6 +581,7 @@ class BSXNetwork:
                     cursor,
                     timestamp,
                     deterministic,
+                    sign_privkey=sign_privkey,
                 )
                 return message_id
             # Route not established or network inactive, fall through to broadcast
@@ -719,6 +724,7 @@ class BSXNetwork:
                         deterministic,
                         return_msg=True,
                         difficulty_target=smsg_difficulty,
+                        sign_privkey=sign_privkey,
                     )
             else:
                 raise ValueError("Unknown network: {}".format(network["type"]))
