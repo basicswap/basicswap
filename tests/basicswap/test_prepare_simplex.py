@@ -28,6 +28,7 @@ from basicswap.network.simplex import (
     createSimplexConnectInvitation,
     formatSimplexChatError,
     getJoinedSimplexLink,
+    getNewSimplexLink,
 )
 from basicswap.util import TemporaryError
 
@@ -105,6 +106,41 @@ class TestSimplexLinkParsing(unittest.TestCase):
         with self.assertRaises(TemporaryError) as cm:
             getJoinedSimplexLink(response)
         self.assertIn("SMP server unreachable", str(cm.exception))
+
+    def test_new_link(self):
+        response = {
+            "corrId": "1",
+            "resp": {
+                "type": "userContactLinkCreated",
+                "connLinkContact": {
+                    "connFullLink": "simplex:/contact#/?v=2-7&smp=test",
+                    "connShortLink": "https://smp5.simplex.im/c#test",
+                },
+            },
+        }
+        self.assertEqual(
+            getNewSimplexLink(response), "simplex:/contact#/?v=2-7&smp=test"
+        )
+
+    def test_new_link_errors(self):
+        error_response = {
+            "corrId": "1",
+            "resp": {
+                "type": "chatCmdError",
+                "chatError": {
+                    "type": "error",
+                    "errorType": {"type": "userContactLinkExists"},
+                },
+            },
+        }
+        with self.assertRaises(TemporaryError) as cm:
+            getNewSimplexLink(error_response)
+        self.assertIn("userContactLinkExists", str(cm.exception))
+
+        unexpected = {"corrId": "1", "resp": {"type": "somethingElse"}}
+        with self.assertRaises(ValueError) as cm:
+            getNewSimplexLink(unexpected)
+        self.assertIn("somethingElse", str(cm.exception))
 
     def test_format_chat_error(self):
         chat_error = {
@@ -224,6 +260,86 @@ class TestSimplexVerify(unittest.TestCase):
                 prepare.verifySimplexRelease(
                     self.client_path, self.release_dir, extra_opts={}
                 )
+
+    def test_listed_file_mismatch_does_not_fall_back(self):
+        # A file present in the signed manifest must match it, the release
+        # notes are never consulted for it.
+        writeSumsFile(
+            self.release_dir,
+            [(sha256hex(GOOD_BINARY), TEST_VERSION + "/" + self.release_file)],
+        )
+        with mock.patch.object(
+            prepare, "fetchSimplexReleaseBodyHash", return_value=sha256hex(BAD_BINARY)
+        ) as mock_fetch:
+            with self.assertRaises(ValueError):
+                prepare.ensureSimplexReleaseHash(
+                    sha256hex(BAD_BINARY),
+                    self.release_file,
+                    os.path.join(self.release_dir, "_sha256sums"),
+                )
+        mock_fetch.assert_not_called()
+
+    def test_unlisted_file_uses_release_notes(self):
+        # Builds missing from _sha256sums (aarch64 Linux, macOS, Windows for
+        # 7.0.0) are checked against the release notes on every platform.
+        writeSumsFile(
+            self.release_dir,
+            [(sha256hex(BAD_BINARY), TEST_VERSION + "/simplex-chat-other-build")],
+        )
+        sums_path = os.path.join(self.release_dir, "_sha256sums")
+        for platform_name in ("Linux", "Darwin", "Windows"):
+            with (
+                mock.patch.object(prepare, "USE_PLATFORM", platform_name),
+                mock.patch.object(
+                    prepare,
+                    "fetchSimplexReleaseBodyHash",
+                    return_value=sha256hex(GOOD_BINARY),
+                ) as mock_fetch,
+            ):
+                prepare.ensureSimplexReleaseHash(
+                    sha256hex(GOOD_BINARY), self.release_file, sums_path
+                )
+                mock_fetch.assert_called_once_with(self.release_file)
+
+                with self.assertRaises(ValueError):
+                    prepare.ensureSimplexReleaseHash(
+                        sha256hex(BAD_BINARY), self.release_file, sums_path
+                    )
+
+        # No hash anywhere: fail
+        with mock.patch.object(
+            prepare, "fetchSimplexReleaseBodyHash", return_value=None
+        ):
+            with self.assertRaises(ValueError):
+                prepare.ensureSimplexReleaseHash(
+                    sha256hex(GOOD_BINARY), self.release_file, sums_path
+                )
+
+    def test_release_body_hash_parsing(self):
+        body = (
+            "Release notes\n"
+            "SHA2-256(simplex-chat-ubuntu-24_04-aarch64)= 70a4396990 53c1d9\n"
+            "SHA2-256(simplex-chat-macos-aarch64)= b2837b8d1e\n"
+        )
+        fake_json = json.dumps({"body": body}).encode("utf-8")
+        with mock.patch.object(prepare, "downloadBytes", return_value=fake_json):
+            assert (
+                prepare.fetchSimplexReleaseBodyHash("simplex-chat-macos-aarch64")
+                == "b2837b8d1e"
+            )
+            # Trailing text after the hash is ignored
+            assert (
+                prepare.fetchSimplexReleaseBodyHash("simplex-chat-ubuntu-24_04-aarch64")
+                == "70a4396990"
+            )
+            assert prepare.fetchSimplexReleaseBodyHash("simplex-chat-nope") is None
+        with mock.patch.object(
+            prepare, "downloadBytes", side_effect=OSError("offline")
+        ):
+            assert (
+                prepare.fetchSimplexReleaseBodyHash("simplex-chat-macos-aarch64")
+                is None
+            )
 
     def test_fresh_download(self):
         writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])

@@ -590,20 +590,36 @@ def fetchSimplexReleaseBodyHash(release_file: str) -> str | None:
     return None
 
 
+def manifestListsFile(assert_path: str, release_file: str) -> bool:
+    """True if the _sha256sums manifest has an entry for release_file."""
+    with open(assert_path) as fp:
+        for line in fp:
+            parts = line.split()
+            if len(parts) >= 2 and parts[-1].rsplit("/", 1)[-1] == release_file:
+                return True
+    return False
+
+
 def ensureSimplexReleaseHash(
     release_hash: str, release_file: str, assert_path: str
 ) -> None:
-    try:
+    if manifestListsFile(assert_path, release_file):
+        # Listed in the signed manifest: the hash must match, no fallback.
         ensureFileHashInFile(release_hash, assert_path, logger)
         return
-    except ValueError:
-        if USE_PLATFORM not in ("Darwin", "Windows"):
-            raise
+
+    # The signed _sha256sums only covers the Ubuntu x86_64 builds (for 7.0.0),
+    # the aarch64, macOS and Windows hashes are only in the release notes.
+    logger.warning(
+        f"{release_file} is not listed in the signed release manifest, "
+        "checking the hash against the release notes instead. "
+        "This hash is not covered by the PGP signature."
+    )
     expected_hash = fetchSimplexReleaseBodyHash(release_file)
     if expected_hash is None:
         raise ValueError(
-            f"Release hash {release_hash} not found in assert file and "
-            f"no hash for {release_file} in release notes."
+            f"{release_file} not found in the release manifest and "
+            "no hash for it in the release notes."
         )
     if release_hash != expected_hash:
         raise ValueError(

@@ -77,6 +77,12 @@ SimpleX Chat release signing key
 `BBDF7BDAD1548B16836AF5B9D53BDFD153C366BA` (`build@simplex.chat`).  The
 key is bundled locally or fetched from a keyserver on first prepare.
 
+Upstream's signed manifest for 7.0.0 only lists the Ubuntu `x86_64`
+builds.  For builds that are not in the manifest (Linux `aarch64`,
+macOS, Windows) prepare checks the hash against the `SHA2-256(...)`
+lines in the GitHub release notes instead and logs a warning, because
+that hash is not covered by the PGP signature.
+
 An existing binary at `bin/simplex/simplex-chat` is re-verified against
 the manifest for `SIMPLEX_CHAT_VERSION` each time prepare adds the
 network.  If it doesn't match (wrong version, manual replacement,
