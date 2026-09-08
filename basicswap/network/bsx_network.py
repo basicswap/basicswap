@@ -82,6 +82,9 @@ class BSXNetwork:
             "check_smsg_seconds", 10, 1, 10 * 60
         )
         self._last_checked_smsg = 0
+        # Network types whose client binary failed verification at startup,
+        # set by run.py.  Kept out of self.settings so it is never persisted.
+        self.networks_failed_verification: set = set()
         self.check_bridges_seconds = self.get_int_setting(
             "check_bridges_seconds", 10, 1, 10 * 60
         )
@@ -157,6 +160,11 @@ class BSXNetwork:
         have_smsg: bool = False
         for network in network_config_list:
             if network.get("enabled", True) is False:
+                continue
+            if network["type"] in self.networks_failed_verification:
+                self.log.warning(
+                    f"Not starting network {network['type']}, client verification failed."
+                )
                 continue
             if network["type"] == "smsg":
                 have_smsg = True

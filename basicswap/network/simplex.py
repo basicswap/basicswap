@@ -29,10 +29,6 @@ from basicswap.util.address import (
 )
 from basicswap.basicswap_util import AddressTypes
 
-# The websocket library logs every connection error to its own logger,
-# duplicating the on_error callbacks.
-logging.getLogger("websocket").setLevel(logging.CRITICAL)
-
 
 def encode_base64(data: bytes) -> str:
     return base64.b64encode(data).decode("utf-8")
@@ -49,6 +45,9 @@ class WebSocketThread(threading.Thread):
         self.tag = tag
         self.logger = logger
         self.shutdown_event = shutdown_event
+        # The websocket library logs every connection error to its own
+        # logger, duplicating the on_error callbacks.
+        logging.getLogger("websocket").setLevel(logging.CRITICAL)
         self.ws = None
         self.mutex = threading.Lock()
         self.corrId: int = 0
@@ -471,7 +470,14 @@ def getResponseData(data, tag=None):
 
 
 def getNewSimplexLink(data):
-    return getResponseData(data)["connLinkContact"]["connFullLink"]
+    response_data = getResponseData(data)
+    if "connLinkContact" in response_data:
+        return response_data["connLinkContact"]["connFullLink"]
+    resp_type = response_data.get("type", "unknown")
+    if resp_type == "chatCmdError":
+        detail = formatSimplexChatError(response_data.get("chatError"))
+        raise TemporaryError("SimpleX /address failed: {}".format(detail))
+    raise ValueError("Unexpected SimpleX response type: {}".format(resp_type))
 
 
 def formatSimplexChatError(chat_error) -> str:

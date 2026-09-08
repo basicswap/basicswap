@@ -486,8 +486,7 @@ def runClient(
                         swap_client.log.error(
                             "Not starting the Simplex network, client binary failed verification."
                         )
-                        # In-memory only, so startNetworks skips it. Not saved to disk.
-                        network["enabled"] = False
+                        swap_client.networks_failed_verification.add(network_type)
                         continue
                     simplex_dir = os.path.join(data_dir, "simplex")
                     log_level = "debug" if swap_client.debug else "info"
