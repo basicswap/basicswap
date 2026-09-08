@@ -1234,6 +1234,8 @@ class BSXNetwork:
             self.closeDB(cursor)
 
     def updateNetworkBridges(self, now: int) -> None:
+        if self._is_locked:
+            return
         for network in self.active_networks:
             network_from_id: int = networkTypeToID(network["type"])
 
