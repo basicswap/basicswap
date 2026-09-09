@@ -31,6 +31,8 @@ timing and size).
 
 ## Enabling
 
+From Settings → Networks, use **Add Nostr**, or:
+
 ```
 basicswap-prepare --datadir=~/coinswaps --addnetwork=nostr
 ```

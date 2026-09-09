@@ -3,7 +3,7 @@
 
   const EventHandlers = {
 
-    showConfirmModal: function(title, message, callback) {
+    showConfirmModal: function(title, message, callback, warning) {
       const modal = document.getElementById('confirmModal');
       if (!modal) {
         if (callback) callback();
@@ -12,6 +12,7 @@
 
       const titleEl = document.getElementById('confirmTitle');
       const messageEl = document.getElementById('confirmMessage');
+      const warningEl = document.getElementById('confirmWarning');
       const yesBtn = document.getElementById('confirmYes');
       const noBtn = document.getElementById('confirmNo');
       const bidDetails = document.getElementById('bidDetailsSection');
@@ -20,6 +21,15 @@
       if (messageEl) {
         messageEl.textContent = message;
         messageEl.classList.remove('hidden');
+      }
+      if (warningEl) {
+        if (warning) {
+          warningEl.textContent = warning;
+          warningEl.classList.remove('hidden');
+        } else {
+          warningEl.textContent = '';
+          warningEl.classList.add('hidden');
+        }
       }
       if (bidDetails) bidDetails.classList.add('hidden');
 
@@ -61,6 +71,25 @@
 
     confirmRemoveExpired: function() {
       return confirm('Are you sure you want to remove all expired offers and bids?');
+    },
+
+    confirmRegenerateNostrKey: function(button) {
+      this.showConfirmModal(
+        'Regenerate Nostr Key',
+        'Generate a new Nostr key?',
+        function() {
+          if (!button || !button.form) {
+            return;
+          }
+          const hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'regenerate_key_nostr';
+          hiddenInput.value = 'Regenerate';
+          button.form.appendChild(hiddenInput);
+          button.form.submit();
+        },
+        'Requires a restart. Existing swaps are not affected.'
+      );
     },
 
     fillDonationAddress: function(address, coinType) {
@@ -289,6 +318,37 @@
     initialize: function() {
 
       document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-confirm-regenerate-nostr]');
+        if (target) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.confirmRegenerateNostrKey(target);
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-confirm-network]');
+        if (target) {
+          e.preventDefault();
+          e.stopPropagation();
+          const title = target.getAttribute('data-confirm-title') || 'Confirm';
+          const message = target.getAttribute('data-confirm-message') || 'Are you sure?';
+          const warning = target.getAttribute('data-confirm-warning') || '';
+          this.showConfirmModal(title, message, function() {
+            if (!target.form) {
+              return;
+            }
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = target.name;
+            hiddenInput.value = target.value;
+            target.form.appendChild(hiddenInput);
+            target.form.submit();
+          }, warning);
+        }
+      });
+
+      document.addEventListener('click', (e) => {
         const target = e.target.closest('[data-confirm]');
         if (target) {
           if (target.dataset.confirmHandled) {
@@ -301,14 +361,17 @@
 
           const action = target.getAttribute('data-confirm-action') || 'proceed';
           const coinName = target.getAttribute('data-confirm-coin') || '';
+          const customMessage = target.getAttribute('data-confirm-message');
+          const customTitle = target.getAttribute('data-confirm-title');
+          const customWarning = target.getAttribute('data-confirm-warning');
 
-          const message = action === 'Accept'
+          const message = customMessage || (action === 'Accept'
             ? 'Are you sure you want to accept this bid?'
             : coinName
               ? `Are you sure you want to ${action} ${coinName}?`
-              : 'Are you sure you want to proceed?';
+              : 'Are you sure you want to proceed?');
 
-          const title = `Confirm ${action}`;
+          const title = customTitle || `Confirm ${action}`;
 
           this.showConfirmModal(title, message, function() {
             target.dataset.confirmHandled = 'true';
@@ -323,7 +386,7 @@
             } else {
               target.click();
             }
-          });
+          }, customWarning);
         }
       });
 

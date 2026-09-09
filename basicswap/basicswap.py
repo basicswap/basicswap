@@ -177,11 +177,16 @@ from .explorers import (
     ExplorerBitAps,
     ExplorerChainz,
 )
-from .network.nostr import newNostrRouteKey, sendNostrMsg
+from .network.nostr import (
+    DEFAULT_NOSTR_RELAYS,
+    newNostrRouteKey,
+    nostrPubkeyFromHex,
+    sendNostrMsg,
+)
 from .network.nostr_client import MAX_POW_TARGET_BITS
 from .network.simplex import (
+    createSimplexConnectInvitation,
     encryptMsg,
-    getJoinedSimplexLink,
     getResponseData,
 )
 from .network.bsx_network import BSXNetwork, networkTypeToID
@@ -6546,10 +6551,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if message_route:
             return message_route.record_id, False
 
-        cmd_id = net_i.send_command("/connect")
-        response = net_i.wait_for_command_response(cmd_id)
-        connReqInvitation = getJoinedSimplexLink(response)
-        pccConnId = getResponseData(response, "connection")["pccConnId"]
+        connReqInvitation, pccConnId = createSimplexConnectInvitation(
+            net_i, self.delay_event, logger=self.log
+        )
         req_data["bsx_address"] = addr_from
         req_data["connection_req"] = connReqInvitation
 
@@ -15655,7 +15659,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     network = n
                     break
             if network is None:
-                if network_type == "smsg":
+                if data.get("add") is True:
+                    if network_type == "nostr":
+                        network = {
+                            "type": "nostr",
+                            "relays": list(DEFAULT_NOSTR_RELAYS),
+                            "private_key": newNostrRouteKey()[0],
+                            "pow_target": 0,
+                            "enabled": True,
+                        }
+                    elif network_type == "smsg":
+                        network = {"type": "smsg", "enabled": True}
+                    else:
+                        raise ValueError(
+                            f"Network {network_type} cannot be added from the UI. "
+                            f"Use basicswap-prepare --addnetwork={network_type} first."
+                        )
+                    network_config_list.append(network)
+                    settings_changed = True
+                    suggest_reboot = True
+                elif network_type == "smsg":
                     network = {"type": "smsg", "enabled": False}
                     network_config_list.append(network)
                 else:
@@ -15820,29 +15843,55 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 info["group_link"] = network.get("group_link", "")
                 if "client_version" in network:
                     info["client_version"] = network["client_version"]
-                info["messages_received"] = (
+                if "verify_status" in network:
+                    info["verify_status"] = network["verify_status"]
+                info["messages_received_broadcast"] = (
                     self.num_group_simplex_messages_received
-                    + self.num_direct_simplex_messages_received
+                )
+                info["messages_sent_broadcast"] = self.num_group_simplex_messages_sent
+                info["messages_received_direct"] = (
+                    self.num_direct_simplex_messages_received
+                )
+                info["messages_sent_direct"] = self.num_direct_simplex_messages_sent
+                info["messages_received"] = (
+                    info["messages_received_broadcast"]
+                    + info["messages_received_direct"]
                 )
                 info["messages_sent"] = (
-                    self.num_group_simplex_messages_sent
-                    + self.num_direct_simplex_messages_sent
+                    info["messages_sent_broadcast"] + info["messages_sent_direct"]
                 )
             elif network_type == "nostr":
                 info["relays"] = network.get("relays", [])
                 info["pow_target"] = network.get("pow_target", 0)
+                info["messages_received_broadcast"] = self.num_nostr_messages_received
+                info["messages_sent_broadcast"] = self.num_nostr_messages_sent
+                info["messages_received_direct"] = (
+                    self.num_direct_nostr_messages_received
+                )
+                info["messages_sent_direct"] = self.num_direct_nostr_messages_sent
                 info["messages_received"] = (
-                    self.num_nostr_messages_received
-                    + self.num_direct_nostr_messages_received
+                    info["messages_received_broadcast"]
+                    + info["messages_received_direct"]
                 )
                 info["messages_sent"] = (
-                    self.num_nostr_messages_sent + self.num_direct_nostr_messages_sent
+                    info["messages_sent_broadcast"] + info["messages_sent_direct"]
                 )
+                config_pubkey = nostrPubkeyFromHex(network.get("private_key", ""))
+                info["pubkey"] = config_pubkey
+                info["active_pubkey"] = ""
+                info["key_pending_restart"] = False
                 active_network = active_by_type.get("nostr")
                 if active_network is not None:
                     client_info = active_network["client"].get_info()
-                    info["pubkey"] = client_info["pubkey"]
+                    info["active_pubkey"] = client_info.get("pubkey", "")
                     info["relay_status"] = client_info["relays"]
+                    if config_pubkey and info["active_pubkey"] != config_pubkey:
+                        info["key_pending_restart"] = True
+            info["restart_required"] = (
+                (info["enabled"] and not info["active"])
+                or (not info["enabled"] and info["active"])
+                or info.get("key_pending_restart", False)
+            )
             rv.append(info)
         return rv
 

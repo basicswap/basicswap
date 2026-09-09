@@ -749,6 +749,10 @@ class TestNetworkSettings(BasicSwapFixture):
         assert by_type["nostr"]["enabled"] is True
         assert by_type["nostr"]["relays"] == ["wss://relay.one", "wss://relay.two"]
         assert by_type["nostr"]["active"] is False  # Networks not started
+        assert by_type["nostr"]["messages_received_broadcast"] == 0
+        assert by_type["nostr"]["messages_received_direct"] == 0
+        assert by_type["nostr"]["messages_sent_broadcast"] == 0
+        assert by_type["nostr"]["messages_sent_direct"] == 0
 
     def test_edit_network_settings(self):
         changed, reboot = self.sc.editNetworkSettings("nostr", {"pow_target": 12})
@@ -806,6 +810,50 @@ class TestNetworkSettings(BasicSwapFixture):
             saved = json.load(fp)
         nostr_net = next(n for n in saved["networks"] if n["type"] == "nostr")
         assert nostr_net["pow_target"] == 11
+
+    def test_add_network_nostr(self):
+        self.sc.settings["networks"] = [
+            n for n in self.sc.settings["networks"] if n["type"] != "nostr"
+        ]
+        changed, reboot = self.sc.editNetworkSettings("nostr", {"add": True})
+        assert changed and reboot
+        nostr_net = next(n for n in self.sc.settings["networks"] if n["type"] == "nostr")
+        assert nostr_net["enabled"] is True
+        assert len(nostr_net["relays"]) > 0
+        assert all(r.startswith("wss://") for r in nostr_net["relays"])
+        assert len(nostr_net["private_key"]) == 64
+        bytes.fromhex(nostr_net["private_key"])
+
+        info = next(n for n in self.sc.getNetworksInfo() if n["type"] == "nostr")
+        assert info["pubkey"]
+        assert info["key_pending_restart"] is False
+        assert info["restart_required"] is True  # enabled but not started
+
+    def test_add_network_simplex_rejected(self):
+        self.assertRaises(
+            ValueError, self.sc.editNetworkSettings, "simplex", {"add": True}
+        )
+
+    def test_key_pending_restart(self):
+        from unittest import mock
+
+        old_pub = "ab" * 32
+        mock_client = mock.Mock()
+        mock_client.get_info.return_value = {"pubkey": old_pub, "relays": []}
+        self.sc.active_networks = [{"type": "nostr", "client": mock_client}]
+
+        before = next(n for n in self.sc.getNetworksInfo() if n["type"] == "nostr")
+        assert before["active_pubkey"] == old_pub
+        assert before["pubkey"] != old_pub
+        assert before["key_pending_restart"] is True
+
+        changed, reboot = self.sc.editNetworkSettings("nostr", {"regenerate_key": True})
+        assert changed and reboot
+        after = next(n for n in self.sc.getNetworksInfo() if n["type"] == "nostr")
+        assert after["key_pending_restart"] is True
+        assert after["active_pubkey"] == old_pub
+        assert after["pubkey"] != old_pub
+        assert after["restart_required"] is True
 
     def test_regenerate_key(self):
         import basicswap.config as cfg

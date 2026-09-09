@@ -33,7 +33,7 @@ def page_settings(self, url_split, post_string):
     messages = []
     err_messages = []
     extra_headers = []
-    active_tab = "default"
+    active_tab = "coins"
     form_data = self.checkForm(post_string, "settings", err_messages)
     if form_data:
         try:
@@ -190,6 +190,15 @@ def page_settings(self, url_split, post_string):
                     messages.append("Nostr key regenerated.")
                 if suggest_reboot:
                     messages.append("Please restart BasicSwap.")
+            elif have_data_entry(form_data, "add_network_nostr"):
+                active_tab = "networks"
+                settings_changed, suggest_reboot = swap_client.editNetworkSettings(
+                    "nostr", {"add": True}
+                )
+                if settings_changed:
+                    messages.append("Nostr network added.")
+                if suggest_reboot:
+                    messages.append("Please restart BasicSwap.")
             elif have_data_entry(form_data, "apply_network_simplex"):
                 active_tab = "networks"
                 data = {
@@ -253,6 +262,7 @@ def page_settings(self, url_split, post_string):
             )
             for name, c in swap_client.settings["chainclients"].items():
                 if have_data_entry(form_data, "apply_" + name):
+                    active_tab = "coins"
                     data = {"lookups": get_data_entry(form_data, "lookups_" + name)}
                     if name in ("monero", "wownero"):
                         data["fee_priority"] = int(
@@ -354,16 +364,19 @@ def page_settings(self, url_split, post_string):
                     if suggest_reboot is True:
                         messages.append("Please restart BasicSwap.")
                 elif have_data_entry(form_data, "enable_" + name):
+                    active_tab = "coins"
                     swap_client.enableCoin(name)
                     display_name = getCoinName(swap_client.getCoinIdFromName(name))
                     messages.append(display_name + " enabled, shutting down.")
                     swap_client.stopRunning()
                 elif have_data_entry(form_data, "disable_" + name):
+                    active_tab = "coins"
                     swap_client.disableCoin(name)
                     display_name = getCoinName(swap_client.getCoinIdFromName(name))
                     messages.append(display_name + " disabled, shutting down.")
                     swap_client.stopRunning()
                 elif have_data_entry(form_data, "force_sweep_" + name):
+                    active_tab = "coins"
                     coin_id = swap_client.getCoinIdFromName(name)
                     display_name = getCoinName(coin_id)
                     try:
@@ -565,12 +578,33 @@ def page_settings(self, url_split, post_string):
                 if not swap_client.use_tor_proxy
                 else []
             )
+            network["uses_tor"] = bool(swap_client.use_tor_proxy)
+        if network["type"] == "simplex":
+            verify_labels = {
+                "ok": "Verified",
+                "unverified": "Unverified",
+                "missing": "Client missing",
+                "hash_mismatch": "Hash mismatch",
+                "unsupported_version": "Unsupported version",
+            }
+            verify_status = network.get("verify_status")
+            network["verify_status_label"] = verify_labels.get(
+                verify_status, verify_status
+            )
         networks_formatted.append(network)
 
     num_enabled_networks: int = sum(1 for n in networks_formatted if n["enabled"])
+    configured_types = {n["type"] for n in networks_formatted}
+    for network in networks_formatted:
+        network["can_disable"] = network["enabled"] and num_enabled_networks > 1
     networks_global = {
         "bridge_networks": swap_client.settings.get("bridge_networks", False),
         "can_bridge": num_enabled_networks >= 2,
+        "addable": [
+            network_type
+            for network_type in ("nostr", "simplex")
+            if network_type not in configured_types
+        ],
     }
 
     template = server.env.get_template("settings.html")
