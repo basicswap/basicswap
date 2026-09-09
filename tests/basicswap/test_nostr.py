@@ -817,7 +817,9 @@ class TestNetworkSettings(BasicSwapFixture):
         ]
         changed, reboot = self.sc.editNetworkSettings("nostr", {"add": True})
         assert changed and reboot
-        nostr_net = next(n for n in self.sc.settings["networks"] if n["type"] == "nostr")
+        nostr_net = next(
+            n for n in self.sc.settings["networks"] if n["type"] == "nostr"
+        )
         assert nostr_net["enabled"] is True
         assert len(nostr_net["relays"]) > 0
         assert all(r.startswith("wss://") for r in nostr_net["relays"])
