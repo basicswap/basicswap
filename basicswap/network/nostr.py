@@ -24,6 +24,21 @@ from basicswap.util.smsg import (
     smsgGetTTL,
 )
 
+DEFAULT_NOSTR_RELAYS = (
+    "wss://relay.damus.io",
+    "wss://nos.lol",
+    "wss://relay.primal.net",
+)
+
+
+def nostrPubkeyFromHex(privkey_hex: str) -> str:
+    if len(privkey_hex) != 64:
+        return ""
+    try:
+        return PrivateKey(bytes.fromhex(privkey_hex)).public_key_xonly.format().hex()
+    except Exception:
+        return ""
+
 
 def encode_base64(data: bytes) -> str:
     return base64.b64encode(data).decode("utf-8")
