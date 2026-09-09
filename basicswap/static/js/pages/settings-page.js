@@ -1086,6 +1086,13 @@
       row.className = 'flex items-center justify-between text-gray-700 dark:text-gray-300';
       const url = document.createElement('span');
       url.textContent = relay.url || '';
+      if (relay.events_rate_limited) {
+        const dropped = document.createElement('span');
+        dropped.className = 'text-yellow-600 dark:text-yellow-400';
+        dropped.title = 'Events dropped by the per-relay rate limit';
+        dropped.textContent = ' (' + relay.events_rate_limited + ' rate limited)';
+        url.appendChild(dropped);
+      }
       const status = document.createElement('span');
       if (relay.connected) {
         status.className = 'text-green-600 dark:text-green-400';

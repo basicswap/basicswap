@@ -14640,6 +14640,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         offer.addr_from,
                         bidder_addr,
                         route_data["local_pubkey"],
+                        route_data["remote_pubkey"],
                         getMsgPubkey(self, msg),
                         cursor,
                         sign_privkey=bytes.fromhex(route_data["local_privkey"]),
@@ -14720,6 +14721,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     offer.addr_from,
                     bidder_addr,
                     route_pubkey,
+                    remote_pubkey,
                     getMsgPubkey(self, msg),
                     cursor,
                     sign_privkey=bytes.fromhex(route_privkey_hex),
@@ -14745,6 +14747,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         addr_from: str,
         addr_to: str,
         local_pubkey: str,
+        remote_pubkey: str,
         pubkey_to: bytes,
         cursor,
         sign_privkey: bytes = None,
@@ -14752,10 +14755,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Sent as a broadcast event, not p-tagged to the remote node, so relays
         # and observers cannot link the two node pubkeys.  The payload is
         # SMSG-encrypted to the bidder's address key.
+        # req_pubkey echoes the bidder's route key from the CONNECT_REQ so the
+        # ACK is bound to this key exchange: a replayed ACK for an earlier
+        # route between the same addresses carries a different key.
         ack_data = {
             "offer_id": offer_id.hex(),
             "bsx_address": addr_from,
             "nostr_pubkey": local_pubkey,
+            "req_pubkey": remote_pubkey,
         }
         msg_buf = ConnectReqMessage()
         msg_buf.network_type = int(MessageNetworks.NOSTR)
@@ -14806,6 +14813,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return
 
             route_data = json.loads(message_route.route_data.decode("UTF-8"))
+            # Bind the ACK to this route's key exchange, ACK events are
+            # stored by relays and can be redelivered after a route between
+            # the same addresses was closed and reopened with a new key.
+            ensure(
+                req_data.get("req_pubkey") == route_data.get("local_pubkey"),
+                "Connect request ack does not match pending route",
+            )
+            ensure(
+                req_data.get("bsx_address") == msg["from"],
+                "Mismatched ack from address",
+            )
+            # The ACK is signed with the route key it announces.
+            event_pubkey = msg.get("nostr_pubkey_from")
+            if event_pubkey is not None:
+                ensure(
+                    event_pubkey == remote_pubkey,
+                    "Connect request ack not signed by announced route key",
+                )
             route_data["remote_pubkey"] = remote_pubkey
             query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
             cursor.execute(

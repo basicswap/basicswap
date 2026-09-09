@@ -28,7 +28,9 @@ from basicswap.util import TemporaryError
 from basicswap.network.nostr_client import (
     BSX_NOSTR_KIND,
     MAX_POW_TARGET_BITS,
+    MAX_RECV_QUEUE_SIZE,
     MAX_RELAY_MESSAGE_LEN,
+    RELAY_EVENT_BURST,
     NostrClient,
     countLeadingZeroBits,
     eventID,
@@ -280,6 +282,65 @@ class TestNostrInboundGates(unittest.TestCase):
         # Genuinely mined event is accepted
         client.receiveEvent("test", self.makeEvent(pow_bits=8))
         assert client.queue_get() is not None
+
+    def test_recv_queue_bounded(self):
+        from unittest import mock
+
+        client = self.makeClient()
+        # Skip the signature check so the test can fill the queue quickly
+        with mock.patch(
+            "basicswap.network.nostr_client.verifyEvent", return_value=True
+        ):
+            events = []
+            for i in range(MAX_RECV_QUEUE_SIZE + 10):
+                event = {
+                    "id": "%064x" % i,
+                    "pubkey": "cd" * 32,
+                    "created_at": int(time.time()),
+                    "kind": BSX_NOSTR_KIND,
+                    "tags": [["t", "bsx"]],
+                    "content": "dGVzdA==",
+                    "sig": "00" * 64,
+                }
+                events.append(event)
+                client.receiveEvent("test", event)
+            assert client.recv_queue.qsize() == MAX_RECV_QUEUE_SIZE
+            assert client.num_messages_dropped == 10
+            assert client.num_messages_received == MAX_RECV_QUEUE_SIZE
+            assert client.get_info()["messages_dropped"] == 10
+
+            # A dropped event is not remembered as seen: once the main loop
+            # drains the queue a redelivery is accepted.
+            assert client.queue_get() is not None
+            client.receiveEvent("test", events[-1])
+            assert client.recv_queue.qsize() == MAX_RECV_QUEUE_SIZE
+            assert client.num_messages_dropped == 10
+
+    def test_relay_rate_limit(self):
+        client = self.makeClient()
+        relay = client.relays[0]
+        received = []
+        client.receiveEvent = lambda url, event: received.append(event)
+
+        message = json.dumps(["EVENT", "sub", {"id": "ab" * 32}])
+        for i in range(RELAY_EVENT_BURST + 50):
+            relay.on_message(None, message)
+        assert len(received) == RELAY_EVENT_BURST
+        assert relay.num_events_rate_limited == 50
+        assert relay.num_events_received == RELAY_EVENT_BURST + 50
+        assert client.get_info()["relays"][0]["events_rate_limited"] == 50
+
+        # Tokens refill over time
+        relay._tokens_updated -= 1.0
+        relay.on_message(None, message)
+        assert len(received) == RELAY_EVENT_BURST + 1
+
+        # Non-event relay messages are not counted against the limit
+        relay._tokens = 0.0
+        relay._tokens_updated = time.monotonic()
+        relay.on_message(None, json.dumps(["EOSE", "sub"]))
+        relay.on_message(None, json.dumps(["OK", "ab" * 32, True, ""]))
+        assert relay.num_events_rate_limited == 50
 
     def test_smsg_replay_dropped(self):
         # The same SMSG blob wrapped in a fresh event must not trigger
@@ -1055,6 +1116,8 @@ class TestNostrHandshake(BasicSwapFixture):
             assert ack["offer_id"] == self.offer_id.hex()
             assert ack["bsx_address"] == self.OFFER_ADDR
             assert ack["nostr_pubkey"] == route_pubkey
+            # Echoes the bidder's route key so the ACK is bound to the request
+            assert ack["req_pubkey"] == self.BIDDER_PUBKEY
             # ACK goes offer address -> bidder address, encrypted to the
             # bidder's address key, signed with the route key, not p-tagged.
             assert mock_send.call_args.args[2:4] == (self.OFFER_ADDR, self.BIDDER_ADDR)
@@ -1067,9 +1130,9 @@ class TestNostrHandshake(BasicSwapFixture):
             # rejecting the duplicate.
             self.sc.processConnectRequest(msg)
             assert mock_send.call_count == 2
-            assert self.parseSentAck(mock_send.call_args)["nostr_pubkey"] == (
-                route_pubkey
-            )
+            resent_ack = self.parseSentAck(mock_send.call_args)
+            assert resent_ack["nostr_pubkey"] == route_pubkey
+            assert resent_ack["req_pubkey"] == self.BIDDER_PUBKEY
             assert mock_send.call_args.kwargs.get("sign_privkey") == route_privkey
             routes, _ = self.readRoutes()
             assert len(routes) == 1  # No duplicate route
@@ -1227,17 +1290,51 @@ class TestNostrHandshake(BasicSwapFixture):
             assert route_data["connect_req_msgid"] == sent_msgids[-1].hex()
             assert "remote_pubkey" not in route_data
 
+            def makeAck(req_pubkey, event_pubkey=None) -> dict:
+                ack = self.makeConnectMsg(
+                    ConnectionRequestTypes.ACK,
+                    {
+                        "offer_id": self.offer_id.hex(),
+                        "bsx_address": self.OFFER_ADDR,
+                        "nostr_pubkey": self.OFFERER_PUBKEY,
+                        "req_pubkey": req_pubkey,
+                    },
+                    self.OFFER_ADDR,
+                    self.BIDDER_ADDR,
+                )
+                if event_pubkey is not None:
+                    ack["nostr_pubkey_from"] = event_pubkey
+                return ack
+
+            # A stale ACK for an earlier route between the same addresses
+            # (different route key) must not activate this route.
+            with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
+                with self.assertRaisesRegex(ValueError, "does not match pending route"):
+                    self.sc.processConnectRequest(makeAck("11" * 32))
+                # Same for an ACK missing the binding altogether
+                unbound = self.makeConnectMsg(
+                    ConnectionRequestTypes.ACK,
+                    {
+                        "offer_id": self.offer_id.hex(),
+                        "bsx_address": self.OFFER_ADDR,
+                        "nostr_pubkey": self.OFFERER_PUBKEY,
+                    },
+                    self.OFFER_ADDR,
+                    self.BIDDER_ADDR,
+                )
+                with self.assertRaisesRegex(ValueError, "does not match pending route"):
+                    self.sc.processConnectRequest(unbound)
+                # The event must be signed by the route key it announces
+                with self.assertRaisesRegex(ValueError, "not signed by announced"):
+                    self.sc.processConnectRequest(
+                        makeAck(sent_pubkeys[0], event_pubkey="22" * 32)
+                    )
+                mock_est.assert_not_called()
+            routes, _ = self.readRoutes()
+            assert routes[0][1] == 2  # Still pending
+
             # ACK from the offerer activates the route and releases the bid
-            ack_msg = self.makeConnectMsg(
-                ConnectionRequestTypes.ACK,
-                {
-                    "offer_id": self.offer_id.hex(),
-                    "bsx_address": self.OFFER_ADDR,
-                    "nostr_pubkey": self.OFFERER_PUBKEY,
-                },
-                self.OFFER_ADDR,
-                self.BIDDER_ADDR,
-            )
+            ack_msg = makeAck(sent_pubkeys[0], event_pubkey=self.OFFERER_PUBKEY)
             with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
                 self.sc.processConnectRequest(ack_msg)
                 mock_est.assert_called_once()
@@ -1276,6 +1373,7 @@ class TestNostrHandshake(BasicSwapFixture):
                 "offer_id": self.offer_id.hex(),
                 "bsx_address": self.OFFER_ADDR,
                 "nostr_pubkey": self.OFFERER_PUBKEY,
+                "req_pubkey": self.BIDDER_PUBKEY,
             },
             self.OFFER_ADDR,
             self.BIDDER_ADDR,
