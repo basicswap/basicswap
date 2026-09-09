@@ -16,7 +16,14 @@ timing and size).
   `private_key`.  Each swap negotiates a direct message route with a
   fresh key pair generated for that route (exchanged in the CONNECT_REQ
   handshake and stored with the route), so bids and swap messages can't
-  be linked to the node key or to other swaps by relays.
+  be linked to the node key or to other swaps by relays.  The ACK echoes
+  the requester's route key and must be signed by the key it announces,
+  so a stored ACK replayed by a relay can't activate a later route.
+- Inbound events are gated before signature verification: relay
+  messages over 72 KiB are dropped, each relay is limited to a burst of
+  2000 events refilling at 20/s, and at most 5000 verified events are
+  queued for processing.  Drop counters are shown per relay on the
+  Settings -> Networks tab.
 - The node key can be replaced at any time with "Regenerate Key" on the
   Settings -> Networks tab (restart required).  Existing routes keep
   their own keys, so in-progress swaps are not affected.

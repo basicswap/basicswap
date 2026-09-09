@@ -15,7 +15,7 @@ import threading
 import time
 
 from collections import OrderedDict
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
 from urllib.parse import urlsplit
 
 from coincurve.keys import PrivateKey, PublicKeyXOnly
@@ -30,6 +30,14 @@ MAX_SEEN_EVENT_IDS: int = 10000
 MAX_EVENT_CONTENT_LEN: int = 65536
 MAX_RELAY_MESSAGE_LEN: int = MAX_EVENT_CONTENT_LEN + 8192
 MAX_POW_TARGET_BITS: int = 12
+# Verified events waiting for the main loop.  readNostrMsgs drains ~200/s,
+# anything beyond this is dropped rather than buffered without limit.
+MAX_RECV_QUEUE_SIZE: int = 5000
+# Per-relay token bucket, applied before signature verification.  The burst
+# covers the backlog a relay replays on subscribe, the refill rate is far
+# above legitimate BSX traffic and caps the verify work a relay can cause.
+RELAY_EVENT_BURST: int = 2000
+RELAY_EVENTS_PER_SECOND: float = 20.0
 SOCKS_CONNECT_TIMEOUT: int = 30
 PING_INTERVAL_SECONDS: int = 30
 PING_TIMEOUT_SECONDS: int = 10
@@ -149,7 +157,23 @@ class RelayThread(threading.Thread):
         self.num_events_received: int = 0
         self.num_events_sent: int = 0
         self.num_oversized_messages: int = 0
+        self.num_events_rate_limited: int = 0
         self.last_error: str = ""
+        self._tokens: float = float(RELAY_EVENT_BURST)
+        self._tokens_updated: float = time.monotonic()
+
+    def allowEvent(self) -> bool:
+        now: float = time.monotonic()
+        self._tokens = min(
+            float(RELAY_EVENT_BURST),
+            self._tokens + (now - self._tokens_updated) * RELAY_EVENTS_PER_SECOND,
+        )
+        self._tokens_updated = now
+        if self._tokens < 1.0:
+            self.num_events_rate_limited += 1
+            return False
+        self._tokens -= 1.0
+        return True
 
     def on_open(self, ws) -> None:
         self.connected = True
@@ -174,6 +198,12 @@ class RelayThread(threading.Thread):
             msg_type = data[0]
             if msg_type == "EVENT" and len(data) >= 3:
                 self.num_events_received += 1
+                if not self.allowEvent():
+                    if self.num_events_rate_limited == 1:
+                        self.client.log.warning(
+                            f"Nostr relay {self.url} exceeded event rate limit, dropping events"
+                        )
+                    return
                 self.client.receiveEvent(self.url, data[2])
             elif msg_type == "OK" and len(data) >= 3:
                 self.client.receiveOK(
@@ -289,13 +319,14 @@ class NostrClient:
             self.socks_proxy_port = int(port_str)
 
         self.mutex = threading.Lock()
-        self.recv_queue = Queue()
+        self.recv_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
         self.ok_queue = Queue()
         self._seen_event_ids = OrderedDict()
         self._seen_smsg_ids = OrderedDict()
 
         self.num_messages_received: int = 0
         self.num_messages_sent: int = 0
+        self.num_messages_dropped: int = 0
 
         self.relays = []
         for url in relays:
@@ -399,8 +430,17 @@ class NostrClient:
                 self._seen_event_ids[event_id] = True
                 while len(self._seen_event_ids) > MAX_SEEN_EVENT_IDS:
                     self._seen_event_ids.popitem(last=False)
+            try:
+                self.recv_queue.put(event, block=False)
+            except Full:
+                # Forget the id so a later redelivery can still be accepted.
+                with self.mutex:
+                    self._seen_event_ids.pop(event_id, None)
+                self.num_messages_dropped += 1
+                if self.num_messages_dropped == 1:
+                    self.log.warning("Nostr receive queue full, dropping events")
+                return
             self.num_messages_received += 1
-            self.recv_queue.put(event)
         except Exception as e:
             self.log.debug(f"Nostr receiveEvent error: {e}")
 
@@ -494,12 +534,14 @@ class NostrClient:
             "pow_target": self.pow_target,
             "messages_received": self.num_messages_received,
             "messages_sent": self.num_messages_sent,
+            "messages_dropped": self.num_messages_dropped,
             "relays": [
                 {
                     "url": relay.url,
                     "connected": relay.connected,
                     "events_received": relay.num_events_received,
                     "events_sent": relay.num_events_sent,
+                    "events_rate_limited": relay.num_events_rate_limited,
                     "last_error": relay.last_error,
                 }
                 for relay in self.relays

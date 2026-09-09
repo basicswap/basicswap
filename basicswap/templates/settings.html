@@ -582,7 +582,7 @@
           {% if n.relay_status %}
            {% for r in n.relay_status %}
           <div class="flex items-center justify-between text-gray-700 dark:text-gray-300">
-           <span>{{ r.url }}</span>
+           <span>{{ r.url }}{% if r.events_rate_limited %} <span class="text-yellow-600 dark:text-yellow-400" title="Events dropped by the per-relay rate limit">({{ r.events_rate_limited }} rate limited)</span>{% endif %}</span>
            {% if r.connected %}
            <span class="text-green-600 dark:text-green-400">Connected</span>
            {% elif r.last_error %}
