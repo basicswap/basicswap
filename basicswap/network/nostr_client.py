@@ -9,6 +9,7 @@
 
 import hashlib
 import json
+import logging
 import socks
 import ssl
 import threading
@@ -23,6 +24,8 @@ from coincurve.keys import PrivateKey, PublicKeyXOnly
 import websocket
 
 from basicswap.util import TemporaryError
+
+logging.getLogger("websocket").setLevel(logging.CRITICAL)
 
 BSX_NOSTR_KIND: int = 4859  # Regular (stored) custom kind
 DEFAULT_BROADCAST_TAG: str = "bsx"
