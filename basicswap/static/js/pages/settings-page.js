@@ -48,6 +48,7 @@
           if (window.history && window.history.replaceState) {
             window.history.replaceState(null, '', '#' + btn.dataset.tab);
           }
+          this.syncNetworkStatusPolling();
         });
       });
 
@@ -964,25 +965,63 @@
     unsupported_version: 'Unsupported version'
   };
 
-  SettingsPage.setupNetworkStatus = function() {
+  SettingsPage.isNetworksTabVisible = function() {
     const networksTab = document.getElementById('networks');
-    if (!networksTab) {
+    if (!networksTab || networksTab.classList.contains('hidden')) {
+      return false;
+    }
+    return document.visibilityState === 'visible';
+  };
+
+  SettingsPage.stopNetworkStatusPolling = function() {
+    if (this.networkStatusTimer) {
+      window.clearInterval(this.networkStatusTimer);
+      this.networkStatusTimer = null;
+    }
+  };
+
+  SettingsPage.startNetworkStatusPolling = function() {
+    if (this.networkStatusTimer) {
+      return;
+    }
+    this.refreshNetworkStatus();
+    if (window.CleanupManager && typeof CleanupManager.setInterval === 'function') {
+      this.networkStatusTimer = CleanupManager.setInterval(() => {
+        if (this.isNetworksTabVisible()) {
+          this.refreshNetworkStatus();
+        } else {
+          this.stopNetworkStatusPolling();
+        }
+      }, 5000);
+    } else {
+      this.networkStatusTimer = window.setInterval(() => {
+        if (this.isNetworksTabVisible()) {
+          this.refreshNetworkStatus();
+        } else {
+          this.stopNetworkStatusPolling();
+        }
+      }, 5000);
+    }
+  };
+
+  SettingsPage.syncNetworkStatusPolling = function() {
+    if (this.isNetworksTabVisible()) {
+      this.startNetworkStatusPolling();
+    } else {
+      this.stopNetworkStatusPolling();
+    }
+  };
+
+  SettingsPage.setupNetworkStatus = function() {
+    if (!document.getElementById('networks')) {
       return;
     }
 
-    const refresh = () => {
-      if (networksTab.classList.contains('hidden')) {
-        return;
-      }
-      this.refreshNetworkStatus();
+    this._onVisibilityChange = () => {
+      this.syncNetworkStatusPolling();
     };
-
-    refresh();
-    if (window.CleanupManager && typeof CleanupManager.setInterval === 'function') {
-      this.networkStatusTimer = CleanupManager.setInterval(refresh, 5000);
-    } else {
-      this.networkStatusTimer = window.setInterval(refresh, 5000);
-    }
+    document.addEventListener('visibilitychange', this._onVisibilityChange);
+    this.syncNetworkStatusPolling();
   };
 
   SettingsPage.refreshNetworkStatus = function() {
@@ -1082,9 +1121,10 @@
   };
 
   SettingsPage.cleanup = function() {
-    if (this.networkStatusTimer) {
-      window.clearInterval(this.networkStatusTimer);
-      this.networkStatusTimer = null;
+    this.stopNetworkStatusPolling();
+    if (this._onVisibilityChange) {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
+      this._onVisibilityChange = null;
     }
   };
 
