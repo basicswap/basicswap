@@ -7,6 +7,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import copy
+import json
 import logging
 import os
 import random
@@ -23,8 +24,8 @@ from basicswap.basicswap import (
     TxStates,
 )
 from basicswap.basicswap_util import EventLogTypes, TxLockTypes, TxTypes
-from basicswap.bidplanner import FILL_RECEIVE
 from basicswap.db import Concepts
+from basicswap.bidplanner import FILL_RECEIVE
 from basicswap.multibid import (
     MIN_LEG_TIMEOUT_SECONDS,
     placeMultiBid,
@@ -1504,6 +1505,43 @@ class Test(BaseTest):
         assert expect_size >= actual_size
         assert expect_size - actual_size < 10
 
+    def test_011_preselected_inputs(self):
+        logging.info(f"---------- Test {self.test_coin.name} preselected inputs")
+
+        swap_clients = self.swap_clients
+        ci = swap_clients[1].ci(self.test_coin)
+        self.prepare_balance(self.test_coin, 10.0, 1801, 1800)
+
+        split = ci.splitOutputs([ci.make_int(1.0), ci.make_int(2.0)])
+        for output in split:
+            ci.lockOutput(output["txid"], output["vout"])
+        try:
+            tx = CTransaction()
+            tx.version = ci.txVersion()
+            pay_to = ci.getPubkeyHashDest(ci.decodeAddress(ci.getNewAddress()))
+            tx.vout.append(ci.txoType()(ci.make_int(0.5), pay_to))
+
+            fee_rate: int = 10000
+            prevout = {"txid": split[1]["txid"], "vout": split[1]["vout"]}
+            funded = ci.fundTx(tx.serialize(), fee_rate, prevouts=[prevout])
+            funded_tx = ci.loadTx(funded)
+            assert len(funded_tx.vout) == 2, "expected a change output"
+
+            split_unconfirmed: bool = split[1]["txid"] in ci.rpc("getrawmempool")
+            signed = ci.signTxWithWallet(funded)
+            ci.publishTx(signed)
+            logging.info(f"Spent a split output, unconfirmed: {split_unconfirmed}")
+
+            decoded = ci.describeTx(signed.hex())
+            assert [(i["txid"], i["vout"]) for i in decoded["vin"]] == [
+                (prevout["txid"], prevout["vout"])
+            ], "funded from outside the preselected inputs"
+            fee: int = split[1]["value"] - sum(txo.value for txo in funded_tx.vout)
+            assert fee >= len(signed) * fee_rate // 1000, "fee below the signed size"
+        finally:
+            for output in split:
+                ci.unlockOutput(output["txid"], output["vout"])
+
     def test_012_lock_tx_vout(self):
         logging.info(f"---------- Test {self.test_coin.name} lock tx vout lookup")
 
@@ -1581,6 +1619,56 @@ class Test(BaseTest):
     def test_15_ads_xmr_coin_swipe_refund(self):
         # Reverse bid
         run_test_ads_swipe_refund(self, Coins.XMR, self.test_coin, lock_value=20)
+
+    def test_16_ads_xmr_coin_plan(self):
+        # XMR as coin_from makes these reverse bids: the bidder leads and funds
+        # a lock per leg, from one output, so the plan must split it first.
+        logging.info(f"---------- Test {self.test_coin.name} leader-side plan")
+
+        coin_from, coin_to = Coins.XMR, self.test_coin
+        num_legs: int = 3
+        id_bidder: int = 1
+        makers = (0, 2)
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
+        for maker_id in makers:
+            self.prepare_balance(coin_from, 10.0, 1800 + maker_id, 1801)
+
+        amount: int = ci_from.make_int(1.0)
+        offer_ids = [
+            swap_clients[makers[i % len(makers)]].postOffer(
+                coin_from,
+                coin_to,
+                amount,
+                ci_to.make_int(1.0, r=1),
+                amount,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=True,
+            )
+            for i in range(num_legs)
+        ]
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        for i in range(120):
+            test_delay_event.wait(1)
+            outputs = sorted(ci_to.getSpendableOutputs(), key=lambda o: o["value"])
+            if outputs and outputs[-1]["value"] > ci_to.make_int(50.0):
+                break
+        else:
+            raise ValueError("Deposit did not confirm")
+        # Hide every output but the largest from the plan.
+        held = outputs[:-1]
+        for o in held:
+            ci_to.lockOutput(o["txid"], o["vout"])
+        try:
+            self.run_leader_plan(offer_ids, amount, num_legs, id_bidder)
+        finally:
+            for o in held:
+                ci_to.unlockOutput(o["txid"], o["vout"])
 
     def test_17_ads_part_coin_plan(self):
         # The bidder follows and pays a coin B lock per leg, from one output.
@@ -1674,6 +1762,60 @@ class Test(BaseTest):
         finally:
             for o in held:
                 ci_to.unlockOutput(o["txid"], o["vout"])
+
+    def run_leader_plan(self, offer_ids, amount: int, num_legs: int, id_bidder: int):
+        coin_from, coin_to = Coins.XMR, self.test_coin
+        swap_clients = self.swap_clients
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            amount * num_legs,
+            max_bids=num_legs,
+            manual_offers=offer_ids,
+        )
+        assert plan.num_bids == num_legs
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == num_legs and len(failed) == 0, failed
+        bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+
+        prevouts = [
+            json.loads(swap_clients[id_bidder].getStringKV(f"bid_prevouts:{b.hex()}"))
+            for b in bid_ids
+        ]
+        assert (
+            len({p["txid"] for leg in prevouts for p in leg}) == 1
+        ), "expected every leg to fund from the split tx"
+
+        for bid_id in bid_ids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=300,
+            )
+
+        lock_txids = {
+            bytes(swap_clients[id_bidder].getXmrBid(bid_id)[1].a_lock_tx_id)
+            for bid_id in bid_ids
+        }
+        assert (
+            len(lock_txids) == num_legs
+        ), f"expected {num_legs} coin A locks, got {len(lock_txids)}"
+
+        locked = {
+            (lu["txid"], lu["vout"]) for lu in ci_to.rpc_wallet("listlockunspent") or []
+        }
+        for leg in prevouts:
+            for p in leg:
+                assert (p["txid"], p["vout"]) not in locked, "plan left inputs locked"
 
 
 if __name__ == "__main__":
