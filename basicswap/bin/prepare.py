@@ -180,7 +180,7 @@ disabled_networks = []
 
 NOSTR_RELAYS = os.getenv(
     "NOSTR_RELAYS",
-    "wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net",
+    "wss://relay.primal.net,wss://nos.lol,wss://relay.damus.io,wss://relay.momostr.pink,wss://nostr.mom",
 )
 NOSTR_POW_TARGET = max(0, min(int(os.getenv("NOSTR_POW_TARGET", "0")), 12))
 NOSTR_SOCKS_PROXY = os.getenv("NOSTR_SOCKS_PROXY", None)

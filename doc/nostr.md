@@ -47,7 +47,7 @@ basicswap-prepare --datadir=~/coinswaps --addnetwork=nostr
 Environment variables read by prepare:
 
 - `NOSTR_RELAYS`: Comma separated relay urls.
-  Default: `wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net`
+  Default: `wss://relay.primal.net,wss://nos.lol,wss://relay.damus.io,wss://relay.momostr.pink,wss://nostr.mom`
 - `NOSTR_POW_TARGET`: NIP-13 difficulty bits for outgoing events,
   default `0`, max `12`.
 - `NOSTR_SOCKS_PROXY`: Optional `host:port` SOCKS5 proxy override.
