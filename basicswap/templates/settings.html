@@ -31,24 +31,30 @@
 
 
 
+ {% set current_tab = active_tab if active_tab in ['coins', 'networks', 'general', 'security', 'notifications', 'tor'] else 'coins' %}
+ {% set tab_on = 'tab-button border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0' %}
+ {% set tab_off = 'tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0' %}
  <section class="py-4">
   <div class="container px-4 mx-auto">
    <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl  ">
     <div class="">
-     <nav class="flex space-x-8 px-6" aria-label="Tabs">
-      <button class="tab-button border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="coins" id="coins-tab">
+     <nav id="settings-tabs" class="flex space-x-8 px-6" aria-label="Tabs" data-initial-tab="{{ current_tab }}">
+      <button class="{{ tab_on if current_tab == 'coins' else tab_off }}" data-tab="coins" id="coins-tab">
        Coins
       </button>
-      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="general" id="general-tab">
+      <button class="{{ tab_on if current_tab == 'networks' else tab_off }}" data-tab="networks" id="networks-tab">
+       Networks
+      </button>
+      <button class="{{ tab_on if current_tab == 'general' else tab_off }}" data-tab="general" id="general-tab">
        General
       </button>
-      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="security" id="security-tab">
+      <button class="{{ tab_on if current_tab == 'security' else tab_off }}" data-tab="security" id="security-tab">
        Security
       </button>
-      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="notifications" id="notifications-tab">
+      <button class="{{ tab_on if current_tab == 'notifications' else tab_off }}" data-tab="notifications" id="notifications-tab">
        Notifications
       </button>
-      <button class="tab-button border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-4 px-1 text-sm font-medium focus:outline-none focus:ring-0" data-tab="tor" id="tor-tab">
+      <button class="{{ tab_on if current_tab == 'tor' else tab_off }}" data-tab="tor" id="tor-tab">
        Tor
       </button>
      </nav>
@@ -59,7 +65,7 @@
 
  <div class="container px-4 mx-auto">
 
-  <div class="tab-content" id="coins" role="tabpanel" aria-labelledby="coins-tab">
+  <div class="tab-content{% if current_tab != 'coins' %} hidden{% endif %}" id="coins" role="tabpanel" aria-labelledby="coins-tab">
    <form method="post" id="coins-form">
     <div class="space-y-6">
      {% for c in chains %}
@@ -475,7 +481,249 @@
    </form>
   </div>
 
-  <div class="tab-content hidden" id="general" role="tabpanel" aria-labelledby="general-tab">
+  <div class="tab-content{% if current_tab != 'networks' %} hidden{% endif %}" id="networks" role="tabpanel" aria-labelledby="networks-tab">
+   <form method="post" id="networks-form">
+    <div class="space-y-6">
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl overflow-hidden">
+      <div class="px-6 py-6">
+       <p class="text-sm text-gray-700 dark:text-gray-300">Message networks carry offers, bids, and swap messages. They are separate from coin daemons. You can run more than one at the same time. Bridging is optional and only needed to help other nodes on different networks reach each other.</p>
+      </div>
+     </div>
+     {% for n in networks %}
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl overflow-hidden">
+      <div class="px-6 py-4">
+       <div class="flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ n.display_name }}</h3>
+        <div class="flex items-center space-x-4">
+         {% if n.active %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+          Active
+         </span>
+         {% elif n.enabled %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+          Enabled (restart required)
+         </span>
+         {% else %}
+         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+          <svg class="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>
+          Disabled
+         </span>
+         {% endif %}
+        </div>
+       </div>
+      </div>
+
+      <div class="px-6 py-6">
+       {% if n.restart_required %}
+       <p class="text-sm text-yellow-600 dark:text-yellow-400 mb-4">Restart BasicSwap for this change to take effect.</p>
+       {% endif %}
+       <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4 network-stats" data-network-type="{{ n.type }}">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
+         {% if n.type == 'smsg' %}
+         <div>Messages received: <span class="font-medium" data-stat="messages_received">{{ n.messages_received }}</span></div>
+         <div>Messages sent: <span class="font-medium" data-stat="messages_sent">{{ n.messages_sent }}</span></div>
+         {% elif n.type == 'simplex' %}
+         <div>Group received: <span class="font-medium" data-stat="messages_received_broadcast">{{ n.messages_received_broadcast }}</span></div>
+         <div>Group sent: <span class="font-medium" data-stat="messages_sent_broadcast">{{ n.messages_sent_broadcast }}</span></div>
+         <div>Direct received: <span class="font-medium" data-stat="messages_received_direct">{{ n.messages_received_direct }}</span></div>
+         <div>Direct sent: <span class="font-medium" data-stat="messages_sent_direct">{{ n.messages_sent_direct }}</span></div>
+         {% else %}
+         <div>Broadcast received: <span class="font-medium" data-stat="messages_received_broadcast">{{ n.messages_received_broadcast }}</span></div>
+         <div>Broadcast sent: <span class="font-medium" data-stat="messages_sent_broadcast">{{ n.messages_sent_broadcast }}</span></div>
+         <div>Direct received: <span class="font-medium" data-stat="messages_received_direct">{{ n.messages_received_direct }}</span></div>
+         <div>Direct sent: <span class="font-medium" data-stat="messages_sent_direct">{{ n.messages_sent_direct }}</span></div>
+         {% endif %}
+         {% if n.bridged %}
+         <div class="md:col-span-2">Bridged to: <span class="font-medium">{{ n.bridged|join(', ') }}</span></div>
+         {% endif %}
+        </div>
+       </div>
+
+       {% if n.type == 'nostr' %}
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Relays (one per line)</label>
+         <textarea rows="4" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_relays" placeholder="wss://relay.example.com">{{ n.relays_text }}</textarea>
+         {% if n.plaintext_relays %}
+         <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Warning: unencrypted ws:// relay(s) without Tor expose your Nostr pubkey and message timing on the network. Use wss:// or enable Tor.</p>
+         {% endif %}
+         {% if n.uses_tor %}
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Relays connect through Tor.</p>
+         {% else %}
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Relays connect directly. Enable Tor to hide your IP from relays.</p>
+         {% endif %}
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proof of Work Target (bits)</label>
+         <input type="number" min="0" max="12" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_pow_target" value="{{ n.pow_target }}">
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">NIP-13 difficulty for outgoing events. 0 disables. Higher bits delay outgoing messages.</p>
+        </div>
+        {% if n.pubkey %}
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{% if n.key_pending_restart %}New Public Key{% else %}Public Key{% endif %}</label>
+         <input type="text" readonly class="bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 text-sm rounded-lg block w-full p-2.5" value="{{ n.pubkey }}">
+         {% if n.key_pending_restart %}
+         <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Takes effect after restart. This session still signs with {{ n.active_pubkey }}.</p>
+         {% else %}
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Signs offers and other broadcasts. Swap messages use a fresh key per route.</p>
+         {% endif %}
+         <button name="regenerate_key_nostr" value="Regenerate" type="button" data-confirm-regenerate-nostr class="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg transition-colors focus:outline-none">Regenerate Key</button>
+        </div>
+        {% else %}
+        <div>
+         <button name="regenerate_key_nostr" value="Regenerate" type="button" data-confirm-regenerate-nostr class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 px-3 rounded-lg transition-colors focus:outline-none">Regenerate Key</button>
+        </div>
+        {% endif %}
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Relay Status</label>
+         <div id="nostr-relay-status-list" class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 space-y-1 text-sm">
+          {% if n.relay_status %}
+           {% for r in n.relay_status %}
+          <div class="flex items-center justify-between text-gray-700 dark:text-gray-300">
+           <span>{{ r.url }}{% if r.events_rate_limited %} <span class="text-yellow-600 dark:text-yellow-400" title="Events dropped by the per-relay rate limit">({{ r.events_rate_limited }} rate limited)</span>{% endif %}</span>
+           {% if r.connected %}
+           <span class="text-green-600 dark:text-green-400">Connected</span>
+           {% elif r.last_error %}
+           <span class="text-red-600 dark:text-red-400">{{ r.last_error }}</span>
+           {% else %}
+           <span class="text-red-600 dark:text-red-400">Disconnected</span>
+           {% endif %}
+          </div>
+           {% endfor %}
+          {% elif n.active %}
+          <p class="text-gray-500 dark:text-gray-400">Waiting for relay status…</p>
+          {% else %}
+          <p class="text-gray-500 dark:text-gray-400">Available when Nostr is active.</p>
+          {% endif %}
+         </div>
+        </div>
+       </div>
+       <div class="flex justify-end items-center gap-4 pt-6 mt-6">
+        {% if n.enabled %}
+         {% if n.can_disable %}
+        <button name="disable_network_nostr" value="Disable" type="button" data-confirm-network data-confirm-title="Disable Nostr" data-confirm-message="Disable Nostr?" data-confirm-warning="Requires a restart. In-progress swaps on this network may stall until it is enabled again." class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Disable</button>
+         {% else %}
+        <button type="button" disabled title="Cannot disable the last enabled network." class="bg-red-500 text-white font-medium py-2 px-4 rounded-lg opacity-50 cursor-not-allowed">Disable</button>
+         {% endif %}
+        {% else %}
+        <button name="enable_network_nostr" value="Enable" type="button" data-confirm-network data-confirm-title="Enable Nostr" data-confirm-message="Enable Nostr?" data-confirm-warning="Requires a restart." class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
+        {% endif %}
+        <button name="apply_network_nostr" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
+       </div>
+       {% if n.enabled and not n.can_disable %}
+       <p class="text-xs text-gray-500 dark:text-gray-400 text-right mt-2">At least one message network must stay enabled.</p>
+       {% endif %}
+       {% elif n.type == 'simplex' %}
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Server Address</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="simplex_server_address" value="{{ n.server_address }}" placeholder="smp://...">
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">WebSocket Port</label>
+         <input type="number" min="1" max="65535" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="simplex_ws_port" value="{{ n.ws_port }}">
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Group Link</label>
+         <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="simplex_group_link" value="{{ n.group_link }}">
+        </div>
+        {% if n.client_version or n.verify_status %}
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Client</label>
+         <p class="text-sm text-gray-700 dark:text-gray-300">
+          {% if n.client_version %}<span>Version {{ n.client_version }}</span>{% endif %}
+          {% if n.verify_status_label %}
+          <span id="simplex-verify-status" class="{% if n.verify_status == 'ok' %}text-green-600 dark:text-green-400{% elif n.verify_status in ('missing', 'hash_mismatch', 'unsupported_version') %}text-red-600 dark:text-red-400{% else %}text-yellow-600 dark:text-yellow-400{% endif %}">{% if n.client_version %} · {% endif %}{{ n.verify_status_label }}</span>
+          {% endif %}
+         </p>
+         {% if n.verify_status and n.verify_status != 'ok' %}
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Re-run <code class="font-mono">basicswap-prepare --addnetwork=simplex</code> if the client is missing or unverified.</p>
+         {% endif %}
+        </div>
+        {% endif %}
+       </div>
+       <div class="flex justify-end items-center gap-4 pt-6 mt-6">
+        {% if n.enabled %}
+         {% if n.can_disable %}
+        <button name="disable_network_simplex" value="Disable" type="button" data-confirm-network data-confirm-title="Disable SimpleX" data-confirm-message="Disable SimpleX?" data-confirm-warning="Requires a restart. In-progress swaps on this network may stall until it is enabled again." class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Disable</button>
+         {% else %}
+        <button type="button" disabled title="Cannot disable the last enabled network." class="bg-red-500 text-white font-medium py-2 px-4 rounded-lg opacity-50 cursor-not-allowed">Disable</button>
+         {% endif %}
+        {% else %}
+        <button name="enable_network_simplex" value="Enable" type="button" data-confirm-network data-confirm-title="Enable SimpleX" data-confirm-message="Enable SimpleX?" data-confirm-warning="Requires a restart." class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
+        {% endif %}
+        <button name="apply_network_simplex" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
+       </div>
+       {% if n.enabled and not n.can_disable %}
+       <p class="text-xs text-gray-500 dark:text-gray-400 text-right mt-2">At least one message network must stay enabled.</p>
+       {% endif %}
+       {% else %}
+       <p class="text-sm text-gray-600 dark:text-gray-300">Particl SMSG is the default message network. It is configured through the Particl core wallet.</p>
+       <div class="flex justify-end items-center gap-4 pt-6 mt-6">
+        {% if n.enabled %}
+         {% if n.can_disable %}
+        <button name="disable_network_smsg" value="Disable" type="button" data-confirm-network data-confirm-title="Disable SMSG" data-confirm-message="Disable SMSG?" data-confirm-warning="Requires a restart. In-progress swaps on this network may stall until it is enabled again." class="bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Disable</button>
+         {% else %}
+        <button type="button" disabled title="Cannot disable the last enabled network." class="bg-red-500 text-white font-medium py-2 px-4 rounded-lg opacity-50 cursor-not-allowed">Disable</button>
+         {% endif %}
+        {% else %}
+        <button name="enable_network_smsg" value="Enable" type="button" data-confirm-network data-confirm-title="Enable SMSG" data-confirm-message="Enable SMSG?" data-confirm-warning="Requires a restart." class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Enable</button>
+        {% endif %}
+       </div>
+       {% if n.enabled and not n.can_disable %}
+       <p class="text-xs text-gray-500 dark:text-gray-400 text-right mt-2">At least one message network must stay enabled.</p>
+       {% endif %}
+       {% endif %}
+      </div>
+     </div>
+     {% endfor %}
+     {% if networks_global.addable %}
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl overflow-hidden">
+      <div class="px-6 py-4">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Add Network</h3>
+      </div>
+      <div class="px-6 py-6 space-y-4">
+       <p class="text-sm text-gray-700 dark:text-gray-300">Add another message network. A restart is required before it becomes active.</p>
+       {% if 'nostr' in networks_global.addable %}
+       <div>
+        <button name="add_network_nostr" value="Add" type="button" data-confirm-network data-confirm-title="Add Nostr" data-confirm-message="Add the Nostr message network with default relays?" data-confirm-warning="Requires a restart. A new identity key will be generated." class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Add Nostr</button>
+       </div>
+       {% endif %}
+       {% if 'simplex' in networks_global.addable %}
+       <p class="text-sm text-gray-600 dark:text-gray-300">SimpleX needs the <code class="font-mono">simplex-chat</code> client. Add it with:</p>
+       <p class="text-xs font-mono text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-700 rounded-lg p-3">basicswap-prepare --addnetwork=simplex</p>
+       {% endif %}
+      </div>
+     </div>
+     {% endif %}
+     <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl overflow-hidden">
+      <div class="px-6 py-4">
+       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Network Bridging</h3>
+      </div>
+      <div class="px-6 py-6">
+       <div class="py-2">
+        <div class="flex items-center">
+         <input type="checkbox" id="bridge_networks" name="bridge_networks" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if networks_global.bridge_networks %} checked{% endif %}{% if not networks_global.can_bridge %} disabled{% endif %}>
+         <label for="bridge_networks" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">Act as a bridge between networks</label>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 ml-7 mt-1">Relay messages between message networks for other nodes. Not required to send and receive on multiple networks yourself. Uses extra bandwidth by forwarding encrypted traffic from third parties.</p>
+        {% if not networks_global.can_bridge %}
+        <p class="text-xs text-yellow-600 dark:text-yellow-400 ml-7 mt-1">At least two networks must be enabled to bridge.</p>
+        {% endif %}
+       </div>
+       <div class="flex justify-end items-center gap-4 pt-4">
+        <button name="apply_networks_bridge" value="Apply" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">Apply Changes</button>
+       </div>
+      </div>
+     </div>
+    </div>
+    <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
+  </div>
+
+  <div class="tab-content{% if current_tab != 'general' %} hidden{% endif %}" id="general" role="tabpanel" aria-labelledby="general-tab">
    <form method="post" id="general-form">
     <div class="space-y-6">
 
@@ -631,7 +879,7 @@
    </form>
   </div>
 
-  <div class="tab-content hidden" id="security" role="tabpanel" aria-labelledby="security-tab">
+  <div class="tab-content{% if current_tab != 'security' %} hidden{% endif %}" id="security" role="tabpanel" aria-labelledby="security-tab">
    <div class="space-y-6">
 
      <div class="bg-coolGray-100 dark:bg-gray-500 rounded-xl">
@@ -722,7 +970,7 @@
     </div>
   </div>
 
-  <div class="tab-content hidden" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
+  <div class="tab-content{% if current_tab != 'notifications' %} hidden{% endif %}" id="notifications" role="tabpanel" aria-labelledby="notifications-tab">
    <form method="post">
     <div class="space-y-6">
 
@@ -885,7 +1133,7 @@
    </form>
   </div>
 
-  <div class="tab-content hidden" id="tor" role="tabpanel" aria-labelledby="tor-tab">
+  <div class="tab-content{% if current_tab != 'tor' %} hidden{% endif %}" id="tor" role="tabpanel" aria-labelledby="tor-tab">
    <form method="post" id="tor-form">
     <div class="space-y-6">
 
@@ -961,7 +1209,8 @@
     <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg transition-opacity duration-300 ease-out">
       <div class="text-center">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4" id="confirmTitle">Confirm Action</h2>
-        <p class="text-gray-600 dark:text-gray-200 mb-6 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+        <p class="text-gray-600 dark:text-gray-200 mb-4 whitespace-pre-line" id="confirmMessage">Are you sure?</p>
+        <p class="hidden text-sm text-yellow-600 dark:text-yellow-400 mb-6" id="confirmWarning"></p>
         <div class="flex justify-center gap-4">
           <button type="button" id="confirmYes"
                   class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none">

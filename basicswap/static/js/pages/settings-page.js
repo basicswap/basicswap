@@ -16,11 +16,13 @@
       this.setupNotificationSettings();
       this.setupMigrationIndicator();
       this.setupServerDiscovery();
+      this.setupNetworkStatus();
     },
 
     setupTabs: function() {
       const tabButtons = document.querySelectorAll('.tab-button');
       const tabContents = document.querySelectorAll('.tab-content');
+      const validTabs = ['coins', 'networks', 'general', 'security', 'notifications', 'tor'];
 
       const switchTab = (targetTab) => {
         tabButtons.forEach(btn => {
@@ -43,8 +45,20 @@
       tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           switchTab(btn.dataset.tab);
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '#' + btn.dataset.tab);
+          }
+          this.syncNetworkStatusPolling();
         });
       });
+
+      const tabsNav = document.getElementById('settings-tabs');
+      const initialTab = tabsNav ? tabsNav.dataset.initialTab : 'coins';
+      const hashTab = (window.location.hash || '').replace('#', '');
+      const startTab = validTabs.includes(hashTab)
+        ? hashTab
+        : (validTabs.includes(initialTab) ? initialTab : 'coins');
+      switchTab(startTab);
     },
 
     setupPasswordToggles: function() {
@@ -506,10 +520,32 @@
       }
     },
 
-    showConfirmDialog: function(title, message, callback) {
+    showConfirmDialog: function(title, message, callback, options) {
+      options = options || {};
+      if (window.EventHandlers && typeof EventHandlers.showConfirmModal === 'function') {
+        EventHandlers.showConfirmModal(title, message, callback, options.warning);
+        return false;
+      }
       this.confirmCallback = callback;
-      document.getElementById('confirmTitle').textContent = title;
-      document.getElementById('confirmMessage').textContent = message;
+      const titleEl = document.getElementById('confirmTitle');
+      if (titleEl) {
+        titleEl.textContent = title;
+      }
+      const messageEl = document.getElementById('confirmMessage');
+      if (messageEl) {
+        messageEl.textContent = message;
+        messageEl.classList.remove('hidden');
+      }
+      const warningEl = document.getElementById('confirmWarning');
+      if (warningEl) {
+        if (options.warning) {
+          warningEl.textContent = options.warning;
+          warningEl.classList.remove('hidden');
+        } else {
+          warningEl.textContent = '';
+          warningEl.classList.add('hidden');
+        }
+      }
       const modal = document.getElementById('confirmModal');
       if (modal) {
         modal.classList.remove('hidden');
@@ -521,6 +557,11 @@
       const modal = document.getElementById('confirmModal');
       if (modal) {
         modal.classList.add('hidden');
+      }
+      const warningEl = document.getElementById('confirmWarning');
+      if (warningEl) {
+        warningEl.textContent = '';
+        warningEl.classList.add('hidden');
       }
       this.confirmCallback = null;
       return false;
@@ -541,6 +582,28 @@
             form.appendChild(hiddenInput);
             form.submit();
           }
+        }
+      );
+    },
+
+    confirmRegenerateNostrKey: function(button) {
+      this.triggerElement = button;
+      return this.showConfirmDialog(
+        'Regenerate Nostr Key',
+        'Generate a new Nostr key?',
+        () => {
+          if (this.triggerElement) {
+            const form = this.triggerElement.form;
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'regenerate_key_nostr';
+            hiddenInput.value = 'Regenerate';
+            form.appendChild(hiddenInput);
+            form.submit();
+          }
+        },
+        {
+          warning: 'Requires a restart. Existing swaps are not affected.',
         }
       );
     },
@@ -894,7 +957,182 @@
     });
   };
 
+  SettingsPage.SIMPLEX_VERIFY_LABELS = {
+    ok: 'Verified',
+    unverified: 'Unverified',
+    missing: 'Client missing',
+    hash_mismatch: 'Hash mismatch',
+    unsupported_version: 'Unsupported version'
+  };
+
+  SettingsPage.isNetworksTabVisible = function() {
+    const networksTab = document.getElementById('networks');
+    if (!networksTab || networksTab.classList.contains('hidden')) {
+      return false;
+    }
+    return document.visibilityState === 'visible';
+  };
+
+  SettingsPage.stopNetworkStatusPolling = function() {
+    if (this.networkStatusTimer) {
+      window.clearInterval(this.networkStatusTimer);
+      this.networkStatusTimer = null;
+    }
+  };
+
+  SettingsPage.startNetworkStatusPolling = function() {
+    if (this.networkStatusTimer) {
+      return;
+    }
+    this.refreshNetworkStatus();
+    if (window.CleanupManager && typeof CleanupManager.setInterval === 'function') {
+      this.networkStatusTimer = CleanupManager.setInterval(() => {
+        if (this.isNetworksTabVisible()) {
+          this.refreshNetworkStatus();
+        } else {
+          this.stopNetworkStatusPolling();
+        }
+      }, 5000);
+    } else {
+      this.networkStatusTimer = window.setInterval(() => {
+        if (this.isNetworksTabVisible()) {
+          this.refreshNetworkStatus();
+        } else {
+          this.stopNetworkStatusPolling();
+        }
+      }, 5000);
+    }
+  };
+
+  SettingsPage.syncNetworkStatusPolling = function() {
+    if (this.isNetworksTabVisible()) {
+      this.startNetworkStatusPolling();
+    } else {
+      this.stopNetworkStatusPolling();
+    }
+  };
+
+  SettingsPage.setupNetworkStatus = function() {
+    if (!document.getElementById('networks')) {
+      return;
+    }
+
+    this._onVisibilityChange = () => {
+      this.syncNetworkStatusPolling();
+    };
+    document.addEventListener('visibilitychange', this._onVisibilityChange);
+    this.syncNetworkStatusPolling();
+  };
+
+  SettingsPage.refreshNetworkStatus = function() {
+    fetch('/json/networks', {
+      headers: { 'Accept': 'application/json' }
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error('Failed to load network status');
+        }
+        return response.json();
+      })
+      .then((networks) => {
+        if (!Array.isArray(networks)) {
+          return;
+        }
+        networks.forEach((network) => {
+          const stats = document.querySelector(
+            '.network-stats[data-network-type="' + network.type + '"]'
+          );
+          if (stats) {
+            [
+              'messages_received',
+              'messages_sent',
+              'messages_received_broadcast',
+              'messages_sent_broadcast',
+              'messages_received_direct',
+              'messages_sent_direct'
+            ].forEach((key) => {
+              const el = stats.querySelector('[data-stat="' + key + '"]');
+              if (el && network[key] !== undefined) {
+                el.textContent = network[key];
+              }
+            });
+          }
+          if (network.type === 'nostr') {
+            this.renderRelayStatus(network.relay_status, network.active);
+          }
+          if (network.type === 'simplex') {
+            this.renderSimplexVerifyStatus(network);
+          }
+        });
+      })
+      .catch(() => {});
+  };
+
+  SettingsPage.renderRelayStatus = function(relays, active) {
+    const list = document.getElementById('nostr-relay-status-list');
+    if (!list) {
+      return;
+    }
+    list.replaceChildren();
+    if (!relays || !relays.length) {
+      const p = document.createElement('p');
+      p.className = 'text-gray-500 dark:text-gray-400';
+      p.textContent = active ? 'Waiting for relay status…' : 'Available when Nostr is active.';
+      list.appendChild(p);
+      return;
+    }
+    relays.forEach((relay) => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between text-gray-700 dark:text-gray-300';
+      const url = document.createElement('span');
+      url.textContent = relay.url || '';
+      if (relay.events_rate_limited) {
+        const dropped = document.createElement('span');
+        dropped.className = 'text-yellow-600 dark:text-yellow-400';
+        dropped.title = 'Events dropped by the per-relay rate limit';
+        dropped.textContent = ' (' + relay.events_rate_limited + ' rate limited)';
+        url.appendChild(dropped);
+      }
+      const status = document.createElement('span');
+      if (relay.connected) {
+        status.className = 'text-green-600 dark:text-green-400';
+        status.textContent = 'Connected';
+      } else {
+        status.className = 'text-red-600 dark:text-red-400';
+        status.textContent = relay.last_error || 'Disconnected';
+      }
+      row.appendChild(url);
+      row.appendChild(status);
+      list.appendChild(row);
+    });
+  };
+
+  SettingsPage.renderSimplexVerifyStatus = function(network) {
+    const statusEl = document.getElementById('simplex-verify-status');
+    if (!statusEl || !network.verify_status) {
+      return;
+    }
+    const label = this.SIMPLEX_VERIFY_LABELS[network.verify_status] || network.verify_status;
+    statusEl.textContent = (network.client_version ? ' · ' : '') + label;
+    if (network.verify_status === 'ok') {
+      statusEl.className = 'text-green-600 dark:text-green-400';
+    } else if (
+      network.verify_status === 'missing' ||
+      network.verify_status === 'hash_mismatch' ||
+      network.verify_status === 'unsupported_version'
+    ) {
+      statusEl.className = 'text-red-600 dark:text-red-400';
+    } else {
+      statusEl.className = 'text-yellow-600 dark:text-yellow-400';
+    }
+  };
+
   SettingsPage.cleanup = function() {
+    this.stopNetworkStatusPolling();
+    if (this._onVisibilityChange) {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
+      this._onVisibilityChange = null;
+    }
   };
 
   document.addEventListener('DOMContentLoaded', function() {
@@ -915,5 +1153,6 @@
   window.showConfirmDialog = SettingsPage.showConfirmDialog.bind(SettingsPage);
   window.hideConfirmDialog = SettingsPage.hideConfirmDialog.bind(SettingsPage);
   window.confirmDisableCoin = SettingsPage.confirmDisableCoin.bind(SettingsPage);
+  window.confirmRegenerateNostrKey = SettingsPage.confirmRegenerateNostrKey.bind(SettingsPage);
 
 })();
