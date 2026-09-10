@@ -31,6 +31,7 @@ from basicswap.multibid import (
     ANCHOR_BEST,
     ANCHOR_MARKET,
     PLAN_ID_LENGTH,
+    assign_prevouts,
     describePlan,
     placeMultiBid,
     planMultiBid,
@@ -71,9 +72,34 @@ class FakeCI:
         self._balance = balance
         self._fee_rate = fee_rate
         self._redeem_fee_rate = redeem_fee_rate
+        self.outputs = None
+        self.locked = []
+        self.split_calls = []
+        self.split_fails = False
 
     def getRedeemFeeRate(self):
         return self._redeem_fee_rate
+
+    def getSpendableOutputs(self):
+        return self.outputs
+
+    def est_lock_tx_vsize(self) -> int:
+        return 200
+
+    def est_tx_input_vsize(self) -> int:
+        return 68
+
+    def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
+        self.locked.append((txid_hex, vout))
+
+    def splitOutputs(self, values):
+        if self.split_fails:
+            raise ValueError("Insufficient funds")
+        self.split_calls.append(list(values))
+        return [
+            {"txid": b"split".hex() + f"{i:02x}", "vout": i, "value": v}
+            for i, v in enumerate(values)
+        ]
 
     def max_batched_lock_outputs(self):
         return 15 if self._coin_type == Coins.XMR else None
@@ -693,6 +719,58 @@ class TestRateScale(unittest.TestCase):
         self.assertEqual(described["total_spend"], "6.000000000000")
 
 
+def outs(*values):
+    return [
+        {"txid": bytes((i,)).hex() * 32, "vout": 0, "value": v}
+        for i, v in enumerate(values)
+    ]
+
+
+class TestAssignPrevouts(unittest.TestCase):
+    def values(self, outputs, assigned):
+        by_txid = {o["txid"]: o["value"] for o in outputs}
+        return [sorted(by_txid[p["txid"]] for p in leg) for leg in assigned]
+
+    def test_gives_each_leg_the_smallest_output_that_covers_it(self):
+        outputs = outs(10, 5, 3)
+        assigned = assign_prevouts(outputs, [3, 5, 10])
+        self.assertEqual(self.values(outputs, assigned), [[3], [5], [10]])
+
+    def test_no_two_legs_share_an_output(self):
+        outputs = outs(10, 10, 10)
+        assigned = assign_prevouts(outputs, [1, 1, 1])
+        spent = [p["txid"] for leg in assigned for p in leg]
+        self.assertEqual(len(set(spent)), 3)
+
+    def test_combines_outputs_when_none_covers_a_leg_alone(self):
+        outputs = outs(4, 3, 2)
+        assigned = assign_prevouts(outputs, [6, 2])
+        self.assertEqual(self.values(outputs, assigned), [[3, 4], [2]])
+
+    def test_charges_a_combining_leg_for_its_extra_inputs(self):
+        # 4 + 3 covers a need of 6, but not once the second input costs 2.
+        self.assertIsNone(assign_prevouts(outs(4, 3), [6], extra_input_costs=[2]))
+        self.assertIsNotNone(assign_prevouts(outs(4, 3), [6], extra_input_costs=[1]))
+
+    def test_takes_no_more_outputs_than_a_leg_needs(self):
+        # 4 + 3 covers a need of 6 plus the second input, so the 2 is left for
+        # the other leg rather than swallowed by the first.
+        outputs = outs(4, 3, 2)
+        assigned = assign_prevouts(outputs, [6, 2], extra_input_costs=[1, 1])
+        self.assertEqual(self.values(outputs, assigned), [[3, 4], [2]])
+
+    def test_rejects_a_wallet_that_cannot_cover_every_leg(self):
+        # 5 5 5 1 1 against legs of 1 2 3 4 5: the three fives go to the three
+        # largest legs and 1 + 1 cannot cover the leg needing 2.
+        self.assertIsNone(assign_prevouts(outs(5, 5, 5, 1, 1), [1, 2, 3, 4, 5]))
+
+    def test_rejects_one_output_shared_by_two_legs(self):
+        self.assertIsNone(assign_prevouts(outs(100), [1, 1]))
+
+    def test_covers_legs_from_a_single_output_each(self):
+        self.assertIsNotNone(assign_prevouts(outs(100, 100), [1, 1]))
+
+
 class TestPlaceMultiBid(unittest.TestCase):
 
     def legs(self, swap_client):
@@ -706,6 +784,84 @@ class TestPlaceMultiBid(unittest.TestCase):
             FakeOffer(b"A", 4, 0.42, min_bid_amount=0.1),
             FakeOffer(b"B", 9, 0.43, amount_negotiable=False),
         ]
+
+    def leader_client(self, *values):
+        # coin_from XMR makes these reverse bids, so the bidder leads.
+        swap_client = FakeSwapClient(self.book())
+        swap_client.ci(Coins.LTC).outputs = outs(*values)
+        return swap_client
+
+    def test_gives_each_led_leg_its_own_inputs(self):
+        swap_client = self.leader_client(ltc(10), ltc(10))
+
+        placed, failed, _ = placeMultiBid(swap_client, self.legs(swap_client))
+
+        self.assertEqual(len(placed), 2)
+        self.assertEqual(failed, [])
+        stored = [
+            json.loads(swap_client.kv[f"bid_prevouts:{p['bid_id']}"]) for p in placed
+        ]
+        spent = [(o["txid"], o["vout"]) for leg in stored for o in leg]
+        self.assertEqual(len(set(spent)), 2)
+
+    def test_reserves_the_inputs_it_assigns(self):
+        swap_client = self.leader_client(ltc(10), ltc(10))
+
+        placeMultiBid(swap_client, self.legs(swap_client))
+
+        self.assertEqual(len(swap_client.ci(Coins.LTC).locked), 2)
+
+    def test_splits_one_output_the_legs_cannot_share(self):
+        swap_client = self.leader_client(ltc(100))
+
+        placed, failed, _ = placeMultiBid(swap_client, self.legs(swap_client))
+
+        self.assertEqual(len(placed), 2)
+        self.assertEqual(failed, [])
+        self.assertEqual(len(swap_client.ci(Coins.LTC).split_calls), 1)
+        stored = [
+            json.loads(swap_client.kv[f"bid_prevouts:{p['bid_id']}"]) for p in placed
+        ]
+        spent = [(o["txid"], o["vout"]) for leg in stored for o in leg]
+        self.assertEqual(len(set(spent)), 2)
+
+    def test_refuses_to_lead_legs_it_cannot_split_for(self):
+        swap_client = self.leader_client(ltc(100))
+        swap_client.ci(Coins.LTC).split_fails = True
+
+        with self.assertRaises(ValueError) as e:
+            placeMultiBid(swap_client, self.legs(swap_client))
+
+        self.assertIn("splitting it failed", str(e.exception))
+        self.assertEqual(swap_client.posted, [])
+
+    def test_does_not_split_when_the_outputs_already_fit(self):
+        swap_client = self.leader_client(ltc(10), ltc(10))
+
+        placeMultiBid(swap_client, self.legs(swap_client))
+
+        self.assertEqual(swap_client.ci(Coins.LTC).split_calls, [])
+
+    def test_does_not_preselect_when_the_bidder_follows(self):
+        swap_client = FakeSwapClient(
+            [
+                FakeOffer(b"A", 4, 0.42, coin_from=Coins.BTC, coin_to=Coins.XMR),
+                FakeOffer(b"B", 9, 0.43, coin_from=Coins.BTC, coin_to=Coins.XMR),
+            ],
+            balance=xmr(100),
+        )
+        swap_client.ci(Coins.XMR).outputs = outs(xmr(100))
+
+        placed, failed, _ = placeMultiBid(
+            swap_client,
+            [
+                {"offer_id": b"A", "amount": units(1, Coins.BTC)},
+                {"offer_id": b"B", "amount": units(9, Coins.BTC)},
+            ],
+        )
+
+        self.assertEqual(len(placed), 2)
+        self.assertEqual(swap_client.ci(Coins.XMR).locked, [])
 
     def test_places_every_leg(self):
         swap_client = FakeSwapClient(self.book())

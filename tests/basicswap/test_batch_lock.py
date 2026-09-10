@@ -17,7 +17,11 @@ from basicswap.interface.part.part import (
     PARTInterfaceBlind,
 )
 from basicswap.interface.xmr.xmr import XMRInterface
-from basicswap.multibid import plan_batch_decision
+from basicswap.multibid import (
+    plan_batch_decision,
+    plan_htlc_batch,
+    HTLC_WAITING_STATES,
+)
 from basicswap.util import format_amount, make_int
 
 
@@ -634,3 +638,121 @@ class TestPlanBatchDecision(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HTLCLeg:
+    def __init__(
+        self,
+        bid_id,
+        state=BidStates.SWAP_INITIATED,
+        ptx_sent=False,
+        ready_at=0,
+        cohort=b"plan",
+        sends_ptx=True,
+        itx_seen=False,
+        lock_value=24 * 60 * 60,
+        lock_remaining_seconds=None,
+    ):
+        self.bid_id = bid_id
+        self.state = state
+        self.ptx_sent = ptx_sent
+        self.ready_at = ready_at
+        self.cohort = cohort
+        self.sends_ptx = sends_ptx
+        self.itx_seen = itx_seen
+        self.lock_value = lock_value
+        self.lock_remaining_seconds = lock_remaining_seconds
+
+
+class TestPlanHTLCBatch(unittest.TestCase):
+    def decide(self, legs, **kwargs):
+        kwargs.setdefault("now", 0)
+        return plan_htlc_batch(legs, b"self", **kwargs)
+
+    def test_batches_every_ready_leg(self):
+        legs = [HTLCLeg(b"self"), HTLCLeg(b"a"), HTLCLeg(b"b")]
+        plan = self.decide(legs)
+        self.assertFalse(plan.wait)
+        self.assertEqual([leg.bid_id for leg in plan.batch], [b"a", b"b"])
+
+    def test_waits_for_a_leg_in_any_state_before_its_initiate_confirms(self):
+        # The bug this guards: only BID_ACCEPTED counted, so a leg part way
+        # through acceptance read as never coming and its siblings sent alone.
+        for state in HTLC_WAITING_STATES:
+            legs = [HTLCLeg(b"self"), HTLCLeg(b"a", state=state)]
+            plan = self.decide(legs, ready_timeout=60)
+            self.assertTrue(plan.wait, state.name)
+            self.assertEqual(plan.batch, [], state.name)
+
+    def test_does_not_wait_on_a_leg_that_has_finished_or_failed(self):
+        for state in (BidStates.SWAP_COMPLETED, BidStates.BID_ERROR):
+            legs = [HTLCLeg(b"self"), HTLCLeg(b"a", state=state)]
+            self.assertFalse(self.decide(legs, ready_timeout=60).wait, state.name)
+
+    def test_gives_a_seen_initiate_tx_the_longer_deadline(self):
+        # Arrival is a peer's responsiveness, confirmation is a chain's block
+        # time, so a leg already seen is not dropped from the batch for being a
+        # block behind.
+        legs = [
+            HTLCLeg(b"self", ready_at=-100),
+            HTLCLeg(b"a", state=BidStates.BID_ACCEPTED, itx_seen=True),
+        ]
+        self.assertTrue(self.decide(legs, ready_timeout=60, confirm_timeout=600).wait)
+        legs[1].itx_seen = False
+        self.assertFalse(self.decide(legs, ready_timeout=60, confirm_timeout=600).wait)
+
+    def test_will_not_hold_past_a_legs_redeem_window(self):
+        # The seller may sit on the participate txn until half the contract has
+        # run, so that half has to outlast the hold.
+        waiting = HTLCLeg(b"a", state=BidStates.BID_ACCEPTED)
+        roomy = HTLCLeg(b"self", lock_value=7200, lock_remaining_seconds=7000)
+        self.assertTrue(self.decide([roomy, waiting], ready_timeout=600).wait)
+
+        tight = HTLCLeg(b"self", lock_value=7200, lock_remaining_seconds=3800)
+        self.assertFalse(self.decide([tight, waiting], ready_timeout=600).wait)
+
+    def test_still_batches_ready_legs_when_it_cannot_hold(self):
+        # Refusing to wait must not cost the legs that are already ready.
+        tight = HTLCLeg(b"self", lock_value=7200, lock_remaining_seconds=3800)
+        legs = [tight, HTLCLeg(b"a"), HTLCLeg(b"b", state=BidStates.BID_ACCEPTED)]
+        plan = self.decide(legs, ready_timeout=600)
+        self.assertFalse(plan.wait)
+        self.assertEqual([leg.bid_id for leg in plan.batch], [b"a"])
+
+    def test_an_unmeasurable_window_does_not_block_a_hold(self):
+        legs = [
+            HTLCLeg(b"self", lock_remaining_seconds=None),
+            HTLCLeg(b"a", state=BidStates.BID_ACCEPTED),
+        ]
+        self.assertTrue(self.decide(legs, ready_timeout=600).wait)
+
+    def test_stops_waiting_once_the_timeout_lapses(self):
+        legs = [HTLCLeg(b"self"), HTLCLeg(b"a", state=BidStates.BID_ACCEPTED)]
+        plan = self.decide(legs, now=9999, ready_timeout=60)
+        self.assertFalse(plan.wait)
+        self.assertEqual(plan.batch, [])
+
+    def test_skips_a_leg_that_already_sent_its_participate_tx(self):
+        legs = [HTLCLeg(b"self"), HTLCLeg(b"a", ptx_sent=True)]
+        plan = self.decide(legs)
+        self.assertEqual(plan.batch, [])
+
+    def test_ignores_legs_of_another_cohort(self):
+        legs = [
+            HTLCLeg(b"self"),
+            HTLCLeg(b"a", state=BidStates.BID_ACCEPTED, cohort=b"retry"),
+        ]
+        self.assertFalse(self.decide(legs, ready_timeout=60).wait)
+
+    def test_ignores_a_leg_whose_participate_tx_is_not_ours(self):
+        legs = [HTLCLeg(b"self"), HTLCLeg(b"a", sends_ptx=False)]
+        self.assertEqual(self.decide(legs).batch, [])
+
+    def test_batch_is_capped_to_the_output_limit(self):
+        legs = [HTLCLeg(b"self")] + [HTLCLeg(bytes((i,))) for i in range(5)]
+        self.assertEqual(len(self.decide(legs, cap=3).batch), 2)
+
+    def test_sends_alone_when_absent_from_its_own_plan(self):
+        plan = self.decide([HTLCLeg(b"other")])
+        self.assertFalse(plan.wait)
+        self.assertEqual(plan.batch, [])
