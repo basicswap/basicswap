@@ -156,6 +156,83 @@ def plan_batch_decision(
     return BatchPlan(wait=False, batch=batch, drop=drop)
 
 
+# Before a leg's initiate txn confirms it owes nothing, so it is still coming.
+HTLC_WAITING_STATES = (
+    BidStates.BID_SENT,
+    BidStates.BID_RECEIVING,
+    BidStates.BID_RECEIVED,
+    BidStates.BID_RECEIVING_ACC,
+    BidStates.BID_ACCEPTED,
+    BidStates.SWAP_DELAYING,
+)
+
+
+def _htlc_leg_ready(leg) -> bool:
+    return leg.state == BidStates.SWAP_INITIATED and not leg.ptx_sent
+
+
+def _htlc_can_hold(ready) -> bool:
+    """Whether the batch can be held without spending a leg's redeem window. The
+    seller may sit on a participate txn until its own refund unlocks, so half the
+    contract belongs to the buyer's redeem and must outlast the hold. A leg with
+    no measurable window does not block a hold."""
+    return all(
+        leg.lock_remaining_seconds is None
+        or leg.lock_remaining_seconds
+        > leg.lock_value // 2 + PEER_CONFIRM_ALLOWANCE_SECONDS
+        for leg in ready
+    )
+
+
+def plan_htlc_batch(
+    legs,
+    bid_id,
+    *,
+    cap=None,
+    now: int = 0,
+    ready_timeout: int = 0,
+    confirm_timeout: Optional[int] = None,
+):
+    """Decide whether bid_id sends its participate txn now and which sibling legs
+    share it.
+
+    A leg still working toward its own initiate confirmation holds the batch,
+    measured from the longest-held ready leg. Its initiate txn has ready_timeout
+    to be seen and, once seen, confirm_timeout to confirm (None means the same
+    for both), because arrival is a peer's responsiveness while confirmation is a
+    chain's block time. Waiting stops early once holding would eat into a ready
+    leg's own redeem window."""
+    me = next((leg for leg in legs if leg.bid_id == bid_id), None)
+    if me is None:
+        return BatchPlan(wait=False, batch=[], drop=[])
+
+    siblings = [
+        leg
+        for leg in legs
+        if leg.bid_id != bid_id and leg.cohort == me.cohort and leg.sends_ptx
+    ]
+    ready = [me] + [leg for leg in siblings if _htlc_leg_ready(leg)]
+    held_for = max(now - leg.ready_at for leg in ready)
+    if confirm_timeout is None:
+        confirm_timeout = ready_timeout
+    can_hold: bool = _htlc_can_hold(ready)
+
+    batch, waiting = [], False
+    for leg in siblings:
+        if _htlc_leg_ready(leg):
+            batch.append(leg)
+        elif leg.state in HTLC_WAITING_STATES:
+            deadline = confirm_timeout if leg.itx_seen else ready_timeout
+            if held_for < deadline and can_hold:
+                waiting = True
+
+    if waiting:
+        return BatchPlan(wait=True, batch=[], drop=[])
+    if cap is not None:
+        batch = batch[: max(cap - 1, 0)]
+    return BatchPlan(wait=False, batch=batch, drop=[])
+
+
 def redeem_fee(fee_rate: int, redeem_vsize: int) -> int:
     """Fee to redeem one received swap output."""
     return fee_rate * redeem_vsize // 1000

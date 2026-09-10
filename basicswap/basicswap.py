@@ -175,6 +175,7 @@ from .multibid import (
     MAX_CONFIRM_WAIT_SECONDS,
     MIN_LEG_TIMEOUT_SECONDS,
     plan_batch_decision,
+    plan_htlc_batch,
 )
 from .wallet_manager import WalletManager
 
@@ -7771,6 +7772,146 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             addr_to = ci.encode_p2sh(participate_script)
 
         txn_signed = ci.createRawSignedTransaction(addr_to, amount_to)
+        self.recordParticipateTxn(bid_id, bid, offer, participate_script, txn_signed)
+
+        return txn_signed
+
+    def getPlanHTLCLegs(self, plan_id: bytes, cursor):
+        """Plan legs whose participate txn we owe, tagged with what the batch
+        decision reads: whether each has sent one, whether its initiate txn has
+        been seen, and how long its contract has left. Readiness itself is
+        decided from the bid state."""
+        legs = list(self.query(Bid, cursor, {"plan_id": plan_id}))
+        for leg in legs:
+            self.loadBidTxns(leg, cursor)
+            raw_cohort = self.getStringKV(f"bid_cohort:{leg.bid_id.hex()}", cursor)
+            leg.cohort = bytes.fromhex(raw_cohort) if raw_cohort else plan_id
+            leg.sends_ptx = leg.was_sent
+            leg.ptx_sent = (
+                leg.participate_tx is not None and leg.participate_tx.txid is not None
+            )
+            ready_at = self.getStringKV(f"plan_ready_at:{leg.bid_id.hex()}", cursor)
+            leg.ready_at = int(ready_at) if ready_at else leg.state_time
+            leg.itx_seen = leg.initiate_tx is not None and leg.initiate_tx.state in (
+                TxStates.TX_IN_MEMPOOL,
+                TxStates.TX_IN_CHAIN,
+                TxStates.TX_CONFIRMED,
+            )
+            leg_offer = self.queryOne(Offer, cursor, {"offer_id": leg.offer_id})
+            leg.lock_value = leg_offer.lock_value if leg_offer else 0
+            leg.lock_remaining_seconds = self.getITxLockRemaining(
+                leg, leg_offer, cursor
+            )
+        return legs
+
+    def getITxLockRemaining(self, leg, leg_offer, cursor):
+        """Seconds left on a leg's initiate txn refund timelock, or None when it
+        cannot be determined."""
+        if leg_offer is None or leg_offer.lock_type != TxLockTypes.SEQUENCE_LOCK_TIME:
+            return None
+        if leg.initiate_tx is None or leg.initiate_tx.block_height is None:
+            return None
+        ci_from = self.ci(leg_offer.coin_from)
+        # csvLockRemaining decodes a sequence, it is not given a lock value.
+        return ci_from.csvLockRemaining(
+            leg_offer.lock_type,
+            ci_from.getExpectedSequence(leg_offer.lock_type, leg_offer.lock_value),
+            leg.initiate_tx.block_height,
+            leg.initiate_tx.block_time,
+        )
+
+    def sendPlanParticipateTx(self, bid_id: bytes, cursor) -> None:
+        """Send this leg's participate txn together with every sibling leg of the
+        same plan that is also waiting to send one, as a single transaction."""
+        bid, offer = self.getBidAndOffer(bid_id, cursor)
+        ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
+        ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+
+        if bid.participate_tx is not None and bid.participate_tx.txid is not None:
+            self.log.warning(
+                f"Participate tx {self.log.id(bid.participate_tx.txid)} exists for bid {self.log.id(bid_id)}."
+            )
+            return
+
+        ci_to = self.ci(offer.coin_to)
+        participate_script = self.deriveParticipateScript(bid_id, bid, offer)
+
+        ready_timeout: int = self._plan_leg_timeout
+        stored_timeout = self.getStringKV(
+            f"plan_leg_timeout:{bid.plan_id.hex()}", cursor
+        )
+        if stored_timeout:
+            ready_timeout = int(stored_timeout)
+
+        plan = plan_htlc_batch(
+            self.getPlanHTLCLegs(bid.plan_id, cursor),
+            bid_id,
+            cap=ci_to.max_batched_lock_outputs(),
+            now=self.getTime(),
+            ready_timeout=ready_timeout,
+            confirm_timeout=self.getPlanConfirmTimeout(
+                self.ci(offer.coin_from), ready_timeout
+            ),
+        )
+        if plan.wait:
+            self.log.info(
+                f"Holding the participate tx for bid {self.log.id(bid_id)}, the rest of its cohort is not ready yet."
+            )
+            self.createActionInSession(
+                self.get_delay_event_seconds(),
+                ActionTypes.SEND_PARTICIPATE_TX,
+                bid_id,
+                cursor,
+            )
+            return
+
+        legs = []
+        for leg in plan.batch:
+            leg_offer = self.queryOne(Offer, cursor, {"offer_id": leg.offer_id})
+            if leg_offer is None or leg_offer.coin_to != offer.coin_to:
+                continue
+            legs.append(
+                (
+                    leg,
+                    leg_offer,
+                    self.deriveParticipateScript(leg.bid_id, leg, leg_offer),
+                )
+            )
+
+        htlcs = [(participate_script, bid.amount_to)] + [
+            (script, leg.amount_to) for leg, _, script in legs
+        ]
+        fee_rate, fee_src = ci_to.get_fee_rate(ci_to._conf_target)
+        ci_to._ensureFeeRateWithinMax(fee_rate, fee_src)
+        txn_signed: str = ci_to.fundHTLCTxs(htlcs, ci_to.make_int(fee_rate)).hex()
+
+        self.recordParticipateTxn(bid_id, bid, offer, participate_script, txn_signed)
+        for leg, leg_offer, script in legs:
+            self.recordParticipateTxn(leg.bid_id, leg, leg_offer, script, txn_signed)
+
+        txid = ci_to.publishTx(bytes.fromhex(txn_signed))
+        self.log.debug(
+            f"Submitted participate tx {self.logIDT(txid)} to {ci_to.coin_name()} chain for {len(htlcs)} plan legs"
+        )
+
+        bid.setPTxState(TxStates.TX_SENT)
+        self.saveBidInSession(bid_id, bid, cursor, save_in_progress=offer)
+        for leg, leg_offer, script in legs:
+            leg.setPTxState(TxStates.TX_SENT)
+            self.saveBidInSession(leg.bid_id, leg, cursor, save_in_progress=leg_offer)
+
+        for leg_bid_id in [bid_id] + [leg.bid_id for leg, _, _ in legs]:
+            self.logEvent(
+                Concepts.BID, leg_bid_id, EventLogTypes.PTX_PUBLISHED, "", cursor
+            )
+
+    def recordParticipateTxn(
+        self, bid_id: bytes, bid, offer, participate_script: bytearray, txn_signed: str
+    ) -> None:
+        """Attach a leg's output of a participate txn to its bid. The txn may
+        carry an output per leg, so the vout is found by this leg's script."""
+        coin_to = Coins(offer.coin_to)
+        ci = self.ci(coin_to)
 
         refund_txn = self.createRefundTxn(
             coin_to,
@@ -7784,17 +7925,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         chain_height = ci.getChainHeight()
         txjs = ci.decodeRawTransaction(txn_signed)
-        txid = txjs["txid"]
 
         if ci.using_segwit():
-            vout = getVoutByScriptPubKey(txjs, p2wsh.hex())
+            vout = getVoutByScriptPubKey(
+                txjs, ci.getScriptDest(participate_script).hex()
+            )
         else:
-            vout = getVoutByAddress(txjs, addr_to)
-        self.addParticipateTxn(bid_id, bid, coin_to, txid, vout, chain_height)
+            vout = getVoutByAddress(txjs, ci.encode_p2sh(participate_script))
+        self.addParticipateTxn(bid_id, bid, coin_to, txjs["txid"], vout, chain_height)
         bid.participate_tx.script = participate_script
         bid.participate_tx.tx_data = bytes.fromhex(txn_signed)
-
-        return txn_signed
 
     def createRedeemTxn(
         self,
@@ -8134,16 +8274,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Seller first mode, buyer participates
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         if bid.was_sent:
+            ci_to = self.ci(offer.coin_to)
             if bid.participate_tx is not None:
-                self.log.warning(
-                    f"Participate tx {self.log.id(bid.participate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
+                # A plan leg holds a script-only tx until its queued action sends it.
+                if bid.participate_tx.txid is not None:
+                    self.log.warning(
+                        f"Participate tx {self.log.id(bid.participate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
+                    )
+            elif bid.plan_id and hasattr(ci_to, "fundHTLCTxs"):
+                bid.participate_tx = SwapTx(
+                    bid_id=bid_id,
+                    tx_type=TxTypes.PTX,
+                    script=participate_script,
                 )
+                # This runs again on every pass until the txn is sent, so the
+                # bid's state time is no measure of how long a leg has waited.
+                self.setStringKV(f"plan_ready_at:{bid_id.hex()}", str(self.getTime()))
+                delay = self.get_delay_event_seconds()
+                self.createAction(delay, ActionTypes.SEND_PARTICIPATE_TX, bid_id)
             else:
                 self.log.debug(
                     f"Preparing participate txn for bid {self.log.id(bid_id)}"
                 )
 
-                ci_to = self.ci(offer.coin_to)
                 txn = self.createParticipateTxn(bid_id, bid, offer, participate_script)
                 txid = ci_to.publishTx(bytes.fromhex(txn))
                 self.log.debug(
@@ -11139,6 +11292,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.sendXmrBidCoinALockTx(linked_id, cursor)
                     elif action_type == ActionTypes.SEND_XMR_SWAP_LOCK_TX_B:
                         self.sendXmrBidCoinBLockTx(linked_id, cursor)
+                    elif action_type == ActionTypes.SEND_PARTICIPATE_TX:
+                        self.sendPlanParticipateTx(linked_id, cursor)
                     elif action_type == ActionTypes.SEND_XMR_LOCK_RELEASE:
                         self.sendXmrBidLockRelease(linked_id, cursor)
                     elif action_type == ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_A:

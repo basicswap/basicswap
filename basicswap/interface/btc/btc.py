@@ -3415,6 +3415,24 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
         return txid
 
+    def getHTLCDest(self, script):
+        return (
+            self.getScriptDest(script)
+            if self.using_segwit()
+            else self.get_p2sh_script_pubkey(script)
+        )
+
+    def fundHTLCTxs(self, htlcs, feerate: int) -> bytes:
+        """Lock several HTLCs in one transaction, so their change is not chained.
+        Returned signed but unpublished, so every leg is recorded first."""
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        for script, output_amount in htlcs:
+            tx.vout.append(self.txoType()(output_amount, self.getHTLCDest(script)))
+
+        funded_tx = self.fundTx(tx.serialize(), feerate)
+        return self.signTxWithWallet(funded_tx)
+
     def getTxVSize(self, tx, add_bytes: int = 0, add_witness_bytes: int = 0) -> int:
         wsf = self.witnessScaleFactor()
         len_full = len(tx.serialize_with_witness()) + add_bytes + add_witness_bytes
