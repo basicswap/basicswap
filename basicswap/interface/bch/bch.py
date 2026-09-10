@@ -73,8 +73,18 @@ class BCHInterface(BTCInterface):
         return Coins.BCH
 
     @staticmethod
+    def est_tx_input_vsize() -> int:
+        # P2PKH
+        return 148
+
+    @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 302
+
+    @staticmethod
+    def supports_add_inputs() -> bool:
+        # BCHN rejects add_inputs; other legs' preselected inputs stay locked.
+        return False
 
     @staticmethod
     def watch_blocks_for_scripts() -> bool:

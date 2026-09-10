@@ -88,6 +88,10 @@ SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = 1 << 22
 SEQUENCE_LOCKTIME_MASK = 0x0000FFFF
 
+# dcrd dust threshold for a P2PKH output at the default relay fee
+# (10000 atoms/kB): 3 * (output 36 + redeeming input 165) * 10000 // 1000
+DUST_THRESHOLD: int = 6030
+
 SigHashSerializePrefix: int = 1
 SigHashSerializeWitness: int = 3
 
@@ -220,6 +224,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     @staticmethod
     def est_lock_tx_vsize() -> int:
         return 224
+
+    @staticmethod
+    def est_tx_input_vsize() -> int:
+        return 166
 
     @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
@@ -1132,6 +1140,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def decodeRawTransaction(self, tx_hex: str):
         return self.rpc("decoderawtransaction", [tx_hex])
 
+    @staticmethod
+    def estimateSignedTxSize(tx_obj) -> int:
+        # Per input: OP_PUSH72 <ecdsa_signature> OP_PUSH33 <public_key>
+        return len(tx_obj.serialize()) + len(tx_obj.vin) * 107 + 1
+
     def fundTx(
         self,
         tx: bytes,
@@ -1140,8 +1153,41 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         subfee: bool = False,
         bid_id: bytes = None,
         cursor=None,
+        prevouts=None,
     ) -> bytes:
-        if subfee:
+        if prevouts:
+            # dcrwallet's fundrawtransaction rejects a tx that has inputs,
+            # build the transaction from the preselected outputs instead.
+            tx_obj = self.loadTx(tx)
+            for prevout in prevouts:
+                txo = self.rpc("gettxout", [prevout["txid"], prevout["vout"], 0])
+                ensure(txo is not None, "Preselected inputs are not spendable")
+                txi = CTxIn(
+                    COutPoint(b2i(bytes.fromhex(prevout["txid"])), prevout["vout"], 0),
+                    sequence=0xFFFFFFFF,
+                )
+                txi.value_in = self.make_int(txo["value"])
+                tx_obj.vin.append(txi)
+            excess: int = sum(txi.value_in for txi in tx_obj.vin) - sum(
+                txo.value for txo in tx_obj.vout
+            )
+
+            change_addr: str = self.rpc_wallet("getrawchangeaddress")
+            change_txo = self.txoType()(
+                0, self.getPubkeyHashDest(self.decodeAddress(change_addr))
+            )
+            tx_obj.vout.append(change_txo)
+            fee: int = self.estimateSignedTxSize(tx_obj) * feerate // 1000
+            if excess - fee > DUST_THRESHOLD:
+                change_txo.value = excess - fee
+            else:
+                # Any dust change not returned to the wallet is left to the fee.
+                tx_obj.vout.pop()
+                fee = self.estimateSignedTxSize(tx_obj) * feerate // 1000
+                ensure(excess >= fee, "Insufficient funds")
+
+            tx_bytes = tx_obj.serialize()
+        elif subfee:
             # dcrwallet's fundrawtransaction has no subtractFeeFromOutputs option,
             # build the transaction from listunspent instead.
             tx_obj = self.loadTx(tx)
@@ -1172,22 +1218,16 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                     break
             ensure(total_input >= total_output, "Insufficient funds")
 
-            # dcrd dust threshold for a P2PKH output at the default relay fee
-            # (10000 atoms/kB): 3 * (output 36 + redeeming input 165) * 10000 // 1000
-            dust_threshold: int = 6030
-
             # Any dust change not returned to the wallet is left to the fee.
             change: int = total_input - total_output
-            if change > dust_threshold:
+            if change > DUST_THRESHOLD:
                 change_addr: str = self.rpc_wallet("getrawchangeaddress")
                 change_script = self.getPubkeyHashDest(self.decodeAddress(change_addr))
                 tx_obj.vout.append(self.txoType()(change, change_script))
 
-            # Estimated signed size, per input: OP_PUSH72 <ecdsa_signature> OP_PUSH33 <public_key>
-            size: int = len(tx_obj.serialize()) + len(tx_obj.vin) * 107 + 1
-            fee: int = size * feerate // 1000
+            fee: int = self.estimateSignedTxSize(tx_obj) * feerate // 1000
             ensure(
-                tx_obj.vout[0].value - fee > dust_threshold, "Amount too low after fee"
+                tx_obj.vout[0].value - fee > DUST_THRESHOLD, "Amount too low after fee"
             )
             tx_obj.vout[0].value -= fee
 
@@ -1201,7 +1241,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             tx_bytes = bytes.fromhex(rv["hex"])
             tx_obj = self.loadTx(tx_bytes)
 
-        if lock_unspents:
+        # Preselected inputs were locked when they were reserved.
+        if lock_unspents and not prevouts:
             for txi in tx_obj.vin:
                 lock_utxos = [
                     {
@@ -1224,9 +1265,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         return tx.serialize()
 
     def fundSCLockTx(
-        self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None, cursor=None
+        self,
+        tx_bytes,
+        feerate,
+        vkbv=None,
+        bid_id: bytes = None,
+        cursor=None,
+        prevouts=None,
     ):
-        return self.fundTx(tx_bytes, feerate, bid_id=bid_id, cursor=cursor)
+        return self.fundTx(
+            tx_bytes, feerate, bid_id=bid_id, cursor=cursor, prevouts=prevouts
+        )
 
     def genScriptLockRefundTxScript(self, Kal, Kaf, csv_val) -> bytes:
         ensure(len(Kal) == 33, "invalid Kal length")
@@ -1769,6 +1818,45 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
 
     def canSendMercyTx(self) -> bool:
         return True
+
+    def getSpendableOutputs(self):
+        # lockOutput locks in the regular tree only.
+        return [
+            {
+                "txid": u["txid"],
+                "vout": u["vout"],
+                "value": self.make_int(u["amount"]),
+            }
+            for u in self.rpc_wallet("listunspent")
+            if u.get("spendable") is True and u["tree"] == 0
+        ]
+
+    def splitOutputs(self, values):
+        """Pay each value to a new address of this wallet in one transaction and
+        broadcast it. Returns the outputs it created, which are spendable as
+        preselected inputs before they confirm."""
+        fee_rate, _ = self.get_fee_rate(self._conf_target)
+
+        tx = CTransaction()
+        tx.version = self.txVersion()
+        scripts = []
+        for value in values:
+            addr: str = self.getNewAddress()
+            scripts.append(self.getPubkeyHashDest(self.decodeAddress(addr)))
+            tx.vout.append(self.txoType()(value, scripts[-1]))
+
+        funded_tx = self.fundTx(tx.serialize(), self.make_int(fee_rate))
+        signed_tx = self.signTxWithWallet(funded_tx)
+        txid: str = self.publishTx(signed_tx)
+        self._log.info(f"Split {len(values)} plan outputs in tx {self._log.id(txid)}")
+
+        outputs, tx_obj = [], self.loadTx(signed_tx)
+        for script in scripts:
+            n = next(
+                i for i, txo in enumerate(tx_obj.vout) if txo.script_pubkey == script
+            )
+            outputs.append({"txid": txid, "vout": n, "value": tx_obj.vout[n].value})
+        return outputs
 
     def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
         try:
