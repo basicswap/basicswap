@@ -148,6 +148,40 @@ def getTagValue(event: dict, tag_name: str):
     return None
 
 
+def sanitizeRelayError(error) -> str:
+    """Short, UI-safe relay error text without HTML bodies or header dumps."""
+    text = str(error).strip()
+    if not text:
+        return "Unknown relay error"
+
+    lower = text.lower()
+    handshake_prefix = "Handshake status "
+    if text.startswith(handshake_prefix):
+        status_part = text[len(handshake_prefix) :].split(" -+-+- ", 1)[0].strip()
+        if (
+            "cf-mitigated" in lower
+            or "just a moment" in lower
+            or "challenges.cloudflare.com" in lower
+        ):
+            return f"{status_part} (Cloudflare challenge)"
+        if "cloudflare" in lower and status_part.startswith("403"):
+            return f"{status_part} (Cloudflare)"
+        return status_part
+
+    if "<!doctype" in lower or "<html" in lower:
+        head = text.split("<!DOCTYPE", 1)[0].split("<!doctype", 1)[0]
+        head = head.split("<html", 1)[0].split("<HTML", 1)[0].strip()
+        if " -+-+- " in head:
+            head = head.rsplit(" -+-+- ", 1)[0].strip()
+        if head:
+            return head[:240] + ("..." if len(head) > 240 else "")
+        return "Relay connection error"
+
+    if len(text) > 240:
+        return text[:240] + "..."
+    return text
+
+
 class RelayThread(threading.Thread):
     def __init__(self, client, url: str):
         super().__init__(daemon=True)
@@ -180,6 +214,7 @@ class RelayThread(threading.Thread):
 
     def on_open(self, ws) -> None:
         self.connected = True
+        self.last_error = ""
         self.client.log.info(f"Nostr relay connected: {self.url}")
         try:
             for i, sub_filter in enumerate(self.client.getSubscriptionFilters()):
@@ -218,8 +253,8 @@ class RelayThread(threading.Thread):
             self.client.log.debug(f"Nostr relay {self.url} message error: {e}")
 
     def on_error(self, ws, error) -> None:
-        self.last_error = str(error)
-        self.client.log.debug(f"Nostr relay {self.url} error: {error}")
+        self.last_error = sanitizeRelayError(error)
+        self.client.log.debug(f"Nostr relay {self.url} error: {self.last_error}")
 
     def on_close(self, ws, close_status_code, close_msg) -> None:
         # Also called after a failed connection attempt, only log those at debug
@@ -281,8 +316,8 @@ class RelayThread(threading.Thread):
                     ping_timeout=PING_TIMEOUT_SECONDS,
                 )
             except Exception as e:
-                self.last_error = str(e)
-                self.client.log.debug(f"Nostr relay {self.url} error: {e}")
+                self.last_error = sanitizeRelayError(e)
+                self.client.log.debug(f"Nostr relay {self.url} error: {self.last_error}")
             self.connected = False
             self.delay_event.wait(5.0)
 

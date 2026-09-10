@@ -25,9 +25,11 @@ from basicswap.util.smsg import (
 )
 
 DEFAULT_NOSTR_RELAYS = (
-    "wss://relay.damus.io",
-    "wss://nos.lol",
     "wss://relay.primal.net",
+    "wss://nos.lol",
+    "wss://relay.damus.io",
+    "wss://relay.momostr.pink",
+    "wss://nostr.mom",
 )
 
 
