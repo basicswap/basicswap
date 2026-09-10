@@ -7,6 +7,7 @@
 
 """Plan and place a buy that is split across several offers."""
 
+import json
 import os
 
 from dataclasses import dataclass, replace
@@ -197,6 +198,69 @@ def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -
                 live_fee = live_redeem_fee(ci_from)
             fees[c.offer_id] = live_fee
     return fees
+
+
+def assign_prevouts(outputs, needs, extra_input_costs=None):
+    """Give every leg its own inputs, largest need first and best fit, so no two
+    legs fund from the same output. Combining outputs for one leg costs its
+    entry in extra_input_costs per input past the first. None when the outputs
+    cannot cover every leg."""
+    extras = extra_input_costs or [0] * len(needs)
+    pool = sorted(outputs, key=lambda o: o["value"])
+    assigned = [None] * len(needs)
+    for i in sorted(range(len(needs)), key=lambda i: needs[i], reverse=True):
+        single = next((o for o in pool if o["value"] >= needs[i]), None)
+        if single is not None:
+            pool.remove(single)
+            assigned[i] = [single]
+            continue
+        taken, total = [], 0
+        while pool and total < needs[i] + max(len(taken) - 1, 0) * extras[i]:
+            taken.append(pool.pop())
+            total += taken[-1]["value"]
+        if not taken or total < needs[i] + (len(taken) - 1) * extras[i]:
+            return None
+        assigned[i] = taken
+    return [[{"txid": o["txid"], "vout": o["vout"]} for o in leg] for leg in assigned]
+
+
+def leg_prevouts(swap_client, ci_from, ci_to, offers, legs):
+    """Inputs for each leg's coin A lock, or None when the coin cannot preselect
+    them. Raises when the wallet's outputs cannot fund every leg separately."""
+    outputs = ci_to.getSpendableOutputs()
+    if outputs is None:
+        return None
+
+    needs, extras = [], []
+    for leg in legs:
+        offer = offers[leg["offer_id"]]
+        _, xmr_offer = swap_client.getXmrOffer(leg["offer_id"])
+        # Chain A is coin_to on a reverse bid, so it is the offer's to-rate.
+        fee_rate: int = xmr_offer.b_fee_rate if xmr_offer else 0
+        cost: int = (int(leg["amount"]) * offer.rate) // ci_from.COIN()
+        needs.append(cost + fee_rate * ci_to.est_lock_tx_vsize() // 1000)
+        extras.append(fee_rate * ci_to.est_tx_input_vsize() // 1000)
+
+    assigned = assign_prevouts(outputs, needs, extras)
+    if assigned is None:
+        try:
+            split = ci_to.splitOutputs(
+                [need + extra for need, extra in zip(needs, extras)]
+            )
+        except Exception as e:
+            raise ValueError(
+                "The {} wallet cannot fund {} locks at once and splitting it failed: {}".format(
+                    ci_to.coin_name(), len(legs), e
+                )
+            )
+        assigned = assign_prevouts(split, needs, extras)
+    ensure(
+        assigned is not None,
+        "The {} wallet cannot fund {} locks at once".format(
+            ci_to.coin_name(), len(legs)
+        ),
+    )
+    return assigned
 
 
 def getMarketRate(swap_client, coin_from, coin_to) -> Optional[int]:
@@ -395,6 +459,14 @@ def placeMultiBid(
         ),
     )
 
+    # Every leg is funded before any is broadcast, so an unbroadcast leg's
+    # change cannot fund the next. Each leg gets its own inputs instead.
+    assigned = (
+        leg_prevouts(swap_client, ci_from, ci_to, offers, legs)
+        if swap_client.is_reverse_ads_bid(coin_from, coin_to)
+        else None
+    )
+
     placed: List[dict] = []
     failed: List[dict] = []
     cohort_id: Optional[bytes] = None
@@ -413,7 +485,7 @@ def placeMultiBid(
         # A retry keeps the plan but is its own cohort, so it locks in a fresh tx.
         cohort_id = os.urandom(PLAN_ID_LENGTH)
 
-    for leg in legs:
+    for leg_n, leg in enumerate(legs):
         offer_id = leg["offer_id"]
         offer = offers[offer_id]
         amount = int(leg["amount"])
@@ -436,6 +508,14 @@ def placeMultiBid(
                     swap_client.setStringKV(
                         f"bid_cohort:{bid_id.hex()}", cohort_id.hex()
                     )
+                if assigned is not None:
+                    swap_client.setStringKV(
+                        f"bid_prevouts:{bid_id.hex()}", json.dumps(assigned[leg_n])
+                    )
+                    for prevout in assigned[leg_n]:
+                        ci_to.lockOutput(
+                            prevout["txid"], prevout["vout"], bid_id=bid_id
+                        )
             except Exception as e:  # noqa: F841
                 swap_client.log.warning(
                     f"Could not mark bid {bid_id.hex()} as part of the plan: {e}"

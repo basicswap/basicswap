@@ -3619,6 +3619,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # TODO process addresspool if bid has previously been abandoned
 
+    def unlockPlanReservedOutputs(self, bid_id: bytes, coin_type, cursor) -> None:
+        """Release the outputs a plan reserved for one leg. The other unlock
+        paths work from a transaction, and a leg whose bid was never accepted
+        has not built one."""
+        raw_prevouts = self.getStringKV(f"bid_prevouts:{bid_id.hex()}", cursor)
+        if not raw_prevouts:
+            return
+        ci = self.ci(coin_type)
+        for prevout in json.loads(raw_prevouts):
+            try:
+                ci.unlockOutput(prevout["txid"], prevout["vout"], cursor=cursor)
+            except Exception as e:
+                self.log.warning(f"Plan reserved output unlock failed {e}")
+
     def unlockPrefundedTxInputs(self, bid_id: bytes, coin_to, cursor) -> None:
         for tx_type, type_str in (
             (TxTypes.ITX_PRE_FUNDED, "ITx"),
@@ -3717,6 +3731,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # Check prefunded txns
                 # The prefunded itx should already be unlocked above (a_lock_tx), repeat to catch edge cases
                 self.unlockPrefundedTxInputs(bid.bid_id, offer.coin_to, use_cursor)
+                self.unlockPlanReservedOutputs(bid.bid_id, offer.coin_to, use_cursor)
             elif SwapTypes.SELLER_FIRST:
                 pass  # No prevouts are locked
 
@@ -7200,6 +7215,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 self.log.info(f"Using pre-funded {ci_from.ticker()} tx")
             else:
+                stored_prevouts = self.getStringKV(
+                    f"bid_prevouts:{bid_id.hex()}", use_cursor
+                )
                 xmr_swap.a_lock_tx = ci_from.createSCLockTx(
                     bid.amount, xmr_swap.a_lock_tx_script, xmr_swap.vkbv
                 )
@@ -7209,6 +7227,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.vkbv,
                     bid_id=bid.bid_id,
                     cursor=use_cursor,
+                    prevouts=json.loads(stored_prevouts) if stored_prevouts else None,
                 )
                 funded_a_lock_tx = xmr_swap.a_lock_tx
 
@@ -15023,6 +15042,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     coin_rows = cursor.execute(query, {"bid_id": bid_id}).fetchall()
                     if len(coin_rows) > 0:
                         self.unlockPrefundedTxInputs(
+                            bid_id, Coins(coin_rows[0][0]), cursor
+                        )
+                        self.unlockPlanReservedOutputs(
                             bid_id, Coins(coin_rows[0][0]), cursor
                         )
             for offer_id in offers_to_expire:

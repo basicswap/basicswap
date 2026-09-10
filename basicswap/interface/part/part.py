@@ -366,6 +366,50 @@ class PARTInterfaceBlind(PARTInterface):
         rv = self.rpc_wallet("createrawparttransaction", params)
         return bytes.fromhex(rv["hex"])
 
+    def getSpendableOutputs(self):
+        return [
+            {
+                "txid": u["txid"],
+                "vout": u["vout"],
+                "value": self.make_int(u["amount"], r=1),
+            }
+            for u in self.rpc_wallet("listunspentblind", [1])
+            if u.get("spendable", False)
+        ]
+
+    def splitOutputs(self, values):
+        """Pay each value to a new stealth address of this wallet in one blind
+        transaction and broadcast it. Returns the outputs it created."""
+        addr_to: str = self.getNewStealthAddress("plan_split")
+        outputs = [
+            {"address": addr_to, "amount": self.format_amount(value)}
+            for value in values
+        ]
+        params = [
+            "blind",
+            "blind",
+            outputs,
+            "",
+            "",
+            self._anon_tx_ring_size,
+            1,
+            False,
+            {"conf_target": self._conf_target, "blind_watchonly_visible": True},
+        ]
+        txid: str = self.rpc_wallet("sendtypeto", params)
+        self._log.info(
+            "Split {} plan outputs in tx {}".format(len(values), self._log.id(txid))
+        )
+        return [
+            {
+                "txid": u["txid"],
+                "vout": u["vout"],
+                "value": self.make_int(u["amount"], r=1),
+            }
+            for u in self.rpc_wallet("listunspentblind", [0])
+            if u["txid"] == txid and u.get("spendable", False)
+        ]
+
     def fundSCLockTx(
         self,
         tx_bytes: bytes,
@@ -373,6 +417,7 @@ class PARTInterfaceBlind(PARTInterface):
         vkbv: bytes,
         bid_id: bytes = None,
         cursor=None,
+        prevouts=None,
     ) -> bytes:
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
@@ -400,6 +445,12 @@ class PARTInterfaceBlind(PARTInterface):
             "lockUnspents": True,
             "feeRate": feerate_str,
         }
+        if prevouts:
+            # allow_other_inputs defaults true, so pin the leg to its own inputs.
+            options["inputs"] = [
+                {"tx": prevout["txid"], "n": prevout["vout"]} for prevout in prevouts
+            ]
+            options["allow_other_inputs"] = False
         rv = self.rpc_wallet(
             "fundrawtransactionfrom", ["blind", tx_hex, {}, outputs_info, options]
         )

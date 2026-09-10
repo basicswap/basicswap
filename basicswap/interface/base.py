@@ -94,6 +94,14 @@ class CoinInterface:
         # Max swap lock outputs payable in one publishBLockTxs tx; None means unbounded.
         return None
 
+    def getSpendableOutputs(self):
+        # Confirmed, unlocked outputs, or None when the coin cannot preselect inputs.
+        return None
+
+    @staticmethod
+    def est_tx_input_vsize() -> int:
+        return 0
+
     def setDefaults(self):
         self._unknown_wallet_seed = True
         self._restore_height = None
