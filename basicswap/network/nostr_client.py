@@ -317,7 +317,9 @@ class RelayThread(threading.Thread):
                 )
             except Exception as e:
                 self.last_error = sanitizeRelayError(e)
-                self.client.log.debug(f"Nostr relay {self.url} error: {self.last_error}")
+                self.client.log.debug(
+                    f"Nostr relay {self.url} error: {self.last_error}"
+                )
             self.connected = False
             self.delay_event.wait(5.0)
 
