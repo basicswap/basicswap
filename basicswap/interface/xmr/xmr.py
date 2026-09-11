@@ -386,6 +386,8 @@ class XMRInterface(CoinInterface):
             except Exception as e:
                 if "Failed to open wallet" in str(e):
                     rv = {
+                        "no_data": True,
+                        "name": self.coin_name(),
                         "encrypted": True,
                         "locked": True,
                         "balance": 0,
