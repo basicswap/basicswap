@@ -1431,8 +1431,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(value, self.getScriptDest(script)))
         return tx.serialize()
 
-    def fundSCLockTx(self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None) -> bytes:
-        funded_tx = self.fundTx(tx_bytes, feerate, bid_id=bid_id)
+    def fundSCLockTx(
+        self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None, cursor=None
+    ) -> bytes:
+        funded_tx = self.fundTx(tx_bytes, feerate, bid_id=bid_id, cursor=cursor)
 
         if self._disable_lock_tx_rbf:
             tx = self.loadTx(funded_tx)
@@ -2160,10 +2162,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_unspents: bool = True,
         subfee: bool = False,
         bid_id: bytes = None,
+        cursor=None,
     ) -> bytes:
         if self.useBackend():
             return self._fundTxElectrum(
-                tx, feerate, lock_unspents=lock_unspents, subfee=subfee, bid_id=bid_id
+                tx,
+                feerate,
+                lock_unspents=lock_unspents,
+                subfee=subfee,
+                bid_id=bid_id,
+                cursor=cursor,
             )
 
         feerate_str = self.format_amount(feerate)
@@ -2189,6 +2197,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         lock_unspents: bool = True,
         subfee: bool = False,
         bid_id: bytes = None,
+        cursor=None,
     ) -> bytes:
         wm = self.getWalletManager()
         backend = self.getBackend()
@@ -2231,7 +2240,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     unconfirmed_count += 1
                     continue
                 if wm.isUTXOLocked(
-                    self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
+                    self.coin_type(),
+                    utxo.get("txid", ""),
+                    utxo.get("vout", 0),
+                    cursor=cursor,
                 ):
                     locked_count += 1
                     continue
@@ -2359,7 +2371,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             with self._utxo_reserve_lock:
                 for utxo in selected_utxos:
                     if wm.isUTXOLocked(
-                        self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
+                        self.coin_type(),
+                        utxo.get("txid", ""),
+                        utxo.get("vout", 0),
+                        cursor=cursor,
                     ):
                         raise ValueError(
                             "UTXO reserved by a concurrent operation, retry funding"
@@ -2373,6 +2388,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                         address=utxo.get("address"),
                         bid_id=bid_id,
                         expires_in=lock_expires_in,
+                        cursor=cursor,
                     )
 
         tx_serialized = funded_tx.serialize()

@@ -742,6 +742,7 @@ class BSXNetwork:
         if return_msg:
             options["returnmsg"] = True
 
+        ro = None
         try:
             ro = self.callrpc(
                 "smsgsend",
@@ -751,9 +752,14 @@ class BSXNetwork:
             if return_msg:
                 return bytes.fromhex(ro["msgid"]), bytes.fromhex(ro["msg"])
             return bytes.fromhex(ro["msgid"])
-        except Exception as e:  # noqa: F841
+        except Exception as e:
             if self.debug:
-                self.log.error("smsgsend failed {}".format(json.dumps(ro, indent=4)))
+                if ro is None:
+                    self.log.error(f"smsgsend failed {e}")
+                else:
+                    self.log.error(
+                        f"smsgsend failed {e}, response {json.dumps(ro, indent=4)}"
+                    )
             raise
 
     def forwardSmsg(self, smsg_msg: bytes) -> None:

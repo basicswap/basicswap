@@ -5368,7 +5368,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return ci.getProofOfFunds(amount_for, extra_commit_bytes)
 
     def saveBidInSession(
-        self, bid_id: bytes, bid, cursor, xmr_swap=None, save_in_progress=None
+        self,
+        bid_id: bytes,
+        bid,
+        cursor,
+        xmr_swap=None,
+        save_in_progress=None,
+        notify: bool = True,
     ) -> None:
         self.add(bid, cursor, upsert=True)
         if bid.initiate_tx:
@@ -5391,7 +5397,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Must specify offer for save_in_progress")
             self.swaps_in_progress[bid_id] = (bid, save_in_progress)  # (bid, offer)
 
-        self.notifyBidChanged(bid_id)
+        if notify:
+            self.notifyBidChanged(bid_id)
 
     def saveBid(self, bid_id: bytes, bid, xmr_swap=None, cursor=None) -> None:
         try:
@@ -6932,6 +6939,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info(f"Accepting adaptor-sig bid {self.log.id(bid_id)}")
 
         now: int = self.getTime()
+        funded_a_lock_tx = None
         try:
             use_cursor = self.openDB(cursor)
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
@@ -7087,8 +7095,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.amount, xmr_swap.a_lock_tx_script, xmr_swap.vkbv
                 )
                 xmr_swap.a_lock_tx = ci_from.fundSCLockTx(
-                    xmr_swap.a_lock_tx, a_fee_rate, xmr_swap.vkbv, bid_id=bid.bid_id
+                    xmr_swap.a_lock_tx,
+                    a_fee_rate,
+                    xmr_swap.vkbv,
+                    bid_id=bid.bid_id,
+                    cursor=use_cursor,
                 )
+                funded_a_lock_tx = xmr_swap.a_lock_tx
 
             xmr_swap.a_lock_tx_id = ci_from.getTxid(xmr_swap.a_lock_tx)
             (
@@ -7249,22 +7262,33 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     payload_version=offer.smsg_payload_version,
                 )
 
-            bid.setState(BidStates.BID_ACCEPTED)  # ADS
-
-            self.saveBidInSession(bid_id, bid, use_cursor, xmr_swap=xmr_swap)
-            for k, msg_id in bid_msg_ids.items():
-                self.addMessageLink(
-                    Concepts.BID,
-                    bid_id,
-                    MessageTypes.BID_ACCEPT,
-                    msg_id,
-                    msg_sequence=k,
-                    cursor=use_cursor,
+            with self.dbSavepoint(use_cursor, "accept_xmr_bid"):
+                bid.setState(BidStates.BID_ACCEPTED)  # ADS
+                self.saveBidInSession(
+                    bid_id, bid, use_cursor, xmr_swap=xmr_swap, notify=False
                 )
+                for k, msg_id in bid_msg_ids.items():
+                    self.addMessageLink(
+                        Concepts.BID,
+                        bid_id,
+                        MessageTypes.BID_ACCEPT,
+                        msg_id,
+                        msg_sequence=k,
+                        cursor=use_cursor,
+                    )
+            self.notifyBidChanged(bid_id)
 
             # Add to swaps_in_progress only when waiting on txns
             self.log.info(f"Sent XMR_BID_ACCEPT_LF {self.log.id(bid_id)}")
             return bid_id
+        except Exception:
+            if funded_a_lock_tx is not None:
+                # a_lock_tx was not saved, nothing else will unlock these
+                try:
+                    ci_from.unlockInputs(funded_a_lock_tx, cursor=use_cursor)
+                except Exception as e:
+                    self.log.warning(f"unlockInputs failed {e}")
+            raise
         finally:
             if cursor is None:
                 self.closeDB(use_cursor)

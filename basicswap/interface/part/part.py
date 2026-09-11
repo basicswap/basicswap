@@ -359,7 +359,12 @@ class PARTInterfaceBlind(PARTInterface):
         return bytes.fromhex(rv["hex"])
 
     def fundSCLockTx(
-        self, tx_bytes: bytes, feerate: int, vkbv: bytes, bid_id: bytes = None
+        self,
+        tx_bytes: bytes,
+        feerate: int,
+        vkbv: bytes,
+        bid_id: bytes = None,
+        cursor=None,
     ) -> bytes:
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled

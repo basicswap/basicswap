@@ -1535,6 +1535,35 @@ class Test(unittest.TestCase):
         finally:
             db_test.closeDB(cursor)
 
+    def test_db_savepoint(self):
+        db_test = DBMethods()
+        db_test.sqlite_file = ":memory:"
+        db_test.mxDB = threading.RLock()
+        cursor = db_test.openDB()
+        try:
+            cursor.execute("CREATE TABLE sp_test (v INTEGER)")
+            cursor.execute("INSERT INTO sp_test VALUES (1)")
+            try:
+                with db_test.dbSavepoint(cursor, "sp"):
+                    cursor.execute("INSERT INTO sp_test VALUES (2)")
+                    raise ValueError("Roll back")
+            except ValueError:
+                pass
+            assert db_test._db_con.in_transaction
+            cursor.execute("INSERT INTO sp_test VALUES (3)")
+            db_test.commitDB()
+
+            # Release must not commit
+            with db_test.dbSavepoint(cursor, "sp"):
+                cursor.execute("INSERT INTO sp_test VALUES (4)")
+            assert db_test._db_con.in_transaction
+            db_test.rollbackDB()
+
+            rows = [r[0] for r in cursor.execute("SELECT v FROM sp_test ORDER BY v")]
+            assert rows == [1, 3]
+        finally:
+            db_test.closeDB(cursor)
+
     def test_tx_hashes(self):
         tx = CTransaction()
         tx.nVersion = 2

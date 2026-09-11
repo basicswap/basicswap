@@ -9,6 +9,7 @@ import inspect
 import sqlite3
 import time
 
+from contextlib import contextmanager
 from enum import IntEnum, auto
 from typing import Optional
 
@@ -978,6 +979,21 @@ class DBMethods:
         assert self._db_lock_held()
         self._db_con.rollback()
         self._onDBRolledBack()
+
+    @contextmanager
+    def dbSavepoint(self, cursor, name: str):
+        assert self._db_lock_held()
+        # Releasing an outermost savepoint would commit
+        if not self._db_con.in_transaction:
+            cursor.execute("BEGIN")
+        cursor.execute(f"SAVEPOINT {name}")
+        try:
+            yield
+        except BaseException:
+            cursor.execute(f"ROLLBACK TO SAVEPOINT {name}")
+            cursor.execute(f"RELEASE SAVEPOINT {name}")
+            raise
+        cursor.execute(f"RELEASE SAVEPOINT {name}")
 
     def _onDBCommitted(self) -> None:
         pass
