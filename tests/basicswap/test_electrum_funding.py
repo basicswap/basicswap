@@ -24,6 +24,8 @@ def make_backend():
     backend._log = MagicMock()
     backend.getBlockHeight = lambda: 110
     backend._call_batch = lambda calls: [UTXOS]
+    backend._max_batch_size = 5
+    backend._server = None
     return backend
 
 
@@ -47,7 +49,7 @@ class FundTxElectrumTest(unittest.TestCase):
         self.ci._log = MagicMock()
         self.addr = self.ci.encodeSegwitAddress(b"\x11" * 20)
 
-    def _fund(self, utxos):
+    def _fund(self, utxos, internal=()):
         sh = self.ci.addressToScripthash(self.addr)
 
         class FakeBackend:
@@ -58,6 +60,9 @@ class FundTxElectrumTest(unittest.TestCase):
 
         wm = MagicMock()
         wm.getFundedAddresses.return_value = {self.addr: sh}
+        wm.getSignableAddresses.return_value = {self.addr: sh}
+        wm.getInternalAddresses.return_value = set(internal)
+        wm.getNewInternalAddress.return_value = self.addr
         wm.isUTXOLocked.return_value = False
         self.ci._backend = FakeBackend()
         self.ci.getWalletManager = lambda: wm
@@ -75,6 +80,11 @@ class FundTxElectrumTest(unittest.TestCase):
         confirmed = {"txid": "aa" * 32, "vout": 0, "value": 10750, "confirmations": 3}
         unconfirmed = {"txid": "bb" * 32, "vout": 0, "value": 99000, "confirmations": 0}
         self.assertEqual(self._fund([unconfirmed, confirmed]), {"aa" * 32})
+
+    def test_unconfirmed_change_is_spent(self):
+        # Only we pay our change addresses, so the output is ours and spendable.
+        unconfirmed = {"txid": "bb" * 32, "vout": 0, "value": 99000, "confirmations": 0}
+        self.assertEqual(self._fund([unconfirmed], internal={self.addr}), {"bb" * 32})
 
     def test_only_unconfirmed_reports_why(self):
         unconfirmed = {"txid": "bb" * 32, "vout": 0, "value": 99000, "confirmations": 0}
