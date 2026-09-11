@@ -1,3 +1,32 @@
+0.18.7
+==============
+
+**Security / hardening**
+- The swipe tx pays a key derived for the swap instead of an address from the wallet's
+  pool, on coins that send a mercy tx.  The wallet can no longer select the swipe payout
+  for another tx before the mercy tx has spent it, and the mercy tx now also moves the coin
+  into the wallet.  BCH is unchanged: its covenant pays the swipe to a wallet address, which
+  stays locked until the mercy tx spends it.
+
+**Fixes**
+- Electrum-backed wallets can spend their own unconfirmed change, as a full node wallet
+  does.  Funding a tx soon after another one no longer fails for lack of confirmed UTXOs.
+- The inputs of a prefunded bid are unlocked when the bid expires.
+- When accepting an adaptor-sig bid fails after the lock tx has been funded, its inputs
+  are unlocked.  The accepted state and its message links are saved together, so a
+  failure leaves no partly accepted bid behind.
+- A failed `smsgsend` with no response logs the real error.  In debug mode it raised an
+  unrelated error that hid the cause.
+
+**UI**
+- A Monero or Wownero wallet that can't be reached no longer shows a balance of 0 on the
+  wallet page.  The last known balance stays until the wallet responds.
+- Pending balances no longer flicker, and each badge only updates for its own coin.
+
+**Daemon updates**
+- Litecoin 0.21.5.7 -> 0.21.5.8
+
+
 0.18.6
 ==============
 
