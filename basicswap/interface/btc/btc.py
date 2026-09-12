@@ -5081,13 +5081,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         refund_swipe_tx_bytes: bytes,
         refund_swipe_tx_id: bytes,
         lock_refund_tx_script: bytes,
-        keyshare: bytes,
+        keyshare: bytes | None,
         tx_fee_rate: int,
         key: bytes | None = None,
         addr_to: str | None = None,
     ) -> bytes:
         # Hands the keyshare to the leader in a tx of its own, spending the
-        # swipe's payout output.
+        # swipe's payout output.  Without a keyshare it is the same spend
+        # without the reveal, which is how a swap that never sends one still
+        # brings the payout home.
         refund_swipe_tx = self.loadTx(refund_swipe_tx_bytes)
         prevout_value: int = refund_swipe_tx.vout[0].nValue
         prevout_script: bytes = refund_swipe_tx.vout[0].scriptPubKey
@@ -5095,7 +5097,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx = CTransaction()
         tx.nVersion = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0)))
-        tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
+        if keyshare is not None:
+            tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
         # Back to the same script by default, which is the wallet's own.  A swipe
         # paid to a key derived for the swap has to name a destination instead,
         # or the coin stays on a key the wallet knows nothing about.
@@ -5116,7 +5119,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             change > self.getdustlimit(),
             "Swipe output too small to send a mercy tx",
         )
-        tx.vout[1].nValue = change
+        tx.vout[-1].nValue = change
 
         tx.rehash()
         self._log.info(

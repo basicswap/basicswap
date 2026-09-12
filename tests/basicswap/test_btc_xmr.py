@@ -579,6 +579,7 @@ class TestFunctions(BaseTest):
         lock_value: int = 32,
         with_mercy: bool = False,
         invalid_mercy: bool = False,
+        stranded_payout: bool = False,
     ):
         logging.info(
             "---------- Test {} to {} follower recovers coin a lock tx{}".format(
@@ -608,7 +609,7 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_follower].ci(
             coin_to if reverse_bid else coin_from
-        )._altruistic = with_mercy
+        )._altruistic = (with_mercy or stranded_payout)
 
         # A leader that is never sent a mercy tx holds the bid open until the
         # watch times out, don't wait out the default for it here.
@@ -657,6 +658,19 @@ class TestFunctions(BaseTest):
 
         swap_clients[id_offerer].acceptBid(bid_id)
 
+        if stranded_payout:
+            # The swipe pays KA_SWIPE, then no mercy tx is queued to move it.
+            for i in range(120):
+                _, xmr_swap = swap_clients[id_follower].getXmrBid(bid_id)
+                if xmr_swap is not None and xmr_swap.a_lock_refund_swipe_tx:
+                    break
+                test_delay_event.wait(1)
+            else:
+                raise ValueError("Follower did not build the swipe tx")
+            swap_clients[id_follower].ci(
+                coin_to if reverse_bid else coin_from
+            )._altruistic = False
+
         if with_mercy and not invalid_mercy:
             self._assert_mercy_waits_for_swipe(
                 bid_id, id_leader, id_follower, coin_to if reverse_bid else coin_from
@@ -697,6 +711,30 @@ class TestFunctions(BaseTest):
             assert self._has_bid_event(
                 swap_clients[id_leader], bid_id, EventLogTypes.MERCY_TX_UNUSABLE
             ), "Leader did not record the unusable mercy tx"
+
+        if stranded_payout:
+            follower = swap_clients[id_follower]
+            ci_swipe = follower.ci(coin_to if reverse_bid else coin_from)
+            bid, _ = follower.getXmrBid(bid_id)
+            assert TxTypes.SWIPE_SWEEP not in bid.txns
+            swipe_txid = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE].txid
+            for i in range(120):
+                if ci_swipe.getTxOutInfo(swipe_txid, 0) is not None:
+                    break
+                test_delay_event.wait(1)
+
+            sweep_txid = follower.sweepSwipePayout(bid_id)
+            assert sweep_txid is not None
+            sweep_raw = self.callnoderpc(
+                "getrawtransaction", [sweep_txid, True], None, id_follower
+            )
+            assert sweep_raw["vin"][0]["txid"] == swipe_txid.hex()
+            assert sweep_raw["vin"][0]["vout"] == 0
+            bid, _ = follower.getXmrBid(bid_id)
+            assert bid.txns[TxTypes.SWIPE_SWEEP].txid.hex() == sweep_txid
+            assert self._has_bid_event(
+                follower, bid_id, EventLogTypes.SWIPE_PAYOUT_SWEPT
+            ), "Follower did not record the sweep"
 
         swap_clients[id_offerer].abandonBid(bid_id)
 
@@ -2640,6 +2678,13 @@ class BasicSwapTest(TestFunctions):
         self.prepare_balance(self.test_coin_from, 100.0, 1801, 1800)
         self.do_test_03_follower_recover_a_lock_tx(
             Coins.XMR, self.test_coin_from, with_mercy=True
+        )
+
+    def test_03_h_follower_sweeps_stranded_swipe_payout(self):
+        if not self.has_segwit:
+            return
+        self.do_test_03_follower_recover_a_lock_tx(
+            self.test_coin_from, Coins.XMR, stranded_payout=True
         )
 
     def test_04_a_follower_recover_b_lock_tx(self):

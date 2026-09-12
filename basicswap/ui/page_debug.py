@@ -7,6 +7,7 @@
 import json
 import traceback
 from .util import (
+    get_data_entry_or,
     have_data_entry,
 )
 from basicswap.chainparams import (
@@ -14,6 +15,9 @@ from basicswap.chainparams import (
 )
 from basicswap.db_util import (
     remove_expired_data,
+)
+from basicswap.util import (
+    ensure,
 )
 
 
@@ -94,6 +98,26 @@ def page_debug(self, url_split, post_string):
                     traceback.format_exc()
                     if swap_client.debug
                     else f"combine_non_segwit_prevouts_ltc: {e}"
+                )
+                err_messages.append(f"Failed: {e}.")
+        if have_data_entry(form_data, "sweep_swipe_payout"):
+            try:
+                bid_id = bytes.fromhex(
+                    get_data_entry_or(form_data, "sweep_bid_id", "").strip()
+                )
+                ensure(len(bid_id) == 28, "Invalid bid id length")
+                txid = swap_client.sweepSwipePayout(bid_id)
+                if txid is None:
+                    messages.append(
+                        "Nothing to sweep, the wallet holds the swipe payout."
+                    )
+                else:
+                    messages.append(f"Swept the swipe payout, txid: {txid}.")
+            except Exception as e:
+                swap_client.log.error(
+                    traceback.format_exc()
+                    if swap_client.debug
+                    else f"sweep_swipe_payout: {e}"
                 )
                 err_messages.append(f"Failed: {e}.")
 
