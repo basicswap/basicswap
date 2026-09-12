@@ -215,6 +215,9 @@ class XMRPrepare(CoinPrepareModule):
                 )
                 config_datadir = "/data"
 
+            if chain == "testnet":
+                fp.write("testnet=1\n")
+
             fp.write("no-dns=1\n")
             fp.write("rpc-bind-port={}\n".format(core_settings["walletrpcport"]))
             fp.write("rpc-bind-ip={}\n".format(ctx.rpcbind_ip))
