@@ -45,6 +45,12 @@ class ExtKeyPair:
 
     def set_seed(self, seed: bytes) -> None:
         hashout: bytes = hmac_sha512(b"Bitcoin seed", seed)
+        # BIP32: a master key of zero or above the group order is invalid, and the
+        # seed must be discarded rather than the key clamped into range.
+        try:
+            PrivateKey(hashout[:32])
+        except ValueError:
+            raise ValueError("Invalid seed") from None
         self._key = hashout[:32]
         self._pubkey = None
         self._chaincode = hashout[32:]

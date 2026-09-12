@@ -1444,6 +1444,39 @@ class Test(unittest.TestCase):
         ek_c0_p_data = decodeAddress(test_key_c0_p)[4:]
         assert m_0.encode_p() == ek_c0_p_data
 
+    def test_extkey_set_seed(self):
+        # BIP32 test vector 1, without the version prefix.
+        ek = ExtKeyPair()
+        ek.set_seed(bytes.fromhex("000102030405060708090a0b0c0d0e0f"))
+        assert (
+            ek.encode_v().hex()
+            == "000000000000000000873dff81c02f525623fd1fe5167eac3a55a049de3d314bb4"
+            "2ee227ffed37d50800e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35"
+        )
+
+        # A master key of zero or above the group order is invalid, and BIP32 says
+        # to discard the seed rather than clamp the key. No reachable seed hashes
+        # to one, so the hmac output has to be driven directly to get there.
+        import basicswap.util.extkey as extkey_module
+
+        real_hmac_sha512 = extkey_module.hmac_sha512
+        try:
+            for bad_key in (
+                bytes(32),
+                bytes.fromhex(
+                    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"
+                ),
+            ):
+                extkey_module.hmac_sha512 = lambda k, d, key=bad_key: key + bytes(32)
+                self.assertRaises(ValueError, ExtKeyPair().set_seed, b"seed")
+        finally:
+            extkey_module.hmac_sha512 = real_hmac_sha512
+
+        # The patch must not have leaked into the module.
+        ek_after = ExtKeyPair()
+        ek_after.set_seed(bytes.fromhex("000102030405060708090a0b0c0d0e0f"))
+        assert ek_after.encode_v() == ek.encode_v()
+
     def test_mnemonic(self):
         entropy0: bytes = Mnemonic("english").to_entropy(mnemonics[0])
         assert entropy0.hex() == "0002207e9b744ea2d7ab41702f31f000"

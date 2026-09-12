@@ -39,6 +39,7 @@ MASKED = 0x80
 PAYLOAD_LEN = 0x7f
 PAYLOAD_LEN_EXT16 = 0x7e
 PAYLOAD_LEN_EXT64 = 0x7f
+MAX_PAYLOAD_LEN = 4 * 1024 * 1024
 
 OPCODE_CONTINUATION = 0x0
 OPCODE_TEXT         = 0x1
@@ -282,9 +283,13 @@ class WebSocketHandler(StreamRequestHandler):
         self._send_lock = threading.Lock()
         if server.key and server.cert:
             try:
-                socket = ssl.wrap_socket(socket, server_side=True, certfile=server.cert, keyfile=server.key)
-            except: # Not sure which exception it throws if the key/cert isn't found
-                logger.warning("SSL not available (are the paths {} and {} correct for the key and cert?)".format(server.key, server.cert))
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(server.cert, server.key)
+                socket = context.wrap_socket(socket, server_side=True)
+            except Exception:
+                # Continuing unwrapped would speak plaintext on a TLS port.
+                logger.warning("SSL failed (are the paths {} and {} correct for the key and cert?)".format(server.key, server.cert))
+                raise
         StreamRequestHandler.__init__(self, socket, addr, server)
 
     def setup(self):
@@ -315,7 +320,10 @@ class WebSocketHandler(StreamRequestHandler):
                 return
             b1, b2 = 0, 0
         except ValueError as e:
-            b1, b2 = 0, 0
+            # EOF, the client died without a close frame
+            logger.info("Client closed connection.")
+            self.keep_alive = 0
+            return
 
         fin    = b1 & FIN
         opcode = b1 & OPCODE
@@ -352,6 +360,11 @@ class WebSocketHandler(StreamRequestHandler):
             payload_length = struct.unpack(">H", self.rfile.read(2))[0]
         elif payload_length == 127:
             payload_length = struct.unpack(">Q", self.rfile.read(8))[0]
+
+        if payload_length > MAX_PAYLOAD_LEN:
+            logger.warning("Frame too large: %d." % payload_length)
+            self.keep_alive = 0
+            return
 
         masks = self.read_bytes(4)
         message_bytes = bytearray()
@@ -465,14 +478,16 @@ class WebSocketHandler(StreamRequestHandler):
     def read_http_headers(self):
         headers = {}
         # first line should be HTTP GET
-        http_get = self.rfile.readline().decode(errors="replace").strip()
+        http_get = self.rfile.readline(4096).decode(errors="replace").strip()
         if not http_get.upper().startswith('GET'):
             return None
         # remaining should be headers
         while True:
-            header = self.rfile.readline().decode(errors="replace").strip()
+            header = self.rfile.readline(4096).decode(errors="replace").strip()
             if not header:
                 break
+            if len(headers) >= 64:
+                return None
             head, sep, value = header.partition(':')
             if not sep:
                 continue
