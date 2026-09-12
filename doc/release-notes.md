@@ -1,3 +1,29 @@
+0.18.8
+==============
+
+**Fixes**
+- When a swap fails and the follower swipes the chain A lock refund output, the follower's
+  coin is no longer left on the swap key if no mercy tx is sent.  When the
+  node gives up on the mercy tx, or altruistic is turned off, the payout is now swept to
+  the wallet in a tx that carries no keyshare.  Particl blind imports the key into the
+  wallet instead.  BCH, and swipes built before 0.18.7, were never affected.
+- If that sweep fails, or the swipe tx hasn't confirmed yet, the bid logs a warning that
+  points to the debug page.
+
+**Security / hardening**
+- The websocket server rejects frames larger than 4 MiB, limits the length of handshake
+  lines and the number of headers, and drops a client that disconnects without a close
+  frame.
+- A wallet seed that would give an invalid BIP32 master key is rejected instead of used.
+
+**UI**
+- The debug page can sweep a bid's swipe payout by bid ID.  It recovers payouts the
+  automatic sweep misses.  It refuses while a mercy tx is still to be sent.
+
+**Upgrade note**
+- 0.18.7 was tagged without its version bump.
+
+
 0.18.7
 ==============
 
