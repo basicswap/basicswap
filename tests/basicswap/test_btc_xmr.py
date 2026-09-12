@@ -22,7 +22,9 @@ from basicswap.basicswap_util import (
     EventLogTypes,
     TxTypes,
 )
+from basicswap.bidplanner import FILL_RECEIVE
 from basicswap.db import Concepts
+from basicswap.multibid import ANCHOR_BEST, planMultiBid, placeMultiBid
 from basicswap.util import make_int
 from basicswap.util.address import (
     b58decode,
@@ -858,6 +860,793 @@ class TestFunctions(BaseTest):
             BidStates.SWAP_COMPLETED,
             wait_for=(self.extra_wait_time + 180),
         )
+
+    def do_test_20_multi_offer_batched(self, coin_from, coin_to):
+        logging.info(
+            f"---------- Test batched multi-offer buy {coin_from.name} to {coin_to.name}"
+        )
+
+        id_bidder: int = self.node_b_id
+        # One offer from each maker, so the coin A locks are independent.
+        makers = ((self.node_a_id, 2.0), (self.node_c_id, 1.0))
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        # A Particl maker stakes its bsx_wallet, so without reserving it can
+        # spend its own lock funds into an immature coinstake before accepting.
+        # Node 0 must keep staking to advance the chain, so only reserve the
+        # other makers.
+        if coin_from == Coins.PART:
+            for maker_id, _ in makers:
+                if maker_id != self.node_a_id:
+                    callnoderpc(
+                        maker_id, "reservebalance", [True, 1000000], "bsx_wallet"
+                    )
+
+        # The bidder pays coin_to, so is the follower and publishes the coin B locks.
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1801)
+        for maker_id, amount in makers:
+            self.prepare_balance(coin_from, amount + 10.0, 1800 + maker_id, 1800)
+
+        rate: int = ci_to.make_int(1.0, r=1)
+        offer_ids = []
+        maker_before = []
+        for maker_id, amount in makers:
+            amt = ci_from.make_int(amount)
+            offer_ids.append(
+                swap_clients[maker_id].postOffer(
+                    coin_from,
+                    coin_to,
+                    amt,
+                    rate,
+                    amt,
+                    SwapTypes.XMR_SWAP,
+                    auto_accept_bids=True,
+                )
+            )
+            js = read_json_api(1800 + maker_id, "wallets")
+            maker_before.append(self.getBalance(js, coin_to))
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        target = ci_from.make_int(sum(amount for _, amount in makers))
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            target,
+            anchor=ANCHOR_BEST,
+            slip_percent=50.0,
+            max_bids=len(makers),
+        )
+        assert plan.num_bids == len(makers)
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        placed, failed, plan_id = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == len(makers) and len(failed) == 0
+
+        bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+        for bid_id in bid_ids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        lock_txids = set()
+        for bid_id in bid_ids:
+            _, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+            lock_txids.add(bytes(xmr_swap.b_lock_tx_id))
+        assert (
+            len(lock_txids) == 1
+        ), f"expected one batched coin B lock tx, got {len(lock_txids)}"
+
+        # Each maker must have been paid its own leg, not some shared total.
+        for (maker_id, amount), before in zip(makers, maker_before):
+            wait_for_balance(
+                test_delay_event,
+                f"http://127.0.0.1:{1800 + maker_id}/json/wallets/{coin_to.name.lower()}",
+                ["balance", "unconfirmed"],
+                before + amount - 0.1,
+            )
+
+    def do_test_21_multi_offer_straggler_drop(self, coin_from, coin_to):
+        logging.info(
+            f"---------- Test multi-offer straggler drop + retry {coin_from.name} to {coin_to.name}"
+        )
+
+        id_bidder: int = self.node_b_id
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        # Two makers that accept, and a third offer that never does. The bidder's
+        # leg to it stays BID_SENT, so the batch must hold for the ready legs and
+        # then drop the straggler once the timeout lapses.
+        ready_makers = ((self.node_a_id, 2.0), (self.node_c_id, 1.0))
+        straggler_maker: int = self.node_a_id
+        straggler_amount: float = 1.0
+
+        # Drop the straggler well inside the 5 minute default, but leave the
+        # ready legs room to lock together on a loaded machine: below this they
+        # race, and the batch splits before the straggler is even the question.
+        # Restored so later tests in the class do not inherit it.
+        default_leg_timeout = swap_clients[id_bidder]._plan_leg_timeout
+        self.addCleanup(
+            setattr, swap_clients[id_bidder], "_plan_leg_timeout", default_leg_timeout
+        )
+        swap_clients[id_bidder]._plan_leg_timeout = 90
+
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1801)
+        # node_a funds two coin A locks: a ready leg now, the retried leg later.
+        self.prepare_balance(coin_from, 20.0, 1800 + self.node_a_id, 1800)
+        self.prepare_balance(coin_from, 20.0, 1800 + self.node_c_id, 1800)
+
+        rate: int = ci_to.make_int(1.0, r=1)
+
+        def post(maker_id: int, amount: float, auto: bool) -> bytes:
+            amt = ci_from.make_int(amount)
+            return swap_clients[maker_id].postOffer(
+                coin_from,
+                coin_to,
+                amt,
+                rate,
+                amt,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=auto,
+            )
+
+        ready_offers = [post(mid, amt, True) for mid, amt in ready_makers]
+        straggler_offer = post(straggler_maker, straggler_amount, False)
+        for offer_id in ready_offers + [straggler_offer]:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        # select_candidates skips the non-auto-accept straggler, so the legs are
+        # assembled directly rather than through planMultiBid.
+        legs = [
+            {"offer_id": oid, "amount": ci_from.make_int(amt)}
+            for oid, (_, amt) in zip(ready_offers, ready_makers)
+        ]
+        legs.append(
+            {"offer_id": straggler_offer, "amount": ci_from.make_int(straggler_amount)}
+        )
+        placed, failed, plan_id = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == 3 and len(failed) == 0
+
+        bids = {
+            bytes.fromhex(p["offer_id"]): bytes.fromhex(p["bid_id"]) for p in placed
+        }
+        ready_bids = [bids[oid] for oid in ready_offers]
+        straggler_bid = bids[straggler_offer]
+
+        # The two accepted legs complete, batched into a single coin B lock tx.
+        for bid_id in ready_bids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        # The never-accepted leg is abandoned once a ready leg waited out the
+        # timeout. Abandoning deactivates it, so listBids (and wait_for_bid) no
+        # longer return it; read it straight from the bid store instead.
+        straggler_state = None
+        # The drop lands one leg timeout after the ready legs are held.
+        for _ in range(self.extra_wait_time + 180):
+            leg_bid, _ = swap_clients[id_bidder].getXmrBid(straggler_bid)
+            straggler_state = leg_bid.state if leg_bid else None
+            if straggler_state == BidStates.BID_ABANDONED:
+                break
+            test_delay_event.wait(1)
+        assert (
+            straggler_state == BidStates.BID_ABANDONED
+        ), f"straggler not abandoned, state {straggler_state}"
+
+        batch_lock_txids = set()
+        for bid_id in ready_bids:
+            _, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+            batch_lock_txids.add(bytes(xmr_swap.b_lock_tx_id))
+        assert (
+            len(batch_lock_txids) == 1
+        ), f"expected one batched coin B lock tx, got {len(batch_lock_txids)}"
+
+        # Retry the shortfall against the same offer, reusing the plan. It is a
+        # fresh cohort, so it must lock in its own tx, not the funded batch.
+        retry_legs = [
+            {"offer_id": straggler_offer, "amount": ci_from.make_int(straggler_amount)}
+        ]
+        placed_r, failed_r, plan_id_r = placeMultiBid(
+            swap_clients[id_bidder], retry_legs, plan_id=plan_id
+        )
+        assert plan_id_r == plan_id and len(placed_r) == 1 and len(failed_r) == 0
+        retry_bid = bytes.fromhex(placed_r[0]["bid_id"])
+
+        # This offer does not auto-accept, so accept the retry by hand.
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[straggler_maker],
+            retry_bid,
+            BidStates.BID_RECEIVED,
+        )
+        swap_clients[straggler_maker].acceptXmrBid(retry_bid)
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_bidder],
+            retry_bid,
+            BidStates.SWAP_COMPLETED,
+            sent=True,
+            wait_for=(self.extra_wait_time + 300),
+        )
+
+        _, retry_swap = swap_clients[id_bidder].getXmrBid(retry_bid)
+        assert (
+            bytes(retry_swap.b_lock_tx_id) not in batch_lock_txids
+        ), "retry leg must lock in its own tx, not the batch"
+
+    def do_test_22_reverse_self_bid_batch(self, coin_from, coin_to):
+        """A reverse-ADS plan containing a self-bid leg must not lock coin B for
+        a leg the bidder leads: on a reverse bid the maker owes coin B, so
+        paying it here would fund both sides of that swap."""
+        logging.info(
+            f"---------- Test reverse self-bid batch {coin_from.name} to {coin_to.name}"
+        )
+
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        id_maker: int = self.node_a_id
+        assert swap_clients[id_bidder].is_reverse_ads_bid(
+            coin_from, coin_to
+        ), "this reproduction needs a reverse-ADS pair"
+
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        # The bidder leads, so it funds coin A (coin_to) for both legs, and owes
+        # coin B (coin_from) only for the offer it makes itself.
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
+        self.prepare_balance(coin_from, 20.0, 1800 + id_bidder, 1801)
+        self.prepare_balance(coin_from, 20.0, 1800 + id_maker, 1801)
+
+        amount = ci_from.make_int(1.0)
+        rate: int = ci_to.make_int(1.0, r=1)
+        offers = {}
+        for owner in (id_bidder, id_maker):
+            offers[owner] = swap_clients[owner].postOffer(
+                coin_from,
+                coin_to,
+                amount,
+                rate,
+                amount,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=True,
+            )
+        for owner, offer_id in offers.items():
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        js_before = read_json_api(1800 + id_bidder, "wallets")
+        bidder_b_before = self.getBalance(js_before, coin_from)
+
+        # Pick both offers by hand so the bidder's own offer is included.
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            amount * 2,
+            manual_offers=list(offers.values()),
+        )
+        assert plan.num_bids == 2, f"expected both legs, got {plan.num_bids}"
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == 2 and len(failed) == 0
+
+        bids = {
+            bytes.fromhex(p["bid_id"]): bytes.fromhex(p["offer_id"]) for p in placed
+        }
+        for bid_id in bids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        # The two legs have different coin B payers, so they must never share a
+        # lock tx: one is ours to fund, the other is the maker's.
+        lock_txids = {}
+        for bid_id, offer_id in bids.items():
+            _, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+            lock_txids[offer_id] = bytes(xmr_swap.b_lock_tx_id)
+        assert (
+            lock_txids[offers[id_bidder]] != lock_txids[offers[id_maker]]
+        ), "batched the maker's coin B lock into our own: we funded a leg we lead"
+
+        # And we should be out only the one lock we owe, not both.
+        js_after = read_json_api(1800 + id_bidder, "wallets")
+        bidder_b_after = self.getBalance(js_after, coin_from)
+        spent = bidder_b_before - bidder_b_after
+        assert spent < 1.5, f"bidder spent {spent} coin B, expected roughly one leg"
+
+    def sweepToOneOutput(self, ci) -> None:
+        """Leave the wallet holding a single spendable output."""
+        # Earlier tests in the class can leave inputs locked, which would hide
+        # part of the balance from the sweep.
+        ci.rpc_wallet("lockunspent", [True])
+        addr = ci.rpc_wallet("getnewaddress")
+        ci.rpc_wallet(
+            "sendtoaddress", [addr, ci.rpc_wallet("getbalance"), "", "", True]
+        )
+        self.waitForOutputs(ci, 1)
+
+    def splitToOutputs(self, ci, count: int, value: float) -> None:
+        """Leave the wallet holding at least count outputs of value each."""
+        ci.rpc_wallet("lockunspent", [True])
+        ci.rpc_wallet(
+            "sendmany",
+            ["", {ci.rpc_wallet("getnewaddress"): value for _ in range(count)}],
+        )
+        self.waitForOutputs(ci, count, value)
+
+    def waitForOutputs(self, ci, count: int, value: float = 0.0) -> None:
+        for i in range(120):
+            if test_delay_event.is_set():
+                raise ValueError("Test stopped.")
+            test_delay_event.wait(1)
+            unspents = [
+                u for u in ci.rpc_wallet("listunspent", [1]) if u["amount"] >= value
+            ]
+            if len(unspents) >= count:
+                return
+        raise ValueError(f"Wallet holds {len(unspents)} outputs, expected {count}")
+
+    def waitForCoinALocks(self, id_bidder: int, bid_ids) -> set:
+        """Wait for every bid to have funded its coin A lock, and return the
+        distinct lock txids."""
+        for i in range(180):
+            if test_delay_event.is_set():
+                raise ValueError("Test stopped.")
+            test_delay_event.wait(1)
+            lock_txids = set()
+            for bid_id in bid_ids:
+                _, xmr_swap = self.swap_clients[id_bidder].getXmrBid(bid_id)
+                if xmr_swap is None or xmr_swap.a_lock_tx_id is None:
+                    break
+                lock_txids.add(bytes(xmr_swap.a_lock_tx_id))
+            else:
+                return lock_txids
+        raise ValueError(f"Only {len(lock_txids)} of {len(bid_ids)} legs funded")
+
+    def setupLeaderPlan(self, coin_from, coin_to, num_legs: int, leg_amount: float):
+        """Post num_legs offers the bidder will lead on, and return their ids."""
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        assert swap_clients[id_bidder].is_reverse_ads_bid(
+            coin_from, coin_to
+        ), "the bidder only leads on a reverse-ADS pair"
+
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        # The bidder leads and funds coin A (coin_to); the makers owe coin B.
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
+        makers = [self.node_a_id, self.node_c_id]
+        for maker_id in makers:
+            self.prepare_balance(
+                coin_from, num_legs * leg_amount + 10.0, 1800 + maker_id, 1801
+            )
+
+        amount = ci_from.make_int(leg_amount)
+        rate: int = ci_to.make_int(1.0, r=1)
+        offer_ids = []
+        for i in range(num_legs):
+            offer_ids.append(
+                swap_clients[makers[i % len(makers)]].postOffer(
+                    coin_from,
+                    coin_to,
+                    amount,
+                    rate,
+                    amount,
+                    SwapTypes.XMR_SWAP,
+                    auto_accept_bids=True,
+                )
+            )
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+        return offer_ids, amount
+
+    def do_test_23_leader_plan_single_utxo(self, coin_from, coin_to, num_legs: int = 3):
+        """Every leg of a plan the bidder leads funds its own coin A lock, and
+        all of them are funded before any is broadcast, so an unbroadcast leg's
+        change cannot fund the next. From one output the plan must split the
+        wallet first, and spend those outputs without waiting for them."""
+        logging.info(
+            f"---------- Test leader-side plan from one output {coin_from.name} to {coin_to.name}"
+        )
+
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+        offer_ids, amount = self.setupLeaderPlan(
+            coin_from, coin_to, num_legs, leg_amount=1.0
+        )
+        self.sweepToOneOutput(ci_to)
+
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            amount * num_legs,
+            max_bids=num_legs,
+            manual_offers=offer_ids,
+        )
+        assert plan.num_bids == num_legs
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+
+        # No blocks while the wallet is split and the legs are funded, so every
+        # leg has to spend an output that is still in the mempool.
+        mining_addr, self.__class__.btc_addr = self.btc_addr, None
+        try:
+            placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+            assert len(placed) == num_legs and len(failed) == 0
+            bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+            lock_txids = self.waitForCoinALocks(id_bidder, bid_ids)
+        finally:
+            self.__class__.btc_addr = mining_addr
+
+        assert (
+            len(lock_txids) == num_legs
+        ), f"expected {num_legs} coin A locks, got {len(lock_txids)}"
+
+        for bid_id in bid_ids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+    def do_test_24_leader_plan_per_leg_outputs(
+        self, coin_from, coin_to, num_legs: int = 3
+    ):
+        """Given an output per leg, a plan the bidder leads funds every leg from
+        its own inputs and each leg gets its own coin A lock."""
+        logging.info(
+            f"---------- Test leader-side plan with an output per leg {coin_from.name} to {coin_to.name}"
+        )
+
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        leg_amount: float = 1.0
+        offer_ids, amount = self.setupLeaderPlan(
+            coin_from, coin_to, num_legs, leg_amount
+        )
+        self.splitToOutputs(
+            swap_clients[id_bidder].ci(coin_to), num_legs, leg_amount + 1.0
+        )
+
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            amount * num_legs,
+            max_bids=num_legs,
+            manual_offers=offer_ids,
+        )
+        assert plan.num_bids == num_legs
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == num_legs and len(failed) == 0
+
+        bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+        for bid_id in bid_ids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        # The leader cannot batch, so every leg must have its own coin A lock.
+        lock_txids = set()
+        for bid_id in bid_ids:
+            _, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+            lock_txids.add(bytes(xmr_swap.a_lock_tx_id))
+        assert (
+            len(lock_txids) == num_legs
+        ), f"expected {num_legs} coin A locks, got {len(lock_txids)}"
+
+        assert (
+            swap_clients[id_bidder].ci(coin_to).rpc_wallet("listlockunspent") == []
+        ), "plan left inputs locked in the wallet"
+
+    def do_test_25_secret_hash_plan(self, coin_from, coin_to, num_legs: int = 3):
+        """A secret-hash plan locks every leg's HTLC in one transaction, so the
+        legs neither chain on each other's change nor need an output each."""
+        logging.info(
+            f"---------- Test secret-hash plan {coin_from.name} to {coin_to.name}"
+        )
+
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        id_maker: int = self.node_c_id
+        assert not swap_clients[id_bidder].is_reverse_ads_bid(
+            coin_from, coin_to
+        ), "a secret-hash plan must not take the leader path"
+
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+        leg_amount: float = 1.0
+
+        # The maker stakes its bsx_wallet and would spend its own initiate funds
+        # into an immature coinstake before sending them.
+        if coin_from == Coins.PART:
+            callnoderpc(id_maker, "reservebalance", [True, 1000000], "bsx_wallet")
+
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
+        self.prepare_balance(
+            coin_from, num_legs * leg_amount + 10.0, 1800 + id_maker, 1800
+        )
+
+        amount = ci_from.make_int(leg_amount)
+        rate: int = ci_to.make_int(1.0, r=1)
+        offer_ids = []
+        for i in range(num_legs):
+            offer_ids.append(
+                swap_clients[id_maker].postOffer(
+                    coin_from,
+                    coin_to,
+                    amount,
+                    rate,
+                    amount,
+                    SwapTypes.SELLER_FIRST,
+                    auto_accept_bids=True,
+                )
+            )
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        # One output, which one batched participate tx can spend for every leg.
+        self.sweepToOneOutput(ci_to)
+
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            amount * num_legs,
+            max_bids=num_legs,
+            manual_offers=offer_ids,
+        )
+        assert plan.num_bids == num_legs, f"expected {num_legs}, got {plan.num_bids}"
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == num_legs and len(failed) == 0
+
+        bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+        for bid_id in bid_ids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        ptx_txids, ptx_vouts = set(), set()
+        for bid_id in bid_ids:
+            bid = swap_clients[id_bidder].getBid(bid_id)
+            assert bid.participate_tx is not None, "leg published no participate tx"
+            ptx_txids.add(bid.participate_tx.txid.hex())
+            ptx_vouts.add((bid.participate_tx.txid.hex(), bid.participate_tx.vout))
+        assert (
+            len(ptx_txids) == 1
+        ), f"expected one batched participate tx, got {len(ptx_txids)}"
+        assert (
+            len(ptx_vouts) == num_legs
+        ), f"expected {num_legs} outputs in it, got {len(ptx_vouts)}"
+
+        # An HTLC output per leg and one change output, nothing chained.
+        tx = ci_to.rpc("getrawtransaction", [ptx_txids.pop(), True])
+        assert (
+            len(tx["vout"]) <= num_legs + 1
+        ), f"batched participate tx has {len(tx['vout'])} outputs"
+
+    def do_test_26_blind_leader_plan(self, coin_from, coin_to, num_legs: int = 3):
+        """A plan the bidder leads on a blinded coin funds a lock per leg from
+        blinded outputs. The wallet holds fewer of those than the plan has legs,
+        so it has to split itself first and pin each leg to its own."""
+        logging.info(
+            f"---------- Test blind leader plan {coin_from.name} to {coin_to.name}"
+        )
+
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        id_maker: int = self.node_a_id
+        assert swap_clients[id_bidder].is_reverse_ads_bid(
+            coin_from, coin_to
+        ), "the bidder only leads on a reverse-ADS pair"
+
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+        leg_amount: float = 1.0
+
+        # The bidder leads and funds coin A (coin_to); the maker owes coin B.
+        # Ask for what the plan needs: a blinded balance takes time to mature
+        # and a larger request just makes the wait more likely to lapse.
+        self.prepare_balance(
+            coin_to, num_legs * leg_amount + 5.0, 1800 + id_bidder, 1800
+        )
+        self.prepare_balance(
+            coin_from, num_legs * leg_amount + 10.0, 1800 + id_maker, 1801
+        )
+
+        outputs_before = len(ci_to.getSpendableOutputs())
+        logging.info(f"Bidder holds {outputs_before} blinded outputs")
+
+        amount = ci_from.make_int(leg_amount)
+        rate: int = ci_to.make_int(1.0, r=1)
+        offer_ids = []
+        for i in range(num_legs):
+            offer_ids.append(
+                swap_clients[id_maker].postOffer(
+                    coin_from,
+                    coin_to,
+                    amount,
+                    rate,
+                    amount,
+                    SwapTypes.XMR_SWAP,
+                    auto_accept_bids=True,
+                )
+            )
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        plan, _, _ = planMultiBid(
+            swap_clients[id_bidder],
+            coin_from,
+            coin_to,
+            FILL_RECEIVE,
+            amount * num_legs,
+            max_bids=num_legs,
+            manual_offers=offer_ids,
+        )
+        assert plan.num_bids == num_legs, f"expected {num_legs}, got {plan.num_bids}"
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == num_legs and len(failed) == 0
+
+        bid_ids = [bytes.fromhex(p["bid_id"]) for p in placed]
+        for bid_id in bid_ids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 600),
+            )
+
+        # A blinded lock cannot be batched, so every leg funds its own.
+        lock_txids = set()
+        for bid_id in bid_ids:
+            _, xmr_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+            lock_txids.add(bytes(xmr_swap.a_lock_tx_id))
+        assert (
+            len(lock_txids) == num_legs
+        ), f"expected {num_legs} coin A locks, got {len(lock_txids)}"
+
+    def do_test_27_secret_hash_straggler(self, coin_from, coin_to):
+        """A leg whose initiate txn is still coming holds its sibling's
+        participate txn. Without the hold the ready leg sends as soon as it can
+        and the two never share a transaction."""
+        logging.info(
+            f"---------- Test secret-hash straggler hold {coin_from.name} to {coin_to.name}"
+        )
+
+        swap_clients = self.swap_clients
+        id_bidder: int = self.node_b_id
+        id_maker: int = self.node_c_id
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+        leg_amount: float = 1.0
+
+        if coin_from == Coins.PART:
+            callnoderpc(id_maker, "reservebalance", [True, 1000000], "bsx_wallet")
+
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
+        self.prepare_balance(coin_from, 2 * leg_amount + 10.0, 1800 + id_maker, 1800)
+
+        amount = ci_from.make_int(leg_amount)
+        rate: int = ci_to.make_int(1.0, r=1)
+        # The second offer does not auto-accept, so its leg lags behind the
+        # first and the first has to wait for it.
+        offer_ids = [
+            swap_clients[id_maker].postOffer(
+                coin_from,
+                coin_to,
+                amount,
+                rate,
+                amount,
+                SwapTypes.SELLER_FIRST,
+                auto_accept_bids=auto,
+            )
+            for auto in (True, False)
+        ]
+        for offer_id in offer_ids:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        # planMultiBid skips offers without auto accept, so the legs are
+        # assembled directly rather than through it.
+        legs = [{"offer_id": offer_id, "amount": amount} for offer_id in offer_ids]
+        # Long enough that the hold outlasts accepting the lagging leg by hand.
+        placed, failed, _ = placeMultiBid(
+            swap_clients[id_bidder], legs, leg_timeout_seconds=300
+        )
+        assert len(placed) == 2 and len(failed) == 0
+        bids = {
+            bytes.fromhex(p["offer_id"]): bytes.fromhex(p["bid_id"]) for p in placed
+        }
+        lagging_bid = bids[offer_ids[1]]
+
+        # Let the auto-accepted leg reach ready with the other still unaccepted,
+        # so holding is the only way the two can share a transaction.
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_bidder],
+            bids[offer_ids[0]],
+            BidStates.SWAP_INITIATED,
+            sent=True,
+            wait_for=(self.extra_wait_time + 180),
+        )
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_maker],
+            lagging_bid,
+            BidStates.BID_RECEIVED,
+        )
+        swap_clients[id_maker].acceptBid(lagging_bid)
+
+        for bid_id in bids.values():
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 600),
+            )
+
+        ptx_txids = set()
+        for bid_id in bids.values():
+            bid = swap_clients[id_bidder].getBid(bid_id)
+            assert bid.participate_tx is not None, "leg published no participate tx"
+            ptx_txids.add(bid.participate_tx.txid.hex())
+        assert (
+            len(ptx_txids) == 1
+        ), f"the ready leg did not wait for the lagging one, got {len(ptx_txids)} txs"
 
     def do_test_08_insufficient_funds(self, coin_from, coin_to):
         logging.info(
@@ -2681,6 +3470,50 @@ class BasicSwapTest(TestFunctions):
             return
         self.do_test_05_self_bid(Coins.XMR, self.test_coin_from)
 
+    def test_20_multi_offer_batched_xmr(self):
+        if not self.has_segwit:
+            return
+        self.do_test_20_multi_offer_batched(self.test_coin_from, Coins.XMR)
+
+    def test_20_multi_offer_batched_btc(self):
+        if not self.has_segwit:
+            return
+        # Follower is a script coin, so the batched coin B lock is a single
+        # pay-to-many transaction rather than a Monero transfer.
+        self.do_test_20_multi_offer_batched(Coins.PART, self.test_coin_from)
+
+    def test_21_multi_offer_straggler_drop_xmr(self):
+        if not self.has_segwit:
+            return
+        self.do_test_21_multi_offer_straggler_drop(self.test_coin_from, Coins.XMR)
+
+    def test_22_reverse_self_bid_batch(self):
+        if not self.has_segwit:
+            return
+        # XMR as coin_from makes this a reverse bid: the bidder leads.
+        self.do_test_22_reverse_self_bid_batch(Coins.XMR, self.test_coin_from)
+
+    def test_23_leader_plan_single_utxo(self):
+        if not self.has_segwit:
+            return
+        self.do_test_23_leader_plan_single_utxo(Coins.XMR, self.test_coin_from)
+
+    def test_24_leader_plan_per_leg_outputs(self):
+        if not self.has_segwit:
+            return
+        self.do_test_24_leader_plan_per_leg_outputs(Coins.XMR, self.test_coin_from)
+
+    def test_25_secret_hash_plan(self):
+        if not self.has_segwit:
+            return
+        # strict_swap_type is off in regtest, so this pair can be secret hash.
+        self.do_test_25_secret_hash_plan(Coins.PART, self.test_coin_from)
+
+    def test_27_secret_hash_straggler(self):
+        if not self.has_segwit:
+            return
+        self.do_test_27_secret_hash_straggler(Coins.PART, self.test_coin_from)
+
     def test_06_preselect_inputs(self):
         tla_from: str = self.test_coin_from.name
         logging.info(f"---------- Test {tla_from} Preselected inputs")
@@ -3371,6 +4204,15 @@ class TestBTC_PARTB(TestFunctions):
             self.do_test_01_full_swap(self.test_coin_to, self.test_coin_from)
         finally:
             self.extra_wait_time = 0
+
+    def test_26_blind_leader_plan(self):
+        # Anon inherits this and cannot run it: it is a scriptless coin, so it is
+        # never the lock's chain.
+        if self.test_coin_to != Coins.PART_BLIND:
+            return
+        # XMR as coin_from makes this a reverse bid: the bidder leads and funds
+        # a blinded lock per leg.
+        self.do_test_26_blind_leader_plan(Coins.XMR, self.test_coin_to)
 
     def test_02_a_leader_recover_a_lock_tx(self):
         self.prepare_balance(self.test_coin_to, 100.0, 1801, 1800)

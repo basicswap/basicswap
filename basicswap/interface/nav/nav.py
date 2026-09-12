@@ -794,7 +794,11 @@ class NAVInterface(BTCInterface):
         subfee: bool = False,
         bid_id: bytes = None,
         cursor=None,
+        prevouts=None,
     ):
+        if prevouts:
+            raise ValueError("Preselected inputs are not supported for Navcoin")
+
         feerate_str = self.format_amount(feerate)
         # TODO: unlock unspents if bid cancelled
         options = {
@@ -816,9 +820,17 @@ class NAVInterface(BTCInterface):
         return tx_signed.serialize_without_witness()
 
     def fundSCLockTx(
-        self, tx_bytes: bytes, feerate, vkbv=None, bid_id: bytes = None, cursor=None
+        self,
+        tx_bytes: bytes,
+        feerate,
+        vkbv=None,
+        bid_id: bytes = None,
+        cursor=None,
+        prevouts=None,
     ) -> bytes:
-        tx_funded = self.fundTx(tx_bytes.hex(), feerate, bid_id=bid_id, cursor=cursor)
+        tx_funded = self.fundTx(
+            tx_bytes.hex(), feerate, bid_id=bid_id, cursor=cursor, prevouts=prevouts
+        )
         return tx_funded
 
     def createSCLockRefundTx(

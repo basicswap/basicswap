@@ -339,9 +339,17 @@ class FIROInterface(BTCInterface):
         return tx.serialize()
 
     def fundSCLockTx(
-        self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None, cursor=None
+        self,
+        tx_bytes,
+        feerate,
+        vkbv=None,
+        bid_id: bytes = None,
+        cursor=None,
+        prevouts=None,
     ):
-        return self.fundTx(tx_bytes, feerate, bid_id=bid_id, cursor=cursor)
+        return self.fundTx(
+            tx_bytes, feerate, bid_id=bid_id, cursor=cursor, prevouts=prevouts
+        )
 
     def signTxWithWallet(self, tx):
         rv = self.rpc("signrawtransaction", [tx.hex()])

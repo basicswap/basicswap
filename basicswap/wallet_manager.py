@@ -1606,7 +1606,14 @@ class WalletManager:
             if cursor is None:
                 self._swap_client.closeDB(use_cursor, commit=False)
 
-    def isUTXOLocked(self, coin_type: Coins, txid: str, vout: int, cursor=None) -> bool:
+    def isUTXOLocked(
+        self,
+        coin_type: Coins,
+        txid: str,
+        vout: int,
+        cursor=None,
+        bid_id: bytes = None,
+    ) -> bool:
         use_cursor = self._swap_client.openDB(cursor)
         try:
             existing = self._swap_client.queryOne(
@@ -1623,6 +1630,8 @@ class WalletManager:
                 )
                 if cursor is None:
                     self._swap_client.commitDB()
+                return False
+            if bid_id is not None and existing.bid_id == bid_id:
                 return False
             return True
         finally:

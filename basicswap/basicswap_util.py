@@ -188,6 +188,7 @@ class ActionTypes(IntEnum):
     REDEEM_ITX = auto()
     ACCEPT_AS_REV_BID = auto()
     SEND_MERCY_TX = auto()
+    SEND_PARTICIPATE_TX = auto()
 
 
 class EventLogTypes(IntEnum):

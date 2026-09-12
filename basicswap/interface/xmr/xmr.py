@@ -452,6 +452,12 @@ class XMRInterface(CoinInterface):
 
         return float(self.format_amount(fee_per_k_bytes)), "get_fee_estimate"
 
+    def getRedeemFeeRate(self) -> int:
+        # A sweep ignores the offer's rate. Priority 0 is resolved by the
+        # wallet against the backlog, so assume the higher tier it can land on.
+        priority: int = self._fee_priority if self._fee_priority > 0 else 2
+        return self.rpc("get_fee_estimate")["fees"][priority - 1] * 1000
+
     def getNewRandomKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
         return i2b(9 + secrets.randbelow(ed25519_l - 9))
@@ -498,6 +504,22 @@ class XMRInterface(CoinInterface):
     def encodeSharedAddress(self, Kbv: bytes, Kbs: bytes) -> str:
         return xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
+    def findPendingLockTx(self, lock_addrs):
+        # An in-flight send is invisible to findTxB: incoming_transfers reads
+        # m_transfers, which monero only fills for mined txs.
+        txns = self.rpc_wallet("get_transfers", {"out": True, "pending": True})
+        for tag in ("pending", "out"):
+            for tx in txns.get(tag, []):
+                for destination in tx.get("destinations", []):
+                    addr = destination.get("address", None)
+                    if addr in lock_addrs:
+                        tx_hash: bytes = bytes.fromhex(tx["txid"])
+                        self._log.warning(
+                            f"Already sending to lock address {addr} in tx: {self._log.id(tx_hash)}"
+                        )
+                        return tx_hash
+        return None
+
     def publishBLockTx(
         self,
         kbv: bytes,
@@ -514,19 +536,9 @@ class XMRInterface(CoinInterface):
             Kbv = self.getPubkey(kbv)
             shared_addr: str = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
 
-            # Check that the wallet is not already sending to the lock address
-            txns = self.rpc_wallet("get_transfers", {"out": True, "pending": True})
-            for tag in ("pending", "out"):
-                if tag not in txns:
-                    continue
-                for tx in txns[tag]:
-                    for destination in tx.get("destinations", []):
-                        if destination.get("address", None) == shared_addr:
-                            tx_hash: bytes = bytes.fromhex(tx["txid"])
-                            self._log.warning(
-                                f"Already sending to lock address {shared_addr} in tx: {self._log.id(tx_hash)}"
-                            )
-                            return tx_hash
+            in_flight = self.findPendingLockTx({shared_addr})
+            if in_flight is not None:
+                return in_flight
 
             params = {
                 "destinations": [{"amount": output_amount, "address": shared_addr}],
@@ -543,6 +555,40 @@ class XMRInterface(CoinInterface):
             )
             tx_hash: bytes = bytes.fromhex(rv["tx_hash"])
             return tx_hash
+
+    def max_batched_lock_outputs(self) -> int:
+        # Monero caps a tx at 16 outputs (BULLETPROOF_MAX_OUTPUTS); one is change.
+        return 15
+
+    def publishBLockTxs(self, locks, feerate: int = 0, unlock_time: int = 0) -> bytes:
+        """Lock for several swaps at once, so their change is not chained."""
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            self.rpc_wallet("refresh")
+
+            destinations = [
+                {
+                    "amount": output_amount,
+                    "address": xmr_util.encode_address(
+                        self.getPubkey(kbv), Kbs, self._addr_prefix
+                    ),
+                }
+                for kbv, Kbs, output_amount in locks
+            ]
+            in_flight = self.findPendingLockTx({d["address"] for d in destinations})
+            if in_flight is not None:
+                return in_flight
+
+            params = {"destinations": destinations, "unlock_time": unlock_time}
+            if self._fee_priority > 0:
+                params["priority"] = self._fee_priority
+            rv = self.rpc_wallet("transfer", params)
+            self._log.info(
+                "publishBLockTxs {} to {} lock addresses".format(
+                    self._log.id(rv["tx_hash"]), len(destinations)
+                )
+            )
+            return bytes.fromhex(rv["tx_hash"])
 
     def findTxB(
         self,

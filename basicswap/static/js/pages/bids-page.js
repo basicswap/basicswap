@@ -1,6 +1,8 @@
 const PAGE_SIZE = 50;
 let activeFetchController = null;
 
+const { formatTime, getTimeStrokeColor, coinImage, groupBids, createPlanRow, getStatusClass } = window.PlanRows;
+
 const state = {
     currentPage: {
         all: 1,
@@ -32,7 +34,7 @@ document.addEventListener('tabactivated', function(event) {
     if (event.detail && event.detail.tabId) {
         const tabType = event.detail.type || (event.detail.tabId === '#all' ? 'all' :
                                              (event.detail.tabId === '#sent' ? 'sent' : 'received'));
-        
+
         state.currentTab = tabType;
         updateBidsTable();
     }
@@ -194,7 +196,7 @@ const EventManager = {
 };
 
 function cleanup() {
-    
+
     try {
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -329,7 +331,7 @@ window.cleanupBidsTable = cleanup;
 
 CleanupManager.addListener(document, 'visibilitychange', () => {
     if (document.hidden) {
-        
+
         if (WebSocketManager && typeof WebSocketManager.pause === 'function') {
             WebSocketManager.pause();
         } else if (WebSocketManager && typeof WebSocketManager.disconnect === 'function') {
@@ -353,7 +355,7 @@ CleanupManager.addListener(document, 'visibilitychange', () => {
 
         const lastUpdateTime = state.lastRefresh || 0;
         const now = Date.now();
-        const refreshInterval = 5 * 60 * 1000; 
+        const refreshInterval = 5 * 60 * 1000;
 
         if (now - lastUpdateTime > refreshInterval) {
             setTimeout(() => {
@@ -428,60 +430,6 @@ const formatAddressSMSG = (address, displayLength = 14) => {
     if (!address) return '';
     if (address.length <= displayLength) return address;
     return `${address.slice(0, displayLength)}...`;
-};
-
-const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-};
-
-const getTimeStrokeColor = (expireTime) => {
-    const now = Math.floor(Date.now() / 1000);
-    return expireTime > now ? '#10B981' : '#9CA3AF';
-};
-
-const getStatusClass = (status) => {
-    switch (status) {
-        case 'Completed':
-            return 'bg-green-300 text-black dark:bg-green-600 dark:text-white';
-        case 'Abandoned':
-        case 'Expired':
-        case 'Timed-out':
-            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-white';
-        case 'Failed, refunded':
-        case 'Failed, swiped':
-            return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
-        case 'Error':
-        case 'Failed':
-        case 'Rejected':
-            return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
-        case 'Accepted':
-        case 'Request accepted':
-        case 'InProgress':
-        case 'Script coin locked':
-        case 'Scriptless coin locked':
-        case 'Script coin lock released':
-        case 'SendingInitialTx':
-        case 'SendingPaymentTx':
-        case 'Received':
-        case 'Exchanged script lock tx sigs msg':
-        case 'Exchanged script lock spend tx msg':
-        case 'Script tx redeemed':
-        case 'Scriptless tx redeemed':
-        case 'Scriptless tx recovered':
-        case 'Delaying':
-        case 'Auto accept delay':
-            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
-        default:
-            return 'bg-blue-300 text-black dark:bg-blue-500 dark:text-white';
-    }
 };
 
 function coinMatches(offerCoin, filterCoin) {
@@ -1014,7 +962,7 @@ const forceTooltipDOMCleanup = () => {
         });
     }
     if (removedCount > 0) {
-       
+
     }
 }
 
@@ -1106,7 +1054,7 @@ async function fetchAllBids() {
     }
 }
 
-const createTableRow = async (bid) => {
+const createTableRow = async (bid, planId = null, isLast = false) => {
     const rawAddress = bid.addr_from || '';
     let identity = null;
     try {
@@ -1148,10 +1096,12 @@ const createTableRow = async (bid) => {
         `;
     }
 
+    const edge = planId && isLast ? ' border-b-2 border-blue-500' : '';
+
     const rowHtml = `
-        <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
+        <tr class="${planId ? `plan-leg plan-leg-${planId} hidden ` : ''}opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
             <!-- Time Column -->
-            <td class="py-3 pl-6 pr-3">
+            <td class="${planId ? 'py-3 pl-8 pr-3 border-l-4 border-blue-500' : 'py-3 pl-6 pr-3'}${edge}">
                 <div class="flex items-center min-w-max">
                     <svg class="w-5 h-5 mr-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <g stroke-linecap="round" stroke-width="2" fill="none" stroke="${timeColor}" stroke-linejoin="round">
@@ -1167,7 +1117,7 @@ const createTableRow = async (bid) => {
             </td>
 
             <!-- Details Column -->
-            <td class="p-3 hidden lg:flex">
+            <td class="p-3 hidden lg:table-cell${edge}">
                 <div class="flex flex-col">
                     <div class="flex items-center min-w-max">
                         <div class="relative" data-tooltip-target="tooltip-identity-${uniqueId}">
@@ -1188,7 +1138,7 @@ const createTableRow = async (bid) => {
             </td>
 
             <!-- Send Coin Column -->
-            <td class="p-3">
+            <td class="p-3${edge}">
                 <div class="flex items-center min-w-max">
                     <img class="w-8 h-8 mr-2"
                          src="/static/images/coins/${isSent ? bid.coin_to.replace(' ', '-') : bid.coin_from.replace(' ', '-')}.png"
@@ -1202,7 +1152,7 @@ const createTableRow = async (bid) => {
             </td>
 
             <!-- Receive Coin Column -->
-            <td class="p-3">
+            <td class="p-3${edge}">
                 <div class="flex items-center min-w-max">
                     <img class="w-8 h-8 mr-2"
                          src="/static/images/coins/${isSent ? bid.coin_from.replace(' ', '-') : bid.coin_to.replace(' ', '-')}.png"
@@ -1216,7 +1166,7 @@ const createTableRow = async (bid) => {
             </td>
 
            <!-- Status Column -->
-           <td class="py-3 px-6">
+           <td class="py-3 px-6${edge}">
             <div class="relative flex justify-center" data-tooltip-target="tooltip-status-${uniqueId}">
                 <span class="w-full lg:w-7/8 xl:w-2/3 px-2.5 py-1 inline-flex items-center justify-center text-center rounded-full text-xs font-medium bold ${getStatusClass(bid.bid_state)}">
                 ${bid.bid_state}
@@ -1225,7 +1175,7 @@ const createTableRow = async (bid) => {
             </td>
 
             <!-- Actions Column -->
-            <td class="py-3 pr-4">
+            <td class="py-3 pr-4${edge}">
                 <div class="flex justify-center">
                     <a href="/bid/${bid.bid_id}"
                         class="inline-block w-20 py-1 px-2 font-medium text-center text-sm rounded-md bg-blue-500 text-white border border-blue-500 hover:bg-blue-600 transition duration-200">
@@ -1408,6 +1358,18 @@ async function fetchBids(type = state.currentTab) {
     }
 }
 
+const togglePlan = (tbody, row) => {
+    const legs = tbody.querySelectorAll(`.plan-leg-${row.dataset.planId}`);
+    const opening = legs.length > 0 && legs[0].classList.contains('hidden');
+
+    legs.forEach((leg) => leg.classList.toggle('hidden', !opening));
+
+    const toggle = row.querySelector('.plan-toggle');
+    if (toggle) {
+        toggle.textContent = opening ? 'Hide' : 'Show';
+    }
+};
+
 const updateTableContent = async (type) => {
     const tbody = elements[`${type}BidsBody`];
     if (!tbody) return;
@@ -1422,7 +1384,7 @@ const updateTableContent = async (type) => {
 
     tooltipIdsToCleanup.clear();
 
-    const filteredData = state.data[type];
+    const filteredData = groupBids(state.data[type]);
 
     const startIndex = (state.currentPage[type] - 1) * PAGE_SIZE;
     const endIndex = startIndex + PAGE_SIZE;
@@ -1449,13 +1411,24 @@ const updateTableContent = async (type) => {
 
             for (let i = 0; i < currentPageData.length; i += BATCH_SIZE) {
                 const batch = currentPageData.slice(i, i + BATCH_SIZE);
-                const rowPromises = batch.map(bid => createTableRow(bid));
-                const rowData = await Promise.all(rowPromises);
+                const itemPromises = batch.map(async (item) => {
+                    if (item.kind === 'bid') {
+                        return [await createTableRow(item.bid)];
+                    }
+                    // The parent row stands in for the buy; its legs follow it, hidden.
+                    const legs = await Promise.all(
+                        item.bids.map((bid, i) => createTableRow(bid, item.plan_id, i === item.bids.length - 1))
+                    );
+                    return [{ rowHtml: createPlanRow(item) }, ...legs];
+                });
+                const itemData = await Promise.all(itemPromises);
 
-                rowData.forEach(data => {
+                itemData.flat().forEach(data => {
                     allRows.push(data.rowHtml);
-                    allTooltips.push(data.tooltipIdentityHtml);
-                    allTooltips.push(data.tooltipStatusHtml);
+                    if (data.tooltipIdentityHtml) {
+                        allTooltips.push(data.tooltipIdentityHtml);
+                        allTooltips.push(data.tooltipStatusHtml);
+                    }
                 });
             }
 
@@ -1463,6 +1436,10 @@ const updateTableContent = async (type) => {
 
             tbody.innerHTML = allRows.join('');
             tooltipContainer.innerHTML = allTooltips.join('');
+
+            tbody.querySelectorAll('.plan-row').forEach((row) => {
+                row.addEventListener('click', () => togglePlan(tbody, row));
+            });
 
             if (tbody.parentElement && scrollPosition > 0) {
                 tbody.parentElement.scrollTop = scrollPosition;
@@ -1511,7 +1488,7 @@ const initializeTooltips = () => {
     const tooltipTriggers = document.querySelectorAll(selector);
     const tooltipCount = tooltipTriggers.length;
     if (tooltipCount > 50) {
-        
+
         const viewportMargin = 200;
         const viewportTooltips = Array.from(tooltipTriggers).filter(trigger => {
             const rect = trigger.getBoundingClientRect();
@@ -1603,7 +1580,9 @@ const updateBidsTable = async () => {
 };
 
 const updatePaginationControls = (type) => {
-    const data = state.data[type] || [];
+    const bids = state.data[type] || [];
+    // Pages are of rows as shown, and a whole buy shows as one row.
+    const data = groupBids(bids);
     const totalPages = Math.ceil(data.length / PAGE_SIZE);
     const controls = elements[`${type}PaginationControls`];
     const prevButton = elements[`prevPage${type.charAt(0).toUpperCase() + type.slice(1)}`];
@@ -1636,7 +1615,8 @@ const updatePaginationControls = (type) => {
     }
 
     if (bidsCount) {
-        bidsCount.textContent = data.length;
+        // The count is of bids, not of rows, so a buy still counts as its legs.
+        bidsCount.textContent = bids.length;
     }
 };
 

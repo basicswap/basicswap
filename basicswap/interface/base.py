@@ -90,6 +90,18 @@ class CoinInterface:
         # coin_type() returns the base coin type, interface_type() returns the coin+balance type.
         return self.coin_type()
 
+    def max_batched_lock_outputs(self):
+        # Max swap lock outputs payable in one publishBLockTxs tx; None means unbounded.
+        return None
+
+    def getSpendableOutputs(self):
+        # Confirmed, unlocked outputs, or None when the coin cannot preselect inputs.
+        return None
+
+    @staticmethod
+    def est_tx_input_vsize() -> int:
+        return 0
+
     def setDefaults(self):
         self._unknown_wallet_seed = True
         self._restore_height = None
@@ -256,6 +268,11 @@ class CoinInterface:
 
     def unlockOutput(self, txid_hex: str, vout: int, cursor=None) -> None:
         pass
+
+    def getRedeemFeeRate(self):
+        """Rate per kB a redeem will pay, when the offer's committed rate does
+        not size it. None leaves the caller on the committed rate."""
+        return None
 
 
 class AdaptorSigInterface:

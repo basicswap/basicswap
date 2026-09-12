@@ -1,7 +1,7 @@
 {% from 'style.html' import change_password_svg, notifications_network_offer_svg,
   notifications_bid_accepted_svg, notifications_unknow_event_svg,
   notifications_new_bid_on_offer_svg, notifications_close_svg, swap_in_progress_mobile_svg,
-  wallet_svg, page_back_svg, order_book_svg, new_offer_svg, settings_svg, asettings_svg,
+  wallet_svg, page_back_svg, order_book_svg, smart_buy_svg, new_offer_svg, settings_svg, asettings_svg,
   cog_svg, rpc_svg, debug_svg, explorer_svg, tor_svg, smsg_svg, outputs_svg, automation_svg,
   shutdown_svg, notifications_svg, debug_nerd_svg, wallet_locked_svg, mobile_menu_svg,
   wallet_unlocked_svg, tor_purple_svg, sun_svg, moon_svg, swap_in_progress_svg,
@@ -87,41 +87,41 @@
   <script src="/static/js/libs/popper.js"></script>
   <script src="/static/js/libs/tippy.js"></script>
   <!-- UI Components -->
-  <script src="/static/js/ui/tabs.js"></script>
-  <script src="/static/js/ui/dropdown.js"></script>
+  <script src="/static/js/ui/tabs.js?v={{ static_v }}"></script>
+  <script src="/static/js/ui/dropdown.js?v={{ static_v }}"></script>
   <!-- Core functionality -->
-  <script src="/static/js/modules/error-handler.js"></script>
-  <script src="/static/js/modules/dom-cache.js"></script>
-  <script src="/static/js/modules/event-handlers.js"></script>
-  <script src="/static/js/modules/form-validator.js"></script>
-  <script src="/static/js/modules/coin-utils.js"></script>
-  <script src="/static/js/modules/coin-manager.js"></script>
-  <script src="/static/js/modules/config-manager.js"></script>
-  <script src="/static/js/modules/cache-manager.js"></script>
-  <script src="/static/js/modules/cleanup-manager.js"></script>
-  <script src="/static/js/modules/websocket-manager.js"></script>
-  <script src="/static/js/modules/network-manager.js"></script>
-  <script src="/static/js/modules/api-manager.js"></script>
-  <script src="/static/js/modules/price-manager.js"></script>
-  <script src="/static/js/modules/tooltips-manager.js"></script>
-  <script src="/static/js/modules/notification-manager.js"></script>
-  <script src="/static/js/modules/balance-updates.js"></script>
-  <script src="/static/js/modules/identity-manager.js"></script>
-  <script src="/static/js/modules/summary-manager.js"></script>
-  <script src="/static/js/modules/wallet-amount.js"></script>
-  <script src="/static/js/pages/amm-counter.js"></script>
+  <script src="/static/js/modules/error-handler.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/dom-cache.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/event-handlers.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/form-validator.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/coin-utils.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/coin-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/config-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/cache-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/cleanup-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/websocket-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/network-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/api-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/price-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/tooltips-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/notification-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/balance-updates.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/identity-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/summary-manager.js?v={{ static_v }}"></script>
+  <script src="/static/js/modules/wallet-amount.js?v={{ static_v }}"></script>
+  <script src="/static/js/pages/amm-counter.js?v={{ static_v }}"></script>
   {% if current_page == 'wallets' or current_page == 'wallet' %}
-  <script src="/static/js/modules/wallet-manager.js"></script>
+  <script src="/static/js/modules/wallet-manager.js?v={{ static_v }}"></script>
   {% endif %}
   {% if client_auth_enabled %}
   <script>window.BSX_SESSION_TIMEOUT_MIN = {{ session_timeout_minutes }};</script>
   <script src="/static/js/modules/session-heartbeat.js"></script>
   {% endif %}
   <!-- Memory management -->
-  <script src="/static/js/modules/memory-manager.js"></script>
+  <script src="/static/js/modules/memory-manager.js?v={{ static_v }}"></script>
   <!-- Main application script -->
-  <script src="/static/js/global.js"></script>
-  <script src="/static/js/pages/bids-tab-navigation.js"></script>
+  <script src="/static/js/global.js?v={{ static_v }}"></script>
+  <script src="/static/js/pages/bids-tab-navigation.js?v={{ static_v }}"></script>
 
 </head>
 <body class="dark:bg-gray-700">
@@ -181,6 +181,15 @@
                 font-semibold ml-3 mr-2 px-2.5 py-1 font-small text-white bg-blue-500 rounded-full">
                 {{ summary.num_network_offers }}
               </span>
+            </a>
+          </li>
+
+          <!-- Smart buy -->
+          <li>
+            <a class="flex mr-10 items-center py-3 text-sm {% if current_page == 'smartbuy' %}text-white font-semibold{% else %}text-gray-50 hover:text-gray-100{% endif %}"
+              href="/smartbuy">
+              {{ smart_buy_svg | safe }}
+              <span>Smart Buy</span>
             </a>
           </li>
 
@@ -614,6 +623,13 @@
               summary.num_network_offers > 0 %}bg-blue-500{% else %}bg-gray-400{% endif %} rounded-full">
               {{ summary.num_network_offers }}
             </span>
+          </a>
+        </li>
+        <li>
+          <a class="flex items-center pl-3 py-3 pr-4 text-gray-50 hover:bg-gray-900 rounded"
+            href="/smartbuy">
+            {{ smart_buy_svg | safe }}
+            <span>Smart Buy</span>
           </a>
         </li>
         <li>

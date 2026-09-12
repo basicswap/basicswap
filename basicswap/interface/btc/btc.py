@@ -239,6 +239,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return 110
 
     @staticmethod
+    def est_tx_input_vsize() -> int:
+        # est_lock_tx_vsize covers one input, each further input adds this.
+        return 68
+
+    @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 147
 
@@ -1432,9 +1437,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return tx.serialize()
 
     def fundSCLockTx(
-        self, tx_bytes, feerate, vkbv=None, bid_id: bytes = None, cursor=None
+        self,
+        tx_bytes,
+        feerate,
+        vkbv=None,
+        bid_id: bytes = None,
+        cursor=None,
+        prevouts=None,
     ) -> bytes:
-        funded_tx = self.fundTx(tx_bytes, feerate, bid_id=bid_id, cursor=cursor)
+        funded_tx = self.fundTx(
+            tx_bytes, feerate, bid_id=bid_id, cursor=cursor, prevouts=prevouts
+        )
 
         if self._disable_lock_tx_rbf:
             tx = self.loadTx(funded_tx)
@@ -2163,6 +2176,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         subfee: bool = False,
         bid_id: bytes = None,
         cursor=None,
+        prevouts=None,
     ) -> bytes:
         if self.useBackend():
             return self._fundTxElectrum(
@@ -2172,6 +2186,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 subfee=subfee,
                 bid_id=bid_id,
                 cursor=cursor,
+                prevouts=prevouts,
             )
 
         feerate_str = self.format_amount(feerate)
@@ -2181,6 +2196,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             "lockUnspents": lock_unspents,
             "feeRate": feerate_str,
         }
+        if prevouts:
+            tx_obj = self.loadTx(tx, allow_witness=False)
+            for prevout in prevouts:
+                tx_obj.vin.append(
+                    CTxIn(
+                        COutPoint(b2i(bytes.fromhex(prevout["txid"])), prevout["vout"])
+                    )
+                )
+            tx = tx_obj.serialize_without_witness()
+            options["add_inputs"] = False
         if subfee:
             tx_obj = self.loadTx(tx, allow_witness=False)
             num_vouts: int = len(tx_obj.vout)
@@ -2198,6 +2223,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         subfee: bool = False,
         bid_id: bytes = None,
         cursor=None,
+        prevouts=None,
     ) -> bytes:
         wm = self.getWalletManager()
         backend = self.getBackend()
@@ -2236,7 +2262,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             f"_fundTxElectrum: scripthash mismatch for {addr}: "
                             f"stored={sh}, computed={computed_sh}"
                         )
-                if utxo.get("confirmations", 0) < 1 and addr not in internal_addrs:
+                if (
+                    utxo.get("confirmations", 0) < 1
+                    and not prevouts
+                    and addr not in internal_addrs
+                ):
                     unconfirmed_count += 1
                     continue
                 if wm.isUTXOLocked(
@@ -2244,10 +2274,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     utxo.get("txid", ""),
                     utxo.get("vout", 0),
                     cursor=cursor,
+                    bid_id=bid_id,
                 ):
                     locked_count += 1
                     continue
                 utxos.append(utxo)
+
+        if prevouts:
+            wanted = {(p["txid"], p["vout"]) for p in prevouts}
+            utxos = [u for u in utxos if (u["txid"], u["vout"]) in wanted]
+            if len(utxos) < len(wanted):
+                raise ValueError("Preselected inputs are not spendable")
 
         if not utxos:
             if locked_count > 0 or unconfirmed_count > 0:
@@ -2546,6 +2583,69 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 self._log.debug("UTXO already locked")
             else:
                 self._log.warning(f"Error locking UTXOs: {e}")
+
+    def splitOutputs(self, values):
+        """Pay each value to a new address of this wallet in one transaction and
+        broadcast it. Returns the outputs it created, which are spendable as
+        preselected inputs before they confirm."""
+        fee_rate, fee_src = self.get_fee_rate(self._conf_target)
+        self._ensureFeeRateWithinMax(fee_rate, fee_src)
+
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        scripts = []
+        for value in values:
+            addr = self.getNewAddress(self._use_segwit, "plan_split")
+            scripts.append(self.getScriptForPubkeyHash(self.decodeAddress(addr)))
+            tx.vout.append(self.txoType()(value, scripts[-1]))
+
+        funded_tx = self.fundTx(tx.serialize(), self.make_int(fee_rate))
+        signed_tx = self.signTxWithWallet(funded_tx)
+        txid: str = self.publishTx(signed_tx)
+        self._log.info(f"Split {len(values)} plan outputs in tx {self._log.id(txid)}")
+
+        outputs, tx_obj = [], self.loadTx(signed_tx)
+        for script in scripts:
+            n = next(
+                i for i, txo in enumerate(tx_obj.vout) if txo.scriptPubKey == script
+            )
+            outputs.append({"txid": txid, "vout": n, "value": tx_obj.vout[n].nValue})
+        return outputs
+
+    def getSpendableOutputs(self):
+        if self.useBackend():
+            wm = self.getWalletManager()
+            backend = self.getBackend()
+            if not wm or not backend:
+                raise ValueError("Electrum backend or WalletManager not available")
+            rv = []
+            addr_to_sh = wm.getSignableAddresses(self.coin_type())
+            for sh_utxos in backend.getBatchUnspent(list(addr_to_sh.values())).values():
+                for utxo in sh_utxos:
+                    if utxo.get("confirmations", 0) < 1:
+                        continue
+                    if wm.isUTXOLocked(
+                        self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
+                    ):
+                        continue
+                    rv.append(
+                        {
+                            "txid": utxo["txid"],
+                            "vout": utxo["vout"],
+                            "value": utxo["value"],
+                        }
+                    )
+            return rv
+
+        return [
+            {
+                "txid": u["txid"],
+                "vout": u["vout"],
+                "value": self.make_int(u["amount"]),
+            }
+            for u in self.rpc_wallet("listunspent", [1])
+            if u.get("spendable", False) and u.get("safe", True)
+        ]
 
     def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
         if self.useBackend():
@@ -3297,6 +3397,41 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         return txid, lock_vout
+
+    def publishBLockTxs(self, locks, feerate: int, unlock_time: int = 0) -> bytes:
+        """Lock several swaps in one transaction, so their change is not chained."""
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        for _kbv, Kbs, output_amount in locks:
+            tx.vout.append(self.txoType()(output_amount, self.getPkDest(Kbs)))
+
+        b_lock_tx = self.fundTx(tx.serialize(), feerate)
+        b_lock_tx = self.signTxWithWallet(b_lock_tx)
+        txid = bytes.fromhex(self.publishTx(b_lock_tx))
+        self._log.info(
+            "publishBLockTxs {} to {} lock outputs".format(
+                self._log.id(txid), len(locks)
+            )
+        )
+        return txid
+
+    def getHTLCDest(self, script):
+        return (
+            self.getScriptDest(script)
+            if self.using_segwit()
+            else self.get_p2sh_script_pubkey(script)
+        )
+
+    def fundHTLCTxs(self, htlcs, feerate: int) -> bytes:
+        """Lock several HTLCs in one transaction, so their change is not chained.
+        Returned signed but unpublished, so every leg is recorded first."""
+        tx = CTransaction()
+        tx.nVersion = self.txVersion()
+        for script, output_amount in htlcs:
+            tx.vout.append(self.txoType()(output_amount, self.getHTLCDest(script)))
+
+        funded_tx = self.fundTx(tx.serialize(), feerate)
+        return self.signTxWithWallet(funded_tx)
 
     def getTxVSize(self, tx, add_bytes: int = 0, add_witness_bytes: int = 0) -> int:
         wsf = self.witnessScaleFactor()
