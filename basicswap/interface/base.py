@@ -233,6 +233,12 @@ class CoinInterface:
         # signed by the wallet as it was then.
         return True
 
+    def mercySpendImportsKey(self) -> bool:
+        # Whether prepareMercySpend leaves the wallet able to spend the swipe
+        # payout on its own.  Where it does not, the payout is only recoverable
+        # by a tx signed with the key here.
+        return False
+
     def prepareMercySpend(self, key: bytes, rescan_from: int) -> None:
         # Called before building the mercy tx, for coins that can only spend the
         # swipe payout through the wallet.  Nothing to do where the mercy tx is

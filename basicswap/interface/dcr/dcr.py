@@ -1792,7 +1792,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         refund_swipe_tx_bytes: bytes,
         refund_swipe_tx_id: bytes,
         lock_refund_tx_script: bytes,
-        keyshare: bytes,
+        keyshare: bytes | None,
         tx_fee_rate: int,
         key: bytes | None = None,
         addr_to: str | None = None,
@@ -1808,10 +1808,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx.version = self.txVersion()
         tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0, 0)))
 
-        mercy_script = bytearray((OP_RETURN,))
-        push_script_data(mercy_script, b"XBSW")
-        push_script_data(mercy_script, keyshare)
-        tx.vout.append(self.txoType()(0, bytes(mercy_script)))
+        if keyshare is not None:
+            mercy_script = bytearray((OP_RETURN,))
+            push_script_data(mercy_script, b"XBSW")
+            push_script_data(mercy_script, keyshare)
+            tx.vout.append(self.txoType()(0, bytes(mercy_script)))
         # Back to the same script by default, which is the wallet's own.  A swipe
         # paid to a key derived for the swap has to name a destination instead,
         # or the coin stays on a key the wallet knows nothing about.
@@ -1828,7 +1829,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         change: int = prevout_value - pay_fee
         # dcrd dust threshold for a P2PKH output at the default relay fee
         ensure(change > 6030, "Swipe output too small to send a mercy tx")
-        tx.vout[1].value = change
+        tx.vout[-1].value = change
 
         self._log.info(
             "createMercyTx {}{}.".format(

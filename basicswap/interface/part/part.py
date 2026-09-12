@@ -1026,6 +1026,9 @@ class PARTInterfaceBlind(PARTInterface):
 
         return True
 
+    def mercySpendImportsKey(self) -> bool:
+        return True
+
     def getMercyWatchVouts(self, swipe_txid_hex: str, swipe_tx=None) -> List[int]:
         # fundrawtransactionfrom reorders the outputs, and the payout is blinded
         # to an address the leader never sees, so it can't pick out the one the
