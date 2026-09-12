@@ -334,11 +334,19 @@ def stopDaemons(daemons):
     for d in daemons:
         try:
             d.handle.wait(timeout=20)
-            for fp in d.files:
-                if fp:
-                    fp.close()
         except Exception as e:
             logging.info(f"Closing {d.handle.pid}, error: {e}")
+            try:
+                d.handle.kill()
+                d.handle.wait(timeout=20)
+            except Exception as e:
+                logging.warning(f"Killing {d.handle.pid}, error: {e}")
+        for fp in d.files:
+            if fp:
+                try:
+                    fp.close()
+                except Exception as e:
+                    logging.info(f"Closing log file, error: {e}")
 
 
 def wait_for_bid(
