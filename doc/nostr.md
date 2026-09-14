@@ -3,10 +3,11 @@
 BasicSwap can use the [Nostr](https://nostr.com) protocol as a message
 transport, alongside or instead of SMSG and SimpleX.
 
-All messages remain end-to-end encrypted with the SMSG payload format
-regardless of the transport.  Relays cannot read message contents, but
-as with any nostr client they can see event metadata (sender pubkey,
-timing and size).
+Swap and bid payloads stay encrypted with the SMSG format regardless of
+the transport.  A relay that only forwards events sees the outer Nostr
+metadata (signing pubkey, timing and size), not the inner ciphertext.
+Offers are different: they are encrypted to the shared network key, so
+any BasicSwap node — and anyone else who has that key — can read them.
 
 ## How it works
 
@@ -15,10 +16,12 @@ timing and size).
 - Offers and other broadcasts are signed with the node's persistent
   `private_key`.  Each swap negotiates a direct message route with a
   fresh key pair generated for that route (exchanged in the CONNECT_REQ
-  handshake and stored with the route), so bids and swap messages can't
-  be linked to the node key or to other swaps by relays.  The ACK echoes
-  the requester's route key and must be signed by the key it announces,
-  so a stored ACK replayed by a relay can't activate a later route.
+  handshake and stored with the route).  Separate route keys reduce
+  identity linkage to the node key and to other swaps, but they do not
+  prevent a relay from correlating messages on the same connection or
+  by timing.  The ACK echoes the requester's route key and must be
+  signed by the key it announces, so a stored ACK replayed by a relay
+  can't activate a later route.
 - A bid waits in state "Connect request sent" until the ACK arrives.
   If the ACK is lost the CONNECT_REQ is retransmitted by the update loop
   with the same route key, backing off from 30s to 10 minutes for up to
