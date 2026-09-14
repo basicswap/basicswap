@@ -18,6 +18,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.14"
+  PYTHON_FLOOR_VERSION: "3.11"
   BASE_COINS: particl,bitcoin,monero
   BIN_DIR: /tmp/cached_bin
   TEST_RELOAD_PATH: /tmp/test_basicswap
@@ -143,6 +144,32 @@ jobs:
       run: |
         black --check --diff .
 
+  test_python_floor:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Python ${{ env.PYTHON_FLOOR_VERSION }}
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ env.PYTHON_FLOOR_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --require-hashes
+        pip install .[dev]
+    - name: Compile all modules
+      run: |
+        python -m compileall -q basicswap tests
+    - name: Run unit tests
+      run: |
+        pytest tests/basicswap/test_other.py
+        pytest tests/basicswap/test_nostr.py
+
   prepare-cores:
     needs: lint
     runs-on: ubuntu-latest
@@ -188,6 +215,7 @@ jobs:
             command: |
               pytest tests/basicswap/test_other.py
               pytest tests/basicswap/test_amm_config_api.py
+              pytest tests/basicswap/test_nostr.py
           - name: test_prepare
             command: |
               export PYTHONPATH=$(pwd)
