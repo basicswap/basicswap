@@ -7,6 +7,7 @@
 
 import base64
 import json
+import logging
 import threading
 import traceback
 import websocket
@@ -22,7 +23,7 @@ from basicswap.util.smsg import (
 from basicswap.chainparams import (
     Coins,
 )
-from basicswap.util import ensure
+from basicswap.util import ensure, TemporaryError
 from basicswap.util.address import (
     decodeWif,
 )
@@ -38,15 +39,20 @@ def decode_base64(encoded_data: str) -> bytes:
 
 
 class WebSocketThread(threading.Thread):
-    def __init__(self, url: str, tag: str = None, logger=None):
+    def __init__(self, url: str, tag: str = None, logger=None, shutdown_event=None):
         super().__init__()
         self.url: str = url
         self.tag = tag
         self.logger = logger
+        self.shutdown_event = shutdown_event
+        # The websocket library logs every connection error to its own
+        # logger, duplicating the on_error callbacks.
+        logging.getLogger("websocket").setLevel(logging.CRITICAL)
         self.ws = None
         self.mutex = threading.Lock()
         self.corrId: int = 0
         self.connected: bool = False
+        self.connection_id: int = 0  # Incremented on each (re)connect
         self.delay_event = threading.Event()
 
         self.recv_queue = Queue()
@@ -56,6 +62,15 @@ class WebSocketThread(threading.Thread):
         self.ignore_events: bool = False
 
         self.num_messages_received: int = 0
+        self.last_error_str: str = ""
+        self._stopping: bool = False
+
+    def _should_stop(self) -> bool:
+        if self._stopping or self.delay_event.is_set():
+            return True
+        if self.shutdown_event is not None and self.shutdown_event.is_set():
+            return True
+        return False
 
     def disable_debug_mode(self):
         self.ignore_events = False
@@ -91,14 +106,25 @@ class WebSocketThread(threading.Thread):
             return None
 
     def on_error(self, ws, error):
+        if self._should_stop():
+            return
+        error_str = str(error)
+        repeated: bool = error_str == self.last_error_str
+        self.last_error_str = error_str
         if self.logger:
-            self.logger.error(f"Simplex ws - {error}")
+            log_func = self.logger.debug if repeated else self.logger.error
+            log_func(f"Simplex ws - {error}")
         else:
             print(f"{self.tag} - Error: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
+        was_connected: bool = self.connected
+        self.connected = False
+        if self._should_stop():
+            return
         if self.logger:
-            self.logger.info(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
+            log_func = self.logger.info if was_connected else self.logger.debug
+            log_func(f"Simplex ws - Closed: {close_status_code}, {close_msg}")
         else:
             print(f"{self.tag} - Closed: {close_status_code}, {close_msg}")
 
@@ -107,10 +133,14 @@ class WebSocketThread(threading.Thread):
             self.logger.info("Simplex ws - Connection opened")
         else:
             print(f"{self.tag}: WebSocket connection opened")
+        self.connection_id += 1
         self.connected = True
+        self.last_error_str = ""
 
     def send_command(self, cmd_str: str):
         with self.mutex:
+            if self.ws is None or not self.connected:
+                raise TemporaryError("SimpleX client not connected.")
             self.corrId += 1
             if self.logger:
                 self.logger.debug(f"Simplex sent command {self.corrId}")
@@ -142,17 +172,26 @@ class WebSocketThread(threading.Thread):
             on_open=self.on_open,
             on_close=self.on_close,
         )
-        while not self.delay_event.is_set():
+        while not self._should_stop():
             self.ws.run_forever()
+            if self._should_stop():
+                break
             self.delay_event.wait(0.5)
 
     def stop(self):
+        if self._stopping:
+            return
+        self._stopping = True
         self.delay_event.set()
         if self.ws:
-            self.ws.close()
+            try:
+                self.ws.close()
+            except Exception:
+                pass
 
 
-def waitForResponse(ws_thread, sent_id, delay_event):
+def waitForResponse(ws_thread, sent_id, delay_event, connection_id=None):
+    # With connection_id set, a lost or missing reply raises TemporaryError
     sent_id = str(sent_id)
     for i in range(200):
         message = ws_thread.cmd_queue_get()
@@ -161,7 +200,15 @@ def waitForResponse(ws_thread, sent_id, delay_event):
             if "corrId" in data:
                 if data["corrId"] == sent_id:
                     return data
+        if connection_id is not None and (
+            not ws_thread.connected or ws_thread.connection_id != connection_id
+        ):
+            raise TemporaryError(
+                f"SimpleX connection lost waiting for response to ID: {sent_id}"
+            )
         delay_event.wait(0.5)
+    if connection_id is not None:
+        raise TemporaryError(f"SimpleX response missing for ID: {sent_id}")
     raise ValueError(f"waitForResponse timed-out waiting for ID: {sent_id}")
 
 
@@ -233,36 +280,31 @@ def sendSimplexMsg(
     )
     smsg_id = smsgGetID(smsg_msg)
 
-    ws_thread = network["ws_thread"]
-    if to_user_name is not None:
-        to = "@" + to_user_name + " "
-    else:
-        to = "#bsx "
-    sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
-    response = waitForResponse(ws_thread, sent_id, self.delay_event)
-    if getResponseData(response, "type") != "newChatItems":
-        json_str = json.dumps(response, indent=4)
-        self.log.debug(f"Response {json_str}")
-        raise ValueError("Send failed")
-    if to_user_name is not None:
-        self.num_direct_simplex_messages_sent += 1
-    else:
-        self.num_group_simplex_messages_sent += 1
+    submitSimplexMsg(self, network, smsg_msg, to_user_name)
 
     if return_msg:
         return smsg_id, smsg_msg
     return smsg_id
 
 
-def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
-    smsg_id = smsgGetID(smsg_msg)
+def submitSimplexMsg(self, network, smsg_msg, to_user_name: str = None) -> None:
+    # Raises TemporaryError while the simplex-chat client is unreachable so
+    # queued actions retry instead of erroring the bid.
     ws_thread = network["ws_thread"]
     if to_user_name is not None:
         to = "@" + to_user_name + " "
     else:
         to = "#bsx "
-    sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
-    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    if not ws_thread.connected:
+        raise TemporaryError("SimpleX client not connected.")
+    connection_id: int = ws_thread.connection_id
+    try:
+        sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
+        response = waitForResponse(
+            ws_thread, sent_id, self.delay_event, connection_id=connection_id
+        )
+    except (websocket.WebSocketException, OSError) as e:
+        raise TemporaryError(f"SimpleX send failed: {e}")
     if getResponseData(response, "type") != "newChatItems":
         json_str = json.dumps(response, indent=4)
         self.log.debug(f"Response {json_str}")
@@ -272,7 +314,10 @@ def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
     else:
         self.num_group_simplex_messages_sent += 1
 
-    return smsg_id
+
+def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
+    submitSimplexMsg(self, network, smsg_msg, to_user_name)
+    return smsgGetID(smsg_msg)
 
 
 def decryptSimplexMsg(self, msg_data):
@@ -439,14 +484,144 @@ def getNewSimplexLink(data):
     response_data = getResponseData(data)
     if "connLinkContact" in response_data:
         return response_data["connLinkContact"]["connFullLink"]
-    return response_data["connReqContact"]
+    # simplex-chat v7 nests group links: groupLinkCreated.groupLink.connLinkContact
+    group_link = response_data.get("groupLink")
+    if isinstance(group_link, dict) and "connLinkContact" in group_link:
+        return group_link["connLinkContact"]["connFullLink"]
+    resp_type = response_data.get("type", "unknown")
+    if resp_type == "chatCmdError":
+        detail = formatSimplexChatError(response_data.get("chatError"))
+        raise TemporaryError("SimpleX /address failed: {}".format(detail))
+    raise ValueError("Unexpected SimpleX response type: {}".format(resp_type))
+
+
+def formatSimplexChatError(chat_error) -> str:
+    if not chat_error:
+        return "unknown error"
+    error_type = chat_error.get("errorType")
+    if isinstance(error_type, dict):
+        if error_type.get("message"):
+            return error_type["message"]
+        if error_type.get("type"):
+            return error_type["type"]
+    agent_error = chat_error.get("agentError")
+    if isinstance(agent_error, dict):
+        broker_err = agent_error.get("brokerErr")
+        if isinstance(broker_err, dict):
+            network_error = broker_err.get("networkError")
+            if isinstance(network_error, dict):
+                if network_error.get("connectError"):
+                    return network_error["connectError"]
+                if network_error.get("type"):
+                    return network_error["type"]
+            if broker_err.get("type"):
+                return broker_err["type"]
+        if agent_error.get("brokerAddress"):
+            return "{} ({})".format(
+                agent_error.get("type", "agent error"), agent_error["brokerAddress"]
+            )
+        if agent_error.get("type"):
+            return agent_error["type"]
+    if chat_error.get("type"):
+        return chat_error["type"]
+    return json.dumps(chat_error)
 
 
 def getJoinedSimplexLink(data):
     response_data = getResponseData(data)
-    if "connLinkInvitation" in response_data:
-        return response_data["connLinkInvitation"]["connFullLink"]
-    return response_data["connReqInvitation"]
+    # SimpleX responds with connLinkInvitation for one-time invitations
+    # and connLinkContact for contact addresses.
+    for link_tag in ("connLinkInvitation", "connLinkContact"):
+        if link_tag in response_data:
+            return response_data[link_tag]["connFullLink"]
+    resp_type = response_data.get("type", "unknown")
+    if resp_type == "chatCmdError":
+        detail = formatSimplexChatError(response_data.get("chatError"))
+        raise TemporaryError("SimpleX /connect failed: {}".format(detail))
+    raise ValueError("Unexpected SimpleX response type: {}".format(resp_type))
+
+
+def createSimplexConnectInvitation(
+    ws_thread, delay_event, logger=None, num_tries: int = 3
+):
+    last_error = None
+    for attempt in range(num_tries):
+        cmd_id = ws_thread.send_command("/connect")
+        response = ws_thread.wait_for_command_response(cmd_id)
+        try:
+            conn_link = getJoinedSimplexLink(response)
+            pccConnId = getResponseData(response, "connection")["pccConnId"]
+            return conn_link, pccConnId
+        except TemporaryError as ex:
+            last_error = ex
+            if logger:
+                logger.warning(
+                    "SimpleX /connect failed (attempt {}/{}): {}".format(
+                        attempt + 1, num_tries, ex
+                    )
+                )
+            if attempt + 1 < num_tries:
+                delay_event.wait(2.0)
+    raise last_error
+
+
+def joinSimplexGroup(self, ws_thread, group_link: str) -> None:
+    sent_id = ws_thread.send_command("/c " + group_link)
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    ensure(
+        "groupLinkId" in getResponseData(response, "connection"),
+        "Missing groupLinkId",
+    )
+
+
+def leaveSimplexGroup(self, ws_thread, group_name: str) -> None:
+    sent_id = ws_thread.send_command(f"/leave #{group_name}")
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    resp_type = getResponseData(response).get("type")
+    if resp_type != "leftMemberUser":
+        self.log.debug(f"SimpleX /leave #{group_name} returned {resp_type}")
+
+    sent_id = ws_thread.send_command(f"/delete #{group_name}")
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    resp_type = getResponseData(response).get("type")
+    ensure(
+        resp_type == "groupDeletedUser",
+        f"Failed to delete SimpleX group #{group_name}: {resp_type}",
+    )
+
+
+def ensureSimplexGroup(self, ws_thread, network_config) -> None:
+    group_link: str = network_config["group_link"]
+    joined_link = network_config.get("joined_group_link")
+
+    sent_id = ws_thread.send_command("/groups")
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    groups = getResponseData(response, "groups")
+
+    if len(groups) > 0 and joined_link is not None and joined_link != group_link:
+        for group in groups:
+            group_name = group["localDisplayName"]
+            if group.get("membership", {}).get("memberRole") == "owner":
+                raise ValueError(
+                    f"Not replacing SimpleX group #{group_name}, this node owns "
+                    "it. Leave or delete it in simplex-chat before changing the "
+                    "group link."
+                )
+        for group in groups:
+            group_name = group["localDisplayName"]
+            self.log.warning(
+                f"SimpleX group link changed, leaving group #{group_name}."
+            )
+            leaveSimplexGroup(self, ws_thread, group_name)
+        groups = []
+
+    if len(groups) < 1:
+        self.log.info("Joining SimpleX group.")
+        joinSimplexGroup(self, ws_thread, group_link)
+
+    if joined_link != group_link:
+        network_config["joined_group_link"] = group_link
+        self._save_settings()
 
 
 def initialiseSimplexNetwork(self, network_config) -> None:
@@ -455,21 +630,16 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     client_host: str = network_config.get("client_host", "127.0.0.1")
     ws_port: str = network_config.get("ws_port")
 
-    ws_thread = WebSocketThread(f"ws://{client_host}:{ws_port}", logger=self.log)
+    ws_thread = WebSocketThread(
+        f"ws://{client_host}:{ws_port}",
+        logger=self.log,
+        shutdown_event=self.delay_event,
+    )
     self.threads.append(ws_thread)
     ws_thread.start()
     waitForConnected(ws_thread, self.delay_event)
 
-    sent_id = ws_thread.send_command("/groups")
-    response = waitForResponse(ws_thread, sent_id, self.delay_event)
-
-    if len(getResponseData(response, "groups")) < 1:
-        sent_id = ws_thread.send_command("/c " + network_config["group_link"])
-        response = waitForResponse(ws_thread, sent_id, self.delay_event)
-        ensure(
-            "groupLinkId" in getResponseData(response, "connection"),
-            "Missing groupLinkId",
-        )
+    ensureSimplexGroup(self, ws_thread, network_config)
 
     add_network = {
         "type": "simplex",
