@@ -550,6 +550,65 @@ def createSimplexConnectInvitation(
     raise last_error
 
 
+def joinSimplexGroup(self, ws_thread, group_link: str) -> None:
+    sent_id = ws_thread.send_command("/c " + group_link)
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    ensure(
+        "groupLinkId" in getResponseData(response, "connection"),
+        "Missing groupLinkId",
+    )
+
+
+def leaveSimplexGroup(self, ws_thread, group_name: str) -> None:
+    sent_id = ws_thread.send_command(f"/leave #{group_name}")
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    resp_type = getResponseData(response).get("type")
+    if resp_type != "leftMemberUser":
+        self.log.debug(f"SimpleX /leave #{group_name} returned {resp_type}")
+
+    sent_id = ws_thread.send_command(f"/delete #{group_name}")
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    resp_type = getResponseData(response).get("type")
+    ensure(
+        resp_type == "groupDeletedUser",
+        f"Failed to delete SimpleX group #{group_name}: {resp_type}",
+    )
+
+
+def ensureSimplexGroup(self, ws_thread, network_config) -> None:
+    group_link: str = network_config["group_link"]
+    joined_link = network_config.get("joined_group_link")
+
+    sent_id = ws_thread.send_command("/groups")
+    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    groups = getResponseData(response, "groups")
+
+    if len(groups) > 0 and joined_link is not None and joined_link != group_link:
+        for group in groups:
+            group_name = group["localDisplayName"]
+            if group.get("membership", {}).get("memberRole") == "owner":
+                raise ValueError(
+                    f"Not replacing SimpleX group #{group_name}, this node owns "
+                    "it. Leave or delete it in simplex-chat before changing the "
+                    "group link."
+                )
+        for group in groups:
+            group_name = group["localDisplayName"]
+            self.log.warning(
+                f"SimpleX group link changed, leaving group #{group_name}."
+            )
+            leaveSimplexGroup(self, ws_thread, group_name)
+        groups = []
+
+    if len(groups) < 1:
+        self.log.info("Joining SimpleX group.")
+        joinSimplexGroup(self, ws_thread, group_link)
+
+    if joined_link != group_link:
+        network_config["joined_group_link"] = group_link
+        self._save_settings()
+
+
 def initialiseSimplexNetwork(self, network_config) -> None:
     self.log.debug("initialiseSimplexNetwork")
 
@@ -565,16 +624,7 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     ws_thread.start()
     waitForConnected(ws_thread, self.delay_event)
 
-    sent_id = ws_thread.send_command("/groups")
-    response = waitForResponse(ws_thread, sent_id, self.delay_event)
-
-    if len(getResponseData(response, "groups")) < 1:
-        sent_id = ws_thread.send_command("/c " + network_config["group_link"])
-        response = waitForResponse(ws_thread, sent_id, self.delay_event)
-        ensure(
-            "groupLinkId" in getResponseData(response, "connection"),
-            "Missing groupLinkId",
-        )
+    ensureSimplexGroup(self, ws_thread, network_config)
 
     add_network = {
         "type": "simplex",

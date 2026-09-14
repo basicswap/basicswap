@@ -78,16 +78,23 @@ SimpleX Chat release signing key
 key is bundled locally or fetched from a keyserver on first prepare.
 
 Upstream's signed manifest for 7.0.0 only lists the Ubuntu `x86_64`
-builds.  For builds that are not in the manifest (Linux `aarch64`,
-macOS, Windows) prepare checks the hash against the `SHA2-256(...)`
-lines in the GitHub release notes instead and logs a warning, because
-that hash is not covered by the PGP signature.
+builds.  The hashes of the other builds (Linux `aarch64`, macOS,
+Windows) are only published in the GitHub release notes, which are not
+signed and can be edited after release.  For those builds prepare
+checks the hash against a per-version checksum pinned in
+`basicswap/bin/prepare.py` (`SIMPLEX_PINNED_HASHES`) instead, so the
+trust anchor is the reviewed BasicSwap source rather than the release
+page.  When `SIMPLEX_CHAT_VERSION` is changed to a release without
+pinned checksums, prepare refuses to download an unsigned build unless
+`SIMPLEX_ALLOW_UNSIGNED_HASH=1` is set, in which case the release-notes
+hash is used and the binary is treated as unverified.
 
 An existing binary at `bin/simplex/simplex-chat` is re-verified against
 the manifest for `SIMPLEX_CHAT_VERSION` each time prepare adds the
 network.  If it doesn't match (wrong version, manual replacement,
 corruption) it is redownloaded.  After successful verification prepare
-writes `bin/simplex/.verified` recording the version and hash.
+writes `bin/simplex/.verified` recording the version, hash and how the
+hash was authenticated (`signed`, `pinned` or `release_notes`).
 
 At startup BasicSwap compares the binary's hash against `.verified` and
 refuses to start the SimpleX network on a mismatch or if the configured
@@ -96,14 +103,21 @@ without a `.verified` file start with a warning; re-run prepare to
 create it.  The check result is logged at startup and recorded on the
 running network config as `verify_status` (`ok`, `unverified`,
 `missing`, `hash_mismatch`, `unsupported_version`) alongside
-`client_version`.
+`client_version` and `verification`.  Only `signed` and `pinned`
+hashes give `ok`; a `release_notes` hash, or a `.verified` file from
+before the method was recorded, gives `unverified`.
 
 Environment variables controlling verification:
 
 - `SKIP_GPG_VALIDATION`: Skip the signature check (hash is still
   enforced), same as for coin cores.
 - `SIMPLEX_SKIP_VERIFY`: Trust an existing binary without any checks.
-  For manual installs or custom builds; no `.verified` file is written.
+  For manual installs or custom builds; any `.verified` file left by a
+  previous verified install is removed so startup reports the binary
+  as `unverified` instead of `hash_mismatch`.
+- `SIMPLEX_ALLOW_UNSIGNED_HASH`: Accept the unsigned release-notes hash
+  for a build that is neither in the signed manifest nor pinned.  The
+  binary is reported as `unverified`.
 - `SIMPLEX_FORCE_DOWNLOAD`: Replace any existing binary with a fresh,
   verified download.
 - `SIMPLEX_ALLOW_UNSUPPORTED_DISTRO`: Try the Ubuntu 24.04 build on an
@@ -140,6 +154,22 @@ basicswap-prepare --datadir=~/coinswaps --disablenetwork=simplex
 ```
 
 Restart BasicSwap after adding, removing, or reconfiguring SimpleX.
+
+## Changing the group
+
+BasicSwap records the link it joined with as `joined_group_link` next
+to `group_link` in the network settings.  When `group_link` is changed
+(in `basicswap.json` or through the Settings page) and BasicSwap is
+restarted, it leaves and deletes the groups in its `simplex-chat`
+database and joins the new link, then updates `joined_group_link`.
+Direct contacts used for bid messages are kept.
+
+If this node owns the current group (it created the group and link
+itself) the switch is refused and SimpleX does not start; leave or
+delete the group in `simplex-chat` first, or keep the link.  Nodes
+upgraded from a version without `joined_group_link` record their
+configured `group_link` as joined at the next start, so change the link
+only after that first restart.
 
 ## Creating a new group
 

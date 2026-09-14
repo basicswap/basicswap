@@ -333,7 +333,8 @@ def checkSimplexClientBinary(client_path: str, network: dict, logger) -> bool:
     Compares the on-disk binary hash against the metadata written by
     basicswap-prepare (bin/simplex/.verified).  Returns False if the binary
     is missing or doesn't match the verified hash.  Installs predating the
-    metadata file are allowed through with a warning.
+    metadata file, and hashes that were only checked against the unsigned
+    release notes, are allowed through with a warning as "unverified".
 
     Sets network["verify_status"] to one of:
     ok, unverified, missing, hash_mismatch, unsupported_version.
@@ -393,6 +394,24 @@ def checkSimplexClientBinary(client_path: str, network: dict, logger) -> bool:
             f"Simplex client version mismatch: verified {verified_version}, "
             f"configured {expected_version}."
         )
+
+    verification = metadata.get("verification")
+    network["verification"] = verification
+    if verification not in ("signed", "pinned"):
+        network["verify_status"] = "unverified"
+        if verification == "release_notes":
+            logger.warning(
+                "Simplex client hash was only checked against the unsigned "
+                "release notes (SIMPLEX_ALLOW_UNSIGNED_HASH), treating it as "
+                "unverified."
+            )
+        else:
+            logger.warning(
+                "Simplex client verification metadata does not record how the "
+                "binary was verified, re-run basicswap-prepare "
+                "--addnetwork=simplex."
+            )
+        return True
     network["verify_status"] = "ok"
     return True
 

@@ -186,6 +186,20 @@ SIMPLEX_FORCE_DOWNLOAD = toBool(os.getenv("SIMPLEX_FORCE_DOWNLOAD", False))
 SIMPLEX_ALLOW_UNSUPPORTED_DISTRO = toBool(
     os.getenv("SIMPLEX_ALLOW_UNSUPPORTED_DISTRO", False)
 )
+# Accept an unsigned release-notes hash for a build that is neither in the
+# signed manifest nor pinned below, startup reports the binary as unverified
+SIMPLEX_ALLOW_UNSIGNED_HASH = toBool(os.getenv("SIMPLEX_ALLOW_UNSIGNED_HASH", False))
+
+# SHA-256 of release files absent from the signed _sha256sums manifest
+SIMPLEX_PINNED_HASHES = {
+    "7.0.0": {
+        "simplex-chat-ubuntu-22_04-aarch64": "798cbe00b1cafcd65804762800aa8b889db42d7e231cfefd1ceeeb4d1e91f7f4",
+        "simplex-chat-ubuntu-24_04-aarch64": "70a439699053c1d9b7f83fef9dcdd5e391a5b6648a28a797b4e1b730a08b1c1b",
+        "simplex-chat-macos-aarch64": "b2837b8d1e782285bdaefca98b61f03cb0384948ab43275b1bed7b2964593590",
+        "simplex-chat-macos-x86-64": "252c566ac1abad183ce6c8e824cdb8320ee7dd420c9e5f973385d2f20e6d5b56",
+        "simplex-chat-windows-x86-64": "30709806598f0e6987fd480b75d03572e12ecf2d460374e3667982c8a180b3ed",
+    },
+}
 
 
 known_networks = ["smsg", "simplex"]
@@ -602,18 +616,36 @@ def manifestListsFile(assert_path: str, release_file: str) -> bool:
 
 def ensureSimplexReleaseHash(
     release_hash: str, release_file: str, assert_path: str
-) -> None:
+) -> str:
     if manifestListsFile(assert_path, release_file):
-        # Listed in the signed manifest: the hash must match, no fallback.
         ensureFileHashInFile(release_hash, assert_path, logger)
-        return
+        return "signed"
 
-    # The signed _sha256sums only covers the Ubuntu x86_64 builds (for 7.0.0),
-    # the aarch64, macOS and Windows hashes are only in the release notes.
+    pinned_hash = SIMPLEX_PINNED_HASHES.get(SIMPLEX_CHAT_VERSION, {}).get(release_file)
+    if pinned_hash is not None:
+        if release_hash != pinned_hash:
+            raise ValueError(
+                f"Release hash mismatch for {release_file}: "
+                f"{release_hash} != {pinned_hash}"
+            )
+        logger.info(
+            f"{release_file} is not in the signed release manifest, "
+            "hash matches the checksum pinned in BasicSwap."
+        )
+        return "pinned"
+
+    if not SIMPLEX_ALLOW_UNSIGNED_HASH:
+        raise ValueError(
+            f"{release_file} is not in the signed release manifest and no "
+            f"checksum is pinned for v{SIMPLEX_CHAT_VERSION}. "
+            "Set SIMPLEX_ALLOW_UNSIGNED_HASH=1 to accept the unsigned hash from "
+            "the release notes, or install a simplex-chat binary manually and "
+            "set SIMPLEX_SKIP_VERIFY=1."
+        )
     logger.warning(
-        f"{release_file} is not listed in the signed release manifest, "
-        "checking the hash against the release notes instead. "
-        "This hash is not covered by the PGP signature."
+        f"SIMPLEX_ALLOW_UNSIGNED_HASH is set, checking {release_file} against "
+        "the release notes. This hash is not covered by the PGP signature and "
+        "the binary will be reported as unverified."
     )
     expected_hash = fetchSimplexReleaseBodyHash(release_file)
     if expected_hash is None:
@@ -627,9 +659,12 @@ def ensureSimplexReleaseHash(
             f"{release_hash} != {expected_hash}"
         )
     logger.info(f"Found release hash for {release_file} in release notes.")
+    return "release_notes"
 
 
-def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
+def verifySimplexRelease(
+    file_path: str, release_dir: str, extra_opts
+) -> tuple[str, str]:
     """Verify a simplex-chat binary against the upstream release manifest.
 
     Ensures the file's SHA-256 is listed in the release _sha256sums file and
@@ -637,7 +672,8 @@ def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
     coin core verification flow.  Honours SKIP_GPG_VALIDATION the same way
     coin cores do: the hash is always checked, only the signature is skipped.
 
-    Returns the file hash on success, raises ValueError on failure.
+    Returns (file hash, verification method) on success, raises ValueError
+    on failure.  The method is "signed", "pinned" or "release_notes".
     """
     assert_filename = "_sha256sums"
     assert_path = os.path.join(release_dir, assert_filename)
@@ -648,13 +684,13 @@ def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
     release_hash: str = getFileHash(file_path)
     logger.info(f"{os.path.basename(file_path)} hash: {release_hash}")
     release_file = getSimplexClientReleaseFilename()
-    ensureSimplexReleaseHash(release_hash, release_file, assert_path)
+    verification = ensureSimplexReleaseHash(release_hash, release_file, assert_path)
 
     if SKIP_GPG_VALIDATION:
         logger.warning(
             "Skipping binary signature check as SKIP_GPG_VALIDATION env var is set."
         )
-        return release_hash
+        return release_hash, verification
 
     assert_sig_path = assert_path + ".asc"
     assert_sig_url = assert_url + ".asc"
@@ -672,19 +708,29 @@ def verifySimplexRelease(file_path: str, release_dir: str, extra_opts) -> str:
         logger,
         filepath=assert_path,
     )
-    return release_hash
+    return release_hash, verification
 
 
-def writeSimplexVerifiedMetadata(simplex_chat_bin_dir: str, release_hash: str) -> None:
+def writeSimplexVerifiedMetadata(
+    simplex_chat_bin_dir: str, release_hash: str, verification: str
+) -> None:
     metadata_path = os.path.join(simplex_chat_bin_dir, ".verified")
     metadata = {
         "version": SIMPLEX_CHAT_VERSION,
         "sha256": release_hash,
+        "verification": verification,
         "verified_at": int(time.time()),
     }
     with open(metadata_path, "w") as fp:
         json.dump(metadata, fp, indent=4)
     logger.info(f"Wrote verification metadata: {metadata_path}")
+
+
+def removeSimplexVerifiedMetadata(simplex_chat_bin_dir: str) -> None:
+    metadata_path = os.path.join(simplex_chat_bin_dir, ".verified")
+    if os.path.isfile(metadata_path):
+        os.remove(metadata_path)
+        logger.info(f"Removed stale verification metadata: {metadata_path}")
 
 
 def smokeTestSimplexClient(client_path: str) -> None:
@@ -712,7 +758,8 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
 
     An existing binary at the client path is verified against the release
     manifest for SIMPLEX_CHAT_VERSION and redownloaded if it doesn't match,
-    unless SIMPLEX_SKIP_VERIFY is set.  SIMPLEX_FORCE_DOWNLOAD always
+    unless SIMPLEX_SKIP_VERIFY is set, which also removes any .verified
+    metadata left by a previous install.  SIMPLEX_FORCE_DOWNLOAD always
     replaces an existing binary with a fresh, verified download.
 
     Returns the path to the client binary.
@@ -739,17 +786,20 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
             logger.warning(
                 f"SIMPLEX_SKIP_VERIFY is set, using existing Simplex client without verification: {simplex_chat_client_path}"
             )
+            removeSimplexVerifiedMetadata(simplex_chat_bin_dir)
             return simplex_chat_client_path
         else:
             logger.info(
                 f"Verifying existing Simplex client: {simplex_chat_client_path}"
             )
             try:
-                release_hash = verifySimplexRelease(
+                release_hash, verification = verifySimplexRelease(
                     simplex_chat_client_path, simplex_chat_release_dir, extra_opts
                 )
                 smokeTestSimplexClient(simplex_chat_client_path)
-                writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
+                writeSimplexVerifiedMetadata(
+                    simplex_chat_bin_dir, release_hash, verification
+                )
                 return simplex_chat_client_path
             except ValueError as e:
                 logger.warning(
@@ -765,14 +815,14 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
     )
     downloadRelease(simplex_chat_release_url, simplex_chat_release_path, extra_opts)
 
-    release_hash = verifySimplexRelease(
+    release_hash, verification = verifySimplexRelease(
         simplex_chat_release_path, simplex_chat_release_dir, extra_opts
     )
 
     shutil.copyfile(simplex_chat_release_path, simplex_chat_client_path)
     os.chmod(simplex_chat_client_path, 0o755)
     smokeTestSimplexClient(simplex_chat_client_path)
-    writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash)
+    writeSimplexVerifiedMetadata(simplex_chat_bin_dir, release_hash, verification)
     return simplex_chat_client_path
 
 

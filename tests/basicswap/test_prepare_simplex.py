@@ -26,6 +26,7 @@ import basicswap.bin.prepare as prepare
 from basicswap.bin.run import checkSimplexClientBinary
 from basicswap.network.simplex import (
     createSimplexConnectInvitation,
+    ensureSimplexGroup,
     formatSimplexChatError,
     getJoinedSimplexLink,
     getNewSimplexLink,
@@ -247,10 +248,11 @@ class TestSimplexVerify(unittest.TestCase):
         writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
         self.writeClient(GOOD_BINARY)
         with mock.patch.object(prepare, "SKIP_GPG_VALIDATION", True):
-            release_hash = prepare.verifySimplexRelease(
+            release_hash, verification = prepare.verifySimplexRelease(
                 self.client_path, self.release_dir, extra_opts={}
             )
         assert release_hash == sha256hex(GOOD_BINARY)
+        assert verification == "signed"
 
     def test_verify_release_hash_mismatch(self):
         writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
@@ -279,25 +281,94 @@ class TestSimplexVerify(unittest.TestCase):
                 )
         mock_fetch.assert_not_called()
 
-    def test_unlisted_file_uses_release_notes(self):
-        # Builds missing from _sha256sums (aarch64 Linux, macOS, Windows for
-        # 7.0.0) are checked against the release notes on every platform.
+    def writeUnlistedSums(self) -> str:
         writeSumsFile(
             self.release_dir,
             [(sha256hex(BAD_BINARY), TEST_VERSION + "/simplex-chat-other-build")],
         )
-        sums_path = os.path.join(self.release_dir, "_sha256sums")
+        return os.path.join(self.release_dir, "_sha256sums")
+
+    def test_unlisted_file_uses_pinned_hash(self):
+        sums_path = self.writeUnlistedSums()
+        pinned = {TEST_VERSION: {self.release_file: sha256hex(GOOD_BINARY)}}
+        with (
+            mock.patch.object(prepare, "SIMPLEX_PINNED_HASHES", pinned),
+            mock.patch.object(prepare, "SIMPLEX_ALLOW_UNSIGNED_HASH", True),
+            mock.patch.object(
+                prepare,
+                "fetchSimplexReleaseBodyHash",
+                return_value=sha256hex(BAD_BINARY),
+            ) as mock_fetch,
+        ):
+            assert (
+                prepare.ensureSimplexReleaseHash(
+                    sha256hex(GOOD_BINARY), self.release_file, sums_path
+                )
+                == "pinned"
+            )
+            with self.assertRaises(ValueError):
+                prepare.ensureSimplexReleaseHash(
+                    sha256hex(BAD_BINARY), self.release_file, sums_path
+                )
+        mock_fetch.assert_not_called()
+
+    def test_current_release_pins_unsigned_builds(self):
+        pinned = prepare.SIMPLEX_PINNED_HASHES[prepare.SIMPLEX_CHAT_VERSION]
+        for platform_name, machine in (
+            ("Darwin", "arm64"),
+            ("Darwin", "x86_64"),
+            ("Windows", "AMD64"),
+        ):
+            with (
+                mock.patch.object(prepare, "USE_PLATFORM", platform_name),
+                mock.patch.object(prepare.platform, "machine", return_value=machine),
+            ):
+                release_file = prepare.getSimplexClientReleaseFilename()
+            assert release_file in pinned, release_file
+            assert len(pinned[release_file]) == 64
+        for os_release in (
+            {"ID": "ubuntu", "VERSION_ID": "24.04"},
+            {"ID": "ubuntu", "VERSION_ID": "22.04"},
+        ):
+            release_file = self.linuxFilename(os_release, machine="aarch64")
+            assert release_file in pinned, release_file
+
+    def test_unlisted_unpinned_file_rejected_by_default(self):
+        sums_path = self.writeUnlistedSums()
+        with (
+            mock.patch.object(prepare, "SIMPLEX_PINNED_HASHES", {}),
+            mock.patch.object(prepare, "SIMPLEX_ALLOW_UNSIGNED_HASH", False),
+            mock.patch.object(
+                prepare,
+                "fetchSimplexReleaseBodyHash",
+                return_value=sha256hex(GOOD_BINARY),
+            ) as mock_fetch,
+        ):
+            with self.assertRaises(ValueError) as cm:
+                prepare.ensureSimplexReleaseHash(
+                    sha256hex(GOOD_BINARY), self.release_file, sums_path
+                )
+        assert "SIMPLEX_ALLOW_UNSIGNED_HASH" in str(cm.exception)
+        mock_fetch.assert_not_called()
+
+    def test_unlisted_file_release_notes_opt_in(self):
+        sums_path = self.writeUnlistedSums()
         for platform_name in ("Linux", "Darwin", "Windows"):
             with (
                 mock.patch.object(prepare, "USE_PLATFORM", platform_name),
+                mock.patch.object(prepare, "SIMPLEX_PINNED_HASHES", {}),
+                mock.patch.object(prepare, "SIMPLEX_ALLOW_UNSIGNED_HASH", True),
                 mock.patch.object(
                     prepare,
                     "fetchSimplexReleaseBodyHash",
                     return_value=sha256hex(GOOD_BINARY),
                 ) as mock_fetch,
             ):
-                prepare.ensureSimplexReleaseHash(
-                    sha256hex(GOOD_BINARY), self.release_file, sums_path
+                assert (
+                    prepare.ensureSimplexReleaseHash(
+                        sha256hex(GOOD_BINARY), self.release_file, sums_path
+                    )
+                    == "release_notes"
                 )
                 mock_fetch.assert_called_once_with(self.release_file)
 
@@ -306,14 +377,38 @@ class TestSimplexVerify(unittest.TestCase):
                         sha256hex(BAD_BINARY), self.release_file, sums_path
                     )
 
-        # No hash anywhere: fail
-        with mock.patch.object(
-            prepare, "fetchSimplexReleaseBodyHash", return_value=None
+        with (
+            mock.patch.object(prepare, "SIMPLEX_PINNED_HASHES", {}),
+            mock.patch.object(prepare, "SIMPLEX_ALLOW_UNSIGNED_HASH", True),
+            mock.patch.object(
+                prepare, "fetchSimplexReleaseBodyHash", return_value=None
+            ),
         ):
             with self.assertRaises(ValueError):
                 prepare.ensureSimplexReleaseHash(
                     sha256hex(GOOD_BINARY), self.release_file, sums_path
                 )
+
+    def test_release_notes_download_recorded_as_unverified(self):
+        self.writeUnlistedSums()
+        with (
+            mock.patch.object(prepare, "SIMPLEX_PINNED_HASHES", {}),
+            mock.patch.object(prepare, "SIMPLEX_ALLOW_UNSIGNED_HASH", True),
+            mock.patch.object(
+                prepare,
+                "fetchSimplexReleaseBodyHash",
+                return_value=sha256hex(GOOD_BINARY),
+            ),
+        ):
+            client_path = self.preparePatched()
+
+        with open(os.path.join(self.simplex_dir, ".verified")) as fp:
+            metadata = json.load(fp)
+        assert metadata["verification"] == "release_notes"
+
+        network = {"client_version": TEST_VERSION}
+        assert checkSimplexClientBinary(client_path, network, logger) is True
+        assert network["verify_status"] == "unverified"
 
     def test_release_body_hash_parsing(self):
         body = (
@@ -355,6 +450,7 @@ class TestSimplexVerify(unittest.TestCase):
             metadata = json.load(fp)
         assert metadata["version"] == TEST_VERSION
         assert metadata["sha256"] == sha256hex(GOOD_BINARY)
+        assert metadata["verification"] == "signed"
 
     def test_existing_binary_verified(self):
         writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
@@ -390,6 +486,34 @@ class TestSimplexVerify(unittest.TestCase):
         with open(client_path, "rb") as fp:
             assert fp.read() == BAD_BINARY
         assert not os.path.isfile(os.path.join(self.simplex_dir, ".verified"))
+
+    def test_skip_verify_clears_stale_metadata(self):
+        writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
+        self.preparePatched()
+        metadata_path = os.path.join(self.simplex_dir, ".verified")
+        assert os.path.isfile(metadata_path)
+
+        self.writeClient(BAD_BINARY)
+        network = {"client_version": TEST_VERSION}
+        assert checkSimplexClientBinary(self.client_path, network, logger) is False
+        assert network["verify_status"] == "hash_mismatch"
+
+        self.download_calls = []
+        with (
+            mock.patch.object(prepare, "SKIP_GPG_VALIDATION", True),
+            mock.patch.object(prepare, "SIMPLEX_SKIP_VERIFY", True),
+            mock.patch.object(prepare, "downloadRelease", self.fakeDownloadRelease),
+        ):
+            client_path = prepare.prepareSimplexClient(self.bin_dir, extra_opts={})
+
+        assert len(self.download_calls) == 0
+        assert not os.path.isfile(metadata_path)
+        with open(client_path, "rb") as fp:
+            assert fp.read() == BAD_BINARY
+
+        network = {"client_version": TEST_VERSION}
+        assert checkSimplexClientBinary(client_path, network, logger) is True
+        assert network["verify_status"] == "unverified"
 
     def test_force_download(self):
         writeSumsFile(self.release_dir, [(sha256hex(GOOD_BINARY), self.release_file)])
@@ -508,6 +632,163 @@ class TestSmokeTest(unittest.TestCase):
             prepare.smokeTestSimplexClient(self.client_path)
 
 
+GROUP_LINK_A = "https://smp4.simplex.im/g#AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+GROUP_LINK_B = "https://smp4.simplex.im/g#BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+
+
+def groupInfo(name: str, role: str = "member") -> dict:
+    return {
+        "groupId": 1,
+        "localDisplayName": name,
+        "groupProfile": {"displayName": name},
+        "membership": {"memberRole": role},
+    }
+
+
+class FakeGroupWs:
+    def __init__(self, groups):
+        self.groups = list(groups)
+        self.commands = []
+        self.queue = []
+        self.next_id = 1
+
+    def send_command(self, cmd_str: str) -> int:
+        cmd_id = self.next_id
+        self.next_id += 1
+        self.commands.append(cmd_str)
+        if cmd_str == "/groups":
+            resp = {"type": "groupsList", "groups": list(self.groups)}
+        elif cmd_str.startswith("/c "):
+            resp = {
+                "type": "sentInvitation",
+                "connection": {"pccConnId": 7, "groupLinkId": "gl"},
+            }
+        elif cmd_str.startswith("/leave #"):
+            resp = {"type": "leftMemberUser", "groupInfo": {}}
+        elif cmd_str.startswith("/delete #"):
+            name = cmd_str.split("#", 1)[1]
+            self.groups = [g for g in self.groups if g["localDisplayName"] != name]
+            resp = {"type": "groupDeletedUser", "groupInfo": {}}
+        else:
+            raise AssertionError(f"Unexpected command {cmd_str}")
+        self.queue.append(json.dumps({"corrId": str(cmd_id), "resp": {"Right": resp}}))
+        return cmd_id
+
+    def cmd_queue_get(self):
+        return self.queue.pop(0) if self.queue else None
+
+
+class FakeApp:
+    def __init__(self, network_config):
+        self.log = logger
+        self.delay_event = mock.Mock()
+        self.settings = {"networks": [network_config]}
+        self.saved = 0
+
+    def _save_settings(self):
+        self.saved += 1
+
+
+class TestSimplexGroup(unittest.TestCase):
+    def test_fresh_client_joins_and_records_link(self):
+        network = {"type": "simplex", "group_link": GROUP_LINK_A}
+        app = FakeApp(network)
+        ws = FakeGroupWs([])
+        ensureSimplexGroup(app, ws, network)
+        assert ws.commands == ["/groups", "/c " + GROUP_LINK_A]
+        assert network["joined_group_link"] == GROUP_LINK_A
+        assert app.saved == 1
+
+    def test_joined_group_unchanged_link_no_commands(self):
+        network = {
+            "type": "simplex",
+            "group_link": GROUP_LINK_A,
+            "joined_group_link": GROUP_LINK_A,
+        }
+        app = FakeApp(network)
+        ws = FakeGroupWs([groupInfo("bsx")])
+        ensureSimplexGroup(app, ws, network)
+        assert ws.commands == ["/groups"]
+        assert app.saved == 0
+
+    def test_existing_install_records_current_link(self):
+        network = {"type": "simplex", "group_link": GROUP_LINK_A}
+        app = FakeApp(network)
+        ws = FakeGroupWs([groupInfo("bsx")])
+        ensureSimplexGroup(app, ws, network)
+        assert ws.commands == ["/groups"]
+        assert network["joined_group_link"] == GROUP_LINK_A
+        assert app.saved == 1
+
+    def test_replacement_link_switches_group(self):
+        network = {
+            "type": "simplex",
+            "group_link": GROUP_LINK_B,
+            "joined_group_link": GROUP_LINK_A,
+        }
+        app = FakeApp(network)
+        ws = FakeGroupWs([groupInfo("bsx")])
+        ensureSimplexGroup(app, ws, network)
+        assert ws.commands == [
+            "/groups",
+            "/leave #bsx",
+            "/delete #bsx",
+            "/c " + GROUP_LINK_B,
+        ]
+        assert ws.groups == []
+        assert network["joined_group_link"] == GROUP_LINK_B
+        assert app.saved == 1
+
+        ws = FakeGroupWs([groupInfo("bsx")])
+        ensureSimplexGroup(app, ws, network)
+        assert ws.commands == ["/groups"]
+        assert app.saved == 1
+
+    def test_owned_group_is_not_replaced(self):
+        network = {
+            "type": "simplex",
+            "group_link": GROUP_LINK_B,
+            "joined_group_link": GROUP_LINK_A,
+        }
+        app = FakeApp(network)
+        ws = FakeGroupWs([groupInfo("bsx", role="owner")])
+        with self.assertRaises(ValueError) as cm:
+            ensureSimplexGroup(app, ws, network)
+        assert "owns" in str(cm.exception)
+        assert ws.commands == ["/groups"]
+        assert network["joined_group_link"] == GROUP_LINK_A
+        assert app.saved == 0
+
+    def test_failed_delete_aborts_switch(self):
+        network = {
+            "type": "simplex",
+            "group_link": GROUP_LINK_B,
+            "joined_group_link": GROUP_LINK_A,
+        }
+        app = FakeApp(network)
+        ws = FakeGroupWs([groupInfo("bsx")])
+        orig_send = ws.send_command
+
+        def failing_send(cmd_str):
+            if cmd_str.startswith("/delete #"):
+                cmd_id = ws.next_id
+                ws.next_id += 1
+                ws.commands.append(cmd_str)
+                resp = {"type": "chatCmdError", "chatError": {"type": "error"}}
+                ws.queue.append(
+                    json.dumps({"corrId": str(cmd_id), "resp": {"Right": resp}})
+                )
+                return cmd_id
+            return orig_send(cmd_str)
+
+        ws.send_command = failing_send
+        with self.assertRaises(ValueError):
+            ensureSimplexGroup(app, ws, network)
+        assert not any(c.startswith("/c ") for c in ws.commands)
+        assert network["joined_group_link"] == GROUP_LINK_A
+        assert app.saved == 0
+
+
 class TestStartupCheck(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp(prefix="bsx_simplex_startup_")
@@ -522,9 +803,14 @@ class TestStartupCheck(unittest.TestCase):
             fp.write(contents)
         os.chmod(self.client_path, 0o755)
 
-    def writeMetadata(self, sha256: str, version: str = TEST_VERSION) -> None:
+    def writeMetadata(
+        self, sha256: str, version: str = TEST_VERSION, verification="signed"
+    ) -> None:
+        metadata = {"version": version, "sha256": sha256, "verified_at": 0}
+        if verification is not None:
+            metadata["verification"] = verification
         with open(self.metadata_path, "w") as fp:
-            json.dump({"version": version, "sha256": sha256, "verified_at": 0}, fp)
+            json.dump(metadata, fp)
 
     def test_missing_binary(self):
         network = {}
@@ -551,6 +837,30 @@ class TestStartupCheck(unittest.TestCase):
         network = {"client_version": TEST_VERSION}
         assert checkSimplexClientBinary(self.client_path, network, logger) is True
         assert network["verify_status"] == "ok"
+        assert network["verification"] == "signed"
+
+    def test_pinned_hash_is_ok(self):
+        self.writeClient(GOOD_BINARY)
+        self.writeMetadata(sha256hex(GOOD_BINARY), verification="pinned")
+        network = {"client_version": TEST_VERSION}
+        assert checkSimplexClientBinary(self.client_path, network, logger) is True
+        assert network["verify_status"] == "ok"
+        assert network["verification"] == "pinned"
+
+    def test_release_notes_hash_is_unverified(self):
+        self.writeClient(GOOD_BINARY)
+        self.writeMetadata(sha256hex(GOOD_BINARY), verification="release_notes")
+        network = {"client_version": TEST_VERSION}
+        assert checkSimplexClientBinary(self.client_path, network, logger) is True
+        assert network["verify_status"] == "unverified"
+        assert network["verification"] == "release_notes"
+
+    def test_metadata_without_method_is_unverified(self):
+        self.writeClient(GOOD_BINARY)
+        self.writeMetadata(sha256hex(GOOD_BINARY), verification=None)
+        network = {"client_version": TEST_VERSION}
+        assert checkSimplexClientBinary(self.client_path, network, logger) is True
+        assert network["verify_status"] == "unverified"
 
     def test_hash_mismatch(self):
         self.writeClient(BAD_BINARY)
