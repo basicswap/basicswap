@@ -27,12 +27,14 @@ from unittest import mock
 import basicswap.bin.prepare as prepare
 from basicswap.bin.run import checkSimplexClientBinary
 from basicswap.network.simplex import (
+    WebSocketThread,
     createSimplexConnectInvitation,
     ensureSimplexGroup,
     formatSimplexChatError,
     getJoinedSimplexLink,
     getNewSimplexLink,
     submitSimplexMsg,
+    waitForResponse,
 )
 from basicswap.util import TemporaryError
 
@@ -817,11 +819,19 @@ class TestSimplexGroup(unittest.TestCase):
 
 class FakeSendWs:
     def __init__(
-        self, connected: bool = True, send_error=None, resp_type="newChatItems"
+        self,
+        connected: bool = True,
+        send_error=None,
+        resp_type="newChatItems",
+        reply: bool = True,
+        after_send=None,
     ):
         self.connected = connected
+        self.connection_id = 1
         self.send_error = send_error
         self.resp_type = resp_type
+        self.reply = reply
+        self.after_send = after_send
         self.commands = []
         self.queue = []
 
@@ -829,9 +839,12 @@ class FakeSendWs:
         if self.send_error is not None:
             raise self.send_error
         self.commands.append(cmd_str)
-        self.queue.append(
-            json.dumps({"corrId": "1", "resp": {"Right": {"type": self.resp_type}}})
-        )
+        if self.reply:
+            self.queue.append(
+                json.dumps({"corrId": "1", "resp": {"Right": {"type": self.resp_type}}})
+            )
+        if self.after_send is not None:
+            self.after_send(self)
         return 1
 
     def cmd_queue_get(self):
@@ -870,6 +883,141 @@ class TestSimplexSend(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
         assert not isinstance(cm.exception, TemporaryError)
+
+    def test_disconnect_while_waiting_is_temporary(self):
+        def drop(ws):
+            ws.connected = False
+
+        ws = FakeSendWs(reply=False, after_send=drop)
+        with self.assertRaises(TemporaryError) as cm:
+            submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        assert "connection lost" in str(cm.exception)
+        assert len(ws.commands) == 1
+
+    def test_reconnect_while_waiting_is_temporary(self):
+        # The client reconnected before replying, the reply will never arrive.
+        def reconnect(ws):
+            ws.connection_id += 1
+
+        ws = FakeSendWs(reply=False, after_send=reconnect)
+        with self.assertRaises(TemporaryError):
+            submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        assert self.app.num_group_simplex_messages_sent == 0
+
+    def test_missing_reply_is_temporary(self):
+        self.app.delay_event = mock.Mock()
+        ws = FakeSendWs(reply=False)
+        with self.assertRaises(TemporaryError) as cm:
+            submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        assert "missing" in str(cm.exception)
+        assert self.app.delay_event.wait.call_count == 200
+
+    def test_stale_reply_ignored(self):
+        # A reply for another command must not be taken for this one
+        def stale(ws):
+            ws.queue.append(
+                json.dumps({"corrId": "0", "resp": {"Right": {"type": "chatCmdError"}}})
+            )
+            ws.queue.append(
+                json.dumps({"corrId": "1", "resp": {"Right": {"type": "newChatItems"}}})
+            )
+
+        ws = FakeSendWs(reply=False, after_send=stale)
+        submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        assert self.app.num_group_simplex_messages_sent == 1
+
+    def test_send_command_not_connected(self):
+        ws = WebSocketThread("ws://127.0.0.1:1", logger=logger)
+        with self.assertRaises(TemporaryError):
+            ws.send_command("/groups")
+        assert ws.corrId == 0
+
+    def test_plain_wait_times_out_with_value_error(self):
+        delay_event = mock.Mock()
+        ws = FakeSendWs(reply=False)
+        with self.assertRaises(ValueError) as cm:
+            waitForResponse(ws, 1, delay_event)
+        assert not isinstance(cm.exception, TemporaryError)
+
+
+class TestAddNetwork(unittest.TestCase):
+    def newSettings(self, group_link: str) -> dict:
+        return {
+            "type": "simplex",
+            "server_address": "smp://server",
+            "client_path": "/bin/simplex-chat",
+            "client_version": TEST_VERSION,
+            "ws_port": 5225,
+            "group_link": group_link,
+            "enabled": True,
+        }
+
+    def test_fresh_install_appends(self):
+        networks = [{"type": "smsg", "enabled": True}]
+        prepare.addSimplexNetworkConfig(networks, self.newSettings(GROUP_LINK_A))
+        assert networks[0] == {"type": "smsg", "enabled": False}
+        assert networks[1] == self.newSettings(GROUP_LINK_A)
+        assert "joined_group_link" not in networks[1]
+
+    def test_replacement_link_keeps_joined_marker(self):
+        networks = [
+            {"type": "smsg", "enabled": False},
+            {
+                "type": "simplex",
+                "server_address": "smp://old",
+                "client_path": "/bin/old/simplex-chat",
+                "client_version": "6.4.0",
+                "ws_port": 5225,
+                "group_link": GROUP_LINK_A,
+                "joined_group_link": GROUP_LINK_A,
+                "socks_proxy_override": "127.0.0.1:9050",
+                "bridged": ["smsg"],
+                "enabled": True,
+            },
+        ]
+        prepare.addSimplexNetworkConfig(networks, self.newSettings(GROUP_LINK_B))
+        assert len(networks) == 2
+        simplex = networks[1]
+        assert simplex["group_link"] == GROUP_LINK_B
+        assert simplex["joined_group_link"] == GROUP_LINK_A
+        assert simplex["client_version"] == TEST_VERSION
+        assert simplex["client_path"] == "/bin/simplex-chat"
+        assert simplex["socks_proxy_override"] == "127.0.0.1:9050"
+        assert simplex["bridged"] == ["smsg"]
+        assert simplex["enabled"] is True
+
+        # Startup with the existing client database performs the switch and
+        # only then records the new link.
+        app = FakeApp(simplex)
+        ws = FakeGroupWs([groupInfo("bsx")])
+        ensureSimplexGroup(app, ws, simplex)
+        assert ws.commands == [
+            "/groups",
+            "/leave #bsx",
+            "/delete #bsx",
+            "/c " + GROUP_LINK_B,
+        ]
+        assert simplex["joined_group_link"] == GROUP_LINK_B
+        assert app.saved == 1
+
+    def test_legacy_install_without_marker(self):
+        networks = [
+            {
+                "type": "simplex",
+                "group_link": GROUP_LINK_A,
+                "client_version": "6.4.0",
+                "enabled": True,
+            }
+        ]
+        prepare.addSimplexNetworkConfig(networks, self.newSettings(GROUP_LINK_A))
+        simplex = networks[0]
+        assert "joined_group_link" not in simplex
+
+        app = FakeApp(simplex)
+        ws = FakeGroupWs([groupInfo("bsx")])
+        ensureSimplexGroup(app, ws, simplex)
+        assert ws.commands == ["/groups"]
+        assert simplex["joined_group_link"] == GROUP_LINK_A
 
 
 class TestStartupCheck(unittest.TestCase):

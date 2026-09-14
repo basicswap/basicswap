@@ -826,6 +826,27 @@ def prepareSimplexClient(bin_dir: str, extra_opts) -> str:
     return simplex_chat_client_path
 
 
+def addSimplexNetworkConfig(network_config_list: list, simplex_settings: dict) -> None:
+    # Keep settings prepare does not manage, joined_group_link is only
+    # updated by startup after a successful group switch.
+    found_network: bool = False
+    for i, network in enumerate(network_config_list):
+        network_type: str = network.get("type", "unknown")
+        if network_type == "simplex":
+            found_network = True
+            if network.get("enabled", False) is True:
+                logger.warning(f"Network {network_type} is already active.")
+            updated = dict(network)
+            updated.update(simplex_settings)
+            network_config_list[i] = updated
+        else:
+            # TODO: Allow multiple active networks
+            network["enabled"] = False
+            logger.info(f"Disabling network {network_type}.")
+    if found_network is False:
+        network_config_list.append(dict(simplex_settings))
+
+
 def testTorConnection():
     test_url = "https://check.torproject.org/"
     logger.info("Testing TOR connection at: " + test_url)
@@ -2169,20 +2190,8 @@ def main():
             if SIMPLEX_SERVER_SOCKS_PROXY is not None:
                 simplex_settings["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
 
-            found_network: bool = False
-            for network in network_config_list:
-                network_type: str = network.get("type", "unknown")
-                if network_type == "simplex":
-                    found_network = True
-                    if network.get("enabled", False) is True:
-                        logger.warning(f"Network {network_type} is already active.")
-                    network = simplex_settings
-                else:
-                    # TODO: Allow multiple active networks
-                    network["enabled"] = False
-                    logger.info(f"Disabling network {network_type}.")
-            if found_network is False:
-                network_config_list.append(simplex_settings)
+            addSimplexNetworkConfig(network_config_list, simplex_settings)
+            network_enabled = True
         elif network_name == "smsg":
             found_network: bool = False
             for network in network_config_list:
@@ -2199,6 +2208,7 @@ def main():
                     logger.info(f"Disabling network {network_type}.")
             if found_network is False:
                 network_config_list.append({"type": "smsg", "enabled": True})
+            network_enabled = True
         else:
             raise ValueError(f"Unknown network {network_name}")
 

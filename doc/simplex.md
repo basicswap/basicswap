@@ -159,7 +159,8 @@ Restart BasicSwap after adding, removing, or reconfiguring SimpleX.
 
 BasicSwap records the link it joined with as `joined_group_link` next
 to `group_link` in the network settings.  When `group_link` is changed
-(in `basicswap.json` or through the Settings page) and BasicSwap is
+(in `basicswap.json`, through the Settings page, or by re-running
+`--addnetwork=simplex` with a new `SIMPLEX_GROUP_LINK`) and BasicSwap is
 restarted, it leaves and deletes the groups in its `simplex-chat`
 database and joins the new link, then updates `joined_group_link`.
 Direct contacts used for bid messages are kept.

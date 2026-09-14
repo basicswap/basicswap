@@ -52,6 +52,7 @@ class WebSocketThread(threading.Thread):
         self.mutex = threading.Lock()
         self.corrId: int = 0
         self.connected: bool = False
+        self.connection_id: int = 0  # Incremented on each (re)connect
         self.delay_event = threading.Event()
 
         self.recv_queue = Queue()
@@ -132,11 +133,14 @@ class WebSocketThread(threading.Thread):
             self.logger.info("Simplex ws - Connection opened")
         else:
             print(f"{self.tag}: WebSocket connection opened")
+        self.connection_id += 1
         self.connected = True
         self.last_error_str = ""
 
     def send_command(self, cmd_str: str):
         with self.mutex:
+            if self.ws is None or not self.connected:
+                raise TemporaryError("SimpleX client not connected.")
             self.corrId += 1
             if self.logger:
                 self.logger.debug(f"Simplex sent command {self.corrId}")
@@ -186,7 +190,8 @@ class WebSocketThread(threading.Thread):
                 pass
 
 
-def waitForResponse(ws_thread, sent_id, delay_event):
+def waitForResponse(ws_thread, sent_id, delay_event, connection_id=None):
+    # With connection_id set, a lost or missing reply raises TemporaryError
     sent_id = str(sent_id)
     for i in range(200):
         message = ws_thread.cmd_queue_get()
@@ -195,7 +200,15 @@ def waitForResponse(ws_thread, sent_id, delay_event):
             if "corrId" in data:
                 if data["corrId"] == sent_id:
                     return data
+        if connection_id is not None and (
+            not ws_thread.connected or ws_thread.connection_id != connection_id
+        ):
+            raise TemporaryError(
+                f"SimpleX connection lost waiting for response to ID: {sent_id}"
+            )
         delay_event.wait(0.5)
+    if connection_id is not None:
+        raise TemporaryError(f"SimpleX response missing for ID: {sent_id}")
     raise ValueError(f"waitForResponse timed-out waiting for ID: {sent_id}")
 
 
@@ -284,15 +297,14 @@ def submitSimplexMsg(self, network, smsg_msg, to_user_name: str = None) -> None:
         to = "#bsx "
     if not ws_thread.connected:
         raise TemporaryError("SimpleX client not connected.")
+    connection_id: int = ws_thread.connection_id
     try:
         sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
-        response = waitForResponse(ws_thread, sent_id, self.delay_event)
+        response = waitForResponse(
+            ws_thread, sent_id, self.delay_event, connection_id=connection_id
+        )
     except (websocket.WebSocketException, OSError) as e:
         raise TemporaryError(f"SimpleX send failed: {e}")
-    except ValueError as e:
-        if not ws_thread.connected:
-            raise TemporaryError(f"SimpleX send failed: {e}")
-        raise
     if getResponseData(response, "type") != "newChatItems":
         json_str = json.dumps(response, indent=4)
         self.log.debug(f"Response {json_str}")
