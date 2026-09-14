@@ -19,7 +19,9 @@ import os
 import shutil
 import sys
 import tempfile
+import threading
 import unittest
+import websocket
 from unittest import mock
 
 import basicswap.bin.prepare as prepare
@@ -30,6 +32,7 @@ from basicswap.network.simplex import (
     formatSimplexChatError,
     getJoinedSimplexLink,
     getNewSimplexLink,
+    submitSimplexMsg,
 )
 from basicswap.util import TemporaryError
 
@@ -810,6 +813,63 @@ class TestSimplexGroup(unittest.TestCase):
         assert not any(c.startswith("/c ") for c in ws.commands)
         assert network["joined_group_link"] == GROUP_LINK_A
         assert app.saved == 0
+
+
+class FakeSendWs:
+    def __init__(
+        self, connected: bool = True, send_error=None, resp_type="newChatItems"
+    ):
+        self.connected = connected
+        self.send_error = send_error
+        self.resp_type = resp_type
+        self.commands = []
+        self.queue = []
+
+    def send_command(self, cmd_str: str) -> int:
+        if self.send_error is not None:
+            raise self.send_error
+        self.commands.append(cmd_str)
+        self.queue.append(
+            json.dumps({"corrId": "1", "resp": {"Right": {"type": self.resp_type}}})
+        )
+        return 1
+
+    def cmd_queue_get(self):
+        return self.queue.pop(0) if self.queue else None
+
+
+class TestSimplexSend(unittest.TestCase):
+    def setUp(self):
+        self.app = FakeApp({"type": "simplex"})
+        self.app.delay_event = threading.Event()
+        self.app.num_direct_simplex_messages_sent = 0
+        self.app.num_group_simplex_messages_sent = 0
+
+    def test_send_counts(self):
+        ws = FakeSendWs()
+        submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg", to_user_name="bob")
+        assert ws.commands[0].startswith("#bsx ")
+        assert ws.commands[1].startswith("@bob ")
+        assert self.app.num_group_simplex_messages_sent == 1
+        assert self.app.num_direct_simplex_messages_sent == 1
+
+    def test_not_connected_is_temporary(self):
+        ws = FakeSendWs(connected=False)
+        with self.assertRaises(TemporaryError):
+            submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        assert ws.commands == []
+
+    def test_socket_closed_is_temporary(self):
+        ws = FakeSendWs(send_error=websocket.WebSocketConnectionClosedException())
+        with self.assertRaises(TemporaryError):
+            submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+
+    def test_rejected_send_is_permanent(self):
+        ws = FakeSendWs(resp_type="chatCmdError")
+        with self.assertRaises(ValueError) as cm:
+            submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
+        assert not isinstance(cm.exception, TemporaryError)
 
 
 class TestStartupCheck(unittest.TestCase):

@@ -12932,6 +12932,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+        except TemporaryError:
+            # Nothing is persisted before the send, leave the queued action to retry
+            raise
         except Exception as e:  # noqa: F841
             if self.debug:
                 self.log.error(traceback.format_exc())

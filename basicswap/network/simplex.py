@@ -267,36 +267,32 @@ def sendSimplexMsg(
     )
     smsg_id = smsgGetID(smsg_msg)
 
-    ws_thread = network["ws_thread"]
-    if to_user_name is not None:
-        to = "@" + to_user_name + " "
-    else:
-        to = "#bsx "
-    sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
-    response = waitForResponse(ws_thread, sent_id, self.delay_event)
-    if getResponseData(response, "type") != "newChatItems":
-        json_str = json.dumps(response, indent=4)
-        self.log.debug(f"Response {json_str}")
-        raise ValueError("Send failed")
-    if to_user_name is not None:
-        self.num_direct_simplex_messages_sent += 1
-    else:
-        self.num_group_simplex_messages_sent += 1
+    submitSimplexMsg(self, network, smsg_msg, to_user_name)
 
     if return_msg:
         return smsg_id, smsg_msg
     return smsg_id
 
 
-def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
-    smsg_id = smsgGetID(smsg_msg)
+def submitSimplexMsg(self, network, smsg_msg, to_user_name: str = None) -> None:
+    # Raises TemporaryError while the simplex-chat client is unreachable so
+    # queued actions retry instead of erroring the bid.
     ws_thread = network["ws_thread"]
     if to_user_name is not None:
         to = "@" + to_user_name + " "
     else:
         to = "#bsx "
-    sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
-    response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    if not ws_thread.connected:
+        raise TemporaryError("SimpleX client not connected.")
+    try:
+        sent_id = ws_thread.send_command(to + encode_base64(smsg_msg))
+        response = waitForResponse(ws_thread, sent_id, self.delay_event)
+    except (websocket.WebSocketException, OSError) as e:
+        raise TemporaryError(f"SimpleX send failed: {e}")
+    except ValueError as e:
+        if not ws_thread.connected:
+            raise TemporaryError(f"SimpleX send failed: {e}")
+        raise
     if getResponseData(response, "type") != "newChatItems":
         json_str = json.dumps(response, indent=4)
         self.log.debug(f"Response {json_str}")
@@ -306,7 +302,10 @@ def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
     else:
         self.num_group_simplex_messages_sent += 1
 
-    return smsg_id
+
+def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
+    submitSimplexMsg(self, network, smsg_msg, to_user_name)
+    return smsgGetID(smsg_msg)
 
 
 def decryptSimplexMsg(self, msg_data):
