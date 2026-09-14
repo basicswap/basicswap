@@ -10,14 +10,17 @@ SMSG + SimpleX + Nostr bridge regtest swaps (3 nodes).
 
 Requires SimpleX SMP server and simplex-chat binary (see test_simplex.py).
 
-Node 0: active SimpleX, bridged to SMSG
-Node 1: active Nostr, bridged to SMSG
-Node 2: active SMSG, bridged to SimpleX and Nostr, network bridging enabled
+Node 0: active SimpleX, bridged to SMSG and Nostr
+Node 1: active Nostr, bridged to SMSG and SimpleX
+Node 2: active SMSG, SimpleX and Nostr, network bridging enabled (portals
+        are single hop, so the bridge node must be active on every network
+        it links)
 
 export PYTHONPATH=$(pwd)
 pytest -v -s tests/basicswap/extended/test_multinet_all.py
 """
 
+import json
 import logging
 import os
 import random
@@ -78,13 +81,27 @@ class TestMultinetAll(BaseTest, NostrRelayFixture):
     nostr_keys = []
 
     @classmethod
+    def readSavedNetworks(cls, node_id: int) -> list:
+        settings_path = os.path.join(
+            TEST_DIR, f"basicswap_{node_id}", cfg.CONFIG_FILENAME
+        )
+        with open(settings_path) as fp:
+            return json.load(fp)["networks"]
+
+    @classmethod
     def prepareTestDir(cls):
-        cls.startRelay()
+        relay_port: int = 0
+        if cls.restore_instance:
+            # Restored settings reference the relay port used on the first run.
+            for network in cls.readSavedNetworks(1):
+                if network["type"] == "nostr":
+                    relay_port = int(network["relays"][0].rsplit(":", 1)[1])
+        cls.startRelay(port=relay_port)
 
         base_ws_port: int = 5225
         for i in range(cls.num_nodes):
             client_dir = os.path.join(TEST_DIR, f"simplex_client{i}")
-            if os.path.exists(client_dir):
+            if os.path.exists(client_dir) and not cls.restore_instance:
                 shutil.rmtree(client_dir)
 
             client_daemon = startSimplexClient(
@@ -96,6 +113,14 @@ class TestMultinetAll(BaseTest, NostrRelayFixture):
                 test_delay_event,
             )
             cls.daemons.append(client_daemon)
+
+        if cls.restore_instance:
+            # Reuse the group created on the first run, node 0's client owns it.
+            for network in cls.readSavedNetworks(0):
+                if network["type"] == "simplex":
+                    cls.group_link = network["group_link"]
+            logger.info(f"Restored BSX group_link: {cls.group_link}")
+            return
 
         logger.info("Creating BSX group")
         ws_thread = None
@@ -152,7 +177,7 @@ class TestMultinetAll(BaseTest, NostrRelayFixture):
                     "ws_port": 5225 + node_id,
                     "group_link": cls.group_link,
                     "enabled": True,
-                    "bridged": [{"type": "smsg"}],
+                    "bridged": [{"type": "smsg"}, {"type": "nostr"}],
                 },
             )
         elif node_id == 1:
@@ -161,16 +186,35 @@ class TestMultinetAll(BaseTest, NostrRelayFixture):
                     node_id,
                     relay_url=cls.relay_url,
                     private_key=cls.nostr_keys[node_id],
-                    bridged=[{"type": "smsg"}],
+                    bridged=[{"type": "smsg"}, {"type": "simplex"}],
                 ),
             )
         elif node_id == 2:
+            # Portals are only created between a node's active networks, so the
+            # bridge node must be active on all three.
             settings["networks"].append(
                 {
                     "type": "smsg",
                     "enabled": True,
                     "bridged": [{"type": "simplex"}, {"type": "nostr"}],
                 },
+            )
+            settings["networks"].append(
+                {
+                    "type": "simplex",
+                    "server_address": SIMPLEX_SERVER_ADDRESS,
+                    "client_path": SIMPLEX_CLIENT_PATH,
+                    "ws_port": 5225 + node_id,
+                    "group_link": cls.group_link,
+                    "enabled": True,
+                },
+            )
+            settings["networks"].append(
+                getNostrNetworkConfig(
+                    node_id,
+                    relay_url=cls.relay_url,
+                    private_key=cls.nostr_keys[node_id],
+                ),
             )
 
         settings["enabled_log_categories"] = ["net"]
@@ -299,13 +343,17 @@ class Test(TestMultinetAll):
         coin_from = Coins.BTC
         coin_to = self.coin_to
 
+        # Two funding txs so node 2 has a spendable UTXO for each bid it accepts.
         self.prepare_balance(coin_from, 100.0, 1802, 1800)
+        self.prepare_balance(coin_from, 200.0, 1802, 1800)
         self.prepare_balance(coin_to, 1000.0, 1800, 1801)
 
         ci_from = swap_clients[2].ci(coin_from)
         ci_to0 = swap_clients[0].ci(coin_to)
 
-        wait_for_portal(test_delay_event, swap_clients[2])
+        # Node 2 is the bridge and ignores its own portals, wait on the edges.
+        wait_for_portal(test_delay_event, swap_clients[0])
+        wait_for_portal(test_delay_event, swap_clients[1])
 
         swap_value = ci_from.make_int(random.uniform(0.2, 10.0), r=1)
         rate_swap = ci_to0.make_int(random.uniform(0.2, 10.0), r=1)
