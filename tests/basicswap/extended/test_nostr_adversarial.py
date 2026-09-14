@@ -85,10 +85,14 @@ class TestNostrAdversarial(TestFunctions, NostrRelayFixture):
         relay_port: int = self.relay.port
         logger.info(f"Stopping relay on port {relay_port} for {seconds}s")
         self.stopRelay()
-        test_delay_event.wait(seconds)
-        for i in range(len(self.swap_clients)):
-            assert not any(r.connected for r in self.nostrClient(i).relays)
-        self.startRelay(port=relay_port)
+        try:
+            test_delay_event.wait(seconds)
+            for i in range(len(self.swap_clients)):
+                assert not any(
+                    r.connected for r in self.nostrClient(i).relays
+                ), f"Node {i} still connected to the stopped relay"
+        finally:
+            self.startRelay(port=relay_port)
         for _ in range(60):
             if all(
                 any(r.connected for r in self.nostrClient(i).relays)

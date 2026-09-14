@@ -261,6 +261,7 @@ class RelayThread(threading.Thread):
         self._tokens: float = float(RELAY_EVENT_BURST)
         self._tokens_updated: float = time.monotonic()
         self.subscribed = set()
+        self._sub_lock = threading.Lock()
         self._resub_lock = threading.Lock()
         self._resub_timer = None
         self._resub_attempts: int = 0
@@ -272,20 +273,29 @@ class RelayThread(threading.Thread):
         ]
 
     def isReceiving(self) -> bool:
-        return self.connected and self.subscribed >= set(self.subscriptionIds())
+        with self._sub_lock:
+            return self.connected and self.subscribed >= set(self.subscriptionIds())
 
     def subscribe(self, ws) -> None:
         for i, sub_filter in enumerate(self.client.getSubscriptionFilters()):
             sub_id: str = f"{self.sub_id}{i}"
-            if sub_id in self.subscribed:
-                continue
-            ws.send(json.dumps(["REQ", sub_id, sub_filter]))
-            self.subscribed.add(sub_id)
+            # Register before send, the reader may process CLOSED before send returns
+            with self._sub_lock:
+                if sub_id in self.subscribed:
+                    continue
+                self.subscribed.add(sub_id)
+            try:
+                ws.send(json.dumps(["REQ", sub_id, sub_filter]))
+            except Exception:
+                with self._sub_lock:
+                    self.subscribed.discard(sub_id)
+                raise
 
     def onSubscriptionClosed(self, sub_id: str, reason: str) -> None:
         if sub_id not in self.subscriptionIds():
             return
-        self.subscribed.discard(sub_id)
+        with self._sub_lock:
+            self.subscribed.discard(sub_id)
         self.num_subscriptions_closed += 1
         reason = str(reason)[:MAX_OK_MESSAGE_LEN]
         self.last_error = f"Subscription closed by relay: {reason or 'no reason'}"
@@ -346,7 +356,8 @@ class RelayThread(threading.Thread):
     def on_open(self, ws) -> None:
         self.connected = True
         self.last_error = ""
-        self.subscribed.clear()
+        with self._sub_lock:
+            self.subscribed.clear()
         self._resub_attempts = 0
         self.client.log.info(f"Nostr relay connected: {self.url}")
         try:
@@ -360,6 +371,7 @@ class RelayThread(threading.Thread):
             self.subscribe(ws)
         except Exception as e:
             self.client.log.warning(f"Nostr relay {self.url} subscribe error: {e}")
+            self.scheduleResubscribe()
 
     def on_message(self, ws, message) -> None:
         try:
@@ -405,7 +417,8 @@ class RelayThread(threading.Thread):
         # to avoid a line every retry while a relay is unreachable.
         log = self.client.log.info if self.connected else self.client.log.debug
         self.connected = False
-        self.subscribed.clear()
+        with self._sub_lock:
+            self.subscribed.clear()
         self.cancelResubscribe()
         log(f"Nostr relay closed: {self.url} {close_status_code}")
 

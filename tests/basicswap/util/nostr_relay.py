@@ -113,10 +113,14 @@ class MiniNostrRelay:
         self.events = []  # Stored events in receive order
         self.mutex = threading.Lock()
         self.clients = []
+        self.client_threads = []
         self.running = False
         self.socket = None
         self.accept_thread = None
         self.num_events_stored: int = 0
+        self.num_reqs_to_reject: int = 0
+        self.num_reqs_rejected: int = 0
+        self.reject_reason: str = "error: backend"
 
     def start(self) -> None:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -131,18 +135,36 @@ class MiniNostrRelay:
     def stop(self) -> None:
         self.running = False
         try:
+            self.socket.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        try:
             self.socket.close()
-        except Exception:
+        except OSError:
             pass
         with self.mutex:
-            for client in self.clients:
-                try:
-                    client.conn.close()
-                except Exception:
-                    pass
-            self.clients.clear()
+            clients = list(self.clients)
+            client_threads = list(self.client_threads)
+        for client in clients:
+            try:
+                client.conn.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                client.conn.close()
+            except OSError:
+                pass
         if self.accept_thread:
-            self.accept_thread.join(timeout=2)
+            self.accept_thread.join(timeout=5)
+            assert (
+                not self.accept_thread.is_alive()
+            ), "Relay accept thread still running"
+        for thread in client_threads:
+            thread.join(timeout=5)
+            assert not thread.is_alive(), "Relay client thread still running"
+        with self.mutex:
+            self.clients.clear()
+            self.client_threads.clear()
 
     def url(self) -> str:
         return f"ws://{self.host}:{self.port}"
@@ -160,6 +182,11 @@ class MiniNostrRelay:
                 except Exception:
                     pass
         return num_closed
+
+    def rejectNextRequests(self, count: int, reason: str = "error: backend") -> None:
+        with self.mutex:
+            self.num_reqs_to_reject = count
+            self.reject_reason = reason
 
     def sendOversizedFrames(self, length: int, chunk: int = 65536) -> None:
         with self.mutex:
@@ -182,7 +209,13 @@ class MiniNostrRelay:
                 conn, _ = self.socket.accept()
             except OSError:
                 break
-            threading.Thread(target=self.clientLoop, args=(conn,), daemon=True).start()
+            if not self.running:
+                conn.close()
+                break
+            thread = threading.Thread(target=self.clientLoop, args=(conn,), daemon=True)
+            with self.mutex:
+                self.client_threads.append(thread)
+            thread.start()
 
     def handshake(self, conn) -> bool:
         request = b""
@@ -264,6 +297,14 @@ class MiniNostrRelay:
         elif msg_type == "REQ":
             sub_id = data[1]
             filters = data[2:]
+            with self.mutex:
+                reject: bool = self.num_reqs_to_reject > 0
+                if reject:
+                    self.num_reqs_to_reject -= 1
+                    self.num_reqs_rejected += 1
+            if reject:
+                client.send(json.dumps(["CLOSED", sub_id, self.reject_reason]))
+                return
             client.subscriptions[sub_id] = filters
             with self.mutex:
                 stored = list(self.events)

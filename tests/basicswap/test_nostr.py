@@ -477,6 +477,55 @@ class TestNostrInboundGates(unittest.TestCase):
             mock_sched.assert_not_called()
         assert relay.num_subscriptions_closed == 2
 
+    def test_closed_during_subscribe_wins(self):
+        # The reader thread can process the relay's CLOSED before the sender
+        # returns from send(); the sender must not mark the subscription as
+        # active afterwards or the retry loop stops with nothing subscribed.
+        from unittest import mock
+
+        client = self.makeClient()
+        relay = client.relays[0]
+        sent = []
+        reject = {"bsxsub1"}
+        ws = mock.Mock()
+        ws.sock = None
+
+        def send(data):
+            msg = json.loads(data)
+            sent.append(msg)
+            if msg[0] == "REQ" and msg[1] in reject:
+                reject.discard(msg[1])
+                relay.on_message(ws, json.dumps(["CLOSED", msg[1], "error: backend"]))
+
+        ws.send = send
+        with mock.patch.object(relay, "scheduleResubscribe") as mock_sched:
+            relay.on_open(ws)
+            mock_sched.assert_called_once()
+        assert [(m[0], m[1]) for m in sent] == [("REQ", "bsxsub0"), ("REQ", "bsxsub1")]
+        assert relay.connected
+        assert "bsxsub0" in relay.subscribed
+        assert "bsxsub1" not in relay.subscribed
+        assert not relay.isReceiving()
+        assert relay.num_subscriptions_closed == 1
+
+        # The retry only resends the closed subscription
+        del sent[:]
+        relay.ws = ws
+        relay.resubscribe()
+        assert [(m[0], m[1]) for m in sent] == [("REQ", "bsxsub1")]
+        assert relay.isReceiving()
+
+        # A failed send leaves the subscription unregistered and retries
+        relay.on_close(ws, 1006, "")
+        assert not relay.subscribed
+        relay.connected = True
+        ws.send = mock.Mock(side_effect=OSError("broken pipe"))
+        with mock.patch.object(relay, "scheduleResubscribe") as mock_sched:
+            relay.on_open(ws)
+            mock_sched.assert_called_once()
+        assert not relay.subscribed
+        assert not relay.isReceiving()
+
         from basicswap.network.nostr_client import (
             RESUBSCRIBE_BASE_SECONDS,
             RESUBSCRIBE_MAX_SECONDS,
@@ -889,6 +938,61 @@ class TestNostrClientRelay(unittest.TestCase):
             finally:
                 client_a.stop()
                 client_b.stop()
+
+    def test_closed_retry_keeps_retrying(self):
+        # A relay that rejects the resubscribe REQ itself must not stall the
+        # retry loop, the client keeps retrying until the relay accepts.
+        from unittest import mock
+
+        with mock.patch("basicswap.network.nostr_client.RESUBSCRIBE_BASE_SECONDS", 0.1):
+            client = self.makeClient()
+            try:
+                for i in range(100):
+                    if client.numReceiving() == 1:
+                        break
+                    time.sleep(0.05)
+                assert client.numReceiving() == 1
+
+                # Reject the next three REQs, the first retry round (two
+                # subscriptions) and half of the second.
+                self.relay.rejectNextRequests(3, "error: backend")
+                assert self.relay.closeSubscriptions("error: backend restart") == 2
+                relay = client.relays[0]
+                for i in range(100):
+                    if relay.num_subscriptions_closed >= 2:
+                        break
+                    time.sleep(0.05)
+                assert client.numReceiving() == 0
+                for i in range(200):
+                    if client.numReceiving() == 1:
+                        break
+                    time.sleep(0.05)
+                assert client.numReceiving() == 1
+                assert self.relay.num_reqs_rejected == 3
+                assert relay.num_subscriptions_closed == 5
+                assert client.numConnected() == 1
+            finally:
+                client.stop()
+
+    def test_relay_stop_disconnects_clients(self):
+        # Outage tests depend on stop() really dropping connected clients.
+        client = self.makeClient()
+        try:
+            relay = client.relays[0]
+            assert relay.connected
+            client_threads = list(self.relay.client_threads)
+            assert len(client_threads) == 1
+            self.relay.stop()
+            assert not self.relay.accept_thread.is_alive()
+            assert not any(t.is_alive() for t in client_threads)
+            for i in range(100):
+                if not relay.connected:
+                    break
+                time.sleep(0.05)
+            assert not relay.connected
+            assert client.numConnected() == 0
+        finally:
+            client.stop()
 
     def test_oversized_frame_rejected_early(self):
         client = self.makeClient()
