@@ -18,7 +18,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.14"
-  PYTHON_FLOOR_VERSION: "3.11"
+  PYTHON_MIN_VERSION: "3.11"
   BASE_COINS: particl,bitcoin,monero
   BIN_DIR: /tmp/cached_bin
   TEST_RELOAD_PATH: /tmp/test_basicswap
@@ -144,15 +144,15 @@ jobs:
       run: |
         black --check --diff .
 
-  test_python_floor:
+  test_python_min:
     needs: lint
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
-    - name: Set up Python ${{ env.PYTHON_FLOOR_VERSION }}
+    - name: Set up Python ${{ env.PYTHON_MIN_VERSION }}
       uses: actions/setup-python@v7
       with:
-        python-version: ${{ env.PYTHON_FLOOR_VERSION }}
+        python-version: ${{ env.PYTHON_MIN_VERSION }}
         cache: pip
         cache-dependency-path: |
           requirements.txt
