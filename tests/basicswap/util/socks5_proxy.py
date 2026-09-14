@@ -19,6 +19,7 @@ class MiniSocks5Proxy:
         self.listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.listener.bind((host, 0))
         self.listener.listen(8)
+        self.listener.settimeout(0.2)
         self.port: int = self.listener.getsockname()[1]
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self.serve, daemon=True)
@@ -34,17 +35,28 @@ class MiniSocks5Proxy:
     def stop(self) -> None:
         self.stop_event.set()
         try:
-            self.listener.close()
-        except Exception:
+            self.listener.shutdown(socket.SHUT_RDWR)
+        except OSError:
             pass
         self.thread.join(timeout=5.0)
+        try:
+            self.listener.close()
+        except OSError:
+            pass
+        assert not self.thread.is_alive(), "MiniSocks5Proxy accept thread still running"
 
     def serve(self) -> None:
         while not self.stop_event.is_set():
             try:
                 conn, _ = self.listener.accept()
+            except socket.timeout:
+                continue
             except OSError:
                 break
+            if self.stop_event.is_set():
+                conn.close()
+                break
+            conn.settimeout(None)
             threading.Thread(target=self.handle, args=(conn,), daemon=True).start()
 
     @staticmethod

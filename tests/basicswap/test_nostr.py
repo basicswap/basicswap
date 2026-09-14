@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import shutil
+import socket
 import sys
 import threading
 import time
@@ -702,6 +703,9 @@ class TestNostrClientRelay(unittest.TestCase):
             client_a.stop()
             client_b.stop()
             proxy.stop()
+
+        with self.assertRaises(OSError):
+            socket.create_connection(("127.0.0.1", proxy.port), timeout=2.0).close()
 
         # An unreachable proxy must not fall back to a direct connection
         client_c = NostrClient(
