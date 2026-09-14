@@ -123,6 +123,29 @@ class TestSimplexLinkParsing(unittest.TestCase):
             getNewSimplexLink(response), "simplex:/contact#/?v=2-7&smp=test"
         )
 
+    def test_new_group_link_v7(self):
+        # simplex-chat v7 nests the link of "/create link #group" under groupLink
+        response = {
+            "corrId": "8",
+            "resp": {
+                "type": "groupLinkCreated",
+                "groupInfo": {"groupId": 1, "localDisplayName": "bsx"},
+                "groupLink": {
+                    "userContactLinkId": 1,
+                    "connLinkContact": {
+                        "connFullLink": "simplex:/contact#/?v=2-7&smp=group",
+                        "connShortLink": "https://127.0.0.1/g#test",
+                    },
+                    "shortLinkDataSet": True,
+                    "shortLinkLargeDataSet": True,
+                    "acceptMemberRole": "member",
+                },
+            },
+        }
+        self.assertEqual(
+            getNewSimplexLink(response), "simplex:/contact#/?v=2-7&smp=group"
+        )
+
     def test_new_link_errors(self):
         error_response = {
             "corrId": "1",

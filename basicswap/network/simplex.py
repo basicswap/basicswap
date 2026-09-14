@@ -473,6 +473,10 @@ def getNewSimplexLink(data):
     response_data = getResponseData(data)
     if "connLinkContact" in response_data:
         return response_data["connLinkContact"]["connFullLink"]
+    # simplex-chat v7 nests group links: groupLinkCreated.groupLink.connLinkContact
+    group_link = response_data.get("groupLink")
+    if isinstance(group_link, dict) and "connLinkContact" in group_link:
+        return group_link["connLinkContact"]["connFullLink"]
     resp_type = response_data.get("type", "unknown")
     if resp_type == "chatCmdError":
         detail = formatSimplexChatError(response_data.get("chatError"))
