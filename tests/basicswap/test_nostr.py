@@ -266,7 +266,7 @@ class TestNostrInboundGates(unittest.TestCase):
         assert client.queue_get() is not None
 
     def test_inbound_pow_enforced(self):
-        client = self.makeClient(pow_target=8)
+        client = self.makeClient(min_incoming_pow=8)
 
         # No committed PoW
         client.receiveEvent("test", self.makeEvent())
@@ -282,6 +282,217 @@ class TestNostrInboundGates(unittest.TestCase):
         # Genuinely mined event is accepted
         client.receiveEvent("test", self.makeEvent(pow_bits=8))
         assert client.queue_get() is not None
+
+        assert self.makeClient(min_incoming_pow=99).min_incoming_pow == (
+            MAX_POW_TARGET_BITS
+        )
+        assert self.makeClient(min_incoming_pow=-1).min_incoming_pow == 0
+
+    def test_outgoing_pow_does_not_filter_incoming(self):
+        pow_client = self.makeClient(pow_target=8)
+        default_client = self.makeClient()
+
+        pow_client.receiveEvent("test", self.makeEvent())
+        assert pow_client.queue_get() is not None
+        mined = pow_client.buildEvent("cG93")
+        assert getEventPow(mined) >= 8
+        default_client.receiveEvent("test", mined)
+        assert default_client.queue_get() is not None
+
+        info = pow_client.get_info()
+        assert info["pow_target"] == 8
+        assert info["min_incoming_pow"] == 0
+
+    def test_unsolicited_oks_dropped(self):
+        client = self.makeClient()
+        relay = client.relays[0]
+        for i in range(1000):
+            relay.on_message(
+                None,
+                json.dumps(["OK", os.urandom(32).hex(), True, "x" * 60000]),
+            )
+        assert len(client._pending_publishes) == 0
+        assert client.num_unsolicited_oks == 1000
+        assert client.get_info()["unsolicited_oks"] == 1000
+
+    def test_ok_matched_to_pending_publish(self):
+        from unittest import mock
+        from basicswap.network.nostr_client import (
+            MAX_OK_MESSAGE_LEN,
+            MAX_PENDING_PUBLISHES,
+            PendingPublish,
+        )
+
+        client = self.makeClient()
+        relay = client.relays[0]
+        event = client.buildEvent("b2s=")
+        result = {}
+
+        def publish():
+            try:
+                result["accepted"] = client.publishEvent(event, wait_seconds=5.0)
+            except Exception as e:
+                result["error"] = e
+
+        with mock.patch.object(relay, "send", return_value=True):
+            t = threading.Thread(target=publish)
+            t.start()
+            for i in range(50):
+                if event["id"] in client._pending_publishes:
+                    break
+                time.sleep(0.02)
+            assert event["id"] in client._pending_publishes
+            client.receiveOK(relay.url, "ab" * 32, True, "")
+            client.receiveOK(
+                relay.url, event["id"], False, "rate-limited: " + "y" * 500
+            )
+            time.sleep(0.1)
+            assert t.is_alive()
+            pending = client._pending_publishes[event["id"]]
+            assert len(pending.rejected[relay.url]) == MAX_OK_MESSAGE_LEN
+            client.receiveOK(relay.url, event["id"], True, "")
+            t.join(timeout=5.0)
+        assert result.get("accepted") == 1
+        assert event["id"] not in client._pending_publishes
+        assert client.num_unsolicited_oks == 1
+
+        event_b = client.buildEvent("cmVq")
+
+        def publish_b():
+            try:
+                client.publishEvent(event_b, wait_seconds=1.0)
+            except Exception as e:
+                result["error_b"] = e
+
+        with mock.patch.object(relay, "send", return_value=True):
+            t = threading.Thread(target=publish_b)
+            t.start()
+            for i in range(50):
+                if event_b["id"] in client._pending_publishes:
+                    break
+                time.sleep(0.02)
+            client.receiveOK(relay.url, event_b["id"], False, "blocked: no")
+            time.sleep(0.1)
+            assert t.is_alive()
+            t.join(timeout=10.0)
+        assert isinstance(result.get("error_b"), TemporaryError)
+        assert "blocked: no" in str(result["error_b"])
+
+        for i in range(MAX_PENDING_PUBLISHES):
+            client._pending_publishes[os.urandom(32).hex()] = PendingPublish()
+        with self.assertRaisesRegex(TemporaryError, "Too many"):
+            client.publishEvent(client.buildEvent("ZnVsbA=="), wait_seconds=0.0)
+
+    def test_frame_limits_reject_before_payload(self):
+        import struct
+        from websocket import WebSocketPayloadException
+        from websocket._abnf import ABNF
+        from basicswap.network.nostr_client import (
+            MAX_WS_FRAME_LEN,
+            BoundedContinuousFrame,
+            BoundedFrameBuffer,
+        )
+
+        claimed = 8 * 1024 * 1024
+        header = bytes([0x81, 127]) + struct.pack(">Q", claimed)
+        offered = bytearray(header)
+        requested = []
+
+        def recv(n):
+            requested.append(n)
+            if len(offered) < 1:
+                raise AssertionError("Payload requested after oversized header")
+            chunk = bytes(offered[:n])
+            del offered[:n]
+            return chunk
+
+        fb = BoundedFrameBuffer(recv, True, MAX_WS_FRAME_LEN)
+        with self.assertRaisesRegex(WebSocketPayloadException, "Frame too large"):
+            fb.recv_frame()
+        assert sum(requested) <= len(header)
+
+        payload = b"a" * 200
+        offered = bytearray(bytes([0x81, 126]) + struct.pack(">H", 200) + payload)
+        fb = BoundedFrameBuffer(recv, True, MAX_WS_FRAME_LEN)
+        frame = fb.recv_frame()
+        assert frame.data == payload
+
+        cf = BoundedContinuousFrame(False, True, 1000)
+        first = ABNF(0, 0, 0, 0, ABNF.OPCODE_TEXT, 0, b"x" * 600)
+        cf.validate(first)
+        cf.add(first)
+        second = ABNF(1, 0, 0, 0, ABNF.OPCODE_CONT, 0, b"y" * 500)
+        cf.validate(second)
+        with self.assertRaisesRegex(WebSocketPayloadException, "Message too large"):
+            cf.add(second)
+        assert cf.cont_data is None
+
+    def test_closed_subscription_tracked(self):
+        from unittest import mock
+
+        client = self.makeClient()
+        relay = client.relays[0]
+        sent = []
+        ws = mock.Mock()
+        ws.send = lambda data: sent.append(json.loads(data))
+        ws.sock = None
+
+        relay.on_open(ws)
+        assert relay.connected
+        assert [m[0] for m in sent] == ["REQ", "REQ"]
+        assert relay.isReceiving()
+        assert client.numReceiving() == 1
+
+        with mock.patch.object(relay, "scheduleResubscribe") as mock_sched:
+            relay.on_message(ws, json.dumps(["CLOSED", "bsxsub0", "error: backend"]))
+            mock_sched.assert_called_once()
+        assert relay.connected
+        assert not relay.isReceiving()
+        assert client.numConnected() == 1
+        assert client.numReceiving() == 0
+        assert relay.num_subscriptions_closed == 1
+        assert "error: backend" in relay.last_error
+        info = client.get_info()["relays"][0]
+        assert info["connected"] is True
+        assert info["receiving"] is False
+        assert info["subscriptions_closed"] == 1
+
+        del sent[:]
+        relay.ws = ws
+        relay.resubscribe()
+        assert [(m[0], m[1]) for m in sent] == [("REQ", "bsxsub0")]
+        assert relay.isReceiving()
+
+        with mock.patch.object(relay, "scheduleResubscribe") as mock_sched:
+            relay.on_message(
+                ws, json.dumps(["CLOSED", "bsxsub1", "auth-required: login"])
+            )
+            mock_sched.assert_not_called()
+        assert not relay.isReceiving()
+        assert "auth-required" in relay.last_error
+
+        with mock.patch.object(relay, "scheduleResubscribe") as mock_sched:
+            relay.on_message(ws, json.dumps(["CLOSED", "other", ""]))
+            mock_sched.assert_not_called()
+        assert relay.num_subscriptions_closed == 2
+
+        from basicswap.network.nostr_client import (
+            RESUBSCRIBE_BASE_SECONDS,
+            RESUBSCRIBE_MAX_SECONDS,
+        )
+
+        waits = []
+        with mock.patch(
+            "basicswap.network.nostr_client.threading.Timer",
+            side_effect=lambda w, fn: waits.append(w) or mock.Mock(),
+        ):
+            for i in range(10):
+                relay.scheduleResubscribe()
+                relay._resub_timer = None
+        assert waits[0] == RESUBSCRIBE_BASE_SECONDS
+        assert waits[1] == RESUBSCRIBE_BASE_SECONDS * 2
+        assert waits[-1] == RESUBSCRIBE_MAX_SECONDS
+        assert max(waits) == RESUBSCRIBE_MAX_SECONDS
 
     def test_recv_queue_bounded(self):
         from unittest import mock
@@ -612,9 +823,87 @@ class TestNostrClientRelay(unittest.TestCase):
             client_a.publishEvent(event, delay_event=self.delay_event)
             received = self.waitForEvent(client_b)
             assert getEventPow(received) == 8
+
+            event_b = client_b.buildEvent("bm9wb3c=", expiration=int(time.time()) + 600)
+            assert getEventPow(event_b) == 0
+            client_b.publishEvent(event_b, delay_event=self.delay_event)
+            received = self.waitForEvent(client_a)
+            assert received["id"] == event_b["id"]
         finally:
             client_a.stop()
             client_b.stop()
+
+    def test_closed_subscription_recovers(self):
+        from unittest import mock
+
+        with mock.patch("basicswap.network.nostr_client.RESUBSCRIBE_BASE_SECONDS", 0.2):
+            client_a = self.makeClient()
+            client_b = self.makeClient()
+            try:
+                for i in range(100):
+                    if client_a.numReceiving() == 1 and client_b.numReceiving() == 1:
+                        break
+                    time.sleep(0.05)
+                assert client_a.numReceiving() == 1
+
+                assert self.relay.closeSubscriptions("error: backend restart") == 4
+                for i in range(100):
+                    if client_a.numReceiving() == 0 and client_b.numReceiving() == 0:
+                        break
+                    time.sleep(0.05)
+                assert client_a.numConnected() == 1
+                assert client_a.numReceiving() == 0
+                relay = client_a.relays[0]
+                assert "backend restart" in relay.last_error
+                assert client_a.get_info()["relays"][0]["receiving"] is False
+
+                event = client_a.buildEvent(
+                    "bG9zdA==", expiration=int(time.time()) + 600
+                )
+                client_a.publishEvent(event, delay_event=self.delay_event)
+
+                for i in range(100):
+                    if client_a.numReceiving() == 1 and client_b.numReceiving() == 1:
+                        break
+                    time.sleep(0.05)
+                assert client_b.numReceiving() == 1
+                received = self.waitForEvent(client_b)
+                assert received["id"] == event["id"]
+
+                event = client_a.buildEvent(
+                    "YWZ0ZXI=", expiration=int(time.time()) + 600
+                )
+                client_a.publishEvent(event, delay_event=self.delay_event)
+                received = self.waitForEvent(client_b)
+                assert received["id"] == event["id"]
+
+                assert self.relay.closeSubscriptions("auth-required: nope") == 4
+                time.sleep(1.0)
+                assert client_a.numConnected() == 1
+                assert client_a.numReceiving() == 0
+                assert "auth-required" in client_a.relays[0].last_error
+            finally:
+                client_a.stop()
+                client_b.stop()
+
+    def test_oversized_frame_rejected_early(self):
+        client = self.makeClient()
+        try:
+            relay = client.relays[0]
+            t = threading.Thread(
+                target=self.relay.sendOversizedFrames, args=(8 * 1024 * 1024,)
+            )
+            t.start()
+            for i in range(100):
+                if not relay.connected:
+                    break
+                time.sleep(0.05)
+            t.join(timeout=5.0)
+            assert not relay.connected
+            assert "Frame too large" in relay.last_error
+            assert relay.num_oversized_messages == 0
+        finally:
+            client.stop()
 
 
 class BasicSwapFixture(unittest.TestCase):
@@ -660,6 +949,179 @@ class BasicSwapFixture(unittest.TestCase):
     def tearDown(self):
         del self.sc
         shutil.rmtree(self.basicswap_dir, ignore_errors=True)
+
+
+class TestTrialDecryptCandidates(BasicSwapFixture):
+
+    def test_candidate_addresses(self):
+        from unittest import mock
+        from basicswap.basicswap_util import AddressTypes, BidStates
+        from basicswap.db import (
+            Bid,
+            Concepts,
+            DirectMessageRoute,
+            Offer,
+            SmsgAddress,
+        )
+        from basicswap.network.simplex import decryptSimplexMsg
+
+        now = self.sc.getTime()
+
+        def add_offer(offer_id, addr_from, was_sent, expire_at):
+            self.sc.add(
+                Offer(
+                    offer_id=offer_id,
+                    active_ind=1,
+                    addr_from=addr_from,
+                    was_sent=was_sent,
+                    created_at=now,
+                    expire_at=expire_at,
+                ),
+                cursor,
+            )
+
+        def add_bid(offer_id, bid_addr, was_sent, state, expire_at):
+            bid = Bid(
+                bid_id=os.urandom(28),
+                offer_id=offer_id,
+                active_ind=1,
+                bid_addr=bid_addr,
+                was_sent=was_sent,
+                was_received=not was_sent,
+                created_at=now,
+                expire_at=expire_at,
+            )
+            bid.setState(state)
+            self.sc.add(bid, cursor)
+
+        def add_route(active_ind, local, remote):
+            self.sc.add(
+                DirectMessageRoute(
+                    active_ind=active_ind,
+                    network_id=3,
+                    linked_type=Concepts.OFFER,
+                    smsg_addr_local=local,
+                    smsg_addr_remote=remote,
+                    route_data=b"{}",
+                    created_at=now,
+                ),
+                cursor,
+            )
+
+        def add_addr(addr, use_type, active_ind=1):
+            self.sc.add(
+                SmsgAddress(
+                    active_ind=active_ind,
+                    created_at=now,
+                    addr=addr,
+                    use_type=int(use_type),
+                ),
+                cursor,
+            )
+
+        try:
+            cursor = self.sc.openDB()
+            from basicswap.db_upgrades import addBidState
+
+            for state in BidStates:
+                addBidState(self.sc, state, now, cursor)
+
+            add_offer(b"\x01" * 28, "own_offer_active", True, now + 3600)
+            add_offer(b"\x02" * 28, "own_offer_expired_live_bid", True, now - 10)
+            add_bid(
+                b"\x02" * 28, "remote_bidder", False, BidStates.BID_ACCEPTED, now - 10
+            )
+            add_offer(b"\x03" * 28, "own_offer_expired", True, now - 10)
+            add_bid(
+                b"\x03" * 28,
+                "remote_bidder_done",
+                False,
+                BidStates.SWAP_COMPLETED,
+                now - 10,
+            )
+            add_offer(b"\x04" * 28, "remote_offer_active", False, now + 3600)
+            add_offer(b"\x05" * 28, "remote_offer_bid_on", False, now + 3600)
+            add_bid(
+                b"\x05" * 28,
+                "own_bid_waiting",
+                True,
+                BidStates.CONNECT_REQ_SENT,
+                now + 3600,
+            )
+            add_bid(
+                b"\x05" * 28,
+                "own_bid_swapping",
+                True,
+                BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+                now - 10,
+            )
+            add_bid(
+                b"\x05" * 28,
+                "own_bid_completed",
+                True,
+                BidStates.SWAP_COMPLETED,
+                now + 3600,
+            )
+            add_bid(b"\x05" * 28, "own_bid_expired", True, BidStates.BID_SENT, now - 10)
+            add_route(2, "own_route_pending", "remote_a")
+            add_route(1, "own_route_active_no_bid", "remote_b")
+            add_addr("recv_offer_addr", AddressTypes.RECV_OFFER)
+            add_addr("recv_offer_addr_disabled", AddressTypes.RECV_OFFER, 0)
+            add_addr("portal_local_addr", AddressTypes.PORTAL_LOCAL)
+            add_addr("send_offer_to_addr", AddressTypes.SEND_OFFER)
+            for i in range(100):
+                add_addr(f"old_bid_addr_{i}", AddressTypes.BID)
+                add_addr(f"old_offer_addr_{i}", AddressTypes.OFFER)
+        finally:
+            self.sc.closeDB(cursor)
+
+        tried = []
+
+        def fake_privkey(cursor, addr):
+            tried.append(addr)
+            raise ValueError("key not found")
+
+        with (
+            mock.patch.object(self.sc, "ci", return_value=mock.Mock()),
+            mock.patch.object(
+                self.sc, "getPrivkeyForAddress", side_effect=fake_privkey
+            ),
+        ):
+            assert decryptSimplexMsg(self.sc, os.urandom(300)) is None
+
+        assert sorted(tried) == sorted(
+            [
+                "own_offer_active",
+                "own_offer_expired_live_bid",
+                "own_bid_waiting",
+                "own_bid_swapping",
+                "own_route_pending",
+                "recv_offer_addr",
+                "portal_local_addr",
+            ]
+        )
+
+    def test_privkey_cache(self):
+        from unittest import mock
+
+        with mock.patch.object(
+            self.sc, "_lookupPrivkeyForAddress", return_value=b"k" * 32
+        ) as mock_lookup:
+            assert self.sc.getPrivkeyForAddress(None, "addr_a") == b"k" * 32
+            assert self.sc.getPrivkeyForAddress(None, "addr_a") == b"k" * 32
+            assert mock_lookup.call_count == 1
+            for i in range(self.sc._privkey_cache_size + 10):
+                self.sc.getPrivkeyForAddress(None, f"addr_{i}")
+            assert len(self.sc._privkey_cache) == self.sc._privkey_cache_size
+            assert "addr_a" not in self.sc._privkey_cache
+
+        with mock.patch.object(
+            self.sc, "_lookupPrivkeyForAddress", side_effect=ValueError("locked")
+        ) as mock_lookup:
+            for i in range(2):
+                with self.assertRaises(ValueError):
+                    self.sc.getPrivkeyForAddress(None, "addr_locked")
+            assert mock_lookup.call_count == 2
 
 
 class TestNetworkSettings(BasicSwapFixture):
@@ -814,6 +1276,56 @@ class TestNetworkSettings(BasicSwapFixture):
         assert by_type["nostr"]["messages_received_direct"] == 0
         assert by_type["nostr"]["messages_sent_broadcast"] == 0
         assert by_type["nostr"]["messages_sent_direct"] == 0
+
+    def test_concurrent_settings_edits_both_persist(self):
+        import basicswap.config as cfg
+
+        nostr_net = next(
+            n for n in self.sc.settings["networks"] if n["type"] == "nostr"
+        )
+        old_key = nostr_net["private_key"]
+        results = {}
+
+        def regenerate():
+            results["key"] = self.sc.editNetworkSettings(
+                "nostr", {"regenerate_key": True}
+            )
+
+        def set_relays():
+            results["relays"] = self.sc.editNetworkSettings(
+                "nostr", {"relays": ["wss://relay.new"]}
+            )
+
+        def set_bridge():
+            results["bridge"] = self.sc.editBridgeNetworksSetting(True)
+
+        threads = [
+            threading.Thread(target=fn) for fn in (regenerate, set_relays, set_bridge)
+        ]
+        with self.sc.mxDB:
+            for t in threads:
+                t.start()
+            time.sleep(0.3)
+        for t in threads:
+            t.join(timeout=10.0)
+
+        assert results["key"] == (True, True)
+        assert results["relays"] == (True, True)
+        assert results["bridge"] == (True, True)
+
+        nostr_net = next(
+            n for n in self.sc.settings["networks"] if n["type"] == "nostr"
+        )
+        assert nostr_net["private_key"] != old_key
+        assert nostr_net["relays"] == ["wss://relay.new"]
+        assert self.sc.settings["bridge_networks"] is True
+
+        with open(os.path.join(self.basicswap_dir, cfg.CONFIG_FILENAME)) as fp:
+            on_disk = json.load(fp)
+        nostr_disk = next(n for n in on_disk["networks"] if n["type"] == "nostr")
+        assert nostr_disk["private_key"] == nostr_net["private_key"]
+        assert nostr_disk["relays"] == ["wss://relay.new"]
+        assert on_disk["bridge_networks"] is True
 
     def test_edit_network_settings(self):
         changed, reboot = self.sc.editNetworkSettings("nostr", {"pow_target": 12})
@@ -1062,6 +1574,291 @@ class TestNostrHandshake(BasicSwapFixture):
             self.sc.closeDB(cursor)
         return routes, links
 
+    def ageRoute(self, cursor, route_id: int, seconds: int) -> None:
+        route_data = json.loads(
+            cursor.execute(
+                "SELECT route_data FROM direct_message_routes WHERE record_id = :record_id",
+                {"record_id": route_id},
+            ).fetchone()[0]
+        )
+        route_data["connect_req_sent_at"] -= seconds
+        cursor.execute(
+            "UPDATE direct_message_routes SET created_at = created_at - :seconds, "
+            "route_data = :route_data WHERE record_id = :record_id",
+            {
+                "seconds": seconds,
+                "route_data": json.dumps(route_data).encode("UTF-8"),
+                "record_id": route_id,
+            },
+        )
+
+    def openPendingBidderRoute(self, sent_msgids: list) -> int:
+        from types import SimpleNamespace
+        from unittest import mock
+        from basicswap.db import Concepts, DirectMessageRouteLink
+
+        net_i = SimpleNamespace(pubkey=self.BIDDER_PUBKEY)
+
+        def fake_send_message(*args, **kwargs):
+            msgid = os.urandom(28)
+            sent_msgids.append(msgid)
+            return msgid
+
+        with (
+            mock.patch.object(self.sc, "getActiveNetworkInterface", return_value=net_i),
+            mock.patch.object(self.sc, "sendMessage", side_effect=fake_send_message),
+        ):
+            try:
+                cursor = self.sc.openDB()
+                route_id, established = self.sc.prepareMessageRoute(
+                    "nostr",
+                    {"offer_id": self.offer_id.hex()},
+                    self.BIDDER_ADDR,
+                    self.OFFER_ADDR,
+                    cursor,
+                    3600,
+                )
+                assert established is False
+                self.sc.add(
+                    DirectMessageRouteLink(
+                        active_ind=1,
+                        direct_message_route_id=route_id,
+                        linked_type=Concepts.BID,
+                        linked_id=self.bid_id,
+                        created_at=self.sc.getTime(),
+                    ),
+                    cursor,
+                )
+            finally:
+                self.sc.closeDB(cursor)
+        return route_id
+
+    def makeAckFor(self, route_id: int) -> dict:
+        from basicswap.basicswap_util import ConnectionRequestTypes
+
+        routes, _ = self.readRoutes()
+        route_data = json.loads(
+            [r for r in routes if r[0] == route_id][0][5].decode("UTF-8")
+        )
+        ack = self.makeConnectMsg(
+            ConnectionRequestTypes.ACK,
+            {
+                "offer_id": self.offer_id.hex(),
+                "bsx_address": self.OFFER_ADDR,
+                "nostr_pubkey": self.OFFERER_PUBKEY,
+                "req_pubkey": route_data["local_pubkey"],
+            },
+            self.OFFER_ADDR,
+            self.BIDDER_ADDR,
+        )
+        ack["nostr_pubkey_from"] = self.OFFERER_PUBKEY
+        return ack
+
+    def test_bid_send_failure_after_ack_is_retried(self):
+        from unittest import mock
+        from basicswap.db import Concepts
+
+        sent_msgids = []
+        route_id = self.openPendingBidderRoute(sent_msgids)
+        ack_msg = self.makeAckFor(route_id)
+
+        with mock.patch.object(
+            self.sc,
+            "routeEstablishedForBid",
+            side_effect=TemporaryError("No relay accepted event"),
+        ) as mock_est:
+            self.sc.processConnectRequest(ack_msg)
+            mock_est.assert_called_once()
+
+        routes, links = self.readRoutes()
+        assert routes[0][1] == 1
+        assert links == [(1, route_id, int(Concepts.BID), self.bid_id)]
+
+        with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
+            self.sc.checkPendingMessageRoutes()
+            mock_est.assert_called_once()
+            assert mock_est.call_args.args[0] == self.bid_id
+
+        routes, links = self.readRoutes()
+        assert links == [(2, route_id, int(Concepts.BID), self.bid_id)]
+
+        with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
+            self.sc.checkPendingMessageRoutes()
+            mock_est.assert_not_called()
+        assert len(sent_msgids) == 1
+
+    def test_redelivered_ack_dispatches_pending_bid(self):
+        from unittest import mock
+        from basicswap.db import Concepts
+
+        sent_msgids = []
+        route_id = self.openPendingBidderRoute(sent_msgids)
+        ack_msg = self.makeAckFor(route_id)
+
+        with mock.patch.object(
+            self.sc, "routeEstablishedForBid", side_effect=TemporaryError("down")
+        ):
+            self.sc.processConnectRequest(ack_msg)
+        _, links = self.readRoutes()
+        assert links[0][0] == 1
+
+        with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
+            self.sc.processConnectRequest(ack_msg)
+            mock_est.assert_called_once()
+        _, links = self.readRoutes()
+        assert links == [(2, route_id, int(Concepts.BID), self.bid_id)]
+
+        from basicswap.basicswap_util import ConnectionRequestTypes
+
+        routes, _ = self.readRoutes()
+        route_data = json.loads(routes[0][5].decode("UTF-8"))
+        bad_ack = self.makeConnectMsg(
+            ConnectionRequestTypes.ACK,
+            {
+                "offer_id": self.offer_id.hex(),
+                "bsx_address": self.OFFER_ADDR,
+                "nostr_pubkey": "ef" * 32,
+                "req_pubkey": route_data["local_pubkey"],
+            },
+            self.OFFER_ADDR,
+            self.BIDDER_ADDR,
+        )
+        bad_ack["nostr_pubkey_from"] = "ef" * 32
+        with self.assertRaisesRegex(ValueError, "does not match active route"):
+            self.sc.processConnectRequest(bad_ack)
+
+    def test_connect_req_retransmitted_by_update_loop(self):
+        from unittest import mock
+
+        sent_msgids = []
+        route_id = self.openPendingBidderRoute(sent_msgids)
+        assert len(sent_msgids) == 1
+
+        def read_route_data():
+            routes, _ = self.readRoutes()
+            return json.loads(routes[0][5].decode("UTF-8"))
+
+        route_data = read_route_data()
+        assert route_data["connect_req_attempts"] == 1
+        assert route_data["connect_req_data"]["offer_id"] == self.offer_id.hex()
+        first_pubkey = route_data["local_pubkey"]
+
+        def fake_send_message(addr_from, addr_to, payload_hex, *args, **kwargs):
+            from basicswap.messages_npb import ConnectReqMessage
+
+            assert (addr_from, addr_to) == (self.BIDDER_ADDR, self.OFFER_ADDR)
+            assert kwargs["message_nets"] == "nostr"
+            msg_data = ConnectReqMessage(init_all=False)
+            msg_data.from_bytes(bytes.fromhex(payload_hex[2:]))
+            req = json.loads(msg_data.request_data)
+            assert req["nostr_pubkey"] == first_pubkey
+            assert req["offer_id"] == self.offer_id.hex()
+            assert (
+                PrivateKey(kwargs["sign_privkey"]).public_key_xonly.format().hex()
+                == first_pubkey
+            )
+            msgid = os.urandom(28)
+            sent_msgids.append(msgid)
+            return msgid
+
+        max_attempts = self.sc._connect_req_max_attempts
+        with mock.patch.object(self.sc, "sendMessage", side_effect=fake_send_message):
+            self.sc.checkPendingMessageRoutes()
+            assert len(sent_msgids) == 1
+
+            expect_wait = 30
+            for attempt in range(2, max_attempts + 1):
+                try:
+                    cursor = self.sc.openDB()
+                    self.ageRoute(cursor, route_id, expect_wait - 5)
+                finally:
+                    self.sc.closeDB(cursor)
+                self.sc.checkPendingMessageRoutes()
+                assert len(sent_msgids) == attempt - 1
+
+                try:
+                    cursor = self.sc.openDB()
+                    self.ageRoute(cursor, route_id, 5)
+                finally:
+                    self.sc.closeDB(cursor)
+                self.sc.checkPendingMessageRoutes()
+                assert len(sent_msgids) == attempt
+                route_data = read_route_data()
+                assert route_data["connect_req_attempts"] == attempt
+                assert route_data["connect_req_msgid"] == sent_msgids[-1].hex()
+                expect_wait = min(expect_wait * 2, 600)
+
+            try:
+                cursor = self.sc.openDB()
+                self.ageRoute(cursor, route_id, 24 * 3600)
+            finally:
+                self.sc.closeDB(cursor)
+            self.sc.checkPendingMessageRoutes()
+            assert len(sent_msgids) == max_attempts
+
+        routes, links = self.readRoutes()
+        assert routes[0][1] == 2
+        assert links[0][0] == 1
+
+        with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
+            self.sc.processConnectRequest(self.makeAckFor(route_id))
+            mock_est.assert_called_once()
+        routes, links = self.readRoutes()
+        assert routes[0][1] == 1
+        assert links[0][0] == 2
+
+    def test_route_established_for_bid_is_idempotent(self):
+        from unittest import mock
+        from basicswap.basicswap_util import BidStates
+        from basicswap.db import Bid, Offer
+
+        now = self.sc.getTime()
+        try:
+            cursor = self.sc.openDB()
+            self.sc.add(
+                Offer(offer_id=self.offer_id, active_ind=1, created_at=now), cursor
+            )
+            bid = Bid(
+                bid_id=self.bid_id,
+                offer_id=self.offer_id,
+                active_ind=1,
+                created_at=now,
+                expire_at=now + 3600,
+                was_sent=True,
+            )
+            bid.setState(BidStates.BID_SENT)
+            self.sc.add(bid, cursor)
+        finally:
+            self.sc.closeDB(cursor)
+
+        with mock.patch.object(self.sc, "sendBidMessage") as mock_send:
+            try:
+                cursor = self.sc.openDB()
+                self.sc.routeEstablishedForBid(self.bid_id, cursor)
+            finally:
+                self.sc.closeDB(cursor)
+            mock_send.assert_not_called()
+
+        try:
+            cursor = self.sc.openDB()
+            cursor.execute(
+                "UPDATE bids SET state = :state, expire_at = :expire_at WHERE bid_id = :bid_id",
+                {
+                    "state": int(BidStates.CONNECT_REQ_SENT),
+                    "expire_at": now - 1,
+                    "bid_id": self.bid_id,
+                },
+            )
+        finally:
+            self.sc.closeDB(cursor)
+        with mock.patch.object(self.sc, "sendBidMessage") as mock_send:
+            try:
+                cursor = self.sc.openDB()
+                self.sc.routeEstablishedForBid(self.bid_id, cursor)
+            finally:
+                self.sc.closeDB(cursor)
+            mock_send.assert_not_called()
+
     def test_offerer_accepts_and_acks(self):
         from types import SimpleNamespace
         from unittest import mock
@@ -1260,11 +2057,7 @@ class TestNostrHandshake(BasicSwapFixture):
 
                 # After 30s without an ACK the CONNECT_REQ is resent on the
                 # same route
-                cursor.execute(
-                    "UPDATE direct_message_routes SET created_at = created_at - 60 "
-                    "WHERE record_id = :record_id",
-                    {"record_id": route_id},
-                )
+                self.ageRoute(cursor, route_id, 60)
                 rv = self.sc.prepareMessageRoute(
                     "nostr", {}, self.BIDDER_ADDR, self.OFFER_ADDR, cursor, 3600
                 )
@@ -1363,6 +2156,86 @@ class TestNostrHandshake(BasicSwapFixture):
             with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
                 self.sc.processConnectRequest(ack_msg)
                 mock_est.assert_not_called()
+
+    def test_simplex_route_readers_skip_nostr_routes(self):
+        from unittest import mock
+        from basicswap.basicswap_util import MessageNetworks
+        from basicswap.db import Concepts, DirectMessageRoute, DirectMessageRouteLink
+
+        now = self.sc.getTime()
+        try:
+            cursor = self.sc.openDB()
+            self.sc.add(
+                DirectMessageRoute(
+                    active_ind=1,
+                    network_id=int(MessageNetworks.NOSTR),
+                    linked_type=Concepts.OFFER,
+                    smsg_addr_local="nostr_local",
+                    smsg_addr_remote="nostr_remote",
+                    route_data=json.dumps(
+                        {"local_pubkey": "ab" * 32, "local_privkey": "cd" * 32}
+                    ).encode("UTF-8"),
+                    created_at=now,
+                ),
+                cursor,
+            )
+            simplex_route_id = self.sc.add(
+                DirectMessageRoute(
+                    active_ind=2,
+                    network_id=int(MessageNetworks.SIMPLEX),
+                    linked_type=Concepts.OFFER,
+                    smsg_addr_local="sx_local",
+                    smsg_addr_remote="sx_remote",
+                    route_data=json.dumps({"pccConnId": "conn-77"}).encode("UTF-8"),
+                    created_at=now,
+                ),
+                cursor,
+            )
+            self.sc.add(
+                DirectMessageRouteLink(
+                    active_ind=1,
+                    direct_message_route_id=simplex_route_id,
+                    linked_type=Concepts.BID,
+                    linked_id=self.bid_id,
+                    created_at=now,
+                ),
+                cursor,
+            )
+        finally:
+            self.sc.closeDB(cursor)
+
+        other_bid_id = os.urandom(28)
+        self.sc.addRecvBidNetworkLink(
+            {"chat_type": "direct", "conn_id": "conn-77"}, other_bid_id
+        )
+        _, links = self.readRoutes()
+        assert (2, simplex_route_id, int(Concepts.BID), other_bid_id) in links
+
+        event = {
+            "resp": {
+                "Right": {
+                    "contact": {
+                        "activeConn": {"connId": "conn-77"},
+                        "localDisplayName": "peer",
+                    }
+                }
+            }
+        }
+        with mock.patch.object(self.sc, "routeEstablishedForBid") as mock_est:
+            self.sc.processContactConnected(event)
+            mock_est.assert_called_once()
+            assert mock_est.call_args.args[0] == self.bid_id
+        routes, links = self.readRoutes()
+        assert [r[1] for r in routes if r[0] == simplex_route_id] == [1]
+        assert (2, simplex_route_id, int(Concepts.BID), self.bid_id) in links
+
+        with (
+            mock.patch.object(self.sc, "getActiveNetworkInterface"),
+            mock.patch("basicswap.network.bsx_network.closeSimplexChat"),
+        ):
+            self.sc.processContactDisconnected(event)
+        routes, _ = self.readRoutes()
+        assert [r[2] for r in routes] == [int(MessageNetworks.NOSTR)]
 
     def test_ack_without_route_is_rejected(self):
         from basicswap.basicswap_util import ConnectionRequestTypes

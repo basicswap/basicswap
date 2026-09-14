@@ -173,6 +173,9 @@ def page_settings(self, url_split, post_string):
                     "pow_target": int(
                         get_data_entry_or(form_data, "nostr_pow_target", "0")
                     ),
+                    "min_incoming_pow": int(
+                        get_data_entry_or(form_data, "nostr_min_incoming_pow", "0")
+                    ),
                 }
                 settings_changed, suggest_reboot = swap_client.editNetworkSettings(
                     "nostr", data

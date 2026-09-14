@@ -22,6 +22,8 @@ from urllib.parse import urlsplit
 from coincurve.keys import PrivateKey, PublicKeyXOnly
 
 import websocket
+from websocket import WebSocketPayloadException
+from websocket._abnf import continuous_frame, frame_buffer
 
 from basicswap.util import TemporaryError
 
@@ -32,6 +34,7 @@ DEFAULT_BROADCAST_TAG: str = "bsx"
 MAX_SEEN_EVENT_IDS: int = 10000
 MAX_EVENT_CONTENT_LEN: int = 65536
 MAX_RELAY_MESSAGE_LEN: int = MAX_EVENT_CONTENT_LEN + 8192
+MAX_WS_FRAME_LEN: int = MAX_RELAY_MESSAGE_LEN
 MAX_POW_TARGET_BITS: int = 12
 # Verified events waiting for the main loop.  readNostrMsgs drains ~200/s,
 # anything beyond this is dropped rather than buffered without limit.
@@ -41,9 +44,67 @@ MAX_RECV_QUEUE_SIZE: int = 5000
 # above legitimate BSX traffic and caps the verify work a relay can cause.
 RELAY_EVENT_BURST: int = 2000
 RELAY_EVENTS_PER_SECOND: float = 20.0
+MAX_PENDING_PUBLISHES: int = 64
+MAX_OK_MESSAGE_LEN: int = 240
 SOCKS_CONNECT_TIMEOUT: int = 30
 PING_INTERVAL_SECONDS: int = 30
 PING_TIMEOUT_SECONDS: int = 10
+RESUBSCRIBE_BASE_SECONDS: float = 5.0
+RESUBSCRIBE_MAX_SECONDS: float = 300.0
+PERMANENT_CLOSED_PREFIXES = ("auth-required", "restricted", "invalid")
+
+
+class BoundedFrameBuffer(frame_buffer):
+
+    def __init__(self, recv_fn, skip_utf8_validation: bool, max_frame_len: int):
+        super().__init__(recv_fn, skip_utf8_validation)
+        self.max_frame_len: int = max_frame_len
+
+    def recv_length(self) -> None:
+        super().recv_length()
+        if self.length is not None and self.length > self.max_frame_len:
+            raise WebSocketPayloadException(
+                f"Frame too large: {self.length} > {self.max_frame_len}"
+            )
+
+
+class BoundedContinuousFrame(continuous_frame):
+
+    def __init__(
+        self, fire_cont_frame: bool, skip_utf8_validation: bool, max_message_len: int
+    ):
+        super().__init__(fire_cont_frame, skip_utf8_validation)
+        self.max_message_len: int = max_message_len
+
+    def add(self, frame) -> None:
+        have: int = len(self.cont_data[1]) if self.cont_data else 0
+        if have + len(frame.data) > self.max_message_len:
+            self.cont_data = None
+            self.recving_frames = None
+            raise WebSocketPayloadException(
+                f"Message too large: {have + len(frame.data)} > {self.max_message_len}"
+            )
+        super().add(frame)
+
+
+def installFrameLimits(ws_sock, max_len: int = MAX_WS_FRAME_LEN) -> None:
+    ws_sock.frame_buffer = BoundedFrameBuffer(
+        ws_sock._recv, ws_sock.frame_buffer.skip_utf8_validation, max_len
+    )
+    ws_sock.cont_frame = BoundedContinuousFrame(
+        ws_sock.cont_frame.fire_cont_frame,
+        ws_sock.cont_frame.skip_utf8_validation,
+        max_len,
+    )
+
+
+class PendingPublish:
+    __slots__ = ("done", "accepted", "rejected")
+
+    def __init__(self):
+        self.done = threading.Event()
+        self.accepted = set()
+        self.rejected = {}
 
 
 def eventSerialize(
@@ -195,9 +256,79 @@ class RelayThread(threading.Thread):
         self.num_events_sent: int = 0
         self.num_oversized_messages: int = 0
         self.num_events_rate_limited: int = 0
+        self.num_subscriptions_closed: int = 0
         self.last_error: str = ""
         self._tokens: float = float(RELAY_EVENT_BURST)
         self._tokens_updated: float = time.monotonic()
+        self.subscribed = set()
+        self._resub_lock = threading.Lock()
+        self._resub_timer = None
+        self._resub_attempts: int = 0
+
+    def subscriptionIds(self) -> list:
+        return [
+            f"{self.sub_id}{i}"
+            for i in range(len(self.client.getSubscriptionFilters()))
+        ]
+
+    def isReceiving(self) -> bool:
+        return self.connected and self.subscribed >= set(self.subscriptionIds())
+
+    def subscribe(self, ws) -> None:
+        for i, sub_filter in enumerate(self.client.getSubscriptionFilters()):
+            sub_id: str = f"{self.sub_id}{i}"
+            if sub_id in self.subscribed:
+                continue
+            ws.send(json.dumps(["REQ", sub_id, sub_filter]))
+            self.subscribed.add(sub_id)
+
+    def onSubscriptionClosed(self, sub_id: str, reason: str) -> None:
+        if sub_id not in self.subscriptionIds():
+            return
+        self.subscribed.discard(sub_id)
+        self.num_subscriptions_closed += 1
+        reason = str(reason)[:MAX_OK_MESSAGE_LEN]
+        self.last_error = f"Subscription closed by relay: {reason or 'no reason'}"
+        prefix: str = reason.split(":", 1)[0].strip() if ":" in reason else ""
+        if prefix in PERMANENT_CLOSED_PREFIXES:
+            self.client.log.warning(
+                f"Nostr relay {self.url} refused subscription {sub_id}: {reason}"
+            )
+            return
+        self.client.log.info(
+            f"Nostr relay {self.url} closed subscription {sub_id}: {reason or 'no reason'}"
+        )
+        self.scheduleResubscribe()
+
+    def scheduleResubscribe(self) -> None:
+        with self._resub_lock:
+            if self._resub_timer is not None or self.delay_event.is_set():
+                return
+            wait: float = min(
+                RESUBSCRIBE_BASE_SECONDS * (2**self._resub_attempts),
+                RESUBSCRIBE_MAX_SECONDS,
+            )
+            self._resub_attempts += 1
+            self._resub_timer = threading.Timer(wait, self.resubscribe)
+            self._resub_timer.daemon = True
+            self._resub_timer.start()
+
+    def cancelResubscribe(self) -> None:
+        with self._resub_lock:
+            if self._resub_timer is not None:
+                self._resub_timer.cancel()
+                self._resub_timer = None
+
+    def resubscribe(self) -> None:
+        with self._resub_lock:
+            self._resub_timer = None
+        if not self.connected or self.ws is None or self.delay_event.is_set():
+            return
+        try:
+            self.subscribe(self.ws)
+        except Exception as e:
+            self.client.log.debug(f"Nostr relay {self.url} resubscribe error: {e}")
+            self.scheduleResubscribe()
 
     def allowEvent(self) -> bool:
         now: float = time.monotonic()
@@ -215,10 +346,18 @@ class RelayThread(threading.Thread):
     def on_open(self, ws) -> None:
         self.connected = True
         self.last_error = ""
+        self.subscribed.clear()
+        self._resub_attempts = 0
         self.client.log.info(f"Nostr relay connected: {self.url}")
         try:
-            for i, sub_filter in enumerate(self.client.getSubscriptionFilters()):
-                ws.send(json.dumps(["REQ", f"{self.sub_id}{i}", sub_filter]))
+            if getattr(ws, "sock", None) is not None:
+                installFrameLimits(ws.sock)
+        except Exception as e:
+            self.client.log.warning(
+                f"Nostr relay {self.url} could not install frame limits: {e}"
+            )
+        try:
+            self.subscribe(ws)
         except Exception as e:
             self.client.log.warning(f"Nostr relay {self.url} subscribe error: {e}")
 
@@ -247,7 +386,12 @@ class RelayThread(threading.Thread):
                 self.client.receiveOK(
                     self.url, data[1], data[2], data[3] if len(data) > 3 else ""
                 )
-            elif msg_type in ("EOSE", "CLOSED", "NOTICE"):
+            elif msg_type == "EOSE":
+                if data[1] in self.subscribed:
+                    self._resub_attempts = 0
+            elif msg_type == "CLOSED":
+                self.onSubscriptionClosed(data[1], data[2] if len(data) > 2 else "")
+            elif msg_type == "NOTICE":
                 pass
         except Exception as e:
             self.client.log.debug(f"Nostr relay {self.url} message error: {e}")
@@ -261,6 +405,8 @@ class RelayThread(threading.Thread):
         # to avoid a line every retry while a relay is unreachable.
         log = self.client.log.info if self.connected else self.client.log.debug
         self.connected = False
+        self.subscribed.clear()
+        self.cancelResubscribe()
         log(f"Nostr relay closed: {self.url} {close_status_code}")
 
     def send(self, data: str) -> bool:
@@ -325,6 +471,7 @@ class RelayThread(threading.Thread):
 
     def stop(self) -> None:
         self.delay_event.set()
+        self.cancelResubscribe()
         if self.ws:
             try:
                 self.ws.close()
@@ -343,12 +490,16 @@ class NostrClient:
         socks_proxy: str = None,
         subscribe_since_seconds: int = 48 * 3600,
         abort_event=None,
+        min_incoming_pow: int = 0,
     ):
         self.log = logger
         self.privkey: bytes = privkey
         self.pubkey: str = PrivateKey(privkey).public_key_xonly.format().hex()
         self.broadcast_tag: str = broadcast_tag
         self.pow_target: int = max(0, min(int(pow_target), MAX_POW_TARGET_BITS))
+        self.min_incoming_pow: int = max(
+            0, min(int(min_incoming_pow), MAX_POW_TARGET_BITS)
+        )
         self.subscribe_since_seconds: int = subscribe_since_seconds
         self.abort_event = abort_event if abort_event is not None else threading.Event()
 
@@ -360,13 +511,14 @@ class NostrClient:
 
         self.mutex = threading.Lock()
         self.recv_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
-        self.ok_queue = Queue()
+        self._pending_publishes = {}
         self._seen_event_ids = OrderedDict()
         self._seen_smsg_ids = OrderedDict()
 
         self.num_messages_received: int = 0
         self.num_messages_sent: int = 0
         self.num_messages_dropped: int = 0
+        self.num_unsolicited_oks: int = 0
 
         self.relays = []
         for url in relays:
@@ -396,6 +548,9 @@ class NostrClient:
 
     def numConnected(self) -> int:
         return sum(1 for relay in self.relays if relay.connected)
+
+    def numReceiving(self) -> int:
+        return sum(1 for relay in self.relays if relay.isReceiving())
 
     def getPlaintextRelays(self) -> list:
         """Relay urls using ws:// (unencrypted transport)."""
@@ -448,8 +603,8 @@ class NostrClient:
             # Gate on the committed PoW before the expensive signature
             # verification.  The claimed id is bound by verifyEvent below,
             # a faked id passes this gate but is dropped unverified.
-            if self.pow_target > 0 and getEventPow(event) < self.pow_target:
-                self.log.debug(f"Nostr event below PoW target: {event_id}")
+            if self.min_incoming_pow > 0 and getEventPow(event) < self.min_incoming_pow:
+                self.log.debug(f"Nostr event below incoming PoW minimum: {event_id}")
                 return
             # Only verified events enter the seen-cache, or a relay could
             # suppress an event on all relays by sending a corrupted copy
@@ -487,9 +642,21 @@ class NostrClient:
     def receiveOK(
         self, relay_url: str, event_id: str, accepted: bool, message: str
     ) -> None:
-        self.ok_queue.put((relay_url, event_id, accepted, message))
-        if not accepted:
-            self.log.debug(f"Nostr relay {relay_url} rejected {event_id}: {message}")
+        with self.mutex:
+            pending = self._pending_publishes.get(event_id)
+            if pending is None:
+                self.num_unsolicited_oks += 1
+                return
+            if accepted is True:
+                pending.accepted.add(relay_url)
+            else:
+                pending.rejected[relay_url] = str(message)[:MAX_OK_MESSAGE_LEN]
+        if accepted is True:
+            pending.done.set()
+        else:
+            self.log.debug(
+                f"Nostr relay {relay_url} rejected {event_id}: {pending.rejected[relay_url]}"
+            )
 
     def queue_get(self):
         try:
@@ -529,41 +696,43 @@ class NostrClient:
         """Send event to all connected relays, wait for at least one OK.
         Returns the number of relays that accepted the event.
         """
-        # Drain stale OK responses
-        while True:
-            try:
-                self.ok_queue.get(block=False)
-            except Empty:
-                break
-
-        # Mark own event as seen before sending so the subscription echo
-        # is ignored even if a relay echoes it back immediately.
+        event_id: str = event["id"]
+        pending = PendingPublish()
         with self.mutex:
-            self._seen_event_ids[event["id"]] = True
+            if len(self._pending_publishes) >= MAX_PENDING_PUBLISHES:
+                raise TemporaryError("Too many Nostr publications in progress.")
+            self._pending_publishes[event_id] = pending
+            self._seen_event_ids[event_id] = True
 
-        event_json: str = json.dumps(["EVENT", event], separators=(",", ":"))
-        num_sent: int = 0
-        for relay in self.relays:
-            if relay.send(event_json):
-                relay.num_events_sent += 1
-                num_sent += 1
-        if num_sent < 1:
-            raise TemporaryError("No connected Nostr relays.")
+        try:
+            event_json: str = json.dumps(["EVENT", event], separators=(",", ":"))
+            num_sent: int = 0
+            for relay in self.relays:
+                if relay.send(event_json):
+                    relay.num_events_sent += 1
+                    num_sent += 1
+            if num_sent < 1:
+                raise TemporaryError("No connected Nostr relays.")
 
-        num_accepted: int = 0
-        deadline: float = time.time() + wait_seconds
-        while time.time() < deadline:
-            if delay_event is not None and delay_event.is_set():
-                break
-            try:
-                _, event_id, accepted, _ = self.ok_queue.get(block=True, timeout=0.5)
-            except Empty:
-                continue
-            if event_id == event["id"] and accepted:
-                num_accepted += 1
-                break
+            deadline: float = time.monotonic() + wait_seconds
+            while len(pending.accepted) < 1:
+                remaining: float = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    break
+                if delay_event is not None and delay_event.is_set():
+                    break
+                pending.done.wait(timeout=min(0.5, remaining))
+        finally:
+            with self.mutex:
+                self._pending_publishes.pop(event_id, None)
+
+        num_accepted: int = len(pending.accepted)
         if num_accepted < 1:
-            raise TemporaryError("No Nostr relay accepted the event.")
+            error_str: str = "No Nostr relay accepted the event."
+            if len(pending.rejected) > 0:
+                relay_url, reason = next(iter(pending.rejected.items()))
+                error_str += f" {relay_url}: {reason}"
+            raise TemporaryError(error_str)
         self.num_messages_sent += 1
         return num_accepted
 
@@ -572,16 +741,20 @@ class NostrClient:
             "pubkey": self.pubkey,
             "broadcast_tag": self.broadcast_tag,
             "pow_target": self.pow_target,
+            "min_incoming_pow": self.min_incoming_pow,
             "messages_received": self.num_messages_received,
             "messages_sent": self.num_messages_sent,
             "messages_dropped": self.num_messages_dropped,
+            "unsolicited_oks": self.num_unsolicited_oks,
             "relays": [
                 {
                     "url": relay.url,
                     "connected": relay.connected,
+                    "receiving": relay.isReceiving(),
                     "events_received": relay.num_events_received,
                     "events_sent": relay.num_events_sent,
                     "events_rate_limited": relay.num_events_rate_limited,
+                    "subscriptions_closed": relay.num_subscriptions_closed,
                     "last_error": relay.last_error,
                 }
                 for relay in self.relays

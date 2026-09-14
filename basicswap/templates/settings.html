@@ -558,7 +558,12 @@
         <div>
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Proof of Work Target (bits)</label>
          <input type="number" min="0" max="12" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_pow_target" value="{{ n.pow_target }}">
-         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">NIP-13 difficulty for outgoing events. 0 disables. Higher bits delay outgoing messages.</p>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">NIP-13 difficulty added to outgoing events for relays that require it. 0 disables. Higher bits delay outgoing messages. Does not affect which events are received.</p>
+        </div>
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Minimum Incoming Proof of Work (bits)</label>
+         <input type="number" min="0" max="12" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="nostr_min_incoming_pow" value="{{ n.min_incoming_pow }}">
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Anti-spam: drop incoming events with less committed work. Peers do not mine by default, so any value above 0 stops you receiving their offers and bids. Leave at 0 unless you know your peers mine.</p>
         </div>
         {% if n.pubkey %}
         <div>
@@ -583,8 +588,10 @@
            {% for r in n.relay_status %}
           <div class="flex items-center justify-between text-gray-700 dark:text-gray-300">
            <span>{{ r.url }}{% if r.events_rate_limited %} <span class="text-yellow-600 dark:text-yellow-400" title="Events dropped by the per-relay rate limit">({{ r.events_rate_limited }} rate limited)</span>{% endif %}</span>
-           {% if r.connected %}
+           {% if r.connected and r.receiving %}
            <span class="text-green-600 dark:text-green-400">Connected</span>
+           {% elif r.connected %}
+           <span class="text-yellow-600 dark:text-yellow-400" title="{{ r.last_error }}">Connected, not subscribed</span>
            {% elif r.last_error %}
            <span class="text-red-600 dark:text-red-400">{{ r.last_error }}</span>
            {% else %}

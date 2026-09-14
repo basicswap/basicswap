@@ -19,6 +19,14 @@ timing and size).
   be linked to the node key or to other swaps by relays.  The ACK echoes
   the requester's route key and must be signed by the key it announces,
   so a stored ACK replayed by a relay can't activate a later route.
+- A bid waits in state "Connect request sent" until the ACK arrives.
+  If the ACK is lost the CONNECT_REQ is retransmitted by the update loop
+  with the same route key, backing off from 30s to 10 minutes for up to
+  6 sends (`connect_req_retry_seconds`, `connect_req_max_attempts`).  If
+  the bid itself fails to publish after the route is up (no relay
+  reachable) it stays pending and is resent on the next check; bid
+  messages are deterministic, so a retry never creates a second bid.
+  Both recoveries are driven from the database and survive a restart.
 - Inbound events are gated before signature verification: relay
   messages over 72 KiB are dropped, each relay is limited to a burst of
   2000 events refilling at 20/s, and at most 5000 verified events are
@@ -34,7 +42,18 @@ timing and size).
 - Optionally, outgoing events can commit NIP-13 proof of work
   (`pow_target` setting, 0-12 bits) for relays that require it.
   Mining runs on the send path, so higher targets delay outgoing
-  messages.  Leave at `0` unless a relay demands it.
+  messages.  Leave at `0` unless a relay demands it.  `pow_target` only
+  affects what you send; it never filters what you receive.
+- `min_incoming_pow` (0-12 bits, default `0`) is a separate anti-spam
+  admission policy: incoming events with less committed work are dropped
+  before signature verification.  Peers do not mine by default, so any
+  value above `0` excludes their offers, bids and swap messages.  The
+  size, rate and queue limits below apply regardless of this setting.
+- A relay that answers a subscription with `CLOSED` (NIP-01) is shown
+  as "Connected, not subscribed" with the relay's reason.  Transient
+  closes are retried with a new REQ, backing off from 5s to 5 minutes;
+  `auth-required`, `restricted` and `invalid` reasons are not retried
+  and stay visible in the relay status.  Other relays are unaffected.
 
 ## Enabling
 
@@ -62,6 +81,7 @@ This adds a section to `basicswap.json`:
             "relays": ["wss://relay.damus.io", "wss://nos.lol"],
             "private_key": "<32 byte hex key>",
             "pow_target": 0,
+            "min_incoming_pow": 0,
             "enabled": true
         }
     ]

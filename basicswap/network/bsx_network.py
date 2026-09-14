@@ -8,6 +8,8 @@ import base64
 import json
 import zmq
 
+from collections import OrderedDict
+
 from basicswap.basicswap_util import (
     AddressTypes,
     MessageNetworkLinkTypes,
@@ -82,6 +84,8 @@ class BSXNetwork:
         self._smsg_payload_version = 0  # Set in startNetworks (if 0)
         self._smsg_add_to_outbox = self.settings.get("smsg_add_to_outbox", False)
         self._have_smsg_rpc = False  # Set in startNetworks
+        self._privkey_cache = OrderedDict()
+        self._privkey_cache_size: int = 256
 
         self._expire_message_routes_after = self._expire_db_records_after = (
             self.get_int_setting(
@@ -287,6 +291,17 @@ class BSXNetwork:
         return self._network.get_info()
 
     def getPrivkeyForAddress(self, cursor, addr: str) -> bytes:
+        cached = self._privkey_cache.get(addr)
+        if cached is not None:
+            self._privkey_cache.move_to_end(addr)
+            return cached
+        privkey = self._lookupPrivkeyForAddress(addr)
+        self._privkey_cache[addr] = privkey
+        while len(self._privkey_cache) > self._privkey_cache_size:
+            self._privkey_cache.popitem(last=False)
+        return privkey
+
+    def _lookupPrivkeyForAddress(self, addr: str) -> bytes:
         ci_part = self.ci(Coins.PART)
         try:
             return ci_part.decodeKey(
@@ -849,11 +864,16 @@ class BSXNetwork:
         self.log.info(f"Direct message route disconnected, connId: {connId}")
         closeSimplexChat(self, net_i, connId)
 
-        query_str = "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes"
+        query_str = (
+            "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
+            + "WHERE network_id = :network_id"
+        )
         try:
             cursor = self.openDB()
 
-            rows = cursor.execute(query_str).fetchall()
+            rows = cursor.execute(
+                query_str, {"network_id": int(MessageNetworks.SIMPLEX)}
+            ).fetchall()
 
             for row in rows:
                 record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = (

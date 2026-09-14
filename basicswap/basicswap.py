@@ -479,6 +479,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.check_delayed_auto_accept_seconds = self.get_int_setting(
             "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
+        self.check_pending_routes_seconds = self.get_int_setting(
+            "check_pending_routes_seconds", 30, 1, 10 * 60
+        )
+        self._connect_req_retry_seconds = self.get_int_setting(
+            "connect_req_retry_seconds", 30, 5, 60 * 60
+        )
+        self._connect_req_max_retry_seconds = 10 * 60
+        self._connect_req_max_attempts = self.get_int_setting(
+            "connect_req_max_attempts", 6, 1, 20
+        )
         if "allowed_hosts" in self.settings:
             self.settings["allowed_hosts"] = normalize_allowed_hosts(
                 self.settings["allowed_hosts"]
@@ -493,6 +503,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._last_checked_watched = 0
         self._last_checked_split_messages = 0
         self._last_checked_delayed_auto_accept = 0
+        self._last_checked_pending_routes = 0
         self._last_checked_pending_sweeps = 0
         self._pending_sweeps = {}
         self._possibly_revoked_offers = collections.deque([], maxlen=1000)
@@ -6609,9 +6620,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # CONNECT_REQ carries the local pubkey, the ACK returns the remote one.
         # Each route uses its own signing key so relays can't link swaps to
         # the node key or to each other.
-        existing_pending_route = None
-        route_privkey_hex = None
-        route_pubkey = None
         message_route = self.getMessageRoute(
             int(MessageNetworks.NOSTR), addr_from, addr_to, cursor=cursor
         )
@@ -6619,60 +6627,38 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if message_route.active_ind == 1:
                 self.log.debug(f"Using active message route: {message_route}")
                 return message_route.record_id, True
-            now_pending: int = self.getTime()
-            if now_pending - int(message_route.created_at or 0) < 30:
+            route_data = json.loads(message_route.route_data.decode("UTF-8"))
+            if not self.resendNostrConnectReq(
+                message_route.record_id,
+                message_route.created_at,
+                addr_from,
+                addr_to,
+                route_data,
+                cursor,
+            ):
                 self.log.debug(f"Waiting for message route: {message_route}")
-                return message_route.record_id, False
-            existing_pending_route = message_route
-            existing_route_data = json.loads(message_route.route_data.decode("UTF-8"))
-            route_privkey_hex = existing_route_data.get("local_privkey")
-            route_pubkey = existing_route_data.get("local_pubkey")
-            self.log.info(
-                f"Resending CONNECT_REQ for pending nostr route {message_route.record_id}"
-            )
+            return message_route.record_id, False
 
-        if route_privkey_hex is None or route_pubkey is None:
-            route_privkey_hex, route_pubkey = newNostrRouteKey()
+        route_privkey_hex, route_pubkey = newNostrRouteKey()
 
         req_data["bsx_address"] = addr_from
         req_data["nostr_pubkey"] = route_pubkey
-        route_data = {"local_pubkey": route_pubkey, "local_privkey": route_privkey_hex}
-
-        msg_buf = ConnectReqMessage()
-        msg_buf.network_type = int(MessageNetworks.NOSTR)
-        msg_buf.network_data = b"bsx"
-        msg_buf.request_type = ConnectionRequestTypes.BID
-        msg_buf.request_data = json.dumps(req_data).encode("UTF-8")
-
-        payload_hex = (
-            str.format("{:02x}", MessageTypes.CONNECT_REQ) + msg_buf.to_bytes().hex()
-        )
-
-        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-        connect_req_msgid = self.sendMessage(
-            addr_from,
-            addr_to,
-            payload_hex,
-            msg_valid,
-            cursor,
-            message_nets=message_nets,
-            sign_privkey=bytes.fromhex(route_privkey_hex),
-        )
-
         now: int = self.getTime()
+        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
+        route_data = {
+            "local_pubkey": route_pubkey,
+            "local_privkey": route_privkey_hex,
+            "connect_req_data": req_data,
+            "connect_req_valid": msg_valid,
+            "connect_req_message_nets": message_nets,
+            "connect_req_sent_at": now,
+            "connect_req_attempts": 1,
+        }
+
+        connect_req_msgid = self.sendNostrConnectReq(
+            addr_from, addr_to, route_data, cursor
+        )
         route_data["connect_req_msgid"] = connect_req_msgid.hex()
-        if existing_pending_route is not None:
-            cursor.execute(
-                "UPDATE direct_message_routes SET route_data = :route_data, "
-                "created_at = :created_at WHERE record_id = :record_id",
-                {
-                    "route_data": json.dumps(route_data).encode("UTF-8"),
-                    "created_at": now,
-                    "record_id": existing_pending_route.record_id,
-                },
-            )
-            self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
-            return existing_pending_route.record_id, False
 
         message_route = DirectMessageRoute(
             active_ind=2,
@@ -6687,6 +6673,78 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
         return message_route_id, False
+
+    def sendNostrConnectReq(
+        self, addr_from: str, addr_to: str, route_data: dict, cursor
+    ) -> bytes:
+        msg_buf = ConnectReqMessage()
+        msg_buf.network_type = int(MessageNetworks.NOSTR)
+        msg_buf.network_data = b"bsx"
+        msg_buf.request_type = ConnectionRequestTypes.BID
+        msg_buf.request_data = json.dumps(route_data["connect_req_data"]).encode(
+            "UTF-8"
+        )
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.CONNECT_REQ) + msg_buf.to_bytes().hex()
+        )
+        return self.sendMessage(
+            addr_from,
+            addr_to,
+            payload_hex,
+            int(route_data.get("connect_req_valid", self.SMSG_SECONDS_IN_HOUR)),
+            cursor,
+            message_nets=route_data.get("connect_req_message_nets", "nostr"),
+            sign_privkey=bytes.fromhex(route_data["local_privkey"]),
+        )
+
+    def resendNostrConnectReq(
+        self,
+        route_id: int,
+        created_at: int,
+        addr_from: str,
+        addr_to: str,
+        route_data: dict,
+        cursor,
+    ) -> bool:
+        attempts: int = int(route_data.get("connect_req_attempts", 1))
+        if attempts >= self._connect_req_max_attempts:
+            self.log.debug(
+                f"Not resending CONNECT_REQ for route {route_id}, {attempts} attempts made."
+            )
+            return False
+        now: int = self.getTime()
+        last_sent_at: int = int(route_data.get("connect_req_sent_at", created_at or 0))
+        wait_seconds: int = min(
+            self._connect_req_retry_seconds * (2 ** (attempts - 1)),
+            self._connect_req_max_retry_seconds,
+        )
+        if now - last_sent_at < wait_seconds:
+            return False
+        if "connect_req_data" not in route_data:
+            self.log.debug(
+                f"Not resending CONNECT_REQ for route {route_id}, no stored request."
+            )
+            return False
+
+        connect_req_msgid = self.sendNostrConnectReq(
+            addr_from, addr_to, route_data, cursor
+        )
+        route_data["connect_req_msgid"] = connect_req_msgid.hex()
+        route_data["connect_req_sent_at"] = now
+        route_data["connect_req_attempts"] = attempts + 1
+        cursor.execute(
+            "UPDATE direct_message_routes SET route_data = :route_data "
+            "WHERE record_id = :record_id",
+            {
+                "route_data": json.dumps(route_data).encode("UTF-8"),
+                "record_id": route_id,
+            },
+        )
+        self.log.info(
+            f"Resent CONNECT_REQ {self.logIDB(connect_req_msgid)} for nostr route {route_id}, "
+            f"attempt {attempts + 1} of {self._connect_req_max_attempts}."
+        )
+        return True
 
     def postXmrBid(
         self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}
@@ -12047,11 +12105,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
         conn_id = msg["conn_id"]
         query_str = (
-            "SELECT record_id, network_id, route_data FROM direct_message_routes"
+            "SELECT record_id, network_id, route_data FROM direct_message_routes "
+            + "WHERE network_id = :network_id"
         )
         try:
             use_cursor = self.openDB(cursor)
-            rows = use_cursor.execute(query_str).fetchall()
+            rows = use_cursor.execute(
+                query_str, {"network_id": int(MessageNetworks.SIMPLEX)}
+            ).fetchall()
 
             for row in rows:
                 record_id, network_id, route_data = row
@@ -14943,9 +15004,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 int(MessageNetworks.NOSTR), msg["to"], msg["from"], cursor=cursor
             )
             ensure(message_route, "No matching direct message route for ack")
-            if message_route.active_ind == 1:
-                self.log.debug("Direct message route is already active.")
-                return
 
             route_data = json.loads(message_route.route_data.decode("UTF-8"))
             # Bind the ACK to this route's key exchange, ACK events are
@@ -14966,39 +15024,108 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     event_pubkey == remote_pubkey,
                     "Connect request ack not signed by announced route key",
                 )
-            route_data["remote_pubkey"] = remote_pubkey
-            query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
-            cursor.execute(
-                query,
-                {
-                    "route_data": json.dumps(route_data).encode("UTF-8"),
-                    "record_id": message_route.record_id,
-                },
-            )
-            self.log.debug(
-                f"Direct message route established local: {msg['to']}, remote: {msg['from']}."
-            )
 
+            if message_route.active_ind == 1:
+                ensure(
+                    route_data.get("remote_pubkey") == remote_pubkey,
+                    "Connect request ack does not match active route",
+                )
+                self.log.debug("Direct message route is already active.")
+            else:
+                route_data["remote_pubkey"] = remote_pubkey
+                query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
+                cursor.execute(
+                    query,
+                    {
+                        "route_data": json.dumps(route_data).encode("UTF-8"),
+                        "record_id": message_route.record_id,
+                    },
+                )
+                self.log.debug(
+                    f"Direct message route established local: {msg['to']}, remote: {msg['from']}."
+                )
+
+            self.dispatchPendingRouteBids(message_route.record_id, cursor)
+        finally:
+            self.closeDB(cursor)
+
+    def dispatchPendingRouteBids(self, route_id: int, cursor) -> int:
+        query_str = (
+            "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
+            + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
+        )
+        rows = cursor.execute(query_str, {"route_id": route_id}).fetchall()
+        num_completed: int = 0
+        for row in rows:
+            record_id, linked_type, linked_id = row
+
+            if linked_type == Concepts.BID:
+                try:
+                    self.routeEstablishedForBid(linked_id, cursor)
+                except Exception as e:
+                    self.log.warning(
+                        f"Bid {self.log.id(linked_id)} not sent on route {route_id}, will retry: {e}"
+                    )
+                    if self.debug:
+                        self.log.error(traceback.format_exc())
+                    continue
+                query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
+                cursor.execute(query, {"record_id": record_id})
+                num_completed += 1
+            elif linked_type == Concepts.OFFER:
+                pass
+            else:
+                self.log.warning(
+                    f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
+                )
+        return num_completed
+
+    def checkPendingMessageRoutes(self) -> None:
+        if self._is_locked is True:
+            return
+
+        cursor = self.openDB()
+        try:
             query_str = (
-                "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
-                + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
+                "SELECT r.record_id, r.network_id, r.active_ind, r.created_at, "
+                + "r.smsg_addr_local, r.smsg_addr_remote, r.route_data "
+                + "FROM direct_message_routes r "
+                + "WHERE r.active_ind IN (1, 2) AND EXISTS ("
+                + "SELECT 1 FROM direct_message_route_links rl "
+                + "WHERE rl.direct_message_route_id = r.record_id "
+                + "AND rl.active_ind = 1 AND rl.linked_type = :link_type_bid)"
             )
             rows = cursor.execute(
-                query_str, {"route_id": message_route.record_id}
+                query_str, {"link_type_bid": int(Concepts.BID)}
             ).fetchall()
             for row in rows:
-                record_id, linked_type, linked_id = row
-
-                if linked_type == Concepts.BID:
-                    self.routeEstablishedForBid(linked_id, cursor)
-                    query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
-                    cursor.execute(query, {"record_id": record_id})
-                elif linked_type == Concepts.OFFER:
-                    pass
-                else:
+                (
+                    record_id,
+                    network_id,
+                    active_ind,
+                    created_at,
+                    addr_local,
+                    addr_remote,
+                    route_data,
+                ) = row
+                try:
+                    if active_ind == 1:
+                        self.dispatchPendingRouteBids(record_id, cursor)
+                    elif network_id == MessageNetworks.NOSTR:
+                        self.resendNostrConnectReq(
+                            record_id,
+                            created_at,
+                            addr_local,
+                            addr_remote,
+                            json.loads(route_data.decode("UTF-8")),
+                            cursor,
+                        )
+                except Exception as e:
                     self.log.warning(
-                        f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
+                        f"checkPendingMessageRoutes route {record_id}: {e}"
                     )
+                    if self.debug:
+                        self.log.error(traceback.format_exc())
         finally:
             self.closeDB(cursor)
 
@@ -15015,9 +15142,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             query_str = (
                 "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
-                + "WHERE active_ind = 2"
+                + "WHERE active_ind = 2 AND network_id = :network_id"
             )
-            rows = cursor.execute(query_str).fetchall()
+            rows = cursor.execute(
+                query_str, {"network_id": int(MessageNetworks.SIMPLEX)}
+            ).fetchall()
 
             found_direct_message_route = None
             for row in rows:
@@ -15032,7 +15161,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
                     # route_data["localDisplayName"] = localDisplayName
 
-                    cursor.execute(query_str)
                     # query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
                     query = "UPDATE direct_message_routes SET active_ind = 1 WHERE record_id = :record_id "
                     cursor.execute(query, {"record_id": record_id})
@@ -15040,26 +15168,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     break
 
             if found_direct_message_route:
-                query_str = (
-                    "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
-                    + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
-                )
-                rows = cursor.execute(
-                    query_str, {"route_id": found_direct_message_route}
-                ).fetchall()
-                for row in rows:
-                    record_id, linked_type, linked_id = row
-
-                    if linked_type == Concepts.BID:
-                        self.routeEstablishedForBid(linked_id, cursor)
-                        query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
-                        cursor.execute(query, {"record_id": record_id})
-                    elif linked_type == Concepts.OFFER:
-                        pass
-                    else:
-                        self.log.warning(
-                            f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
-                        )
+                self.dispatchPendingRouteBids(found_direct_message_route, cursor)
             else:
                 self.log.warning(
                     f"Unknown direct message route connected, connId: {connId}"
@@ -15073,6 +15182,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid, offer = self.getBidAndOffer(bid_id, cursor)
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+
+        if bid.state != BidStates.CONNECT_REQ_SENT:
+            self.log.debug(
+                f"Bid {self.log.id(bid_id)} is not waiting for a route, state {BidStates(bid.state).name}."
+            )
+            return
+        if bid.expire_at <= self.getTime():
+            self.log.info(f"Not sending expired bid {self.log.id(bid_id)}.")
+            return
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -15478,6 +15596,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self._last_checked_actions = now
 
             if (
+                now - self._last_checked_pending_routes
+                >= self.check_pending_routes_seconds
+            ):
+                self.checkPendingMessageRoutes()
+                self._last_checked_pending_routes = now
+
+            if (
                 now - self._last_checked_split_messages
                 >= self.check_split_messages_seconds
             ):
@@ -15845,8 +15970,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         settings_changed = False
         suggest_reboot = False
-        settings_copy = copy.deepcopy(self.settings)
         with self.mxDB:
+            settings_copy = copy.deepcopy(self.settings)
             network_config_list = settings_copy.get("networks", [])
             if len(network_config_list) < 1:
                 network_config_list = [{"type": "smsg", "enabled": True}]
@@ -15929,6 +16054,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         settings_changed = True
                         suggest_reboot = True
 
+                if "min_incoming_pow" in data:
+                    new_value = data["min_incoming_pow"]
+                    ensure(
+                        isinstance(new_value, int),
+                        "New min_incoming_pow value not integer",
+                    )
+                    ensure(
+                        0 <= new_value <= MAX_POW_TARGET_BITS,
+                        f"min_incoming_pow must be between 0 and {MAX_POW_TARGET_BITS}",
+                    )
+                    if network.get("min_incoming_pow", 0) != new_value:
+                        network["min_incoming_pow"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
                 if data.get("regenerate_key", False) is True:
                     # Active routes have their own keys, only new broadcasts
                     # are affected.
@@ -15984,8 +16124,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info(f"Setting bridge_networks: {enabled}.")
         settings_changed = False
         suggest_reboot = False
-        settings_copy = copy.deepcopy(self.settings)
         with self.mxDB:
+            settings_copy = copy.deepcopy(self.settings)
             if settings_copy.get("bridge_networks", False) != enabled:
                 if enabled:
                     num_enabled: int = sum(
@@ -16062,6 +16202,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif network_type == "nostr":
                 info["relays"] = network.get("relays", [])
                 info["pow_target"] = network.get("pow_target", 0)
+                info["min_incoming_pow"] = network.get("min_incoming_pow", 0)
                 info["messages_received_broadcast"] = self.num_nostr_messages_received
                 info["messages_sent_broadcast"] = self.num_nostr_messages_sent
                 info["messages_received_direct"] = (
@@ -16084,6 +16225,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     client_info = active_network["client"].get_info()
                     info["active_pubkey"] = client_info.get("pubkey", "")
                     info["relay_status"] = client_info["relays"]
+                    info["relays_receiving"] = sum(
+                        1 for r in client_info["relays"] if r.get("receiving")
+                    )
                     if config_pubkey and info["active_pubkey"] != config_pubkey:
                         info["key_pending_restart"] = True
             info["restart_required"] = (
@@ -17905,12 +18049,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 try:
                     if row[1] is not None and row[1] != "None":
                         volume_24h = float(row[1])
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     pass
                 try:
                     if row[2] is not None and row[2] != "None":
                         price_change_24h = float(row[2])
-                except ValueError, TypeError:
+                except (ValueError, TypeError):
                     pass
                 return_data[coin_id] = {
                     "volume_24h": volume_24h,

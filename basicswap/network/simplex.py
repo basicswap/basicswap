@@ -293,18 +293,26 @@ def decryptSimplexMsg(self, msg_data):
     except Exception as e:  # noqa: F841
         pass
 
-    # Try with all active bid/offer addresses
     query: str = """SELECT DISTINCT address FROM (
         SELECT b.bid_addr AS address FROM bids b
                JOIN bidstates s ON b.state = s.state_id
-               WHERE b.active_ind = 1
+               WHERE b.active_ind = 1 AND b.was_sent = 1
                      AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
         UNION
-        SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
+        SELECT o.addr_from AS address FROM bids b
+               JOIN bidstates s ON b.state = s.state_id
+               JOIN offers o ON o.offer_id = b.offer_id
+               WHERE b.active_ind = 1 AND b.was_received = 1
+                     AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
+        UNION
+        SELECT addr_from AS address FROM offers
+               WHERE active_ind = 1 AND was_sent = 1 AND expire_at > :now
+        UNION
+        SELECT smsg_addr_local AS address FROM direct_message_routes
+               WHERE active_ind = 2
         UNION
         SELECT addr AS address FROM smsgaddresses
-               WHERE active_ind = 1 AND use_type IN (
-                   :local_portal, :bid, :offer, :recv_offer, :send_offer)
+               WHERE active_ind = 1 AND use_type IN (:local_portal, :recv_offer)
         )"""
 
     now: int = self.getTime()
@@ -316,10 +324,7 @@ def decryptSimplexMsg(self, msg_data):
             {
                 "now": now,
                 "local_portal": AddressTypes.PORTAL_LOCAL,
-                "bid": AddressTypes.BID,
-                "offer": AddressTypes.OFFER,
                 "recv_offer": AddressTypes.RECV_OFFER,
-                "send_offer": AddressTypes.SEND_OFFER,
             },
         ).fetchall()
         decrypted = None

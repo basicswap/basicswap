@@ -74,6 +74,7 @@ def initialiseNostrNetwork(self, network_config) -> None:
         self.log,
         broadcast_tag=network_config.get("broadcast_tag", DEFAULT_BROADCAST_TAG),
         pow_target=int(network_config.get("pow_target", 0)),
+        min_incoming_pow=int(network_config.get("min_incoming_pow", 0)),
         socks_proxy=socks_proxy,
         abort_event=self.delay_event,
     )

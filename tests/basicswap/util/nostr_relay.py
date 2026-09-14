@@ -147,6 +147,35 @@ class MiniNostrRelay:
     def url(self) -> str:
         return f"ws://{self.host}:{self.port}"
 
+    def closeSubscriptions(self, reason: str = "") -> int:
+        num_closed: int = 0
+        with self.mutex:
+            clients = list(self.clients)
+        for client in clients:
+            for sub_id in list(client.subscriptions.keys()):
+                client.subscriptions.pop(sub_id, None)
+                try:
+                    client.send(json.dumps(["CLOSED", sub_id, reason]))
+                    num_closed += 1
+                except Exception:
+                    pass
+        return num_closed
+
+    def sendOversizedFrames(self, length: int, chunk: int = 65536) -> None:
+        with self.mutex:
+            clients = list(self.clients)
+        for client in clients:
+            with client.send_mutex:
+                try:
+                    header = bytes([0x81, 127]) + struct.pack(">Q", length)
+                    client.conn.sendall(header)
+                    sent: int = 0
+                    while sent < length:
+                        client.conn.sendall(bytes(min(chunk, length - sent)))
+                        sent += chunk
+                except OSError:
+                    pass
+
     def acceptLoop(self) -> None:
         while self.running:
             try:

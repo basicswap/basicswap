@@ -1094,9 +1094,13 @@
         url.appendChild(dropped);
       }
       const status = document.createElement('span');
-      if (relay.connected) {
+      if (relay.connected && relay.receiving !== false) {
         status.className = 'text-green-600 dark:text-green-400';
         status.textContent = 'Connected';
+      } else if (relay.connected) {
+        status.className = 'text-yellow-600 dark:text-yellow-400';
+        status.title = relay.last_error || '';
+        status.textContent = 'Connected, not subscribed';
       } else {
         status.className = 'text-red-600 dark:text-red-400';
         status.textContent = relay.last_error || 'Disconnected';
