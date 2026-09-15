@@ -1,3 +1,14 @@
+0.18.9
+==============
+
+**Fixes**
+- The websocket server no longer logs an "SSL failed" warning about the key and cert
+  paths, or a traceback, when a client fails the TLS handshake.
+
+**Daemon updates**
+- Particl Core  v27.2.4 -> v27.2.5
+
+
 0.18.8
 ==============
 
