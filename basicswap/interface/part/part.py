@@ -7,7 +7,6 @@
 
 import hashlib
 from enum import IntEnum
-from typing import List
 
 from basicswap.contrib.test_framework.messages import (
     CTxOutPart,
@@ -178,7 +177,7 @@ class PARTInterface(BTCInterface):
             return True
         return False
 
-    def getScriptDummyWitness(self, script: bytes) -> List[bytes]:
+    def getScriptDummyWitness(self, script: bytes) -> list[bytes]:
         if self.isScriptP2WPKH(script) or self.isScriptP2PKH(script):
             return self.getP2WPKHDummyWitness()
         raise ValueError("Unknown script type")
@@ -1029,7 +1028,7 @@ class PARTInterfaceBlind(PARTInterface):
     def mercySpendImportsKey(self) -> bool:
         return True
 
-    def getMercyWatchVouts(self, swipe_txid_hex: str, swipe_tx=None) -> List[int]:
+    def getMercyWatchVouts(self, swipe_txid_hex: str, swipe_tx=None) -> list[int]:
         # fundrawtransactionfrom reorders the outputs, and the payout is blinded
         # to an address the leader never sees, so it can't pick out the one the
         # mercy tx will spend.

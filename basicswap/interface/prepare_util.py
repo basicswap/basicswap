@@ -13,7 +13,7 @@ import tarfile
 import zipfile
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable
 
 from basicswap.contrib.rpcauth import generate_salt, password_to_hmac
 from basicswap.util.network import make_reporthook
@@ -29,18 +29,18 @@ class PrepareContext:
     should_manage_daemon: Callable[[str], bool]
     bin_arch: str = ""
     file_ext: str = ""
-    download_release: Optional[Callable] = None
-    download_file: Optional[Callable] = None
-    import_pubkey: Optional[Callable] = None
-    logger: Optional[object] = None  # logging.Logger
+    download_release: Callable | None = None
+    download_file: Callable | None = None
+    import_pubkey: Callable | None = None
+    logger: object | None = None  # logging.Logger
     rpcbind_ip: str = "127.0.0.1"
     docker_mode: bool = False
-    write_tor_settings: Optional[Callable] = None
-    gnupg: Optional[Callable] = None
+    write_tor_settings: Callable | None = None
+    gnupg: Callable | None = None
     gpg_homedir: str = ""
     wallet_encryption_pwd: str = ""
-    monerod_proxy_config: Optional[list] = None
-    monero_wallet_rpc_proxy_config: Optional[list] = None
+    monerod_proxy_config: list | None = None
+    monero_wallet_rpc_proxy_config: list | None = None
 
 
 def createGPG(gnupg_module, homedir):
@@ -514,7 +514,7 @@ class CoinPrepareModule:
         # True where the wallet must be encrypted after initialiseWallet
         return not self.creates_wallet
 
-    def getPostInitWarning(self, ctx: PrepareContext) -> Optional[str]:
+    def getPostInitWarning(self, ctx: PrepareContext) -> str | None:
         return None
 
     def ensureWallet(

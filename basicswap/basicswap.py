@@ -25,7 +25,6 @@ import time
 import traceback
 import zmq
 
-from typing import Optional
 
 from . import __version__
 from .base import BaseApp
@@ -1014,7 +1013,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         return False
 
-    def getXMRWalletProxy(self, coin, node_host: str) -> (Optional[str], Optional[int]):
+    def getXMRWalletProxy(self, coin, node_host: str) -> (str | None, int | None):
         coin = Coins(coin)  # Errors for invalid coin value
         chain_client_settings = self.getChainClientSettings(coin)
         proxy_host = None
@@ -3486,7 +3485,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def getPreFundedTx(
         self, linked_type: int, linked_id: bytes, tx_type: int, cursor=None
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         try:
             use_cursor = self.openDB(cursor)
             tx = self.queryOne(
@@ -7508,7 +7507,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def createInitiateTxn(
         self, coin_type, bid_id: bytes, bid, initiate_script, prefunded_tx=None
-    ) -> (Optional[str], Optional[int]):
+    ) -> (str | None, int | None):
         if self.coin_clients[coin_type]["connection_type"] not in ("rpc", "electrum"):
             return None, None
         ci = self.ci(coin_type)
@@ -9274,10 +9273,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         xmr_offer,
         xmr_swap,
         swipe_out,
-        ka_swipe: Optional[bytes],
-        keyshare: Optional[bytes],
+        ka_swipe: bytes | None,
+        keyshare: bytes | None,
         cursor,
-    ) -> Optional[str]:
+    ) -> str | None:
         # Returns None where the wallet was left to spend the payout itself.
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         addr_to = None
@@ -9306,7 +9305,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         return ci_from.publishTx(spend_tx)
 
-    def _sweepSwipePayout(self, ci_from, bid, offer, xmr_swap, cursor) -> Optional[str]:
+    def _sweepSwipePayout(self, ci_from, bid, offer, xmr_swap, cursor) -> str | None:
         # Returns the sweep txid, None where the wallet already holds the payout.
         if not ci_from.canSendMercyTx():
             return None
@@ -15230,7 +15229,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         finally:
             self.closeDB(cursor, commit=False)
 
-    def sweepSwipePayout(self, bid_id: bytes) -> Optional[str]:
+    def sweepSwipePayout(self, bid_id: bytes) -> str | None:
         self.log.info(
             f"Manually sweeping the swipe payout for bid {self.log.id(bid_id)}."
         )
