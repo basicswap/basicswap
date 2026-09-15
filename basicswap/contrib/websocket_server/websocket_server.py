@@ -285,11 +285,15 @@ class WebSocketHandler(StreamRequestHandler):
             try:
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 context.load_cert_chain(server.cert, server.key)
-                socket = context.wrap_socket(socket, server_side=True)
             except Exception:
-                # Continuing unwrapped would speak plaintext on a TLS port.
-                logger.warning("SSL failed (are the paths {} and {} correct for the key and cert?)".format(server.key, server.cert))
+                logger.warning(f"SSL failed (are the paths {server.key} and {server.cert} correct for the key and cert?)")
                 raise
+            try:
+                socket = context.wrap_socket(socket, server_side=True)
+            except Exception as e:
+                # Continuing unwrapped would speak plaintext on a TLS port.
+                logger.debug(f"TLS handshake failed from {addr}: {e}")
+                return
         StreamRequestHandler.__init__(self, socket, addr, server)
 
     def setup(self):
