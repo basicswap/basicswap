@@ -4,7 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from typing import Union
 from basicswap.contrib.test_framework.messages import COutPoint, CTransaction, CTxIn
 from basicswap.util import b2i, ensure, i2b
 from basicswap.util.script import decodePushData, decodeScriptNum
@@ -451,7 +450,7 @@ class BCHInterface(BTCInterface):
     def getScriptDest(self, script):
         return self.scriptToP2SH32LockingBytecode(script)
 
-    def scriptToP2SH32LockingBytecode(self, script: Union[bytes, str]) -> bytes:
+    def scriptToP2SH32LockingBytecode(self, script: bytes | str) -> bytes:
         return CScript(
             [
                 OP_HASH256,

@@ -8,7 +8,6 @@
 import traceback
 import time
 
-from typing import List
 from urllib import parse
 from .util import (
     getCoinType,
@@ -825,7 +824,7 @@ def page_newoffer(self, url_split, post_string, get_string=""):
     )
 
 
-def page_offer(self, url_split: List[str], post_string: str) -> bytes:
+def page_offer(self, url_split: list[str], post_string: str) -> bytes:
     ensure(len(url_split) > 2, "Offer ID not specified")
     offer_id = decode_offer_id(url_split[2])
     server = self.server

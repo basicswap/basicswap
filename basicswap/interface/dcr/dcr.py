@@ -12,7 +12,6 @@ import logging
 import random
 import traceback
 
-from typing import List, Optional
 
 from basicswap.basicswap_util import (
     ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
@@ -1892,10 +1891,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script_pk = self.getScriptDest(script)
         return findOutput(tx, script_pk)
 
-    def getScriptLockTxDummyWitness(self, script: bytes) -> List[bytes]:
+    def getScriptLockTxDummyWitness(self, script: bytes) -> list[bytes]:
         return [bytes(72), bytes(72), bytes(len(script))]
 
-    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes) -> List[bytes]:
+    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes) -> list[bytes]:
         return [bytes(72), bytes(72), bytes(len(script))]
 
     def extractLeaderSig(self, tx_bytes: bytes) -> bytes:
@@ -2228,11 +2227,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         self,
         lock_type: int,
         encoded_sequence: int,
-        parent_block_height: Optional[int],
-        parent_block_time: Optional[int],
-        chain_height: Optional[int] = None,
-        chain_mtp: Optional[int] = None,
-        coin_mtp: Optional[int] = None,
+        parent_block_height: int | None,
+        parent_block_time: int | None,
+        chain_height: int | None = None,
+        chain_mtp: int | None = None,
+        coin_mtp: int | None = None,
     ) -> bool:
         if parent_block_height is None or parent_block_height < 1:
             return False
@@ -2260,8 +2259,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def isAbsLockTimeMature(
         self,
         nlocktime: int,
-        chain_height: Optional[int] = None,
-        chain_mtp: Optional[int] = None,
+        chain_height: int | None = None,
+        chain_mtp: int | None = None,
     ) -> bool:
         if nlocktime == 0:
             return True
