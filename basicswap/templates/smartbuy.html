@@ -1,0 +1,302 @@
+{% include 'header.html' %}
+{% from 'macros.html' import page_header %}
+{% from 'style.html' import input_down_arrow_offer_svg %}
+
+{% macro coin_card(side, label, select_id, amount_id, balance_id, coin_list) %}
+<div class="bg-white dark:bg-gray-600 rounded-xl p-6">
+ <div class="flex justify-between text-sm mb-4">
+  <span class="font-semibold text-gray-700 dark:text-white">{{ label }}</span>
+  <span class="text-gray-500 dark:text-gray-300">Balance: <span id="{{ balance_id }}" class="monospace">-</span></span>
+ </div>
+
+ <div class="coin-picker coin-picker-sunken mb-4" data-coin-picker data-with-balance="true" data-placeholder="Select coin">
+  <select id="{{ select_id }}" class="coin-picker-native select w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 text-gray-900 dark:text-white text-sm rounded-lg p-2.5 outline-none focus:ring-0">
+   {% for c in coin_list %}
+   <option value="{{ c[0] }}" data-balance="{{ c[2] }}" data-image="/static/images/coins/{{ c[1]|replace(' ', '-') }}.png">{{ c[1] }}</option>
+   {% endfor %}
+  </select>
+ </div>
+
+ <input type="text" id="{{ amount_id }}" inputmode="decimal" autocomplete="off" placeholder="0.00"
+  class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 rounded-xl p-4 text-2xl monospace text-gray-900 dark:text-white outline-none focus:border-blue-500">
+
+ {% if side == 'pay' %}
+ <div class="flex gap-2 mt-3">
+  {% for pct in [25, 50, 75, 100] %}
+  <button type="button" data-pct="{{ pct }}" class="pct-btn flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 rounded-lg p-2 text-sm text-gray-700 dark:text-white hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-colors focus:outline-none"
+   {% if pct == 100 %}title="Your balance minus a small reserve for the lock fee"{% endif %}>
+   {% if pct == 100 %}Max{% else %}{{ pct }}%{% endif %}
+  </button>
+  {% endfor %}
+ </div>
+ {% endif %}
+</div>
+{% endmacro %}
+
+{{ page_header('Smart Buy (BETA)', 'Fill an amount across as many offers as necessary.', dark_bg='dark:bg-gray-500') }}
+
+{% include 'inc_messages.html' %}
+
+<section>
+ <div class="xl:container mx-auto lg:px-0 px-6">
+  <div class="p-6 mt-6 mb-6 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+   <div class="border-b border-gray-300 dark:border-gray-400 mb-6">
+    <nav class="flex -mb-px">
+     <button type="button" data-sb-tab="buy" id="sb-tab-buy"
+      class="sb-tab flex-1 text-center border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-3 px-1 text-lg font-bold focus:outline-none">
+      Buy
+     </button>
+     <button type="button" data-sb-tab="history" id="sb-tab-history"
+      class="sb-tab flex-1 text-center border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 py-3 px-1 text-lg font-bold focus:outline-none">
+      History
+     </button>
+    </nav>
+   </div>
+
+   <div id="sb-panel-buy">
+   <div class="flex flex-col lg:flex-row gap-8">
+
+    <div class="w-full lg:max-w-md space-y-3">
+     {{ coin_card('pay', 'YOU PAY', 'coin_to', 'pay_amount', 'pay_balance', coins) }}
+
+     <button type="button" id="flipBtn" title="Swap the two coins"
+      class="relative left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 -my-2 z-10 focus:outline-none">
+      &#8645;
+     </button>
+
+     {{ coin_card('receive', 'YOU RECEIVE', 'coin_from', 'receive_amount', 'receive_balance', coins_from) }}
+
+     <div class="bg-white dark:bg-gray-600 rounded-xl p-6">
+      <div class="flex justify-between text-sm mb-3">
+       <span class="text-gray-500 dark:text-gray-300">Don't pay more than</span>
+      </div>
+
+      <div class="flex gap-2 mb-3">
+       <div class="relative flex-1">
+        {{ input_down_arrow_offer_svg | safe }}
+        <select id="anchor" class="appearance-none pr-10 w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 text-gray-900 dark:text-white text-sm rounded-lg p-2.5 outline-none focus:ring-0">
+        <option value="market" {% if default_anchor == 'market' %}selected{% endif %}>Market rate, plus</option>
+        <option value="best" {% if default_anchor == 'best' %}selected{% endif %}>Best offer, plus</option>
+        </select>
+       </div>
+       <div class="relative w-28">
+        <input type="text" id="slip_percent" inputmode="decimal" autocomplete="off" value="{{ default_slip_percent }}"
+         class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 text-gray-900 dark:text-white text-sm rounded-lg p-2.5 pr-7 monospace outline-none focus:border-blue-500">
+        <span class="absolute inset-y-0 right-3 flex items-center text-sm text-gray-500 dark:text-gray-300">%</span>
+       </div>
+      </div>
+
+      <div class="flex justify-between items-center text-sm">
+       <span class="text-gray-500 dark:text-gray-300">Split over at most</span>
+       <div class="flex items-center gap-2">
+        <input type="text" id="max_bids" inputmode="numeric" autocomplete="off" value="{{ default_max_bids }}"
+         data-batch-caps="{{ batch_caps|tojson|forceescape }}"
+         class="w-16 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 text-gray-900 dark:text-white text-sm rounded-lg p-2 monospace text-center outline-none focus:border-blue-500">
+        <span class="monospace text-gray-500 dark:text-gray-300">bids</span>
+       </div>
+      </div>
+
+      <div class="flex justify-between items-center text-sm mt-3">
+       <span class="text-gray-500 dark:text-gray-300">Max wait time for legs</span>
+       <div class="flex items-center gap-2">
+        <input type="text" id="leg_timeout_mins" inputmode="numeric" autocomplete="off" value="10"
+         class="w-16 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 text-gray-900 dark:text-white text-sm rounded-lg p-2 monospace text-center outline-none focus:border-blue-500">
+        <span class="monospace text-gray-500 dark:text-gray-300">mins</span>
+       </div>
+      </div>
+
+      <div class="flex justify-between items-center text-sm mt-3">
+       <label for="manual_offers" class="text-gray-500 dark:text-gray-300">Pick the offers myself</label>
+       <input type="checkbox" id="manual_offers"
+        class="w-4 h-4 text-blue-500 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 rounded focus:ring-0">
+      </div>
+
+      {% if debug_ui_mode %}
+      <div class="flex justify-between items-center text-sm mt-3">
+       <label for="allow_self_bids" class="text-gray-500 dark:text-gray-300">Bid on my own offers <span class="text-xs">(testing)</span></label>
+       <input type="checkbox" id="allow_self_bids"
+        class="w-4 h-4 text-blue-500 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 rounded focus:ring-0">
+      </div>
+      {% endif %}
+
+      <button type="button" id="previewBtn" class="w-full mt-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 hover:bg-blue-500 hover:text-white hover:border-blue-500 rounded-lg text-sm text-gray-700 dark:text-white transition-colors focus:outline-none">
+       Find the cheapest fill
+      </button>
+     </div>
+    </div>
+
+    <div class="flex-1 bg-white dark:bg-gray-600 rounded-xl p-6">
+     <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+      <div class="flex items-center gap-3">
+       <h2 class="text-lg font-semibold text-gray-900 dark:text-white" id="planTitle">This swap</h2>
+       <span id="planExhaustive" class="hidden text-xs text-gray-500 dark:text-gray-300">Best of a partial search</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+       <button type="button" id="excludedBtn"
+        class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 hover:bg-blue-500 hover:text-white hover:border-blue-500 rounded-lg text-sm text-gray-700 dark:text-white transition-colors focus:outline-none">
+        <span id="excludedBtnText">Show skipped offers</span>
+       </button>
+
+       <button type="button" id="placeBtn" disabled
+        class="px-6 py-2 bg-blue-500 text-white hover:bg-blue-600 rounded-lg font-medium transition-colors opacity-50 cursor-not-allowed focus:outline-none">
+        <span id="placeBtnText">Place bids</span>
+       </button>
+      </div>
+     </div>
+
+     <div id="planEmpty" class="py-16 text-center text-sm text-gray-500 dark:text-gray-300">
+      Pick a pair, enter an amount to pay or to receive, then find the cheapest fill.
+     </div>
+
+     <div id="planError" class="hidden p-4 text-sm text-red-700 bg-red-100 dark:bg-red-900 dark:text-red-200 rounded-lg"></div>
+
+     <div id="planBody" class="hidden">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+       <div>
+        <div class="text-xs text-gray-500 dark:text-gray-300 mb-1">Average rate</div>
+        <div id="planAvgRate" class="text-lg font-semibold monospace text-gray-900 dark:text-white">-</div>
+       </div>
+       <div>
+        <div class="text-xs text-gray-500 dark:text-gray-300 mb-1">Against market</div>
+        <div id="planVsMarket" class="text-lg font-semibold monospace">-</div>
+       </div>
+       <div>
+        <div class="text-xs text-gray-500 dark:text-gray-300 mb-1">Total cost</div>
+        <div id="planSpend" class="text-lg font-semibold monospace text-gray-900 dark:text-white">-</div>
+       </div>
+       <div>
+        <div class="text-xs text-gray-500 dark:text-gray-300 mb-1">Bids</div>
+        <div id="planNumBids" class="text-lg font-semibold monospace text-gray-900 dark:text-white">-</div>
+       </div>
+      </div>
+
+      <div id="planUnfilled" class="hidden mb-4 p-3 text-sm text-yellow-800 bg-yellow-100 dark:bg-yellow-900 dark:text-yellow-200 rounded-lg"></div>
+      <div id="planResult" class="hidden mb-4 p-3 text-sm text-gray-700 bg-gray-100 dark:bg-gray-700 dark:text-white rounded-lg"></div>
+
+      <div class="w-full overflow-x-auto">
+       <table class="w-full min-w-max">
+        <thead class="uppercase">
+         <tr>
+          <th class="p-0">
+           <div class="py-3 pl-4 text-left rounded-tl-xl bg-coolGray-200 dark:bg-gray-700">
+            <span class="text-sm text-gray-600 dark:text-white font-semibold">Offer</span>
+           </div>
+          </th>
+          <th class="p-0">
+           <div class="py-3 px-4 text-left bg-coolGray-200 dark:bg-gray-700">
+            <span class="text-sm text-gray-600 dark:text-white font-semibold">Rate</span>
+           </div>
+          </th>
+          <th class="p-0">
+           <div class="py-3 px-4 text-right bg-coolGray-200 dark:bg-gray-700">
+            <span class="text-sm text-gray-600 dark:text-white font-semibold">You receive</span>
+           </div>
+          </th>
+          <th class="p-0">
+           <div class="py-3 px-4 text-right bg-coolGray-200 dark:bg-gray-700">
+            <span class="text-sm text-gray-600 dark:text-white font-semibold">You pay</span>
+           </div>
+          </th>
+          <th class="p-0">
+           <div class="py-3 px-4 text-center rounded-tr-xl bg-coolGray-200 dark:bg-gray-700">
+            <span class="text-sm text-gray-600 dark:text-white font-semibold">Status</span>
+           </div>
+          </th>
+         </tr>
+        </thead>
+        <tbody id="planLegs" class="divide-y divide-gray-200 dark:divide-gray-400"></tbody>
+       </table>
+      </div>
+     </div>
+    </div>
+
+   </div>
+   </div>
+
+   <div id="sb-panel-history" class="hidden">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Your Smart Buys</h2>
+     <span class="text-xs text-gray-500 dark:text-gray-300">Progress updates live; failed or unfilled amounts can be retried.</span>
+    </div>
+
+    <div class="bg-white dark:bg-gray-600 rounded-xl p-6">
+     <div class="w-full overflow-x-auto">
+      <table class="w-full min-w-max">
+       <thead class="uppercase">
+        <tr class="text-left">
+         <th class="p-0"><div class="py-3 pl-6 rounded-tl-xl bg-coolGray-200 dark:bg-gray-600"><span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Date/Time</span></div></th>
+         <th class="p-0 hidden lg:block"><div class="p-3 bg-coolGray-200 dark:bg-gray-600"><span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Details</span></div></th>
+         <th class="p-0"><div class="p-3 bg-coolGray-200 dark:bg-gray-600"><span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">You Send</span></div></th>
+         <th class="p-0"><div class="p-3 bg-coolGray-200 dark:bg-gray-600"><span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">You Receive</span></div></th>
+         <th class="p-0"><div class="p-3 text-center bg-coolGray-200 dark:bg-gray-600"><span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">Status</span></div></th>
+         <th class="p-0"><div class="p-3 pr-4 text-center rounded-tr-xl bg-coolGray-200 dark:bg-gray-600"><span class="text-sm text-gray-600 dark:text-gray-300 font-semibold">&nbsp;</span></div></th>
+        </tr>
+       </thead>
+       <tbody id="sb-history-body" class="divide-y divide-gray-200 dark:divide-gray-400">
+        <tr><td colspan="6" class="py-8 text-center text-sm text-gray-500 dark:text-gray-300">Loading&hellip;</td></tr>
+       </tbody>
+      </table>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</section>
+
+<div id="insufficientModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+ <div class="fixed inset-0 bg-black bg-opacity-50"></div>
+ <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+  <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg text-center">
+   <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Insufficient balance</h2>
+   <p class="text-gray-600 dark:text-gray-200 mb-6" id="insufficientMessage"></p>
+   <button type="button" id="insufficientOk"
+    class="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white rounded-md focus:outline-none">
+    OK
+   </button>
+  </div>
+ </div>
+</div>
+
+<div id="confirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+ <div class="fixed inset-0 bg-black bg-opacity-50"></div>
+ <div class="relative z-50 min-h-screen px-4 flex items-center justify-center">
+  <div class="bg-white dark:bg-gray-500 rounded-lg max-w-md w-full p-6 shadow-lg">
+   <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-6 text-center">Confirm this swap</h2>
+   <div class="space-y-3 mb-6">
+    <div class="flex justify-between text-sm">
+     <span class="text-gray-500 dark:text-gray-300">Bids</span>
+     <span class="monospace text-gray-900 dark:text-white" id="confirmBids">-</span>
+    </div>
+    <div class="flex justify-between text-sm">
+     <span class="text-gray-500 dark:text-gray-300">You pay</span>
+     <span class="monospace text-gray-900 dark:text-white" id="confirmPay">-</span>
+    </div>
+    <div class="flex justify-between text-sm">
+     <span class="text-gray-500 dark:text-gray-300">Approx. redeem fees</span>
+     <span class="monospace text-gray-900 dark:text-white" id="confirmFees">-</span>
+    </div>
+    <div class="flex justify-between text-sm">
+     <span class="text-gray-500 dark:text-gray-300">Approx. net received</span>
+     <span class="monospace text-gray-900 dark:text-white" id="confirmNet">-</span>
+    </div>
+   </div>
+   <div class="flex justify-center gap-4">
+    <button type="button" id="confirmPlace"
+     class="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white rounded-md focus:outline-none">
+     Place bids
+    </button>
+    <button type="button" id="confirmCancel"
+     class="px-6 py-2.5 bg-red-500 hover:bg-red-600 font-medium text-sm text-white rounded-md focus:outline-none">
+     Cancel
+    </button>
+   </div>
+  </div>
+ </div>
+</div>
+
+<script src="/static/js/modules/coin-picker.js?v={{ static_v }}"></script>
+<script src="/static/js/pages/plan-rows.js?v={{ static_v }}"></script>
+<script src="/static/js/pages/smartbuy.js?v={{ static_v }}"></script>
+
+{% include 'footer.html' %}

@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 38
+CURRENT_DB_VERSION = 39
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -267,6 +267,9 @@ class Bid(Table, StateRows):
     reject_code = Column("integer")
 
     index = Index("bid_offer_id_index", "offer_id")
+
+    # Shared by the bids placed together by one multi-offer buy, else null.
+    plan_id = Column("blob")
 
     initiate_tx = None
     participate_tx = None

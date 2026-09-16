@@ -49,6 +49,19 @@ from .ui.util import (
 )
 from .ui.page_offers import postNewOffer
 from .protocols.xmr_swap_1 import recoverNoScriptTxnWithKey, getChainBSplitKey
+from .bidplanner import FILL_RECEIVE, FILL_SPEND
+from .multibid import (
+    ANCHOR_MARKET,
+    DEFAULT_BID_VALID_SECONDS,
+    DEFAULT_MAX_BIDS,
+    DEFAULT_SLIP_PERCENT,
+    MAX_CONFIRM_WAIT_SECONDS,
+    MIN_LEG_TIMEOUT_SECONDS,
+    describePlan,
+    placeMultiBid,
+    planMultiBid,
+    PLAN_ID_LENGTH,
+)
 from .db import Concepts
 
 
@@ -639,6 +652,7 @@ def parseBidFilters(post_data):
 def formatBids(swap_client, bids, filters) -> bytes:
     with_extra_info = filters.get("with_extra_info", False)
     rv = []
+    plan_targets = {}
     for b in bids:
         ci_from = swap_client.ci(b[9])
         offer = swap_client.getOffer(b[3])
@@ -663,7 +677,17 @@ def formatBids(swap_client, bids, filters) -> bytes:
             "bid_state": strBidState(b[5]),
             "addr_from": b[11],
             "addr_to": offer.addr_to if offer else None,
+            "plan_id": b[15].hex() if b[15] else None,
         }
+
+        if b[15] is not None:
+            plan_id_hex = b[15].hex()
+            if plan_id_hex not in plan_targets:
+                raw = swap_client.getStringKV(f"plan_target:{plan_id_hex}")
+                plan_targets[plan_id_hex] = (
+                    ci_from.format_amount(int(raw)) if raw is not None else None
+                )
+            bid_data["plan_target"] = plan_targets[plan_id_hex]
 
         if with_extra_info:
             bid_data.update(
@@ -671,6 +695,156 @@ def formatBids(swap_client, bids, filters) -> bytes:
             )
         rv.append(bid_data)
     return bytes(json.dumps(rv), "UTF-8")
+
+
+def parseMultiBidRequest(swap_client, post_data):
+    coin_from = Coins(getCoinType(get_data_entry(post_data, "coin_from")))
+    coin_to = Coins(getCoinType(get_data_entry(post_data, "coin_to")))
+    ci_from = swap_client.ci(coin_from)
+    ci_to = swap_client.ci(coin_to)
+
+    have_receive: bool = have_data_entry(post_data, "receive_amount")
+    have_spend: bool = have_data_entry(post_data, "spend_amount")
+    ensure(
+        have_receive != have_spend,
+        "Requires one of receive_amount or spend_amount",
+    )
+
+    if have_receive:
+        mode = FILL_RECEIVE
+        target = inputAmount(get_data_entry(post_data, "receive_amount"), ci_from)
+    else:
+        mode = FILL_SPEND
+        target = inputAmount(get_data_entry(post_data, "spend_amount"), ci_to)
+
+    max_bids = int(get_data_entry_or(post_data, "max_bids", DEFAULT_MAX_BIDS))
+    ensure(max_bids >= 1, "max_bids must be at least 1")
+    batch_cap = ci_to.max_batched_lock_outputs()
+    if batch_cap is not None:
+        max_bids = min(max_bids, batch_cap)
+
+    return {
+        "coin_from": coin_from,
+        "coin_to": coin_to,
+        "mode": mode,
+        "target": target,
+        "anchor": get_data_entry_or(post_data, "anchor", ANCHOR_MARKET),
+        "slip_percent": float(
+            get_data_entry_or(post_data, "slip_percent", DEFAULT_SLIP_PERCENT)
+        ),
+        "max_bids": max_bids,
+        "allow_known_only": toBool(
+            get_data_entry_or(post_data, "allow_known_only", "false")
+        ),
+        "allow_self_bids": toBool(
+            get_data_entry_or(post_data, "allow_self_bids", "false")
+        ),
+        "manual_offers": [
+            bytes.fromhex(offer_id)
+            for offer_id in get_data_entry_or(post_data, "manual_offers", [])
+        ],
+    }
+
+
+def js_bids_plan(self, post_string: str, is_json: bool) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = getFormData(post_string, is_json)
+    args = parseMultiBidRequest(swap_client, post_data)
+
+    plan, market_rate, limit_rate = planMultiBid(swap_client, **args)
+
+    rv = describePlan(
+        swap_client,
+        args["coin_from"],
+        args["coin_to"],
+        args["mode"],
+        plan,
+        market_rate,
+        limit_rate,
+    )
+    return bytes(json.dumps(rv), "UTF-8")
+
+
+def js_bids_bulk(self, post_string: str, is_json: bool) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = getFormData(post_string, is_json)
+
+    legs_in = get_data_entry(post_data, "legs")
+    if isinstance(legs_in, str):
+        legs_in = json.loads(legs_in)
+    ensure(isinstance(legs_in, list) and len(legs_in) > 0, "Requires a list of legs")
+
+    legs = []
+    coin_from = None
+    coin_to = None
+    for leg in legs_in:
+        ensure(
+            isinstance(leg, dict) and "offer_id" in leg and "amount" in leg,
+            "Each leg requires an offer_id and an amount",
+        )
+        offer_id = bytes.fromhex(leg["offer_id"])
+        ensure(len(offer_id) == 28, "Invalid offer_id")
+        offer = swap_client.getOffer(offer_id)
+        ensure(offer, "Offer not found")
+        if coin_from is None:
+            coin_from, coin_to = offer.coin_from, offer.coin_to
+        ci_from = swap_client.ci(offer.coin_from)
+        legs.append(
+            {
+                "offer_id": offer_id,
+                "amount": inputAmount(leg["amount"], ci_from),
+            }
+        )
+
+    valid_for_seconds: int = DEFAULT_BID_VALID_SECONDS
+    if have_data_entry(post_data, "validmins"):
+        valid_for_seconds = int(get_data_entry(post_data, "validmins")) * 60
+    elif have_data_entry(post_data, "valid_for_seconds"):
+        valid_for_seconds = int(get_data_entry(post_data, "valid_for_seconds"))
+
+    addr_from = None
+    if have_data_entry(post_data, "addr_from"):
+        addr_from = get_data_entry(post_data, "addr_from")
+        if addr_from == "-1":
+            addr_from = None
+
+    plan_id = None
+    if have_data_entry(post_data, "plan_id"):
+        plan_id = bytes.fromhex(get_data_entry(post_data, "plan_id"))
+        ensure(len(plan_id) == PLAN_ID_LENGTH, "Invalid plan_id")
+
+    leg_timeout_seconds = None
+    if have_data_entry(post_data, "plan_leg_timeout"):
+        leg_timeout_seconds = int(get_data_entry(post_data, "plan_leg_timeout")) * 60
+        ensure(
+            leg_timeout_seconds >= MIN_LEG_TIMEOUT_SECONDS,
+            f"plan_leg_timeout must be at least {MIN_LEG_TIMEOUT_SECONDS // 60} minutes",
+        )
+        ensure(
+            leg_timeout_seconds <= MAX_CONFIRM_WAIT_SECONDS,
+            f"plan_leg_timeout must be at most {MAX_CONFIRM_WAIT_SECONDS // 60} minutes",
+        )
+
+    placed, failed, plan_id = placeMultiBid(
+        swap_client,
+        legs,
+        valid_for_seconds=valid_for_seconds,
+        addr_from=addr_from,
+        plan_id=plan_id,
+        leg_timeout_seconds=leg_timeout_seconds,
+    )
+
+    ci_from = swap_client.ci(coin_from)
+    ci_to = swap_client.ci(coin_to)
+    for entry in placed + failed:
+        entry["amount"] = ci_from.format_amount(entry["amount"])
+    for entry in placed:
+        entry["rate"] = ci_to.format_amount(entry["rate"])
+
+    return bytes(
+        json.dumps({"placed": placed, "failed": failed, "plan_id": plan_id.hex()}),
+        "UTF-8",
+    )
 
 
 def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
@@ -774,6 +948,12 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
 
             rv = {"bid_id": bid_id.hex()}
             return bytes(json.dumps(rv), "UTF-8")
+
+        if url_split[3] == "plan":
+            return js_bids_plan(self, post_string, is_json)
+
+        if url_split[3] == "bulk":
+            return js_bids_bulk(self, post_string, is_json)
 
         bid_id = bytes.fromhex(url_split[3])
         ensure(len(bid_id) == 28, "Invalid bid id size")
