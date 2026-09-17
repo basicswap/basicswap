@@ -1552,6 +1552,7 @@ def main():
         "navcoin": nav_prepare.getConfigSegment(prepare_ctx),
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
         "dogecoin": doge_prepare.getConfigSegment(prepare_ctx),
+        "sharecoin": shc_prepare.getConfigSegment(prepare_ctx),
     }
 
     electrum_supported_coins = {

@@ -9,6 +9,7 @@ import os
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
+    ensurePubkey,
 )
 from basicswap.interface.shc.chainparams import params
 
@@ -65,6 +66,49 @@ class SHCPrepare(CoinPrepareModule):
         # SHA256SUMS is itself clearsigned (gpg --clearsign), not
         # accompanied by a separate .asc/.sig file.
         return False
+
+    def verifyCoreSignature(
+        self,
+        ctx: PrepareContext,
+        gpg,
+        release_path: str,
+        assert_path: str,
+        assert_sig_path: str,
+        signing_key_name: str,
+        extra_opts: dict,
+    ) -> None:
+        # The hashes file is itself an inline-signed (clearsigned) document,
+        # verify it directly - same pattern as FIRO's own override.
+        pubkey_filename = self.getPubkeyFilename(signing_key_name)
+        pubkeyurls = self.getAllPubkeyUrls(ctx)
+
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
+
+        with open(assert_path, "rb") as fp:
+            verified = gpg.verify_file(fp)
+
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
+
+    def getExtractBins(self) -> list:
+        # The real release tarball only bundles sharecoind/sharecoin-cli
+        # under those exact names (plus sharecoin-qt/sharecoin-util, which
+        # BasicSwap has no use for) - no -tx or -wallet tool exists.
+        return ["sharecoind", "sharecoin-cli"]
+
+    def getExtractPath(
+        self,
+        ctx: PrepareContext,
+        bin_name: str,
+        release_path: str,
+        extra_opts: dict,
+    ) -> str:
+        # Real archive layout is flat (sharecoin-linux-x64/<binary>), not
+        # BasicSwap's default name-version/bin/binary convention.
+        return f"sharecoin-linux-x64/{bin_name}"
 
     def getReleaseFilename(self, ctx: PrepareContext, arch_name: str) -> str:
         # Only linux-x64 has a verified, signed release asset so far - see
