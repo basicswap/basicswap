@@ -1230,6 +1230,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.doge.doge import DOGEInterface
 
             return DOGEInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.SHC:
+            from .interface.shc.shc import SHCInterface
+
+            connection_type = self.coin_clients[coin].get("connection_type", "rpc")
+            interface = SHCInterface(self.coin_clients[coin], self.chain, self)
+
+            if connection_type == "electrum":
+                self._initElectrumBackend(coin, interface)
+
+            return interface
         elif coin == Coins.DCR:
             from .interface.dcr.dcr import DCRInterface
 

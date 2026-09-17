@@ -72,6 +72,7 @@ from basicswap.interface.wow.core import (
 from basicswap.interface.pivx.core import prepare_module as pivx_prepare
 from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
+from basicswap.interface.shc.core import prepare_module as shc_prepare
 from basicswap.interface.nav.core import prepare_module as nav_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
 
@@ -83,6 +84,7 @@ coin_prepare_modules = {
     "dash": dash_prepare,
     "decred": dcr_prepare,
     "dogecoin": doge_prepare,
+    "sharecoin": shc_prepare,
     "navcoin": nav_prepare,
     "namecoin": nmc_prepare,
     "monero": xmr_prepare,
@@ -156,6 +158,11 @@ known_coins = {
         doge_prepare.version,
         doge_prepare.version_tag,
         doge_prepare.signers.keys(),
+    ),
+    "sharecoin": (
+        shc_prepare.version,
+        shc_prepare.version_tag,
+        shc_prepare.signers.keys(),
     ),
 }
 
@@ -710,6 +717,8 @@ def modify_tor_config(
             default_onionport = ltc_prepare.onion_port
         elif coin == "dogecoin":
             default_onionport = doge_prepare.onion_port
+        elif coin == "sharecoin":
+            default_onionport = shc_prepare.onion_port
         elif coin in ("decred",):
             pass
         else:
