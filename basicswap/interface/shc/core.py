@@ -12,28 +12,18 @@ from basicswap.interface.prepare_util import (
 )
 from basicswap.interface.shc.chainparams import params
 
-# NOTE, real open item: Sharecoin's tagged GitHub releases
-# (github.com/Share-coin/Sharecoin/releases) currently ship a bundled
-# portable wallet+miner package (sharecoin-portable-win64.zip), not a bare
-# daemon/CLI binary in the gitian/guix-style naming BasicSwap's automatic
-# prepare/download system expects (see getReleaseUrl/getAssertUrl below -
-# both are best-effort guesses at a URL PATTERN, not confirmed to actually
-# resolve to a real matching asset yet). Until a proper daemon-only release
-# exists, run BasicSwap against an already-installed/already-running
-# sharecoind instead: set manage_daemon=False (or leave SHC out of
-# should_manage_daemon's managed list) and point SHC_RPC_HOST/PORT/USER/PWD
-# at a real node - this project already runs 4 real synced mainnet nodes,
-# so this isn't a hypothetical fallback, it's the realistic near-term path.
 SHARECOIN_VERSION = os.getenv("SHARECOIN_VERSION", "1.0.0")
 SHARECOIN_VERSION_TAG = os.getenv("SHARECOIN_VERSION_TAG", "")
-# TODO real open item: BasicSwap release-signature verification expects a
-# signer key fingerprint here (see e.g. doge_signers/litecoin_signers in
-# the sibling core.py files) - Sharecoin doesn't currently gitian/guix-sign
-# releases at all, so there's no real fingerprint to put here yet. Left
-# empty rather than fabricated; this needs a real decision (start signing
-# releases, or ask BasicSwap maintainers how unsigned-release coins are
-# handled elsewhere in the project) before this is submission-ready.
-sharecoin_signers = {}
+
+# Single-signer release key, not a full gitian/guix multi-builder quorum -
+# Sharecoin is a small project and this is a first step, not a claim of
+# parity with e.g. Bitcoin Core's reproducible-build process. The key signs
+# a SHA256SUMS file (clearsigned, not detached - see hasDetachedSig below)
+# covering the release asset already published at v1.0.0 and already
+# confirmed byte-identical (sha256) to the sharecoind/sharecoin-cli
+# binaries actually running on two of the project's four live mainnet
+# nodes (Oracle secondary, GCP) at the time this key was made.
+sharecoin_signers = {"releases": ("86B410C06A18A1647557BB2B23AEF4BF0FB8E55E",)}
 
 SHC_RPC_HOST = os.getenv("SHC_RPC_HOST", "127.0.0.1")
 SHC_RPC_PORT = int(os.getenv("SHC_RPC_PORT", 8332))
@@ -71,12 +61,25 @@ class SHCPrepare(CoinPrepareModule):
 
         return config
 
+    def hasDetachedSig(self) -> bool:
+        # SHA256SUMS is itself clearsigned (gpg --clearsign), not
+        # accompanied by a separate .asc/.sig file.
+        return False
+
+    def getReleaseFilename(self, ctx: PrepareContext, arch_name: str) -> str:
+        # Only linux-x64 has a verified, signed release asset so far - see
+        # the sharecoin_signers comment above. Other platforms aren't
+        # covered yet; fail clearly rather than guess a filename that
+        # doesn't exist.
+        os_name = ctx.bin_arch
+        if "linux" not in os_name and "x86_64" not in os_name:
+            raise NotImplementedError(
+                "Only linux-x64 has a signed Sharecoin release asset so far."
+            )
+        return "sharecoin-linux-x64.tar.gz"
+
     def getReleaseUrl(self, ctx: PrepareContext, release_filename: str) -> str:
-        # Best-effort URL pattern, NOT confirmed to resolve - see the
-        # module-level note above. Sharecoin's actual v1.0.0 release asset
-        # is a differently-named bundled package, not `release_filename`
-        # in BasicSwap's expected per-platform daemon-binary form.
-        return f"https://github.com/Share-coin/Sharecoin/releases/download/v{self.version}{self.version_tag}/{release_filename}"
+        return f"https://github.com/Share-coin/Sharecoin/releases/download/v{self.version}/{release_filename}"
 
     def getAssertUrl(
         self,
@@ -86,9 +89,7 @@ class SHCPrepare(CoinPrepareModule):
         signing_key_name: str,
         use_guix: bool,
     ) -> str:
-        # No real gitian/guix attestation file exists yet - see the
-        # sharecoin_signers note above. Placeholder pattern only.
-        return f"https://raw.githubusercontent.com/Share-coin/guix.sigs/sharecoin/{self.version}/{signing_key_name}/noncodesigned.SHA256SUMS"
+        return f"https://github.com/Share-coin/Sharecoin/releases/download/v{self.version}/SHA256SUMS.asc"
 
     def writeCoinConfig(
         self,
