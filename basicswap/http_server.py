@@ -181,6 +181,7 @@ JSON_GET_ALLOWED = frozenset(
         "coinvolume",
         "coinhistory",
         "messageroutes",
+        "networks",
         "modeswitchinfo",
     }
 )

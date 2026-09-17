@@ -183,10 +183,12 @@ def encryptMsg(
     timestamp=None,
     deterministic=False,
     difficulty_target=0x1EFFFFFF,
+    pubkey_to: bytes = None,
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
+    if pubkey_to is None:
+        pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
     privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
     payload_format: int = 2
@@ -291,16 +293,26 @@ def decryptSimplexMsg(self, msg_data):
     except Exception as e:  # noqa: F841
         pass
 
-    # Try with all active bid/offer addresses
     query: str = """SELECT DISTINCT address FROM (
         SELECT b.bid_addr AS address FROM bids b
                JOIN bidstates s ON b.state = s.state_id
-               WHERE b.active_ind = 1
+               WHERE b.active_ind = 1 AND b.was_sent = 1
                      AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
         UNION
-        SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
+        SELECT o.addr_from AS address FROM bids b
+               JOIN bidstates s ON b.state = s.state_id
+               JOIN offers o ON o.offer_id = b.offer_id
+               WHERE b.active_ind = 1 AND b.was_received = 1
+                     AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
         UNION
-        SELECT addr AS address FROM smsgaddresses WHERE active_ind = 1 AND use_type = :local_portal
+        SELECT addr_from AS address FROM offers
+               WHERE active_ind = 1 AND was_sent = 1 AND expire_at > :now
+        UNION
+        SELECT smsg_addr_local AS address FROM direct_message_routes
+               WHERE active_ind = 2
+        UNION
+        SELECT addr AS address FROM smsgaddresses
+               WHERE active_ind = 1 AND use_type IN (:local_portal, :recv_offer)
         )"""
 
     now: int = self.getTime()
@@ -308,7 +320,12 @@ def decryptSimplexMsg(self, msg_data):
     try:
         cursor = self.openDB()
         addr_rows = cursor.execute(
-            query, {"now": now, "local_portal": AddressTypes.PORTAL_LOCAL}
+            query,
+            {
+                "now": now,
+                "local_portal": AddressTypes.PORTAL_LOCAL,
+                "recv_offer": AddressTypes.RECV_OFFER,
+            },
         ).fetchall()
         decrypted = None
         for row in addr_rows:
