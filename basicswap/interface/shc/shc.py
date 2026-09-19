@@ -14,13 +14,10 @@ class SHCInterface(BTCInterface):
         return Coins.SHC
 
     def max_money(self) -> int:
-        # Computed, not guessed: SHC's genesis block sets a real 50 * COIN
-        # initial subsidy (bitcoin-source/src/kernel/chainparams.cpp,
-        # CreateGenesisBlock call in CMainParams), halving every 2,500,000
-        # blocks (consensus.nSubsidyHalvingInterval). Same geometric-halving
-        # total formula as Bitcoin itself: initial_subsidy * interval * 2
-        # = 50 * 2,500,000 * 2 = 250,000,000 SHC.
-        return 250000000 * self.COIN()
+        # From GetBlockSubsidy (validation.cpp): 100 SHC initial subsidy halving every
+        # 2,500,000 blocks (consensus.nSubsidyHalvingInterval), so the total is
+        # 100 * 2,500,000 * 2 = 500,000,000 SHC.
+        return 500000000 * self.COIN()
 
     # No other overrides needed: SHC uses standard P2PKH/P2SH/native-segwit
     # scripts exactly like BTCInterface's own defaults (confirmed - unlike
