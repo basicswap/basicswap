@@ -49,7 +49,8 @@ class SHCPrepare(CoinPrepareModule):
             # False in that coin's own core.py).
             "use_segwit": True,
             "use_csv": True,
-            "blocks_confirmed": 2,
+            # Low network hashrate makes short reorgs cheap, so wait far longer than other coins.
+            "blocks_confirmed": 20,
             "conf_target": 2,
             "core_version_no": self.version + self.version_tag,
             "core_version_group": 29,  # SHC's bitcoin-source is a current (v29-class) Bitcoin Core fork, not an old-lineage codebase like most other integrated coins
