@@ -1137,6 +1137,134 @@ class TestFunctions(BaseTest):
             bytes(retry_swap.b_lock_tx_id) not in batch_lock_txids
         ), "retry leg must lock in its own tx, not the batch"
 
+    def do_test_27_partial_inflight_lock_reuse(self, coin_from, coin_to):
+        """An in-flight coin B lock only covers the legs it pays: a batch that
+        matches it must record those legs and let the rest lock themselves."""
+        logging.info(
+            f"---------- Test partial in-flight coin B lock reuse {coin_from.name} to {coin_to.name}"
+        )
+
+        id_bidder: int = self.node_b_id
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[id_bidder].ci(coin_from)
+        ci_to = swap_clients[id_bidder].ci(coin_to)
+
+        ready_makers = ((self.node_a_id, 2.0), (self.node_c_id, 1.0))
+        straggler_maker: int = self.node_a_id
+        straggler_amount: float = 1.0
+
+        default_leg_timeout = swap_clients[id_bidder]._plan_leg_timeout
+        self.addCleanup(
+            setattr, swap_clients[id_bidder], "_plan_leg_timeout", default_leg_timeout
+        )
+        swap_clients[id_bidder]._plan_leg_timeout = 300
+
+        self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1801)
+        self.prepare_balance(coin_from, 20.0, 1800 + self.node_a_id, 1800)
+        self.prepare_balance(coin_from, 20.0, 1800 + self.node_c_id, 1800)
+
+        rate: int = ci_to.make_int(1.0, r=1)
+
+        def post(maker_id: int, amount: float, auto: bool) -> bytes:
+            amt = ci_from.make_int(amount)
+            return swap_clients[maker_id].postOffer(
+                coin_from,
+                coin_to,
+                amt,
+                rate,
+                amt,
+                SwapTypes.XMR_SWAP,
+                auto_accept_bids=auto,
+            )
+
+        ready_offers = [post(mid, amt, True) for mid, amt in ready_makers]
+        straggler_offer = post(straggler_maker, straggler_amount, False)
+        for offer_id in ready_offers + [straggler_offer]:
+            wait_for_offer(test_delay_event, swap_clients[id_bidder], offer_id)
+
+        legs = [
+            {"offer_id": oid, "amount": ci_from.make_int(amt)}
+            for oid, (_, amt) in zip(ready_offers, ready_makers)
+        ]
+        legs.append(
+            {"offer_id": straggler_offer, "amount": ci_from.make_int(straggler_amount)}
+        )
+        placed, failed, _ = placeMultiBid(swap_clients[id_bidder], legs)
+        assert len(placed) == 3 and len(failed) == 0
+
+        bids = {
+            bytes.fromhex(p["offer_id"]): bytes.fromhex(p["bid_id"]) for p in placed
+        }
+        ready_bids = [bids[oid] for oid in ready_offers]
+        straggler_bid = bids[straggler_offer]
+
+        # The ready legs hold for the unaccepted straggler, which is the window
+        # the lock is published in.
+        for bid_id in ready_bids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        # Freeze the coin B chain so the published lock stays in the mempool,
+        # where findTxB cannot see it. Coin A keeps mining, so the straggler
+        # can still become ready.
+        xmr_addr = self.xmr_addr
+        self.addCleanup(setattr, type(self), "xmr_addr", xmr_addr)
+        type(self).xmr_addr = None
+
+        pre_bid = ready_bids[0]
+        bid, xmr_swap = swap_clients[id_bidder].getXmrBid(pre_bid)
+        _, xmr_offer = swap_clients[id_bidder].getXmrOffer(bid.offer_id)
+        pre_txid = ci_to.publishBLockTx(
+            xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to, xmr_offer.b_fee_rate
+        )
+        logging.info(f"Published an unrecorded coin B lock: {pre_txid.hex()}")
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[straggler_maker],
+            straggler_bid,
+            BidStates.BID_RECEIVED,
+        )
+        swap_clients[straggler_maker].acceptXmrBid(straggler_bid)
+
+        # The batch now matches a tx that pays one of its three locks.
+        for _ in range(self.extra_wait_time + 300):
+            _, pre_swap = swap_clients[id_bidder].getXmrBid(pre_bid)
+            if pre_swap is not None and pre_swap.b_lock_tx_id is not None:
+                break
+            test_delay_event.wait(1)
+
+        type(self).xmr_addr = xmr_addr
+
+        all_bids = ready_bids + [straggler_bid]
+        for bid_id in all_bids:
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[id_bidder],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=(self.extra_wait_time + 300),
+            )
+
+        _, pre_swap = swap_clients[id_bidder].getXmrBid(pre_bid)
+        assert (
+            bytes(pre_swap.b_lock_tx_id) == pre_txid
+        ), "the paid leg must keep the tx that pays it"
+        for bid_id in all_bids:
+            if bid_id == pre_bid:
+                continue
+            _, other_swap = swap_clients[id_bidder].getXmrBid(bid_id)
+            assert (
+                bytes(other_swap.b_lock_tx_id) != pre_txid
+            ), "a leg the tx does not pay must lock in its own tx"
+
     def do_test_22_reverse_self_bid_batch(self, coin_from, coin_to):
         """A reverse-ADS plan containing a self-bid leg must not lock coin B for
         a leg the bidder leads: on a reverse bid the maker owes coin B, so
@@ -3556,6 +3684,11 @@ class BasicSwapTest(TestFunctions):
         if not self.has_segwit:
             return
         self.do_test_24_leader_plan_per_leg_outputs(Coins.XMR, self.test_coin_from)
+
+    def test_27_partial_inflight_lock_reuse_xmr(self):
+        if not self.has_segwit:
+            return
+        self.do_test_27_partial_inflight_lock_reuse(self.test_coin_from, Coins.XMR)
 
     def test_25_secret_hash_plan(self):
         if not self.has_segwit:

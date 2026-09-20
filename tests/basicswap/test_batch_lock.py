@@ -46,6 +46,7 @@ class FakeXmr:
         self._log.addr = lambda v: v
         self.calls = []
         self.pending_destinations = []
+        self.pending_tag = "pending"
 
     def coin_name(self) -> str:
         return "Monero"
@@ -64,7 +65,7 @@ class FakeXmr:
             if not self.pending_destinations:
                 return {}
             return {
-                "pending": [
+                self.pending_tag: [
                     {"txid": "cd" * 32, "destinations": self.pending_destinations}
                 ]
             }
@@ -74,12 +75,20 @@ class FakeXmr:
         return xmr_util.encode_address(self.getPubkey(kbv), Kbs, self._addr_prefix)
 
 
+def paid_addresses(ci, txid: bytes) -> set:
+    """The addresses the tx returned by a publish actually pays."""
+    if txid == bytes.fromhex("ab" * 32):
+        params = [p for method, p in ci.calls if method == "transfer"][-1]
+        return {d["address"] for d in params["destinations"]}
+    return {d["address"] for d in ci.pending_destinations}
+
+
 class TestXmrPublishBLockTxs(unittest.TestCase):
 
     def test_locks_every_swap_in_one_transfer(self):
         ci = FakeXmr()
 
-        txid = ci.publishBLockTxs(
+        txid, covered = ci.publishBLockTxs(
             [
                 (key(1), key(2), 100),
                 (key(3), key(4), 250),
@@ -88,6 +97,7 @@ class TestXmrPublishBLockTxs(unittest.TestCase):
         )
 
         self.assertEqual(txid, bytes.fromhex("ab" * 32))
+        self.assertEqual(covered, [0, 1, 2])
 
         transfers = [params for method, params in ci.calls if method == "transfer"]
         self.assertEqual(len(transfers), 1)
@@ -101,21 +111,38 @@ class TestXmrPublishBLockTxs(unittest.TestCase):
     def test_returns_the_in_flight_tx_instead_of_locking_twice(self):
         ci = FakeXmr()
         locks = [(key(1), key(2), 100), (key(3), key(4), 250)]
-        # Only the second leg's address is in flight; the batch is still one tx.
-        ci.pending_destinations = [{"address": ci.lock_address(key(3), key(4))}]
+        ci.pending_destinations = [
+            {"address": ci.lock_address(key(1), key(2))},
+            {"address": ci.lock_address(key(3), key(4))},
+        ]
 
-        txid = ci.publishBLockTxs(locks, 0)
+        txid, covered = ci.publishBLockTxs(locks, 0)
 
         self.assertEqual(txid, bytes.fromhex("cd" * 32))
+        self.assertEqual(covered, [0, 1])
+        self.assertEqual([m for m, _ in ci.calls if m == "transfer"], [])
+
+    def test_reports_only_the_locks_the_in_flight_tx_pays(self):
+        # A retry can plan a batch the in-flight tx was never built for.
+        ci = FakeXmr()
+        locks = [(key(1), key(2), 100), (key(3), key(4), 250)]
+        # Only the second leg's address is in flight.
+        ci.pending_destinations = [{"address": ci.lock_address(key(3), key(4))}]
+
+        txid, covered = ci.publishBLockTxs(locks, 0)
+
+        self.assertEqual(txid, bytes.fromhex("cd" * 32))
+        self.assertEqual(covered, [1])
         self.assertEqual([m for m, _ in ci.calls if m == "transfer"], [])
 
     def test_an_unrelated_pending_send_does_not_block_the_batch(self):
         ci = FakeXmr()
         ci.pending_destinations = [{"address": ci.lock_address(key(9), key(9))}]
 
-        txid = ci.publishBLockTxs([(key(1), key(2), 100)], 0)
+        txid, covered = ci.publishBLockTxs([(key(1), key(2), 100)], 0)
 
         self.assertEqual(txid, bytes.fromhex("ab" * 32))
+        self.assertEqual(covered, [0])
         self.assertEqual(len([m for m, _ in ci.calls if m == "transfer"]), 1)
 
     def test_single_lock_keeps_its_in_flight_guard(self):
@@ -126,6 +153,40 @@ class TestXmrPublishBLockTxs(unittest.TestCase):
 
         self.assertEqual(txid, bytes.fromhex("cd" * 32))
         self.assertEqual([m for m, _ in ci.calls if m == "transfer"], [])
+
+    def test_does_not_reuse_a_tx_that_misses_a_lock_address(self):
+        # A retry re-plans the cohort, so a straggler that turned ready in the
+        # meantime joins a batch the in-flight tx never paid.
+        ci = FakeXmr()
+        locks = [(key(1), key(2), 100), (key(3), key(4), 250), (key(5), key(6), 375)]
+        wanted_paid = {
+            ci.lock_address(key(1), key(2)),
+            ci.lock_address(key(3), key(4)),
+        }
+        ci.pending_destinations = [
+            {"address": ci.lock_address(key(1), key(2))},
+            {"address": ci.lock_address(key(3), key(4))},
+        ]
+
+        txid, covered = ci.publishBLockTxs(locks, 0)
+
+        self.assertEqual(paid_addresses(ci, txid), wanted_paid)
+        self.assertEqual(covered, [0, 1])
+        self.assertEqual([m for m, _ in ci.calls if m == "transfer"], [])
+
+    def test_does_not_reuse_a_confirmed_tx_that_misses_a_lock_address(self):
+        # get_transfers reports a mined lock under "out", so the stale match
+        # outlives the mempool.
+        ci = FakeXmr()
+        ci.pending_tag = "out"
+        locks = [(key(1), key(2), 100), (key(5), key(6), 375)]
+        wanted_paid = {ci.lock_address(key(1), key(2))}
+        ci.pending_destinations = [{"address": ci.lock_address(key(1), key(2))}]
+
+        txid, covered = ci.publishBLockTxs(locks, 0)
+
+        self.assertEqual(paid_addresses(ci, txid), wanted_paid)
+        self.assertEqual(covered, [0])
 
     def test_priority_is_passed_when_set(self):
         ci = FakeXmr()
@@ -208,7 +269,7 @@ class TestPartPublishBLockTxs(unittest.TestCase):
     def test_anon_locks_every_swap_in_one_send(self):
         ci = FakeAnon()
 
-        txid = ci.publishBLockTxs(
+        txid, covered = ci.publishBLockTxs(
             [
                 (key(1), key(2), make_int(1)),
                 (key(3), key(4), make_int(2)),
@@ -218,6 +279,7 @@ class TestPartPublishBLockTxs(unittest.TestCase):
         )
 
         self.assertEqual(txid, bytes.fromhex("ab" * 32))
+        self.assertEqual(covered, [0, 1, 2])
 
         sends = [params for method, params in ci.calls if method == "sendtypeto"]
         self.assertEqual(len(sends), 1)
