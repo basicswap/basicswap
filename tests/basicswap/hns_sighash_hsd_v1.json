@@ -1,0 +1,255 @@
+{
+  "schema": 1,
+  "oracle": {
+    "repository": "handshake-org/hsd",
+    "revision": "698e252ebc7b5c1dd0a9587e342fdd153d020ae4",
+    "hsdVersion": "8.99.0"
+  },
+  "transactionRaw": "020000000211111111111111111111111111111111111111111111111111111111111111110300000078563412222222222222222222222222222222222222222222222222222222222222222205000000214365870307b20100000000000014aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa00000e640300000000000020bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb000015160500000000000014cccccccccccccccccccccccccccccccccccccccc0000907856340000",
+  "previousScriptRaw": "5253935587",
+  "previousValue": 987654321,
+  "vectors": [
+    {
+      "inputIndex": 0,
+      "type": 1,
+      "hash": "cb4a35c13f76461bb3643ce11b1fc67b2b714abf0c7f6e1e2e7047068f35b48c"
+    },
+    {
+      "inputIndex": 0,
+      "type": 2,
+      "hash": "e8b7106ef2f0df452b12364631d378e2d0e8d038788c1b3d26a101303544293e"
+    },
+    {
+      "inputIndex": 0,
+      "type": 3,
+      "hash": "2badccb2547452294fce40200dde2e0b815f533736b0501d92241ec3877f953a"
+    },
+    {
+      "inputIndex": 0,
+      "type": 4,
+      "hash": "36635027506339b57147797c1c21896f67885701c6d60852aa5e7d6a11957b9d"
+    },
+    {
+      "inputIndex": 0,
+      "type": 65,
+      "hash": "3308248a050d86b124892b19b7ebf11a45d0c8f7068859de6e23e42758fa0ab4"
+    },
+    {
+      "inputIndex": 0,
+      "type": 66,
+      "hash": "918bddfad16c5d4dd36e712b224c8f268235b9322083cd38d894f0421056a222"
+    },
+    {
+      "inputIndex": 0,
+      "type": 67,
+      "hash": "780d7fc10313a485f787711ccf6aebe2784d4ade6b533ff121dda582d44f927c"
+    },
+    {
+      "inputIndex": 0,
+      "type": 68,
+      "hash": "f10465c8399650d0be57443cdbf120361abd3ad23ccee6d53fc527d96a457e82"
+    },
+    {
+      "inputIndex": 0,
+      "type": 129,
+      "hash": "e701f42f9acdbae7701c7e9385920c3703464ef1a0a470614f4d4050363d82dd"
+    },
+    {
+      "inputIndex": 0,
+      "type": 130,
+      "hash": "c5fd1e28fa48b09c1798e5ef0872748cb7fe7af0761f022ba515457c78381058"
+    },
+    {
+      "inputIndex": 0,
+      "type": 131,
+      "hash": "7e92178fa4ccd6e1f512bbe7798332a0e8c47d9f9a3e2ac8a1a91cf0447dad48"
+    },
+    {
+      "inputIndex": 0,
+      "type": 132,
+      "hash": "ad3258f7941426d7fdb0156d8aa54e9d5be1c5e92835acfac26b8ad64d0be412"
+    },
+    {
+      "inputIndex": 0,
+      "type": 193,
+      "hash": "ab225099577a95638bce984856b66fd120841ca973e8ac28326c30fefeaecbf7"
+    },
+    {
+      "inputIndex": 0,
+      "type": 194,
+      "hash": "dd5fd763b10c009df41b8ba0ec28e7f173bc96b24f375085f9207b9b664f56f5"
+    },
+    {
+      "inputIndex": 0,
+      "type": 195,
+      "hash": "899d213b9afdbf585c1a864d43e2617f56cb72a85e2c0f2992999488eb34904f"
+    },
+    {
+      "inputIndex": 0,
+      "type": 196,
+      "hash": "bdd91d3743dee83ac581820261735071babf6931fb411e1789287053c69bb65b"
+    },
+    {
+      "inputIndex": 1,
+      "type": 1,
+      "hash": "4a4117ac47acdd10d82f0f05fb6899d015b5aa42cef22d224ce826ed8e33b3a2"
+    },
+    {
+      "inputIndex": 1,
+      "type": 2,
+      "hash": "08c99aa330db462ac2157149e5f04be29c6d62119ba61249caaa1c4d23554701"
+    },
+    {
+      "inputIndex": 1,
+      "type": 3,
+      "hash": "664feef71a0d2e5c9c8fe86ca390cd273cfe122e89457461f5832817eac0e912"
+    },
+    {
+      "inputIndex": 1,
+      "type": 4,
+      "hash": "bf35522c50c16e473574695a6ddc1ecaf85ce382478faacf746e8ae504a75294"
+    },
+    {
+      "inputIndex": 1,
+      "type": 65,
+      "hash": "3308248a050d86b124892b19b7ebf11a45d0c8f7068859de6e23e42758fa0ab4"
+    },
+    {
+      "inputIndex": 1,
+      "type": 66,
+      "hash": "918bddfad16c5d4dd36e712b224c8f268235b9322083cd38d894f0421056a222"
+    },
+    {
+      "inputIndex": 1,
+      "type": 67,
+      "hash": "43299bddf81890c215e4afe2aec8d9f616f27f0c67e4135597dee61f4442dbc8"
+    },
+    {
+      "inputIndex": 1,
+      "type": 68,
+      "hash": "2b2b3d03745b2c8d2865585f21ec5952fbaca033366407c45c18467fd6779c7f"
+    },
+    {
+      "inputIndex": 1,
+      "type": 129,
+      "hash": "8015e96e71335685c73f7ab7f435adc1d52d68fb85bc1ca12fd65c8f7c614799"
+    },
+    {
+      "inputIndex": 1,
+      "type": 130,
+      "hash": "a07d199a13827f9d44363e3c03cc05a97e9ff6e9dc247cff24c45f0fdc8f6586"
+    },
+    {
+      "inputIndex": 1,
+      "type": 131,
+      "hash": "c6400fef4c2cf6a1c7366f0fc9a567d6f612f7f0407f70ba9229d646bb949a00"
+    },
+    {
+      "inputIndex": 1,
+      "type": 132,
+      "hash": "a515e6e7fcfb29dac6d22da2916c11f0b078414820e63333357419589bbdca3a"
+    },
+    {
+      "inputIndex": 1,
+      "type": 193,
+      "hash": "ab225099577a95638bce984856b66fd120841ca973e8ac28326c30fefeaecbf7"
+    },
+    {
+      "inputIndex": 1,
+      "type": 194,
+      "hash": "dd5fd763b10c009df41b8ba0ec28e7f173bc96b24f375085f9207b9b664f56f5"
+    },
+    {
+      "inputIndex": 1,
+      "type": 195,
+      "hash": "87c0a0b612a243ad22eecaefe9ca36ec298d336e86dab9afe4fa75326dbc013e"
+    },
+    {
+      "inputIndex": 1,
+      "type": 196,
+      "hash": "e26f14476b55a26a0999e4f1b196fc718aa37b56d7db3ea70007617c59f23018"
+    }
+  ],
+  "signatureTypes": [
+    {
+      "type": 0,
+      "valid": false
+    },
+    {
+      "type": 1,
+      "valid": true
+    },
+    {
+      "type": 2,
+      "valid": true
+    },
+    {
+      "type": 3,
+      "valid": true
+    },
+    {
+      "type": 4,
+      "valid": true
+    },
+    {
+      "type": 5,
+      "valid": false
+    },
+    {
+      "type": 32,
+      "valid": false
+    },
+    {
+      "type": 33,
+      "valid": false
+    },
+    {
+      "type": 64,
+      "valid": false
+    },
+    {
+      "type": 65,
+      "valid": true
+    },
+    {
+      "type": 68,
+      "valid": true
+    },
+    {
+      "type": 69,
+      "valid": false
+    },
+    {
+      "type": 128,
+      "valid": false
+    },
+    {
+      "type": 129,
+      "valid": true
+    },
+    {
+      "type": 132,
+      "valid": true
+    },
+    {
+      "type": 133,
+      "valid": false
+    },
+    {
+      "type": 193,
+      "valid": true
+    },
+    {
+      "type": 196,
+      "valid": true
+    },
+    {
+      "type": 197,
+      "valid": false
+    },
+    {
+      "type": 255,
+      "valid": false
+    }
+  ]
+}
