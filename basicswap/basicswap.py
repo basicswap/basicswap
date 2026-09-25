@@ -814,6 +814,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.thread_pool.shutdown()
 
         self.swaps_in_progress.clear()
+        hns_client = self.coin_clients.get(Coins.HNS)
+        if hns_client and hns_client.get("interface"):
+            hns_client["interface"].close()
         super().finalise()
 
     def logIDB(self, concept_id: bytes) -> str:
@@ -838,6 +841,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
         chain_client_settings = self.getChainClientSettings(coin)
+        if coin == Coins.HNS and chain_client_settings.get("manage_daemon", False):
+            raise ValueError("HSRD must be managed separately from BasicSwap")
 
         coin_chainparams = chainparams[coin]
         coin_name: str = coin_chainparams["name"]
@@ -935,6 +940,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "electrum_port",
             "electrum_ssl",
             "electrum_poll_interval",
+            "rpc_authorization_file",
+            "bridge_executable",
+            "wallet_database",
+            "wallet_seed_fingerprint",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -1212,6 +1221,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.bch.bch import BCHInterface
 
             return BCHInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.HNS:
+            from .interface.hns.coin import HNSInterface
+
+            return HNSInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
             from .interface.ltc.ltc import LTCInterface, LTCInterfaceMWEB
 
@@ -1275,7 +1288,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
-        if coin in self.xmr_based_coins:
+        if coin in self.xmr_based_coins or coin == Coins.HNS:
             return
         if cc["connection_type"] == "rpc" and cc["rpcauth"] is None:
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), ".cookie")
@@ -1932,6 +1945,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def changeWalletPasswords(
         self, old_password: str, new_password: str, coin=None
     ) -> None:
+        if Coins.HNS in self.activeCoins() and coin in (None, Coins.HNS):
+            raise ValueError("HNS wallet passphrase rotation is not available yet")
         # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
             raise ValueError("Can't change passwords while swaps are in progress")
@@ -3779,6 +3794,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return coin_from in self.scriptless_coins + self.coins_without_segwit
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
+        if Coins.HNS in (coin_from, coin_to):
+            raise ValueError("HNS/BTC trades require the native swap protocol")
 
         for coin in (coin_from, coin_to):
             if coin in self.balance_only_coins:
@@ -5153,6 +5170,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def checkWalletSeed(self, c) -> bool:
         ci = self.ci(c)
+        if c == Coins.HNS:
+            return ci.walletIdentityReady()
         if c == Coins.PART:
             ci.setWalletSeedWarning(
                 False
@@ -8139,6 +8158,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def getTotalBalance(self, coin_type) -> int:
         try:
             ci = self.ci(coin_type)
+            if coin_type == Coins.HNS:
+                return ci.getSpendableBalance()
             if self.coin_clients[coin_type].get("connection_type") == "electrum":
                 return ci.getSpendableBalance()
             if hasattr(ci, "rpc_wallet"):

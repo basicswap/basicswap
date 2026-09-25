@@ -1,10 +1,12 @@
 # Handshake (HNS) integration status
 
 This branch starts a native HNS integration in BasicSwap. **HNS is not yet a
-tradable or selectable asset.** The read-only HSRD adapter, transaction codec,
+tradable asset.** Its coin ID and chain parameters are registered, but every
+generic swap type is rejected for HNS until the dedicated trade dispatcher is
+connected. The read-only HSRD adapter, transaction codec,
 signature digest, canonical HTLC verifier, and client for the local
 `hns-wallet-basicswap-bridge` are isolated under `basicswap/interface/hns/`.
-No coin ID, offer path, or UI asset entry has been enabled.
+No HNS offer path has been enabled.
 
 Source snapshot: BasicSwap `5471e609b9fbcba1a528dac60e2e06fc2f1a8ca4`,
 HSRD `c0785719db68a574a13fba224af5ff34ead13c3e`, and hns-wallet-rs
@@ -43,6 +45,13 @@ branch, and witness/preimage locally.
   Its confirmed-page collector splits script sets under HSRD's default 65,536
   byte request limit, rejects a changed epoch or tip, and discards partial
   results on a stale response. It is read-only.
+- `HNSInterface` exposes HSRD's bound chain tip, six-decimal HNS amounts,
+  native receive addresses, and the encrypted wallet balance through the Rust
+  sidecar. It checks a configured seed fingerprint on unlock and shuts the
+  sidecar down with BasicSwap. An isolated HSD/HSRD startup test creates the
+  account and enters through `BasicSwap.createInterface`. Generic HNS offers
+  still fail closed; HNS wallet creation, recovery, password rotation, and
+  ordinary withdrawals have no BasicSwap UI path yet.
 - `HnsTransaction` encodes and decodes the HNS base/witness format and computes
   the native Blake2b-256 txid and witness hash. HSD-generated codec vectors
   verify the format.
@@ -171,9 +180,9 @@ state machine or perform either chain's funding and spend actions.
 
 ## Work needed before an HNS asset can be enabled
 
-1. Complete the native HNS coin interface around the address and transaction
-   primitives already in this branch. Use HNS's six decimal places and its
-   own money, dust, covenant, and policy rules, rather than BTC defaults.
+1. Complete the remaining native HNS coin interface operations, including
+   fee policy, ordinary withdrawals, and wallet UI. Its HSRD chain/wallet
+   reads and six-decimal monetary boundary are now in place.
 2. Route the new bid and acceptance messages through a BasicSwap HNS/BTC
    protocol variant. Generate and persist the random nonce before sending the
    bid, derive the taker's HNS receive key, and retain the assigned bid ID.
@@ -195,9 +204,9 @@ state machine or perform either chain's funding and spend actions.
    states and the wallet's persisted settlement states. Verify the exact
    amount, plain covenant, script address, funding outpoint, spend branch,
    and preimage before crediting a lock or completion.
-5. Wire the new coin ID, chain parameters, prepare/install configuration,
-   daemon supervision, offer eligibility, UI/API display, and protocol routing
-   only after the spend and recovery paths exist.
+5. Complete prepare/install configuration, daemon supervision, offer
+   eligibility, UI/API display, and protocol routing. The coin ID and chain
+   parameters now exist, with generic HNS swaps rejected.
 6. Exercise both swap directions on isolated HNS regtest against another
    BasicSwap asset: normal redeem, timeout refund, counterparty disconnect,
    restart, reorg, fee rejection, malformed witness, and stale index reads.

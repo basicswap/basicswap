@@ -7,8 +7,12 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
+from basicswap.basicswap import BasicSwap
+from basicswap.chainparams import Coins
 from basicswap.interface.hns.node_rpc import HnsNodeRpc
+from basicswap.interface.hns.wallet_bridge import initialize_hns_wallet
 
 
 def free_port():
@@ -87,6 +91,45 @@ class HnsNodeRpcRegtest(unittest.TestCase):
                         binding = client.bound_snapshot("regtest")
                         if client.sync_ready("regtest", binding):
                             self.assertGreaterEqual(binding.tip["height"], 0)
+                            if os.getenv("HNS_BRIDGE_BIN"):
+                                database = root / "hns-wallet.db"
+                                _, fingerprint, _ = initialize_hns_wallet(
+                                    os.environ["HNS_BRIDGE_BIN"],
+                                    database,
+                                    "regtest",
+                                    0,
+                                    "test passphrase",
+                                )
+                                coin_settings = {
+                                    "connection_type": "rpc",
+                                    "rpchost": "127.0.0.1",
+                                    "rpcport": hsrd_rpc,
+                                    "rpc_authorization_file": str(authorization),
+                                    "bridge_executable": os.environ["HNS_BRIDGE_BIN"],
+                                    "wallet_database": str(database),
+                                    "wallet_seed_fingerprint": fingerprint.hex(),
+                                }
+                                app = SimpleNamespace(
+                                    coin_clients={Coins.HNS: coin_settings},
+                                    chain="regtest",
+                                    getBaseAltruistic=lambda: False,
+                                )
+                                coin = BasicSwap.createInterface(app, Coins.HNS)
+                                try:
+                                    coin.testDaemonRPC()
+                                    coin.unlockWallet("test passphrase")
+                                    self.assertEqual(coin.getSpendableBalance(), 0)
+                                    self.assertTrue(
+                                        coin.getMainWalletAddress().startswith("rs1")
+                                    )
+                                    self.assertEqual(
+                                        coin.getBlockchainInfo()[
+                                            "verificationprogress"
+                                        ],
+                                        1.0,
+                                    )
+                                finally:
+                                    coin.close()
                             return
                         last_error = "HSRD scheduler has not reached the wallet tip"
                     except Exception as exc:  # noqa: BLE001
