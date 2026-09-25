@@ -232,6 +232,23 @@ class HnsBtcSettlementTest(unittest.TestCase):
         self.assertIsNone(settlement.record.btc_scan_height)
         self.assertEqual(saved, [])
 
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_peer_bitcoin_cursor_is_independent_and_rewinds_after_reorg(
+        self, _mock_time
+    ):
+        settlement, _, _ = self.make_settlement(True, MAKER)
+        bind_lock(settlement.record, "btc", bytes.fromhex("cd" * 32), 1)
+        with patch.object(settlement.btc, "scan_confirmed_spend", return_value=None):
+            self.assertIsNone(settlement.scan_peer_btc_lock_spend(5, max_blocks=3))
+            self.assertEqual(settlement.record.btc_peer_scan_height, 7)
+            self.assertIsNone(settlement.record.btc_scan_height)
+            settlement.btc.ci.hashes[7] = "ab" * 32
+            self.assertIsNone(settlement.scan_peer_btc_lock_spend(5, max_blocks=3))
+            self.assertEqual(settlement.record.btc_peer_scan_height, 7)
+            self.assertEqual(
+                settlement.record.btc_peer_scan_anchor, bytes.fromhex("ab" * 32)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

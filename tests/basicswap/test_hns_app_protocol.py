@@ -89,7 +89,7 @@ class FakeApp(DBMethods):
     chain = "regtest"
     _smsg_payload_version = 2
 
-    def __init__(self, path, maker=False):
+    def __init__(self, path, maker=False, create_schema=True):
         self.path = path
         self.now = 1_790_000_000
         self.coin = FakeCoin(maker)
@@ -108,10 +108,11 @@ class FakeApp(DBMethods):
             id=lambda value: value.hex(),
         )
         self.connections = {}
-        with closing(sqlite3.connect(path)) as connection, connection:
-            schema = extract_schema()
-            for table in ("offers", "bids", "hns_btc_swaps", "hns_btc_outbox"):
-                create_table(connection.cursor(), table, schema[table])
+        if create_schema:
+            with closing(sqlite3.connect(path)) as connection, connection:
+                schema = extract_schema()
+                for table in ("offers", "bids", "hns_btc_swaps", "hns_btc_outbox"):
+                    create_table(connection.cursor(), table, schema[table])
 
     def openDB(self):
         connection = sqlite3.connect(self.path)

@@ -458,10 +458,7 @@ class HnsTwoChainRegtest(unittest.TestCase):
         coin_to = Coins.BTC if hns_first else Coins.HNS
         maker = FakeApp(root / f"app-maker-{marker.hex()}.sqlite", maker=True)
         taker = FakeApp(root / f"app-taker-{marker.hex()}.sqlite")
-        for app, bridge, was_sent in (
-            (maker, maker_bridge, True),
-            (taker, taker_bridge, False),
-        ):
+        def configure(app, bridge):
             app.now = now
             hns_ci = SimpleNamespace(
                 bridge=bridge,
@@ -472,6 +469,12 @@ class HnsTwoChainRegtest(unittest.TestCase):
             app.coin = hns_ci
             app.ci = lambda coin, hns=hns_ci: hns if coin == Coins.HNS else btc
             app.fail_first_send = False
+
+        for app, bridge, was_sent in (
+            (maker, maker_bridge, True),
+            (taker, taker_bridge, False),
+        ):
+            configure(app, bridge)
             app.offer = Offer(
                 offer_id=offer_id,
                 swap_type=SwapTypes.HNS_BTC_SWAP,
@@ -498,6 +501,12 @@ class HnsTwoChainRegtest(unittest.TestCase):
                 app.add(app.offer, cursor)
             finally:
                 app.closeDB(cursor)
+
+        def restart(app, bridge):
+            restored = FakeApp(app.path, maker=app.maker, create_schema=False)
+            configure(restored, bridge)
+            restored.offer = app.offer
+            return restored
 
         def easy_encrypt(
             _app,
@@ -571,6 +580,7 @@ class HnsTwoChainRegtest(unittest.TestCase):
             return record.btc_lock_txid if hns_first else record.hns_lock_txid
 
         wait_for(second_funded, "app taker funding")
+        taker = restart(taker, taker_bridge)
         if hns_first:
             core.call("generatetoaddress", [2, miner])
         else:
@@ -608,6 +618,7 @@ class HnsTwoChainRegtest(unittest.TestCase):
             )
 
         wait_for(maker_redeemed, f"app maker redeeming {second_coin}")
+        maker = restart(maker, maker_bridge)
         if hns_first:
             core.call("generatetoaddress", [2, miner])
         else:
