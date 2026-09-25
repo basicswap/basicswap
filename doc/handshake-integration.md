@@ -68,6 +68,24 @@ branch, and witness/preimage locally.
   first outpoint. It enforces a later refund on the first funded chain in
   either trade direction. This outpoint remains an untrusted hint until the
   applicable node verifies its funding output and confirmations.
+- `BtcHtlcContract` prepares a Bitcoin Core wallet-funded P2WSH lock, verifies
+  the exact confirmed unspent output, signs either native SegWit redeem or
+  CLTV refund witnesses with a swap key, and scans confirmed blocks for the
+  validated spend branch and revealed preimage. It returns signed raw bytes to
+  the caller for durable persistence before broadcast. The isolated Bitcoin
+  Core regtest test exercises both trade role mappings, redeem, and refund.
+- `HnsBtcSwap` records the pre-bid session ID, nonce, exact accepted contracts,
+  lock outpoints, Bitcoin prepared transaction bytes, and scan cursor in the
+  BasicSwap database (schema version 39). The record helpers reject changed
+  identities or terms and can reconstruct an accepted trade after the refund
+  window closes. The message handlers and periodic recovery worker do not yet
+  write this table.
+- `HnsBtcSettlement` connects the two native value adapters to that persisted
+  record. It gates the taker's funding on the maker's confirmed first lock,
+  checks both nodes' median times and the live funding window, and persists
+  Bitcoin signed bytes before broadcast. It supports redeem, refund, and a
+  confirmed witness observation in either role mapping. BasicSwap's message
+  dispatcher and bid worker still need to call it.
 
 The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
 HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the
@@ -153,9 +171,9 @@ state machine or perform either chain's funding and spend actions.
    dedicated HNS account, arrange protected unlock and HSRD Authorization
    delivery, supervise the sidecar, and reconcile BasicSwap's persisted bid
    identity with the wallet's persisted settlement identity after a restart.
-   The current bridge is an existing-wallet process boundary; its value path
-   has not yet been exercised on funded regtest. HSRD remains its full-node
-   backend.
+   The current bridge opens an existing wallet and its HNS value path has
+   passed funded regtest, but BasicSwap has no wallet lifecycle for it yet.
+   HSRD remains its full-node backend.
 4. Wire BasicSwap's offer and bid state machine to that bridge, including
    restart/reorg reconciliation and the correct mapping between BasicSwap
    states and the wallet's persisted settlement states. Verify the exact

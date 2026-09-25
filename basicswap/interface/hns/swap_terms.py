@@ -161,6 +161,7 @@ class HnsBtcSwapTerms:
         now_unix,
         expected_hns_magic,
         expected_hns_genesis,
+        require_funding_window=True,
     ):
         """Reject changed wire terms before trusting the announced first lock.
 
@@ -210,9 +211,21 @@ class HnsBtcSwapTerms:
         )
         if accept.terms_commitment != commitment:
             raise ValueError("HNS/BTC swap terms commitment mismatch")
+        terms.validate(
+            now_unix,
+            expected_hns_magic,
+            expected_hns_genesis,
+            require_funding_window=require_funding_window,
+        )
         return terms, (accept.first_txid, accept.first_vout)
 
-    def validate(self, now_unix, expected_hns_magic, expected_hns_genesis):
+    def validate(
+        self,
+        now_unix,
+        expected_hns_magic,
+        expected_hns_genesis,
+        require_funding_window=True,
+    ):
         if not isinstance(self.offer_id, bytes) or len(self.offer_id) != 28:
             raise ValueError("invalid offer ID")
         if not isinstance(self.bid_id, bytes) or len(self.bid_id) != 28:
@@ -298,15 +311,23 @@ class HnsBtcSwapTerms:
 
         first_deadline = hns_refund_unix if self.hns_first else btc_refund_unix
         second_deadline = btc_refund_unix if self.hns_first else hns_refund_unix
-        if (
-            second_deadline <= now_unix + MINIMUM_REFUND_MARGIN_SECONDS
-            or first_deadline < second_deadline + MINIMUM_REFUND_MARGIN_SECONDS
+        if first_deadline < second_deadline + MINIMUM_REFUND_MARGIN_SECONDS or (
+            require_funding_window
+            and second_deadline <= now_unix + MINIMUM_REFUND_MARGIN_SECONDS
         ):
             raise ValueError("unsafe swap refund ordering")
         return first_deadline, second_deadline
 
     def commitment(self, now_unix, expected_hns_magic, expected_hns_genesis):
-        self.validate(now_unix, expected_hns_magic, expected_hns_genesis)
+        # The commitment identifies immutable negotiated terms. A later
+        # recovery or spend observation must still be able to compare it once
+        # the initial funding window has closed.
+        self.validate(
+            now_unix,
+            expected_hns_magic,
+            expected_hns_genesis,
+            require_funding_window=False,
+        )
         payload = (
             self.offer_id
             + self.bid_id

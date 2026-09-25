@@ -174,6 +174,70 @@ class HnsBtcSwapTermsTest(unittest.TestCase):
                     0,
                 )
 
+    def test_commitment_and_second_lock_hint_survive_expired_funding_window(self):
+        for hns_first in (True, False):
+            with self.subTest(hns_first=hns_first):
+                trade = terms(hns_first)
+                bid, accept = messages(trade)
+                decoded, _ = HnsBtcSwapTerms.from_messages(
+                    bid.to_bytes(),
+                    accept.to_bytes(),
+                    trade.offer_id,
+                    trade.bid_id,
+                    hns_first,
+                    trade.hns_amount,
+                    trade.btc_amount,
+                    NOW,
+                    MAGIC,
+                    GENESIS,
+                )
+                after_refunds = NOW + 48 * 60 * 60
+                with self.assertRaisesRegex(ValueError, "unsafe swap refund ordering"):
+                    decoded.validate(after_refunds, MAGIC, GENESIS)
+                with self.assertRaisesRegex(ValueError, "unsafe swap refund ordering"):
+                    HnsBtcSwapTerms.from_messages(
+                        bid.to_bytes(),
+                        accept.to_bytes(),
+                        trade.offer_id,
+                        trade.bid_id,
+                        hns_first,
+                        trade.hns_amount,
+                        trade.btc_amount,
+                        after_refunds,
+                        MAGIC,
+                        GENESIS,
+                    )
+                recovered, _ = HnsBtcSwapTerms.from_messages(
+                    bid.to_bytes(),
+                    accept.to_bytes(),
+                    trade.offer_id,
+                    trade.bid_id,
+                    hns_first,
+                    trade.hns_amount,
+                    trade.btc_amount,
+                    after_refunds,
+                    MAGIC,
+                    GENESIS,
+                    require_funding_window=False,
+                )
+                self.assertEqual(recovered, trade)
+                self.assertEqual(
+                    decoded.commitment(after_refunds, MAGIC, GENESIS),
+                    accept.terms_commitment,
+                )
+                second = HnsBtcSecondLockMessage(
+                    bid_msg_id=trade.bid_id,
+                    second_txid=bytes.fromhex("cd" * 32),
+                    second_vout=0,
+                    terms_commitment=accept.terms_commitment,
+                )
+                self.assertEqual(
+                    decoded.second_lock_outpoint(
+                        second.to_bytes(), after_refunds, MAGIC, GENESIS
+                    ),
+                    (bytes.fromhex("cd" * 32), 0),
+                )
+
     def test_changed_hashlock_key_amount_and_network_are_rejected(self):
         trade = terms(True)
         changed = (

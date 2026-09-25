@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 38
+CURRENT_DB_VERSION = 39
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -486,6 +486,43 @@ class XmrSwap(Table):
             return 16000, 17000
         msg_split_info = self.msg_split_info.split(":")
         return int(msg_split_info[0]), int(msg_split_info[1])
+
+
+class HnsBtcSwap(Table):
+    """Durable HNS/BTC terms and side effects keyed before a bid ID exists.
+
+    The session ID comes from the offer ID and the taker's random nonce. A
+    maker records the same ID when it receives the bid. Signed Bitcoin bytes
+    are stored before broadcast; the HNS wallet stores its own signed bytes.
+    """
+
+    __tablename__ = "hns_btc_swaps"
+
+    session_id = Column("blob", primary_key=True)
+    offer_id = Column("blob")
+    bid_id = Column("blob", unique=True)
+    role = Column("integer")  # 1 maker, 2 taker
+    phase = Column("integer")
+    session_nonce = Column("blob")
+    bid_message = Column("blob")
+    accept_message = Column("blob")
+    second_lock_message = Column("blob")
+    hns_descriptor = Column("blob")
+    btc_contract_script = Column("blob")
+    terms_commitment = Column("blob")
+    hns_lock_txid = Column("blob")
+    btc_lock_txid = Column("blob")
+    btc_lock_vout = Column("integer")
+    btc_funding_tx = Column("blob")
+    btc_redeem_tx = Column("blob")
+    btc_refund_tx = Column("blob")
+    btc_scan_height = Column("integer")
+    btc_scan_anchor = Column("blob")
+    secret_preimage = Column("blob")
+    created_at = Column("integer")
+    updated_at = Column("integer")
+
+    index = Index("hns_btc_offer_id_index", "offer_id")
 
 
 class XmrSplitData(Table):
