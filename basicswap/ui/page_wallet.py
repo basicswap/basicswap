@@ -307,11 +307,13 @@ def page_wallet(self, url_split, post_string):
                 if len(token) != 16:
                     raise ValueError("invalid HNS send approval token")
                 txid = swap_client.ci(coin_id).approveWithdrawal(token)
-                messages.append(f"HNS sent in transaction: {txid}")
-                withdrawal_successful = True
-                swap_client.updateWalletsInfo(True, only_coin=coin_id)
             except Exception as e:  # noqa: BLE001
                 err_messages.append(f"HNS send failed: {e}")
+            else:
+                # A cache refresh failure must not turn a broadcast receipt
+                # into a misleading "send failed" result.
+                messages.append(f"HNS sent in transaction: {txid}")
+                withdrawal_successful = True
         elif coin_id == Coins.HNS and have_data_entry(form_data, "reject_hns_send"):
             try:
                 token = bytes.fromhex(
@@ -522,9 +524,14 @@ def page_wallet(self, url_split, post_string):
         swap_client.coin_clients.get(coin_id, {}).get("connection_type") == "electrum"
     )
 
-    swap_client.updateWalletsInfo(
-        force_refresh, only_coin=coin_id, wait_for_complete=not is_electrum_mode
-    )
+    try:
+        swap_client.updateWalletsInfo(
+            force_refresh, only_coin=coin_id, wait_for_complete=not is_electrum_mode
+        )
+    except Exception as e:  # noqa: BLE001
+        if coin_id != Coins.HNS or not withdrawal_successful:
+            raise
+        swap_client.log.warning("HNS balance refresh pending: %s", e)
     wallets = swap_client.getCachedWalletsInfo({"coin_id": coin_id})
     wallet_data = {}
     for k in wallets.keys():

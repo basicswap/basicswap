@@ -272,6 +272,10 @@ class HnsCoinInterfaceTest(unittest.TestCase):
             b"approve_hns_send": [b"1"],
             b"hns_send_token": [result["w"]["hns_send"]["token"].encode()],
         }
+        def offline_cache(*_args, **_kwargs):
+            raise RuntimeError("cache offline")
+
+        app.updateWalletsInfo = offline_cache
         approved = page_wallet(page, ["", "wallet", "hns"], b"")
         self.assertEqual(approved["err_messages"], [])
         self.assertIn("cd" * 32, approved["messages"][0])
