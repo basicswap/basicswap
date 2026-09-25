@@ -540,6 +540,7 @@ class HnsBtcOutbox(Table):
     delivered_at = Column("integer")
 
     index = Index("hns_btc_outbox_session_index", "session_id")
+    unique = UniqueConstraint("session_id", "message_type")
 
 
 class XmrSplitData(Table):

@@ -944,6 +944,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "bridge_executable",
             "wallet_database",
             "wallet_seed_fingerprint",
+            "maximum_htlc_fee",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -3756,6 +3757,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     and bid.state < BidStates.SWAP_COMPLETED
                 ):
                     try:
+                        offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
+                        if offer is not None and offer.swap_type == SwapTypes.HNS_BTC_SWAP:
+                            continue  # The HNS/BTC worker restores these rows itself.
                         self.activateBid(cursor, bid)
                     except Exception as ex:
                         self.logException(f"Failed to activate bid! Error: {ex}")
@@ -6085,6 +6089,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def acceptBid(self, bid_id: bytes, cursor=None) -> None:
         self.log.info(f"Accepting bid {self.log.id(bid_id)}")
+
+        if cursor is not None:
+            hns_bid = cursor.execute(
+                "SELECT 1 FROM bids b JOIN offers o ON o.offer_id = b.offer_id "
+                "WHERE b.bid_id = :bid_id AND o.swap_type = :swap_type",
+                {"bid_id": bid_id, "swap_type": int(SwapTypes.HNS_BTC_SWAP)},
+            ).fetchone()
+            if hns_bid is not None:
+                raise ValueError("HNS/BTC acceptance requires an independent transaction")
+        if cursor is None:
+            hns_cursor = self.openDB()
+            try:
+                hns_bid = hns_cursor.execute(
+                    "SELECT 1 FROM bids b JOIN offers o ON o.offer_id = b.offer_id "
+                    "WHERE b.bid_id = :bid_id AND o.swap_type = :swap_type",
+                    {"bid_id": bid_id, "swap_type": int(SwapTypes.HNS_BTC_SWAP)},
+                ).fetchone()
+            finally:
+                self.closeDB(hns_cursor, commit=False)
+            if hns_bid is not None:
+                from .interface.hns.app_protocol import accept_hns_btc_bid
+
+                return accept_hns_btc_bid(self, bid_id)
 
         try:
             use_cursor = self.openDB(cursor)
@@ -14855,6 +14882,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 from .interface.hns.app_protocol import receive_hns_btc_bid
 
                 receive_hns_btc_bid(self, msg)
+            elif msg_type == MessageTypes.HNS_BTC_BID_ACCEPT:
+                from .interface.hns.app_protocol import receive_hns_btc_accept
+
+                receive_hns_btc_accept(self, msg)
+            elif msg_type == MessageTypes.HNS_BTC_SECOND_LOCK:
+                from .interface.hns.app_protocol import receive_hns_btc_second_lock
+
+                receive_hns_btc_second_lock(self, msg)
 
         except InactiveCoin as ex:
             self.log.debug(
@@ -15070,9 +15105,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self, "_last_hns_outbox_flush", 0
             ) >= 60:
                 from .interface.hns.app_protocol import flush_hns_app_outbox
+                from .interface.hns.app_settlement import progress_hns_btc_trades
 
                 try:
                     flush_hns_app_outbox(self, now)
+                    progress_hns_btc_trades(self)
                 except Exception as ex:
                     self.logException(f"HNS/BTC outbox retry failed: {ex}")
                 self._last_hns_outbox_flush = now

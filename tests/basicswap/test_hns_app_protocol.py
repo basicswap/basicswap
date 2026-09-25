@@ -11,35 +11,55 @@ from unittest.mock import patch
 from coincurve import PrivateKey
 
 from basicswap.basicswap import BasicSwap
-from basicswap.basicswap_util import MessageNetworks, SwapTypes
+from basicswap.basicswap_util import (
+    MessageNetworks,
+    MessageTypes,
+    SwapTypes,
+    TxLockTypes,
+)
 from basicswap.chainparams import Coins
 from basicswap.db import (
     DBMethods,
     HnsBtcOutbox,
     HnsBtcSwap,
+    Offer,
     create_table,
     extract_schema,
 )
 from basicswap.interface.hns.app_protocol import (
     flush_hns_app_outbox,
+    receive_hns_btc_accept,
     receive_hns_btc_bid,
+    receive_hns_btc_second_lock,
 )
+from basicswap.interface.hns.app_settlement import progress_hns_btc_trades
+from basicswap.interface.hns.node_rpc import hns_network_binding
+from basicswap.interface.hns.trade_protocol import receive_accept_message
+from basicswap.interface.hns.trade_record import bind_lock
 from basicswap.util.smsg import smsgEncrypt, smsgGetID
 
 
 class FakeBridge:
+    def __init__(self, maker=False):
+        self.maker = maker
+
     def identity(self, network):
         assert network == "regtest"
         return bytes.fromhex("11" * 16), bytes.fromhex("22" * 32)
 
     def key(self, offer_id, session_nonce, refund):
-        scalar = b"\x05" * 32 if refund else b"\x04" * 32
+        scalar = (
+            (b"\x15" if refund else b"\x14") * 32
+            if self.maker
+            else ((b"\x05" if refund else b"\x04") * 32)
+        )
         return PrivateKey(scalar).public_key.format()
 
 
 class FakeCoin:
-    def __init__(self):
-        self.bridge = FakeBridge()
+    def __init__(self, maker=False):
+        self.bridge = FakeBridge(maker)
+        self.node = object()
 
     def walletIdentityReady(self):
         return True
@@ -53,22 +73,28 @@ class FakeApp(DBMethods):
     chain = "regtest"
     _smsg_payload_version = 2
 
-    def __init__(self, path):
+    def __init__(self, path, maker=False):
         self.path = path
         self.now = 1_790_000_000
-        self.coin = FakeCoin()
+        self.coin = FakeCoin(maker)
+        self.maker = maker
+        self.coin_clients = {
+            Coins.HNS: {"maximum_htlc_fee": 100_000},
+            Coins.BTC: {"connection_type": "rpc"},
+        }
         self.sent = []
         self.fail_first_send = True
         self.logs = []
         self.log = SimpleNamespace(
             warning=lambda *args: self.logs.append(args),
             debug=lambda *args: None,
+            info=lambda *args: None,
             id=lambda value: value.hex(),
         )
         self.connections = {}
         with closing(sqlite3.connect(path)) as connection, connection:
             schema = extract_schema()
-            for table in ("bids", "hns_btc_swaps", "hns_btc_outbox"):
+            for table in ("offers", "bids", "hns_btc_swaps", "hns_btc_outbox"):
                 create_table(connection.cursor(), table, schema[table])
 
     def openDB(self):
@@ -117,7 +143,10 @@ class FakeApp(DBMethods):
         return 1
 
     def getPathKey(self, *args):
-        return b"\x06" * 32
+        return (b"\x16" if self.maker else b"\x06") * 32
+
+    def getContractSecret(self, *args):
+        return b"\x19" * 32
 
     def prepareSMSGAddress(self, *args):
         return "sender"
@@ -162,8 +191,15 @@ class HnsAppProtocolTest(unittest.TestCase):
                 protocol_version=5,
                 active_ind=1,
                 was_sent=False,
+                lock_type=TxLockTypes.ABS_LOCK_TIME,
+                lock_value=24 * 3600,
             )
             app.offer = offer
+            taker_cursor = app.openDB()
+            try:
+                app.add(Offer(**vars(offer)), taker_cursor)
+            finally:
+                app.closeDB(taker_cursor)
 
             def easy_encrypt(
                 _app,
@@ -209,9 +245,14 @@ class HnsAppProtocolTest(unittest.TestCase):
             self.assertEqual(app.sent, [row.message_bytes, row.message_bytes])
             self.assertEqual(flush_hns_app_outbox(app, app.now + 2), 0)
 
-            maker = FakeApp(Path(directory) / "maker.sqlite")
-            maker.offer = SimpleNamespace(**vars(offer))
+            maker = FakeApp(Path(directory) / "maker.sqlite", maker=True)
+            maker.offer = Offer(**vars(offer))
             maker.offer.was_sent = True
+            maker_cursor = maker.openDB()
+            try:
+                maker.add(maker.offer, maker_cursor)
+            finally:
+                maker.closeDB(maker_cursor)
             msg = {
                 "msgid": bid_id.hex(),
                 "sent": app.now,
@@ -236,6 +277,138 @@ class HnsAppProtocolTest(unittest.TestCase):
                     {"bid_id": bid_id},
                 )
             self.assertEqual(maker_record.session_id, record.session_id)
+
+            class FakeSettlement:
+                def __init__(self, maker_record, terms, *args):
+                    self.record = maker_record
+                    self.persist = args[-1]
+                    self.terms = terms
+
+                def fund_owned_lock(self, maximum_hns_fee):
+                    self.assertEqual(maximum_hns_fee, 100_000)
+                    bind_lock(self.record, "hns", b"\x27" * 32, 0)
+                    self.persist(self.record)
+
+            FakeSettlement.assertEqual = self.assertEqual
+            maker.fail_first_send = False
+            with (
+                patch(
+                    "basicswap.interface.hns.app_protocol.HnsBtcSettlement",
+                    FakeSettlement,
+                ),
+                patch("basicswap.interface.hns.app_protocol.encryptMsg", easy_encrypt),
+            ):
+                accept_id = BasicSwap.acceptBid(maker, bid_id)
+            with closing(sqlite3.connect(maker.path)) as connection:
+                maker_record = maker.queryOne(
+                    HnsBtcSwap, connection.cursor(), {"bid_id": bid_id}
+                )
+                accept_row = maker.queryOne(
+                    HnsBtcOutbox, connection.cursor(), {"message_id": accept_id}
+                )
+            self.assertEqual(maker_record.hns_lock_txid, b"\x27" * 32)
+            self.assertEqual(smsgGetID(accept_row.message_bytes), accept_id)
+            self.assertIsNotNone(accept_row.delivered_at)
+            self.assertEqual(maker.sent, [accept_row.message_bytes])
+            magic, genesis = hns_network_binding("regtest")
+            terms = receive_accept_message(
+                record,
+                maker_record.accept_message,
+                True,
+                offer.amount_from,
+                offer.amount_to,
+                app.now,
+                magic,
+                genesis,
+            )
+            self.assertEqual(terms.hns_wallet_terms().session_id(), record.session_id)
+            accept_msg = {
+                "msgid": accept_id.hex(),
+                "sent": app.now,
+                "from": "receiver",
+                "to": "sender",
+                "type": "smsg",
+                "raw": maker_record.accept_message,
+            }
+            self.assertEqual(receive_hns_btc_accept(app, accept_msg), bid_id)
+            self.assertEqual(receive_hns_btc_accept(app, accept_msg), bid_id)
+            with closing(sqlite3.connect(app.path)) as connection:
+                saved = app.queryOne(
+                    HnsBtcSwap, connection.cursor(), {"bid_id": bid_id}
+                )
+            self.assertEqual(saved.accept_message, maker_record.accept_message)
+            self.assertEqual(saved.hns_lock_txid, b"\x27" * 32)
+            with self.assertRaisesRegex(ValueError, "sender or bid mismatch"):
+                receive_hns_btc_accept(
+                    app, dict(accept_msg, **{"from": "different maker"})
+                )
+
+            confirmed = {"hns": False, "btc": False}
+            funded = []
+
+            class FakeTakerSettlement:
+                MINIMUM_MAKER_REDEEM_MARGIN_SECONDS = 30 * 60
+                own_coin = "btc"
+                peer_coin = "hns"
+
+                def __init__(self, taker_record, _terms, *args):
+                    self.record = taker_record
+                    self.persist = args[-1]
+
+                def verify_lock(self, coin):
+                    return confirmed[coin]
+
+                def _chain_now(self):
+                    return app.now
+
+                def fund_owned_lock(self, maximum_hns_fee):
+                    assert maximum_hns_fee == 100_000
+                    if self.record.btc_lock_txid is None:
+                        funded.append(True)
+                        bind_lock(self.record, "btc", b"\x28" * 32, 1)
+                        self.persist(self.record)
+
+            with (
+                patch(
+                    "basicswap.interface.hns.app_settlement.HnsBtcSettlement",
+                    FakeTakerSettlement,
+                ),
+                patch(
+                    "basicswap.interface.hns.app_settlement.encryptMsg", easy_encrypt
+                ),
+            ):
+                self.assertEqual(progress_hns_btc_trades(app), 0)
+                confirmed["hns"] = True
+                self.assertEqual(progress_hns_btc_trades(app), 0)
+                confirmed["btc"] = True
+                self.assertEqual(progress_hns_btc_trades(app), 1, app.logs)
+                self.assertEqual(progress_hns_btc_trades(app), 0)
+            self.assertEqual(len(funded), 1)
+            with closing(sqlite3.connect(app.path)) as connection:
+                taker_record = app.queryOne(
+                    HnsBtcSwap, connection.cursor(), {"bid_id": bid_id}
+                )
+                second_row = app.queryOne(
+                    HnsBtcOutbox,
+                    connection.cursor(),
+                    {
+                        "session_id": taker_record.session_id,
+                        "message_type": int(MessageTypes.HNS_BTC_SECOND_LOCK),
+                    },
+                )
+            self.assertEqual(taker_record.btc_lock_txid, b"\x28" * 32)
+            self.assertIsNotNone(taker_record.second_lock_message)
+            self.assertIsNotNone(second_row)
+            second_msg = {
+                "msgid": second_row.message_id.hex(),
+                "sent": app.now,
+                "from": "sender",
+                "to": "receiver",
+                "type": "smsg",
+                "raw": taker_record.second_lock_message,
+            }
+            self.assertEqual(receive_hns_btc_second_lock(maker, second_msg), bid_id)
+            self.assertEqual(receive_hns_btc_second_lock(maker, second_msg), bid_id)
 
 
 if __name__ == "__main__":
