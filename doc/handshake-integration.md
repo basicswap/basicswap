@@ -28,10 +28,11 @@ instead of treating HSRD as a Core-compatible wallet.
    trade completes or refunds. The Core wallet must be available for funding
    and receiving the Bitcoin contract output.
 3. Build the separate `hns-wallet-basicswap-bridge` binary from the companion
-   `hns-wallet-rs` branch. Create or restore a **dedicated** HNS wallet from a
-   terminal. The recovery phrase is displayed only during creation; back it
-   up before sending funds. Use the same passphrase that unlocks BasicSwap's
-   wallets. An existing wallet database cannot be overwritten by the helper.
+   `handshake-rs/hns-wallet-rs` repository. Create or restore a **dedicated**
+   HNS wallet from a terminal. The recovery phrase is displayed only during
+   creation; back it up before sending funds. Use the same passphrase that
+   unlocks BasicSwap's wallets. An existing wallet database cannot be
+   overwritten by the helper.
 
    ```text
    python -m bin.basicswap_hns_wallet create \
