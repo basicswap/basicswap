@@ -383,6 +383,52 @@ class HnsWalletBridge:
             raise HnsWalletBridgeError("invalid HNS wallet balance")
         return int(balance), self._receive_address(network, result["receive_address"])
 
+    def prepare_send(self, network, recipient, amount, maximum_fee):
+        """Hold one Rust approval and return the exact native send summary."""
+        try:
+            decoded = decode_v0_address(network, recipient)
+        except ValueError as exc:
+            raise ValueError("invalid HNS send address") from exc
+        if len(decoded.program) not in (20, 32):
+            raise ValueError("invalid HNS send address")
+        result = self._request(
+            "prepare_send",
+            recipient=recipient,
+            amount=_positive_integer(amount, "HNS send amount", 0xFFFFFFFFFFFFFFFF),
+            maximum_fee=_positive_integer(
+                maximum_fee, "maximum HNS send fee", 0xFFFFFFFFFFFFFFFF
+            ),
+        )
+        if set(result) != {
+            "token",
+            "recipient",
+            "amount",
+            "maximum_fee",
+            "expires_at_unix",
+        }:
+            raise HnsWalletBridgeError("invalid HNS send approval")
+        token = _wire_bytes(result["token"], 16, "send token")
+        if (
+            result["recipient"] != recipient
+            or result["amount"] != str(amount)
+            or result["maximum_fee"] != str(maximum_fee)
+            or type(result["expires_at_unix"]) is not int
+            or result["expires_at_unix"] <= 0
+        ):
+            raise HnsWalletBridgeError("HNS send approval differs from request")
+        return token.hex(), recipient, amount, maximum_fee, result["expires_at_unix"]
+
+    def approve_send(self, token):
+        result = self._request("approve_send", token=_hex_bytes(token, 16, "send token"))
+        if set(result) != {"transaction_id"}:
+            raise HnsWalletBridgeError("invalid HNS send receipt")
+        return _wire_bytes(result["transaction_id"], 32, "send transaction ID").hex()
+
+    def reject_send(self, token):
+        result = self._request("reject_send", token=_hex_bytes(token, 16, "send token"))
+        if result != {"rejected": True}:
+            raise HnsWalletBridgeError("invalid HNS send rejection")
+
     def key(self, offer_id, session_nonce, refund):
         if type(refund) is not bool:
             raise ValueError("invalid HNS settlement branch")

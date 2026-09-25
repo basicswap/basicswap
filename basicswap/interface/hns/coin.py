@@ -6,6 +6,7 @@ CoinInterface value methods are deliberately absent; HNS trades must use the
 HNS/BTC protocol and settlement controller.
 """
 
+import logging
 import os
 import stat
 from pathlib import Path
@@ -60,6 +61,7 @@ class HNSInterface(CoinInterface):
         self, coin_settings, network, swap_client=None, *, node=None, bridge=None
     ):
         super().__init__(network, coin_settings=coin_settings, swap_client=swap_client)
+        self._log = swap_client.log if swap_client is not None else logging
         if network not in ("mainnet", "testnet", "regtest"):
             raise ValueError("unsupported HNS network")
         if coin_settings.get("connection_type") != "rpc":
@@ -76,6 +78,12 @@ class HNSInterface(CoinInterface):
         except ValueError as exc:
             raise ValueError("invalid HNS wallet seed fingerprint") from exc
         self._connection_type = "rpc"
+        self._maximum_send_fee = coin_settings.get("maximum_send_fee", 100_000)
+        if (
+            type(self._maximum_send_fee) is not int
+            or not 0 < self._maximum_send_fee <= 10_000_000
+        ):
+            raise ValueError("invalid maximum HNS send fee")
         self._use_segwit = True
         self.setConfTarget(coin_settings.get("conf_target", 2))
         self._node = node
@@ -183,6 +191,31 @@ class HNSInterface(CoinInterface):
         if not self.walletIdentityReady():
             raise ValueError("HNS wallet is locked or seed identity is unknown")
         return self._bridge.receive(self._network)[0]
+
+    def prepareWithdrawal(self, value, address):
+        if not self.walletIdentityReady():
+            raise ValueError("HNS wallet is locked or seed identity is unknown")
+        if not self.isValidAddress(address):
+            raise ValueError("invalid HNS withdrawal address")
+        amount = self.make_int(value)
+        if amount <= 0:
+            raise ValueError("HNS withdrawal amount must be positive")
+        return self._bridge.prepare_send(
+            self._network, address, amount, self._maximum_send_fee
+        )
+
+    def approveWithdrawal(self, token):
+        if not self.walletIdentityReady():
+            raise ValueError("HNS wallet is locked or seed identity is unknown")
+        return self._bridge.approve_send(token)
+
+    def rejectWithdrawal(self, token):
+        if not self.walletIdentityReady():
+            raise ValueError("HNS wallet is locked or seed identity is unknown")
+        self._bridge.reject_send(token)
+
+    def withdrawCoin(self, value, addr_to, subfee=False):
+        raise ValueError("HNS sends require review on the HNS wallet page")
 
     def isWalletEncryptedLocked(self):
         return True, not self.walletIdentityReady()

@@ -4,6 +4,7 @@ Run through run_hns_bridge_regtest.py --two-chain. This exercises the value
 protocol in both directions; BasicSwap message routing is tested separately.
 """
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -53,6 +54,7 @@ from basicswap.interface.hns.wallet_bridge import (
     HnsWalletBridge,
     initialize_hns_wallet,
 )
+from basicswap.util.address import b58decode, decodeWif
 from basicswap.util.smsg import smsgEncrypt
 from tests.basicswap.run_hns_bridge_regtest import free_port
 from tests.basicswap.test_hns_app_protocol import FakeApp
@@ -224,30 +226,106 @@ class HnsTwoChainRegtest(unittest.TestCase):
                             lambda b=bridge: b.snapshot("regtest")[0] > 2_100_000,
                             "HNS wallet funding",
                         )
-                    for hns_first in (True, False):
-                        with self.subTest(hns_first=hns_first):
-                            self.run_trade(
-                                hns_first,
-                                bridges[0],
-                                bridges[1],
-                                node,
-                                btc,
-                                core,
-                                miner,
-                                magic,
-                                genesis,
-                                root,
+                    smsg = None
+                    if bool(os.getenv("PARTICLD_BIN")) != bool(
+                        os.getenv("PARTICL_CLI_BIN")
+                    ):
+                        raise ValueError(
+                            "set both PARTICLD_BIN and PARTICL_CLI_BIN for live SMSG"
+                        )
+                    if os.getenv("PARTICLD_BIN") and os.getenv("PARTICL_CLI_BIN"):
+                        from tests.basicswap.test_hns_particl_smsg_regtest import (
+                            ParticlNode,
+                        )
+
+                        maker_smsg = ParticlNode(
+                            root / "particl-maker",
+                            os.environ["PARTICLD_BIN"],
+                            os.environ["PARTICL_CLI_BIN"],
+                        )
+                        try:
+                            taker_smsg = ParticlNode(
+                                root / "particl-taker",
+                                os.environ["PARTICLD_BIN"],
+                                os.environ["PARTICL_CLI_BIN"],
+                                maker_smsg.p2p_port,
                             )
-                            self.run_app_trade(
-                                hns_first,
-                                bridges[0],
-                                bridges[1],
-                                node,
-                                btc,
-                                core,
-                                miner,
-                                root,
+                        except Exception:
+                            maker_smsg.close()
+                            raise
+                        try:
+                            wait_for(
+                                lambda: (
+                                    maker_smsg.rpc("getconnectioncount") > 0
+                                    and taker_smsg.rpc("getconnectioncount") > 0
+                                ),
+                                "Particl SMSG peers",
+                                30,
                             )
+                            maker_address = maker_smsg.rpc("getnewaddress")
+                            taker_address = taker_smsg.rpc("getnewaddress")
+                            maker_smsg.rpc("smsgaddlocaladdress", maker_address)
+                            taker_smsg.rpc("smsgaddlocaladdress", taker_address)
+                            smsg = {
+                                "maker": maker_smsg,
+                                "taker": taker_smsg,
+                                "maker_address": maker_address,
+                                "taker_address": taker_address,
+                                "keys": {
+                                    maker_address: decodeWif(
+                                        maker_smsg.rpc("dumpprivkey", maker_address)
+                                    ),
+                                    taker_address: decodeWif(
+                                        taker_smsg.rpc("dumpprivkey", taker_address)
+                                    ),
+                                },
+                                "public_keys": {
+                                    maker_address: b58decode(
+                                        maker_smsg.rpc("smsggetpubkey", maker_address)[
+                                            "publickey"
+                                        ]
+                                    ),
+                                    taker_address: b58decode(
+                                        taker_smsg.rpc("smsggetpubkey", taker_address)[
+                                            "publickey"
+                                        ]
+                                    ),
+                                },
+                            }
+                        except Exception:
+                            taker_smsg.close()
+                            maker_smsg.close()
+                            raise
+                    try:
+                        for hns_first in (True, False):
+                            with self.subTest(hns_first=hns_first):
+                                self.run_trade(
+                                    hns_first,
+                                    bridges[0],
+                                    bridges[1],
+                                    node,
+                                    btc,
+                                    core,
+                                    miner,
+                                    magic,
+                                    genesis,
+                                    root,
+                                )
+                                self.run_app_trade(
+                                    hns_first,
+                                    bridges[0],
+                                    bridges[1],
+                                    node,
+                                    btc,
+                                    core,
+                                    miner,
+                                    root,
+                                    smsg,
+                                )
+                    finally:
+                        if smsg is not None:
+                            smsg["taker"].close()
+                            smsg["maker"].close()
                 finally:
                     for bridge in bridges:
                         bridge.close()
@@ -448,6 +526,7 @@ class HnsTwoChainRegtest(unittest.TestCase):
         core,
         miner,
         root,
+        smsg=None,
     ):
         """Drive the BasicSwap bid, message, and worker route with live chains."""
         now = int(time.time())
@@ -469,6 +548,14 @@ class HnsTwoChainRegtest(unittest.TestCase):
             app.coin = hns_ci
             app.ci = lambda coin, hns=hns_ci: hns if coin == Coins.HNS else btc
             app.fail_first_send = False
+            if smsg is not None:
+                role = "maker" if app.maker else "taker"
+                address = smsg[f"{role}_address"]
+                app.prepareSMSGAddress = lambda *_args, addr=address: addr
+                particl_peer = smsg[role]
+                app.callrpc = lambda method, params, peer=particl_peer: peer.rpc(
+                    method, params[0], json.dumps(params[1])
+                )
 
         for app, bridge, was_sent in (
             (maker, maker_bridge, True),
@@ -489,7 +576,7 @@ class HnsTwoChainRegtest(unittest.TestCase):
                 message_nets="smsg",
                 created_at=now,
                 expire_at=now + 3600,
-                addr_from="maker",
+                addr_from=smsg["maker_address"] if smsg is not None else "maker",
                 protocol_version=5,
                 active_ind=1,
                 was_sent=was_sent,
@@ -510,14 +597,23 @@ class HnsTwoChainRegtest(unittest.TestCase):
 
         def easy_encrypt(
             _app,
-            _sender,
-            _receiver,
+            sender,
+            receiver,
             payload,
             ttl,
             _cursor,
             timestamp,
             deterministic,
         ):
+            if smsg is not None:
+                return smsgEncrypt(
+                    smsg["keys"][sender],
+                    smsg["public_keys"][receiver],
+                    payload,
+                    smsg_timestamp=timestamp,
+                    deterministic=deterministic,
+                    smsg_ttl=ttl,
+                )
             return smsgEncrypt(
                 b"\x07" * 32,
                 PrivateKey(b"\x08" * 32).public_key.format(),
@@ -536,6 +632,44 @@ class HnsTwoChainRegtest(unittest.TestCase):
                 app.closeDB(cursor, commit=False)
 
         def envelope(raw, message_id, sender, receiver):
+            if smsg is not None:
+                peer = (
+                    smsg["maker"]
+                    if receiver == smsg["maker_address"]
+                    else smsg["taker"]
+                )
+
+                def delivered():
+                    inbox = peer.rpc(
+                        "smsginbox",
+                        "all",
+                        "",
+                        json.dumps({"encoding": "hex", "pubkey_from": True}),
+                    )
+                    return next(
+                        (
+                            item
+                            for item in inbox.get("messages", [])
+                            if item.get("msgid") == message_id.hex()
+                        ),
+                        None,
+                    )
+
+                item = wait_for(delivered, "HNS trade packet over Particl SMSG", 45)
+                self.assertEqual(item.get("payloadversion"), 2)
+                plaintext = bytes.fromhex(item["hex"])
+                self.assertEqual(plaintext[1:], raw)
+                self.assertIn(
+                    plaintext[0],
+                    (
+                        int(MessageTypes.HNS_BTC_BID),
+                        int(MessageTypes.HNS_BTC_BID_ACCEPT),
+                        int(MessageTypes.HNS_BTC_SECOND_LOCK),
+                    ),
+                )
+                self.assertEqual(item["from"], sender)
+                self.assertEqual(item["to"], receiver)
+                return dict(item, raw=raw, type="smsg")
             return {
                 "raw": raw,
                 "msgid": message_id.hex(),
@@ -552,11 +686,20 @@ class HnsTwoChainRegtest(unittest.TestCase):
         taker_record = read(taker, HnsBtcSwap, {"bid_id": bid_id})
         with patch(
             "basicswap.interface.hns.app_protocol.getMsgPubkey",
-            return_value=PrivateKey(b"\x07" * 32).public_key.format(),
+            return_value=(
+                smsg["public_keys"][smsg["taker_address"]]
+                if smsg is not None
+                else PrivateKey(b"\x07" * 32).public_key.format()
+            ),
         ):
             receive_hns_btc_bid(
                 maker,
-                envelope(taker_record.bid_message, bid_id, "sender", "maker"),
+                envelope(
+                    taker_record.bid_message,
+                    bid_id,
+                    smsg["taker_address"] if smsg is not None else "sender",
+                    smsg["maker_address"] if smsg is not None else "maker",
+                ),
             )
         with (
             patch(
@@ -591,7 +734,12 @@ class HnsTwoChainRegtest(unittest.TestCase):
         self.assertIsNotNone(accept_row.delivered_at)
         receive_hns_btc_accept(
             taker,
-            envelope(maker_record.accept_message, accept_id, "maker", "sender"),
+            envelope(
+                maker_record.accept_message,
+                accept_id,
+                smsg["maker_address"] if smsg is not None else "maker",
+                smsg["taker_address"] if smsg is not None else "sender",
+            ),
         )
         if hns_first:
             mine_hns(2)
@@ -632,8 +780,8 @@ class HnsTwoChainRegtest(unittest.TestCase):
             envelope(
                 taker_record.second_lock_message,
                 second_row.message_id,
-                "sender",
-                "maker",
+                smsg["taker_address"] if smsg is not None else "sender",
+                smsg["maker_address"] if smsg is not None else "maker",
             ),
         )
         if hns_first:

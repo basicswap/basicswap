@@ -13,6 +13,7 @@ from basicswap.interface.hns.coin import (
     HNSInterface,
     read_private_hsrd_authorization,
 )
+from basicswap.ui.page_wallet import page_wallet
 
 ADDRESS = "rs1qqyqszqgpqyqszqgpqyqszqgpqyqszqgpprmh8u"
 FINGERPRINT = bytes.fromhex("55" * 32)
@@ -55,6 +56,18 @@ class FakeBridge:
     def receive(self, network):
         assert not self.locked
         return ADDRESS, 1
+
+    def prepare_send(self, network, recipient, amount, maximum_fee):
+        assert network == "regtest" and recipient == ADDRESS
+        assert amount == 250_000 and maximum_fee == 100_000
+        return "ab" * 16, recipient, amount, maximum_fee, 1_900_000_000
+
+    def approve_send(self, token):
+        assert token == bytes.fromhex("ab" * 16)
+        return "cd" * 32
+
+    def reject_send(self, token):
+        assert token == bytes.fromhex("ab" * 16)
 
     def close(self):
         self.closed = True
@@ -190,6 +203,79 @@ class HnsCoinInterfaceTest(unittest.TestCase):
         node.ready = False
         coin = self.interface(node=node)
         self.assertEqual(coin.getBlockchainInfo()["verificationprogress"], 0.0)
+
+    def test_hns_withdrawal_requires_wallet_and_exact_native_approval(self):
+        coin = self.interface()
+        with self.assertRaisesRegex(ValueError, "locked"):
+            coin.prepareWithdrawal("0.250000", ADDRESS)
+        with self.assertRaisesRegex(ValueError, "wallet page"):
+            coin.withdrawCoin("0.250000", ADDRESS)
+        coin.unlockWallet("test passphrase")
+        with self.assertRaisesRegex(ValueError, "invalid HNS withdrawal address"):
+            coin.prepareWithdrawal("0.250000", "bc1qwrong")
+        with self.assertRaisesRegex(ValueError, "must be positive"):
+            coin.prepareWithdrawal("0", ADDRESS)
+        preview = coin.prepareWithdrawal("0.250000", ADDRESS)
+        self.assertEqual(
+            preview,
+            ("ab" * 16, ADDRESS, 250_000, 100_000, 1_900_000_000),
+        )
+        token = bytes.fromhex(preview[0])
+        self.assertEqual(coin.approveWithdrawal(token), "cd" * 32)
+        coin.rejectWithdrawal(token)
+
+    def test_hns_wallet_page_reviews_the_native_send_without_core_fee_rpc(self):
+        coin = self.interface()
+        coin.unlockWallet("test passphrase")
+        app = SimpleNamespace(
+            checkSystemStatus=lambda: None,
+            getSummary=dict,
+            updateWalletsInfo=lambda *_args, **_kwargs: None,
+            ci=lambda selected: coin,
+            coin_clients={Coins.HNS: {"connection_type": "rpc"}},
+            getCachedWalletsInfo=lambda _filter: {
+                Coins.HNS: {
+                    "name": "Handshake",
+                    "balance": "1.250000",
+                    "deposit_address": ADDRESS,
+                }
+            },
+            xmr_based_coins=(),
+            _restrict_unknown_seed_wallets=False,
+            debug_ui=False,
+            debug=False,
+            use_tor_proxy=False,
+            log=SimpleNamespace(warning=lambda *_args: None),
+            getFeeRateForCoin=lambda _coin: self.fail(
+                "HNS wallet page must not request a Core fee rate"
+            ),
+        )
+        form = {
+            b"withdraw_19": [b"Withdraw"],
+            b"amt_19": [b"0.250000"],
+            b"to_19": [ADDRESS.encode()],
+        }
+        page = SimpleNamespace(
+            server=SimpleNamespace(
+                swap_client=app,
+                env=SimpleNamespace(get_template=lambda _name: "wallet-template"),
+            ),
+            checkForm=lambda *_args: form,
+            render_template=lambda _template, context: context,
+        )
+        result = page_wallet(page, ["", "wallet", "hns"], b"")
+        self.assertEqual(result["err_messages"], [])
+        self.assertEqual(result["w"]["hns_send"]["recipient"], ADDRESS)
+        self.assertEqual(result["w"]["hns_send"]["amount"], "0.250000")
+        self.assertEqual(result["w"]["hns_send"]["maximum_fee"], "0.100000")
+        page.checkForm = lambda *_args: {
+            b"approve_hns_send": [b"1"],
+            b"hns_send_token": [result["w"]["hns_send"]["token"].encode()],
+        }
+        approved = page_wallet(page, ["", "wallet", "hns"], b"")
+        self.assertEqual(approved["err_messages"], [])
+        self.assertIn("cd" * 32, approved["messages"][0])
+        self.assertNotIn("hns_send", approved["w"])
 
     def test_authorization_file_must_be_private_and_bounded(self):
         with tempfile.TemporaryDirectory() as directory:

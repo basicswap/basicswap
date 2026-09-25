@@ -56,7 +56,8 @@ instead of treating HSRD as a Core-compatible wallet.
          "bridge_executable": "/path/to/hns-wallet-basicswap-bridge",
          "wallet_database": "/private/path/hns-wallet.sqlite3",
          "wallet_seed_fingerprint": "64-lowercase-hex-characters",
-         "maximum_htlc_fee": 100000
+         "maximum_htlc_fee": 100000,
+         "maximum_send_fee": 100000
        }
      }
    }
@@ -67,6 +68,11 @@ instead of treating HSRD as a Core-compatible wallet.
    2 must be active, since offers and the three HNS/BTC trade messages use
    exact SMSG message IDs. The Rust wallet database has single-process
    ownership; do not open it in another wallet process while trading.
+   Ordinary HNS withdrawals use a separate two-step review in BasicSwap's
+   wallet page. The Rust wallet binds the destination, amount, and maximum fee
+   to a short-lived approval and rechecks the transaction before broadcast.
+   The send fee cap is in HNS base units (one HNS is 1,000,000 units); the
+   wallet chooses the actual fee below that cap.
 
 ## Trade and recovery rules
 
@@ -120,13 +126,22 @@ test advances only isolated regtest processes under a shared clock and verifies
 a funded HNS timeout refund through confirmed `SWAP_TIMEDOUT`. Another opt-in
 test starts two Particl Core regtest wallets: it delivers a native HNS/BTC offer
 and bid into BasicSwap's actual handlers, and delivers all three trade-envelope
-types with exact `smsgimport` message IDs over SMSG v2.
+types with exact `smsgimport` message IDs over SMSG v2. When both Particl
+binaries are supplied to the funded two-chain harness, the BasicSwap app test
+also sends each bid, acceptance, and second-lock packet through those real
+Particl nodes before completing both HNS/BTC trade directions. The Rust wallet's
+isolated funded regtest also sends an ordinary HNS payment through the
+prepare/review/approve pipe, rejects a wrong or reused approval token, cancels
+a later prepared send without retaining its coin reservation, and then funds
+the HNS lock.
 
 ```text
 python -m unittest discover -s tests/basicswap -p 'test_hns*.py' -q
 
 HNS_BRIDGE_BIN=/path/to/hns-wallet-basicswap-bridge \
 BITCOIND_BIN=/path/to/bitcoind \
+PARTICLD_BIN=/path/to/particld \
+PARTICL_CLI_BIN=/path/to/particl-cli \
 python -m tests.basicswap.run_hns_bridge_regtest \
   --hsd /path/to/hsd --hsrd /path/to/hsrd \
   --wallet-repo /path/to/hns-wallet-rs --two-chain-only
@@ -148,13 +163,14 @@ interrupted maker acceptance in both directions, and a Bitcoin reorganization
 before maker redemption. The HNS timeout refund passes with real HSD, HSRD,
 and the Rust wallet under one isolated clock; the Bitcoin refund has a funded
 Core regtest. A separate two-node Particl regtest covers real SMSG v2 offer and
-bid handling and the exact encrypted envelope route in both directions.
-These suites have not yet run as one combined HNS, BTC, and Particl app test. Package
-and version the Rust bridge and HSRD for BasicSwap's supported platforms. The
-HNS wallet currently has no BasicSwap ordinary withdrawal screen or passphrase
-rotation; BasicSwap refuses a global password change while HNS is active
-rather than leaving its encrypted wallet with an unrecorded password. These
-release gates remain before HNS is presented as a fully supported asset.
+bid handling. The combined app regtest runs funded trades in both directions
+while Particl carries the three trade packets; the offer row is seeded after
+the separate real offer-delivery check. Package and version the Rust bridge
+and HSRD for BasicSwap's supported platforms. HNS passphrase rotation remains
+unavailable; BasicSwap refuses a
+global password change while HNS is active rather than leaving its encrypted
+wallet with an unrecorded password. These release gates remain before HNS is
+presented as a fully supported asset.
 
 Companion source: [HSRD wallet RPC](https://github.com/handshake-rs/hns-node-rs/blob/main/docs/WALLET_RPC_V1.md)
 and [hns-wallet-rs bridge contract](https://github.com/handshake-rs/hns-wallet-rs/blob/main/docs/BASICSWAP_BRIDGE.md).
