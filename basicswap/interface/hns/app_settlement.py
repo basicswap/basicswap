@@ -16,6 +16,7 @@ from .app_protocol import (
     _hns_btc_offer_pair,
     _persist_trade,
     accept_hns_btc_bid,
+    btc_swap_scan_start,
     deliver_hns_app_message,
 )
 from .node_rpc import hns_network_binding
@@ -54,7 +55,7 @@ def _load_trade(app, bid_id):
     return bid, offer, record, terms, magic, genesis
 
 
-def _settlement(app, record, terms):
+def _settlement(app, bid, offer, record, terms):
     hns_ci, btc_ci = app.ci(Coins.HNS), app.ci(Coins.BTC)
     if not hns_ci.walletIdentityReady():
         raise ValueError("HNS wallet is locked or has an unknown seed")
@@ -68,6 +69,7 @@ def _settlement(app, record, terms):
         hns_ci.node,
         app.chain,
         lambda changed: _persist_trade(app, changed),
+        btc_scan_start_height=btc_swap_scan_start(bid, offer),
     )
 
 
@@ -119,17 +121,6 @@ def _btc_spend_args(app, bid, offer, record, field):
     }
 
 
-def _spend_scan_start(bid, offer):
-    height = (
-        bid.chain_a_height_start
-        if offer.coin_from == Coins.BTC
-        else bid.chain_b_height_start
-    )
-    if type(height) is not int or height < 0:
-        raise ValueError("missing Bitcoin swap scan start height")
-    return max(0, height - 2)
-
-
 def _observe_spend(settlement, bid, offer, owned):
     coin = settlement.own_coin if owned else settlement.peer_coin
     if coin == "hns":
@@ -148,7 +139,7 @@ def _observe_spend(settlement, bid, offer, owned):
         from .settlement import ObservedSwapSpend
 
         return ObservedSwapSpend(branch, txid, confirmations, preimage)
-    start = _spend_scan_start(bid, offer)
+    start = btc_swap_scan_start(bid, offer)
     if owned:
         return settlement.scan_own_btc_lock_spend(start)
     return settlement.scan_peer_btc_lock_spend(start)
@@ -277,7 +268,7 @@ def progress_hns_btc_taker(app, bid_id):
     bid, offer, record, terms, magic, genesis = _load_trade(app, bid_id)
     if record.role != TAKER or not bid.was_sent or record.accept_message is None:
         raise ValueError("incomplete taker HNS/BTC trade")
-    settlement = _settlement(app, record, terms)
+    settlement = _settlement(app, bid, offer, record, terms)
     if record.second_lock_message is not None:
         return _progress_after_second(
             app, bid, offer, record, terms, settlement, magic, genesis
@@ -354,7 +345,7 @@ def progress_hns_btc_maker(app, bid_id):
         or (record.accept_message is None and record.phase < 1)
     ):
         raise ValueError("incomplete maker HNS/BTC trade")
-    settlement = _settlement(app, record, terms)
+    settlement = _settlement(app, bid, offer, record, terms)
     own_txid = (
         record.hns_lock_txid if settlement.own_coin == "hns" else record.btc_lock_txid
     )

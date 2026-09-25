@@ -49,6 +49,18 @@ def _hns_btc_offer_pair(offer):
     return offer.coin_from == Coins.HNS
 
 
+def btc_swap_scan_start(bid, offer):
+    """Recover Bitcoin actions from the offer's durable pre-trade height."""
+    height = (
+        bid.chain_a_height_start
+        if offer.coin_from == Coins.BTC
+        else bid.chain_b_height_start
+    )
+    if type(height) is not int or height < 0:
+        raise ValueError("missing Bitcoin swap scan start height")
+    return max(0, height - 2)
+
+
 def _submit_exact_smsg(app, row):
     response = app.callrpc(
         "smsgimport",
@@ -415,6 +427,7 @@ def accept_hns_btc_bid(app, bid_id):
         hns_ci.node,
         app.chain,
         lambda changed: _persist_trade(app, changed),
+        btc_scan_start_height=btc_swap_scan_start(bid, offer),
     )
     maximum_hns_fee = app.coin_clients[Coins.HNS].get("maximum_htlc_fee", 100_000)
     if type(maximum_hns_fee) is not int or not 0 < maximum_hns_fee <= 10_000_000:

@@ -16,7 +16,7 @@ import unittest
 from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from coincurve import PrivateKey
@@ -123,7 +123,7 @@ class BtcHtlcRegtest(unittest.TestCase):
                     f"-rpcport={port}",
                     f"-port={p2p_port}",
                     "-server=1",
-                    "-txindex=1",
+                    "-prune=550",
                     "-fallbackfee=0.0001",
                     "-printtoconsole=0",
                 ],
@@ -169,7 +169,11 @@ class BtcHtlcRegtest(unittest.TestCase):
                         maker_btc_key_hash=receiver_hash if hns_first else refund_hash,
                         taker_btc_key_hash=refund_hash if hns_first else receiver_hash,
                     )
-                    contract = BtcHtlcContract(ci, trade)
+                    contract = BtcHtlcContract(
+                        ci,
+                        trade,
+                        scan_start_height=max(0, core.call("getblockcount") - 2),
+                    )
                     prepared = contract.prepare_funding(now, MAGIC, GENESIS)
                     self.assertIsNotNone(prepared.contract_vout)
                     contract.validate_prepared_funding(prepared, prepared.contract_vout)
@@ -180,6 +184,8 @@ class BtcHtlcRegtest(unittest.TestCase):
                     self.assertEqual(contract.broadcast(prepared), prepared.txid)
                     self.assertEqual(contract.broadcast(prepared), prepared.txid)
                     core.call("generatetoaddress", [2, miner])
+                    with self.assertRaises(HTTPError):
+                        core.call("getrawtransaction", [prepared.txid.hex(), False])
                     self.assertEqual(contract.broadcast(prepared), prepared.txid)
                     self.assertGreaterEqual(
                         contract.verify_lock(
@@ -210,6 +216,7 @@ class BtcHtlcRegtest(unittest.TestCase):
                         )
                     self.assertEqual(contract.broadcast(redeem), redeem.txid)
                     core.call("generatetoaddress", [1, miner])
+                    self.assertEqual(contract.broadcast(redeem), redeem.txid)
                     tip = core.call("getblockcount")
                     observation = contract.scan_confirmed_spend(
                         prepared.txid, prepared.contract_vout, tip, tip
@@ -253,6 +260,7 @@ class BtcHtlcRegtest(unittest.TestCase):
                 )
                 self.assertEqual(contract.broadcast(refund), refund.txid)
                 core.call("generatetoaddress", [1, miner])
+                self.assertEqual(contract.broadcast(refund), refund.txid)
                 tip = core.call("getblockcount")
                 observation = contract.scan_confirmed_spend(
                     refund_prepared.txid, refund_prepared.contract_vout, tip, tip

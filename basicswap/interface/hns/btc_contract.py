@@ -68,9 +68,16 @@ class BtcSpendObservation:
 
 
 class BtcHtlcContract:
-    def __init__(self, coin_interface, terms):
+    MAX_REPLAY_SCAN_BLOCKS = 1000
+
+    def __init__(self, coin_interface, terms, *, scan_start_height=None):
+        if scan_start_height is not None and (
+            type(scan_start_height) is not int or scan_start_height < 0
+        ):
+            raise ValueError("invalid Bitcoin replay scan start")
         self.ci = coin_interface
         self.terms = terms
+        self.scan_start_height = scan_start_height
         self.script = terms.btc_contract_script
         self.hashlock, self.receiver_hash, self.refund_time, self.refund_hash = (
             _parse_btc_contract_script(self.script)
@@ -126,22 +133,65 @@ class BtcHtlcContract:
         try:
             returned = self.ci.publishTx(prepared.raw)
         except Exception as broadcast_error:  # noqa: BLE001
-            # Repeating the same persisted intent after a crash is safe only
-            # when Core can return the identical transaction bytes. A pruned
-            # node without the transaction in its wallet/index may be unable
-            # to prove this; leave the intent pending for reconciliation.
+            # An indexed node or the mempool can return the exact bytes by
+            # txid. A pruned node can do so only with a retained block hash.
             try:
                 observed_hex = self.ci.rpc(
                     "getrawtransaction", [prepared.txid.hex(), False]
                 )
             except Exception:  # noqa: BLE001
-                raise broadcast_error
+                observed_hex = self._find_confirmed_replay(prepared.txid)
+                if observed_hex is None:
+                    raise broadcast_error
             if observed_hex != prepared.raw.hex():
                 raise ValueError("Bitcoin transaction ID has different witness bytes")
             return prepared.txid
         if returned != prepared.txid.hex():
             raise ValueError("Bitcoin broadcast transaction ID mismatch")
         return prepared.txid
+
+    def _find_confirmed_replay(self, txid):
+        """Recover exact mined bytes from retained blocks without txindex."""
+        if self.scan_start_height is None:
+            return None
+        chain = self.ci.rpc("getblockchaininfo")
+        if not isinstance(chain, dict):
+            raise ValueError("Bitcoin chain status is unavailable")
+        tip = chain.get("blocks")
+        if type(tip) is not int or tip < 0:
+            raise ValueError("invalid Bitcoin chain height")
+        first = self.scan_start_height
+        if chain.get("pruned") is True:
+            prune_height = chain.get("pruneheight", 0)
+            if type(prune_height) is not int or prune_height < 0:
+                raise ValueError("invalid Bitcoin prune height")
+            first = max(first, prune_height)
+        if first > tip:
+            return None
+        if tip - first + 1 > self.MAX_REPLAY_SCAN_BLOCKS:
+            raise ValueError("Bitcoin replay exceeds retained scan window")
+        txid_hex = txid.hex()
+        for height in range(tip, first - 1, -1):
+            block_hash = self.ci.rpc("getblockhash", [height])
+            block = self.ci.rpc("getblock", [block_hash, 1])
+            if (
+                not isinstance(block, dict)
+                or block.get("hash") != block_hash
+                or block.get("height") != height
+                or type(block.get("confirmations")) is not int
+                or block["confirmations"] < 1
+                or not isinstance(block.get("tx"), list)
+            ):
+                raise ValueError("invalid Bitcoin replay block")
+            if txid_hex not in block["tx"]:
+                continue
+            observed_hex = self.ci.rpc(
+                "getrawtransaction", [txid_hex, False, block_hash]
+            )
+            if self.ci.rpc("getblockhash", [height]) != block_hash:
+                raise ValueError("Bitcoin replay block reorganized")
+            return observed_hex
+        return None
 
     def validate_prepared_funding(self, prepared, contract_vout):
         """Recheck a stored signed lock before replaying its raw bytes."""

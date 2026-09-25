@@ -46,6 +46,8 @@ class HnsBtcSettlement:
         hns_node,
         hns_network,
         persist_record,
+        *,
+        btc_scan_start_height=None,
     ):
         if record.role not in (MAKER, TAKER):
             raise ValueError("invalid HNS/BTC trade role")
@@ -77,7 +79,9 @@ class HnsBtcSettlement:
             raise ValueError("HNS/BTC wallet recovery seed changed")
         self.record = record
         self.terms = terms
-        self.btc = BtcHtlcContract(btc_interface, terms)
+        self.btc = BtcHtlcContract(
+            btc_interface, terms, scan_start_height=btc_scan_start_height
+        )
         self.hns_bridge = hns_bridge
         self.hns_node = hns_node
         self.hns_network = hns_network

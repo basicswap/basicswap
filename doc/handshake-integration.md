@@ -19,10 +19,14 @@ instead of treating HSRD as a Core-compatible wallet.
    `--transaction-relay`. Enable its authenticated wallet RPC only on loopback.
    Keep the Authorization header in an owner-only regular file under an
    owner-controlled directory. HSRD never receives an HNS signing key.
-2. Run Bitcoin Core in RPC mode with `prune=0` and `txindex=1`. The Bitcoin
-   contract observer checks decoded confirmed blocks from a saved height and
-   block hash; missing historical blocks fail closed. The Core wallet must be
-   available for funding and receiving the Bitcoin contract output.
+2. Run Bitcoin Core in RPC mode. BasicSwap's Bitcoin setup uses `prune=2000`;
+   this HNS/BTC path does not require `txindex=1` or an unpruned node. The
+   contract observer checks retained confirmed blocks from a saved height and
+   block hash. After an interrupted broadcast, the replay path can locate
+   exact signed transaction bytes in retained blocks without a transaction
+   index. Missing pruned blocks fail closed, so keep the node online until the
+   trade completes or refunds. The Core wallet must be available for funding
+   and receiving the Bitcoin contract output.
 3. Build the separate `hns-wallet-basicswap-bridge` binary from the companion
    `hns-wallet-rs` branch. Create or restore a **dedicated** HNS wallet from a
    terminal. The recovery phrase is displayed only during creation; back it

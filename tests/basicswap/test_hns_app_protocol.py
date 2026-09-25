@@ -497,10 +497,11 @@ class HnsAppProtocolTest(unittest.TestCase):
 
             class FakeSettlement:
                 MINIMUM_MAKER_REDEEM_MARGIN_SECONDS = 30 * 60
-                def __init__(self, maker_record, terms, *args):
+                def __init__(self, maker_record, terms, *args, btc_scan_start_height):
                     self.record = maker_record
                     self.persist = args[-1]
                     self.terms = terms
+                    assert type(btc_scan_start_height) is int
 
                 def fund_owned_lock(self, maximum_hns_fee):
                     self.assertEqual(maximum_hns_fee, 100_000)
@@ -586,9 +587,10 @@ class HnsAppProtocolTest(unittest.TestCase):
                 own_coin = "btc"
                 peer_coin = "hns"
 
-                def __init__(self, taker_record, _terms, *args):
+                def __init__(self, taker_record, _terms, *args, btc_scan_start_height):
                     self.record = taker_record
                     self.persist = args[-1]
+                    assert type(btc_scan_start_height) is int
 
                 def verify_lock(self, coin):
                     return confirmed[coin]
@@ -659,11 +661,12 @@ class HnsAppProtocolTest(unittest.TestCase):
                 own_coin = "hns"
                 peer_coin = "btc"
 
-                def __init__(self, maker_record, swap_terms, *args):
+                def __init__(self, maker_record, swap_terms, *args, btc_scan_start_height):
                     self.record = maker_record
                     self.terms = swap_terms
                     self.persist = args[-1]
                     self.hns_bridge = maker.coin.bridge
+                    assert type(btc_scan_start_height) is int
 
                 def observe_own_lock_spend(self):
                     if not maker_chain["own_spent"]:
