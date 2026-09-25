@@ -1030,6 +1030,19 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
 
     rv = {"coin_from": ci_from.ticker(), "fee": None}
     try:
+        if {Coins(coin_from), Coins(coin_to)} == {Coins.HNS, Coins.BTC}:
+            if Coins(coin_from) == Coins.HNS:
+                cap = swap_client.coin_clients[Coins.HNS].get(
+                    "maximum_htlc_fee", 100_000
+                )
+                rv["fee"] = ci_from.format_amount(cap)
+                rv["fee_src"] = "maximum HNS HTLC funding fee"
+                return bytes(json.dumps(rv), "UTF-8")
+            fee_rate, fee_src = ci_from.get_fee_rate(2)
+            fee_sats = max(1000, int(float(fee_rate) * 100_000 * 250))
+            rv["fee"] = ci_from.format_amount(fee_sats)
+            rv["fee_src"] = fee_src
+            return bytes(json.dumps(rv), "UTF-8")
         reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
         conf_target = (
             ci_from.getConfTarget() if coin_from not in (Coins.XMR, Coins.WOW) else 2

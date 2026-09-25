@@ -12,9 +12,30 @@ import time
 import unittest
 from contextlib import closing
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.error import URLError
 
-from basicswap.db import DBMethods, HnsBtcSwap, create_table, extract_schema
+from coincurve import PrivateKey
+
+from basicswap.basicswap import BasicSwap
+from basicswap.basicswap_util import BidStates, MessageTypes, SwapTypes, TxLockTypes
+from basicswap.chainparams import Coins
+from basicswap.db import (
+    Bid,
+    DBMethods,
+    HnsBtcOutbox,
+    HnsBtcSwap,
+    Offer,
+    create_table,
+    extract_schema,
+)
+from basicswap.interface.hns.app_protocol import (
+    receive_hns_btc_accept,
+    receive_hns_btc_bid,
+    receive_hns_btc_second_lock,
+)
+from basicswap.interface.hns.app_settlement import progress_hns_btc_trades
 from basicswap.interface.hns.node_rpc import HnsNodeRpc, hns_network_binding
 from basicswap.interface.hns.settlement import HnsBtcSettlement
 from basicswap.interface.hns.trade_protocol import (
@@ -32,7 +53,9 @@ from basicswap.interface.hns.wallet_bridge import (
     HnsWalletBridge,
     initialize_hns_wallet,
 )
+from basicswap.util.smsg import smsgEncrypt
 from tests.basicswap.run_hns_bridge_regtest import free_port
+from tests.basicswap.test_hns_app_protocol import FakeApp
 from tests.basicswap.test_hns_btc_contract_regtest import (
     CoreContractInterface,
     CoreRegtest,
@@ -109,6 +132,17 @@ class TradeJournal:
         return record
 
 
+class AppCoreInterface(CoreContractInterface):
+    def getChainHeight(self):
+        return self.rpc("getblockcount")
+
+    def get_fee_rate(self, _target=2):
+        return 0.00002, "regtest"
+
+    def getNewAddress(self, _segwit=True, _label="hns_btc_swap"):
+        return self.core.call("getnewaddress", [], "swap")
+
+
 @unittest.skipUnless(
     all(
         os.getenv(name)
@@ -151,7 +185,7 @@ class HnsTwoChainRegtest(unittest.TestCase):
                 core.call("createwallet", ["swap"])
                 miner = core.call("getnewaddress", [], "swap")
                 core.call("generatetoaddress", [105, miner])
-                btc = CoreContractInterface(core)
+                btc = AppCoreInterface(core)
                 host, port = os.environ["BASICSWAP_HSRD_REGTEST_RPC"].split(":")
                 self.assertEqual(host, "127.0.0.1")
                 auth_file = Path(os.environ["BASICSWAP_HSRD_REGTEST_AUTH_FILE"])
@@ -202,6 +236,16 @@ class HnsTwoChainRegtest(unittest.TestCase):
                                 miner,
                                 magic,
                                 genesis,
+                                root,
+                            )
+                            self.run_app_trade(
+                                hns_first,
+                                bridges[0],
+                                bridges[1],
+                                node,
+                                btc,
+                                core,
+                                miner,
                                 root,
                             )
                 finally:
@@ -393,6 +437,204 @@ class HnsTwoChainRegtest(unittest.TestCase):
         self.assertEqual(maker_observed.preimage, secret)
         self.assertGreater(maker_journal.writes, 4)
         self.assertGreater(taker_journal.writes, 4)
+
+    def run_app_trade(
+        self,
+        hns_first,
+        maker_bridge,
+        taker_bridge,
+        node,
+        btc,
+        core,
+        miner,
+        root,
+    ):
+        """Drive the BasicSwap bid, message, and worker route with live chains."""
+        now = int(time.time())
+        marker = b"\x41" if hns_first else b"\x42"
+        offer_id = marker * 28
+        hns_amount, btc_amount = 2_000_000, 100_000
+        coin_from = Coins.HNS if hns_first else Coins.BTC
+        coin_to = Coins.BTC if hns_first else Coins.HNS
+        maker = FakeApp(root / f"app-maker-{marker.hex()}.sqlite", maker=True)
+        taker = FakeApp(root / f"app-taker-{marker.hex()}.sqlite")
+        for app, bridge, was_sent in (
+            (maker, maker_bridge, True),
+            (taker, taker_bridge, False),
+        ):
+            app.now = now
+            hns_ci = SimpleNamespace(
+                bridge=bridge,
+                node=node,
+                walletIdentityReady=lambda: True,
+                getChainHeight=lambda: node.bound_snapshot("regtest").tip["height"],
+            )
+            app.coin = hns_ci
+            app.ci = lambda coin, hns=hns_ci: hns if coin == Coins.HNS else btc
+            app.fail_first_send = False
+            app.offer = Offer(
+                offer_id=offer_id,
+                swap_type=SwapTypes.HNS_BTC_SWAP,
+                coin_from=coin_from,
+                coin_to=coin_to,
+                amount_from=hns_amount if hns_first else btc_amount,
+                amount_to=btc_amount if hns_first else hns_amount,
+                rate=50_000 if hns_first else 2_000_000_000,
+                min_bid_amount=hns_amount if hns_first else btc_amount,
+                amount_negotiable=False,
+                rate_negotiable=False,
+                message_nets="smsg",
+                created_at=now,
+                expire_at=now + 3600,
+                addr_from="maker",
+                protocol_version=5,
+                active_ind=1,
+                was_sent=was_sent,
+                lock_type=TxLockTypes.ABS_LOCK_TIME,
+                lock_value=24 * 3600,
+            )
+            cursor = app.openDB()
+            try:
+                app.add(app.offer, cursor)
+            finally:
+                app.closeDB(cursor)
+
+        def easy_encrypt(
+            _app,
+            _sender,
+            _receiver,
+            payload,
+            ttl,
+            _cursor,
+            timestamp,
+            deterministic,
+        ):
+            return smsgEncrypt(
+                b"\x07" * 32,
+                PrivateKey(b"\x08" * 32).public_key.format(),
+                payload,
+                smsg_timestamp=timestamp,
+                deterministic=deterministic,
+                smsg_ttl=ttl,
+                difficulty_target=0x207FFFFF,
+            )
+
+        def read(app, model, constraints):
+            cursor = app.openDB()
+            try:
+                return app.queryOne(model, cursor, constraints)
+            finally:
+                app.closeDB(cursor, commit=False)
+
+        def envelope(raw, message_id, sender, receiver):
+            return {
+                "raw": raw,
+                "msgid": message_id.hex(),
+                "sent": now,
+                "from": sender,
+                "to": receiver,
+                "type": "smsg",
+            }
+
+        with patch("basicswap.interface.hns.app_protocol.encryptMsg", easy_encrypt):
+            bid_id = BasicSwap.postBid(
+                taker, offer_id, taker.offer.amount_from, None, {}
+            )
+        taker_record = read(taker, HnsBtcSwap, {"bid_id": bid_id})
+        with patch(
+            "basicswap.interface.hns.app_protocol.getMsgPubkey",
+            return_value=PrivateKey(b"\x07" * 32).public_key.format(),
+        ):
+            receive_hns_btc_bid(
+                maker,
+                envelope(taker_record.bid_message, bid_id, "sender", "maker"),
+            )
+        with patch("basicswap.interface.hns.app_protocol.encryptMsg", easy_encrypt):
+            accept_id = BasicSwap.acceptBid(maker, bid_id)
+        maker_record = read(maker, HnsBtcSwap, {"bid_id": bid_id})
+        accept_row = read(maker, HnsBtcOutbox, {"message_id": accept_id})
+        self.assertIsNotNone(accept_row.delivered_at)
+        receive_hns_btc_accept(
+            taker,
+            envelope(maker_record.accept_message, accept_id, "maker", "sender"),
+        )
+        if hns_first:
+            mine_hns(2)
+        else:
+            core.call("generatetoaddress", [2, miner])
+
+        second_coin = "btc" if hns_first else "hns"
+
+        def second_funded():
+            progress_hns_btc_trades(taker)
+            record = read(taker, HnsBtcSwap, {"bid_id": bid_id})
+            return record.btc_lock_txid if hns_first else record.hns_lock_txid
+
+        wait_for(second_funded, "app taker funding")
+        if hns_first:
+            core.call("generatetoaddress", [2, miner])
+        else:
+            mine_hns(2)
+        with patch("basicswap.interface.hns.app_settlement.encryptMsg", easy_encrypt):
+            wait_for(
+                lambda: progress_hns_btc_trades(taker),
+                "app confirmed second lock announcement",
+            )
+        taker_record = read(taker, HnsBtcSwap, {"bid_id": bid_id})
+        second_row = read(
+            taker,
+            HnsBtcOutbox,
+            {
+                "session_id": taker_record.session_id,
+                "message_type": int(MessageTypes.HNS_BTC_SECOND_LOCK),
+            },
+        )
+        self.assertIsNotNone(second_row.delivered_at)
+        receive_hns_btc_second_lock(
+            maker,
+            envelope(
+                taker_record.second_lock_message,
+                second_row.message_id,
+                "sender",
+                "maker",
+            ),
+        )
+
+        def maker_redeemed():
+            progress_hns_btc_trades(maker)
+            return read(maker, Bid, {"bid_id": bid_id}).state in (
+                BidStates.SWAP_PARTICIPATING,
+                BidStates.SWAP_COMPLETED,
+            )
+
+        wait_for(maker_redeemed, f"app maker redeeming {second_coin}")
+        if hns_first:
+            core.call("generatetoaddress", [2, miner])
+        else:
+            mine_hns(2)
+
+        def taker_redeemed():
+            progress_hns_btc_trades(taker)
+            return read(taker, Bid, {"bid_id": bid_id}).state in (
+                BidStates.SWAP_PARTICIPATING,
+                BidStates.SWAP_COMPLETED,
+            )
+
+        wait_for(taker_redeemed, "app taker recovering preimage and redeeming")
+        if hns_first:
+            mine_hns(2)
+        else:
+            core.call("generatetoaddress", [2, miner])
+
+        def both_completed():
+            progress_hns_btc_trades(maker)
+            progress_hns_btc_trades(taker)
+            return all(
+                read(app, Bid, {"bid_id": bid_id}).state == BidStates.SWAP_COMPLETED
+                for app in (maker, taker)
+            )
+
+        wait_for(both_completed, "both app bids completing")
 
 
 if __name__ == "__main__":

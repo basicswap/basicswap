@@ -307,6 +307,7 @@ def receive_hns_btc_bid(app, msg):
 def accept_hns_btc_bid(app, bid_id):
     """Fund the maker's first lock and queue its exact acceptance SMSG."""
     cursor = app.openDB()
+    existing_accept = None
     try:
         bid = app.queryOne(Bid, cursor, {"bid_id": bid_id})
         record = app.queryOne(HnsBtcSwap, cursor, {"bid_id": bid_id})
@@ -322,7 +323,7 @@ def accept_hns_btc_bid(app, bid_id):
             record.role != MAKER
             or not bid.was_received
             or not offer.was_sent
-            or offer.active_ind != 1
+            or (offer.active_ind != 1 and record.terms_commitment is None)
             or offer.amount_negotiable
             or offer.rate_negotiable
             or offer.lock_type != TxLockTypes.ABS_LOCK_TIME
@@ -331,16 +332,40 @@ def accept_hns_btc_bid(app, bid_id):
         ):
             raise ValueError("HNS/BTC bid was not received by this maker")
         now = app.getTime()
-        if bid.expire_at <= now or offer.expire_at <= now:
+        if record.terms_commitment is None and (
+            bid.expire_at <= now or offer.expire_at <= now
+        ):
             raise ValueError("HNS/BTC bid or offer expired")
         if bid.contract_count is None:
             bid.contract_count = app.getNewContractId(cursor)
             app.updateDB(bid, cursor, ["bid_id"])
+        existing_row = cursor.execute(
+            "SELECT message_id FROM hns_btc_outbox "
+            "WHERE session_id = :session_id AND message_type = :message_type",
+            {
+                "session_id": record.session_id,
+                "message_type": int(MessageTypes.HNS_BTC_BID_ACCEPT),
+            },
+        ).fetchone()
+        if existing_row is not None:
+            if record.accept_message is None:
+                raise ValueError("HNS/BTC acceptance outbox has no persisted terms")
+            existing_accept = app.queryOne(
+                HnsBtcOutbox, cursor, {"message_id": existing_row[0]}
+            )
     except Exception:
         app.closeDB(cursor, commit=False)
         raise
     else:
         app.closeDB(cursor)
+
+    if existing_accept is not None:
+        if existing_accept.delivered_at is None:
+            try:
+                deliver_hns_app_message(app, existing_accept, app.getTime())
+            except Exception as exc:  # noqa: BLE001
+                app.log.warning("HNS/BTC accept %s queued for retry: %s", bid_id.hex(), exc)
+        return existing_accept.message_id
 
     hns_ci, btc_ci = app.ci(Coins.HNS), app.ci(Coins.BTC)
     if not hns_ci.walletIdentityReady():
@@ -378,6 +403,9 @@ def accept_hns_btc_bid(app, bid_id):
         genesis,
         app.chain,
     )
+    # The partial unique index makes accepting one bid per offer atomic even
+    # when two UI requests race. No value action occurs before this commit.
+    record.phase = 1
     _persist_trade(app, record)
     settlement = HnsBtcSettlement(
         record,
@@ -412,15 +440,19 @@ def accept_hns_btc_bid(app, bid_id):
                 raise ValueError("HNS/BTC acceptance outbox row is missing")
         else:
             now = app.getTime()
-            if bid.expire_at <= now:
-                raise ValueError("HNS/BTC bid expired after first lock funding")
+            _, second_deadline = terms.validate(now, magic, genesis, False)
+            if second_deadline <= now + HnsBtcSettlement.MINIMUM_MAKER_REDEEM_MARGIN_SECONDS:
+                raise ValueError("HNS/BTC second lock refund is too close")
             raw = make_accept_message(record, terms, now, magic, genesis)
             encrypted = encryptMsg(
                 app,
                 offer.addr_from,
                 bid.bid_addr,
                 bytes((MessageTypes.HNS_BTC_BID_ACCEPT,)) + raw,
-                max(app.SMSG_SECONDS_IN_HOUR, bid.expire_at - now),
+                min(
+                    48 * 3600,
+                    max(app.SMSG_SECONDS_IN_HOUR, second_deadline - now),
+                ),
                 cursor,
                 timestamp=now,
                 deterministic=True,
@@ -430,7 +462,7 @@ def accept_hns_btc_bid(app, bid_id):
                 MessageTypes.HNS_BTC_BID_ACCEPT,
                 encrypted,
                 now,
-                bid.expire_at,
+                second_deadline,
             )
             app.updateDB(record, cursor, ["session_id"])
             bid.setState(BidStates.BID_ACCEPTED)
@@ -495,7 +527,7 @@ def receive_hns_btc_accept(app, msg):
             genesis,
         )
         app.updateDB(record, cursor, ["session_id"])
-        if bid.state != BidStates.BID_ACCEPTED:
+        if bid.state in (BidStates.BID_SENT, BidStates.BID_RECEIVING_ACC):
             bid.setState(BidStates.BID_ACCEPTED)
             app.updateDB(bid, cursor, ["bid_id"])
         app.addRecvBidNetworkLink(msg, bid_id, cursor)

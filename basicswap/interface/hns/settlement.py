@@ -344,13 +344,28 @@ class HnsBtcSettlement:
         """
         if self.own_coin != "btc":
             raise ValueError("the owned HNS/BTC lock is not on Bitcoin")
+        return self._scan_btc_lock_spend(
+            first_height, max_blocks, "btc_scan_height", "btc_scan_anchor"
+        )
+
+    def scan_peer_btc_lock_spend(self, first_height, max_blocks=100):
+        """Confirm the taker's Bitcoin redemption with a separate reorg cursor."""
+        if self.peer_coin != "btc":
+            raise ValueError("the peer HNS/BTC lock is not on Bitcoin")
+        return self._scan_btc_lock_spend(
+            first_height, max_blocks, "btc_peer_scan_height", "btc_peer_scan_anchor"
+        )
+
+    def _scan_btc_lock_spend(
+        self, first_height, max_blocks, height_field, anchor_field
+    ):
         if type(first_height) is not int or first_height < 0:
             raise ValueError("invalid Bitcoin spend scan start")
         if type(max_blocks) is not int or not 1 <= max_blocks <= 100:
             raise ValueError("invalid Bitcoin spend scan size")
         txid, vout = self._outpoint("btc")
-        height = self.record.btc_scan_height
-        anchor = self.record.btc_scan_anchor
+        height = getattr(self.record, height_field)
+        anchor = getattr(self.record, anchor_field)
         if (height is None) != (anchor is None):
             raise ValueError("incomplete Bitcoin spend scan cursor")
         if height is not None:
@@ -366,8 +381,8 @@ class HnsBtcSettlement:
             except Exception:  # noqa: BLE001
                 current_anchor = None
             if current_anchor != anchor.hex():
-                self.record.btc_scan_height = None
-                self.record.btc_scan_anchor = None
+                setattr(self.record, height_field, None)
+                setattr(self.record, anchor_field, None)
                 self.persist_record(self.record)
                 height = None
         tip_height = self.btc.ci.rpc("getblockcount")
@@ -391,8 +406,8 @@ class HnsBtcSettlement:
         if self.btc.ci.rpc("getblockhash", [scan_last]) != end_hash:
             raise ValueError("Bitcoin chain changed during spend scan")
         if result is None:
-            self.record.btc_scan_height = scan_last
-            self.record.btc_scan_anchor = bytes.fromhex(end_hash)
+            setattr(self.record, height_field, scan_last)
+            setattr(self.record, anchor_field, bytes.fromhex(end_hash))
             self.persist_record(self.record)
             return None
         if result.block_height > scan_first:
@@ -400,8 +415,8 @@ class HnsBtcSettlement:
             prior_hash = self.btc.ci.rpc("getblockhash", [prior_height])
             if self.btc.ci.rpc("getblockhash", [scan_last]) != end_hash:
                 raise ValueError("Bitcoin chain changed during spend scan")
-            self.record.btc_scan_height = prior_height
-            self.record.btc_scan_anchor = bytes.fromhex(prior_hash)
+            setattr(self.record, height_field, prior_height)
+            setattr(self.record, anchor_field, bytes.fromhex(prior_hash))
         if result.branch == "redeem":
             bind_preimage(self.record, result.preimage)
         self.persist_record(self.record)

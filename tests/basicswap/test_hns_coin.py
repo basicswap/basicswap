@@ -106,15 +106,20 @@ class HnsCoinInterfaceTest(unittest.TestCase):
         self.assertEqual(coin.isWalletEncryptedLocked(), (True, True))
 
     def test_generic_swap_types_cannot_fund_hns(self):
+        app = SimpleNamespace(coin_clients={Coins.BTC: {"connection_type": "rpc"}})
         for swap_type in SwapTypes:
+            if swap_type == SwapTypes.HNS_BTC_SWAP:
+                BasicSwap.validateSwapType(app, Coins.HNS, Coins.BTC, swap_type)
+                BasicSwap.validateSwapType(app, Coins.BTC, Coins.HNS, swap_type)
+                continue
             with (
                 self.subTest(swap_type=swap_type),
-                self.assertRaisesRegex(ValueError, "not enabled"),
+                self.assertRaisesRegex(ValueError, "native HNS/BTC"),
             ):
-                BasicSwap.validateSwapType(None, Coins.HNS, Coins.BTC, swap_type)
-        with self.assertRaisesRegex(ValueError, "HNS/BTC pair"):
+                BasicSwap.validateSwapType(app, Coins.HNS, Coins.BTC, swap_type)
+        with self.assertRaisesRegex(ValueError, "native HNS/BTC"):
             BasicSwap.validateSwapType(
-                None, Coins.BTC, Coins.LTC, SwapTypes.HNS_BTC_SWAP
+                app, Coins.BTC, Coins.LTC, SwapTypes.HNS_BTC_SWAP
             )
         BasicSwap.validateOfferLockValue(
             None,

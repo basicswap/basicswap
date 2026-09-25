@@ -260,12 +260,17 @@ def upgradeDatabaseFromSchema(self, cursor, expect_schema):
                 column_1 = index["column_1"]
                 column_2 = index.get("column_2", None)
                 column_3 = index.get("column_3", None)
-                query: str = f"CREATE INDEX {index_name} ON {table_name} ({column_1}"
+                query: str = (
+                    f"CREATE {'UNIQUE ' if index.get('unique') else ''}INDEX "
+                    f"{index_name} ON {table_name} ({column_1}"
+                )
                 if column_2:
                     query += f", {column_2}"
                 if column_3:
                     query += f", {column_3}"
                 query += ")"
+                if index.get("where"):
+                    query += f" WHERE {index['where']}"
                 cursor.execute(query)
 
 

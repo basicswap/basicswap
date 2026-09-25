@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 41
+CURRENT_DB_VERSION = 42
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -133,11 +133,15 @@ class UniqueConstraint:
 class Index:
     __sqlite3_index__ = True
 
-    def __init__(self, name, column_1, column_2=None, column_3=None):
+    def __init__(
+        self, name, column_1, column_2=None, column_3=None, *, unique=False, where=None
+    ):
         self.name = name
         self.column_1 = column_1
         self.column_2 = column_2
         self.column_3 = column_3
+        self.unique = unique
+        self.where = where
 
 
 class StateRows:
@@ -519,11 +523,19 @@ class HnsBtcSwap(Table):
     btc_refund_tx = Column("blob")
     btc_scan_height = Column("integer")
     btc_scan_anchor = Column("blob")
+    btc_peer_scan_height = Column("integer")
+    btc_peer_scan_anchor = Column("blob")
     secret_preimage = Column("blob")
     created_at = Column("integer")
     updated_at = Column("integer")
 
     index = Index("hns_btc_offer_id_index", "offer_id")
+    accepted_offer_index = Index(
+        "hns_btc_one_accepted_bid_per_offer",
+        "offer_id",
+        unique=True,
+        where="role = 1 AND phase >= 1",
+    )
 
 
 class HnsBtcOutbox(Table):
@@ -540,7 +552,12 @@ class HnsBtcOutbox(Table):
     delivered_at = Column("integer")
 
     index = Index("hns_btc_outbox_session_index", "session_id")
-    unique = UniqueConstraint("session_id", "message_type")
+    message_index = Index(
+        "hns_btc_outbox_session_message_unique",
+        "session_id",
+        "message_type",
+        unique=True,
+    )
 
 
 class XmrSplitData(Table):
@@ -916,6 +933,10 @@ def extract_schema(input_globals: dict = None) -> dict:
                 table_index["column_2"] = i.column_2
             if i.column_3 is not None:
                 table_index["column_3"] = i.column_3
+            if i.unique:
+                table_index["unique"] = True
+            if i.where is not None:
+                table_index["where"] = i.where
             table["indices"].append(table_index)
 
         tables[table_name] = table
@@ -965,12 +986,17 @@ def create_table(c, table_name, table) -> None:
         column_1 = index["column_1"]
         column_2 = index.get("column_2", None)
         column_3 = index.get("column_3", None)
-        query: str = f"CREATE INDEX {index_name} ON {table_name} ({column_1}"
+        query: str = (
+            f"CREATE {'UNIQUE ' if index.get('unique') else ''}INDEX "
+            f"{index_name} ON {table_name} ({column_1}"
+        )
         if column_2:
             query += f", {column_2}"
         if column_3:
             query += f", {column_3}"
         query += ")"
+        if index.get("where"):
+            query += f" WHERE {index['where']}"
         c.execute(query)
 
 

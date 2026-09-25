@@ -74,6 +74,8 @@ def swap_type_from_string(str_swap_type: str) -> SwapTypes:
         return SwapTypes.SELLER_FIRST
     elif str_swap_type == "xmr_swap" or str_swap_type == "adaptor_sig":
         return SwapTypes.XMR_SWAP
+    elif str_swap_type == "hns_btc_swap":
+        return SwapTypes.HNS_BTC_SWAP
     else:
         raise ValueError("Unknown swap type")
 
@@ -225,6 +227,12 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data["swap_type"] = get_data_entry(form_data, "swap_type")
         parsed_data["swap_type"] = page_data["swap_type"]
         swap_type = swap_type_from_string(parsed_data["swap_type"])
+    elif {parsed_data["coin_from"], parsed_data["coin_to"]} == {
+        Coins.HNS,
+        Coins.BTC,
+    }:
+        parsed_data["swap_type"] = strSwapType(SwapTypes.HNS_BTC_SWAP)
+        swap_type = SwapTypes.HNS_BTC_SWAP
     elif (
         parsed_data["coin_from"] in swap_client.coins_without_segwit
         and parsed_data["coin_to"] in swap_client.coins_without_segwit
@@ -239,6 +247,14 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data["swap_style"] = "xmr"
     else:
         page_data["swap_style"] = "atomic"
+    if swap_type == SwapTypes.HNS_BTC_SWAP:
+        page_data["amt_var"] = False
+        parsed_data["amt_var"] = False
+        page_data["rate_var"] = False
+        parsed_data["rate_var"] = False
+        if "amt_from" in parsed_data:
+            parsed_data["amt_bid_min"] = parsed_data["amt_from"]
+            page_data["amt_bid_min"] = page_data["amt_from"]
 
     if "swap_type" in parsed_data:
         try:
@@ -383,7 +399,9 @@ def postNewOfferFromParsed(swap_client, parsed_data):
     ):
         swap_type = SwapTypes.XMR_SWAP
 
-    if swap_type == SwapTypes.XMR_SWAP:
+    if swap_type == SwapTypes.HNS_BTC_SWAP:
+        lock_type = TxLockTypes.ABS_LOCK_TIME
+    elif swap_type == SwapTypes.XMR_SWAP:
         # All coins capable of segwit should be capable of csv
         lock_type = TxLockTypes.SEQUENCE_LOCK_TIME
     else:
@@ -397,6 +415,8 @@ def postNewOfferFromParsed(swap_client, parsed_data):
 
     extra_options = {}
     lock_value: int = parsed_data.get("lock_seconds", -1)
+    if swap_type == SwapTypes.HNS_BTC_SWAP and lock_value == -1:
+        lock_value = 24 * 60 * 60
     if swap_client.debug:
         if "lock_type" in parsed_data:
             lock_type = parsed_data["lock_type"]
@@ -441,6 +461,15 @@ def postNewOfferFromParsed(swap_client, parsed_data):
             extra_options["total_budget"] = parsed_data["total_budget"]
         if parsed_data.get("min_wallet_reserve", None) is not None:
             extra_options["min_wallet_reserve"] = parsed_data["min_wallet_reserve"]
+
+    if swap_type == SwapTypes.HNS_BTC_SWAP:
+        if parsed_data.get("subfee", False):
+            raise ValueError("HNS/BTC does not support prefunded offers")
+        extra_options["offer_mode"] = int(OfferTrackingModes.ONE_TIME)
+        extra_options["automation_id"] = -1
+        extra_options["amount_negotiable"] = False
+        extra_options["rate_negotiable"] = False
+        parsed_data["amt_bid_min"] = parsed_data["amt_from"]
 
     swap_value = parsed_data["amt_from"]
     if parsed_data.get("amt_to", None) is not None:

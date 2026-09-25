@@ -1,252 +1,145 @@
-# Handshake (HNS) integration status
+# Handshake (HNS) native swap integration
 
-This branch starts a native HNS integration in BasicSwap. **HNS is not yet a
-tradable asset.** Its coin ID and chain parameters are registered, but every
-generic swap type is rejected for HNS until the dedicated trade dispatcher is
-connected. The read-only HSRD adapter, transaction codec,
-signature digest, canonical HTLC verifier, and client for the local
-`hns-wallet-basicswap-bridge` are isolated under `basicswap/interface/hns/`.
-No HNS offer path has been enabled.
+This branch routes fixed, manual HNS/BTC offers through BasicSwap's own bid and
+state database, with HSRD as the Handshake full node and `hns-wallet-rs` as the
+separate encrypted HNS signing wallet. Both HNS → BTC and BTC → HNS use the
+same seller-first hashlock protocol. HNS is never passed through BasicSwap's
+generic Bitcoin contract interface.
 
-Source snapshot: BasicSwap `5471e609b9fbcba1a528dac60e2e06fc2f1a8ca4`,
-HSRD `c0785719db68a574a13fba224af5ff34ead13c3e`, and hns-wallet-rs
-`f5a6a77841f34bf5a601df83de2900f76605df43`. Recheck these contracts
-when updating either project.
+The [BasicSwap coin integration guide](https://github.com/basicswap/basicswap-docs/blob/master/docs/user-guides/integrate-coin.md)
+lists UTXOs, timelocks, SegWit, and watch-only monitoring as standard
+prerequisites. HNS has those chain features. Its transaction encoding, witness
+rules, absolute-time lock encoding, and wallet RPC differ from Bitcoin Core,
+so this integration uses a dedicated protocol and the existing Rust wallet
+instead of treating HSRD as a Core-compatible wallet.
 
-## Compatibility result
+## Operator setup
 
-BasicSwap's [coin integration guide](https://github.com/basicswap/basicswap-docs/blob/master/docs/user-guides/integrate-coin.md)
-asks for a UTXO script chain, CLTV or CSV, SegWit, and watch-only monitoring.
-Handshake has UTXOs, witness programs, both lock opcodes, and an indexed script
-history and UTXO read path. HSRD does **not** provide a Bitcoin Core style
-wallet, `importaddress`, `fundrawtransaction`, or wallet signing RPC. The
-standard BasicSwap requirements script assumes a Core-like daemon and cannot
-establish HSRD wallet compatibility by itself.
+1. Run a synced HSRD for the selected HNS network with `--wallet-index` and
+   `--transaction-relay`. Enable its authenticated wallet RPC only on loopback.
+   Keep the Authorization header in an owner-only regular file under an
+   owner-controlled directory. HSRD never receives an HNS signing key.
+2. Run Bitcoin Core in RPC mode with `prune=0` and `txindex=1`. The Bitcoin
+   contract observer checks decoded confirmed blocks from a saved height and
+   block hash; missing historical blocks fail closed. The Core wallet must be
+   available for funding and receiving the Bitcoin contract output.
+3. Build the separate `hns-wallet-basicswap-bridge` binary from the companion
+   `hns-wallet-rs` branch. Create or restore a **dedicated** HNS wallet from a
+   terminal. The recovery phrase is displayed only during creation; back it
+   up before sending funds. Use the same passphrase that unlocks BasicSwap's
+   wallets. An existing wallet database cannot be overwritten by the helper.
 
-| Requirement | HNS / HSRD evidence | BasicSwap consequence |
-| --- | --- | --- |
-| UTXO scripts | HNS transaction outputs contain an address and covenant; HNS consensus executes witness scripts. | Implement a native HNS transaction and script interface. |
-| CLTV / CSV | `hns-consensus` implements `OP_CHECKLOCKTIMEVERIFY` and `OP_CHECKSEQUENCEVERIFY`. | Use HNS's high-bit, 512-second absolute-time encoding and its sequence policy. |
-| Witness | Every HNS input has a witness section after locktime. | Do not use Bitcoin's marker/flag serialization or txid calculation. |
-| Watch-only | HSRD `--wallet-index` exposes `confirmed_scripts_page`, `mempool_scripts_page`, and ordered spender evidence over authenticated `/api/v1/wallet`. | BasicSwap must persist the scripts it owns and reconcile the index across restarts/reorgs; there is no `importaddress` equivalent. |
-| Spend authorization | HSRD never holds keys or signs transactions. hns-wallet-rs already implements HNS funding, signing, native HTLC lock/redeem/refund, encrypted workflow state, and recovery over an HSRD adapter. | Reuse hns-wallet-rs through a BasicSwap-specific bridge; no new HNS wallet implementation is needed. |
+   ```text
+   python -m bin.basicswap_hns_wallet create \
+     --bridge /path/to/hns-wallet-basicswap-bridge \
+     --database /private/path/hns-wallet.sqlite3 \
+     --network mainnet --restore-height 0
+   ```
 
-HSRD's `tracked_contract_*` reads cannot currently be used as the only swap
-watch: the public wallet RPC reports descriptor registration as
-`unavailable_unpublished_protocol_boundary`. Script history and spender reads
-are the available public evidence path. They still require BasicSwap to verify
-the exact expected output address, amount, covenant, funding bytes, spend
-branch, and witness/preimage locally.
+   To restore, replace `create` with `restore` and provide the backed-up
+   24-word phrase at the hidden terminal prompt. A restored wallet may have a
+   different wallet ID. The printed seed fingerprint is stable and is the
+   value BasicSwap binds to every active HNS/BTC trade.
+4. Add a `handshake` entry to the existing BasicSwap `chainclients` settings.
+   Use the actual absolute paths and the fingerprint printed above. Keep
+   `manage_daemon` false; BasicSwap does not launch or manage HSRD.
 
-## Implemented here
+   ```json
+   {
+     "chainclients": {
+       "handshake": {
+         "connection_type": "rpc",
+         "manage_daemon": false,
+         "rpchost": "127.0.0.1",
+         "rpcport": 12037,
+         "rpc_authorization_file": "/private/path/hsrd-wallet.auth",
+         "bridge_executable": "/path/to/hns-wallet-basicswap-bridge",
+         "wallet_database": "/private/path/hns-wallet.sqlite3",
+         "wallet_seed_fingerprint": "64-lowercase-hex-characters",
+         "maximum_htlc_fee": 100000
+       }
+     }
+   }
+   ```
 
-- `HnsNodeRpc` connects only to loopback and the authenticated wallet v1 route.
-  It checks an exact network genesis under one chain epoch before script queries.
-  Its confirmed-page collector splits script sets under HSRD's default 65,536
-  byte request limit, rejects a changed epoch or tip, and discards partial
-  results on a stale response. It is read-only.
-- `HNSInterface` exposes HSRD's bound chain tip, six-decimal HNS amounts,
-  native receive addresses, and the encrypted wallet balance through the Rust
-  sidecar. It checks a configured seed fingerprint on unlock and shuts the
-  sidecar down with BasicSwap. If the sidecar exits, wallet status becomes
-  locked; supplying the passphrase again reopens it and rechecks the seed.
-  An isolated HSD/HSRD startup test creates the account, enters through
-  `BasicSwap.createInterface`, and reopens the sidecar. Generic HNS offers
-  still fail closed; HNS wallet creation, recovery, password rotation, and
-  ordinary withdrawals have no BasicSwap UI path yet.
-- `HnsTransaction` encodes and decodes the HNS base/witness format and computes
-  the native Blake2b-256 txid and witness hash. HSD-generated codec vectors
-  verify the format.
-- `signature_hash` computes the HNS BIP143-style Blake2b digest, including
-  NOINPUT, ANYONECANPAY, SINGLE, and SINGLE_REVERSE. All 32 HSD oracle vectors
-  from HSRD's pinned fixture pass.
-- `HnsHtlc` parses the wallet's canonical `hns-swap` v1 descriptor under an
-  expected network binding, reproduces its exact witness script and descriptor
-  hash, and rejects a funding output with a different amount, script address,
-  or covenant. The pinned `hns-rs` protocol fixture passes.
-- `HnsWalletBridge` launches a separately named trusted-native wallet process
-  over a versioned, bounded, sequential local pipe. It carries BasicSwap's
-  offer/bid IDs, a pre-bid session nonce, and the exact HTLC descriptor, and validates returned transaction
-  IDs, branch observations, and revealed preimages. The companion Rust binary
-  is implemented in the local `hns-wallet-rs` `basicswap-bridge` branch. That
-  binary opens one existing encrypted HNS account over its HSRD adapter and
-  exposes key lookup, lock funding/verification, redeem/refund, spend
-  observation, and durable rebroadcast without exporting signing keys.
-- `HnsBtcSwapTerms` reconstructs the exact HNS and Bitcoin contracts from
-  canonical, bounded bid and acceptance messages. It verifies a shared
-  SHA-256 hashlock, both chains' recipient/refund roles, amounts, HNS network,
-  minimum confirmations, and the commitment before exposing the announced
-  first outpoint. It enforces a later refund on the first funded chain in
-  either trade direction. This outpoint remains an untrusted hint until the
-  applicable node verifies its funding output and confirmations.
-- `BtcHtlcContract` prepares a Bitcoin Core wallet-funded P2WSH lock, verifies
-  the exact confirmed unspent output, signs either native SegWit redeem or
-  CLTV refund witnesses with a swap key, and scans confirmed blocks for the
-  validated spend branch and revealed preimage. It returns signed raw bytes to
-  the caller for durable persistence before broadcast. The isolated Bitcoin
-  Core regtest test exercises both trade role mappings, redeem, and refund.
-- `HnsBtcSwap` records the pre-bid session ID, nonce, exact accepted contracts,
-  lock outpoints, Bitcoin prepared transaction bytes, wallet seed fingerprint,
-  and scan cursor in the BasicSwap database (schema version 41). The record helpers reject changed
-  identities or terms and can reconstruct an accepted trade after the refund
-  window closes. `trade_protocol.py` now constructs and binds the bid,
-  acceptance, and second-lock messages to that row in both trade directions,
-  including a maker restart between terms persistence and acceptance. The
-  BasicSwap message handlers and periodic recovery worker do not yet call it.
-- `HnsBtcSettlement` connects the two native value adapters to that persisted
-  record. It gates the taker's funding on the maker's confirmed first lock,
-  requires HSRD's sync scheduler to agree with its wallet chain tip, checks
-  both nodes' median times and the live funding window, and persists
-  Bitcoin signed bytes before broadcast. It supports redeem, refund, and a
-  confirmed witness observation in either role mapping. Its bounded Bitcoin
-  spend scanner persists a canonical block anchor, rewinds on a reorg, and
-  leaves a found spend in the next scan range for rechecking after restart.
-  It asks the Rust bridge for a previously submitted HNS lock or spend before
-  considering a new action after restart. Stored Bitcoin lock and spend bytes
-  are checked against the exact contract, outpoint, branch, and preimage before
-  replay. A trade stores the HNS recovery-seed fingerprint and rejects a
-  different unlocked account even if its wallet ID changed on restore.
-  BasicSwap's message dispatcher and bid worker still need to call it.
-- `HnsBtcOutbox` stores exact encrypted SMSG bytes and their precomputed
-  message ID in the same database transaction as a trade record. Retrying a
-  pending row submits the same bytes and cannot change the bid ID or HNS
-  settlement session. BasicSwap's HNS taker bid sender and periodic delivery
-  route now use this table, limited to a fixed full-size offer and SMSG v2.
-  The inbound bid dispatcher checks the sent offer, sender destination, exact
-  amounts, and replay identity before storing its maker bid and session in
-  one transaction. The HNS offer, acceptance, second-lock, and value worker
-  routes still need to be connected before offers can be enabled.
+   The example port is HSRD mainnet's wallet RPC default. Keep the existing
+   Particl and Bitcoin entries in `chainclients`. Particl SMSG payload version
+   2 must be active, since offers and the three HNS/BTC trade messages use
+   exact SMSG message IDs. The Rust wallet database has single-process
+   ownership; do not open it in another wallet process while trading.
 
-The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
-HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the
-Rust bridge against an indexed live chain. A fresh encrypted HNS wallet
-received an ordinary transfer, funded an HNS HTLC, verified its lock after
-the account's two required confirmations, redeemed with the preimage, and
-observed the spend. Its submitted-funding and submitted-spend lookups returned
-the same transaction IDs before and after the spend. The bridge's ignored live
-test records this setup; `tests/basicswap/run_hns_bridge_regtest.py` starts the
-isolated nodes and runs it. Its opt-in `--two-chain` mode also starts Bitcoin
-Core, funds both HNS/BTC directions, verifies each confirmed lock, reloads
-both peers' SQLite trade records before redemption, and observes the revealed
-preimage and final spend on each chain. The two-chain test invokes the
-protocol and value adapters directly; it does not exercise BasicSwap's offer,
-bid, or worker routing.
+## Trade and recovery rules
 
-The HNS refund branch still needs a live maturity test with both HSD and HSRD
-sharing a controlled clock. Advancing only HSD by the required refund window
-causes HSRD to reject its blocks as too far in the future, which is the
-correct consensus safety behavior. Bitcoin Core's refund branch has an
-isolated regtest test.
-
-These Python components are independent evidence and encoding checks. The
-spend-capable implementation is already in hns-wallet-rs; BasicSwap should use
-its native wallet and `hns-swap` settlement code. A passing Python fixture does
-not connect BasicSwap's offer protocol to that wallet.
-
-## Reuse of hns-wallet-rs
-
-The wallet repository already has `HnsNodeRpcBackend` for authenticated HSRD
-wallet RPC, `HnsWalletRuntime` for HNS accounts and transaction workflows, and
-`hns-swap::HnsHtlc` for a SHA-256 preimage/absolute-CLTV contract. Its market
-module also has signed direct HNS/BTC and BTC/HNS offers, bilateral sessions,
-funding watches, and evidence-driven redeem/refund recovery. The
-`hns-wallet-service` library exposes trusted-native HTLC lock, verification,
-redeem, refund, broadcast, and cancel methods. Its encrypted state and
-reconciliation logic provide the HNS-side recovery machinery. These are the
-components to adapt for BasicSwap; the HNS wallet and swap primitives do not
-need to be rebuilt.
-
-The default `hns-wallet-service` executable only processes the private ABI's
-control operations. The new `hns-wallet-basicswap-bridge` is separately named
-and uses trusted-native library APIs without adding value operations to that
-browser/provider ABI. It opens a single existing encrypted account, accepts
-only canonical HNS HTLC operations over a local process pipe, derives local
-  settlement keys inside the wallet from the offer ID and nonce, and recovers the ID of a durably submitted
-lock/redeem/refund after response loss. The Python HSRD client here can
-cross-check chain observations; it is not a substitute for the wallet's node
-adapter.
-
-BasicSwap's existing seller-first contract uses an `OP_SIZE` check, a public-key
-hash branch, and a CSV refund by default. The canonical `HnsHtlc` commits to
-compressed receiver/refund public keys and an absolute CLTV refund. The
-wallet's signed direct-offer/session envelopes are also a distinct protocol
-from BasicSwap's offer and bid messages. The swap message and script
-verification paths must agree on one exact HNS descriptor; the existing
-Bitcoin contract cannot be sent to the HNS wallet unchanged.
-
-## BTC ↔ HNS trade order
-
-Both directions use seller-first funding and one 32-byte preimage selected by
-the maker. The taker generates and persists a random 32-byte nonce before its
-bid so its HNS settlement public key can be derived before BasicSwap assigns
-the bid ID. The maker binds that bid, both exact contracts, and the first
-funding outpoint in its acceptance message. The taker must verify the
-acceptance commitment and first on-chain lock before funding the second lock.
-The maker then redeems the second lock, revealing the preimage; the taker
-redeems the first. Each party must resume observation and its own refund after
-restart or a counterparty disconnect.
-
-| Offered by maker | First lock | Second lock | Maker's receive branch | Taker's receive branch |
+| Maker offers | First funded lock | Taker's second lock | Maker receives | Taker receives |
 | --- | --- | --- | --- | --- |
-| HNS | HNS HTLC | Bitcoin CLTV HTLC | Bitcoin | HNS |
-| BTC | Bitcoin CLTV HTLC | HNS HTLC | HNS | Bitcoin |
+| HNS | HNS native HTLC | Bitcoin P2WSH CLTV HTLC | BTC | HNS |
+| BTC | Bitcoin P2WSH CLTV HTLC | HNS native HTLC | HNS | BTC |
 
-The first refund becomes spendable at least two hours after the second, and
-the second remains at least two hours from negotiation. HNS absolute time uses
-its high-bit 512-second median-time encoding; the threshold is rounded up
-when chosen. An implementation must also check live chain median times,
-confirmation progress, fee policy, and remaining refund margin before every
-funding action. The message and terms code does not yet run BasicSwap's bid
-state machine. The isolated two-chain test invokes the funding and spend
-actions directly.
+The offer is one-time, fixed size, and manually accepted. The maker stores the
+bid, both canonical contracts, preimage, and wallet fingerprint before it
+funds the first lock. Its acceptance carries the exact first outpoint and
+terms commitment. The taker stores those terms before checking the first
+confirmed, unspent lock; it then funds its own lock. Only after the second
+lock confirms does it queue the second-lock announcement. The maker verifies
+that lock before redeeming it and revealing the preimage. The taker extracts
+the preimage only from a confirmed spend of its own lock. Both parties wait
+for confirmed redemption on both chains before marking the bid complete.
 
-## Work needed before an HNS asset can be enabled
+The first funded chain has the later refund deadline. The two deadlines are
+at least two hours apart, and the second deadline must remain at least two
+hours away when the contracts are negotiated. HNS absolute-time CLTV uses its
+high-bit 512-second encoding; the refund threshold is rounded up. The worker
+checks live HSRD and Bitcoin median times, HNS sync, contract outputs,
+confirmation floors, unspent status, and the remaining refund margin before
+value actions. Each side can refund only its own lock after its native
+threshold. Bitcoin signed bytes are stored in SQLite before broadcast; the
+Rust wallet stores and reconciles its signed HNS transactions in its own
+encrypted workflow. The worker also stores bounded Bitcoin scan cursors and
+rewinds them if their block hash anchor changes.
 
-1. Complete the remaining native HNS coin interface operations, including
-   fee policy, ordinary withdrawals, and wallet UI. Its HSRD chain/wallet
-   reads and six-decimal monetary boundary are now in place.
-2. Route the new bid and acceptance messages through a BasicSwap HNS/BTC
-   protocol variant. Generate and persist the random nonce before sending the
-   bid, derive the taker's HNS receive key, and retain the assigned bid ID.
-   Persist the exact negotiated contracts and commitment on both peers before
-   any value operation. The current message/terms classes have no network
-   handlers or database mapping yet.
-3. Complete bridge installation and wallet lifecycle: create/restore a
-   dedicated HNS account, arrange protected unlock and HSRD Authorization
-   delivery, supervise the sidecar, and reconcile BasicSwap's persisted bid
-   identity with the wallet's persisted settlement identity after a restart.
-   hns-wallet-rs now has a one-shot atomic create/restore mode and BasicSwap has
-   a private-pipe client for it. The bridge exposes a stable seed fingerprint
-   for comparing an unlocked account after restore; wallet IDs differ between
-   create and restore. The UI and application startup do not yet
-   call those paths. The HNS value path has passed funded regtest.
-   HSRD remains its full-node backend.
-4. Wire BasicSwap's offer and bid state machine to that bridge, including
-   restart/reorg reconciliation and the correct mapping between BasicSwap
-   states and the wallet's persisted settlement states. Verify the exact
-   amount, plain covenant, script address, funding outpoint, spend branch,
-   and preimage before crediting a lock or completion.
-5. Complete prepare/install configuration, daemon supervision, offer
-   eligibility, UI/API display, and protocol routing. The coin ID and chain
-   parameters now exist, with generic HNS swaps rejected.
-6. Exercise both swap directions on isolated HNS regtest against another
-   BasicSwap asset: normal redeem, timeout refund, counterparty disconnect,
-   restart, reorg, fee rejection, malformed witness, and stale index reads.
-   Inspect exact raw transactions and on-chain outcomes before enabling
-   mainnet offers.
+An exact encrypted SMSG message is stored before delivery. Retrying a
+pending bid, acceptance, or second-lock message resubmits the same bytes and
+message ID. A database unique index permits one accepted maker bid per
+one-time offer, including if two acceptance requests race. Restarted workers
+load the saved terms and the Rust wallet's submitted transaction IDs instead
+of deriving new contract keys or funding a second lock.
 
-HSRD requires active native sync, `--wallet-index`, and a private
-`--rpc-authorization-header-file` for the wallet route. The BasicSwap side must
-keep that authorization value private and use a dedicated local wallet/account
-authority. The node's `broadcast_transaction` accepts already signed HNS
-bytes; it never supplies signing authority.
+## Verification
 
-## Reference source
+The focused Python HNS tests cover codec and HSD signature vectors, term and
+message validation, SQLite replay, fee and time guards, reorganization
+cursors, and the app bid/acceptance/second-lock handoff. An opt-in funded
+regtest starts isolated HSD, HSRD, two encrypted Rust wallet processes, and
+Bitcoin Core. It runs both directions through the value controller and then
+through BasicSwap's bid handlers and scheduled worker. The latter test uses a
+mock SMSG transport because the isolated harness has no Particl node; it
+still stores and retries exact encrypted SMSG bytes and message IDs.
 
-- [BasicSwap's Bitcoin coin interface](https://github.com/basicswap/basicswap/blob/master/basicswap/interface/btc/btc.py)
-  and [coin registration](https://github.com/basicswap/basicswap/blob/master/basicswap/chainparams.py).
-- [HSRD wallet RPC contract](https://github.com/handshake-rs/hns-node-rs/blob/main/docs/WALLET_RPC_V1.md)
-  and [consensus primitives](https://github.com/handshake-rs/hns-node-rs/tree/main/crates/hns-consensus).
-- [hns-wallet-rs](https://github.com/handshake-rs/hns-wallet-rs) for the
-  existing signing, HTLC, and recovery implementation, including its
-  [native service APIs](https://github.com/handshake-rs/hns-wallet-rs/blob/main/crates/hns-wallet-service/src/native_value_runtime.rs).
+```text
+python -m unittest discover -s tests/basicswap -p 'test_hns*.py' -q
+
+HNS_BRIDGE_BIN=/path/to/hns-wallet-basicswap-bridge \
+BITCOIND_BIN=/path/to/bitcoind \
+python -m tests.basicswap.run_hns_bridge_regtest \
+  --hsd /path/to/hsd --hsrd /path/to/hsrd \
+  --wallet-repo /path/to/hns-wallet-rs --two-chain-only
+```
+
+## Remaining release work
+
+The live app regtest now covers normal redemption and confirmed completion in
+both directions. Before treating mainnet HNS offers as a release-ready feature,
+the integration still needs a live HNS timeout refund with HSD and HSRD under
+one controlled clock, an end-to-end Particl SMSG test, and interruption and
+reorganization cases through the app worker. The Bitcoin refund has a funded
+Core regtest; the HNS refund is covered by wallet and controller tests but has
+not passed a controlled-clock funded regtest. Package and version the Rust
+bridge and HSRD for BasicSwap's supported platforms. The HNS wallet currently
+has no BasicSwap ordinary withdrawal screen or passphrase rotation; BasicSwap
+refuses a global password change while HNS is active rather than leaving its
+encrypted wallet with an unrecorded password. These release gates are tracked
+here so the asset is not presented as fully supported on the strength of the
+normal redemption test alone.
+
+Companion source: [HSRD wallet RPC](https://github.com/handshake-rs/hns-node-rs/blob/main/docs/WALLET_RPC_V1.md)
+and [hns-wallet-rs bridge contract](https://github.com/handshake-rs/hns-wallet-rs/blob/main/docs/BASICSWAP_BRIDGE.md).

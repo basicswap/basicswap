@@ -12,6 +12,7 @@ from coincurve import PrivateKey
 
 from basicswap.basicswap import BasicSwap
 from basicswap.basicswap_util import (
+    BidStates,
     MessageNetworks,
     MessageTypes,
     SwapTypes,
@@ -19,10 +20,13 @@ from basicswap.basicswap_util import (
 )
 from basicswap.chainparams import Coins
 from basicswap.db import (
+    Bid,
     DBMethods,
     HnsBtcOutbox,
     HnsBtcSwap,
     Offer,
+    OfferTracking,
+    SentOffer,
     create_table,
     extract_schema,
 )
@@ -34,8 +38,11 @@ from basicswap.interface.hns.app_protocol import (
 )
 from basicswap.interface.hns.app_settlement import progress_hns_btc_trades
 from basicswap.interface.hns.node_rpc import hns_network_binding
+from basicswap.interface.hns.settlement import ObservedSwapSpend
 from basicswap.interface.hns.trade_protocol import receive_accept_message
 from basicswap.interface.hns.trade_record import bind_lock
+from basicswap.messages_npb import OfferMessage
+from basicswap.offer_tracking import OfferTrackingModes
 from basicswap.util.smsg import smsgEncrypt, smsgGetID
 
 
@@ -55,6 +62,9 @@ class FakeBridge:
         )
         return PrivateKey(scalar).public_key.format()
 
+    def submitted_spend(self, *args, **kwargs):
+        return None
+
 
 class FakeCoin:
     def __init__(self, maker=False):
@@ -66,6 +76,12 @@ class FakeCoin:
 
     def getChainHeight(self):
         return 110
+
+    def get_fee_rate(self, _target):
+        return 0.00002, "fake"
+
+    def getNewAddress(self, _segwit, _label):
+        return "bitcoin-receive"
 
 
 class FakeApp(DBMethods):
@@ -172,6 +188,148 @@ class FakeApp(DBMethods):
 
 
 class HnsAppProtocolTest(unittest.TestCase):
+    def test_native_offer_post_uses_smsg_v2_and_one_time_tracking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = FakeApp(Path(directory) / "post-offer.sqlite", maker=True)
+            app.network_addr = "public"
+            app.ws_server = None
+            app.coin.COIN = lambda: 1_000_000
+            app.coin.getSpendableBalance = lambda: 10_000_000
+            app.coin.ensureFunds = lambda _amount: None
+            app.coin.make_int = lambda value, r=0: round(value * 1_000_000)
+            app.validateSwapType = lambda *args: BasicSwap.validateSwapType(app, *args)
+            app.validateOfferLockValue = lambda *args: BasicSwap.validateOfferLockValue(app, *args)
+            app.validateOfferValidTime = lambda *args: BasicSwap.validateOfferValidTime(app, *args)
+            app.validateOfferAmounts = lambda *_args: None
+            app.getFeeRateForCoin = lambda *_args: (0.00002, "test")
+            app.is_reverse_ads_bid = lambda *_args: False
+            app.getOfferAddressTo = lambda options: BasicSwap.getOfferAddressTo(app, options)
+            app.getPubkeyForAddress = lambda *_args: PrivateKey(
+                b"\x14" * 32
+            ).public_key.format()
+            sent = []
+
+            def send_message(*args, **kwargs):
+                sent.append((args, kwargs))
+                return b"\x74" * 28
+
+            app.sendMessage = send_message
+            with closing(sqlite3.connect(app.path)) as connection, connection:
+                create_table(
+                    connection.cursor(), "sentoffers", extract_schema()["sentoffers"]
+                )
+                create_table(
+                    connection.cursor(),
+                    "offer_tracking",
+                    extract_schema()["offer_tracking"],
+                )
+            offer_id = BasicSwap.postOffer(
+                app,
+                Coins.HNS,
+                Coins.BTC,
+                2_000_000,
+                50_000,
+                2_000_000,
+                SwapTypes.HNS_BTC_SWAP,
+                lock_type=TxLockTypes.ABS_LOCK_TIME,
+                lock_value=24 * 3600,
+            )
+            self.assertEqual(offer_id, b"\x74" * 28)
+            self.assertEqual(sent[0][1]["message_nets"], "smsg")
+            self.assertEqual(sent[0][1]["payload_version"], 2)
+            self.assertEqual(bytes.fromhex(sent[0][0][2])[:1], bytes((MessageTypes.OFFER,)))
+            with closing(sqlite3.connect(app.path)) as connection:
+                offer = app.queryOne(
+                    Offer, connection.cursor(), {"offer_id": offer_id}
+                )
+                posted = app.queryOne(
+                    SentOffer, connection.cursor(), {"offer_id": offer_id}
+                )
+                tracking = app.queryOne(
+                    OfferTracking, connection.cursor(), {"offer_id": offer_id}
+                )
+            self.assertEqual(offer.message_nets, "smsg")
+            self.assertEqual(offer.min_bid_amount, offer.amount_from)
+            self.assertIsNotNone(posted)
+            self.assertEqual(tracking.mode, OfferTrackingModes.ONE_TIME)
+            self.assertEqual(tracking.max_fills, 1)
+            with self.assertRaisesRegex(ValueError, "prefunded"):
+                BasicSwap.postOffer(
+                    app,
+                    Coins.HNS,
+                    Coins.BTC,
+                    2_000_000,
+                    50_000,
+                    2_000_000,
+                    SwapTypes.HNS_BTC_SWAP,
+                    lock_type=TxLockTypes.ABS_LOCK_TIME,
+                    lock_value=24 * 3600,
+                    extra_options={"prefunded_itx": b"unexpected"},
+                )
+            self.assertEqual(len(sent), 1)
+
+    def test_native_offer_is_received_with_fixed_smsg_terms(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = FakeApp(Path(directory) / "offer.sqlite")
+            app.network_addr = "receiver"
+            app._debug_cases = []
+            app.getSmsgMsgPayloadVersion = lambda _msg: 2
+            app.getOffer = lambda offer_id, cursor=None: app.queryOne(
+                Offer, cursor, {"offer_id": offer_id}
+            )
+            app.isOfferRevoked = lambda *_args: False
+            app.notify = lambda *_args: None
+            app.addMessageNetworkLink = lambda *_args: None
+            app.is_reverse_ads_bid = lambda *_args: False
+            app.validateSwapType = lambda *args: BasicSwap.validateSwapType(app, *args)
+            app.validateOfferAmounts = lambda *_args: None
+            app.validateOfferLockValue = lambda *args: BasicSwap.validateOfferLockValue(app, *args)
+            app.validateOfferValidTime = lambda *args: BasicSwap.validateOfferValidTime(app, *args)
+            app.validateMessageNets = lambda *args: BasicSwap.validateMessageNets(app, *args)
+            app.coin.validateFeeRate = lambda *_args: None
+            app.coin.make_int = lambda value, r=0: round(value * 1_000_000)
+
+            for hns_first in (True, False):
+                with self.subTest(hns_first=hns_first):
+                    message = OfferMessage()
+                    message.protocol_version = 5
+                    message.coin_from = int(Coins.HNS if hns_first else Coins.BTC)
+                    message.coin_to = int(Coins.BTC if hns_first else Coins.HNS)
+                    message.amount_from = 2_000_000 if hns_first else 100_000
+                    message.amount_to = 100_000 if hns_first else 2_000_000
+                    message.min_bid_amount = message.amount_from
+                    message.time_valid = 3600
+                    message.lock_type = int(TxLockTypes.ABS_LOCK_TIME)
+                    message.lock_value = 24 * 3600
+                    message.swap_type = int(SwapTypes.HNS_BTC_SWAP)
+                    message.message_nets = "smsg"
+                    if hns_first:
+                        message.fee_rate_to = 1000
+                    else:
+                        message.fee_rate_from = 1000
+                    msg_id = (b"\x71" if hns_first else b"\x72") * 28
+                    incoming = {
+                        "msgid": msg_id.hex(),
+                        "sent": app.now,
+                        "from": "sender",
+                        "to": "receiver",
+                        "type": "smsg",
+                        "raw": message.to_bytes(),
+                    }
+                    with patch(
+                        "basicswap.basicswap.getMsgPubkey",
+                        return_value=PrivateKey(b"\x04" * 32).public_key.format(),
+                    ):
+                        BasicSwap.processOffer(app, incoming)
+                    with closing(sqlite3.connect(app.path)) as connection:
+                        offer = app.queryOne(
+                            Offer, connection.cursor(), {"offer_id": msg_id}
+                        )
+                    self.assertEqual(offer.swap_type, SwapTypes.HNS_BTC_SWAP)
+                    self.assertEqual(offer.message_nets, "smsg")
+                    self.assertEqual(offer.min_bid_amount, offer.amount_from)
+                    self.assertEqual(offer.smsg_payload_version, 2)
+
     def test_sender_commits_bid_id_then_retries_same_encrypted_message(self):
         with tempfile.TemporaryDirectory() as directory:
             app = FakeApp(Path(directory) / "app.sqlite")
@@ -279,6 +437,7 @@ class HnsAppProtocolTest(unittest.TestCase):
             self.assertEqual(maker_record.session_id, record.session_id)
 
             class FakeSettlement:
+                MINIMUM_MAKER_REDEEM_MARGIN_SECONDS = 30 * 60
                 def __init__(self, maker_record, terms, *args):
                     self.record = maker_record
                     self.persist = args[-1]
@@ -307,8 +466,25 @@ class HnsAppProtocolTest(unittest.TestCase):
                     HnsBtcOutbox, connection.cursor(), {"message_id": accept_id}
                 )
             self.assertEqual(maker_record.hns_lock_txid, b"\x27" * 32)
+            maker_cursor = maker.openDB()
+            try:
+                with self.assertRaises(sqlite3.IntegrityError):
+                    maker.add(
+                        HnsBtcSwap(
+                            session_id=b"\x71" * 32,
+                            offer_id=offer.offer_id,
+                            bid_id=b"\x72" * 28,
+                            role=1,
+                            phase=1,
+                        ),
+                        maker_cursor,
+                    )
+            finally:
+                maker.closeDB(maker_cursor, commit=False)
             self.assertEqual(smsgGetID(accept_row.message_bytes), accept_id)
             self.assertIsNotNone(accept_row.delivered_at)
+            self.assertEqual(maker.sent, [accept_row.message_bytes])
+            self.assertEqual(BasicSwap.acceptBid(maker, bid_id), accept_id)
             self.assertEqual(maker.sent, [accept_row.message_bytes])
             magic, genesis = hns_network_binding("regtest")
             terms = receive_accept_message(
@@ -357,6 +533,9 @@ class HnsAppProtocolTest(unittest.TestCase):
 
                 def verify_lock(self, coin):
                     return confirmed[coin]
+
+                def scan_own_btc_lock_spend(self, _height):
+                    return None
 
                 def _chain_now(self):
                     return app.now
@@ -409,6 +588,71 @@ class HnsAppProtocolTest(unittest.TestCase):
             }
             self.assertEqual(receive_hns_btc_second_lock(maker, second_msg), bid_id)
             self.assertEqual(receive_hns_btc_second_lock(maker, second_msg), bid_id)
+
+            maker_chain = {
+                "peer_confirmed": False,
+                "own_spent": False,
+                "peer_spent": False,
+            }
+            redeemed = []
+
+            class FakeMakerSettlement:
+                own_coin = "hns"
+                peer_coin = "btc"
+
+                def __init__(self, maker_record, swap_terms, *args):
+                    self.record = maker_record
+                    self.terms = swap_terms
+                    self.persist = args[-1]
+                    self.hns_bridge = maker.coin.bridge
+
+                def observe_own_lock_spend(self):
+                    if not maker_chain["own_spent"]:
+                        return None
+                    return ObservedSwapSpend(
+                        "redeem", b"\x31" * 32, 2, self.record.secret_preimage
+                    )
+
+                def verify_lock(self, coin):
+                    assert coin == "btc"
+                    return maker_chain["peer_confirmed"]
+
+                def redeem_peer_lock(self, maximum_hns_fee, **kwargs):
+                    assert maximum_hns_fee == 100_000
+                    redeemed.append(kwargs)
+                    if self.record.btc_redeem_tx is None:
+                        self.record.btc_redeem_tx = b"prepared"
+                        self.persist(self.record)
+
+                def scan_peer_btc_lock_spend(self, _height):
+                    if not maker_chain["peer_spent"]:
+                        return None
+                    return ObservedSwapSpend(
+                        "redeem", b"\x30" * 32, 2, self.record.secret_preimage
+                    )
+
+                def _prepared_btc(self, _field):
+                    return (
+                        SimpleNamespace(txid=b"\x30" * 32)
+                        if self.record.btc_redeem_tx is not None
+                        else None
+                    )
+
+            with patch(
+                "basicswap.interface.hns.app_settlement.HnsBtcSettlement",
+                FakeMakerSettlement,
+            ):
+                self.assertEqual(progress_hns_btc_trades(maker), 0, maker.logs)
+                self.assertEqual(redeemed, [])
+                maker_chain["peer_confirmed"] = True
+                self.assertEqual(progress_hns_btc_trades(maker), 0, maker.logs)
+                self.assertEqual(len(redeemed), 1)
+                maker_chain["own_spent"] = True
+                maker_chain["peer_spent"] = True
+                self.assertEqual(progress_hns_btc_trades(maker), 1, maker.logs)
+            with closing(sqlite3.connect(maker.path)) as connection:
+                maker_bid = maker.queryOne(Bid, connection.cursor(), {"bid_id": bid_id})
+            self.assertEqual(maker_bid.state, BidStates.SWAP_COMPLETED)
 
 
 if __name__ == "__main__":
