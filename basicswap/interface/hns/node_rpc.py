@@ -75,6 +75,17 @@ def _valid_tip(tip):
     )
 
 
+def _sync_tip_hash(value):
+    """HSRD's scheduler JSON uses a byte array; wallet v1 uses hex."""
+    if (
+        not isinstance(value, list)
+        or len(value) != 32
+        or any(type(byte) is not int or not 0 <= byte <= 255 for byte in value)
+    ):
+        raise HnsNodeError("invalid hsrd synchronization tip hash")
+    return bytes(value).hex()
+
+
 def script_id_for_address(version: int, program: bytes) -> str:
     """Derive hsrd's ScriptId from a canonical Handshake output address."""
     if type(version) is not int or not 0 <= version <= 31:
@@ -242,12 +253,13 @@ class HnsNodeRpc:
             raise HnsNodeError("invalid hsrd synchronization tip")
         for tip in (active, stored, best):
             if (
-                tip.get("hash") != binding.tip["hash"]
-                or tip.get("height") != binding.tip["height"]
+                _sync_tip_hash(tip.get("hash")) != binding.tip["hash"].lower()
+                or type(tip.get("height")) is not int
+                or tip["height"] != binding.tip["height"]
             ):
                 return False
         if target is not None and (
-            type(target) is not int or target > binding.tip["height"]
+            type(target) is not int or target < 0 or target > binding.tip["height"]
         ):
             return False
         for key in ("pending_blocks", "inflight_blocks", "tracked_blocks"):

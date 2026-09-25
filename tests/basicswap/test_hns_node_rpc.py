@@ -104,18 +104,25 @@ class HnsNodeRpcTest(unittest.TestCase):
         self.assertTrue(all(conn.closed for conn in connections))
 
     def test_sync_readiness_requires_scheduler_and_wallet_tip_agreement(self):
+        scheduler_tip = {
+            "hash": list(bytes.fromhex(TIP["hash"])),
+            "height": TIP["height"],
+        }
         synced = {
             "stage": "Synced",
-            "active_tip": {"hash": TIP["hash"], "height": TIP["height"]},
-            "stored_tip": {"hash": TIP["hash"], "height": TIP["height"]},
-            "best_header": {"hash": TIP["hash"], "height": TIP["height"]},
+            "active_tip": scheduler_tip,
+            "stored_tip": scheduler_tip,
+            "best_header": scheduler_tip,
             "target_height": TIP["height"],
             "pending_blocks": 0,
             "inflight_blocks": 0,
             "tracked_blocks": 0,
             "peers": [],
         }
-        stale = {**synced, "best_header": {"hash": "ef" * 32, "height": 13}}
+        stale = {
+            **synced,
+            "best_header": {"hash": list(bytes.fromhex("ef" * 32)), "height": 13},
+        }
         client, requests, connections = self.make_client([(200, synced), (200, stale)])
         binding = HnsChainSnapshot(7, TIP)
         self.assertTrue(client.sync_ready("regtest", binding))
@@ -125,11 +132,15 @@ class HnsNodeRpcTest(unittest.TestCase):
         self.assertTrue(all(conn.closed for conn in connections))
 
     def test_mainnet_sync_readiness_needs_a_peer(self):
+        scheduler_tip = {
+            "hash": list(bytes.fromhex(TIP["hash"])),
+            "height": TIP["height"],
+        }
         status = {
             "stage": "Synced",
-            "active_tip": {"hash": TIP["hash"], "height": TIP["height"]},
-            "stored_tip": {"hash": TIP["hash"], "height": TIP["height"]},
-            "best_header": {"hash": TIP["hash"], "height": TIP["height"]},
+            "active_tip": scheduler_tip,
+            "stored_tip": scheduler_tip,
+            "best_header": scheduler_tip,
             "target_height": TIP["height"],
             "pending_blocks": 0,
             "inflight_blocks": 0,
@@ -138,6 +149,28 @@ class HnsNodeRpcTest(unittest.TestCase):
         }
         client, _, _ = self.make_client([(200, status)])
         self.assertFalse(client.sync_ready("mainnet", HnsChainSnapshot(7, TIP)))
+
+    def test_sync_readiness_rejects_malformed_scheduler_hash(self):
+        status = {
+            "stage": "Synced",
+            "active_tip": {"hash": [True] * 32, "height": TIP["height"]},
+            "stored_tip": {
+                "hash": list(bytes.fromhex(TIP["hash"])),
+                "height": TIP["height"],
+            },
+            "best_header": {
+                "hash": list(bytes.fromhex(TIP["hash"])),
+                "height": TIP["height"],
+            },
+            "target_height": TIP["height"],
+            "pending_blocks": 0,
+            "inflight_blocks": 0,
+            "tracked_blocks": 0,
+            "peers": [],
+        }
+        client, _, _ = self.make_client([(200, status)])
+        with self.assertRaisesRegex(HnsNodeError, "tip hash"):
+            client.sync_ready("regtest", HnsChainSnapshot(7, TIP))
 
     def test_genesis_mismatch_is_rejected(self):
         replies = [
