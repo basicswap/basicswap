@@ -67,6 +67,14 @@ class HnsBtcSettlement:
             raise ValueError("HNS/BTC settlement terms differ from durable record")
         if not callable(persist_record):
             raise TypeError("HNS/BTC settlement requires a persistence callback")
+        if (
+            not isinstance(record.hns_wallet_fingerprint, bytes)
+            or len(record.hns_wallet_fingerprint) != 32
+        ):
+            raise ValueError("HNS/BTC wallet identity is not persisted")
+        _, live_fingerprint = hns_bridge.identity(hns_network)
+        if live_fingerprint != record.hns_wallet_fingerprint:
+            raise ValueError("HNS/BTC wallet recovery seed changed")
         self.record = record
         self.terms = terms
         self.btc = BtcHtlcContract(btc_interface, terms)
@@ -133,15 +141,39 @@ class HnsBtcSettlement:
             return None
         tx = self.btc.ci.loadTx(raw)
         tx.rehash()
-        return PreparedBtcTransaction(
+        prepared = PreparedBtcTransaction(
             bytes.fromhex(tx.hash),
             raw,
             self.record.btc_lock_vout if field == "btc_funding_tx" else None,
         )
+        if field == "btc_funding_tx":
+            if prepared.txid != self.record.btc_lock_txid:
+                raise ValueError("stored Bitcoin funding outpoint mismatch")
+            self.btc.validate_prepared_funding(prepared, self.record.btc_lock_vout)
+        else:
+            txid, vout = self._outpoint("btc")
+            self.btc.validate_prepared_spend(
+                prepared,
+                txid,
+                vout,
+                "redeem" if field == "btc_redeem_tx" else "refund",
+                self.record.secret_preimage,
+            )
+        return prepared
 
     def fund_owned_lock(self, maximum_hns_fee):
         """Fund exactly once; the taker first verifies the maker's lock."""
-        now = self._funding_now()
+        if self.own_coin == "hns":
+            submitted = self.hns_bridge.submitted_funding(self.terms.hns_wallet_terms())
+            if submitted is not None:
+                bind_lock(self.record, "hns", submitted, 0)
+                self.persist_record(self.record)
+                return submitted, 0
+        prepared = (
+            self._prepared_btc("btc_funding_tx") if self.own_coin == "btc" else None
+        )
+        if prepared is None:
+            now = self._funding_now()
         if self.record.role == TAKER and not self.verify_lock(self.peer_coin):
             raise ValueError("first HNS/BTC lock is not sufficiently confirmed")
         if self.own_coin == "hns":
@@ -152,7 +184,6 @@ class HnsBtcSettlement:
             self.persist_record(self.record)
             return txid, vout
 
-        prepared = self._prepared_btc("btc_funding_tx")
         if prepared is None:
             prepared = self.btc.prepare_funding(
                 now,
@@ -174,6 +205,17 @@ class HnsBtcSettlement:
         maximum_btc_fee=None,
     ):
         """Reveal the persisted secret only after the peer's lock confirms."""
+        txid, vout = self._outpoint(self.peer_coin)
+        if self.peer_coin == "hns":
+            submitted = self.hns_bridge.submitted_spend(
+                self.terms.hns_wallet_terms(), txid, refund=False
+            )
+            if submitted is not None:
+                return submitted
+        else:
+            prepared = self._prepared_btc("btc_redeem_tx")
+            if prepared is not None:
+                return self.btc.broadcast(prepared)
         if self.record.role == MAKER:
             now = self._chain_now()
             _, second_deadline = self.terms.validate(
@@ -232,7 +274,6 @@ class HnsBtcSettlement:
             raise ValueError("HNS/BTC persisted preimage is invalid")
         if not self.verify_lock(self.peer_coin):
             raise ValueError("peer HNS/BTC lock is not sufficiently confirmed")
-        txid, vout = self._outpoint(self.peer_coin)
         if self.peer_coin == "hns":
             return self.hns_bridge.redeem(
                 self.terms.hns_wallet_terms(),
@@ -241,19 +282,17 @@ class HnsBtcSettlement:
                 self.record.secret_preimage,
                 maximum_hns_fee,
             )
-        prepared = self._prepared_btc("btc_redeem_tx")
-        if prepared is None:
-            prepared = self.btc.prepare_spend(
-                txid,
-                vout,
-                btc_destination,
-                btc_private_key,
-                btc_fee_rate,
-                maximum_btc_fee,
-                preimage=self.record.secret_preimage,
-            )
-            bind_prepared_btc_tx(self.record, "btc_redeem_tx", prepared)
-            self.persist_record(self.record)
+        prepared = self.btc.prepare_spend(
+            txid,
+            vout,
+            btc_destination,
+            btc_private_key,
+            btc_fee_rate,
+            maximum_btc_fee,
+            preimage=self.record.secret_preimage,
+        )
+        bind_prepared_btc_tx(self.record, "btc_redeem_tx", prepared)
+        self.persist_record(self.record)
         return self.btc.broadcast(prepared)
 
     def observe_own_lock_spend(self, btc_first_height=None, btc_last_height=None):
@@ -386,6 +425,11 @@ class HnsBtcSettlement:
         """Refund only the local lock after its chain's native timelock."""
         txid, vout = self._outpoint(self.own_coin)
         if self.own_coin == "hns":
+            submitted = self.hns_bridge.submitted_spend(
+                self.terms.hns_wallet_terms(), txid, refund=True
+            )
+            if submitted is not None:
+                return submitted
             return self.hns_bridge.refund(
                 self.terms.hns_wallet_terms(),
                 txid,

@@ -75,8 +75,8 @@ branch, and witness/preimage locally.
   the caller for durable persistence before broadcast. The isolated Bitcoin
   Core regtest test exercises both trade role mappings, redeem, and refund.
 - `HnsBtcSwap` records the pre-bid session ID, nonce, exact accepted contracts,
-  lock outpoints, Bitcoin prepared transaction bytes, and scan cursor in the
-  BasicSwap database (schema version 39). The record helpers reject changed
+  lock outpoints, Bitcoin prepared transaction bytes, wallet seed fingerprint,
+  and scan cursor in the BasicSwap database (schema version 40). The record helpers reject changed
   identities or terms and can reconstruct an accepted trade after the refund
   window closes. `trade_protocol.py` now constructs and binds the bid,
   acceptance, and second-lock messages to that row in both trade directions,
@@ -90,6 +90,11 @@ branch, and witness/preimage locally.
   confirmed witness observation in either role mapping. Its bounded Bitcoin
   spend scanner persists a canonical block anchor, rewinds on a reorg, and
   leaves a found spend in the next scan range for rechecking after restart.
+  It asks the Rust bridge for a previously submitted HNS lock or spend before
+  considering a new action after restart. Stored Bitcoin lock and spend bytes
+  are checked against the exact contract, outpoint, branch, and preimage before
+  replay. A trade stores the HNS recovery-seed fingerprint and rejects a
+  different unlocked account even if its wallet ID changed on restore.
   BasicSwap's message dispatcher and bid worker still need to call it.
 
 The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
@@ -97,7 +102,10 @@ HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the
 Rust bridge against an indexed live chain. A fresh encrypted HNS wallet
 received an ordinary transfer, funded an HNS HTLC, verified its lock after
 the account's two required confirmations, redeemed with the preimage, and
-observed the spend. The bridge's ignored live test records this setup. It is
+observed the spend. Its submitted-funding and submitted-spend lookups returned
+the same transaction IDs before and after the spend. The bridge's ignored live
+test records this setup; `tests/basicswap/run_hns_bridge_regtest.py` starts the
+isolated nodes and runs it. It is
 an HNS settlement test; a funded two-chain BasicSwap trade has not passed.
 
 These Python components are independent evidence and encoding checks. The

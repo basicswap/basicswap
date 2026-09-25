@@ -12,6 +12,7 @@ from basicswap.interface.hns.trade_record import (
     bind_bid_id,
     bind_lock,
     bind_terms,
+    bind_wallet_fingerprint,
     new_trade_record,
 )
 from tests.basicswap.test_hns_btc_swap import GENESIS, MAGIC, NOW, messages, terms
@@ -48,6 +49,18 @@ class FakeHnsBridge:
     def __init__(self):
         self.first_verified = False
         self.funded = 0
+        self.submitted_funding_id = None
+        self.submitted_spend_id = None
+
+    def identity(self, expected_network):
+        assert expected_network == "regtest"
+        return bytes.fromhex("44" * 16), bytes.fromhex("55" * 32)
+
+    def submitted_funding(self, terms):
+        return self.submitted_funding_id
+
+    def submitted_spend(self, terms, funding_id, refund):
+        return self.submitted_spend_id
 
     def verify_lock(self, terms, txid, confirmations):
         return self.first_verified
@@ -66,6 +79,7 @@ class HnsBtcSettlementTest(unittest.TestCase):
         )
         bind_bid_id(record, trade.bid_id)
         bind_terms(record, trade, NOW, MAGIC, GENESIS)
+        bind_wallet_fingerprint(record, bytes.fromhex("55" * 32))
         bridge = FakeHnsBridge()
         saved = []
         settlement = HnsBtcSettlement(
@@ -113,13 +127,51 @@ class HnsBtcSettlementTest(unittest.TestCase):
             )
 
     @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_restored_wallet_seed_must_match_persisted_trade(self, _mock_time):
+        settlement, bridge, saved = self.make_settlement(False, MAKER)
+        settlement.record.hns_wallet_fingerprint = bytes.fromhex("66" * 32)
+        with self.assertRaisesRegex(ValueError, "recovery seed changed"):
+            HnsBtcSettlement(
+                settlement.record,
+                settlement.terms,
+                FakeBitcoin(),
+                bridge,
+                FakeHnsNode(),
+                "regtest",
+                lambda changed: saved.append(changed.hns_lock_txid),
+            )
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
     def test_maker_does_not_reveal_secret_near_second_refund(self, _mock_time):
         settlement, _, _ = self.make_settlement(True, MAKER)
+        bind_lock(settlement.record, "btc", bytes.fromhex("cd" * 32), 1)
         with (
             patch.object(settlement, "_chain_now", return_value=NOW + 12 * 60 * 60),
             self.assertRaisesRegex(ValueError, "too close to refund"),
         ):
             settlement.redeem_peer_lock(100000)
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_recovers_submitted_hns_funding_after_window_closes(self, _mock_time):
+        settlement, bridge, saved = self.make_settlement(True, MAKER)
+        bridge.submitted_funding_id = bytes.fromhex("ab" * 32)
+        with patch.object(settlement, "_funding_now", side_effect=AssertionError):
+            self.assertEqual(
+                settlement.fund_owned_lock(100000), (bridge.submitted_funding_id, 0)
+            )
+        self.assertEqual(settlement.record.hns_lock_txid, bridge.submitted_funding_id)
+        self.assertEqual(saved, [bridge.submitted_funding_id])
+        self.assertEqual(bridge.funded, 0)
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_recovers_submitted_hns_redeem_without_revealing_again(self, _mock_time):
+        settlement, bridge, _ = self.make_settlement(True, TAKER)
+        bind_lock(settlement.record, "hns", bytes.fromhex("ab" * 32), 0)
+        bridge.submitted_spend_id = bytes.fromhex("ef" * 32)
+        with patch.object(settlement, "_chain_now", side_effect=AssertionError):
+            self.assertEqual(
+                settlement.redeem_peer_lock(100000), bridge.submitted_spend_id
+            )
 
     @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
     def test_funding_waits_for_hsrd_sync(self, _mock_time):

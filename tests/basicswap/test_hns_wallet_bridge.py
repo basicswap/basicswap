@@ -45,6 +45,10 @@ while True:
     elif operation == 'fund':
         result = {'transaction_id': '44' * 32, 'output_index': 0,
                   'recovered': False}
+    elif operation == 'submitted_funding':
+        result = {'transaction_id': '44' * 32}
+    elif operation == 'submitted_spend':
+        result = {'transaction_id': None}
     elif operation == 'observe_spend':
         result = {'observed': False}
     elif operation == 'lock':
@@ -115,6 +119,10 @@ class HnsWalletBridgeTest(unittest.TestCase):
             self.assertEqual(
                 bridge.fund(self.terms, 1_000), (bytes.fromhex("44" * 32), 0)
             )
+            self.assertEqual(
+                bridge.submitted_funding(self.terms), bytes.fromhex("44" * 32)
+            )
+            self.assertIsNone(bridge.submitted_spend(self.terms, bytes(32), False))
             self.assertIsNone(bridge.observe_spend(self.terms, bytes(32), 2))
             bridge.lock()
 

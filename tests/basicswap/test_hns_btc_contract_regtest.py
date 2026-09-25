@@ -172,6 +172,11 @@ class BtcHtlcRegtest(unittest.TestCase):
                     contract = BtcHtlcContract(ci, trade)
                     prepared = contract.prepare_funding(now, MAGIC, GENESIS)
                     self.assertIsNotNone(prepared.contract_vout)
+                    contract.validate_prepared_funding(prepared, prepared.contract_vout)
+                    with self.assertRaisesRegex(ValueError, "funding output mismatch"):
+                        contract.validate_prepared_funding(
+                            prepared, prepared.contract_vout + 1
+                        )
                     self.assertEqual(contract.broadcast(prepared), prepared.txid)
                     self.assertEqual(contract.broadcast(prepared), prepared.txid)
                     core.call("generatetoaddress", [2, miner])
@@ -192,6 +197,17 @@ class BtcHtlcRegtest(unittest.TestCase):
                         10000,
                         preimage=secret,
                     )
+                    contract.validate_prepared_spend(
+                        redeem, prepared.txid, prepared.contract_vout, "redeem", secret
+                    )
+                    with self.assertRaisesRegex(ValueError, "redeem mismatch"):
+                        contract.validate_prepared_spend(
+                            redeem,
+                            prepared.txid,
+                            prepared.contract_vout,
+                            "redeem",
+                            bytes(32),
+                        )
                     self.assertEqual(contract.broadcast(redeem), redeem.txid)
                     core.call("generatetoaddress", [1, miner])
                     tip = core.call("getblockcount")
@@ -227,6 +243,13 @@ class BtcHtlcRegtest(unittest.TestCase):
                     refund_key,
                     2,
                     10000,
+                )
+                contract.validate_prepared_spend(
+                    refund,
+                    refund_prepared.txid,
+                    refund_prepared.contract_vout,
+                    "refund",
+                    None,
                 )
                 self.assertEqual(contract.broadcast(refund), refund.txid)
                 core.call("generatetoaddress", [1, miner])

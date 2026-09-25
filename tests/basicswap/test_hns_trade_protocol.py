@@ -24,11 +24,17 @@ NONCE = bytes.fromhex("33" * 32)
 MAKER_BTC_KEY = bytes.fromhex("01" * 32)
 TAKER_BTC_KEY = bytes.fromhex("02" * 32)
 SECRET = bytes.fromhex("aa" * 32)
+WALLET_FINGERPRINT = bytes.fromhex("55" * 32)
 
 
 class FakeHnsBridge:
-    def __init__(self, scalar):
+    def __init__(self, scalar, fingerprint=WALLET_FINGERPRINT):
         self.scalar = scalar
+        self.fingerprint = fingerprint
+
+    def identity(self, expected_network):
+        assert expected_network == "regtest"
+        return bytes.fromhex("44" * 16), self.fingerprint
 
     def key(self, offer_id, session_nonce, refund):
         assert offer_id == OFFER_ID
@@ -52,9 +58,11 @@ class HnsTradeProtocolTest(unittest.TestCase):
                     taker_bridge,
                     NOW,
                     session_nonce=NONCE,
+                    hns_network="regtest",
                 )
                 self.assertIsNone(taker.bid_id)
                 self.assertEqual(taker.bid_message, bid_raw)
+                self.assertEqual(taker.hns_wallet_fingerprint, taker_bridge.fingerprint)
                 bind_sent_bid(taker, BID_ID)
                 maker = receive_maker_bid(OFFER_ID, BID_ID, bid_raw, NOW, NOW)
                 self.assertEqual(maker.session_id, taker.session_id)
@@ -72,8 +80,10 @@ class HnsTradeProtocolTest(unittest.TestCase):
                     NOW,
                     MAGIC,
                     GENESIS,
+                    "regtest",
                 )
                 self.assertEqual(maker.secret_preimage, SECRET)
+                self.assertEqual(maker.hns_wallet_fingerprint, maker_bridge.fingerprint)
                 self.assertEqual(
                     restore_maker_terms(
                         maker, hns_first, 2_000_000, 100_000, NOW, MAGIC, GENESIS
@@ -94,6 +104,7 @@ class HnsTradeProtocolTest(unittest.TestCase):
                         NOW,
                         MAGIC,
                         GENESIS,
+                        "regtest",
                     ),
                     terms,
                 )
@@ -166,6 +177,7 @@ class HnsTradeProtocolTest(unittest.TestCase):
             FakeHnsBridge(3),
             NOW,
             session_nonce=NONCE,
+            hns_network="regtest",
         )
         maker = receive_maker_bid(OFFER_ID, BID_ID, bid_raw, NOW, NOW)
         prepare_maker_terms(
@@ -181,6 +193,7 @@ class HnsTradeProtocolTest(unittest.TestCase):
             NOW,
             MAGIC,
             GENESIS,
+            "regtest",
         )
         with self.assertRaisesRegex(ValueError, "wallet key changed"):
             prepare_maker_terms(
@@ -196,6 +209,7 @@ class HnsTradeProtocolTest(unittest.TestCase):
                 NOW,
                 MAGIC,
                 GENESIS,
+                "regtest",
             )
 
     def test_expired_inbound_bid_is_rejected(self):
@@ -208,6 +222,7 @@ class HnsTradeProtocolTest(unittest.TestCase):
             FakeHnsBridge(3),
             NOW,
             session_nonce=NONCE,
+            hns_network="regtest",
         )
         with self.assertRaisesRegex(ValueError, "receive time"):
             receive_maker_bid(OFFER_ID, BID_ID, bid_raw, NOW, NOW + 601)

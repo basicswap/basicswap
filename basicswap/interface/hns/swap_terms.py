@@ -20,6 +20,8 @@ from basicswap.messages_npb import (
 from basicswap.script import OpCodes
 from basicswap.util import SerialiseNum
 
+from . import HNS_MAX_MONEY
+
 HNS_TIME_FLAG = 0x80000000
 HNS_TIME_MASK = 0x7FFFFFFF
 HNS_TIME_UNIT = 512
@@ -238,10 +240,7 @@ class HnsBtcSwapTerms:
             raise ValueError("invalid HNS swap session nonce")
         if type(self.hns_first) is not bool:
             raise ValueError("invalid HNS swap direction")
-        if (
-            type(self.hns_amount) is not int
-            or not 0 < self.hns_amount <= 0xFFFFFFFFFFFFFFFF
-        ):
+        if type(self.hns_amount) is not int or not 0 < self.hns_amount <= HNS_MAX_MONEY:
             raise ValueError("invalid HNS swap amount")
         if (
             type(self.btc_amount) is not int

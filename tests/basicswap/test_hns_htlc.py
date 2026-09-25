@@ -3,6 +3,7 @@
 import unittest
 from dataclasses import replace
 
+from basicswap.interface.hns import HNS_MAX_MONEY
 from basicswap.interface.hns.htlc import HnsHtlc
 from basicswap.interface.hns.transaction import HnsCovenant, HnsTransaction
 
@@ -69,6 +70,8 @@ class HnsHtlcTest(unittest.TestCase):
             ).script()
         with self.assertRaises(ValueError):
             replace(descriptor, receiver_public_key=b"\x02" + bytes(32)).script()
+        with self.assertRaisesRegex(ValueError, "HTLC value"):
+            replace(descriptor, value=HNS_MAX_MONEY + 1).encode()
 
 
 if __name__ == "__main__":

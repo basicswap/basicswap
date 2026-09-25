@@ -9,6 +9,7 @@ pinned to hns-rs ``HnsHtlc`` version 1.
 import hashlib
 from dataclasses import dataclass
 
+from . import HNS_MAX_MONEY
 from .address import witness_script_program
 from .transaction import HnsAddress, HnsCovenant, HnsOutput
 
@@ -61,7 +62,7 @@ class HnsHtlc:
             raise ValueError("invalid HNS network magic")
         if not isinstance(self.genesis, bytes) or len(self.genesis) != 32:
             raise ValueError("invalid HNS genesis hash")
-        if type(self.value) is not int or not 0 < self.value <= 0xFFFFFFFFFFFFFFFF:
+        if type(self.value) is not int or not 0 < self.value <= HNS_MAX_MONEY:
             raise ValueError("invalid HNS HTLC value")
         if (
             not isinstance(self.hashlock, bytes)

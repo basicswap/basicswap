@@ -18,6 +18,7 @@ from basicswap.util.crypto import hash160
 
 from .htlc import HnsHtlc
 from .swap_terms import (
+    HNS_MAX_MONEY,
     SWAP_PROTOCOL_VERSION,
     HnsBtcSwapTerms,
     _decode_exact_message,
@@ -34,6 +35,7 @@ from .trade_record import (
     bind_message,
     bind_preimage,
     bind_terms,
+    bind_wallet_fingerprint,
     new_trade_record,
 )
 
@@ -73,13 +75,15 @@ def prepare_taker_bid(
     minimum_btc_confirmations=2,
     message_nets=None,
     session_nonce=None,
+    *,
+    hns_network,
 ):
     """Return the pre-bid record and wire bytes to persist before send."""
     if type(hns_first) is not bool:
         raise ValueError("invalid HNS/BTC trade direction")
     if (
         type(hns_amount) is not int
-        or not 0 < hns_amount <= 0xFFFFFFFFFFFFFFFF
+        or not 0 < hns_amount <= HNS_MAX_MONEY
         or type(btc_amount) is not int
         or not 0 < btc_amount <= 21_000_000 * 100_000_000
     ):
@@ -93,6 +97,7 @@ def prepare_taker_bid(
     if not isinstance(nonce, bytes) or len(nonce) != 32 or nonce == bytes(32):
         raise ValueError("invalid HNS/BTC session nonce")
     btc_hash = _btc_key_hash(bitcoin_private_key)
+    _, wallet_fingerprint = hns_bridge.identity(hns_network)
     hns_key = _hns_key(hns_bridge, offer_id, nonce, refund=not hns_first)
     message = HnsBtcBidMessage(
         protocol_version=SWAP_PROTOCOL_VERSION,
@@ -113,6 +118,7 @@ def prepare_taker_bid(
     raw = message.to_bytes()
     _decode_exact_message(HnsBtcBidMessage, raw)
     record = new_trade_record(offer_id, nonce, TAKER, raw, now_unix)
+    bind_wallet_fingerprint(record, wallet_fingerprint)
     return record, raw
 
 
@@ -223,12 +229,15 @@ def prepare_maker_terms(
     now_unix,
     hns_magic,
     hns_genesis,
+    hns_network,
 ):
     """Bind both exact contracts and the secret before funding the first leg."""
     if record.role != MAKER or record.bid_id is None:
         raise ValueError("incomplete maker HNS/BTC bid")
     if not isinstance(secret_preimage, bytes) or len(secret_preimage) != 32:
         raise ValueError("invalid HNS/BTC maker preimage")
+    _, wallet_fingerprint = hns_bridge.identity(hns_network)
+    bind_wallet_fingerprint(record, wallet_fingerprint)
     if record.terms_commitment is not None:
         terms = restore_maker_terms(
             record, hns_first, hns_amount, btc_amount, now_unix, hns_magic, hns_genesis

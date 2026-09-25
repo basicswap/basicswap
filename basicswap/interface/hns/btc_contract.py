@@ -143,6 +143,79 @@ class BtcHtlcContract:
             raise ValueError("Bitcoin broadcast transaction ID mismatch")
         return prepared.txid
 
+    def validate_prepared_funding(self, prepared, contract_vout):
+        """Recheck a stored signed lock before replaying its raw bytes."""
+        if not isinstance(prepared, PreparedBtcTransaction):
+            raise TypeError("invalid prepared Bitcoin transaction")
+        tx = self.ci.loadTx(prepared.raw)
+        tx.rehash()
+        if (
+            bytes.fromhex(tx.hash) != prepared.txid
+            or tx.serialize_with_witness() != prepared.raw
+        ):
+            raise ValueError("stored Bitcoin funding ID mismatch")
+        if (
+            type(contract_vout) is not int
+            or not 0 <= contract_vout < len(tx.vout)
+            or tx.vout[contract_vout].scriptPubKey != self.script_pubkey
+            or tx.vout[contract_vout].nValue != self.terms.btc_amount
+        ):
+            raise ValueError("stored Bitcoin funding output mismatch")
+
+    def validate_prepared_spend(
+        self, prepared, funding_txid, funding_vout, branch, preimage
+    ):
+        """Recheck a stored contract spend before replaying its raw bytes."""
+        _hex32(funding_txid, "Bitcoin lock transaction ID")
+        if branch not in ("redeem", "refund"):
+            raise ValueError("invalid Bitcoin spend branch")
+        if not isinstance(prepared, PreparedBtcTransaction):
+            raise TypeError("invalid prepared Bitcoin transaction")
+        tx = self.ci.loadTx(prepared.raw)
+        tx.rehash()
+        if (
+            bytes.fromhex(tx.hash) != prepared.txid
+            or tx.serialize_with_witness() != prepared.raw
+        ):
+            raise ValueError("stored Bitcoin spend ID mismatch")
+        if (
+            tx.nVersion != 2
+            or len(tx.vin) != 1
+            or len(tx.vout) != 1
+            or len(tx.wit.vtxinwit) != 1
+            or tx.vin[0].prevout.hash != b2i(funding_txid)
+            or tx.vin[0].prevout.n != funding_vout
+            or tx.vin[0].scriptSig != b""
+            or tx.vin[0].nSequence != 0xFFFFFFFE
+            or not 0 < tx.vout[0].nValue <= self.terms.btc_amount
+        ):
+            raise ValueError("stored Bitcoin spend transaction mismatch")
+        witness = tx.wit.vtxinwit[0].scriptWitness.stack
+        if (
+            len(witness) != (5 if branch == "redeem" else 4)
+            or not witness[0]
+            or len(witness[1]) != 33
+            or witness[-1] != self.script
+        ):
+            raise ValueError("stored Bitcoin spend witness mismatch")
+        if branch == "redeem":
+            if (
+                tx.nLockTime != 0
+                or witness[3] != b"\x01"
+                or witness[2] != preimage
+                or not isinstance(preimage, bytes)
+                or len(preimage) != 32
+                or hashlib.sha256(preimage).digest() != self.hashlock
+                or hash160(witness[1]) != self.receiver_hash
+            ):
+                raise ValueError("stored Bitcoin redeem mismatch")
+        elif (
+            tx.nLockTime != self.refund_time
+            or witness[2] != b""
+            or hash160(witness[1]) != self.refund_hash
+        ):
+            raise ValueError("stored Bitcoin refund mismatch")
+
     def verify_lock(self, txid, vout, minimum_confirmations):
         """Require the exact confirmed, still unspent output on Bitcoin Core."""
         txid_hex = _hex32(txid, "Bitcoin lock transaction ID")

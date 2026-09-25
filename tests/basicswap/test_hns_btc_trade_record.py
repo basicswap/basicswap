@@ -14,6 +14,7 @@ from basicswap.interface.hns.trade_record import (
     bind_message,
     bind_preimage,
     bind_terms,
+    bind_wallet_fingerprint,
     new_trade_record,
     restore_trade,
 )
@@ -30,6 +31,7 @@ class HnsBtcTradeRecordTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "terms do not match"):
             bind_terms(record, trade, NOW, MAGIC, GENESIS)
         bind_bid_id(record, trade.bid_id)
+        bind_wallet_fingerprint(record, bytes.fromhex("55" * 32))
         bind_terms(record, trade, NOW, MAGIC, GENESIS)
         bind_terms(record, trade, NOW + 48 * 60 * 60, MAGIC, GENESIS)
         bind_message(record, "accept_message", accept.to_bytes())
@@ -53,6 +55,9 @@ class HnsBtcTradeRecordTest(unittest.TestCase):
                     {"session_id": record.session_id},
                 )
                 self.assertEqual(restored.bid_id, trade.bid_id)
+                self.assertEqual(
+                    restored.hns_wallet_fingerprint, bytes.fromhex("55" * 32)
+                )
                 self.assertEqual(restored.hns_descriptor, trade.hns_descriptor.encode())
                 self.assertEqual(
                     restored.btc_contract_script, trade.btc_contract_script

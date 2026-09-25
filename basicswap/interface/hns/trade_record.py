@@ -58,6 +58,15 @@ def bind_bid_id(record, bid_id):
     _set_once(record, "bid_id", _bytes(bid_id, 28, "bid ID"))
 
 
+def bind_wallet_fingerprint(record, fingerprint):
+    """Bind the recovery seed, whose wallet ID may change on restore."""
+    _set_once(
+        record,
+        "hns_wallet_fingerprint",
+        _bytes(fingerprint, 32, "HNS wallet fingerprint"),
+    )
+
+
 def bind_terms(record, terms, now_unix, hns_magic, hns_genesis):
     """Persist the exact descriptor and script before either chain is funded."""
     if (

@@ -411,6 +411,34 @@ class HnsWalletBridge:
             raise HnsWalletBridgeError("invalid HNS funding output index")
         return _wire_bytes(result.get("transaction_id"), 32, "funding ID"), 0
 
+    @staticmethod
+    def _submitted_transaction(result):
+        if set(result) != {"transaction_id"}:
+            raise HnsWalletBridgeError("invalid HNS submitted transaction result")
+        transaction_id = result["transaction_id"]
+        if transaction_id is None:
+            return None
+        return _wire_bytes(transaction_id, 32, "submitted transaction ID")
+
+    def submitted_funding(self, terms):
+        """Recover a submitted lock without authorizing a new funding action."""
+        return self._submitted_transaction(
+            self._request("submitted_funding", terms=terms.as_wire())
+        )
+
+    def submitted_spend(self, terms, funding_id, refund):
+        """Recover a submitted spend without authorizing a new redeem/refund."""
+        if type(refund) is not bool:
+            raise ValueError("invalid HNS spend branch")
+        return self._submitted_transaction(
+            self._request(
+                "submitted_spend",
+                terms=terms.as_wire(),
+                funding_id=_hex_bytes(funding_id, 32, "funding ID"),
+                refund=refund,
+            )
+        )
+
     def verify_lock(self, terms, funding_id, confirmations):
         result = self._request(
             "verify_lock",

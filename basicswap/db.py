@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 39
+CURRENT_DB_VERSION = 40
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -504,6 +504,7 @@ class HnsBtcSwap(Table):
     role = Column("integer")  # 1 maker, 2 taker
     phase = Column("integer")
     session_nonce = Column("blob")
+    hns_wallet_fingerprint = Column("blob")
     bid_message = Column("blob")
     accept_message = Column("blob")
     second_lock_message = Column("blob")
