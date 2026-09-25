@@ -814,6 +814,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.thread_pool.shutdown()
 
         self.swaps_in_progress.clear()
+        hns_client = self.coin_clients.get(Coins.HNS)
+        if hns_client and hns_client.get("interface"):
+            hns_client["interface"].close()
         super().finalise()
 
     def logIDB(self, concept_id: bytes) -> str:
@@ -838,6 +841,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def setCoinConnectParams(self, coin):
         # Set anything that does not require the daemon to be running
         chain_client_settings = self.getChainClientSettings(coin)
+        if coin == Coins.HNS and chain_client_settings.get("manage_daemon", False):
+            raise ValueError("HSRD must be managed separately from BasicSwap")
 
         coin_chainparams = chainparams[coin]
         coin_name: str = coin_chainparams["name"]
@@ -935,6 +940,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "electrum_port",
             "electrum_ssl",
             "electrum_poll_interval",
+            "rpc_authorization_file",
+            "bridge_executable",
+            "wallet_database",
+            "wallet_seed_fingerprint",
+            "maximum_htlc_fee",
+            "maximum_htlc_fee_rate",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -1212,6 +1223,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.bch.bch import BCHInterface
 
             return BCHInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.HNS:
+            from .interface.hns.coin import HNSInterface
+
+            return HNSInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.LTC:
             from .interface.ltc.ltc import LTCInterface, LTCInterfaceMWEB
 
@@ -1275,7 +1290,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def setCoinRunParams(self, coin):
         cc = self.coin_clients[coin]
-        if coin in self.xmr_based_coins:
+        if coin in self.xmr_based_coins or coin == Coins.HNS:
             return
         if cc["connection_type"] == "rpc" and cc["rpcauth"] is None:
             authcookiepath = os.path.join(self.getChainDatadirPath(coin), ".cookie")
@@ -3741,6 +3756,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     and bid.state < BidStates.SWAP_COMPLETED
                 ):
                     try:
+                        offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
+                        if offer is not None and offer.swap_type == SwapTypes.HNS_BTC_SWAP:
+                            continue  # The HNS/BTC worker restores these rows itself.
                         self.activateBid(cursor, bid)
                     except Exception as ex:
                         self.logException(f"Failed to activate bid! Error: {ex}")
@@ -3779,6 +3797,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return coin_from in self.scriptless_coins + self.coins_without_segwit
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
+        if Coins.HNS in (coin_from, coin_to) or swap_type == SwapTypes.HNS_BTC_SWAP:
+            if (
+                frozenset((coin_from, coin_to)) != frozenset((Coins.HNS, Coins.BTC))
+                or swap_type != SwapTypes.HNS_BTC_SWAP
+            ):
+                raise ValueError("HNS requires the native HNS/BTC swap type")
+            if self.coin_clients[Coins.BTC]["connection_type"] != "rpc":
+                raise ValueError("HNS/BTC requires Bitcoin Core RPC")
+            return
 
         for coin in (coin_from, coin_to):
             if coin in self.balance_only_coins:
@@ -4086,6 +4113,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def validateOfferLockValue(
         self, swap_type, coin_from, coin_to, lock_type, lock_value: int
     ) -> None:
+        if swap_type == SwapTypes.HNS_BTC_SWAP:
+            ensure(
+                lock_type == TxLockTypes.ABS_LOCK_TIME
+                and type(lock_value) is int
+                and 6 * 60 * 60 <= lock_value <= 96 * 60 * 60,
+                "HNS/BTC requires a 6 to 96 hour absolute-time lock",
+            )
+            return
         coin_from_has_csv = self.coin_clients[coin_from]["use_csv"]
         coin_to_has_csv = self.coin_clients[coin_to]["use_csv"]
 
@@ -4269,6 +4304,39 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.validateOfferAmounts(
             coin_from_t, coin_to_t, amount, amount_to, min_bid_amount
         )
+        native_hns_btc = swap_type == SwapTypes.HNS_BTC_SWAP
+        if native_hns_btc:
+            if (
+                min_bid_amount != amount
+                or extra_options.get("per_swap_amount", amount) != amount
+                or extra_options.get("amount_negotiable", False)
+                or extra_options.get("rate_negotiable", False)
+                or auto_accept_bids
+                or extra_options.get("automation_id", -1) != -1
+            ):
+                raise ValueError("HNS/BTC requires a manual fixed full-size offer")
+            if "prefunded_itx" in extra_options:
+                raise ValueError("HNS/BTC does not support prefunded offers")
+            hns_fee_field = (
+                "from_fee_override" if coin_from_t == Coins.HNS else "to_fee_override"
+            )
+            if hns_fee_field in extra_options:
+                raise ValueError("HNS/BTC cannot override the HNS wallet fee")
+            offer_mode = offerTrackingModeFromString(extra_options.get("offer_mode"))
+            if offer_mode not in (
+                OfferTrackingModes.LEGACY,
+                OfferTrackingModes.ONE_TIME,
+            ):
+                raise ValueError("HNS/BTC requires a one-time offer")
+            if self._smsg_payload_version < 2 or MessageNetworks.SMSG not in (
+                self.expandMessageNets("smsg")[0]
+            ):
+                raise ValueError("HNS/BTC requires active SMSG payload version 2")
+            if not self.ci(Coins.HNS).walletIdentityReady():
+                raise ValueError("HNS wallet is locked or has an unknown seed")
+            security_token = extra_options.get("security_token")
+            if security_token is not None and len(security_token) != 20:
+                raise ValueError("Security token must be 20 bytes long.")
         # Recalculate the rate so it will match the bid rate
         rate: int = ci_from.make_int(amount_to / amount, r=1)
 
@@ -4290,6 +4358,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             offer_mode = offerTrackingModeFromString(
                 extra_options.get("offer_mode", None)
             )
+            if native_hns_btc:
+                offer_mode = OfferTrackingModes.ONE_TIME
             tracking_per_swap: int = int(extra_options.get("per_swap_amount", amount))
             tracking_total_budget: int = int(extra_options.get("total_budget", 0))
             tracking_max_fills: int = int(extra_options.get("max_fills", 0))
@@ -4319,7 +4389,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             msg_buf.amount_negotiable = extra_options.get("amount_negotiable", False)
             msg_buf.rate_negotiable = extra_options.get("rate_negotiable", False)
 
-            msg_buf.message_nets = self.getMessageNetsString()
+            msg_buf.message_nets = (
+                "smsg" if native_hns_btc else self.getMessageNetsString()
+            )
 
             if msg_buf.amount_negotiable or msg_buf.rate_negotiable:
                 ensure(
@@ -4327,7 +4399,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "Auto-accept unavailable when amount or rate are variable",
                 )
 
-            if "from_fee_override" in extra_options:
+            if native_hns_btc and coin_from_t == Coins.HNS:
+                # The Rust HNS wallet quotes its own fee when it prepares the
+                # HTLC. The generic offer fee hint is not used for funding.
+                msg_buf.fee_rate_from = 0
+            elif "from_fee_override" in extra_options:
                 msg_buf.fee_rate_from = ci_from.make_int(
                     extra_options["from_fee_override"]
                 )
@@ -4341,7 +4417,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     fee_rate *= extra_options["fee_multiplier"] / 100.0
                 msg_buf.fee_rate_from = ci_from.make_int(fee_rate)
 
-            if "to_fee_override" in extra_options:
+            if native_hns_btc and coin_to_t == Coins.HNS:
+                msg_buf.fee_rate_to = 0
+            elif "to_fee_override" in extra_options:
                 msg_buf.fee_rate_to = ci_to.make_int(extra_options["to_fee_override"])
             else:
                 # TODO: conf_target = ci_to.settings.get('conf_target', 2)
@@ -4399,11 +4477,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
             if "prefunded_itx" not in extra_options:
-                # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
-                estimated_fee: int = (
-                    msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
-                )
-                self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
+                if native_hns_btc:
+                    from .interface.hns.app_settlement import _maximum_hns_fee
+
+                    estimated_fee = (
+                        _maximum_hns_fee(self)
+                        if coin_from_t == Coins.HNS
+                        else max(1000, msg_buf.fee_rate_from // 5)
+                    )
+                    if coin_from_t == Coins.HNS:
+                        if ci_from.getSpendableBalance() < amount + estimated_fee:
+                            raise BalanceError("Insufficient HNS for offer and fee")
+                    else:
+                        ci_from.ensureFunds(amount + estimated_fee)
+                else:
+                    # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
+                    estimated_fee: int = (
+                        msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
+                    )
+                    self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
 
             # TODO: Send proof of funds with offer
             # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
@@ -4418,7 +4510,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
             # Send offers to active and bridged networks
             offer_id: bytes = self.sendMessage(
-                offer_addr, offer_addr_to, payload_hex, msg_valid, cursor
+                offer_addr,
+                offer_addr_to,
+                payload_hex,
+                msg_valid,
+                cursor,
+                message_nets="smsg" if native_hns_btc else None,
+                payload_version=2 if native_hns_btc else None,
             )
 
             security_token = extra_options.get("security_token", None)
@@ -5153,6 +5251,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def checkWalletSeed(self, c) -> bool:
         ci = self.ci(c)
+        if c == Coins.HNS:
+            return ci.walletIdentityReady()
         if c == Coins.PART:
             ci.setWalletSeedWarning(
                 False
@@ -5769,6 +5869,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer.expire_at > self.getTime(), "Offer has expired")
         ensure(offer.active_ind == 1, "Offer not active")
 
+        if offer.swap_type == SwapTypes.HNS_BTC_SWAP:
+            from .interface.hns.app_protocol import post_hns_btc_bid
+
+            return post_hns_btc_bid(
+                self, offer, amount, addr_send_from, extra_options
+            )
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
 
@@ -6050,6 +6156,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def acceptBid(self, bid_id: bytes, cursor=None) -> None:
         self.log.info(f"Accepting bid {self.log.id(bid_id)}")
+
+        if cursor is not None:
+            hns_bid = cursor.execute(
+                "SELECT 1 FROM bids b JOIN offers o ON o.offer_id = b.offer_id "
+                "WHERE b.bid_id = :bid_id AND o.swap_type = :swap_type",
+                {"bid_id": bid_id, "swap_type": int(SwapTypes.HNS_BTC_SWAP)},
+            ).fetchone()
+            if hns_bid is not None:
+                raise ValueError("HNS/BTC acceptance requires an independent transaction")
+        if cursor is None:
+            hns_cursor = self.openDB()
+            try:
+                hns_bid = hns_cursor.execute(
+                    "SELECT 1 FROM bids b JOIN offers o ON o.offer_id = b.offer_id "
+                    "WHERE b.bid_id = :bid_id AND o.swap_type = :swap_type",
+                    {"bid_id": bid_id, "swap_type": int(SwapTypes.HNS_BTC_SWAP)},
+                ).fetchone()
+            finally:
+                self.closeDB(hns_cursor, commit=False)
+            if hns_bid is not None:
+                from .interface.hns.app_protocol import accept_hns_btc_bid
+
+                return accept_hns_btc_bid(self, bid_id)
 
         try:
             use_cursor = self.openDB(cursor)
@@ -8139,6 +8268,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def getTotalBalance(self, coin_type) -> int:
         try:
             ci = self.ci(coin_type)
+            if coin_type == Coins.HNS:
+                return ci.getSpendableBalance()
             if self.coin_clients[coin_type].get("connection_type") == "electrum":
                 return ci.getSpendableBalance()
             if hasattr(ci, "rpc_wallet"):
@@ -11471,6 +11602,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
             ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
+
+        elif offer_data.swap_type == SwapTypes.HNS_BTC_SWAP:
+            ensure(
+                offer_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH
+                and msg_payload_version >= 2
+                and msg.get("type", "smsg") == "smsg",
+                "HNS/BTC offer requires SMSG payload version 2",
+            )
+            ensure(
+                not offer_data.amount_negotiable
+                and not offer_data.rate_negotiable
+                and offer_data.min_bid_amount == offer_data.amount_from
+                and offer_data.message_nets == "smsg"
+                and offer_data.auto_accept_type == 0,
+                "HNS/BTC offer must be manual and fixed-size",
+            )
+            ensure(
+                not offer_data.proof_address
+                and not offer_data.proof_signature
+                and not offer_data.pkhash_seller
+                and not offer_data.secret_hash,
+                "unexpected HNS/BTC offer proof fields",
+            )
+            if coin_from == Coins.HNS:
+                ensure(offer_data.fee_rate_from == 0, "HNS offer fee hint must be zero")
+                ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
+            else:
+                ensure(offer_data.fee_rate_to == 0, "HNS offer fee hint must be zero")
+                ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
 
         else:
             raise ValueError(f"Unknown swap type {offer_data.swap_type}.")
@@ -14814,6 +14974,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.processPortalOffer(msg)
             elif msg_type == MessageTypes.PORTAL_SEND:
                 self.processPortalMessage(msg)
+            elif msg_type == MessageTypes.HNS_BTC_BID:
+                from .interface.hns.app_protocol import receive_hns_btc_bid
+
+                receive_hns_btc_bid(self, msg)
+            elif msg_type == MessageTypes.HNS_BTC_BID_ACCEPT:
+                from .interface.hns.app_protocol import receive_hns_btc_accept
+
+                receive_hns_btc_accept(self, msg)
+            elif msg_type == MessageTypes.HNS_BTC_SECOND_LOCK:
+                from .interface.hns.app_protocol import receive_hns_btc_second_lock
+
+                receive_hns_btc_second_lock(self, msg)
 
         except InactiveCoin as ex:
             self.log.debug(
@@ -15025,6 +15197,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # TODO: Wait for blocks / txns, would need to check multiple coins
             now: int = self.getTime()
             self.expireBidsAndOffers(now)
+            if Coins.HNS in self.coin_clients and now - getattr(
+                self, "_last_hns_outbox_flush", 0
+            ) >= 60:
+                from .interface.hns.app_protocol import flush_hns_app_outbox
+                from .interface.hns.app_settlement import progress_hns_btc_trades
+
+                try:
+                    flush_hns_app_outbox(self, now)
+                    progress_hns_btc_trades(self)
+                except Exception as ex:
+                    self.logException(f"HNS/BTC outbox retry failed: {ex}")
+                self._last_hns_outbox_flush = now
 
             to_remove = []
             if now - self._last_checked_progress >= self.check_progress_seconds:

@@ -252,6 +252,25 @@ def describeBid(
             state_description = "Bid abandoned"
         elif bid.state == BidStates.BID_ERROR:
             state_description = "Bid error"
+    elif offer.swap_type == SwapTypes.HNS_BTC_SWAP:
+        if bid.state == BidStates.BID_SENT:
+            state_description = "Bid sent; waiting for the maker to fund the first lock"
+        elif canAcceptBidState(bid.state):
+            state_description = "Bid received; waiting for manual acceptance"
+        elif bid.state == BidStates.BID_ACCEPTED:
+            state_description = (
+                "First lock funded; waiting for the taker's confirmed second lock"
+                if bid.was_received
+                else "Waiting for the first lock to confirm before funding the second"
+            )
+        elif bid.state == BidStates.SWAP_INITIATED:
+            state_description = "Second lock announced; waiting for the maker to redeem"
+        elif bid.state == BidStates.SWAP_PARTICIPATING:
+            state_description = "Redemption submitted; waiting for both chain spends to confirm"
+        elif bid.state == BidStates.SWAP_COMPLETED:
+            state_description = "Both lock redemptions confirmed"
+        elif bid.state == BidStates.SWAP_TIMEDOUT:
+            state_description = "Own lock refunded after timeout"
     elif offer.swap_type == SwapTypes.XMR_SWAP:
         if bid.state == BidStates.BID_SENT:
             state_description = "Bid sent, waiting for offerer to accept"
@@ -400,6 +419,31 @@ def describeBid(
         "reverse_bid": reverse_bid,
         "message_nets": bid.message_nets,
     }
+
+    if offer.swap_type == SwapTypes.HNS_BTC_SWAP:
+        from basicswap.db import HnsBtcSwap
+
+        cursor = swap_client.openDB()
+        try:
+            hns_record = swap_client.queryOne(
+                HnsBtcSwap, cursor, {"bid_id": bid.bid_id}
+            )
+        finally:
+            swap_client.closeDB(cursor, commit=False)
+        data["is_hns_btc"] = True
+        data["hns_lock_txid"] = (
+            hns_record.hns_lock_txid.hex()
+            if hns_record and hns_record.hns_lock_txid
+            else None
+        )
+        data["btc_lock_txid"] = (
+            hns_record.btc_lock_txid.hex()
+            if hns_record and hns_record.btc_lock_txid
+            else None
+        )
+        data["btc_lock_vout"] = (
+            hns_record.btc_lock_vout if hns_record else None
+        )
 
     if edit_bid:
         data["bid_state_ind"] = int(bid.state)

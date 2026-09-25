@@ -299,7 +299,33 @@ def page_wallet(self, url_split, post_string):
 
         estimate_fee: bool = have_data_entry(form_data, "estfee_" + cid)
         withdraw: bool = have_data_entry(form_data, "withdraw_" + cid)
-        if have_data_entry(form_data, "newaddr_" + cid):
+        if coin_id == Coins.HNS and have_data_entry(form_data, "approve_hns_send"):
+            try:
+                token = bytes.fromhex(
+                    form_data[b"hns_send_token"][0].decode("ascii")
+                )
+                if len(token) != 16:
+                    raise ValueError("invalid HNS send approval token")
+                txid = swap_client.ci(coin_id).approveWithdrawal(token)
+            except Exception as e:  # noqa: BLE001
+                err_messages.append(f"HNS send failed: {e}")
+            else:
+                # A cache refresh failure must not turn a broadcast receipt
+                # into a misleading "send failed" result.
+                messages.append(f"HNS sent in transaction: {txid}")
+                withdrawal_successful = True
+        elif coin_id == Coins.HNS and have_data_entry(form_data, "reject_hns_send"):
+            try:
+                token = bytes.fromhex(
+                    form_data[b"hns_send_token"][0].decode("ascii")
+                )
+                if len(token) != 16:
+                    raise ValueError("invalid HNS send approval token")
+                swap_client.ci(coin_id).rejectWithdrawal(token)
+                messages.append("HNS send cancelled")
+            except Exception as e:  # noqa: BLE001
+                err_messages.append(f"HNS send cancellation failed: {e}")
+        elif have_data_entry(form_data, "newaddr_" + cid):
             swap_client.cacheNewAddressForCoin(coin_id)
         elif have_data_entry(form_data, "forcerefresh"):
             force_refresh = True
@@ -333,6 +359,25 @@ def page_wallet(self, url_split, post_string):
             except Exception as ex:
                 err_messages.append(f"Import failed: {ex}")
             swap_client.updateWalletsInfo(True, coin_id)
+        elif coin_id == Coins.HNS and withdraw:
+            try:
+                value = form_data[bytes("amt_" + cid, "utf-8")][0].decode("utf-8")
+                address = form_data[bytes("to_" + cid, "utf-8")][0].decode("utf-8")
+                page_data["wd_value_" + cid] = value
+                page_data["wd_address_" + cid] = address
+                ci = swap_client.ci(coin_id)
+                token, recipient, amount, maximum_fee, expires = (
+                    ci.prepareWithdrawal(value, address)
+                )
+                page_data["hns_send"] = {
+                    "token": token,
+                    "recipient": recipient,
+                    "amount": ci.format_amount(amount),
+                    "maximum_fee": ci.format_amount(maximum_fee),
+                    "expires_at_unix": expires,
+                }
+            except Exception as e:  # noqa: BLE001
+                err_messages.append(f"HNS send preparation failed: {e}")
         elif withdraw or estimate_fee:
             subfee = True if have_data_entry(form_data, "subfee_" + cid) else False
             page_data["wd_subfee_" + cid] = subfee
@@ -479,9 +524,14 @@ def page_wallet(self, url_split, post_string):
         swap_client.coin_clients.get(coin_id, {}).get("connection_type") == "electrum"
     )
 
-    swap_client.updateWalletsInfo(
-        force_refresh, only_coin=coin_id, wait_for_complete=not is_electrum_mode
-    )
+    try:
+        swap_client.updateWalletsInfo(
+            force_refresh, only_coin=coin_id, wait_for_complete=not is_electrum_mode
+        )
+    except Exception as e:  # noqa: BLE001
+        if coin_id != Coins.HNS or not withdrawal_successful:
+            raise
+        swap_client.log.warning("HNS balance refresh pending: %s", e)
     wallets = swap_client.getCachedWalletsInfo({"coin_id": coin_id})
     wallet_data = {}
     for k in wallets.keys():
@@ -502,6 +552,8 @@ def page_wallet(self, url_split, post_string):
         cid = str(int(coin_id))
 
         wallet_data = format_wallet_data(swap_client, ci, w)
+        if k == Coins.HNS and "hns_send" in page_data:
+            wallet_data["hns_send"] = page_data["hns_send"]
         wallet_data["is_electrum_mode"] = (
             getattr(ci, "_connection_type", "rpc") == "electrum"
         )
@@ -515,13 +567,19 @@ def page_wallet(self, url_split, post_string):
             except Exception:
                 pass
 
-        fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
-        est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
-        wallet_data["fee_rate"] = ci.format_amount(int(fee_rate * ci.COIN()))
-        wallet_data["fee_rate_src"] = fee_src
-        wallet_data["est_fee"] = (
-            "Unknown" if est_fee is None else ci.format_amount(int(est_fee * ci.COIN()))
-        )
+        if k == Coins.HNS:
+            # The Rust wallet prepares the exact send fee under its configured cap.
+            wallet_data["fee_rate"] = "Wallet determined"
+            wallet_data["fee_rate_src"] = "HNS wallet"
+            wallet_data["est_fee"] = "Shown during send review"
+        else:
+            fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
+            est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
+            wallet_data["fee_rate"] = ci.format_amount(int(fee_rate * ci.COIN()))
+            wallet_data["fee_rate_src"] = fee_src
+            wallet_data["est_fee"] = (
+                "Unknown" if est_fee is None else ci.format_amount(int(est_fee * ci.COIN()))
+            )
         wallet_data["deposit_address"] = w.get("deposit_address", "Refresh necessary")
 
         if k in swap_client.xmr_based_coins:
@@ -575,7 +633,10 @@ def page_wallet(self, url_split, post_string):
             wallet_data["show_utxo_groups"] = True
             wallet_data["utxo_groups"] = utxo_groups
 
-        checkAddressesOwned(swap_client, ci, wallet_data)
+        if k != Coins.HNS:
+            # The separate Rust wallet authenticates its receive address and
+            # seed identity; the Core wallet ownership probe is inapplicable.
+            checkAddressesOwned(swap_client, ci, wallet_data)
 
     donation_info = None
     ticker = wallet_data.get("ticker", "").upper()

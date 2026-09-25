@@ -40,6 +40,7 @@ class KeyTypes(IntEnum):
     KBSF = 5
     KAF = 6
     KA_SWIPE = 7
+    HNS_BTC = 8
 
 
 class MessageNetworks(IntEnum):
@@ -72,6 +73,9 @@ class MessageTypes(IntEnum):
     CONNECT_REQ = auto()
     PORTAL_OFFER = auto()
     PORTAL_SEND = auto()
+    HNS_BTC_BID = auto()
+    HNS_BTC_BID_ACCEPT = auto()
+    HNS_BTC_SECOND_LOCK = auto()
 
 
 class AddressTypes(IntEnum):
@@ -90,6 +94,7 @@ class SwapTypes(IntEnum):
     BUYER_FIRST_2MSG = auto()
     XMR_SWAP = auto()
     XMR_BCH_SWAP = auto()
+    HNS_BTC_SWAP = auto()
 
 
 class OfferStates(IntEnum):
@@ -623,6 +628,8 @@ def strSwapType(swap_type) -> str:
         return "seller_first"
     if swap_type == SwapTypes.XMR_SWAP:
         return "xmr_swap"
+    if swap_type == SwapTypes.HNS_BTC_SWAP:
+        return "hns_btc_swap"
     return None
 
 
@@ -631,6 +638,8 @@ def strSwapDesc(swap_type) -> str:
         return "Secret Hash"
     if swap_type == SwapTypes.XMR_SWAP:
         return "Adaptor Sig"
+    if swap_type == SwapTypes.HNS_BTC_SWAP:
+        return "HNS/BTC HTLC"
     return None
 
 

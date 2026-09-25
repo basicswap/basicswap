@@ -484,6 +484,14 @@ const SwapTypeManager = {
         coinTo = String(coinTo);
 
         if (
+            (coinFrom === '19' && coinTo === '2') ||
+            (coinFrom === '2' && coinTo === '19')
+        ) {
+            swapTypeElement.disabled = true;
+            swapTypeElement.value = 'hns_btc_swap';
+            makeHidden = true;
+            swapTypeElement.classList.add('select-disabled');
+        } else if (
             SwapTypeManager.coins_without_segwit.includes(coinFrom) &&
             SwapTypeManager.coins_without_segwit.includes(coinTo)
         ) {
