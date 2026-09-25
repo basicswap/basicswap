@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from basicswap.interface.hns.node_rpc import (
+    HnsChainSnapshot,
     HnsNodeError,
     HnsNodeRpc,
     HnsStaleSnapshot,
@@ -36,18 +37,24 @@ class FakeConnection:
         self._request = None
         self.closed = False
 
-    def request(self, verb, path, body, headers):
-        self._request = json.loads(body)
+    def request(self, verb, path, body=None, headers=None):
+        self._request = json.loads(body) if body is not None else None
         self._requests.append((verb, path, self._request, headers))
 
     def getresponse(self):
         status, result = self._replies.pop(0)
-        envelope = {
-            "api_version": 1,
-            "request_id": self._request["request_id"],
-            **result,
-        }
-        return FakeResponse(status, json.dumps(envelope).encode())
+        if self._request is None:
+            return FakeResponse(status, json.dumps(result).encode())
+        return FakeResponse(
+            status,
+            json.dumps(
+                {
+                    "api_version": 1,
+                    "request_id": self._request["request_id"],
+                    **result,
+                }
+            ).encode(),
+        )
 
     def close(self):
         self.closed = True
@@ -95,6 +102,42 @@ class HnsNodeRpcTest(unittest.TestCase):
         self.assertEqual(requests[1][2]["call"]["params"]["expected_chain_epoch"], 7)
         self.assertEqual(requests[0][3]["Authorization"], "Bearer secret")
         self.assertTrue(all(conn.closed for conn in connections))
+
+    def test_sync_readiness_requires_scheduler_and_wallet_tip_agreement(self):
+        synced = {
+            "stage": "Synced",
+            "active_tip": {"hash": TIP["hash"], "height": TIP["height"]},
+            "stored_tip": {"hash": TIP["hash"], "height": TIP["height"]},
+            "best_header": {"hash": TIP["hash"], "height": TIP["height"]},
+            "target_height": TIP["height"],
+            "pending_blocks": 0,
+            "inflight_blocks": 0,
+            "tracked_blocks": 0,
+            "peers": [],
+        }
+        stale = {**synced, "best_header": {"hash": "ef" * 32, "height": 13}}
+        client, requests, connections = self.make_client([(200, synced), (200, stale)])
+        binding = HnsChainSnapshot(7, TIP)
+        self.assertTrue(client.sync_ready("regtest", binding))
+        self.assertFalse(client.sync_ready("regtest", binding))
+        self.assertEqual(requests[0][:2], ("GET", "/api/v1/sync"))
+        self.assertEqual(requests[0][3]["Authorization"], "Bearer secret")
+        self.assertTrue(all(conn.closed for conn in connections))
+
+    def test_mainnet_sync_readiness_needs_a_peer(self):
+        status = {
+            "stage": "Synced",
+            "active_tip": {"hash": TIP["hash"], "height": TIP["height"]},
+            "stored_tip": {"hash": TIP["hash"], "height": TIP["height"]},
+            "best_header": {"hash": TIP["hash"], "height": TIP["height"]},
+            "target_height": TIP["height"],
+            "pending_blocks": 0,
+            "inflight_blocks": 0,
+            "tracked_blocks": 0,
+            "peers": [],
+        }
+        client, _, _ = self.make_client([(200, status)])
+        self.assertFalse(client.sync_ready("mainnet", HnsChainSnapshot(7, TIP)))
 
     def test_genesis_mismatch_is_rejected(self):
         replies = [

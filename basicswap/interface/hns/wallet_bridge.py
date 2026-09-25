@@ -24,10 +24,112 @@ MAX_FRAME_BYTES = 65_536
 PROTOCOL_VERSION = 2
 SESSION_DOMAIN = b"basicswap/hns-wallet-bridge/session/v2\0"
 _DECIMAL_UNITS = re.compile(r"(0|[1-9][0-9]*)\Z")
+_RECOVERY_WORD = re.compile(r"[a-z]+\Z")
 
 
 class HnsWalletBridgeError(RuntimeError):
     """The local wallet process rejected a request or lost its protocol pipe."""
+
+
+def initialize_hns_wallet(
+    executable, database, network, restore_height, passphrase, recovery_phrase=None
+):
+    """Run the short-lived Rust account initializer over a private pipe.
+
+    A newly created recovery phrase is returned exactly once. The caller must
+    present it for backup before treating the account as usable.
+    """
+    executable = Path(executable).resolve(strict=True)
+    database = Path(database)
+    if database.is_symlink() or database.exists():
+        raise ValueError("HNS wallet database already exists")
+    if network not in ("mainnet", "testnet", "regtest", "simnet"):
+        raise ValueError("invalid HNS wallet network")
+    if type(restore_height) is not int or restore_height < 0:
+        raise ValueError("invalid HNS wallet restore height")
+    if not isinstance(passphrase, str) or not passphrase:
+        raise ValueError("invalid HNS wallet passphrase")
+    if recovery_phrase is not None and (
+        not isinstance(recovery_phrase, str) or not recovery_phrase
+    ):
+        raise ValueError("invalid HNS wallet recovery phrase")
+    if not executable.is_file() or not os.access(executable, os.X_OK):
+        raise ValueError("invalid HNS wallet bridge executable")
+    request = json.dumps(
+        {
+            "version": PROTOCOL_VERSION,
+            "sequence": 1,
+            "passphrase": passphrase,
+            "recovery_phrase": recovery_phrase,
+        },
+        separators=(",", ":"),
+    ).encode()
+    if not 0 < len(request) <= MAX_FRAME_BYTES:
+        raise ValueError("HNS wallet initialization request is too large")
+    try:
+        process = subprocess.run(
+            [
+                str(executable),
+                "--initialize",
+                "--database",
+                str(database),
+                "--network",
+                network,
+                "--restore-height",
+                str(restore_height),
+            ],
+            input=len(request).to_bytes(4, "little") + request,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=180,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HnsWalletBridgeError("HNS wallet initialization process failed") from exc
+    output = process.stdout
+    if process.returncode != 0 or len(output) < 4:
+        raise HnsWalletBridgeError("HNS wallet initialization failed")
+    length = int.from_bytes(output[:4], "little")
+    if not 0 < length <= MAX_FRAME_BYTES or len(output) != 4 + length:
+        raise HnsWalletBridgeError("invalid HNS wallet initialization response")
+    try:
+        response = json.loads(output[4:])
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HnsWalletBridgeError(
+            "invalid HNS wallet initialization response"
+        ) from exc
+    if (
+        not isinstance(response, dict)
+        or set(response) != {"version", "sequence", "ok", "result", "error"}
+        or type(response["version"]) is not int
+        or response["version"] != PROTOCOL_VERSION
+        or type(response["sequence"]) is not int
+        or response["sequence"] != 1
+        or response["ok"] is not True
+        or response["error"] is not None
+        or not isinstance(response["result"], dict)
+    ):
+        raise HnsWalletBridgeError("invalid HNS wallet initialization response")
+    result = response["result"]
+    created = recovery_phrase is None
+    expected_keys = (
+        {"created", "wallet_id", "recovery_phrase"}
+        if created
+        else {"created", "wallet_id"}
+    )
+    if set(result) != expected_keys or result["created"] is not created:
+        raise HnsWalletBridgeError("invalid HNS wallet initialization result")
+    wallet_id = _wire_bytes(result["wallet_id"], 16, "wallet ID")
+    phrase = result.get("recovery_phrase")
+    if created and (
+        not isinstance(phrase, str)
+        or len(phrase.split()) != 24
+        or any(_RECOVERY_WORD.fullmatch(word) is None for word in phrase.split())
+    ):
+        raise HnsWalletBridgeError("invalid HNS wallet recovery phrase")
+    if not database.is_file() or database.is_symlink():
+        raise HnsWalletBridgeError("HNS wallet database was not created")
+    return wallet_id, phrase
 
 
 def _hex_bytes(value, size, name):

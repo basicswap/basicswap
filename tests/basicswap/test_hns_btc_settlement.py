@@ -24,10 +24,15 @@ class FakeBitcoin:
 
 
 class FakeHnsNode:
+    ready = True
+
     def bound_snapshot(self, network):
         if network != "regtest":
             raise AssertionError("wrong HNS network")
         return SimpleNamespace(tip={"median_time_past": NOW})
+
+    def sync_ready(self, network, binding):
+        return self.ready
 
 
 class FakeHnsBridge:
@@ -97,6 +102,24 @@ class HnsBtcSettlementTest(unittest.TestCase):
                 "regtest",
                 lambda changed: saved.append(changed.hns_lock_txid),
             )
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_maker_does_not_reveal_secret_near_second_refund(self, _mock_time):
+        settlement, _, _ = self.make_settlement(True, MAKER)
+        with (
+            patch.object(settlement, "_chain_now", return_value=NOW + 12 * 60 * 60),
+            self.assertRaisesRegex(ValueError, "too close to refund"),
+        ):
+            settlement.redeem_peer_lock(100000)
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_funding_waits_for_hsrd_sync(self, _mock_time):
+        settlement, bridge, saved = self.make_settlement(True, MAKER)
+        settlement.hns_node.ready = False
+        with self.assertRaisesRegex(ValueError, "not synchronized"):
+            settlement.fund_owned_lock(100000)
+        self.assertEqual(bridge.funded, 0)
+        self.assertEqual(saved, [])
 
 
 if __name__ == "__main__":

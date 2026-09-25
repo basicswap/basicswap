@@ -171,8 +171,9 @@ state machine or perform either chain's funding and spend actions.
    dedicated HNS account, arrange protected unlock and HSRD Authorization
    delivery, supervise the sidecar, and reconcile BasicSwap's persisted bid
    identity with the wallet's persisted settlement identity after a restart.
-   The current bridge opens an existing wallet and its HNS value path has
-   passed funded regtest, but BasicSwap has no wallet lifecycle for it yet.
+   hns-wallet-rs now has a one-shot atomic create/restore mode and BasicSwap has
+   a private-pipe client for it, but the UI and application startup do not yet
+   call those paths. The HNS value path has passed funded regtest.
    HSRD remains its full-node backend.
 4. Wire BasicSwap's offer and bid state machine to that bridge, including
    restart/reorg reconciliation and the correct mapping between BasicSwap

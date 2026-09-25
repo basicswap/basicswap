@@ -6,8 +6,8 @@ should call those Rust APIs for value operations. This client never constructs,
 signs, or broadcasts a transaction.
 """
 
-import http.client
 import hashlib
+import http.client
 import json
 import re
 import threading
@@ -202,6 +202,61 @@ class HnsNodeRpc:
         if genesis["hash"].lower() != _GENESIS[network]:
             raise HnsNodeError("hsrd network genesis mismatch")
         return HnsChainSnapshot(epoch, tip)
+
+    def sync_ready(self, network: str, binding: HnsChainSnapshot) -> bool:
+        """Require HSRD's sync scheduler to agree with the wallet chain tip."""
+        if network not in _GENESIS or not isinstance(binding, HnsChainSnapshot):
+            raise ValueError("invalid hsrd synchronization binding")
+        connection = http.client.HTTPConnection(
+            self._host, self._port, timeout=self._timeout
+        )
+        try:
+            connection.request(
+                "GET",
+                "/api/v1/sync",
+                headers={"Authorization": self._authorization},
+            )
+            response = connection.getresponse()
+            content = response.read(128 * 1024 + 1)
+            if response.status != 200 or len(content) > 128 * 1024:
+                raise HnsNodeError("hsrd synchronization status unavailable")
+            status = json.loads(content)
+        except (
+            OSError,
+            http.client.HTTPException,
+            UnicodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise HnsNodeError("hsrd synchronization status failed") from exc
+        finally:
+            connection.close()
+        if not isinstance(status, dict):
+            raise HnsNodeError("invalid hsrd synchronization status")
+        if status.get("stage") != "Synced":
+            return False
+        target = status.get("target_height")
+        active = status.get("active_tip")
+        stored = status.get("stored_tip")
+        best = status.get("best_header")
+        if any(not isinstance(tip, dict) for tip in (active, stored, best)):
+            raise HnsNodeError("invalid hsrd synchronization tip")
+        for tip in (active, stored, best):
+            if (
+                tip.get("hash") != binding.tip["hash"]
+                or tip.get("height") != binding.tip["height"]
+            ):
+                return False
+        if target is not None and (
+            type(target) is not int or target > binding.tip["height"]
+        ):
+            return False
+        for key in ("pending_blocks", "inflight_blocks", "tracked_blocks"):
+            if status.get(key) != 0:
+                return False
+        peers = status.get("peers")
+        if not isinstance(peers, list):
+            raise HnsNodeError("invalid hsrd synchronization peers")
+        return not (network != "regtest" and not peers)
 
     def confirmed_scripts(self, script_ids: list[str], binding: HnsChainSnapshot):
         """Return a complete confirmed scan, or no results on a reorg.

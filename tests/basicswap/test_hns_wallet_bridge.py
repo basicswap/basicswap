@@ -10,6 +10,7 @@ from basicswap.interface.hns.wallet_bridge import (
     HnsBridgeTerms,
     HnsWalletBridge,
     HnsWalletBridgeError,
+    initialize_hns_wallet,
 )
 from tests.basicswap.test_hns_htlc import DESCRIPTOR
 
@@ -109,16 +110,45 @@ class HnsWalletBridgeTest(unittest.TestCase):
             bridge.lock()
 
     def test_response_sequence_and_auth_file_fail_closed(self):
-        with self.bridge() as bridge:
-            with self.assertRaisesRegex(HnsWalletBridgeError, "response mismatch"):
-                bridge.sync()
-        with self.bridge() as bridge:
-            with self.assertRaisesRegex(HnsWalletBridgeError, "response mismatch"):
-                bridge.rebroadcast()
+        with (
+            self.bridge() as bridge,
+            self.assertRaisesRegex(HnsWalletBridgeError, "response mismatch"),
+        ):
+            bridge.sync()
+        with (
+            self.bridge() as bridge,
+            self.assertRaisesRegex(HnsWalletBridgeError, "response mismatch"),
+        ):
+            bridge.rebroadcast()
         if os.name == "posix":
             self.authorization.chmod(0o644)
             with self.assertRaisesRegex(ValueError, "must be private"):
                 self.bridge()
+
+    @unittest.skipUnless(os.getenv("HNS_BRIDGE_BIN"), "set HNS_BRIDGE_BIN")
+    def test_initializer_create_and_restore_over_private_pipe(self):
+        executable = os.environ["HNS_BRIDGE_BIN"]
+        created_db = Path(self.temp.name) / "created.db"
+        restored_db = Path(self.temp.name) / "restored.db"
+        wallet_id, phrase = initialize_hns_wallet(
+            executable, created_db, "regtest", 0, "test passphrase"
+        )
+        self.assertEqual(len(wallet_id), 16)
+        self.assertEqual(len(phrase.split()), 24)
+        restored_id, restored_phrase = initialize_hns_wallet(
+            executable,
+            restored_db,
+            "regtest",
+            0,
+            "test passphrase",
+            recovery_phrase=phrase,
+        )
+        self.assertEqual(len(restored_id), 16)
+        self.assertIsNone(restored_phrase)
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            initialize_hns_wallet(
+                executable, created_db, "regtest", 0, "test passphrase"
+            )
 
 
 if __name__ == "__main__":

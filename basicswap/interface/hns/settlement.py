@@ -35,6 +35,8 @@ class ObservedSwapSpend:
 
 
 class HnsBtcSettlement:
+    MINIMUM_MAKER_REDEEM_MARGIN_SECONDS = 30 * 60
+
     def __init__(
         self,
         record,
@@ -81,14 +83,19 @@ class HnsBtcSettlement:
     def peer_coin(self):
         return "btc" if self.own_coin == "hns" else "hns"
 
-    def _funding_now(self):
+    def _chain_now(self):
         binding = self.hns_node.bound_snapshot(self.hns_network)
+        if not self.hns_node.sync_ready(self.hns_network, binding):
+            raise ValueError("HSRD is not synchronized to the wallet chain tip")
         hns_median = binding.tip["median_time_past"]
         btc_info = self.btc.ci.rpc("getblockchaininfo")
         btc_median = btc_info.get("mediantime") if isinstance(btc_info, dict) else None
         if type(hns_median) is not int or type(btc_median) is not int:
             raise ValueError("swap chain median time is unavailable")
-        now = max(int(time.time()), hns_median, btc_median)
+        return max(int(time.time()), hns_median, btc_median)
+
+    def _funding_now(self):
+        now = self._chain_now()
         self.terms.validate(
             now,
             self.terms.hns_descriptor.network_magic,
@@ -167,6 +174,16 @@ class HnsBtcSettlement:
         maximum_btc_fee=None,
     ):
         """Reveal the persisted secret only after the peer's lock confirms."""
+        if self.record.role == MAKER:
+            now = self._chain_now()
+            _, second_deadline = self.terms.validate(
+                now,
+                self.terms.hns_descriptor.network_magic,
+                self.terms.hns_descriptor.genesis,
+                require_funding_window=False,
+            )
+            if second_deadline <= now + self.MINIMUM_MAKER_REDEEM_MARGIN_SECONDS:
+                raise ValueError("second HNS/BTC lock is too close to refund")
         if self.record.role == TAKER:
             minimum = (
                 self.terms.minimum_hns_confirmations
