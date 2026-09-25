@@ -4,6 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from basicswap.interface.hns.btc_contract import BtcSpendObservation
 from basicswap.interface.hns.settlement import HnsBtcSettlement
 from basicswap.interface.hns.trade_record import (
     MAKER,
@@ -17,9 +18,17 @@ from tests.basicswap.test_hns_btc_swap import GENESIS, MAGIC, NOW, messages, ter
 
 
 class FakeBitcoin:
+    def __init__(self):
+        self.tip = 11
+        self.hashes = {height: f"{height:064x}" for height in range(12)}
+
     def rpc(self, method, params=None):
         if method == "getblockchaininfo":
             return {"mediantime": NOW}
+        if method == "getblockcount":
+            return self.tip
+        if method == "getblockhash":
+            return self.hashes[params[0]]
         raise AssertionError(f"unexpected Bitcoin RPC {method}")
 
 
@@ -119,6 +128,56 @@ class HnsBtcSettlementTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not synchronized"):
             settlement.fund_owned_lock(100000)
         self.assertEqual(bridge.funded, 0)
+        self.assertEqual(saved, [])
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_bitcoin_spend_cursor_rewinds_after_reorg(self, _mock_time):
+        settlement, _, _ = self.make_settlement(True, TAKER)
+        bind_lock(settlement.record, "btc", bytes.fromhex("cd" * 32), 1)
+        saved = []
+        settlement.persist_record = lambda record: saved.append(
+            (record.btc_scan_height, record.btc_scan_anchor)
+        )
+        with patch.object(settlement.btc, "scan_confirmed_spend") as scan:
+            scan.return_value = None
+            self.assertIsNone(settlement.scan_own_btc_lock_spend(5, max_blocks=3))
+            scan.assert_called_with(settlement.record.btc_lock_txid, 1, 5, 7, 2)
+            self.assertEqual(settlement.record.btc_scan_height, 7)
+
+            settlement.btc.ci.hashes[7] = "ab" * 32
+            observed = BtcSpendObservation(
+                bytes.fromhex("ef" * 32),
+                "refund",
+                None,
+                6,
+                bytes.fromhex(settlement.btc.ci.hashes[6]),
+            )
+            scan.return_value = observed
+            result = settlement.scan_own_btc_lock_spend(5, max_blocks=3)
+            self.assertEqual(result.branch, "refund")
+            self.assertEqual(settlement.record.btc_scan_height, 5)
+            self.assertEqual(len(saved), 3)  # advance, reorg rewind, spend
+
+            result = settlement.scan_own_btc_lock_spend(5, max_blocks=3)
+            self.assertEqual(result.txid, observed.txid)
+            scan.assert_called_with(settlement.record.btc_lock_txid, 1, 6, 8, 2)
+
+    @patch("basicswap.interface.hns.settlement.time.time", return_value=NOW)
+    def test_bitcoin_cursor_does_not_advance_across_mid_scan_reorg(self, _mock_time):
+        settlement, _, saved = self.make_settlement(True, TAKER)
+        bind_lock(settlement.record, "btc", bytes.fromhex("cd" * 32), 1)
+
+        def reorganize(*args):
+            settlement.btc.ci.hashes[7] = "ab" * 32
+
+        with (
+            patch.object(
+                settlement.btc, "scan_confirmed_spend", side_effect=reorganize
+            ),
+            self.assertRaisesRegex(ValueError, "chain changed"),
+        ):
+            settlement.scan_own_btc_lock_spend(5, max_blocks=3)
+        self.assertIsNone(settlement.record.btc_scan_height)
         self.assertEqual(saved, [])
 
 

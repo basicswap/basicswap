@@ -200,6 +200,14 @@ class BtcHtlcRegtest(unittest.TestCase):
                     )
                     self.assertEqual(observation.branch, "redeem")
                     self.assertEqual(observation.preimage, secret)
+                    with self.assertRaisesRegex(ValueError, "lost confirmations"):
+                        contract.confirm_spend_observation(
+                            observation, prepared.txid, prepared.contract_vout, 2
+                        )
+                    core.call("generatetoaddress", [1, miner])
+                    contract.confirm_spend_observation(
+                        observation, prepared.txid, prepared.contract_vout, 2
+                    )
 
                     if not hns_first:
                         refund_prepared = contract.prepare_funding(now, MAGIC, GENESIS)

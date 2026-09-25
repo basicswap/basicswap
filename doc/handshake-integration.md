@@ -82,10 +82,13 @@ branch, and witness/preimage locally.
   write this table.
 - `HnsBtcSettlement` connects the two native value adapters to that persisted
   record. It gates the taker's funding on the maker's confirmed first lock,
-  checks both nodes' median times and the live funding window, and persists
+  requires HSRD's sync scheduler to agree with its wallet chain tip, checks
+  both nodes' median times and the live funding window, and persists
   Bitcoin signed bytes before broadcast. It supports redeem, refund, and a
-  confirmed witness observation in either role mapping. BasicSwap's message
-  dispatcher and bid worker still need to call it.
+  confirmed witness observation in either role mapping. Its bounded Bitcoin
+  spend scanner persists a canonical block anchor, rewinds on a reorg, and
+  leaves a found spend in the next scan range for rechecking after restart.
+  BasicSwap's message dispatcher and bid worker still need to call it.
 
 The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
 HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the

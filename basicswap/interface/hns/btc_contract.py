@@ -326,15 +326,21 @@ class BtcHtlcContract:
                     transaction, txid, vout, height, block_hash
                 )
                 if observed is not None:
-                    self.confirm_spend_observation(observed, txid, vout)
+                    self.confirm_spend_observation(
+                        observed, txid, vout, minimum_confirmations
+                    )
                     return observed
         if self.ci.rpc("getblockhash", [last_height]) != block_hash_hex:
             raise ValueError("Bitcoin chain changed during spend scan")
         return None
 
-    def confirm_spend_observation(self, observation, funding_txid, funding_vout):
+    def confirm_spend_observation(
+        self, observation, funding_txid, funding_vout, minimum_confirmations=1
+    ):
         if not isinstance(observation, BtcSpendObservation):
             raise TypeError("invalid Bitcoin spend observation")
+        if type(minimum_confirmations) is not int or minimum_confirmations < 1:
+            raise ValueError("invalid Bitcoin confirmation minimum")
         try:
             current_hash = self.ci.rpc("getblockhash", [observation.block_height])
         except Exception as exc:
@@ -343,6 +349,12 @@ class BtcHtlcContract:
             ) from exc
         if current_hash != observation.block_hash.hex():
             raise ValueError("Bitcoin spend observation was reorganized")
+        tip_height = self.ci.rpc("getblockcount")
+        if (
+            type(tip_height) is not int
+            or tip_height - observation.block_height + 1 < minimum_confirmations
+        ):
+            raise ValueError("Bitcoin spend observation lost confirmations")
         block = self.ci.rpc("getblock", [current_hash, 2])
         if block.get("hash") != current_hash:
             raise ValueError("Bitcoin spend observation block mismatch")

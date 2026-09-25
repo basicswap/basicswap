@@ -208,6 +208,7 @@ class HnsBtcSettlement:
                     ),
                     self.record.btc_lock_txid,
                     self.record.btc_lock_vout,
+                    minimum,
                 )
             else:
                 current = self.hns_bridge.observe_spend(
@@ -295,6 +296,84 @@ class HnsBtcSettlement:
             bind_preimage(self.record, observed.preimage)
             self.persist_record(self.record)
         return observed
+
+    def scan_own_btc_lock_spend(self, first_height, max_blocks=100):
+        """Advance a durable Bitcoin cursor only across one stable chain span.
+
+        Stop immediately before a discovered spend so the next run can rebuild
+        and recheck its confirmed witness after a restart or reorganization.
+        """
+        if self.own_coin != "btc":
+            raise ValueError("the owned HNS/BTC lock is not on Bitcoin")
+        if type(first_height) is not int or first_height < 0:
+            raise ValueError("invalid Bitcoin spend scan start")
+        if type(max_blocks) is not int or not 1 <= max_blocks <= 100:
+            raise ValueError("invalid Bitcoin spend scan size")
+        txid, vout = self._outpoint("btc")
+        height = self.record.btc_scan_height
+        anchor = self.record.btc_scan_anchor
+        if (height is None) != (anchor is None):
+            raise ValueError("incomplete Bitcoin spend scan cursor")
+        if height is not None:
+            if (
+                type(height) is not int
+                or height < first_height
+                or not isinstance(anchor, bytes)
+                or len(anchor) != 32
+            ):
+                raise ValueError("invalid Bitcoin spend scan cursor")
+            try:
+                current_anchor = self.btc.ci.rpc("getblockhash", [height])
+            except Exception:  # noqa: BLE001
+                current_anchor = None
+            if current_anchor != anchor.hex():
+                self.record.btc_scan_height = None
+                self.record.btc_scan_anchor = None
+                self.persist_record(self.record)
+                height = None
+        tip_height = self.btc.ci.rpc("getblockcount")
+        if type(tip_height) is not int or tip_height < 0:
+            raise ValueError("invalid Bitcoin chain height")
+        mature_height = tip_height - self.terms.minimum_btc_confirmations + 1
+        scan_first = first_height if height is None else height + 1
+        if scan_first > mature_height:
+            return None
+        scan_last = min(mature_height, scan_first + max_blocks - 1)
+        end_hash = self.btc.ci.rpc("getblockhash", [scan_last])
+        if not isinstance(end_hash, str) or len(end_hash) != 64:
+            raise ValueError("invalid Bitcoin spend scan anchor")
+        result = self.btc.scan_confirmed_spend(
+            txid,
+            vout,
+            scan_first,
+            scan_last,
+            self.terms.minimum_btc_confirmations,
+        )
+        if self.btc.ci.rpc("getblockhash", [scan_last]) != end_hash:
+            raise ValueError("Bitcoin chain changed during spend scan")
+        if result is None:
+            self.record.btc_scan_height = scan_last
+            self.record.btc_scan_anchor = bytes.fromhex(end_hash)
+            self.persist_record(self.record)
+            return None
+        if result.block_height > scan_first:
+            prior_height = result.block_height - 1
+            prior_hash = self.btc.ci.rpc("getblockhash", [prior_height])
+            if self.btc.ci.rpc("getblockhash", [scan_last]) != end_hash:
+                raise ValueError("Bitcoin chain changed during spend scan")
+            self.record.btc_scan_height = prior_height
+            self.record.btc_scan_anchor = bytes.fromhex(prior_hash)
+        if result.branch == "redeem":
+            bind_preimage(self.record, result.preimage)
+        self.persist_record(self.record)
+        return ObservedSwapSpend(
+            result.branch,
+            result.txid,
+            tip_height - result.block_height + 1,
+            result.preimage,
+            result.block_height,
+            result.block_hash,
+        )
 
     def refund_owned_lock(
         self,
