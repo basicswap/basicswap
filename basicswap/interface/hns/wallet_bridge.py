@@ -10,17 +10,20 @@ import hashlib
 import json
 import os
 import queue
+import re
 import stat
 import subprocess
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 
+from .address import decode_v0_address
 from .htlc import HnsHtlc
 
 MAX_FRAME_BYTES = 65_536
-PROTOCOL_VERSION = 1
-SESSION_DOMAIN = b"basicswap/hns-wallet-bridge/session/v1\0"
+PROTOCOL_VERSION = 2
+SESSION_DOMAIN = b"basicswap/hns-wallet-bridge/session/v2\0"
+_DECIMAL_UNITS = re.compile(r"(0|[1-9][0-9]*)\Z")
 
 
 class HnsWalletBridgeError(RuntimeError):
@@ -55,17 +58,25 @@ def _positive_integer(value, name, maximum):
 class HnsBridgeTerms:
     offer_id: bytes
     bid_id: bytes
+    session_nonce: bytes
     descriptor: HnsHtlc
 
     def session_id(self):
         _hex_bytes(self.offer_id, 28, "offer ID")
         _hex_bytes(self.bid_id, 28, "bid ID")
-        return hashlib.sha256(SESSION_DOMAIN + self.offer_id + self.bid_id).digest()
+        _hex_bytes(self.session_nonce, 32, "session nonce")
+        if self.session_nonce == bytes(32):
+            raise ValueError("invalid HNS session nonce")
+        return hashlib.sha256(
+            SESSION_DOMAIN + self.offer_id + self.session_nonce
+        ).digest()
 
     def as_wire(self):
+        self.session_id()
         return {
             "offer_id": _hex_bytes(self.offer_id, 28, "offer ID"),
             "bid_id": _hex_bytes(self.bid_id, 28, "bid ID"),
+            "session_nonce": _hex_bytes(self.session_nonce, 32, "session nonce"),
             "descriptor": self.descriptor.encode().hex(),
             "descriptor_hash": self.descriptor.descriptor_hash().hex(),
         }
@@ -210,18 +221,58 @@ class HnsWalletBridge:
         if result != {"unlocked": True}:
             raise HnsWalletBridgeError("invalid HNS unlock result")
 
+    def lock(self):
+        result = self._request("lock")
+        if result != {"unlocked": False}:
+            raise HnsWalletBridgeError("invalid HNS lock result")
+
     def sync(self):
         result = self._request("sync")
         if result != {"synchronized": True}:
             raise HnsWalletBridgeError("invalid HNS synchronization result")
 
-    def key(self, offer_id, bid_id, refund):
+    @staticmethod
+    def _receive_address(network, address):
+        try:
+            decoded = decode_v0_address(network, address)
+        except ValueError as exc:
+            raise HnsWalletBridgeError("invalid HNS wallet receive address") from exc
+        if len(decoded.program) != 20:
+            raise HnsWalletBridgeError("invalid HNS wallet receive program")
+        return address
+
+    def receive(self, network):
+        result = self._request("receive")
+        if set(result) != {"address", "derivation_index"}:
+            raise HnsWalletBridgeError("invalid HNS receive result")
+        index = result["derivation_index"]
+        if type(index) is not int or not 0 <= index <= 0xFFFFFFFF:
+            raise HnsWalletBridgeError("invalid HNS receive derivation index")
+        return self._receive_address(network, result["address"]), index
+
+    def snapshot(self, network):
+        result = self._request("snapshot")
+        if set(result) != {"balance", "receive_address"}:
+            raise HnsWalletBridgeError("invalid HNS wallet snapshot")
+        balance = result["balance"]
+        if (
+            not isinstance(balance, str)
+            or not _DECIMAL_UNITS.fullmatch(balance)
+            or int(balance) > 0xFFFFFFFFFFFFFFFF
+        ):
+            raise HnsWalletBridgeError("invalid HNS wallet balance")
+        return int(balance), self._receive_address(network, result["receive_address"])
+
+    def key(self, offer_id, session_nonce, refund):
         if type(refund) is not bool:
             raise ValueError("invalid HNS settlement branch")
+        _hex_bytes(session_nonce, 32, "session nonce")
+        if session_nonce == bytes(32):
+            raise ValueError("invalid HNS session nonce")
         result = self._request(
             "key",
             offer_id=_hex_bytes(offer_id, 28, "offer ID"),
-            bid_id=_hex_bytes(bid_id, 28, "bid ID"),
+            session_nonce=session_nonce.hex(),
             refund=refund,
         )
         if set(result) != {"public_key"}:

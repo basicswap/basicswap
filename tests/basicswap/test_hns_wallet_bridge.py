@@ -30,6 +30,12 @@ while True:
     sequence = request['sequence']
     if operation == 'key':
         result = {'public_key': '02' + '11' * 32}
+    elif operation == 'receive':
+        result = {'address': 'rs1qqyqszqgpqyqszqgpqyqszqgpqyqszqgpprmh8u',
+                  'derivation_index': 0}
+    elif operation == 'snapshot':
+        result = {'balance': '1000000',
+                  'receive_address': 'rs1qqyqszqgpqyqszqgpqyqszqgpqyqszqgpprmh8u'}
     elif operation == 'verify_lock':
         result = {'verified': False}
     elif operation == 'fund':
@@ -37,13 +43,15 @@ while True:
                   'recovered': False}
     elif operation == 'observe_spend':
         result = {'observed': False}
+    elif operation == 'lock':
+        result = {'unlocked': False}
     else:
         result = {'unlocked': True}
     if operation == 'sync':
         sequence += 1
     if operation == 'rebroadcast':
         result = {'count': 0}
-    response = {'version': 1, 'sequence': sequence, 'ok': True,
+    response = {'version': 2, 'sequence': sequence, 'ok': True,
                 'result': result, 'error': None}
     if operation == 'rebroadcast':
         response['version'] = True
@@ -68,6 +76,7 @@ class HnsWalletBridgeTest(unittest.TestCase):
         self.terms = HnsBridgeTerms(
             bytes.fromhex("11" * 28),
             bytes.fromhex("22" * 28),
+            bytes.fromhex("23" * 32),
             HnsHtlc.decode(DESCRIPTOR, 0x5B6EC393, bytes.fromhex("11" * 32)),
         )
 
@@ -82,12 +91,14 @@ class HnsWalletBridgeTest(unittest.TestCase):
     def test_session_and_framed_operations(self):
         self.assertEqual(
             self.terms.session_id().hex(),
-            "25993e216776141c0e1e4f68712c48b71b954fabbc98cb47c1c960f5a3196777",
+            "b21dc4109bd11c635b5f092849de8121700c137209834cca621f3974ae501b38",
         )
         with self.bridge() as bridge:
             bridge.unlock("test passphrase")
+            self.assertEqual(bridge.receive("regtest")[1], 0)
+            self.assertEqual(bridge.snapshot("regtest")[0], 1_000_000)
             self.assertEqual(
-                bridge.key(self.terms.offer_id, self.terms.bid_id, False),
+                bridge.key(self.terms.offer_id, self.terms.session_nonce, False),
                 bytes.fromhex("02" + "11" * 32),
             )
             self.assertFalse(bridge.verify_lock(self.terms, bytes(32), 2))
@@ -95,6 +106,7 @@ class HnsWalletBridgeTest(unittest.TestCase):
                 bridge.fund(self.terms, 1_000), (bytes.fromhex("44" * 32), 0)
             )
             self.assertIsNone(bridge.observe_spend(self.terms, bytes(32), 2))
+            bridge.lock()
 
     def test_response_sequence_and_auth_file_fail_closed(self):
         with self.bridge() as bridge:

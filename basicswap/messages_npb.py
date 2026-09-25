@@ -302,3 +302,47 @@ class MessagePortalSend(NonProtobufClass):
         1: ("forward_address", NPBW_BYTES, 0),  # pubkey, 33 bytes
         2: ("message_bytes", NPBW_BYTES, 0),
     }
+
+
+class HnsBtcBidMessage(NonProtobufClass):
+    """Taker keys and nonce known before BasicSwap assigns the bid message ID."""
+
+    _map = {
+        1: ("protocol_version", NPBW_INT, 0),
+        2: ("offer_msg_id", NPBW_BYTES, 0),
+        3: ("time_valid", NPBW_INT, 0),
+        4: ("amount_from", NPBW_INT, 0),
+        5: ("amount_to", NPBW_INT, 0),
+        6: ("session_nonce", NPBW_BYTES, 0),
+        7: ("taker_hns_public_key", NPBW_BYTES, 0),
+        8: ("taker_btc_key_hash", NPBW_BYTES, 0),
+        9: ("minimum_hns_confirmations", NPBW_INT, 0),
+        10: ("minimum_btc_confirmations", NPBW_INT, 0),
+        11: ("message_nets", NPBW_BYTES, NPBF_STR),
+    }
+
+
+class HnsBtcBidAcceptMessage(NonProtobufClass):
+    """Maker's complete dual-chain contract and first-funding announcement."""
+
+    _map = {
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("first_txid", NPBW_BYTES, 0),
+        3: ("first_vout", NPBW_INT, 0),
+        4: ("hns_descriptor", NPBW_BYTES, 0),
+        5: ("btc_contract_script", NPBW_BYTES, 0),
+        6: ("maker_hns_public_key", NPBW_BYTES, 0),
+        7: ("maker_btc_key_hash", NPBW_BYTES, 0),
+        8: ("terms_commitment", NPBW_BYTES, 0),
+    }
+
+
+class HnsBtcSecondLockMessage(NonProtobufClass):
+    """Untrusted hint; the receiver must verify the second lock from its node."""
+
+    _map = {
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("second_txid", NPBW_BYTES, 0),
+        3: ("second_vout", NPBW_INT, 0),
+        4: ("terms_commitment", NPBW_BYTES, 0),
+    }

@@ -55,18 +55,27 @@ branch, and witness/preimage locally.
   or covenant. The pinned `hns-rs` protocol fixture passes.
 - `HnsWalletBridge` launches a separately named trusted-native wallet process
   over a versioned, bounded, sequential local pipe. It carries BasicSwap's
-  offer/bid IDs and exact HTLC descriptor, and validates returned transaction
+  offer/bid IDs, a pre-bid session nonce, and the exact HTLC descriptor, and validates returned transaction
   IDs, branch observations, and revealed preimages. The companion Rust binary
   is implemented in the local `hns-wallet-rs` `basicswap-bridge` branch. That
   binary opens one existing encrypted HNS account over its HSRD adapter and
   exposes key lookup, lock funding/verification, redeem/refund, spend
   observation, and durable rebroadcast without exporting signing keys.
+- `HnsBtcSwapTerms` reconstructs the exact HNS and Bitcoin contracts from
+  canonical, bounded bid and acceptance messages. It verifies a shared
+  SHA-256 hashlock, both chains' recipient/refund roles, amounts, HNS network,
+  minimum confirmations, and the commitment before exposing the announced
+  first outpoint. It enforces a later refund on the first funded chain in
+  either trade direction. This outpoint remains an untrusted hint until the
+  applicable node verifies its funding output and confirmations.
 
-The focused Python tests pass. A fresh isolated HSRD regtest process using
-`--wallet-index` and an Authorization header also answered `capabilities` and
-`chain_snapshot` through this client. Its tip was uninitialized, and
-`bound_snapshot()` correctly refused to issue a wallet script query. This
-does not constitute a funded regtest or swap test.
+The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
+HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the
+Rust bridge against an indexed live chain. A fresh encrypted HNS wallet
+received an ordinary transfer, funded an HNS HTLC, verified its lock after
+the account's two required confirmations, redeemed with the preimage, and
+observed the spend. The bridge's ignored live test records this setup. It is
+an HNS settlement test; a funded two-chain BasicSwap trade has not passed.
 
 These Python components are independent evidence and encoding checks. The
 spend-capable implementation is already in hns-wallet-rs; BasicSwap should use
@@ -91,7 +100,7 @@ control operations. The new `hns-wallet-basicswap-bridge` is separately named
 and uses trusted-native library APIs without adding value operations to that
 browser/provider ABI. It opens a single existing encrypted account, accepts
 only canonical HNS HTLC operations over a local process pipe, derives local
-settlement keys inside the wallet, and recovers the ID of a durably submitted
+  settlement keys inside the wallet from the offer ID and nonce, and recovers the ID of a durably submitted
 lock/redeem/refund after response loss. The Python HSRD client here can
 cross-check chain observations; it is not a substitute for the wallet's node
 adapter.
@@ -104,15 +113,42 @@ from BasicSwap's offer and bid messages. The swap message and script
 verification paths must agree on one exact HNS descriptor; the existing
 Bitcoin contract cannot be sent to the HNS wallet unchanged.
 
+## BTC ↔ HNS trade order
+
+Both directions use seller-first funding and one 32-byte preimage selected by
+the maker. The taker generates and persists a random 32-byte nonce before its
+bid so its HNS settlement public key can be derived before BasicSwap assigns
+the bid ID. The maker binds that bid, both exact contracts, and the first
+funding outpoint in its acceptance message. The taker must verify the
+acceptance commitment and first on-chain lock before funding the second lock.
+The maker then redeems the second lock, revealing the preimage; the taker
+redeems the first. Each party must resume observation and its own refund after
+restart or a counterparty disconnect.
+
+| Offered by maker | First lock | Second lock | Maker's receive branch | Taker's receive branch |
+| --- | --- | --- | --- | --- |
+| HNS | HNS HTLC | Bitcoin CLTV HTLC | Bitcoin | HNS |
+| BTC | Bitcoin CLTV HTLC | HNS HTLC | HNS | Bitcoin |
+
+The first refund becomes spendable at least two hours after the second, and
+the second remains at least two hours from negotiation. HNS absolute time uses
+its high-bit 512-second median-time encoding; the threshold is rounded up
+when chosen. An implementation must also check live chain median times,
+confirmation progress, fee policy, and remaining refund margin before every
+funding action. The message and terms code does not yet run BasicSwap's bid
+state machine or perform either chain's funding and spend actions.
+
 ## Work needed before an HNS asset can be enabled
 
 1. Complete the native HNS coin interface around the address and transaction
    primitives already in this branch. Use HNS's six decimal places and its
    own money, dust, covenant, and policy rules, rather than BTC defaults.
-2. Add a BasicSwap HNS protocol variant that negotiates the canonical
-   `hns-swap::HnsHtlc` descriptor and maps BasicSwap bid/session identities,
-   secret exchange, confirmation policy, and refund deadlines onto it. Both
-   peers must validate the same descriptor and on-chain funding/spend evidence.
+2. Route the new bid and acceptance messages through a BasicSwap HNS/BTC
+   protocol variant. Generate and persist the random nonce before sending the
+   bid, derive the taker's HNS receive key, and retain the assigned bid ID.
+   Persist the exact negotiated contracts and commitment on both peers before
+   any value operation. The current message/terms classes have no network
+   handlers or database mapping yet.
 3. Complete bridge installation and wallet lifecycle: create/restore a
    dedicated HNS account, arrange protected unlock and HSRD Authorization
    delivery, supervise the sidecar, and reconcile BasicSwap's persisted bid
