@@ -1947,8 +1947,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def changeWalletPasswords(
         self, old_password: str, new_password: str, coin=None
     ) -> None:
-        if Coins.HNS in self.activeCoins() and coin in (None, Coins.HNS):
-            raise ValueError("HNS wallet passphrase rotation is not available yet")
         # Only the main wallet password is changed for monero, avoid issues by preventing until active swaps are complete
         if len(self.swaps_in_progress) > 0:
             raise ValueError("Can't change passwords while swaps are in progress")

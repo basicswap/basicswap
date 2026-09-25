@@ -53,6 +53,8 @@ while True:
         result = {'observed': False}
     elif operation == 'lock':
         result = {'unlocked': False}
+    elif operation == 'change_passphrase':
+        result = {'changed': True, 'unlocked': False}
     else:
         result = {'unlocked': True}
     if operation == 'sync':
@@ -125,6 +127,9 @@ class HnsWalletBridgeTest(unittest.TestCase):
             )
             self.assertIsNone(bridge.submitted_spend(self.terms, bytes(32), False))
             self.assertIsNone(bridge.observe_spend(self.terms, bytes(32), 2))
+            with self.assertRaisesRegex(ValueError, "old HNS wallet passphrase"):
+                bridge.change_passphrase("", "next passphrase")
+            bridge.change_passphrase("test passphrase", "next passphrase")
             bridge.lock()
         self.assertFalse(bridge.is_running())
 

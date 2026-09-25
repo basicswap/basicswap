@@ -37,10 +37,16 @@ class FakeBridge:
         self.fingerprint = FINGERPRINT
         self.locked = True
         self.closed = False
+        self.passphrase = "test passphrase"
 
     def unlock(self, passphrase):
-        assert passphrase == "test passphrase"
+        assert passphrase == self.passphrase
         self.locked = False
+
+    def change_passphrase(self, old, new):
+        assert not self.locked and old == self.passphrase
+        self.passphrase = new
+        self.locked = True
 
     def identity(self, network):
         assert network == "regtest"
@@ -160,6 +166,16 @@ class HnsCoinInterfaceTest(unittest.TestCase):
             coin.unlockWallet("test passphrase")
         self.assertTrue(bridge.locked)
         self.assertFalse(coin.knownWalletSeed())
+
+    def test_password_change_reopens_same_seed_under_new_password(self):
+        coin = self.interface()
+        with self.assertRaisesRegex(ValueError, "must be unlocked"):
+            coin.changeWalletPassword("test passphrase", "next passphrase")
+        coin.unlockWallet("test passphrase")
+        coin.changeWalletPassword("test passphrase", "next passphrase")
+        self.assertTrue(coin.walletIdentityReady())
+        self.assertEqual(coin.bridge.passphrase, "next passphrase")
+        self.assertEqual(coin.getSpendableBalance(), 1_250_000)
 
     def test_dead_bridge_is_not_reported_as_unlocked(self):
         bridge = FakeBridge()

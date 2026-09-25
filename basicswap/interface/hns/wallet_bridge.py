@@ -328,6 +328,19 @@ class HnsWalletBridge:
         if result != {"unlocked": True}:
             raise HnsWalletBridgeError("invalid HNS unlock result")
 
+    def change_passphrase(self, old_passphrase, new_passphrase):
+        if not isinstance(old_passphrase, str) or not old_passphrase:
+            raise ValueError("invalid old HNS wallet passphrase")
+        if not isinstance(new_passphrase, str) or not new_passphrase:
+            raise ValueError("invalid new HNS wallet passphrase")
+        result = self._request(
+            "change_passphrase",
+            old_passphrase=old_passphrase,
+            new_passphrase=new_passphrase,
+        )
+        if result != {"changed": True, "unlocked": False}:
+            raise HnsWalletBridgeError("invalid HNS passphrase change result")
+
     def lock(self):
         result = self._request("lock")
         if result != {"unlocked": False}:

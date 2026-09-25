@@ -166,11 +166,14 @@ Core regtest. A separate two-node Particl regtest covers real SMSG v2 offer and
 bid handling. The combined app regtest runs funded trades in both directions
 while Particl carries the three trade packets; the offer row is seeded after
 the separate real offer-delivery check. Package and version the Rust bridge
-and HSRD for BasicSwap's supported platforms. HNS passphrase rotation remains
-unavailable; BasicSwap refuses a
-global password change while HNS is active rather than leaving its encrypted
-wallet with an unrecorded password. These release gates remain before HNS is
-presented as a fully supported asset.
+and HSRD for BasicSwap's supported platforms. HNS now participates in
+BasicSwap's password change: the Rust store re-encrypts all records and
+key-derived private origin indexes in one transaction, checkpoints old
+ciphertext, closes its runtime, and reopens under the new passphrase. If the
+bridge reports `passphrase_changed_checkpoint_pending`, the database already
+uses the new passphrase; retry a new unlock to finish the checkpoint. Release
+qualification against the packaged binaries remains before HNS is presented
+as a fully supported asset.
 
 Companion source: [HSRD wallet RPC](https://github.com/handshake-rs/hns-node-rs/blob/main/docs/WALLET_RPC_V1.md)
 and [hns-wallet-rs bridge contract](https://github.com/handshake-rs/hns-wallet-rs/blob/main/docs/BASICSWAP_BRIDGE.md).

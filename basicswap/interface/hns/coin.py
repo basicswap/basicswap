@@ -167,6 +167,18 @@ class HNSInterface(CoinInterface):
         self._unlocked = True
         self.setWalletSeedWarning(False)
 
+    def changeWalletPassword(self, old_password, new_password):
+        if not self.walletIdentityReady():
+            raise ValueError("HNS wallet must be unlocked before changing its password")
+        try:
+            self._bridge.change_passphrase(old_password, new_password)
+        finally:
+            # The bridge discards its runtime after a rekey attempt. Recheck
+            # identity and rebuild its wallet service under the new key.
+            self._unlocked = False
+            self.setWalletSeedWarning(True)
+        self.unlockWallet(new_password)
+
     def lockWallet(self):
         self._bridge.lock()
         self._unlocked = False
