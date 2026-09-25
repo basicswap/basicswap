@@ -87,7 +87,7 @@ branch, and witness/preimage locally.
   Core regtest test exercises both trade role mappings, redeem, and refund.
 - `HnsBtcSwap` records the pre-bid session ID, nonce, exact accepted contracts,
   lock outpoints, Bitcoin prepared transaction bytes, wallet seed fingerprint,
-  and scan cursor in the BasicSwap database (schema version 40). The record helpers reject changed
+  and scan cursor in the BasicSwap database (schema version 41). The record helpers reject changed
   identities or terms and can reconstruct an accepted trade after the refund
   window closes. `trade_protocol.py` now constructs and binds the bid,
   acceptance, and second-lock messages to that row in both trade directions,
@@ -107,6 +107,11 @@ branch, and witness/preimage locally.
   replay. A trade stores the HNS recovery-seed fingerprint and rejects a
   different unlocked account even if its wallet ID changed on restore.
   BasicSwap's message dispatcher and bid worker still need to call it.
+- `HnsBtcOutbox` stores exact encrypted SMSG bytes and their precomputed
+  message ID in the same database transaction as a trade record. Retrying a
+  pending row submits the same bytes and cannot change the bid ID or HNS
+  settlement session. The app sender and periodic delivery route still need
+  to use this table.
 
 The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
 HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the

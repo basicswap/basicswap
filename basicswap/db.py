@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 40
+CURRENT_DB_VERSION = 41
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -524,6 +524,22 @@ class HnsBtcSwap(Table):
     updated_at = Column("integer")
 
     index = Index("hns_btc_offer_id_index", "offer_id")
+
+
+class HnsBtcOutbox(Table):
+    """Exact encrypted HNS/BTC message committed before network submission."""
+
+    __tablename__ = "hns_btc_outbox"
+
+    message_id = Column("blob", primary_key=True)
+    session_id = Column("blob")
+    message_type = Column("integer")
+    message_bytes = Column("blob")
+    created_at = Column("integer")
+    expire_at = Column("integer")
+    delivered_at = Column("integer")
+
+    index = Index("hns_btc_outbox_session_index", "session_id")
 
 
 class XmrSplitData(Table):
