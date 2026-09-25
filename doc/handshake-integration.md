@@ -48,8 +48,10 @@ branch, and witness/preimage locally.
 - `HNSInterface` exposes HSRD's bound chain tip, six-decimal HNS amounts,
   native receive addresses, and the encrypted wallet balance through the Rust
   sidecar. It checks a configured seed fingerprint on unlock and shuts the
-  sidecar down with BasicSwap. An isolated HSD/HSRD startup test creates the
-  account and enters through `BasicSwap.createInterface`. Generic HNS offers
+  sidecar down with BasicSwap. If the sidecar exits, wallet status becomes
+  locked; supplying the passphrase again reopens it and rechecks the seed.
+  An isolated HSD/HSRD startup test creates the account, enters through
+  `BasicSwap.createInterface`, and reopens the sidecar. Generic HNS offers
   still fail closed; HNS wallet creation, recovery, password rotation, and
   ordinary withdrawals have no BasicSwap UI path yet.
 - `HnsTransaction` encodes and decodes the HNS base/witness format and computes

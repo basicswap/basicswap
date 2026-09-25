@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from basicswap.basicswap import BasicSwap
 from basicswap.basicswap_util import SwapTypes, TxLockTypes
@@ -58,6 +59,9 @@ class FakeBridge:
     def close(self):
         self.closed = True
 
+    def is_running(self):
+        return not self.closed
+
 
 class HnsCoinInterfaceTest(unittest.TestCase):
     def interface(self, bridge=None, node=None):
@@ -98,6 +102,8 @@ class HnsCoinInterfaceTest(unittest.TestCase):
         self.assertFalse(coin.knownWalletSeed())
         coin.close()
         self.assertTrue(coin.bridge.closed)
+        self.assertEqual(coin.checkWallets(), 0)
+        self.assertEqual(coin.isWalletEncryptedLocked(), (True, True))
 
     def test_generic_swap_types_cannot_fund_hns(self):
         for swap_type in SwapTypes:
@@ -136,6 +142,43 @@ class HnsCoinInterfaceTest(unittest.TestCase):
             coin.unlockWallet("test passphrase")
         self.assertTrue(bridge.locked)
         self.assertFalse(coin.knownWalletSeed())
+
+    def test_dead_bridge_is_not_reported_as_unlocked(self):
+        bridge = FakeBridge()
+        coin = self.interface(bridge=bridge)
+        coin.unlockWallet("test passphrase")
+        bridge.closed = True
+        self.assertEqual(coin.checkWallets(), 0)
+        self.assertEqual(coin.isWalletEncryptedLocked(), (True, True))
+        self.assertTrue(coin.getWalletInfo()["locked"])
+        with self.assertRaisesRegex(ValueError, "locked"):
+            coin.getSpendableBalance()
+        with self.assertRaisesRegex(ValueError, "bridge is unavailable"):
+            coin.unlockWallet("test passphrase")
+
+    def test_unlock_reopens_a_stopped_owned_bridge(self):
+        settings = {
+            "connection_type": "rpc",
+            "rpchost": "127.0.0.1",
+            "rpcport": 14037,
+            "wallet_seed_fingerprint": FINGERPRINT.hex(),
+            "bridge_executable": "/trusted/hns-wallet-basicswap-bridge",
+            "wallet_database": "/private/hns-wallet.db",
+            "rpc_authorization_file": "/private/hsrd-auth",
+        }
+        with patch(
+            "basicswap.interface.hns.coin.HnsWalletBridge",
+            side_effect=lambda *args: FakeBridge(),
+        ) as constructor:
+            coin = HNSInterface(settings, "regtest", node=FakeNode())
+            first = coin.bridge
+            coin.unlockWallet("test passphrase")
+            first.close()
+            self.assertTrue(coin.getWalletInfo()["locked"])
+            coin.unlockWallet("test passphrase")
+            self.assertIsNot(coin.bridge, first)
+            self.assertEqual(coin.getSpendableBalance(), 1_250_000)
+            self.assertEqual(constructor.call_count, 2)
 
     def test_stale_hsrd_scheduler_is_not_reported_synced(self):
         node = FakeNode()

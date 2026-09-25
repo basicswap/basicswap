@@ -128,6 +128,11 @@ class HnsNodeRpcRegtest(unittest.TestCase):
                                         ],
                                         1.0,
                                     )
+                                    coin.bridge.close()
+                                    self.assertEqual(coin.checkWallets(), 0)
+                                    self.assertTrue(coin.getWalletInfo()["locked"])
+                                    coin.unlockWallet("test passphrase")
+                                    self.assertEqual(coin.getSpendableBalance(), 0)
                                 finally:
                                     coin.close()
                             return

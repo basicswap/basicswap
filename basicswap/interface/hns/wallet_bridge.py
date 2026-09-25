@@ -225,6 +225,10 @@ class HnsWalletBridge:
         self._reader = threading.Thread(target=self._read_responses, daemon=True)
         self._reader.start()
 
+    def is_running(self):
+        """Report child liveness without sending a wallet request."""
+        return not self._closed and self._process.poll() is None
+
     def _read_responses(self):
         try:
             while True:

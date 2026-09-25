@@ -80,18 +80,20 @@ class HNSInterface(CoinInterface):
         self.setConfTarget(coin_settings.get("conf_target", 2))
         self._node = node
         self._bridge = bridge
+        self._bridge_config = None
         self._unlocked = False
         if self._node is None:
             authorization_file = coin_settings.get("rpc_authorization_file")
             authorization = read_private_hsrd_authorization(authorization_file)
             self._node = HnsNodeRpc(port, authorization, host)
         if self._bridge is None:
-            self._bridge = HnsWalletBridge(
+            self._bridge_config = (
                 coin_settings["bridge_executable"],
                 coin_settings["wallet_database"],
                 f"{host}:{port}",
                 coin_settings["rpc_authorization_file"],
             )
+            self._bridge = HnsWalletBridge(*self._bridge_config)
 
     @property
     def node(self):
@@ -107,7 +109,7 @@ class HNSInterface(CoinInterface):
             raise ValueError("HNS wallet bridge is unavailable")
 
     def checkWallets(self):
-        return 1 if self._bridge is not None else 0
+        return 1 if self._bridge is not None and self._bridge.is_running() else 0
 
     def getDaemonVersion(self):
         self.testDaemonRPC(with_wallet=False)
@@ -136,6 +138,13 @@ class HNSInterface(CoinInterface):
             return False
 
     def unlockWallet(self, passphrase):
+        if not self._bridge.is_running():
+            self._unlocked = False
+            self.setWalletSeedWarning(True)
+            if self._bridge_config is None:
+                raise ValueError("HNS wallet bridge is unavailable")
+            self._bridge.close()
+            self._bridge = HnsWalletBridge(*self._bridge_config)
         self._bridge.unlock(passphrase)
         try:
             _, fingerprint = self._bridge.identity(self._network)
@@ -144,7 +153,8 @@ class HNSInterface(CoinInterface):
                     "HNS wallet recovery seed differs from configured wallet"
                 )
         except Exception:
-            self._bridge.lock()
+            if self._bridge.is_running():
+                self._bridge.lock()
             raise
         self._unlocked = True
         self.setWalletSeedWarning(False)
@@ -155,7 +165,7 @@ class HNSInterface(CoinInterface):
         self.setWalletSeedWarning(True)
 
     def walletIdentityReady(self):
-        return self._unlocked and self.knownWalletSeed()
+        return self._unlocked and self.knownWalletSeed() and self.checkWallets() == 1
 
     def getSpendableBalance(self):
         if not self.walletIdentityReady():
@@ -175,7 +185,7 @@ class HNSInterface(CoinInterface):
         return self._bridge.receive(self._network)[0]
 
     def isWalletEncryptedLocked(self):
-        return True, not self._unlocked
+        return True, not self.walletIdentityReady()
 
     def getWalletInfo(self):
         # The encrypted sidecar cannot disclose balance while it is locked.
@@ -184,7 +194,7 @@ class HNSInterface(CoinInterface):
             "balance": self.format_amount(balance),
             "unconfirmed_balance": "0",
             "encrypted": True,
-            "locked": not self._unlocked,
+            "locked": not self.walletIdentityReady(),
         }
 
     def close(self):

@@ -102,6 +102,7 @@ class HnsWalletBridgeTest(unittest.TestCase):
             "b21dc4109bd11c635b5f092849de8121700c137209834cca621f3974ae501b38",
         )
         with self.bridge() as bridge:
+            self.assertTrue(bridge.is_running())
             bridge.unlock("test passphrase")
             self.assertEqual(
                 bridge.identity("regtest"),
@@ -125,6 +126,7 @@ class HnsWalletBridgeTest(unittest.TestCase):
             self.assertIsNone(bridge.submitted_spend(self.terms, bytes(32), False))
             self.assertIsNone(bridge.observe_spend(self.terms, bytes(32), 2))
             bridge.lock()
+        self.assertFalse(bridge.is_running())
 
     def test_response_sequence_and_auth_file_fail_closed(self):
         with (
