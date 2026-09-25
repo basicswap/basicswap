@@ -14851,6 +14851,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.processPortalOffer(msg)
             elif msg_type == MessageTypes.PORTAL_SEND:
                 self.processPortalMessage(msg)
+            elif msg_type == MessageTypes.HNS_BTC_BID:
+                from .interface.hns.app_protocol import receive_hns_btc_bid
+
+                receive_hns_btc_bid(self, msg)
 
         except InactiveCoin as ex:
             self.log.debug(

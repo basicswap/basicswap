@@ -15,10 +15,12 @@ from basicswap.basicswap_util import (
 )
 from basicswap.chainparams import Coins
 from basicswap.db import Bid, HnsBtcOutbox
+from basicswap.messages_npb import HnsBtcBidMessage
 from basicswap.network.simplex import encryptMsg
+from basicswap.network.util import getMsgPubkey
 
 from .outbox import deliver_hns_outbox_message, prepare_hns_outbox_message
-from .trade_protocol import bind_sent_bid, prepare_taker_bid
+from .trade_protocol import bind_sent_bid, prepare_taker_bid, receive_maker_bid
 
 
 def _hns_btc_offer_pair(offer):
@@ -190,3 +192,84 @@ def post_hns_btc_bid(app, offer, amount, addr_send_from, extra_options):
             "HNS/BTC bid %s queued for retry: %s", outbox.message_id.hex(), exc
         )
     return outbox.message_id
+
+
+def receive_hns_btc_bid(app, msg):
+    """Bind a received SMSG bid to a sent fixed HNS/BTC offer atomically."""
+    if msg.get("type", "smsg") != "smsg":
+        raise ValueError("HNS/BTC bid must arrive over SMSG")
+    try:
+        bid_id = bytes.fromhex(msg["msgid"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("invalid HNS/BTC bid message ID") from exc
+    if len(bid_id) != 28:
+        raise ValueError("invalid HNS/BTC bid message ID")
+    raw = app.getSmsgMsgBytes(msg)
+    wire = HnsBtcBidMessage()
+    try:
+        wire.from_bytes(raw)
+        if wire.to_bytes() != raw:
+            raise ValueError("noncanonical HNS/BTC bid")
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        raise ValueError("invalid HNS/BTC bid message") from exc
+    offer = app.getOffer(wire.offer_msg_id)
+    if offer is None or not offer.was_sent or offer.active_ind != 1:
+        raise ValueError("unknown HNS/BTC offer")
+    _hns_btc_offer_pair(offer)
+    now = app.getTime()
+    if (
+        offer.expire_at <= now
+        or offer.amount_negotiable
+        or offer.rate_negotiable
+        or msg.get("to") != offer.addr_from
+        or wire.amount_from != offer.amount_from
+        or wire.amount_to != offer.amount_to
+        or wire.message_nets != "smsg"
+    ):
+        raise ValueError("HNS/BTC bid differs from fixed offer or destination")
+    record = receive_maker_bid(offer.offer_id, bid_id, raw, msg["sent"], now)
+    coin_from, coin_to = Coins(offer.coin_from), Coins(offer.coin_to)
+    cursor = app.openDB()
+    duplicate = False
+    try:
+        existing = app.queryOne(Bid, cursor, {"bid_id": bid_id})
+        if existing is not None:
+            existing_record = app.queryOne(
+                type(record), cursor, {"session_id": record.session_id}
+            )
+            if (
+                existing_record is None
+                or existing_record.bid_message != raw
+                or existing.offer_id != offer.offer_id
+                or existing.bid_addr != msg["from"]
+            ):
+                raise ValueError("HNS/BTC bid replay changed")
+            duplicate = True
+        else:
+            bid = Bid(
+                bid_id=bid_id,
+                active_ind=1,
+                offer_id=offer.offer_id,
+                protocol_version=offer.protocol_version,
+                amount=offer.amount_from,
+                amount_to=offer.amount_to,
+                rate=offer.rate,
+                created_at=msg["sent"],
+                expire_at=msg["sent"] + wire.time_valid,
+                bid_addr=msg["from"],
+                pk_bid_addr=getMsgPubkey(app, msg),
+                was_received=True,
+                chain_a_height_start=app.ci(coin_from).getChainHeight(),
+                chain_b_height_start=app.ci(coin_to).getChainHeight(),
+                message_nets="smsg",
+            )
+            bid.setState(BidStates.BID_RECEIVED)
+            app.add(record, cursor)
+            app.saveBidInSession(bid_id, bid, cursor)
+            app.addRecvBidNetworkLink(msg, bid_id, cursor)
+    except Exception:
+        app.closeDB(cursor, commit=False)
+        raise
+    else:
+        app.closeDB(cursor, commit=not duplicate)
+    return bid_id

@@ -22,6 +22,7 @@ from basicswap.db import (
 )
 from basicswap.interface.hns.app_protocol import (
     flush_hns_app_outbox,
+    receive_hns_btc_bid,
 )
 from basicswap.util.smsg import smsgEncrypt, smsgGetID
 
@@ -125,6 +126,12 @@ class FakeApp(DBMethods):
         assert bid_id == bid.bid_id
         self.add(bid, cursor)
 
+    def getSmsgMsgBytes(self, msg):
+        return msg["raw"]
+
+    def addRecvBidNetworkLink(self, msg, bid_id, cursor):
+        return None
+
     def callrpc(self, method, params):
         assert method == "smsgimport"
         raw = bytes.fromhex(params[0])
@@ -154,6 +161,7 @@ class HnsAppProtocolTest(unittest.TestCase):
                 addr_from="receiver",
                 protocol_version=5,
                 active_ind=1,
+                was_sent=False,
             )
             app.offer = offer
 
@@ -200,6 +208,34 @@ class HnsAppProtocolTest(unittest.TestCase):
             self.assertEqual(flush_hns_app_outbox(app, app.now + 1), 1)
             self.assertEqual(app.sent, [row.message_bytes, row.message_bytes])
             self.assertEqual(flush_hns_app_outbox(app, app.now + 2), 0)
+
+            maker = FakeApp(Path(directory) / "maker.sqlite")
+            maker.offer = SimpleNamespace(**vars(offer))
+            maker.offer.was_sent = True
+            msg = {
+                "msgid": bid_id.hex(),
+                "sent": app.now,
+                "from": "sender",
+                "to": "receiver",
+                "type": "smsg",
+                "raw": record.bid_message,
+            }
+            with patch(
+                "basicswap.interface.hns.app_protocol.getMsgPubkey",
+                return_value=b"\x02" + b"\x09" * 32,
+            ):
+                self.assertEqual(receive_hns_btc_bid(maker, msg), bid_id)
+                self.assertEqual(receive_hns_btc_bid(maker, msg), bid_id)
+                changed = dict(msg, **{"from": "other sender"})
+                with self.assertRaisesRegex(ValueError, "replay changed"):
+                    receive_hns_btc_bid(maker, changed)
+            with closing(sqlite3.connect(maker.path)) as connection:
+                maker_record = maker.queryOne(
+                    HnsBtcSwap,
+                    connection.cursor(),
+                    {"bid_id": bid_id},
+                )
+            self.assertEqual(maker_record.session_id, record.session_id)
 
 
 if __name__ == "__main__":
