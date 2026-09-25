@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from basicswap.basicswap import BasicSwap
-from basicswap.basicswap_util import SwapTypes
+from basicswap.basicswap_util import SwapTypes, TxLockTypes
 from basicswap.chainparams import Coins, chainparams
 from basicswap.interface.hns.coin import (
     HNSInterface,
@@ -103,9 +103,30 @@ class HnsCoinInterfaceTest(unittest.TestCase):
         for swap_type in SwapTypes:
             with (
                 self.subTest(swap_type=swap_type),
-                self.assertRaisesRegex(ValueError, "native swap protocol"),
+                self.assertRaisesRegex(ValueError, "not enabled"),
             ):
                 BasicSwap.validateSwapType(None, Coins.HNS, Coins.BTC, swap_type)
+        with self.assertRaisesRegex(ValueError, "HNS/BTC pair"):
+            BasicSwap.validateSwapType(
+                None, Coins.BTC, Coins.LTC, SwapTypes.HNS_BTC_SWAP
+            )
+        BasicSwap.validateOfferLockValue(
+            None,
+            SwapTypes.HNS_BTC_SWAP,
+            Coins.HNS,
+            Coins.BTC,
+            TxLockTypes.ABS_LOCK_TIME,
+            48 * 60 * 60,
+        )
+        with self.assertRaisesRegex(ValueError, "absolute-time lock"):
+            BasicSwap.validateOfferLockValue(
+                None,
+                SwapTypes.HNS_BTC_SWAP,
+                Coins.HNS,
+                Coins.BTC,
+                TxLockTypes.SEQUENCE_LOCK_TIME,
+                48 * 60 * 60,
+            )
 
     def test_changed_seed_locks_bridge(self):
         bridge = FakeBridge()

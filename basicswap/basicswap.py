@@ -3795,7 +3795,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
         if Coins.HNS in (coin_from, coin_to):
-            raise ValueError("HNS/BTC trades require the native swap protocol")
+            raise ValueError("HNS/BTC trade routing is not enabled")
+        if swap_type == SwapTypes.HNS_BTC_SWAP:
+            raise ValueError("HNS/BTC swap type requires the HNS/BTC pair")
 
         for coin in (coin_from, coin_to):
             if coin in self.balance_only_coins:
@@ -4103,6 +4105,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def validateOfferLockValue(
         self, swap_type, coin_from, coin_to, lock_type, lock_value: int
     ) -> None:
+        if swap_type == SwapTypes.HNS_BTC_SWAP:
+            ensure(
+                lock_type == TxLockTypes.ABS_LOCK_TIME
+                and type(lock_value) is int
+                and 6 * 60 * 60 <= lock_value <= 96 * 60 * 60,
+                "HNS/BTC requires a 6 to 96 hour absolute-time lock",
+            )
+            return
         coin_from_has_csv = self.coin_clients[coin_from]["use_csv"]
         coin_to_has_csv = self.coin_clients[coin_to]["use_csv"]
 

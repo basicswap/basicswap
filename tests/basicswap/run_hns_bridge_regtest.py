@@ -33,6 +33,16 @@ def main():
     parser.add_argument("--hsd", type=Path, required=True)
     parser.add_argument("--hsrd", type=Path, required=True)
     parser.add_argument("--wallet-repo", type=Path, required=True)
+    parser.add_argument(
+        "--two-chain",
+        action="store_true",
+        help="also run both funded HNS/BTC trade directions",
+    )
+    parser.add_argument(
+        "--two-chain-only",
+        action="store_true",
+        help="run the funded HNS/BTC trade directions without repeating the Rust test",
+    )
     args = parser.parse_args()
     hsd = args.hsd.resolve(strict=True)
     hsrd = args.hsrd.resolve(strict=True)
@@ -169,25 +179,46 @@ def main():
                     "BASICSWAP_HSRD_REGTEST_AUTH_FILE": str(auth_file),
                 }
             )
-            subprocess.run(
-                [
-                    "cargo",
-                    "test",
-                    "--locked",
-                    "--manifest-path",
-                    "integrations/basicswap-bridge/Cargo.toml",
-                    "--test",
-                    "process",
-                    "funded_lock_uses_real_hsrd_wallet_index",
-                    "--",
-                    "--ignored",
-                    "--nocapture",
-                ],
-                cwd=wallet_repo,
-                env=environment,
-                timeout=240,
-                check=True,
-            )
+            if not args.two_chain_only:
+                subprocess.run(
+                    [
+                        "cargo",
+                        "test",
+                        "--locked",
+                        "--manifest-path",
+                        "integrations/basicswap-bridge/Cargo.toml",
+                        "--test",
+                        "process",
+                        "funded_lock_uses_real_hsrd_wallet_index",
+                        "--",
+                        "--ignored",
+                        "--nocapture",
+                    ],
+                    cwd=wallet_repo,
+                    env=environment,
+                    timeout=240,
+                    check=True,
+                )
+            if args.two_chain or args.two_chain_only:
+                bridge = os.environ.get("HNS_BRIDGE_BIN")
+                bitcoind = os.environ.get("BITCOIND_BIN")
+                if not bridge or not bitcoind:
+                    raise ValueError(
+                        "--two-chain requires HNS_BRIDGE_BIN and BITCOIND_BIN"
+                    )
+                environment.update({"HNS_BRIDGE_BIN": bridge, "BITCOIND_BIN": bitcoind})
+                subprocess.run(
+                    [
+                        os.environ.get("PYTHON", os.sys.executable),
+                        "-m",
+                        "unittest",
+                        "tests.basicswap.test_hns_two_chain_regtest",
+                        "-q",
+                    ],
+                    env=environment,
+                    timeout=360,
+                    check=True,
+                )
         except Exception:
             for log in logs:
                 log.flush()

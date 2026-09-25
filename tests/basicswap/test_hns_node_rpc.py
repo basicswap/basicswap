@@ -9,6 +9,7 @@ from basicswap.interface.hns.node_rpc import (
     HnsNodeError,
     HnsNodeRpc,
     HnsStaleSnapshot,
+    hns_network_binding,
     script_id_for_address,
 )
 
@@ -61,6 +62,13 @@ class FakeConnection:
 
 
 class HnsNodeRpcTest(unittest.TestCase):
+    def test_descriptor_network_binding_uses_hsrd_genesis(self):
+        magic, genesis = hns_network_binding("regtest")
+        self.assertEqual(magic, 0xAE3895CF)
+        self.assertEqual(genesis.hex(), GENESIS)
+        with self.assertRaisesRegex(ValueError, "unsupported"):
+            hns_network_binding("simnet")
+
     def make_client(self, replies):
         requests = []
         connections = []

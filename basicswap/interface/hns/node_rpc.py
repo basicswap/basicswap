@@ -19,6 +19,16 @@ _GENESIS = {
     "testnet": "b1520dd24372f82ec94ebf8cf9d9b037d419c4aa3575d05dec70aedd1b427901",
     "regtest": "ae3895cf597eff05b19e02a70ceeeecb9dc72dbfe6504a50e9343a72f06a87c5",
 }
+
+
+def hns_network_binding(network):
+    """Return the wallet descriptor magic and genesis for one HSRD network."""
+    if network not in _GENESIS:
+        raise ValueError("unsupported HSRD network")
+    genesis = bytes.fromhex(_GENESIS[network])
+    return int.from_bytes(genesis[:4], "big"), genesis
+
+
 # hsrd limits the result projection to 8 MiB; allow room for the envelope.
 _MAX_RESPONSE = 8 * 1024 * 1024 + 4096
 # hsrd defaults to a 65,536-byte request-body limit. A full 10,000-script

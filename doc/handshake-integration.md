@@ -114,8 +114,12 @@ the account's two required confirmations, redeemed with the preimage, and
 observed the spend. Its submitted-funding and submitted-spend lookups returned
 the same transaction IDs before and after the spend. The bridge's ignored live
 test records this setup; `tests/basicswap/run_hns_bridge_regtest.py` starts the
-isolated nodes and runs it. It is
-an HNS settlement test; a funded two-chain BasicSwap trade has not passed.
+isolated nodes and runs it. Its opt-in `--two-chain` mode also starts Bitcoin
+Core, funds both HNS/BTC directions, verifies each confirmed lock, reloads
+both peers' SQLite trade records before redemption, and observes the revealed
+preimage and final spend on each chain. The two-chain test invokes the
+protocol and value adapters directly; it does not exercise BasicSwap's offer,
+bid, or worker routing.
 
 These Python components are independent evidence and encoding checks. The
 spend-capable implementation is already in hns-wallet-rs; BasicSwap should use
@@ -176,7 +180,8 @@ its high-bit 512-second median-time encoding; the threshold is rounded up
 when chosen. An implementation must also check live chain median times,
 confirmation progress, fee policy, and remaining refund margin before every
 funding action. The message and terms code does not yet run BasicSwap's bid
-state machine or perform either chain's funding and spend actions.
+state machine. The isolated two-chain test invokes the funding and spend
+actions directly.
 
 ## Work needed before an HNS asset can be enabled
 
