@@ -121,6 +121,12 @@ preimage and final spend on each chain. The two-chain test invokes the
 protocol and value adapters directly; it does not exercise BasicSwap's offer,
 bid, or worker routing.
 
+The HNS refund branch still needs a live maturity test with both HSD and HSRD
+sharing a controlled clock. Advancing only HSD by the required refund window
+causes HSRD to reject its blocks as too far in the future, which is the
+correct consensus safety behavior. Bitcoin Core's refund branch has an
+isolated regtest test.
+
 These Python components are independent evidence and encoding checks. The
 spend-capable implementation is already in hns-wallet-rs; BasicSwap should use
 its native wallet and `hns-swap` settlement code. A passing Python fixture does
