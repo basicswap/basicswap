@@ -110,8 +110,10 @@ branch, and witness/preimage locally.
 - `HnsBtcOutbox` stores exact encrypted SMSG bytes and their precomputed
   message ID in the same database transaction as a trade record. Retrying a
   pending row submits the same bytes and cannot change the bid ID or HNS
-  settlement session. The app sender and periodic delivery route still need
-  to use this table.
+  settlement session. BasicSwap's HNS taker bid sender and periodic delivery
+  route now use this table, limited to a fixed full-size offer and SMSG v2.
+  The HNS offer, inbound bid, acceptance, second-lock, and value worker
+  routes still need to be connected before offers can be enabled.
 
 The focused Python tests pass. An isolated HSD and HSRD regtest pair, with
 HSRD's `--wallet-index --mining-engine --transaction-relay`, exercised the

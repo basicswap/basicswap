@@ -5798,6 +5798,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer.expire_at > self.getTime(), "Offer has expired")
         ensure(offer.active_ind == 1, "Offer not active")
 
+        if offer.swap_type == SwapTypes.HNS_BTC_SWAP:
+            from .interface.hns.app_protocol import post_hns_btc_bid
+
+            return post_hns_btc_bid(
+                self, offer, amount, addr_send_from, extra_options
+            )
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
 
@@ -15056,6 +15062,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # TODO: Wait for blocks / txns, would need to check multiple coins
             now: int = self.getTime()
             self.expireBidsAndOffers(now)
+            if Coins.HNS in self.coin_clients and now - getattr(
+                self, "_last_hns_outbox_flush", 0
+            ) >= 60:
+                from .interface.hns.app_protocol import flush_hns_app_outbox
+
+                try:
+                    flush_hns_app_outbox(self, now)
+                except Exception as ex:
+                    self.logException(f"HNS/BTC outbox retry failed: {ex}")
+                self._last_hns_outbox_flush = now
 
             to_remove = []
             if now - self._last_checked_progress >= self.check_progress_seconds:

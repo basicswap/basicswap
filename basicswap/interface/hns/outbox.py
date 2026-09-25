@@ -98,5 +98,9 @@ def deliver_hns_outbox_message(row, now, submit, persist):
         raise TypeError("HNS/BTC outbox callbacks are required")
     submit(row.message_bytes)
     row.delivered_at = now
-    persist(row)
+    try:
+        persist(row)
+    except Exception:
+        row.delivered_at = None
+        raise
     return row.message_id
