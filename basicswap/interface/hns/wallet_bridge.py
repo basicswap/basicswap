@@ -113,13 +113,14 @@ def initialize_hns_wallet(
     result = response["result"]
     created = recovery_phrase is None
     expected_keys = (
-        {"created", "wallet_id", "recovery_phrase"}
+        {"created", "wallet_id", "seed_fingerprint", "recovery_phrase"}
         if created
-        else {"created", "wallet_id"}
+        else {"created", "wallet_id", "seed_fingerprint"}
     )
     if set(result) != expected_keys or result["created"] is not created:
         raise HnsWalletBridgeError("invalid HNS wallet initialization result")
     wallet_id = _wire_bytes(result["wallet_id"], 16, "wallet ID")
+    seed_fingerprint = _wire_bytes(result["seed_fingerprint"], 32, "seed fingerprint")
     phrase = result.get("recovery_phrase")
     if created and (
         not isinstance(phrase, str)
@@ -129,7 +130,7 @@ def initialize_hns_wallet(
         raise HnsWalletBridgeError("invalid HNS wallet recovery phrase")
     if not database.is_file() or database.is_symlink():
         raise HnsWalletBridgeError("HNS wallet database was not created")
-    return wallet_id, phrase
+    return wallet_id, seed_fingerprint, phrase
 
 
 def _hex_bytes(value, size, name):
@@ -332,6 +333,19 @@ class HnsWalletBridge:
         result = self._request("sync")
         if result != {"synchronized": True}:
             raise HnsWalletBridgeError("invalid HNS synchronization result")
+
+    def identity(self, expected_network):
+        if expected_network not in ("mainnet", "testnet", "regtest", "simnet"):
+            raise ValueError("invalid HNS wallet network")
+        result = self._request("identity")
+        if set(result) != {"wallet_id", "seed_fingerprint", "network"}:
+            raise HnsWalletBridgeError("invalid HNS wallet identity")
+        if result["network"] != expected_network:
+            raise HnsWalletBridgeError("HNS wallet network mismatch")
+        return (
+            _wire_bytes(result["wallet_id"], 16, "wallet ID"),
+            _wire_bytes(result["seed_fingerprint"], 32, "seed fingerprint"),
+        )
 
     @staticmethod
     def _receive_address(network, address):

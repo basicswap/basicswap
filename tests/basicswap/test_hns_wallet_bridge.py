@@ -31,6 +31,9 @@ while True:
     sequence = request['sequence']
     if operation == 'key':
         result = {'public_key': '02' + '11' * 32}
+    elif operation == 'identity':
+        result = {'wallet_id': '44' * 16, 'seed_fingerprint': '55' * 32,
+                  'network': 'regtest'}
     elif operation == 'receive':
         result = {'address': 'rs1qqyqszqgpqyqszqgpqyqszqgpqyqszqgpprmh8u',
                   'derivation_index': 0}
@@ -96,6 +99,12 @@ class HnsWalletBridgeTest(unittest.TestCase):
         )
         with self.bridge() as bridge:
             bridge.unlock("test passphrase")
+            self.assertEqual(
+                bridge.identity("regtest"),
+                (bytes.fromhex("44" * 16), bytes.fromhex("55" * 32)),
+            )
+            with self.assertRaisesRegex(HnsWalletBridgeError, "network mismatch"):
+                bridge.identity("mainnet")
             self.assertEqual(bridge.receive("regtest")[1], 0)
             self.assertEqual(bridge.snapshot("regtest")[0], 1_000_000)
             self.assertEqual(
@@ -130,12 +139,13 @@ class HnsWalletBridgeTest(unittest.TestCase):
         executable = os.environ["HNS_BRIDGE_BIN"]
         created_db = Path(self.temp.name) / "created.db"
         restored_db = Path(self.temp.name) / "restored.db"
-        wallet_id, phrase = initialize_hns_wallet(
+        wallet_id, fingerprint, phrase = initialize_hns_wallet(
             executable, created_db, "regtest", 0, "test passphrase"
         )
         self.assertEqual(len(wallet_id), 16)
+        self.assertEqual(len(fingerprint), 32)
         self.assertEqual(len(phrase.split()), 24)
-        restored_id, restored_phrase = initialize_hns_wallet(
+        restored_id, restored_fingerprint, restored_phrase = initialize_hns_wallet(
             executable,
             restored_db,
             "regtest",
@@ -144,7 +154,13 @@ class HnsWalletBridgeTest(unittest.TestCase):
             recovery_phrase=phrase,
         )
         self.assertEqual(len(restored_id), 16)
+        self.assertEqual(restored_fingerprint, fingerprint)
         self.assertIsNone(restored_phrase)
+        with HnsWalletBridge(
+            executable, created_db, "127.0.0.1:24192", self.authorization
+        ) as bridge:
+            bridge.unlock("test passphrase")
+            self.assertEqual(bridge.identity("regtest"), (wallet_id, fingerprint))
         with self.assertRaisesRegex(ValueError, "already exists"):
             initialize_hns_wallet(
                 executable, created_db, "regtest", 0, "test passphrase"

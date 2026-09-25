@@ -177,7 +177,9 @@ state machine or perform either chain's funding and spend actions.
    delivery, supervise the sidecar, and reconcile BasicSwap's persisted bid
    identity with the wallet's persisted settlement identity after a restart.
    hns-wallet-rs now has a one-shot atomic create/restore mode and BasicSwap has
-   a private-pipe client for it, but the UI and application startup do not yet
+   a private-pipe client for it. The bridge exposes a stable seed fingerprint
+   for comparing an unlocked account after restore; wallet IDs differ between
+   create and restore. The UI and application startup do not yet
    call those paths. The HNS value path has passed funded regtest.
    HSRD remains its full-node backend.
 4. Wire BasicSwap's offer and bid state machine to that bridge, including
