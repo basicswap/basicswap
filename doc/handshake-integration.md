@@ -78,8 +78,10 @@ branch, and witness/preimage locally.
   lock outpoints, Bitcoin prepared transaction bytes, and scan cursor in the
   BasicSwap database (schema version 39). The record helpers reject changed
   identities or terms and can reconstruct an accepted trade after the refund
-  window closes. The message handlers and periodic recovery worker do not yet
-  write this table.
+  window closes. `trade_protocol.py` now constructs and binds the bid,
+  acceptance, and second-lock messages to that row in both trade directions,
+  including a maker restart between terms persistence and acceptance. The
+  BasicSwap message handlers and periodic recovery worker do not yet call it.
 - `HnsBtcSettlement` connects the two native value adapters to that persisted
   record. It gates the taker's funding on the maker's confirmed first lock,
   requires HSRD's sync scheduler to agree with its wallet chain tip, checks
