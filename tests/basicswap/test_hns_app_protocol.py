@@ -189,6 +189,64 @@ class FakeApp(DBMethods):
 
 
 class HnsAppProtocolTest(unittest.TestCase):
+    def test_worker_resumes_maker_after_terms_commit_before_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = FakeApp(Path(directory) / "maker-recovery.sqlite", maker=True)
+            offer_id = b"\x51" * 28
+            bid_id = b"\x52" * 28
+            cursor = app.openDB()
+            try:
+                app.add(
+                    Offer(offer_id=offer_id, swap_type=SwapTypes.HNS_BTC_SWAP),
+                    cursor,
+                )
+                app.add(
+                    Bid(
+                        bid_id=bid_id,
+                        offer_id=offer_id,
+                        state=BidStates.BID_RECEIVED,
+                        created_at=app.now,
+                    ),
+                    cursor,
+                )
+                app.add(
+                    HnsBtcSwap(
+                        session_id=b"\x53" * 32,
+                        offer_id=offer_id,
+                        bid_id=bid_id,
+                        role=1,
+                        phase=1,
+                    ),
+                    cursor,
+                )
+            finally:
+                app.closeDB(cursor)
+            reopened = FakeApp(app.path, maker=True, create_schema=False)
+            with (
+                patch(
+                    "basicswap.interface.hns.app_settlement.accept_hns_btc_bid"
+                ) as resume,
+                patch(
+                    "basicswap.interface.hns.app_settlement.progress_hns_btc_maker",
+                    return_value=False,
+                ) as monitor,
+            ):
+                self.assertEqual(progress_hns_btc_trades(reopened), 0)
+            resume.assert_called_once_with(reopened, bid_id)
+            monitor.assert_called_once_with(reopened, bid_id)
+            with (
+                patch(
+                    "basicswap.interface.hns.app_settlement.accept_hns_btc_bid",
+                    side_effect=ValueError("second deadline passed"),
+                ),
+                patch(
+                    "basicswap.interface.hns.app_settlement.progress_hns_btc_maker",
+                    return_value=True,
+                ) as monitor_refund,
+            ):
+                self.assertEqual(progress_hns_btc_trades(reopened), 1)
+            monitor_refund.assert_called_once_with(reopened, bid_id)
+
     def test_native_offer_post_uses_smsg_v2_and_one_time_tracking(self):
         with tempfile.TemporaryDirectory() as directory:
             app = FakeApp(Path(directory) / "post-offer.sqlite", maker=True)

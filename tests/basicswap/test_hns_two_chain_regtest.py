@@ -558,9 +558,35 @@ class HnsTwoChainRegtest(unittest.TestCase):
                 maker,
                 envelope(taker_record.bid_message, bid_id, "sender", "maker"),
             )
+        with (
+            patch(
+                "basicswap.interface.hns.app_protocol.make_accept_message",
+                side_effect=RuntimeError("simulated interruption after first funding"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "simulated interruption"),
+        ):
+            BasicSwap.acceptBid(maker, bid_id)
+        pending = read(maker, HnsBtcSwap, {"bid_id": bid_id})
+        self.assertEqual(pending.phase, 1)
+        self.assertIsNone(pending.accept_message)
+        maker = restart(maker, maker_bridge)
         with patch("basicswap.interface.hns.app_protocol.encryptMsg", easy_encrypt):
-            accept_id = BasicSwap.acceptBid(maker, bid_id)
+            wait_for(
+                lambda: (
+                    progress_hns_btc_trades(maker),
+                    read(maker, HnsBtcSwap, {"bid_id": bid_id}).accept_message,
+                )[1],
+                "maker acceptance after restart",
+            )
         maker_record = read(maker, HnsBtcSwap, {"bid_id": bid_id})
+        accept_id = read(
+            maker,
+            HnsBtcOutbox,
+            {
+                "session_id": maker_record.session_id,
+                "message_type": int(MessageTypes.HNS_BTC_BID_ACCEPT),
+            },
+        ).message_id
         accept_row = read(maker, HnsBtcOutbox, {"message_id": accept_id})
         self.assertIsNotNone(accept_row.delivered_at)
         receive_hns_btc_accept(
@@ -581,8 +607,9 @@ class HnsTwoChainRegtest(unittest.TestCase):
 
         wait_for(second_funded, "app taker funding")
         taker = restart(taker, taker_bridge)
+        second_confirmation = None
         if hns_first:
-            core.call("generatetoaddress", [2, miner])
+            second_confirmation = core.call("generatetoaddress", [2, miner])
         else:
             mine_hns(2)
         with patch("basicswap.interface.hns.app_settlement.encryptMsg", easy_encrypt):
@@ -609,6 +636,12 @@ class HnsTwoChainRegtest(unittest.TestCase):
                 "maker",
             ),
         )
+        if hns_first:
+            core.call("invalidateblock", [second_confirmation[0]])
+            progress_hns_btc_trades(maker)
+            unsettled = read(maker, HnsBtcSwap, {"bid_id": bid_id})
+            self.assertIsNone(unsettled.btc_redeem_tx)
+            core.call("reconsiderblock", [second_confirmation[0]])
 
         def maker_redeemed():
             progress_hns_btc_trades(maker)

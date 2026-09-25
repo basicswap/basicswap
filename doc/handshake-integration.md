@@ -113,7 +113,14 @@ regtest starts isolated HSD, HSRD, two encrypted Rust wallet processes, and
 Bitcoin Core. It runs both directions through the value controller and then
 through BasicSwap's bid handlers and scheduled worker. The latter test uses a
 mock SMSG transport because the isolated harness has no Particl node; it
-still stores and retries exact encrypted SMSG bytes and message IDs.
+still stores and retries exact encrypted SMSG bytes and message IDs. It also
+reopens both app databases during a trade and injects a crash after the maker
+funds the first lock, before its acceptance is stored. A separate opt-in Linux
+test advances only isolated regtest processes under a shared clock and verifies
+a funded HNS timeout refund through confirmed `SWAP_TIMEDOUT`. Another opt-in
+test starts two Particl Core regtest wallets: it delivers a native HNS/BTC offer
+and bid into BasicSwap's actual handlers, and delivers all three trade-envelope
+types with exact `smsgimport` message IDs over SMSG v2.
 
 ```text
 python -m unittest discover -s tests/basicswap -p 'test_hns*.py' -q
@@ -123,23 +130,31 @@ BITCOIND_BIN=/path/to/bitcoind \
 python -m tests.basicswap.run_hns_bridge_regtest \
   --hsd /path/to/hsd --hsrd /path/to/hsrd \
   --wallet-repo /path/to/hns-wallet-rs --two-chain-only
+
+HNS_BRIDGE_BIN=/path/to/hns-wallet-basicswap-bridge \
+python -m tests.basicswap.run_hns_bridge_regtest \
+  --hsd /path/to/hsd --hsrd /path/to/hsrd \
+  --wallet-repo /path/to/hns-wallet-rs --hns-refund-clock
+
+PARTICLD_BIN=/path/to/particld \
+PARTICL_CLI_BIN=/path/to/particl-cli \
+python -m unittest tests.basicswap.test_hns_particl_smsg_regtest -q
 ```
 
 ## Remaining release work
 
-The live app regtest now covers normal redemption and confirmed completion in
-both directions. Before treating mainnet HNS offers as a release-ready feature,
-the integration still needs a live HNS timeout refund with HSD and HSRD under
-one controlled clock, an end-to-end Particl SMSG test, and interruption and
-reorganization cases through the app worker. The Bitcoin refund has a funded
-Core regtest; the HNS refund is covered by wallet and controller tests but has
-not passed a controlled-clock funded regtest. Package and version the Rust
-bridge and HSRD for BasicSwap's supported platforms. The HNS wallet currently
-has no BasicSwap ordinary withdrawal screen or passphrase rotation; BasicSwap
-refuses a global password change while HNS is active rather than leaving its
-encrypted wallet with an unrecorded password. These release gates are tracked
-here so the asset is not presented as fully supported on the strength of the
-normal redemption test alone.
+The live app regtest covers normal redemption, confirmed completion,
+interrupted maker acceptance in both directions, and a Bitcoin reorganization
+before maker redemption. The HNS timeout refund passes with real HSD, HSRD,
+and the Rust wallet under one isolated clock; the Bitcoin refund has a funded
+Core regtest. A separate two-node Particl regtest covers real SMSG v2 offer and
+bid handling and the exact encrypted envelope route in both directions.
+These suites have not yet run as one combined HNS, BTC, and Particl app test. Package
+and version the Rust bridge and HSRD for BasicSwap's supported platforms. The
+HNS wallet currently has no BasicSwap ordinary withdrawal screen or passphrase
+rotation; BasicSwap refuses a global password change while HNS is active
+rather than leaving its encrypted wallet with an unrecorded password. These
+release gates remain before HNS is presented as a fully supported asset.
 
 Companion source: [HSRD wallet RPC](https://github.com/handshake-rs/hns-node-rs/blob/main/docs/WALLET_RPC_V1.md)
 and [hns-wallet-rs bridge contract](https://github.com/handshake-rs/hns-wallet-rs/blob/main/docs/BASICSWAP_BRIDGE.md).

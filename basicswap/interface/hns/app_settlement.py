@@ -15,12 +15,13 @@ from basicswap.network.simplex import encryptMsg
 from .app_protocol import (
     _hns_btc_offer_pair,
     _persist_trade,
+    accept_hns_btc_bid,
     deliver_hns_app_message,
 )
 from .node_rpc import hns_network_binding
 from .outbox import prepare_hns_outbox_message
 from .settlement import HnsBtcSettlement
-from .trade_protocol import make_second_lock_message
+from .trade_protocol import make_second_lock_message, restore_maker_terms
 from .trade_record import MAKER, TAKER, restore_trade
 
 
@@ -42,9 +43,14 @@ def _load_trade(app, bid_id):
     hns_amount = bid.amount if hns_first else bid.amount_to
     btc_amount = bid.amount_to if hns_first else bid.amount
     magic, genesis = hns_network_binding(app.chain)
-    terms, _ = restore_trade(
-        record, hns_first, hns_amount, btc_amount, app.getTime(), magic, genesis
-    )
+    if record.role == MAKER and record.accept_message is None and record.phase >= 1:
+        terms = restore_maker_terms(
+            record, hns_first, hns_amount, btc_amount, app.getTime(), magic, genesis
+        )
+    else:
+        terms, _ = restore_trade(
+            record, hns_first, hns_amount, btc_amount, app.getTime(), magic, genesis
+        )
     return bid, offer, record, terms, magic, genesis
 
 
@@ -342,9 +348,18 @@ def progress_hns_btc_taker(app, bid_id):
 def progress_hns_btc_maker(app, bid_id):
     """Redeem only a confirmed second lock and observe both final spends."""
     bid, offer, record, terms, magic, genesis = _load_trade(app, bid_id)
-    if record.role != MAKER or not bid.was_received or record.accept_message is None:
+    if (
+        record.role != MAKER
+        or not bid.was_received
+        or (record.accept_message is None and record.phase < 1)
+    ):
         raise ValueError("incomplete maker HNS/BTC trade")
     settlement = _settlement(app, record, terms)
+    own_txid = (
+        record.hns_lock_txid if settlement.own_coin == "hns" else record.btc_lock_txid
+    )
+    if own_txid is None and record.accept_message is None:
+        return False
     if record.second_lock_message is not None:
         return _progress_after_second(
             app, bid, offer, record, terms, settlement, magic, genesis
@@ -372,14 +387,20 @@ def progress_hns_btc_trades(app, limit=100):
                 "JOIN offers o ON o.offer_id = b.offer_id "
                 "JOIN hns_btc_swaps s ON s.bid_id = b.bid_id "
                 "WHERE o.swap_type = :swap_type "
-                "AND s.accept_message IS NOT NULL "
-                "AND b.state IN (:accepted, :initiated, :participating) "
+                "AND ((s.accept_message IS NOT NULL "
+                "AND b.state IN (:accepted, :initiated, :participating)) "
+                "OR (s.role = :maker AND s.phase >= 1 "
+                "AND s.accept_message IS NULL "
+                "AND b.state NOT IN (:completed, :timedout))) "
                 "ORDER BY b.created_at LIMIT :limit",
                 {
                     "swap_type": int(SwapTypes.HNS_BTC_SWAP),
                     "accepted": int(BidStates.BID_ACCEPTED),
                     "initiated": int(BidStates.SWAP_INITIATED),
                     "participating": int(BidStates.SWAP_PARTICIPATING),
+                    "maker": MAKER,
+                    "completed": int(BidStates.SWAP_COMPLETED),
+                    "timedout": int(BidStates.SWAP_TIMEDOUT),
                     "limit": limit,
                 },
             )
@@ -392,13 +413,21 @@ def progress_hns_btc_trades(app, limit=100):
             cursor = app.openDB()
             try:
                 row = cursor.execute(
-                    "SELECT role FROM hns_btc_swaps WHERE bid_id = :bid_id",
+                    "SELECT role, phase, accept_message FROM hns_btc_swaps "
+                    "WHERE bid_id = :bid_id",
                     {"bid_id": bid_id},
                 ).fetchone()
             finally:
                 app.closeDB(cursor, commit=False)
             if row is None:
                 raise ValueError("HNS/BTC trade disappeared")
+            if row[0] == MAKER and row[1] >= 1 and row[2] is None:
+                try:
+                    accept_hns_btc_bid(app, bid_id)
+                except Exception as exc:  # noqa: BLE001
+                    app.log.warning(
+                        "HNS/BTC maker acceptance %s pending: %s", bid_id.hex(), exc
+                    )
             if row[0] == TAKER:
                 progressed += bool(progress_hns_btc_taker(app, bid_id))
             elif row[0] == MAKER:

@@ -14,7 +14,9 @@ import argparse
 import json
 import os
 import socket
+import struct
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -43,6 +45,11 @@ def main():
         action="store_true",
         help="run the funded HNS/BTC trade directions without repeating the Rust test",
     )
+    parser.add_argument(
+        "--hns-refund-clock",
+        action="store_true",
+        help="run the isolated HNS timeout refund with a shared test clock (Linux)",
+    )
     args = parser.parse_args()
     hsd = args.hsd.resolve(strict=True)
     hsrd = args.hsrd.resolve(strict=True)
@@ -55,6 +62,25 @@ def main():
 
     with tempfile.TemporaryDirectory(prefix="basicswap-hns-bridge-") as directory:
         root = Path(directory)
+        program_environment = os.environ.copy()
+        if args.hns_refund_clock:
+            if sys.platform != "linux":
+                raise ValueError("the HNS refund test clock requires Linux")
+            clock_source = Path(__file__).with_name("hns_regtest_clock.c")
+            clock_library = root / "hns_regtest_clock.so"
+            subprocess.run(
+                [
+                    "cc", "-shared", "-fPIC", "-O2", "-Wall", "-Wextra", "-Werror",
+                    str(clock_source), "-o", str(clock_library),
+                ],
+                check=True,
+            )
+            clock_file = root / "hns_regtest_clock.offset"
+            clock_file.write_bytes(struct.pack("=q", 0))
+            program_environment["BASICSWAP_HNS_REGTEST_CLOCK_FILE"] = str(clock_file)
+            program_environment["LD_PRELOAD"] = ":".join(
+                filter(None, (str(clock_library), os.environ.get("LD_PRELOAD")))
+            )
         hsd_prefix = root / "hsd"
         auth_file = root / "hsrd-auth"
         authorization = "Bearer isolated-regtest"
@@ -128,7 +154,12 @@ def main():
                 log = (root / f"{name}.log").open("w", encoding="utf-8")
                 logs.append(log)
                 processes.append(
-                    subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+                    subprocess.Popen(
+                        command,
+                        env=program_environment,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                    )
                 )
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
@@ -166,7 +197,7 @@ def main():
                 raise RuntimeError(
                     f"HSRD did not synchronize to the funded HSD tip: {last_error}"
                 )
-            environment = os.environ.copy()
+            environment = program_environment.copy()
             environment.update(
                 {
                     "BASICSWAP_HSD_CLI": str(hsd_cli),
@@ -179,7 +210,7 @@ def main():
                     "BASICSWAP_HSRD_REGTEST_AUTH_FILE": str(auth_file),
                 }
             )
-            if not args.two_chain_only:
+            if not args.two_chain_only and not args.hns_refund_clock:
                 subprocess.run(
                     [
                         "cargo",
@@ -214,6 +245,21 @@ def main():
                         "unittest",
                         "tests.basicswap.test_hns_two_chain_regtest",
                         "-q",
+                    ],
+                    env=environment,
+                    timeout=360,
+                    check=True,
+                )
+            if args.hns_refund_clock:
+                bridge = os.environ.get("HNS_BRIDGE_BIN")
+                if not bridge:
+                    raise ValueError("--hns-refund-clock requires HNS_BRIDGE_BIN")
+                environment["HNS_BRIDGE_BIN"] = bridge
+                subprocess.run(
+                    [
+                        os.environ.get("PYTHON", os.sys.executable),
+                        "-m", "unittest",
+                        "tests.basicswap.test_hns_timeout_refund_regtest", "-q",
                     ],
                     env=environment,
                     timeout=360,
