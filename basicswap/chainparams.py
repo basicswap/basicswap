@@ -11,6 +11,7 @@ from basicswap.interface.part.chainparams import params as part_params
 from basicswap.interface.btc.chainparams import params as btc_params
 from basicswap.interface.ltc.chainparams import params as ltc_params
 from basicswap.interface.doge.chainparams import params as doge_params
+from basicswap.interface.wam.chainparams import params as wam_params
 from basicswap.interface.dcr.chainparams import params as dcr_params
 from basicswap.interface.nmc.chainparams import params as nmc_params
 from basicswap.interface.xmr.chainparams import params as xmr_params
@@ -41,6 +42,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    WAM = 19
 
 
 class Fiat(IntEnum):
@@ -73,6 +75,7 @@ chainparams = {
     Coins.NAV: nav_params,
     Coins.BCH: bch_params,
     Coins.DOGE: doge_params,
+    Coins.WAM: wam_params,
 }
 
 name_map = {}
