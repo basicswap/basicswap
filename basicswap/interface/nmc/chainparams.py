@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "namecoin",
     "ticker": "NMC",
+    "rate_ids": {
+        "coingecko.com": "namecoin",
+    },
     "message_magic": "Namecoin Signed Message:\n",
     "blocks_target": 60 * 10,
     "decimal_places": 8,

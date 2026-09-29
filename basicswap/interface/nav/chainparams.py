@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "navcoin",
     "ticker": "NAV",
+    "rate_ids": {
+        "coingecko.com": "nav-coin",
+    },
     "message_magic": "Navcoin Signed Message:\n",
     "blocks_target": 30,
     "decimal_places": 8,

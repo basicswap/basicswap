@@ -41,7 +41,6 @@ from basicswap.basicswap_util import (
 )
 from basicswap.chainparams import (
     Coins,
-    ticker_map,
 )
 from basicswap.offer_tracking import (
     OfferTrackingModes,
@@ -1320,33 +1319,7 @@ def page_offers(self, url_split, post_string, sent=False):
 
     offers_count = len(formatted_offers)
 
-    enabled_chart_coins = []
-    enabled_chart_coins_setting = swap_client.settings.get("enabled_chart_coins", "")
-    if enabled_chart_coins_setting.lower() == "all":
-        for coin_ticker in ticker_map:
-            enabled_chart_coins.append(coin_ticker.upper())
-    elif enabled_chart_coins_setting.strip() == "":
-        for coin_id in swap_client.coin_clients:
-            if not swap_client.isCoinActive(coin_id):
-                continue
-            try:
-                enabled_ticker = swap_client.ci(coin_id).ticker_mainnet()
-            except Exception:
-                continue
-            if (
-                enabled_ticker not in enabled_chart_coins
-                and enabled_ticker.lower() in ticker_map
-            ):
-                enabled_chart_coins.append(enabled_ticker)
-    else:
-        for ticker in enabled_chart_coins_setting.split(","):
-            upcased_ticker = ticker.strip().upper()
-
-            if (
-                upcased_ticker not in enabled_chart_coins
-                and upcased_ticker.lower() in ticker_map
-            ):
-                enabled_chart_coins.append(upcased_ticker)
+    enabled_chart_coins = swap_client.getChartCoins()
 
     template = server.env.get_template("offers.html")
     return self.render_template(

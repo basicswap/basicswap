@@ -11,6 +11,9 @@ WOW_COIN = 10**11
 params = {
     "name": "wownero",
     "ticker": "WOW",
+    "rate_ids": {
+        # "coingecko.com": "wownero",  # last updated 2025-09-08, 4x the market price
+    },
     "client": "wow",
     "blocks_target": 60 * 5,
     "decimal_places": 11,

@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "dash",
     "ticker": "DASH",
+    "rate_ids": {
+        "coingecko.com": "dash",
+    },
     "message_magic": "DarkCoin Signed Message:\n",
     "blocks_target": 150,
     "decimal_places": 8,

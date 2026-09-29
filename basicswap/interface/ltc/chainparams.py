@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "litecoin",
     "ticker": "LTC",
+    "rate_ids": {
+        "coingecko.com": "litecoin",
+    },
     "message_magic": "Litecoin Signed Message:\n",
     "blocks_target": 150,
     "decimal_places": 8,

@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "decred",
     "ticker": "DCR",
+    "rate_ids": {
+        "coingecko.com": "decred",
+    },
     "message_magic": "Decred Signed Message:\n",
     "blocks_target": 60 * 5,
     "decimal_places": 8,

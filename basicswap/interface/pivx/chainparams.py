@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "pivx",
     "ticker": "PIVX",
+    "rate_ids": {
+        "coingecko.com": "pivx",
+    },
     "display_name": "PIVX",
     "message_magic": "DarkNet Signed Message:\n",
     "blocks_target": 60 * 1,

@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "firo",
     "ticker": "FIRO",
+    "rate_ids": {
+        "coingecko.com": "zcoin",
+    },
     "message_magic": "Zcoin Signed Message:\n",
     "blocks_target": 150,
     "decimal_places": 8,

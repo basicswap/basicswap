@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "bitcoincash",
     "ticker": "BCH",
+    "rate_ids": {
+        "coingecko.com": "bitcoin-cash",
+    },
     "display_name": "Bitcoin Cash",
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 10,

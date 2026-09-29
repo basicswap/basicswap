@@ -11,6 +11,9 @@ XMR_COIN = 10**12
 params = {
     "name": "monero",
     "ticker": "XMR",
+    "rate_ids": {
+        "coingecko.com": "monero",
+    },
     "client": "xmr",
     "blocks_target": 60 * 2,
     "decimal_places": 12,

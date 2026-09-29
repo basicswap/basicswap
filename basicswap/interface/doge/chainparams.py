@@ -9,6 +9,9 @@ from basicswap.util import COIN
 params = {
     "name": "dogecoin",
     "ticker": "DOGE",
+    "rate_ids": {
+        "coingecko.com": "dogecoin",
+    },
     "message_magic": "Dogecoin Signed Message:\n",
     "blocks_target": 60 * 1,
     "decimal_places": 8,
