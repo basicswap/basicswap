@@ -12,6 +12,7 @@ params = {
     "rate_ids": {
         "coingecko.com": "dogecoin",
         "kraken.com": "XDGUSD",
+        "kucoin.com": "DOGE-USDT",
     },
     "message_magic": "Dogecoin Signed Message:\n",
     "blocks_target": 60 * 1,

@@ -12,6 +12,7 @@ params = {
     "rate_ids": {
         "coingecko.com": "dash",
         "kraken.com": "DASHUSD",
+        "kucoin.com": "DASH-USDT",
     },
     "message_magic": "DarkCoin Signed Message:\n",
     "blocks_target": 150,

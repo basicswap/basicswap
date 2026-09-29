@@ -12,6 +12,7 @@ params = {
     "rate_ids": {
         "coingecko.com": "decred",
         "kraken.com": "DCRUSD",
+        "kucoin.com": "DCR-USDT",
     },
     "message_magic": "Decred Signed Message:\n",
     "blocks_target": 60 * 5,

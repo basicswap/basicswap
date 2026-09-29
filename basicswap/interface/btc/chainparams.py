@@ -12,6 +12,7 @@ params = {
     "rate_ids": {
         "coingecko.com": "bitcoin",
         "kraken.com": "XXBTZUSD",
+        "kucoin.com": "BTC-USDT",
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 10,

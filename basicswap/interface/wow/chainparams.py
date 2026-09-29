@@ -14,6 +14,7 @@ params = {
     "rate_ids": {
         # "coingecko.com": "wownero",  # last updated 2025-09-08, 4x the market price
         # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
     },
     "client": "wow",
     "blocks_target": 60 * 5,

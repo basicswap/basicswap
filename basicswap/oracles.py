@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import json
+import urllib.error
 
 from .basicswap_util import fiatTicker
 from .chainparams import Coins, Fiat, chainparams
@@ -13,6 +14,7 @@ from .util import ensure
 rate_sources_ordered = (
     "coingecko.com",
     "kraken.com",
+    "kucoin.com",
 )
 
 
@@ -84,7 +86,42 @@ def fetchKrakenRates(
     return rates
 
 
+def fetchKuCoinRates(
+    swap_client, coins_list, currency_to, oldest_valid_update: int
+) -> dict:
+    ensure(currency_to == Fiat.USD, "KuCoin rates are USDT only")
+    headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+
+    rates = {}
+    for coin_id in coins_list:
+        symbol = getExchangeName(coin_id, "kucoin.com")
+        if symbol is None:
+            continue
+        url = f"https://api.kucoin.com/api/v1/market/stats?symbol={symbol}"
+        try:
+            js = json.loads(swap_client.readURL(url, timeout=5, headers=headers))
+        except urllib.error.HTTPError as e:
+            if swap_client.isRateLimitError(e):
+                raise
+            swap_client.log.debug(f"kucoin.com rate for {symbol} failed: {e}")
+            continue
+        data = js.get("data") or {}
+        if data.get("last") is None:
+            continue
+        rates[coin_id] = (
+            float(data["last"]),
+            data.get("volValue"),
+            (
+                float(data["changeRate"]) * 100
+                if data.get("changeRate") is not None
+                else None
+            ),
+        )
+    return rates
+
+
 oracle_fetchers = {
     "coingecko.com": fetchCoinGeckoRates,
     "kraken.com": fetchKrakenRates,
+    "kucoin.com": fetchKuCoinRates,
 }

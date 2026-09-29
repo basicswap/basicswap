@@ -12,6 +12,7 @@ params = {
     "rate_ids": {
         "coingecko.com": "pivx",
         # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
     },
     "display_name": "PIVX",
     "message_magic": "DarkNet Signed Message:\n",

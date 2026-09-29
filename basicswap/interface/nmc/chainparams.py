@@ -12,6 +12,7 @@ params = {
     "rate_ids": {
         "coingecko.com": "namecoin",
         # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
     },
     "message_magic": "Namecoin Signed Message:\n",
     "blocks_target": 60 * 10,
