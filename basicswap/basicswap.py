@@ -18018,6 +18018,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ticker_to = ci_to.chainparams()["ticker"]
         rv = {}
 
+        # VMESH has no external market-rate source in BasicSwap.
+        # Offers involving VMESH intentionally use a manually entered rate.
+        if Coins.VMESH in (int(coin_from), int(coin_to)):
+            msg = (
+                "No automatic market rate is available for VMESH. "
+                "Set the VMESH exchange rate manually."
+            )
+            if output_array:
+                return [("manual", "error", msg)]
+            return {"rate_error": msg}
+
         if any(enabled for _, _, enabled in self.getRateSources()):
             try:
                 price_coin_from = int(coin_from)
