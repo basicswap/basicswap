@@ -209,6 +209,7 @@ class XmrSplitMessage(NonProtobufClass):
         2: ("msg_type", NPBW_INT, 0),
         3: ("sequence", NPBW_INT, 0),
         4: ("dleag", NPBW_BYTES, 0),
+        5: ("parent_msg_id", NPBW_BYTES, 0),
     }
 
 

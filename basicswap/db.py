@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 38
+CURRENT_DB_VERSION = 39
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -446,6 +446,8 @@ class XmrSwap(Table):
 
     kbsl_dleag = Column("blob")
     kbsf_dleag = Column("blob")
+    # The received message whose proof the split messages complete
+    split_parent_msg_id = Column("blob")
 
     vkbv = Column("blob")  # chain b view private key
     pkbv = Column("blob")  # chain b view public key
@@ -499,6 +501,7 @@ class XmrSplitData(Table):
     msg_sequence = Column("integer")
     dleag = Column("blob")
     created_at = Column("integer")
+    parent_msg_id = Column("blob")
 
 
 class RevokedMessage(Table):
