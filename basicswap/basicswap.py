@@ -17130,9 +17130,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if rate_source == "coingecko.com":
             ticker_to = fiatTicker(currency_to).lower()
             root, headers = self._coingeckoAuth()
-            url = f"{root}/simple/price?ids={coin_ids}&vs_currencies={ticker_to}&include_24hr_vol=true&include_24hr_change=true"
+            url = f"{root}/simple/price?ids={coin_ids}&vs_currencies={ticker_to}&include_24hr_vol=true&include_24hr_change=true&include_last_updated_at=true"
 
             js = json.loads(self.readURL(url, timeout=5, headers=headers))
+
+            oldest_valid_update: int = now - 15 * 60
+            stale = [
+                k
+                for k, v in js.items()
+                if v.get("last_updated_at", 0) < oldest_valid_update
+            ]
+            if stale:
+                self.log.debug(f"Ignoring stale {rate_source} rates: {stale}")
+                for k in stale:
+                    del js[k]
 
             with self._price_cache_lock:
                 for k, v in js.items():
