@@ -18,7 +18,6 @@ from util import (
     BSX_0_PORT,
     get_driver,
 )
-from basicswap.explorers import default_coingecko_api_key
 
 
 def click_option(el, option_text):
@@ -88,7 +87,7 @@ def test_settings(driver):
                 expected_chart_state = True
 
             difficult_text = "`~!@#$%^&*()-_=+[{}]\\|;:'\",<>./? "
-            el = driver.find_element(By.NAME, "chartapikey")
+            el = driver.find_element(By.NAME, "coingeckoapikey")
             el.clear()
             el.send_keys(difficult_text)
 
@@ -107,7 +106,7 @@ def test_settings(driver):
             ).decode("utf-8")
             assert coingecko_api_key == difficult_text
 
-            hex_text = default_coingecko_api_key
+            hex_text = "a1b2c3d4e5f67890"
             el = driver.find_element(By.NAME, "coingeckoapikey")
             el.clear()
             el.send_keys(hex_text)
@@ -124,6 +123,19 @@ def test_settings(driver):
                 settings = json.load(fs)
 
             assert settings.get("coingecko_api_key") == hex_text
+
+            el = driver.find_element(By.NAME, "coingeckoapiplan")
+            click_option(el, "Pro")
+            btn_apply_chart = wait.until(
+                EC.element_to_be_clickable((By.NAME, "apply_chart"))
+            )
+            btn_apply_chart.click()
+            time.sleep(1)
+
+            with open(settings_path_0) as fs:
+                settings = json.load(fs)
+
+            assert settings.get("coingecko_api_plan") == "pro"
         else:
             print("Chart settings not accessible, skipping chart tests")
             expected_chart_state = None

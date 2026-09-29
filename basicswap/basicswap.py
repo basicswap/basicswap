@@ -125,7 +125,6 @@ from .util.network import (
 from .util.smsg import smsgGetID
 from .interface.base import Curves
 from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
-from .explorers import default_coingecko_api_key
 from .script import OpCodes
 from .messages_npb import (
     ADSBidIntentAcceptMessage,
@@ -15340,6 +15339,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             settings_copy.pop("coingecko_api_key")
                         settings_changed = True
 
+            if "coingecko_api_plan" in data:
+                new_value = data["coingecko_api_plan"]
+                ensure(
+                    new_value in ("demo", "pro"),
+                    "New coingecko_api_plan value not demo or pro",
+                )
+                if settings_copy.get("coingecko_api_plan", "demo") != new_value:
+                    settings_copy["coingecko_api_plan"] = new_value
+                    settings_changed = True
+
             if "enabled_chart_coins" in data:
                 new_value = data["enabled_chart_coins"].strip()
                 ensure(
@@ -17084,17 +17093,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         api_key: str = get_api_key_setting(
             self.settings,
             "coingecko_api_key",
-            default_coingecko_api_key,
+            "",
         )
         headers: dict = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
-        if api_key.startswith("CG-"):
+        plan: str = self.settings.get("coingecko_api_plan", "demo")
+        if api_key == "":
             root = "https://api.coingecko.com/api/v3"
-            headers["x-cg-demo-api-key"] = api_key
-        elif api_key != "":
+        elif plan == "pro":
             root = "https://pro-api.coingecko.com/api/v3"
             headers["x-cg-pro-api-key"] = api_key
         else:
             root = "https://api.coingecko.com/api/v3"
+            headers["x-cg-demo-api-key"] = api_key
         return root, headers
 
     def _fetchPricesAndVolumeBackground(self):

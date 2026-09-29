@@ -104,6 +104,9 @@ def page_settings(self, url_split, post_string):
                     "coingecko_api_key": html.unescape(
                         get_data_entry_or(form_data, "coingeckoapikey", "")
                     ),
+                    "coingecko_api_plan": get_data_entry_or(
+                        form_data, "coingeckoapiplan", "demo"
+                    ),
                     "enabled_chart_coins": get_data_entry_or(
                         form_data, "enabledchartcoins", ""
                     ),
@@ -413,6 +416,7 @@ def page_settings(self, url_split, post_string):
     chart_settings = {
         "show_chart": swap_client.settings.get("show_chart", True),
         "coingecko_api_key": coingecko_api_key,
+        "coingecko_api_plan": swap_client.settings.get("coingecko_api_plan", "demo"),
         "enabled_chart_coins": swap_client.settings.get("enabled_chart_coins", ""),
     }
 

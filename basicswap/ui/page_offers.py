@@ -49,8 +49,6 @@ from basicswap.offer_tracking import (
     offerTrackingModeToString,
     strOfferTrackingMode,
 )
-from basicswap.explorers import default_coingecko_api_key
-
 MAX_SEND_FROM_ADDRS = 50
 
 
@@ -800,7 +798,7 @@ def page_newoffer(self, url_split, post_string, get_string=""):
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
     coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", default_coingecko_api_key
+        swap_client.settings, "coingecko_api_key", ""
     )
 
     return self.render_template(
@@ -1316,7 +1314,7 @@ def page_offers(self, url_split, post_string, sent=False):
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
     coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", default_coingecko_api_key
+        swap_client.settings, "coingecko_api_key", ""
     )
 
     offers_count = len(formatted_offers)
