@@ -603,12 +603,28 @@
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enable price charts in the interface</p>
         </div>
 
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">CoinGecko Plan</label>
+         <div class="relative">
+          <select name="coingeckoapiplan" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if chart_settings.coingecko_api_plan != "pro" %}selected{% endif %} value="demo">Demo</option>
+           <option {% if chart_settings.coingecko_api_plan == "pro" %}selected{% endif %} value="pro">Pro</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+          </div>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Match this to the key type from your CoinGecko account</p>
+        </div>
+
         <div class="md:col-span-2">
          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">CoinGecko API Key</label>
          <div class="max-w-md">
           <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="coingeckoapikey" value="{{ chart_settings.coingecko_api_key }}" placeholder="Enter API key">
          </div>
-         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">API key for CoinGecko price data (optional for basic usage)</p>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Personal CoinGecko key. Leave blank to send requests without a key</p>
         </div>
 
         <div class="md:col-span-2">

@@ -167,6 +167,21 @@ Alternatively --extracoinopts can be used with --startonlycoin
 
 
 
+## CoinGecko Steps for user
+
+Price and chart data need your own CoinGecko API key. BasicSwap does not include one. A request with no key is rejected, so prices stay empty until a key is set.
+
+1. Create a key at [CoinGecko API pricing](https://www.coingecko.com/en/api/pricing).
+   - Demo: choose Create Free Account, then open the Developer Dashboard, API Keys, and add a key.
+   - Pro: use the key from a paid CoinGecko API plan.
+2. In BasicSwap open Settings, then Charts Configuration.
+3. Set CoinGecko Plan to Demo or Pro so it matches that key.
+4. Paste the key into CoinGecko API Key.
+5. Click Apply Changes.
+
+The next price fetch uses the new key. One free Demo key is enough for a single node. Do not share it. A shared key runs out of its monthly allowance.
+
+
 ## FAQ
 
 ### How can I double check my backup words / mnemonic phrase

@@ -7,8 +7,6 @@
 
 import json
 
-default_coingecko_api_key = "CG-8hm3r9iLfpEXv4ied8oLbeUj"
-
 
 class Explorer:
     def __init__(self, swapclient, coin_type, base_url):

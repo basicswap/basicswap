@@ -125,7 +125,6 @@ from .util.network import (
 from .util.smsg import smsgGetID
 from .interface.base import Curves
 from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
-from .explorers import default_coingecko_api_key
 from .script import OpCodes
 from .messages_npb import (
     ADSBidIntentAcceptMessage,
@@ -15340,6 +15339,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             settings_copy.pop("coingecko_api_key")
                         settings_changed = True
 
+            if "coingecko_api_plan" in data:
+                new_value = data["coingecko_api_plan"]
+                ensure(
+                    new_value in ("demo", "pro"),
+                    "New coingecko_api_plan value not demo or pro",
+                )
+                if settings_copy.get("coingecko_api_plan", "demo") != new_value:
+                    settings_copy["coingecko_api_plan"] = new_value
+                    settings_changed = True
+
             if "enabled_chart_coins" in data:
                 new_value = data["enabled_chart_coins"].strip()
                 ensure(
@@ -17080,6 +17089,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     break
                 time.sleep(1)
 
+    def _coingeckoAuth(self) -> tuple[str, dict]:
+        api_key: str = get_api_key_setting(
+            self.settings,
+            "coingecko_api_key",
+            "",
+        )
+        headers: dict = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+        plan: str = self.settings.get("coingecko_api_plan", "demo")
+        if api_key == "":
+            root = "https://api.coingecko.com/api/v3"
+        elif plan == "pro":
+            root = "https://pro-api.coingecko.com/api/v3"
+            headers["x-cg-pro-api-key"] = api_key
+        else:
+            root = "https://api.coingecko.com/api/v3"
+            headers["x-cg-demo-api-key"] = api_key
+        return root, headers
+
     def _fetchPricesAndVolumeBackground(self):
         all_coins = [c for c in Coins if c in chainparams]
         if not all_coins:
@@ -17090,7 +17117,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _fetchPricesAndVolumeForSource(self, coins_list, rate_source, currency_to):
         now = int(time.time())
-        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
 
         exchange_name_map = {}
         coin_ids = ""
@@ -17103,15 +17129,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if rate_source == "coingecko.com":
             ticker_to = fiatTicker(currency_to).lower()
-            api_key = get_api_key_setting(
-                self.settings,
-                "coingecko_api_key",
-                default_coingecko_api_key,
-                escape=True,
-            )
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_ids}&vs_currencies={ticker_to}&include_24hr_vol=true&include_24hr_change=true"
-            if api_key != "":
-                url += f"&api_key={api_key}"
+            root, headers = self._coingeckoAuth()
+            url = f"{root}/simple/price?ids={coin_ids}&vs_currencies={ticker_to}&include_24hr_vol=true&include_24hr_change=true"
 
             js = json.loads(self.readURL(url, timeout=5, headers=headers))
 
@@ -17346,8 +17365,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         oldest_time_valid: int = now - saved_ttl
         return_data = {}
 
-        headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
-
         cursor = self.openDB()
         try:
             parameters = {
@@ -17393,21 +17410,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return return_data
 
             if rate_source == "coingecko.com":
-                api_key: str = get_api_key_setting(
-                    self.settings,
-                    "coingecko_api_key",
-                    default_coingecko_api_key,
-                    escape=True,
-                )
+                root, headers = self._coingeckoAuth()
 
                 for coin_id in need_coins:
                     try:
                         exchange_name: str = self.getExchangeName(coin_id, rate_source)
                         url: str = (
-                            f"https://api.coingecko.com/api/v3/coins/{exchange_name}/market_chart?vs_currency=usd&days={days}"
+                            f"{root}/coins/{exchange_name}/market_chart?vs_currency=usd&days={days}"
                         )
-                        if api_key != "":
-                            url += f"&api_key={api_key}"
 
                         js = json.loads(self.readURL(url, timeout=5, headers=headers))
 
