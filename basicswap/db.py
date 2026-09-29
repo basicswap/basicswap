@@ -1223,13 +1223,16 @@ class DBMethods:
                     query += f" AND {ck} = :{ck} "
                     query_data[ck] = constraint_value
 
+        order_terms = []
         for order_col, order_dir in order_by.items():
             if validColumnName(order_col) is False:
                 raise ValueError(f"Invalid sort by: {order_col}")
             order_dir = order_dir.upper()
             if order_dir not in ("ASC", "DESC"):
                 raise ValueError(f"Invalid sort dir: {order_dir}")
-            query += f" ORDER BY {order_col} {order_dir}"
+            order_terms.append(f"{order_col} {order_dir}")
+        if len(order_terms) > 0:
+            query += " ORDER BY " + ", ".join(order_terms)
 
         if query_suffix:
             query += query_suffix
