@@ -100,6 +100,15 @@ class Table:
         return True if io is not None else False
 
 
+COLUMN_TYPES = {
+    "BLOB": "BLOB",
+    "BOOL": "INTEGER",
+    "INTEGER": "INTEGER",
+    "STRING": "TEXT",
+    "TEXT": "TEXT",
+}
+
+
 class Column:
     __sqlite3_column__ = True
 
@@ -700,7 +709,7 @@ class MessageNetworkLink(Table):
     linked_type = Column("integer")
     linked_id = Column("blob")
 
-    network_id = Column("string")
+    network_id = Column("integer")
     link_type = Column("integer")  # MessageNetworkLinkTypes
     created_at = Column("integer")
 
@@ -827,9 +836,11 @@ def extract_schema(input_globals: dict = None) -> dict:
                 indices.append(m_obj)
                 continue
             if hasattr(m_obj, "__sqlite3_column__"):
-                col_type: str = m_obj.column_type.upper()
-                if col_type == "BOOL":
-                    col_type = "INTEGER"
+                col_type = COLUMN_TYPES.get(m_obj.column_type.upper())
+                if col_type is None:
+                    raise ValueError(
+                        f"Unknown column type {m_obj.column_type} for {table_name}.{m_name}"
+                    )
                 columns[m_name] = {
                     "type": col_type,
                     "primary_key": m_obj.primary_key,
