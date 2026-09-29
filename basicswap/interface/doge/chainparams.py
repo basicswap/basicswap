@@ -16,6 +16,7 @@ params = {
         "mexc.com": "DOGEUSDT",
         # "coinlore.com": "2",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "doge-dogecoin",
+        "neroswap.com": "DOGE",
     },
     "message_magic": "Dogecoin Signed Message:\n",
     "blocks_target": 60 * 1,

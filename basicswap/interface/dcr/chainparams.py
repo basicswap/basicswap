@@ -16,6 +16,7 @@ params = {
         "mexc.com": "DCRUSDT",
         # "coinlore.com": "99",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "dcr-decred",
+        # "neroswap.com": N/A  # not listed on neroswap
     },
     "message_magic": "Decred Signed Message:\n",
     "blocks_target": 60 * 5,

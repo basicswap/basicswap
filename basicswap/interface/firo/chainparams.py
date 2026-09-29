@@ -16,6 +16,7 @@ params = {
         "mexc.com": "FIROUSDT",
         # "coinlore.com": "46573",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "firo-firo",
+        # "neroswap.com": N/A  # not listed on neroswap
     },
     "message_magic": "Zcoin Signed Message:\n",
     "blocks_target": 150,

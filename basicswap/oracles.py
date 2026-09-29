@@ -19,6 +19,7 @@ rate_sources_ordered = (
     "mexc.com",
     "coinlore.com",
     "coinpaprika.com",
+    "neroswap.com",
 )
 
 
@@ -222,6 +223,28 @@ def fetchCoinPaprikaRates(
     return rates
 
 
+def fetchNeroswapRates(
+    swap_client, coins_list, currency_to, oldest_valid_update: int
+) -> dict:
+    ensure(currency_to == Fiat.USD, "neroswap rates are USD only")
+    headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+    js = json.loads(
+        swap_client.readURL(
+            "https://prices.neroswap.com/v1/prices", timeout=5, headers=headers
+        )
+    )
+    if dt.datetime.fromisoformat(js["fetched_at"]).timestamp() < oldest_valid_update:
+        swap_client.log.debug(f"Ignoring stale neroswap.com rates: {js['fetched_at']}")
+        return {}
+
+    rates = {}
+    for coin_id in coins_list:
+        symbol = getExchangeName(coin_id, "neroswap.com")
+        if symbol in js["rates"]:
+            rates[coin_id] = (float(js["rates"][symbol]), None, None)
+    return rates
+
+
 oracle_fetchers = {
     "coingecko.com": fetchCoinGeckoRates,
     "kraken.com": fetchKrakenRates,
@@ -229,4 +252,5 @@ oracle_fetchers = {
     "mexc.com": fetchMexcRates,
     "coinlore.com": fetchCoinLoreRates,
     "coinpaprika.com": fetchCoinPaprikaRates,
+    "neroswap.com": fetchNeroswapRates,
 }

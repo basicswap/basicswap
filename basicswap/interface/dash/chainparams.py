@@ -16,6 +16,7 @@ params = {
         "mexc.com": "DASHUSDT",
         # "coinlore.com": "8",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "dash-dash",
+        # "neroswap.com": N/A  # not listed on neroswap
     },
     "message_magic": "DarkCoin Signed Message:\n",
     "blocks_target": 150,

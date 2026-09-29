@@ -16,6 +16,7 @@ params = {
         # "mexc.com": N/A  # not listed on MEXC
         # "coinlore.com": "34",  # zero volume, far off other sources
         "coinpaprika.com": "nav-navcoin",
+        # "neroswap.com": N/A  # not listed on neroswap
     },
     "message_magic": "Navcoin Signed Message:\n",
     "blocks_target": 30,

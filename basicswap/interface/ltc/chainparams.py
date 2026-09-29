@@ -16,6 +16,7 @@ params = {
         "mexc.com": "LTCUSDT",
         # "coinlore.com": "1",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "ltc-litecoin",
+        "neroswap.com": "LTC",
     },
     "message_magic": "Litecoin Signed Message:\n",
     "blocks_target": 150,

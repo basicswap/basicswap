@@ -18,6 +18,7 @@ params = {
         "mexc.com": "XMRUSDT",
         # "coinlore.com": "28",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "xmr-monero",
+        "neroswap.com": "XMR",
     },
     "client": "xmr",
     "blocks_target": 60 * 2,

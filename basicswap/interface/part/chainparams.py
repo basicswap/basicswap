@@ -16,6 +16,7 @@ params = {
         "mexc.com": "PARTUSDT",
         # "coinlore.com": "236",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "part-particl",
+        # "neroswap.com": N/A  # not listed on neroswap
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 2,
