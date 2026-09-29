@@ -1271,6 +1271,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.nmc.nmc import NMCInterface
 
             return NMCInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.VMESH:
+            from .interface.vmesh.vmesh import VMESHInterface
+
+            return VMESHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.XMR:
             from .interface.xmr.xmr import XMRInterface
 
@@ -1322,6 +1326,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "dash",
                 "firo",
                 "bitcoincash",
+                "vargamesh",
             ):
                 pidfilename += "d"
 

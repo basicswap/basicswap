@@ -70,6 +70,7 @@ from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
 from basicswap.interface.nav.core import prepare_module as nav_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
+from basicswap.interface.vmesh.core import prepare_module as vmesh_prepare
 from basicswap.network.nostr.prepare import prepare_module as nostr_prepare
 from basicswap.network.simplex.prepare import prepare_module as simplex_prepare
 
@@ -83,6 +84,7 @@ coin_prepare_modules = {
     "dogecoin": doge_prepare,
     "navcoin": nav_prepare,
     "namecoin": nmc_prepare,
+    "vargamesh": vmesh_prepare,
     "monero": xmr_prepare,
     "wownero": wow_prepare,
     "pivx": pivx_prepare,
@@ -114,6 +116,11 @@ known_coins = {
         nmc_prepare.version,
         nmc_prepare.version_tag,
         nmc_prepare.signers.keys(),
+    ),
+    "vargamesh": (
+        vmesh_prepare.version,
+        vmesh_prepare.version_tag,
+        vmesh_prepare.signers.keys(),
     ),
     "monero": (
         xmr_prepare.version,
@@ -301,7 +308,7 @@ def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> 
 
 def getDescriptorWalletOption(coin_params):
     ticker: str = coin_params["ticker"]
-    default_option: bool = True if ticker in ("NMC",) else False
+    default_option: bool = True if ticker in ("NMC", "VMESH") else False
     return toBool(os.getenv(ticker + "_USE_DESCRIPTORS", default_option))
 
 
@@ -1535,6 +1542,7 @@ def main():
         "litecoin": ltc_prepare.getConfigSegment(prepare_ctx),
         "decred": dcr_prepare.getConfigSegment(prepare_ctx),
         "namecoin": nmc_prepare.getConfigSegment(prepare_ctx),
+        "vargamesh": vmesh_prepare.getConfigSegment(prepare_ctx),
         "monero": xmr_prepare.getConfigSegment(prepare_ctx),
         "wownero": wow_prepare.getConfigSegment(prepare_ctx),
         "pivx": pivx_prepare.getConfigSegment(prepare_ctx),
@@ -1598,7 +1606,7 @@ def main():
 
         ticker: str = coin_params["ticker"]
         if getDescriptorWalletOption(coin_params):
-            if coin_id not in (Coins.BTC, Coins.NMC):
+            if coin_id not in (Coins.BTC, Coins.NMC, Coins.VMESH):
                 raise ValueError(f"Descriptor wallet unavailable for {coin_name}")
 
             coin_settings["use_descriptors"] = True
