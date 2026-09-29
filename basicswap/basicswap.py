@@ -17587,9 +17587,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     js[name_to] = {"usd": js[price_coin_to]}
                     js.pop(price_coin_to)
 
-                rv["coingecko"] = js
+                rv["oracle"] = js
             except Exception as e:
-                rv["coingecko_error"] = str(e)
+                rv["oracle_error"] = str(e)
                 if self.debug:
                     self.log.error(traceback.format_exc())
 
@@ -17599,13 +17599,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return "{:.12f}".format(f).rstrip("0").rstrip(".")
 
             rv_array = []
-            if "coingecko_error" in rv:
-                rv_array.append(("coingecko.com", "error", rv["coingecko_error"]))
-            elif "coingecko" in rv:
-                js = rv["coingecko"]
+            if "oracle_error" in rv:
+                rv_array.append(("oracle", "error", rv["oracle_error"]))
+            elif "oracle" in rv:
+                js = rv["oracle"]
                 rv_array.append(
                     (
-                        "coingecko.com",
+                        "oracle",
                         ticker_from,
                         ticker_to,
                         format_float(float(js[name_from]["usd"])),

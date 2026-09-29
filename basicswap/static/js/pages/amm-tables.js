@@ -337,7 +337,7 @@ const AmmTablesManager = (function() {
                                 Rates: ${adjustRatesValue === 'static'  ? 'Static'
                                        : adjustRatesValue === 'only'    ? 'Market'
                                        : adjustRatesValue === 'minrate' ? 'Market (fallback)'
-                                       : adjustRatesValue === 'false'   ? 'CoinGecko'
+                                       : adjustRatesValue === 'false'   ? 'Oracle'
                                        : adjustRatesValue === 'all'     ? 'Auto (all)'
                                        : adjustRates                    ? 'Auto (any)'
                                        : 'Off'}
@@ -2857,7 +2857,7 @@ const AmmTablesManager = (function() {
         }
     }
 
-    function getRateFromCoinGecko(coinFromSelect, coinToSelect, rateInput) {
+    function getRateFromOracle(coinFromSelect, coinToSelect, rateInput) {
         const coinFromOption = coinFromSelect.options[coinFromSelect.selectedIndex];
         const coinToOption = coinToSelect.options[coinToSelect.selectedIndex];
 
@@ -2909,8 +2909,8 @@ const AmmTablesManager = (function() {
                     const response = JSON.parse(xhr.responseText);
                     debugLog('Rate response:', response);
 
-                    if (response.coingecko && response.coingecko.rate_inferred) {
-                        rateInput.value = response.coingecko.rate_inferred;
+                    if (response.oracle && response.oracle.rate_inferred) {
+                        rateInput.value = response.oracle.rate_inferred;
 
                         if (getRateButton && originalButtonText) {
                             getRateButton.disabled = false;
@@ -2924,45 +2924,20 @@ const AmmTablesManager = (function() {
                         } else {
                             alert('Error: ' + response.error);
                         }
-                    } else if (response.coingecko_error) {
-                        console.error('CoinGecko error:', response.coingecko_error);
+                    } else if (response.oracle_error) {
+                        console.error('Oracle error:', response.oracle_error);
                         rateInput.value = originalValue || '';
-
-                        const userMessage = 'Unable to get current market rate from CoinGecko.';
-                        let details = '';
-
-                        if (typeof response.coingecko_error === 'number') {
-                            switch(response.coingecko_error) {
-                                case 8:
-                                    details = 'This usually means:\n• One or both coins are not supported by CoinGecko\n• The trading pair is not available\n• Temporary API limitations\n\nYou can manually enter a rate or try again later.';
-                                    break;
-                                case 429:
-                                    details = 'Rate limit exceeded. Please wait a moment and try again.';
-                                    break;
-                                case 404:
-                                    details = 'The requested coin pair was not found on CoinGecko.';
-                                    break;
-                                case 500:
-                                    details = 'CoinGecko service is temporarily unavailable. Please try again later.';
-                                    break;
-                                default:
-                                    details = `Error code: ${response.coingecko_error}\n\nThis may be a temporary issue. Please try again or enter the rate manually.`;
-                            }
-                        } else {
-                            details = `${response.coingecko_error}\n\nPlease try again or enter the rate manually.`;
-                        }
-
                         if (window.showErrorModal) {
-                            window.showErrorModal('Market Rate Unavailable', `${userMessage}\n\n${details}`);
+                            window.showErrorModal('Market Rate Unavailable', `Unable to get the current market rate from the oracles.\n\n${response.oracle_error}\n\nPlease try again or enter the rate manually.`);
                         } else {
-                            alert('Unable to get rate from CoinGecko: ' + response.coingecko_error);
+                            alert('Unable to get rate from the oracles: ' + response.oracle_error);
                         }
                     } else {
                         rateInput.value = originalValue || '';
                         if (window.showErrorModal) {
-                            window.showErrorModal('Rate Not Available', `No current market rate is available for this ${coinFromSymbol}/${coinToSymbol} trading pair.\n\nThis could mean:\n• The coins are not traded together on major exchanges\n• CoinGecko doesn't have data for this pair\n• The coins may not be supported\n\nPlease enter a rate manually based on your research.`);
+                            window.showErrorModal('Rate Not Available', `No current market rate is available for this ${coinFromSymbol}/${coinToSymbol} trading pair.\n\nThis could mean:\n• The coins are not traded together on major exchanges\n• No enabled oracle has a rate for these coins\n• The coins may not be supported\n\nPlease enter a rate manually based on your research.`);
                         } else {
-                            alert('No rate available from CoinGecko for this pair.');
+                            alert('No oracle rate available for this pair.');
                         }
                     }
                 } catch (e) {
@@ -3041,7 +3016,7 @@ const AmmTablesManager = (function() {
                 const rateInput = document.getElementById('add-amm-rate');
 
                 if (coinFromSelect && coinToSelect && rateInput) {
-                    getRateFromCoinGecko(coinFromSelect, coinToSelect, rateInput);
+                    getRateFromOracle(coinFromSelect, coinToSelect, rateInput);
                 } else {
                     console.error('Missing required elements for rate lookup');
                 }
@@ -3056,7 +3031,7 @@ const AmmTablesManager = (function() {
                 const rateInput = document.getElementById('edit-amm-rate');
 
                 if (coinFromSelect && coinToSelect && rateInput) {
-                    getRateFromCoinGecko(coinFromSelect, coinToSelect, rateInput);
+                    getRateFromOracle(coinFromSelect, coinToSelect, rateInput);
                 } else {
                     console.error('Missing required elements for rate lookup');
                 }

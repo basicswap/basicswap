@@ -567,8 +567,8 @@ def _add_review_insights(swap_client, page_data, parsed_data) -> None:
 
     try:
         rates = swap_client.lookupRates(int(coin_from), int(coin_to))
-        cg = rates.get("coingecko", {}) if isinstance(rates, dict) else {}
-        inferred = cg.get("rate_inferred")
+        oracle = rates.get("oracle", {}) if isinstance(rates, dict) else {}
+        inferred = oracle.get("rate_inferred")
         if inferred is not None:
             inferred_f = float(inferred)
             page_data["market_rate_inferred"] = _fmt_float(inferred_f)

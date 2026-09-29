@@ -1356,7 +1356,7 @@ const app = {
   },
 
 refreshAllData: async function() {
-  
+
   if (app.isRefreshing) {
     console.log('Refresh already in progress, skipping...');
     return;
@@ -1493,7 +1493,7 @@ refreshAllData: async function() {
         }
       }, 1000);
     }
-   
+
   } catch (error) {
     console.error('Critical error during refresh:', error);
     NetworkManager.handleNetworkError(error);
@@ -1610,7 +1610,7 @@ refreshAllData: async function() {
 
   updateResolutionButtons: function() {
     const resolutionButtons = document.querySelectorAll('.resolution-button');
-    
+
     resolutionButtons.forEach(button => {
       const resolution = button.id.split('-')[1];
       if (!chartModule.hasChartData) {
