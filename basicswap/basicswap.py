@@ -556,8 +556,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._volume_cache = {}
         self._pending_bid_notifications = set()
         self._price_cache_lock = threading.Lock()
-        self._rate_limit_backoff_until = 0
-        self._rate_limit_backoff_step = 1
+        self._rate_limit_backoff = {}
         self._price_fetch_thread = None
         self._price_fetch_running = False
         self._last_price_fetch = 0
@@ -17038,50 +17037,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         error_str = str(e)
         return "429" in error_str or "Too Many Requests" in error_str
 
-    def rateSourceBackoffRemaining(self) -> int:
+    def rateSourceBackoffRemaining(self, rate_source: str) -> int:
         with self._price_cache_lock:
-            return max(0, self._rate_limit_backoff_until - int(time.time()))
+            until, _ = self._rate_limit_backoff.get(rate_source, (0, 1))
+            return max(0, until - int(time.time()))
 
-    def noteRateSourceLimited(self) -> int:
+    def noteRateSourceLimited(self, rate_source: str) -> int:
         with self._price_cache_lock:
-            backoff_seconds: int = min(20 * self._rate_limit_backoff_step, 120)
-            self._rate_limit_backoff_until = int(time.time()) + backoff_seconds
-            self._rate_limit_backoff_step = min(self._rate_limit_backoff_step + 1, 6)
+            _, step = self._rate_limit_backoff.get(rate_source, (0, 1))
+            backoff_seconds: int = min(20 * step, 120)
+            self._rate_limit_backoff[rate_source] = (
+                int(time.time()) + backoff_seconds,
+                min(step + 1, 6),
+            )
         return backoff_seconds
 
-    def clearRateSourceBackoff(self) -> None:
+    def clearRateSourceBackoff(self, rate_source: str) -> None:
         with self._price_cache_lock:
-            self._rate_limit_backoff_until = 0
-            self._rate_limit_backoff_step = 1
+            self._rate_limit_backoff.pop(rate_source, None)
 
     def _backgroundPriceFetchLoop(self):
         while self._price_fetch_running:
             try:
                 now = int(time.time())
 
-                backoff_remaining: int = self.rateSourceBackoffRemaining()
-                if backoff_remaining > 0:
-                    for _ in range(backoff_remaining):
-                        if not self._price_fetch_running:
-                            break
-                        time.sleep(1)
-                    continue
-
                 if now - self._last_price_fetch >= self.price_fetch_interval:
                     try:
                         self._fetchPricesAndVolumeBackground()
                         self._last_price_fetch = now
-                        self.clearRateSourceBackoff()
                     except Exception as e:
-                        if self.isRateLimitError(e):
-                            backoff_seconds: int = self.noteRateSourceLimited()
-                            self.log.warning(
-                                f"Rate source limited, backing off for {backoff_seconds}s"
-                            )
-                        else:
-                            self.log.warning(
-                                f"Background price/volume fetch failed: {e}"
-                            )
+                        self.log.warning(f"Background price/volume fetch failed: {e}")
             except Exception as e:
                 self.log.error(f"Background price/volume fetch error: {e}")
 
@@ -17165,7 +17150,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ticker_map[t.lower()] for t in self.getChartCoins()
         }
         fetched = set()
-        transient_error = None
+        retry_sources = []
         for rate_source in rate_sources_ordered:
             if not self.isRateSourceEnabled(rate_source):
                 continue
@@ -17175,19 +17160,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 coins = [c for c in wanted_coins if c not in fetched]
             if not coins:
                 break
+            backoff_remaining: int = self.rateSourceBackoffRemaining(rate_source)
+            if backoff_remaining > 0:
+                self.log.debug(
+                    f"Skipping {rate_source}, rate limited for {backoff_remaining}s"
+                )
+                retry_sources.append(rate_source)
+                continue
             try:
                 fetched |= self._fetchPricesAndVolumeForSource(
                     coins, rate_source, Fiat.USD
                 )
+                self.clearRateSourceBackoff(rate_source)
             except Exception as e:
                 if self.isRateLimitError(e):
-                    raise
+                    backoff_seconds: int = self.noteRateSourceLimited(rate_source)
+                    self.log.warning(
+                        f"{rate_source} rate limited, backing off for {backoff_seconds}s"
+                    )
+                    retry_sources.append(rate_source)
+                    continue
                 self.log.warning(f"{rate_source} price fetch failed: {e}")
                 if not isinstance(e, urllib.error.HTTPError):
-                    transient_error = e
+                    retry_sources.append(rate_source)
 
-        if transient_error is not None and any(c not in fetched for c in wanted_coins):
-            raise transient_error
+        missing = [Coins(c).name for c in wanted_coins if c not in fetched]
+        if retry_sources and missing:
+            raise ValueError(
+                f"No rate for {', '.join(missing)}, retrying {', '.join(retry_sources)}"
+            )
 
     def _fetchPricesAndVolumeForSource(
         self, coins_list, rate_source, currency_to
@@ -17471,7 +17472,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if len(need_coins) < 1:
                 return return_data
 
-            backoff_remaining: int = self.rateSourceBackoffRemaining()
+            backoff_remaining: int = self.rateSourceBackoffRemaining(rate_source)
             if backoff_remaining > 0:
                 self.log.debug(
                     f"Skipping historical data fetch, rate limited for {backoff_remaining}s"
@@ -17498,14 +17499,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         if "prices" in js:
                             return_data[coin_id] = js["prices"]
                             new_values[coin_id] = js["prices"]
-                        self.clearRateSourceBackoff()
+                        self.clearRateSourceBackoff(rate_source)
                     except Exception as e:
                         self.log.warning(
                             f"Could not fetch historical data for {Coins(coin_id).name}: {e}"
                         )
                         return_data[coin_id] = []
                         if self.isRateLimitError(e):
-                            backoff_seconds: int = self.noteRateSourceLimited()
+                            backoff_seconds: int = self.noteRateSourceLimited(
+                                rate_source
+                            )
                             self.log.warning(
                                 f"CoinGecko rate limited, backing off for {backoff_seconds}s"
                             )
