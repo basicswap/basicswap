@@ -192,7 +192,9 @@ PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
 PROTOCOL_VERSION_ADAPTOR_SIG = 7
-MINPROTO_VERSION_ADAPTOR_SIG = 7
+MINPROTO_VERSION_ADAPTOR_SIG = 6
+# Split messages to a peer at this version or later carry parent_msg_id
+PROTOCOL_VERSION_SPLIT_PARENT = 7
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
@@ -6256,7 +6258,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         cursor,
         message_nets,
         payload_version,
-        parent_msg_id: bytes,
+        parent_msg_id: bytes = b"",
     ) -> None:
 
         dleag_split_size_init, dleag_split_size = xmr_swap.getMsgSplitInfo()
@@ -6402,7 +6404,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 cursor,
                 message_nets=bid.message_nets,
                 payload_version=offer.smsg_payload_version,
-                parent_msg_id=bid_id,
+                parent_msg_id=(
+                    bid_id
+                    if offer.protocol_version >= PROTOCOL_VERSION_SPLIT_PARENT
+                    else b""
+                ),
             )
         for k, msg_id in bid_msg_ids.items():
             self.addMessageLink(
@@ -7262,7 +7268,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     use_cursor,
                     bid.message_nets,
                     payload_version=offer.smsg_payload_version,
-                    parent_msg_id=bid_msg_ids[0],
+                    parent_msg_id=(
+                        bid_msg_ids[0]
+                        if (offer if reverse_bid else bid).protocol_version
+                        >= PROTOCOL_VERSION_SPLIT_PARENT
+                        else b""
+                    ),
                 )
 
             with self.dbSavepoint(use_cursor, "accept_xmr_bid"):
@@ -7441,7 +7452,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     use_cursor,
                     message_nets=bid.message_nets,
                     payload_version=offer.smsg_payload_version,
-                    parent_msg_id=bid_msg_ids[0],
+                    parent_msg_id=(
+                        bid_msg_ids[0]
+                        if bid.protocol_version >= PROTOCOL_VERSION_SPLIT_PARENT
+                        else b""
+                    ),
                 )
 
             bid.setState(BidStates.BID_REQUEST_ACCEPTED)
@@ -11298,7 +11313,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "SELECT COUNT(*), SUM(LENGTH(dleag)) AS total_dleag_size FROM xmr_split_data "
                     + " WHERE bid_id = :bid_id AND msg_type = :msg_type "
                     + " AND ((addr_from = :bid_addr AND addr_to = :offer_addr) OR (addr_from = :offer_addr AND addr_to = :bid_addr))"
-                    + " AND parent_msg_id = :parent_msg_id",
+                    + " AND (:parent_msg_id IS NULL OR parent_msg_id IS NULL OR parent_msg_id = :parent_msg_id)",
                     {
                         "bid_id": bid.bid_id,
                         "msg_type": msg_type,
@@ -12257,11 +12272,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         "msg_type": int(XmrSplitMsgTypes.BID),
                         "addr_from": addr_expect_from,
                         "addr_to": addr_expect_to,
-                        "parent_msg_id": xmr_swap.split_parent_msg_id,
                     },
                     {"msg_sequence": "asc"},
                 )
                 for row in q:
+                    if not self.splitDataBelongs(row, xmr_swap):
+                        continue
                     xmr_swap.kbsf_dleag += row.dleag
 
             if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
@@ -12340,11 +12356,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         "msg_type": int(XmrSplitMsgTypes.BID_ACCEPT),
                         "addr_from": addr_from,
                         "addr_to": addr_to,
-                        "parent_msg_id": xmr_swap.split_parent_msg_id,
                     },
                     order_by={"msg_sequence": "asc"},
                 )
                 for row in q:
+                    if not self.splitDataBelongs(row, xmr_swap):
+                        continue
                     xmr_swap.kbsl_dleag += row.dleag
             if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
                 raise ValueError("Invalid DLEAG proof.")
@@ -14212,6 +14229,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
 
+    def splitDataBelongs(self, row, xmr_swap) -> bool:
+        # Chunks from a peer before PROTOCOL_VERSION_SPLIT_PARENT carry no parent
+        return (
+            xmr_swap.split_parent_msg_id is None
+            or row.parent_msg_id is None
+            or row.parent_msg_id == xmr_swap.split_parent_msg_id
+        )
+
     def processXmrSplitMessage(self, msg) -> None:
         self.log.debug("Processing xmr split msg {}".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
@@ -14221,8 +14246,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Validate data
         ensure(len(msg_data.msg_id) == 28, "Bad msg_id length")
-        parent_msg_id = msg_data.parent_msg_id
-        ensure(len(parent_msg_id) == 28, "Bad parent_msg_id length")
+        parent_msg_id = msg_data.parent_msg_id or None
+        ensure(
+            parent_msg_id is None or len(parent_msg_id) == 28,
+            "Bad parent_msg_id length",
+        )
         self.log.debug(f"for bid {self.log.id(msg_data.msg_id)}")
 
         max_dleag_proof_len: int = 48893  # coincurve.dleag.dleag_proof_len()
@@ -14252,7 +14280,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             cursor = self.openDB()
             try:
                 q = cursor.execute(
-                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence AND addr_from = :addr_from AND parent_msg_id = :parent_msg_id",
+                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence AND addr_from = :addr_from AND parent_msg_id IS :parent_msg_id",
                     {
                         "bid_id": msg_data.msg_id,
                         "msg_type": msg_data.msg_type,
