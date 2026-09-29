@@ -15,6 +15,7 @@ params = {
         "kucoin.com": "DASH-USDT",
         "mexc.com": "DASHUSDT",
         # "coinlore.com": "8",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "dash-dash",
     },
     "message_magic": "DarkCoin Signed Message:\n",
     "blocks_target": 150,

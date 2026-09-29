@@ -4,6 +4,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import datetime as dt
 import json
 import urllib.error
 
@@ -17,6 +18,7 @@ rate_sources_ordered = (
     "kucoin.com",
     "mexc.com",
     "coinlore.com",
+    "coinpaprika.com",
 )
 
 
@@ -183,10 +185,48 @@ def fetchCoinLoreRates(
     return rates
 
 
+def fetchCoinPaprikaRates(
+    swap_client, coins_list, currency_to, oldest_valid_update: int
+) -> dict:
+    headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+    ticker_to = fiatTicker(currency_to)
+
+    rates = {}
+    stale = []
+    for coin_id in coins_list:
+        paprika_id = getExchangeName(coin_id, "coinpaprika.com")
+        if paprika_id is None:
+            continue
+        url = f"https://api.coinpaprika.com/v1/tickers/{paprika_id}?quotes={ticker_to}"
+        try:
+            js = json.loads(swap_client.readURL(url, timeout=5, headers=headers))
+        except urllib.error.HTTPError as e:
+            if swap_client.isRateLimitError(e):
+                raise
+            swap_client.log.debug(f"coinpaprika.com rate for {paprika_id} failed: {e}")
+            continue
+        if (
+            dt.datetime.fromisoformat(js["last_updated"]).timestamp()
+            < oldest_valid_update
+        ):
+            stale.append(paprika_id)
+            continue
+        quote = js["quotes"][ticker_to]
+        rates[coin_id] = (
+            quote["price"],
+            quote["volume_24h"],
+            quote["percent_change_24h"],
+        )
+    if stale:
+        swap_client.log.debug(f"Ignoring stale coinpaprika.com rates: {stale}")
+    return rates
+
+
 oracle_fetchers = {
     "coingecko.com": fetchCoinGeckoRates,
     "kraken.com": fetchKrakenRates,
     "kucoin.com": fetchKuCoinRates,
     "mexc.com": fetchMexcRates,
     "coinlore.com": fetchCoinLoreRates,
+    "coinpaprika.com": fetchCoinPaprikaRates,
 }

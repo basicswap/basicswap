@@ -15,6 +15,7 @@ params = {
         # "kucoin.com": N/A  # not listed on KuCoin
         # "mexc.com": N/A  # not listed on MEXC
         # "coinlore.com": "323",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "nmc-namecoin",
     },
     "message_magic": "Namecoin Signed Message:\n",
     "blocks_target": 60 * 10,

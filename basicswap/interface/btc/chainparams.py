@@ -15,6 +15,7 @@ params = {
         "kucoin.com": "BTC-USDT",
         "mexc.com": "BTCUSDT",
         # "coinlore.com": "90",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "btc-bitcoin",
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 10,

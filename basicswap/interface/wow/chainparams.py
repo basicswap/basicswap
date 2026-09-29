@@ -17,6 +17,7 @@ params = {
         # "kucoin.com": N/A  # not listed on KuCoin
         # "mexc.com": N/A  # not listed on MEXC
         # "coinlore.com": "36551",  # zero volume market that only tracks BTC
+        # "coinpaprika.com": "wow-wownero",  # inactive on CoinPaprika, no ticker
     },
     "client": "wow",
     "blocks_target": 60 * 5,

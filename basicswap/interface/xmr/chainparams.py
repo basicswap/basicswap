@@ -17,6 +17,7 @@ params = {
         "kucoin.com": "XMR-USDT",
         "mexc.com": "XMRUSDT",
         # "coinlore.com": "28",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "xmr-monero",
     },
     "client": "xmr",
     "blocks_target": 60 * 2,

@@ -15,6 +15,7 @@ params = {
         # "kucoin.com": N/A  # not listed on KuCoin
         "mexc.com": "PIVXUSDT",
         "coinlore.com": "103",
+        # "coinpaprika.com": "pivx-pivx",  # averages in off market XT and CoinEx rates, 11-16% high
     },
     "display_name": "PIVX",
     "message_magic": "DarkNet Signed Message:\n",

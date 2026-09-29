@@ -15,6 +15,7 @@ params = {
         "kucoin.com": "BCH-USDT",
         "mexc.com": "BCHUSDT",
         # "coinlore.com": "2321",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "bch-bitcoin-cash",
     },
     "display_name": "Bitcoin Cash",
     "message_magic": "Bitcoin Signed Message:\n",
