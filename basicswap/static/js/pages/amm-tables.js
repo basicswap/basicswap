@@ -656,7 +656,7 @@ const AmmTablesManager = (function() {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `coins=${encodeURIComponent(coins)}&currency_to=USD&source=coingecko.com&match_input_key=true`
+                body: `coins=${encodeURIComponent(coins)}&currency_to=USD&match_input_key=true`
             });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

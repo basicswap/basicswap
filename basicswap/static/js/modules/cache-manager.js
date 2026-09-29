@@ -30,7 +30,6 @@ const CacheManager = (function() {
 
   const isCacheKey = (key) => {
     return CACHE_KEY_PATTERNS.some(pattern => key.startsWith(pattern)) ||
-           key === 'coinGeckoOneLiner' ||
            key === PRICES_CACHE_KEY;
   };
 
@@ -137,7 +136,7 @@ const CacheManager = (function() {
             const keysToDelete = Array.from(memoryCache.keys())
               .filter(k => isCacheKey(k))
               .sort((a, b) => memoryCache.get(a).timestamp - memoryCache.get(b).timestamp)
-              .slice(0, Math.floor(memoryCache.size * 0.2)); 
+              .slice(0, Math.floor(memoryCache.size * 0.2));
 
             keysToDelete.forEach(k => memoryCache.delete(k));
           }
@@ -304,7 +303,7 @@ const CacheManager = (function() {
         const keysToDelete = Array.from(memoryCache.keys())
           .filter(key => isCacheKey(key))
           .sort((a, b) => memoryCache.get(a).timestamp - memoryCache.get(b).timestamp)
-          .slice(0, Math.floor(memoryCache.size * 0.3)); 
+          .slice(0, Math.floor(memoryCache.size * 0.3));
 
         keysToDelete.forEach(key => memoryCache.delete(key));
       }
@@ -464,77 +463,6 @@ const CacheManager = (function() {
 
       const normalizedSymbol = symbol.toLowerCase();
       return prices.value[normalizedSymbol] || null;
-    },
-
-    getCompatiblePrices: function(format) {
-      const prices = this.getPrices();
-      if (!prices || !prices.value) {
-        return null;
-      }
-
-      switch(format) {
-        case 'rates':
-          const ratesFormat = {};
-          Object.entries(prices.value).forEach(([coin, data]) => {
-            const coinKey = coin.replace(/-/g, ' ')
-              .split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ')
-              .toLowerCase()
-              .replace(' ', '-');
-
-            ratesFormat[coinKey] = {
-              usd: data.price || data.usd,
-              btc: data.price_btc || data.btc
-            };
-          });
-          return {
-            value: ratesFormat,
-            remainingTime: prices.remainingTime
-          };
-
-        case 'coinGecko':
-          const geckoFormat = {};
-          Object.entries(prices.value).forEach(([coin, data]) => {
-            const symbol = this.getSymbolFromCoinId(coin);
-            if (symbol) {
-              geckoFormat[symbol.toLowerCase()] = {
-                current_price: data.price || data.usd,
-                price_btc: data.price_btc || data.btc,
-                total_volume: data.total_volume,
-                price_change_percentage_24h: data.price_change_percentage_24h,
-                displayName: symbol
-              };
-            }
-          });
-          return {
-            value: geckoFormat,
-            remainingTime: prices.remainingTime
-          };
-
-        default:
-          return prices;
-      }
-    },
-
-    getSymbolFromCoinId: function(coinId) {
-      const symbolMap = {
-        'bitcoin': 'BTC',
-        'litecoin': 'LTC',
-        'monero': 'XMR',
-        'wownero': 'WOW',
-        'particl': 'PART',
-        'pivx': 'PIVX',
-        'firo': 'FIRO',
-        'zcoin': 'FIRO',
-        'dash': 'DASH',
-        'decred': 'DCR',
-        'namecoin': 'NMR',
-        'bitcoin-cash': 'BCH',
-        'dogecoin': 'DOGE'
-      };
-
-      return symbolMap[coinId] || null;
     }
   };
 

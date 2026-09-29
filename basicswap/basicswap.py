@@ -17272,11 +17272,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self,
         coins_list,
         currency_to: int = Fiat.USD,
-        rate_source: str = "coingecko.com",
+        rate_source: str | None = None,
         saved_ttl: int = 300,
     ):
         ensure(len(coins_list) > 0, "Must specify coin/s")
         ensure(saved_ttl >= 0, "Invalid saved time")
+        if rate_source is None:
+            rate_source = rate_sources_ordered[0]
 
         if not self.isRateSourceEnabled(rate_source):
             fallback_source = self.nextRateSource(rate_source)
@@ -17339,11 +17341,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def lookupVolume(
         self,
         coins_list,
-        rate_source: str = "coingecko.com",
+        rate_source: str | None = None,
         saved_ttl: int = 300,
     ):
         ensure(len(coins_list) > 0, "Must specify coin/s")
         ensure(saved_ttl >= 0, "Invalid saved time")
+        if rate_source is None:
+            rate_source = rate_sources_ordered[0]
 
         if not self.isRateSourceEnabled(rate_source):
             fallback_source = self.nextRateSource(rate_source)

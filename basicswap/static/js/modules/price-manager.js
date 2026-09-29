@@ -95,11 +95,7 @@ const PriceManager = (function() {
 
                 let apiResponse;
                 try {
-                    apiResponse = await Api.fetchCoinPrices(
-                        coinSymbols,
-                        "coingecko.com",
-                        300
-                    );
+                    apiResponse = await Api.fetchCoinPrices(coinSymbols, 300);
 
                     if (!apiResponse) {
                         throw new Error('Empty response received from API');

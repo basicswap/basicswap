@@ -50,7 +50,7 @@ const api = {
         }
     },
 
-    fetchCoinGeckoDataXHR: async () => {
+    fetchPriceDataXHR: async () => {
         try {
             const priceData = await window.PriceManager.getPrices();
             const transformedData = {};
@@ -86,7 +86,7 @@ const api = {
 
             return transformedData;
         } catch (error) {
-            console.error('Error in fetchCoinGeckoDataXHR:', error);
+            console.error('Error in fetchPriceDataXHR:', error);
             return {};
         }
     },
@@ -134,86 +134,6 @@ const api = {
             return results;
         }
     },
-};
-
-const rateLimiter = {
-    lastRequestTime: {},
-    minRequestInterval: {
-        coingecko: window.config.rateLimits.coingecko.minInterval
-    },
-    requestQueue: {},
-    retryDelays: window.config.retryDelays,
-
-    canMakeRequest: function(apiName) {
-        const now = Date.now();
-        const lastRequest = this.lastRequestTime[apiName] || 0;
-        return (now - lastRequest) >= this.minRequestInterval[apiName];
-    },
-
-    updateLastRequestTime: function(apiName) {
-        this.lastRequestTime[apiName] = Date.now();
-    },
-
-    getWaitTime: function(apiName) {
-        const now = Date.now();
-        const lastRequest = this.lastRequestTime[apiName] || 0;
-        return Math.max(0, this.minRequestInterval[apiName] - (now - lastRequest));
-    },
-
-    queueRequest: async function(apiName, requestFn, retryCount = 0) {
-        if (!this.requestQueue[apiName]) {
-            this.requestQueue[apiName] = Promise.resolve();
-        }
-
-        try {
-            await this.requestQueue[apiName];
-
-            const executeRequest = async () => {
-                const waitTime = this.getWaitTime(apiName);
-                if (waitTime > 0) {
-                    await new Promise(resolve => CleanupManager.setTimeout(resolve, waitTime));
-                }
-
-                try {
-                    this.updateLastRequestTime(apiName);
-                    return await requestFn();
-                } catch (error) {
-                    if (error.message.includes('429') && retryCount < this.retryDelays.length) {
-                        const delay = this.retryDelays[retryCount];
-                        console.log(`Rate limit hit, retrying in ${delay/1000} seconds...`);
-                        await new Promise(resolve => CleanupManager.setTimeout(resolve, delay));
-                        return this.queueRequest(apiName, requestFn, retryCount + 1);
-                    }
-
-                    if ((error.message.includes('timeout') || error.name === 'NetworkError') &&
-                        retryCount < this.retryDelays.length) {
-                        const delay = this.retryDelays[retryCount];
-                        logger.warn(`Request failed, retrying in ${delay/1000} seconds...`);
-                        await new Promise(resolve => CleanupManager.setTimeout(resolve, delay));
-                        return this.queueRequest(apiName, requestFn, retryCount + 1);
-                    }
-
-                    throw error;
-                }
-            };
-
-            this.requestQueue[apiName] = executeRequest();
-            return await this.requestQueue[apiName];
-        } catch (error) {
-            if (error.message.includes('429') ||
-                error.message.includes('timeout') ||
-                error.name === 'NetworkError') {
-
-                NetworkManager.handleNetworkError(error);
-
-                const cachedData = CacheManager.get(`coinData_${apiName}`);
-                if (cachedData) {
-                    return cachedData.value;
-                }
-            }
-            throw error;
-        }
-    }
 };
 
 const ui = {
@@ -1152,7 +1072,7 @@ const app = {
         throw new Error('Network is offline');
       }
 
-      const allCoinData = await api.fetchCoinGeckoDataXHR();
+      const allCoinData = await api.fetchPriceDataXHR();
       if (allCoinData.error) {
         throw new Error(allCoinData.error);
       }
@@ -1200,7 +1120,7 @@ const app = {
     } else {
       try {
         ui.showCoinLoader(coin.symbol);
-        data = await api.fetchCoinGeckoDataXHR(coin.symbol);
+        data = await api.fetchPriceDataXHR(coin.symbol);
         if (data.error) {
           throw new Error(data.error);
         }
@@ -1324,7 +1244,7 @@ const app = {
     let earliestExpiration = Infinity;
 
     Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('coinData_') || key.startsWith('chartData_') || key === 'coinGeckoOneLiner') {
+      if (key.startsWith('coinData_') || key.startsWith('chartData_')) {
         try {
           const cachedItem = JSON.parse(localStorage.getItem(key));
           if (cachedItem && cachedItem.expiresAt) {
@@ -1367,28 +1287,6 @@ refreshAllData: async function() {
     return;
   }
 
-  const lastGeckoRequest = rateLimiter.lastRequestTime['coingecko'] || 0;
-  const timeSinceLastRequest = Date.now() - lastGeckoRequest;
-  const waitTime = Math.max(0, rateLimiter.minRequestInterval.coingecko - timeSinceLastRequest);
-
-  if (waitTime > 0) {
-    const seconds = Math.ceil(waitTime / 1000);
-    ui.displayErrorMessage(`Rate limit: Please wait ${seconds} seconds before refreshing`);
-
-    let remainingTime = seconds;
-    const countdownInterval = CleanupManager.setInterval(() => {
-      remainingTime--;
-      if (remainingTime > 0) {
-        ui.displayErrorMessage(`Rate limit: Please wait ${remainingTime} seconds before refreshing`);
-      } else {
-        clearInterval(countdownInterval);
-        ui.hideErrorMessage();
-      }
-    }, 1000);
-
-    return;
-  }
-
   app.isRefreshing = true;
   app.updateNextRefreshTime();
   ui.showLoader();
@@ -1405,9 +1303,9 @@ refreshAllData: async function() {
 
     await new Promise(resolve => CleanupManager.setTimeout(resolve, 1000));
 
-    const allCoinData = await api.fetchCoinGeckoDataXHR();
+    const allCoinData = await api.fetchPriceDataXHR();
     if (allCoinData.error) {
-      throw new Error(`CoinGecko API Error: ${allCoinData.error}`);
+      throw new Error(`Price data error: ${allCoinData.error}`);
     }
 
     let volumeData = {};

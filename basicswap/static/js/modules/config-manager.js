@@ -34,12 +34,8 @@ const ConfigManager = (function() {
             fallbackTTL: 24 * 60 * 60 * 1000
         },
         itemsPerPage: 50,
-        apiEndpoints: {
-            coinGecko: 'https://api.coingecko.com/api/v3',
-            volumeEndpoint: 'https://api.coingecko.com/api/v3/simple/price'
-        },
         rateLimits: {
-            coingecko: {
+            prices: {
                 requestsPerMinute: 50,
                 minInterval: 1200
             }

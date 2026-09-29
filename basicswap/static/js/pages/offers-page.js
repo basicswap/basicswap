@@ -146,7 +146,7 @@ function initializeTooltipsInBatches() {
     if (!window.TooltipManager) return;
 
     const tooltipElements = document.querySelectorAll('[data-tooltip-target]');
-    const BATCH_SIZE = 5; 
+    const BATCH_SIZE = 5;
     let currentIndex = 0;
 
     function processBatch() {
@@ -770,7 +770,7 @@ async function fetchOffers() {
             } catch (error) {
                 if (i === maxRetries - 1) throw error;
                 console.log(`Fetch retry ${i + 1}/${maxRetries} for ${url}`);
-                
+
                 await new Promise(resolve => CleanupManager.setTimeout(resolve, 100 * Math.pow(2, i)));
             }
         }
@@ -907,7 +907,7 @@ function updateConnectionStatus(status) {
 }
 
 function updateRowTimes() {
-    
+
     const rows = document.querySelectorAll('[data-offer-id]');
     const updates = [];
 
@@ -1193,7 +1193,7 @@ async function updateOffersTable(options = {}) {
 
         if (offersBody) {
             if (isIncrementalUpdate && offersBody.children.length > 0) {
-                
+
                 const existingRows = Array.from(offersBody.querySelectorAll('tr[data-offer-id]'));
                 const newRows = Array.from(fragment.querySelectorAll('tr[data-offer-id]'));
 
@@ -1213,19 +1213,19 @@ async function updateOffersTable(options = {}) {
                     const existingRow = existingMap.get(offerId);
 
                     if (existingRow) {
-                        
+
                         const currentIndex = Array.from(offersBody.children).indexOf(existingRow);
                         if (currentIndex !== index) {
-                            
+
                             if (index >= offersBody.children.length) {
                                 offersBody.appendChild(existingRow);
                             } else {
                                 offersBody.insertBefore(existingRow, offersBody.children[index]);
                             }
                         }
-                        
+
                     } else {
-                        
+
                         if (index >= offersBody.children.length) {
                             offersBody.appendChild(newRow);
                         } else {
@@ -1234,7 +1234,7 @@ async function updateOffersTable(options = {}) {
                     }
                 });
             } else {
-                
+
                 const existingRows = offersBody.querySelectorAll('tr');
                 existingRows.forEach(row => cleanupRow(row));
                 offersBody.textContent = '';
@@ -1266,7 +1266,7 @@ async function updateOffersTable(options = {}) {
 }
 
 function updateProfitLossDisplays() {
-    
+
     const rows = document.querySelectorAll('[data-offer-id]');
     const updates = [];
 
@@ -2269,7 +2269,7 @@ function initializeTableEvents() {
             refreshButton.classList.add('opacity-75', 'cursor-wait');
 
             try {
-                const cachedPrices = CacheManager.get('prices_coingecko');
+                const cachedPrices = CacheManager.get('prices_oracle');
                 const previousPrices = cachedPrices ? cachedPrices.value : null;
                 CacheManager.clear();
                 window.isManualRefresh = true;
@@ -2302,7 +2302,7 @@ function initializeTableEvents() {
                 NetworkManager.handleNetworkError(error);
                 ui.displayErrorMessage('Unable to refresh data. Previous data will be preserved.');
 
-                const cachedData = CacheManager.get('prices_coingecko');
+                const cachedData = CacheManager.get('prices_oracle');
                 if (cachedData?.value) {
                     latestPrices = cachedData.value;
                     applyFilters();
@@ -2447,10 +2447,10 @@ function startAutoRefresh() {
 
     autoRefreshInterval = CleanupManager.setInterval(async () => {
         try {
-          
+
             const response = await fetch(isSentOffers ? '/json/sentoffers' : '/json/offers');
             if (response.ok) {
-                
+
             }
         } catch (error) {
             console.error('[Auto-refresh] Error during background refresh:', error);
@@ -2571,7 +2571,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             WebSocketManager.addMessageHandler('message', async (data) => {
                 if (data.event === 'new_offer' || data.event === 'offer_revoked') {
                     try {
-                        
+
                         const fetchWithRetry = async (url, maxRetries = 3) => {
                             for (let i = 0; i < maxRetries; i++) {
                                 try {
@@ -2582,7 +2582,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                                     return response;
                                 } catch (error) {
                                     if (i === maxRetries - 1) throw error;
-                                    
+
                                     await new Promise(resolve => CleanupManager.setTimeout(resolve, 100 * Math.pow(2, i)));
                                 }
                             }
@@ -2607,14 +2607,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const previousPrices = latestPrices;
                         let priceData;
                         if (window.PriceManager) {
-                            priceData = await window.PriceManager.getPrices(false); 
+                            priceData = await window.PriceManager.getPrices(false);
                         } else {
                             priceData = await fetchLatestPrices();
                         }
 
                         if (priceData) {
                             latestPrices = priceData;
-                            CacheManager.set('prices_coingecko', priceData, 'prices');
+                            CacheManager.set('prices_oracle', priceData, 'prices');
                         } else if (previousPrices) {
                             latestPrices = previousPrices;
                         }
