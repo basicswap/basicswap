@@ -16,6 +16,7 @@ rate_sources_ordered = (
     "kraken.com",
     "kucoin.com",
     "mexc.com",
+    "coinlore.com",
 )
 
 
@@ -154,9 +155,38 @@ def fetchMexcRates(
     return rates
 
 
+def fetchCoinLoreRates(
+    swap_client, coins_list, currency_to, oldest_valid_update: int
+) -> dict:
+    ensure(currency_to == Fiat.USD, "CoinLore rates are USD only")
+    headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+    id_map = {
+        coinlore_id: c
+        for c in coins_list
+        if (coinlore_id := getExchangeName(c, "coinlore.com"))
+    }
+    if not id_map:
+        return {}
+
+    url = f"https://api.coinlore.net/api/ticker/?id={','.join(id_map)}"
+    js = json.loads(swap_client.readURL(url, timeout=5, headers=headers))
+
+    rates = {}
+    for v in js:
+        if v.get("id") not in id_map or v.get("price_usd") is None:
+            continue
+        rates[id_map[v["id"]]] = (
+            float(v["price_usd"]),
+            v.get("volume24"),
+            v.get("percent_change_24h"),
+        )
+    return rates
+
+
 oracle_fetchers = {
     "coingecko.com": fetchCoinGeckoRates,
     "kraken.com": fetchKrakenRates,
     "kucoin.com": fetchKuCoinRates,
     "mexc.com": fetchMexcRates,
+    "coinlore.com": fetchCoinLoreRates,
 }

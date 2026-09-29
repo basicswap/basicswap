@@ -14,6 +14,7 @@ params = {
         "kraken.com": "DCRUSD",
         "kucoin.com": "DCR-USDT",
         "mexc.com": "DCRUSDT",
+        # "coinlore.com": "99",  # no per-coin timestamp, used only where CoinPaprika is unreliable
     },
     "message_magic": "Decred Signed Message:\n",
     "blocks_target": 60 * 5,

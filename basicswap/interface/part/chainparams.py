@@ -14,6 +14,7 @@ params = {
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
         "mexc.com": "PARTUSDT",
+        # "coinlore.com": "236",  # no per-coin timestamp, used only where CoinPaprika is unreliable
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 2,

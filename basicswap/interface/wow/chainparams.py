@@ -16,6 +16,7 @@ params = {
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
         # "mexc.com": N/A  # not listed on MEXC
+        # "coinlore.com": "36551",  # zero volume market that only tracks BTC
     },
     "client": "wow",
     "blocks_target": 60 * 5,

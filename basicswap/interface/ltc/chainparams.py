@@ -14,6 +14,7 @@ params = {
         "kraken.com": "XLTCZUSD",
         "kucoin.com": "LTC-USDT",
         "mexc.com": "LTCUSDT",
+        # "coinlore.com": "1",  # no per-coin timestamp, used only where CoinPaprika is unreliable
     },
     "message_magic": "Litecoin Signed Message:\n",
     "blocks_target": 150,

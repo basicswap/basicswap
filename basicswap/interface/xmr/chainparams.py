@@ -16,6 +16,7 @@ params = {
         "kraken.com": "XXMRZUSD",
         "kucoin.com": "XMR-USDT",
         "mexc.com": "XMRUSDT",
+        # "coinlore.com": "28",  # no per-coin timestamp, used only where CoinPaprika is unreliable
     },
     "client": "xmr",
     "blocks_target": 60 * 2,
