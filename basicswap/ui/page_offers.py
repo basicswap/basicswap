@@ -32,7 +32,6 @@ from basicswap.basicswap_util import (
     SwapTypes,
     DebugTypes,
     getLockName,
-    get_api_key_setting,
     strBidState,
     strSwapDesc,
     strSwapType,
@@ -797,10 +796,6 @@ def page_newoffer(self, url_split, post_string, get_string=""):
     automation_filters = {"type_ind": Concepts.OFFER, "sort_by": "label"}
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
-    coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", ""
-    )
-
     return self.render_template(
         template,
         {
@@ -817,7 +812,6 @@ def page_newoffer(self, url_split, post_string, get_string=""):
                 (strSwapType(x), strSwapDesc(x)) for x in SwapTypes if strSwapType(x)
             ],
             "show_chart": swap_client.settings.get("show_chart", True),
-            "coingecko_api_key": coingecko_api_key,
         },
     )
 
@@ -1313,10 +1307,6 @@ def page_offers(self, url_split, post_string, sent=False):
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
-    coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", ""
-    )
-
     offers_count = len(formatted_offers)
 
     enabled_chart_coins = swap_client.getChartCoins()
@@ -1335,7 +1325,6 @@ def page_offers(self, url_split, post_string, sent=False):
             "show_chart": (
                 False if sent else swap_client.settings.get("show_chart", True)
             ),
-            "coingecko_api_key": coingecko_api_key,
             "coins_from": coins_from,
             "coins": coins_to,
             "messages": messages,

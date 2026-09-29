@@ -88,17 +88,6 @@ const ConfigManager = (function() {
             console.log('ConfigManager initialized');
             return this;
         },
-        getAPIKeys: function() {
-            if (typeof window.getAPIKeys === 'function') {
-                const apiKeys = window.getAPIKeys();
-                return {
-                    coinGecko: apiKeys.coinGecko || ''
-                };
-            }
-            return {
-                coinGecko: ''
-            };
-        },
         getCoinBackendId: function(coinName) {
             if (!coinName) return null;
             if (window.CoinManager) {

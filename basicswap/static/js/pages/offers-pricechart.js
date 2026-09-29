@@ -1,6 +1,5 @@
 const chartConfig = window.config.chartConfig;
 const coins = window.config.coins;
-const apiKeys = window.config.getAPIKeys();
 
 const logger = {
   log: (message) => console.log(`[AppLog] ${new Date().toISOString()}: ${message}`),
@@ -23,9 +22,7 @@ const api = {
                 throw new Error('Network is offline');
             }
 
-            const volumeData = await Api.fetchVolumeData({
-                coinGecko: apiKeys.coinGecko
-            });
+            const volumeData = await Api.fetchVolumeData();
 
             if (Object.keys(volumeData).length > 0) {
                 CacheManager.set(cacheKey, volumeData, 'volume');
