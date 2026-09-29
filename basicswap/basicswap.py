@@ -6973,6 +6973,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(offer.active_ind == 1, "Offer not active")
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+            coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
+            coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
+            ci_from = self.ci(coin_from)
+            ci_to = self.ci(coin_to)
+
+            if xmr_swap.accept_prepared_at is not None:
+                self.log.info(
+                    f"Resending the prepared accept for bid {self.log.id(bid_id)}"
+                )
+                return self.sendXmrBidAccept(
+                    bid, xmr_swap, offer, reverse_bid, ci_to, use_cursor
+                )
+
             budget_amount: int = bid.amount_to if reverse_bid else bid.amount
             validate_offer_budget(
                 self,
@@ -6982,11 +6995,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
             )
             self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
-
-            coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
-            coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
-            ci_from = self.ci(coin_from)
-            ci_to = self.ci(coin_to)
 
             a_fee_rate: int = (
                 xmr_offer.b_fee_rate if reverse_bid else xmr_offer.a_fee_rate
@@ -7207,15 +7215,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 **refundExtraArgs,
             )
 
-            msg_buf = XmrBidAcceptMessage()
-            msg_buf.bid_msg_id = bid_id
-            msg_buf.pkal = xmr_swap.pkal
-            msg_buf.kbvl = kbvl
-
-            dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
-                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:dleag_split_size_init]
             elif ci_to.curve_type() == Curves.secp256k1:
                 xmr_swap.kbsl_dleag = ci_to.signRecoverable(
                     kbsl, "proof kbsl owned for swap"
@@ -7224,77 +7225,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
                 )
                 ensure(pk_recovered == xmr_swap.pkbsl, "kbsl recovered pubkey mismatch")
-                msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag
             else:
                 raise ValueError("Unknown curve")
 
-            # MSG2F
-            msg_buf.a_lock_tx = xmr_swap.a_lock_tx
-            msg_buf.a_lock_tx_script = xmr_swap.a_lock_tx_script
-            msg_buf.a_lock_refund_tx = xmr_swap.a_lock_refund_tx
-            msg_buf.a_lock_refund_tx_script = bytes(xmr_swap.a_lock_refund_tx_script)
-            msg_buf.a_lock_refund_spend_tx = xmr_swap.a_lock_refund_spend_tx
-            msg_buf.al_lock_refund_tx_sig = xmr_swap.al_lock_refund_tx_sig
-
-            msg_bytes = msg_buf.to_bytes()
-            payload_hex = (
-                str.format("{:02x}", MessageTypes.XMR_BID_ACCEPT_LF) + msg_bytes.hex()
+            xmr_swap.accept_prepared_at = now
+            self.saveBidInSession(
+                bid_id, bid, use_cursor, xmr_swap=xmr_swap, notify=False
             )
+            self.commitDB()
+            funded_a_lock_tx = None
 
-            addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
-            addr_to: str = offer.addr_from if reverse_bid else bid.bid_addr
-
-            msg_valid: int = self.getAcceptBidMsgValidTime(bid)
-            bid_msg_ids = {}
-            bid_msg_ids[0] = self.sendMessage(
-                addr_from,
-                addr_to,
-                payload_hex,
-                msg_valid,
-                use_cursor,
-                message_nets=bid.message_nets,
-                payload_version=offer.smsg_payload_version,
+            return self.sendXmrBidAccept(
+                bid, xmr_swap, offer, reverse_bid, ci_to, use_cursor
             )
-
-            if ci_to.curve_type() == Curves.ed25519:
-                self.sendXmrSplitMessages(
-                    XmrSplitMsgTypes.BID_ACCEPT,
-                    addr_from,
-                    addr_to,
-                    xmr_swap,
-                    xmr_swap.kbsl_dleag,
-                    msg_valid,
-                    bid_msg_ids,
-                    use_cursor,
-                    bid.message_nets,
-                    payload_version=offer.smsg_payload_version,
-                    parent_msg_id=(
-                        bid_msg_ids[0]
-                        if (offer if reverse_bid else bid).protocol_version
-                        >= PROTOCOL_VERSION_SPLIT_PARENT
-                        else b""
-                    ),
-                )
-
-            with self.dbSavepoint(use_cursor, "accept_xmr_bid"):
-                bid.setState(BidStates.BID_ACCEPTED)  # ADS
-                self.saveBidInSession(
-                    bid_id, bid, use_cursor, xmr_swap=xmr_swap, notify=False
-                )
-                for k, msg_id in bid_msg_ids.items():
-                    self.addMessageLink(
-                        Concepts.BID,
-                        bid_id,
-                        MessageTypes.BID_ACCEPT,
-                        msg_id,
-                        msg_sequence=k,
-                        cursor=use_cursor,
-                    )
-            self.notifyBidChanged(bid_id)
-
-            # Add to swaps_in_progress only when waiting on txns
-            self.log.info(f"Sent XMR_BID_ACCEPT_LF {self.log.id(bid_id)}")
-            return bid_id
         except Exception:
             if funded_a_lock_tx is not None:
                 # a_lock_tx was not saved, nothing else will unlock these
@@ -7306,6 +7249,86 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         finally:
             if cursor is None:
                 self.closeDB(use_cursor)
+
+    def sendXmrBidAccept(
+        self, bid, xmr_swap, offer, reverse_bid: bool, ci_to, cursor
+    ) -> bytes:
+        bid_id: bytes = bid.bid_id
+        msg_buf = XmrBidAcceptMessage()
+        msg_buf.bid_msg_id = bid_id
+        msg_buf.pkal = xmr_swap.pkal
+        msg_buf.kbvl = xmr_swap.vkbvl
+        if ci_to.curve_type() == Curves.ed25519:
+            dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
+            msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag[:dleag_split_size_init]
+        else:
+            msg_buf.kbsl_dleag = xmr_swap.kbsl_dleag
+
+        # MSG2F
+        msg_buf.a_lock_tx = xmr_swap.a_lock_tx
+        msg_buf.a_lock_tx_script = xmr_swap.a_lock_tx_script
+        msg_buf.a_lock_refund_tx = xmr_swap.a_lock_refund_tx
+        msg_buf.a_lock_refund_tx_script = bytes(xmr_swap.a_lock_refund_tx_script)
+        msg_buf.a_lock_refund_spend_tx = xmr_swap.a_lock_refund_spend_tx
+        msg_buf.al_lock_refund_tx_sig = xmr_swap.al_lock_refund_tx_sig
+
+        msg_bytes = msg_buf.to_bytes()
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.XMR_BID_ACCEPT_LF) + msg_bytes.hex()
+        )
+
+        addr_from: str = bid.bid_addr if reverse_bid else offer.addr_from
+        addr_to: str = offer.addr_from if reverse_bid else bid.bid_addr
+
+        msg_valid: int = self.getAcceptBidMsgValidTime(bid)
+        bid_msg_ids = {}
+        bid_msg_ids[0] = self.sendMessage(
+            addr_from,
+            addr_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
+        )
+
+        if ci_to.curve_type() == Curves.ed25519:
+            self.sendXmrSplitMessages(
+                XmrSplitMsgTypes.BID_ACCEPT,
+                addr_from,
+                addr_to,
+                xmr_swap,
+                xmr_swap.kbsl_dleag,
+                msg_valid,
+                bid_msg_ids,
+                cursor,
+                bid.message_nets,
+                payload_version=offer.smsg_payload_version,
+                parent_msg_id=(
+                    bid_msg_ids[0]
+                    if (offer if reverse_bid else bid).protocol_version
+                    >= PROTOCOL_VERSION_SPLIT_PARENT
+                    else b""
+                ),
+            )
+
+        with self.dbSavepoint(cursor, "accept_xmr_bid"):
+            bid.setState(BidStates.BID_ACCEPTED)  # ADS
+            self.saveBidInSession(bid_id, bid, cursor, xmr_swap=xmr_swap, notify=False)
+            for k, msg_id in bid_msg_ids.items():
+                self.addMessageLink(
+                    Concepts.BID,
+                    bid_id,
+                    MessageTypes.BID_ACCEPT,
+                    msg_id,
+                    msg_sequence=k,
+                    cursor=cursor,
+                )
+        self.notifyBidChanged(bid_id)
+
+        # Add to swaps_in_progress only when waiting on txns
+        self.log.info(f"Sent XMR_BID_ACCEPT_LF {self.log.id(bid_id)}")
+        return bid_id
 
     def acceptADSReverseBid(self, bid_id: bytes, cursor=None) -> None:
         self.log.info(f"Accepting reverse adaptor-sig bid {self.log.id(bid_id)}")
@@ -7335,6 +7358,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(offer.expire_at > now, "Offer has expired")
             ensure(offer.active_ind == 1, "Offer not active")
 
+            # Bid is reversed
+            coin_from = Coins(offer.coin_to)
+            coin_to = Coins(offer.coin_from)
+            ci_from = self.ci(coin_from)
+            ci_to = self.ci(coin_to)
+
+            if xmr_swap.accept_prepared_at is not None:
+                self.log.info(
+                    f"Resending the prepared accept for bid {self.log.id(bid_id)}"
+                )
+                self.sendADSBidIntentAccept(bid, xmr_swap, offer, ci_to, use_cursor)
+                return
+
             validate_offer_budget(
                 self,
                 offer,
@@ -7343,12 +7379,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
             )
             self.validateOfferWalletFloor(offer, bid.amount_to, use_cursor, bid_id)
-
-            # Bid is reversed
-            coin_from = Coins(offer.coin_to)
-            coin_to = Coins(offer.coin_from)
-            ci_from = self.ci(coin_from)
-            ci_to = self.ci(coin_to)
 
             # TODO: Better tx size estimate
             fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
@@ -7409,72 +7439,82 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
             ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
-            dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
-            msg_buf = ADSBidIntentAcceptMessage()
-            msg_buf.bid_msg_id = bid_id
-            msg_buf.dest_af = xmr_swap.dest_af
-            msg_buf.pkaf = xmr_swap.pkaf
-            msg_buf.kbvf = kbvf
-            msg_buf.kbsf_dleag = (
-                xmr_swap.kbsf_dleag
-                if len(xmr_swap.kbsf_dleag) < dleag_split_size_init
-                else xmr_swap.kbsf_dleag[:dleag_split_size_init]
+            xmr_swap.accept_prepared_at = now
+            self.saveBidInSession(
+                bid_id, bid, use_cursor, xmr_swap=xmr_swap, notify=False
             )
+            self.commitDB()
 
-            bid_bytes = msg_buf.to_bytes()
-            payload_hex = (
-                str.format("{:02x}", MessageTypes.ADS_BID_ACCEPT_FL) + bid_bytes.hex()
-            )
-
-            addr_from: str = offer.addr_from
-            addr_to: str = bid.bid_addr
-            msg_valid: int = self.getAcceptBidMsgValidTime(bid)
-            bid_msg_ids = {}
-            bid_msg_ids[0] = self.sendMessage(
-                addr_from,
-                addr_to,
-                payload_hex,
-                msg_valid,
-                use_cursor,
-                message_nets=bid.message_nets,
-                payload_version=offer.smsg_payload_version,
-            )
-
-            if ci_to.curve_type() == Curves.ed25519:
-                self.sendXmrSplitMessages(
-                    XmrSplitMsgTypes.BID,
-                    addr_from,
-                    addr_to,
-                    xmr_swap,
-                    xmr_swap.kbsf_dleag,
-                    msg_valid,
-                    bid_msg_ids,
-                    use_cursor,
-                    message_nets=bid.message_nets,
-                    payload_version=offer.smsg_payload_version,
-                    parent_msg_id=(
-                        bid_msg_ids[0]
-                        if bid.protocol_version >= PROTOCOL_VERSION_SPLIT_PARENT
-                        else b""
-                    ),
-                )
-
-            bid.setState(BidStates.BID_REQUEST_ACCEPTED)
-
-            for k, msg_id in bid_msg_ids.items():
-                self.addMessageLink(
-                    Concepts.BID,
-                    bid_id,
-                    MessageTypes.ADS_BID_ACCEPT_FL,
-                    msg_id,
-                    msg_sequence=k,
-                    cursor=use_cursor,
-                )
-            self.log.info(f"Sent ADS_BID_ACCEPT_FL {self.logIDM(bid_msg_ids[0])}")
-            self.saveBidInSession(bid_id, bid, use_cursor, xmr_swap=xmr_swap)
+            self.sendADSBidIntentAccept(bid, xmr_swap, offer, ci_to, use_cursor)
         finally:
             if cursor is None:
                 self.closeDB(use_cursor)
+
+    def sendADSBidIntentAccept(self, bid, xmr_swap, offer, ci_to, cursor) -> None:
+        bid_id: bytes = bid.bid_id
+        dleag_split_size_init, _ = xmr_swap.getMsgSplitInfo()
+        msg_buf = ADSBidIntentAcceptMessage()
+        msg_buf.bid_msg_id = bid_id
+        msg_buf.dest_af = xmr_swap.dest_af
+        msg_buf.pkaf = xmr_swap.pkaf
+        msg_buf.kbvf = xmr_swap.vkbvf
+        msg_buf.kbsf_dleag = (
+            xmr_swap.kbsf_dleag
+            if len(xmr_swap.kbsf_dleag) < dleag_split_size_init
+            else xmr_swap.kbsf_dleag[:dleag_split_size_init]
+        )
+
+        bid_bytes = msg_buf.to_bytes()
+        payload_hex = (
+            str.format("{:02x}", MessageTypes.ADS_BID_ACCEPT_FL) + bid_bytes.hex()
+        )
+
+        addr_from: str = offer.addr_from
+        addr_to: str = bid.bid_addr
+        msg_valid: int = self.getAcceptBidMsgValidTime(bid)
+        bid_msg_ids = {}
+        bid_msg_ids[0] = self.sendMessage(
+            addr_from,
+            addr_to,
+            payload_hex,
+            msg_valid,
+            cursor,
+            message_nets=bid.message_nets,
+            payload_version=offer.smsg_payload_version,
+        )
+
+        if ci_to.curve_type() == Curves.ed25519:
+            self.sendXmrSplitMessages(
+                XmrSplitMsgTypes.BID,
+                addr_from,
+                addr_to,
+                xmr_swap,
+                xmr_swap.kbsf_dleag,
+                msg_valid,
+                bid_msg_ids,
+                cursor,
+                message_nets=bid.message_nets,
+                payload_version=offer.smsg_payload_version,
+                parent_msg_id=(
+                    bid_msg_ids[0]
+                    if bid.protocol_version >= PROTOCOL_VERSION_SPLIT_PARENT
+                    else b""
+                ),
+            )
+
+        bid.setState(BidStates.BID_REQUEST_ACCEPTED)
+
+        for k, msg_id in bid_msg_ids.items():
+            self.addMessageLink(
+                Concepts.BID,
+                bid_id,
+                MessageTypes.ADS_BID_ACCEPT_FL,
+                msg_id,
+                msg_sequence=k,
+                cursor=cursor,
+            )
+        self.log.info(f"Sent ADS_BID_ACCEPT_FL {self.logIDM(bid_msg_ids[0])}")
+        self.saveBidInSession(bid_id, bid, cursor, xmr_swap=xmr_swap)
 
     def deactivateBidForReason(self, bid_id: bytes, new_state, cursor=None) -> None:
         try:
