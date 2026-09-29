@@ -5294,6 +5294,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self._log.debug(f"_findConfirmedTxnByHashElectrum failed: {e}")
         return None
 
+    def getTxOut(self, txid: bytes, n: int):
+        txout = self.rpc("gettxout", [txid.hex(), n])
+        if txout is None:
+            return None
+        return self.txoType()(
+            self.make_int(txout["value"]),
+            bytes.fromhex(txout["scriptPubKey"]["hex"]),
+        )
+
     def getTxOutInfo(
         self, txid: bytes, n: int, include_mempool: bool = False
     ) -> dict():
