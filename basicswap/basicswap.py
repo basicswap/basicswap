@@ -10685,7 +10685,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             t, block_hash, block["height"], chain_blocks
                         )
 
-                for s in c["watched_scripts"]:
+                for s in list(c["watched_scripts"]):
                     for i, txo in enumerate(tx["vout"]):
                         if "scriptPubKey" in txo and "hex" in txo["scriptPubKey"]:
                             # TODO: Optimise by loading rawtx in CTransaction
@@ -10696,7 +10696,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 )
                                 self.processFoundScript(coin_type, s, txid_bytes, i)
 
-                for o in c["watched_outputs"]:
+                for o in list(c["watched_outputs"]):
                     for i, inp in enumerate(tx["vin"]):
                         inp_txid = inp.get("txid", None)
                         if inp_txid is None:  # Coinbase
