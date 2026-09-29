@@ -11,6 +11,7 @@ params = {
     "ticker": "PART",
     "rate_ids": {
         "coingecko.com": "particl",
+        # "kraken.com": N/A  # not listed on Kraken
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 2,

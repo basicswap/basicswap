@@ -11,6 +11,7 @@ params = {
     "ticker": "PIVX",
     "rate_ids": {
         "coingecko.com": "pivx",
+        # "kraken.com": N/A  # not listed on Kraken
     },
     "display_name": "PIVX",
     "message_magic": "DarkNet Signed Message:\n",

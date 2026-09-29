@@ -11,6 +11,7 @@ params = {
     "ticker": "LTC",
     "rate_ids": {
         "coingecko.com": "litecoin",
+        "kraken.com": "XLTCZUSD",
     },
     "message_magic": "Litecoin Signed Message:\n",
     "blocks_target": 150,

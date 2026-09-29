@@ -11,6 +11,7 @@ params = {
     "ticker": "NMC",
     "rate_ids": {
         "coingecko.com": "namecoin",
+        # "kraken.com": N/A  # not listed on Kraken
     },
     "message_magic": "Namecoin Signed Message:\n",
     "blocks_target": 60 * 10,

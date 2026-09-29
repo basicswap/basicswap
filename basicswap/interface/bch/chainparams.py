@@ -11,6 +11,7 @@ params = {
     "ticker": "BCH",
     "rate_ids": {
         "coingecko.com": "bitcoin-cash",
+        "kraken.com": "BCHUSD",
     },
     "display_name": "Bitcoin Cash",
     "message_magic": "Bitcoin Signed Message:\n",

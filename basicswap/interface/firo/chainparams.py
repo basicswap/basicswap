@@ -11,6 +11,7 @@ params = {
     "ticker": "FIRO",
     "rate_ids": {
         "coingecko.com": "zcoin",
+        # "kraken.com": N/A  # not listed on Kraken
     },
     "message_magic": "Zcoin Signed Message:\n",
     "blocks_target": 150,

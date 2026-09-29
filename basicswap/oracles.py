@@ -7,9 +7,13 @@
 import json
 
 from .basicswap_util import fiatTicker
-from .chainparams import Coins, chainparams
+from .chainparams import Coins, Fiat, chainparams
+from .util import ensure
 
-rate_sources_ordered = ("coingecko.com",)
+rate_sources_ordered = (
+    "coingecko.com",
+    "kraken.com",
+)
 
 
 def getExchangeName(coin_id: int, exchange_name: str):
@@ -56,6 +60,31 @@ def fetchCoinGeckoRates(
     return rates
 
 
+def fetchKrakenRates(
+    swap_client, coins_list, currency_to, oldest_valid_update: int
+) -> dict:
+    ensure(currency_to == Fiat.USD, "Kraken rates are USD only")
+    headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+    pair_map = {
+        pair: c for c in coins_list if (pair := getExchangeName(c, "kraken.com"))
+    }
+    if not pair_map:
+        return {}
+
+    url = f"https://api.kraken.com/0/public/Ticker?pair={','.join(pair_map)}"
+    js = json.loads(swap_client.readURL(url, timeout=5, headers=headers))
+    ensure(not js.get("error"), f"Kraken error: {js.get('error')}")
+
+    rates = {}
+    for pair, v in js["result"].items():
+        if pair not in pair_map:
+            continue
+        price = float(v["c"][0])
+        rates[pair_map[pair]] = (price, float(v["v"][1]) * price, None)
+    return rates
+
+
 oracle_fetchers = {
     "coingecko.com": fetchCoinGeckoRates,
+    "kraken.com": fetchKrakenRates,
 }

@@ -13,6 +13,7 @@ params = {
     "ticker": "XMR",
     "rate_ids": {
         "coingecko.com": "monero",
+        "kraken.com": "XXMRZUSD",
     },
     "client": "xmr",
     "blocks_target": 60 * 2,

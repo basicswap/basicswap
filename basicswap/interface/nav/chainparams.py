@@ -11,6 +11,7 @@ params = {
     "ticker": "NAV",
     "rate_ids": {
         "coingecko.com": "nav-coin",
+        # "kraken.com": N/A  # not listed on Kraken
     },
     "message_magic": "Navcoin Signed Message:\n",
     "blocks_target": 30,
