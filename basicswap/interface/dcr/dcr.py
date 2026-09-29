@@ -939,9 +939,19 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             return None
 
         found_vout = None
-        # Search for txo at vout 0 and 1 if vout is not known
         if vout is None:
-            test_range = range(2)
+            # dcrd runs without txindex, so only the wallet can list a mined
+            # tx's outputs. Search a tx it lacks at vout 0 and 1.
+            wallet_tx = self.getWalletTransaction(txid)
+            if wallet_tx is None:
+                test_range = range(2)
+            else:
+                txjs = self.decodeRawTransaction(wallet_tx.hex())
+                test_range = [
+                    txo["n"]
+                    for txo in txjs["vout"]
+                    if txo["scriptPubKey"].get("addresses") == [dest_address]
+                ]
         else:
             test_range = (vout,)
         for try_vout in test_range:

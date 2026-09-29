@@ -1497,6 +1497,39 @@ class Test(BaseTest):
         assert expect_size >= actual_size
         assert expect_size - actual_size < 10
 
+    def test_012_lock_tx_vout(self):
+        logging.info(f"---------- Test {self.test_coin.name} lock tx vout lookup")
+
+        ci = self.swap_clients[0].ci(self.test_coin)
+        amount: int = ci.make_int(1.1)
+        dest_address: str = ci.getNewAddress()
+        tx = CTransaction()
+        tx.version = ci.txVersion()
+        # Two outputs ahead of the lock put it past the vout 0 and 1 search.
+        for addr, value in (
+            (ci.getNewAddress(), ci.make_int(1.0)),
+            (ci.getNewAddress(), ci.make_int(1.0)),
+            (dest_address, amount),
+        ):
+            pkh = ci.decodeAddress(addr)
+            tx.vout.append(ci.txoType()(value, ci.getPubkeyHashDest(pkh)))
+        signed_tx = ci.signTxWithWallet(ci.fundTx(tx.serialize(), 10000))
+        txid = bytes.fromhex(ci.publishTx(signed_tx))
+
+        lock_vout: int = ci.findOutput(
+            ci.loadTx(signed_tx), ci.getPubkeyHashDest(ci.decodeAddress(dest_address))
+        )
+        assert lock_vout >= 2
+        # The wallet learns of a tx published through dcrd a moment later.
+        for i in range(20):
+            test_delay_event.wait(1)
+            found = ci.getLockTxHeight(
+                txid, dest_address, amount, 0, find_index=True, vout=None
+            )
+            if found is not None:
+                break
+        assert found is not None and found["index"] == lock_vout
+
     def test_02_part_coin(self):
         run_test_success_path(self, Coins.PART, self.test_coin)
 
