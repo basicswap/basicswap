@@ -633,10 +633,10 @@
 
                 <div class="space-y-4">
                   <div class="border-l-4 border-gray-300 dark:border-gray-600 pl-4">
-                    <h5 class="font-semibold text-gray-900 dark:text-white">Coingecko</h5>
+                    <h5 class="font-semibold text-gray-900 dark:text-white">Oracle</h5>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">false</code><br>
-                      <strong>Behavior:</strong> Uses only CoinGecko exchange rates. Fails if CoinGecko data is unavailable.<br>
+                      <strong>Behavior:</strong> Uses only the oracle rate, from the enabled oracles in settings. Fails if no oracle has a rate.<br>
                       <strong>Best for:</strong> Stable, external market pricing without local market influence.
                     </p>
                   </div>
@@ -654,7 +654,7 @@
                     <h5 class="font-semibold text-gray-900 dark:text-white">Either</h5>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">true</code><br>
-                      <strong>Behavior:</strong> Uses the higher rate between CoinGecko and market offers. Fails only if BOTH sources are unavailable.<br>
+                      <strong>Behavior:</strong> Uses the higher rate between the oracle and market offers. Fails only if BOTH sources are unavailable.<br>
                       <strong>Best for:</strong> Balanced approach with fallback protection.
                     </p>
                   </div>
@@ -663,7 +663,7 @@
                     <h5 class="font-semibold text-gray-900 dark:text-white">Both</h5>
                     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       <strong>Value:</strong> <code class="bg-gray-200 dark:bg-gray-600 px-1 rounded text-gray-900 dark:text-gray-200">"all"</code><br>
-                      <strong>Behavior:</strong> Uses the higher rate between CoinGecko and market offers. Fails if EITHER source is unavailable.<br>
+                      <strong>Behavior:</strong> Uses the higher rate between the oracle and market offers. Fails if EITHER source is unavailable.<br>
                       <strong>Best for:</strong> Strict validation requiring both external and market data.
                     </p>
                   </div>
@@ -1027,10 +1027,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                       </svg>
                       <select id="add-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
-                        <option value="false">Coingecko - Use CoinGecko, fail if rates not found</option>
+                        <option value="false">Oracle - Use the oracle rate, fail if rates not found</option>
                         <option value="only">Orderbook - Use Orderbook auto-accept offers only, fail if rates not found</option>
-                        <option value="true">Either - Use greater of CoinGecko + Orderbook, fail if BOTH unavailable</option>
-                        <option value="all">Both - Use greater of CoinGecko + Orderbook, fail if EITHER unavailable</option>
+                        <option value="true">Either - Use greater of Oracle + Orderbook, fail if BOTH unavailable</option>
+                        <option value="all">Both - Use greater of Oracle + Orderbook, fail if EITHER unavailable</option>
                         <option value="minrate">Orderbook (Fallback) - Fallback to Minimum Rate</option>
                         <option value="static">Static - Exclusively use Minimum Rate + Tweak</option>
                       </select>
@@ -1353,10 +1353,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                       </svg>
                       <select id="edit-offer-adjust-rates" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 appearance-none">
-                        <option value="false">Coingecko - Use CoinGecko, fail if rates not found</option>
+                        <option value="false">Oracle - Use the oracle rate, fail if rates not found</option>
                         <option value="only">Orderbook - Use Orderbook auto-accept offers only, fail if rates not found</option>
-                        <option value="true">Either - Use greater of CoinGecko + Orderbook, fail if BOTH unavailable</option>
-                        <option value="all">Both - Use greater of CoinGecko + Orderbook, fail if EITHER unavailable</option>
+                        <option value="true">Either - Use greater of Oracle + Orderbook, fail if BOTH unavailable</option>
+                        <option value="all">Both - Use greater of Oracle + Orderbook, fail if EITHER unavailable</option>
                         <option value="minrate">Orderbook (Fallback) - Fallback to Minimum Rate</option>
                         <option value="static">Static - Exclusively use Minimum Rate + Tweak</option>
                       </select>

@@ -9,6 +9,15 @@ from basicswap.util import COIN
 params = {
     "name": "particl",
     "ticker": "PART",
+    "rate_ids": {
+        "coingecko.com": "particl",
+        # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
+        "mexc.com": "PARTUSDT",
+        # "coinlore.com": "236",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "part-particl",
+        # "neroswap.com": N/A  # not listed on neroswap
+    },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 2,
     "decimal_places": 8,

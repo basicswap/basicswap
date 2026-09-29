@@ -11,6 +11,15 @@ WOW_COIN = 10**11
 params = {
     "name": "wownero",
     "ticker": "WOW",
+    "rate_ids": {
+        # "coingecko.com": "wownero",  # last updated 2025-09-08, 4x the market price
+        # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
+        # "mexc.com": N/A  # not listed on MEXC
+        # "coinlore.com": "36551",  # zero volume market that only tracks BTC
+        # "coinpaprika.com": "wow-wownero",  # inactive on CoinPaprika, no ticker
+        "neroswap.com": "WOW",
+    },
     "client": "wow",
     "blocks_target": 60 * 5,
     "decimal_places": 11,

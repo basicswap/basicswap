@@ -9,7 +9,7 @@ const ApiManager = (function() {
             requestTimeout: 60000,
             retryDelays: [5000, 15000, 30000],
             rateLimits: {
-                coingecko: { requestsPerMinute: 50, minInterval: 1200 }
+                prices: { requestsPerMinute: 50, minInterval: 1200 }
             }
         };
     }
@@ -214,7 +214,7 @@ const ApiManager = (function() {
             });
         },
 
-        fetchCoinPrices: async function(coins, source = "coingecko.com", ttl = 300) {
+        fetchCoinPrices: async function(coins, ttl = 300) {
             if (!coins) {
                 throw new Error('No coins specified for price lookup');
             }
@@ -232,44 +232,12 @@ const ApiManager = (function() {
 
             return this.makeRequest('/json/coinprices', 'POST', {}, {
                 coins: coinsParam,
-                source: source,
                 ttl: ttl
             });
         },
 
-        fetchCoinGeckoData: async function() {
-            return this.rateLimiter.queueRequest('coingecko', async () => {
-                try {
-                    const coins = (window.config && window.config.coins) ?
-                        window.config.coins
-                            .filter(coin => coin.usesCoinGecko)
-                            .map(coin => coin.name)
-                            .join(',') :
-                        'bitcoin,monero,particl,bitcoincash,pivx,firo,dash,litecoin,dogecoin,decred,namecoin';
-
-                    const response = await this.fetchCoinPrices(coins);
-
-                    if (!response || typeof response !== 'object') {
-                        throw new Error('Invalid response type');
-                    }
-
-                    if (!response.rates || typeof response.rates !== 'object' || Object.keys(response.rates).length === 0) {
-                        throw new Error('No valid rates found in response');
-                    }
-
-                    return response;
-                } catch (error) {
-                    console.error('Error in fetchCoinGeckoData:', {
-                        message: error.message,
-                        stack: error.stack
-                    });
-                    throw error;
-                }
-            });
-        },
-
         fetchVolumeData: async function() {
-            return this.rateLimiter.queueRequest('coingecko', async () => {
+            return this.rateLimiter.queueRequest('prices', async () => {
                 try {
                     const coinSymbols = window.CoinManager
                         ? window.CoinManager.getAllCoins().map(c => c.symbol).filter(symbol => symbol && symbol.trim() !== '')
@@ -279,7 +247,6 @@ const ApiManager = (function() {
 
                     const response = await this.makeRequest('/json/coinvolume', 'POST', {}, {
                         coins: coinSymbols.join(','),
-                        source: 'coingecko.com',
                         ttl: 300
                     });
 
@@ -316,7 +283,7 @@ const ApiManager = (function() {
                 coinSymbols = [coinSymbols];
             }
 
-            return this.rateLimiter.queueRequest('coingecko', async () => {
+            return this.rateLimiter.queueRequest('prices', async () => {
                 try {
                     let days;
                     if (resolution === 'day') {

@@ -34,12 +34,8 @@ const ConfigManager = (function() {
             fallbackTTL: 24 * 60 * 60 * 1000
         },
         itemsPerPage: 50,
-        apiEndpoints: {
-            coinGecko: 'https://api.coingecko.com/api/v3',
-            volumeEndpoint: 'https://api.coingecko.com/api/v3/simple/price'
-        },
         rateLimits: {
-            coingecko: {
+            prices: {
                 requestsPerMinute: 50,
                 minInterval: 1200
             }
@@ -87,17 +83,6 @@ const ConfigManager = (function() {
             state.isInitialized = true;
             console.log('ConfigManager initialized');
             return this;
-        },
-        getAPIKeys: function() {
-            if (typeof window.getAPIKeys === 'function') {
-                const apiKeys = window.getAPIKeys();
-                return {
-                    coinGecko: apiKeys.coinGecko || ''
-                };
-            }
-            return {
-                coinGecko: ''
-            };
         },
         getCoinBackendId: function(coinName) {
             if (!coinName) return null;

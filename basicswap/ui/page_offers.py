@@ -32,7 +32,6 @@ from basicswap.basicswap_util import (
     SwapTypes,
     DebugTypes,
     getLockName,
-    get_api_key_setting,
     strBidState,
     strSwapDesc,
     strSwapType,
@@ -41,7 +40,6 @@ from basicswap.basicswap_util import (
 )
 from basicswap.chainparams import (
     Coins,
-    ticker_map,
 )
 from basicswap.offer_tracking import (
     OfferTrackingModes,
@@ -569,8 +567,8 @@ def _add_review_insights(swap_client, page_data, parsed_data) -> None:
 
     try:
         rates = swap_client.lookupRates(int(coin_from), int(coin_to))
-        cg = rates.get("coingecko", {}) if isinstance(rates, dict) else {}
-        inferred = cg.get("rate_inferred")
+        oracle = rates.get("oracle", {}) if isinstance(rates, dict) else {}
+        inferred = oracle.get("rate_inferred")
         if inferred is not None:
             inferred_f = float(inferred)
             page_data["market_rate_inferred"] = _fmt_float(inferred_f)
@@ -798,10 +796,6 @@ def page_newoffer(self, url_split, post_string, get_string=""):
     automation_filters = {"type_ind": Concepts.OFFER, "sort_by": "label"}
     automation_strategies = swap_client.listAutomationStrategies(automation_filters)
 
-    coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", ""
-    )
-
     return self.render_template(
         template,
         {
@@ -818,7 +812,6 @@ def page_newoffer(self, url_split, post_string, get_string=""):
                 (strSwapType(x), strSwapDesc(x)) for x in SwapTypes if strSwapType(x)
             ],
             "show_chart": swap_client.settings.get("show_chart", True),
-            "coingecko_api_key": coingecko_api_key,
         },
     )
 
@@ -1314,39 +1307,9 @@ def page_offers(self, url_split, post_string, sent=False):
 
     coins_from, coins_to = listAvailableCoins(swap_client, split_from=True)
 
-    coingecko_api_key = get_api_key_setting(
-        swap_client.settings, "coingecko_api_key", ""
-    )
-
     offers_count = len(formatted_offers)
 
-    enabled_chart_coins = []
-    enabled_chart_coins_setting = swap_client.settings.get("enabled_chart_coins", "")
-    if enabled_chart_coins_setting.lower() == "all":
-        for coin_ticker in ticker_map:
-            enabled_chart_coins.append(coin_ticker.upper())
-    elif enabled_chart_coins_setting.strip() == "":
-        for coin_id in swap_client.coin_clients:
-            if not swap_client.isCoinActive(coin_id):
-                continue
-            try:
-                enabled_ticker = swap_client.ci(coin_id).ticker_mainnet()
-            except Exception:
-                continue
-            if (
-                enabled_ticker not in enabled_chart_coins
-                and enabled_ticker.lower() in ticker_map
-            ):
-                enabled_chart_coins.append(enabled_ticker)
-    else:
-        for ticker in enabled_chart_coins_setting.split(","):
-            upcased_ticker = ticker.strip().upper()
-
-            if (
-                upcased_ticker not in enabled_chart_coins
-                and upcased_ticker.lower() in ticker_map
-            ):
-                enabled_chart_coins.append(upcased_ticker)
+    enabled_chart_coins = swap_client.getChartCoins()
 
     template = server.env.get_template("offers.html")
     return self.render_template(
@@ -1362,7 +1325,6 @@ def page_offers(self, url_split, post_string, sent=False):
             "show_chart": (
                 False if sent else swap_client.settings.get("show_chart", True)
             ),
-            "coingecko_api_key": coingecko_api_key,
             "coins_from": coins_from,
             "coins": coins_to,
             "messages": messages,

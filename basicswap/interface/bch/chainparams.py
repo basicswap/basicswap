@@ -9,6 +9,15 @@ from basicswap.util import COIN
 params = {
     "name": "bitcoincash",
     "ticker": "BCH",
+    "rate_ids": {
+        "coingecko.com": "bitcoin-cash",
+        "kraken.com": "BCHUSD",
+        "kucoin.com": "BCH-USDT",
+        "mexc.com": "BCHUSDT",
+        # "coinlore.com": "2321",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "bch-bitcoin-cash",
+        "neroswap.com": "BCH",
+    },
     "display_name": "Bitcoin Cash",
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 10,

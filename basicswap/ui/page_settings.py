@@ -110,6 +110,12 @@ def page_settings(self, url_split, post_string):
                     "enabled_chart_coins": get_data_entry_or(
                         form_data, "enabledchartcoins", ""
                     ),
+                    "rate_sources": {
+                        rate_source: have_data_entry(
+                            form_data, f"ratesource_{rate_source}"
+                        )
+                        for rate_source, _, _ in swap_client.getRateSources()
+                    },
                 }
                 swap_client.editGeneralSettings(data)
             elif have_data_entry(form_data, "apply_notifications"):
@@ -418,6 +424,7 @@ def page_settings(self, url_split, post_string):
         "coingecko_api_key": coingecko_api_key,
         "coingecko_api_plan": swap_client.settings.get("coingecko_api_plan", "demo"),
         "enabled_chart_coins": swap_client.settings.get("enabled_chart_coins", ""),
+        "rate_sources": swap_client.getRateSources(),
     }
 
     security_settings = {
