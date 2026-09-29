@@ -49,6 +49,7 @@ from basicswap.offer_tracking import (
     offerTrackingModeToString,
     strOfferTrackingMode,
 )
+
 MAX_SEND_FROM_ADDRS = 50
 
 
