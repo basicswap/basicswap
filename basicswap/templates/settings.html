@@ -633,6 +633,17 @@
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Coins to show data for: Blank for active coins, "all" for all known coins or comma separated list of coin tickers to show</p>
         </div>
 
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Oracles</label>
+         {% for rate_source, name, enabled in chart_settings.rate_sources %}
+         <div class="flex items-center py-1">
+          <input type="checkbox" id="ratesource_{{ rate_source }}" name="ratesource_{{ rate_source }}" value="true" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"{% if enabled %} checked{% endif %}>
+          <label for="ratesource_{{ rate_source }}" class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">{{ name }}</label>
+         </div>
+         {% endfor %}
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Tried in the order listed; each coin uses the first enabled source that has a fresh rate for it. Kraken and KuCoin cover BTC, LTC, DCR, XMR, DASH, BCH and DOGE; MEXC adds PART, PIVX, FIRO and DCR; CoinLore is used for PIVX only; neroswap covers WOW</p>
+        </div>
+
        </div>
 
        <div class="flex justify-end pt-6  mt-6">

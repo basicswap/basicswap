@@ -87,6 +87,7 @@ from .offer_tracking import (
 from .oracles import (
     getExchangeName,
     oracle_fetchers,
+    rate_source_names,
     rate_sources_ordered,
 )
 from .db_util import remove_expired_data
@@ -15376,6 +15377,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     settings_copy["enabled_chart_coins"] = new_value
                     settings_changed = True
 
+            if "rate_sources" in data:
+                new_value = data["rate_sources"]
+                ensure(isinstance(new_value, dict), "New rate_sources value not a dict")
+                for k, v in new_value.items():
+                    ensure(k in rate_sources_ordered, f"Unknown rate source {k}")
+                    ensure(isinstance(v, bool), f"Rate source {k} value not boolean")
+                if settings_copy.get("rate_sources", {}) != new_value:
+                    settings_copy["rate_sources"] = new_value
+                    settings_changed = True
+
             if "notifications_new_offers" in data:
                 new_value = data["notifications_new_offers"]
                 ensure(
@@ -17127,11 +17138,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     enabled_chart_coins.append(upcased_ticker)
         return enabled_chart_coins
 
+    def isRateSourceEnabled(self, rate_source: str) -> bool:
+        return self.settings.get("rate_sources", {}).get(rate_source, True)
+
+    def getRateSources(self) -> list:
+        return [
+            (s, rate_source_names[s], self.isRateSourceEnabled(s))
+            for s in rate_sources_ordered
+        ]
+
     def nextRateSource(self, rate_source: str):
         if rate_source not in rate_sources_ordered:
             return None
         i: int = rate_sources_ordered.index(rate_source) + 1
-        return rate_sources_ordered[i] if i < len(rate_sources_ordered) else None
+        for next_source in rate_sources_ordered[i:]:
+            if self.isRateSourceEnabled(next_source):
+                return next_source
+        return None
 
     def _fetchPricesAndVolumeBackground(self):
         all_coins = [c for c in Coins if c in chainparams]
@@ -17144,6 +17167,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         fetched = set()
         transient_error = None
         for rate_source in rate_sources_ordered:
+            if not self.isRateSourceEnabled(rate_source):
+                continue
             if rate_source == "coingecko.com":
                 coins = all_coins
             else:
@@ -17253,6 +17278,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(len(coins_list) > 0, "Must specify coin/s")
         ensure(saved_ttl >= 0, "Invalid saved time")
 
+        if not self.isRateSourceEnabled(rate_source):
+            fallback_source = self.nextRateSource(rate_source)
+            if fallback_source is None:
+                return {}
+            return self.lookupFiatRates(
+                coins_list, currency_to, fallback_source, saved_ttl
+            )
+
         now: int = int(time.time())
         oldest_time_valid: int = now - saved_ttl
         return_rates = {}
@@ -17311,6 +17344,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     ):
         ensure(len(coins_list) > 0, "Must specify coin/s")
         ensure(saved_ttl >= 0, "Invalid saved time")
+
+        if not self.isRateSourceEnabled(rate_source):
+            fallback_source = self.nextRateSource(rate_source)
+            if fallback_source is None:
+                return {}
+            return self.lookupVolume(coins_list, fallback_source, saved_ttl)
 
         now: int = int(time.time())
         oldest_time_valid: int = now - saved_ttl
@@ -17508,7 +17547,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
         )
 
-        rate_sources = self.settings.get("rate_sources", {})
         ci_from = self.ci(int(coin_from))
         ci_to = self.ci(int(coin_to))
         name_from = ci_from.chainparams()["name"]
@@ -17517,7 +17555,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ticker_to = ci_to.chainparams()["ticker"]
         rv = {}
 
-        if rate_sources.get("coingecko.com", True):
+        if any(enabled for _, _, enabled in self.getRateSources()):
             try:
                 price_coin_from = int(coin_from)
                 price_coin_to = int(coin_to)

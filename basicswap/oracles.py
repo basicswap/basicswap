@@ -22,6 +22,16 @@ rate_sources_ordered = (
     "neroswap.com",
 )
 
+rate_source_names = {
+    "coingecko.com": "CoinGecko",
+    "kraken.com": "Kraken",
+    "kucoin.com": "KuCoin",
+    "mexc.com": "MEXC",
+    "coinlore.com": "CoinLore",
+    "coinpaprika.com": "CoinPaprika",
+    "neroswap.com": "neroswap",
+}
+
 
 def getExchangeName(coin_id: int, exchange_name: str):
     # Handle coin variants that use base coin chainparams
