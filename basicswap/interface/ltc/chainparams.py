@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "litecoin",
         "kraken.com": "XLTCZUSD",
         "kucoin.com": "LTC-USDT",
+        "mexc.com": "LTCUSDT",
     },
     "message_magic": "Litecoin Signed Message:\n",
     "blocks_target": 150,

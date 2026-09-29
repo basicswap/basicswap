@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "dogecoin",
         "kraken.com": "XDGUSD",
         "kucoin.com": "DOGE-USDT",
+        "mexc.com": "DOGEUSDT",
     },
     "message_magic": "Dogecoin Signed Message:\n",
     "blocks_target": 60 * 1,

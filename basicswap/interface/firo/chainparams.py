@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "zcoin",
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
+        "mexc.com": "FIROUSDT",
     },
     "message_magic": "Zcoin Signed Message:\n",
     "blocks_target": 150,

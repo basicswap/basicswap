@@ -15,6 +15,7 @@ rate_sources_ordered = (
     "coingecko.com",
     "kraken.com",
     "kucoin.com",
+    "mexc.com",
 )
 
 
@@ -120,8 +121,42 @@ def fetchKuCoinRates(
     return rates
 
 
+def fetchMexcRates(
+    swap_client, coins_list, currency_to, oldest_valid_update: int
+) -> dict:
+    ensure(currency_to == Fiat.USD, "MEXC rates are USDT only")
+    headers = {"User-Agent": "Mozilla/5.0", "Connection": "close"}
+
+    rates = {}
+    for coin_id in coins_list:
+        symbol = getExchangeName(coin_id, "mexc.com")
+        if symbol is None:
+            continue
+        url = f"https://api.mexc.com/api/v3/ticker/24hr?symbol={symbol}"
+        try:
+            js = json.loads(swap_client.readURL(url, timeout=5, headers=headers))
+        except urllib.error.HTTPError as e:
+            if swap_client.isRateLimitError(e):
+                raise
+            swap_client.log.debug(f"mexc.com rate for {symbol} failed: {e}")
+            continue
+        if js.get("lastPrice") is None:
+            continue
+        rates[coin_id] = (
+            float(js["lastPrice"]),
+            js.get("quoteVolume"),
+            (
+                float(js["priceChangePercent"]) * 100
+                if js.get("priceChangePercent") is not None
+                else None
+            ),
+        )
+    return rates
+
+
 oracle_fetchers = {
     "coingecko.com": fetchCoinGeckoRates,
     "kraken.com": fetchKrakenRates,
     "kucoin.com": fetchKuCoinRates,
+    "mexc.com": fetchMexcRates,
 }

@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "dash",
         "kraken.com": "DASHUSD",
         "kucoin.com": "DASH-USDT",
+        "mexc.com": "DASHUSDT",
     },
     "message_magic": "DarkCoin Signed Message:\n",
     "blocks_target": 150,

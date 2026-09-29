@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "bitcoin",
         "kraken.com": "XXBTZUSD",
         "kucoin.com": "BTC-USDT",
+        "mexc.com": "BTCUSDT",
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 10,

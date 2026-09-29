@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "bitcoin-cash",
         "kraken.com": "BCHUSD",
         "kucoin.com": "BCH-USDT",
+        "mexc.com": "BCHUSDT",
     },
     "display_name": "Bitcoin Cash",
     "message_magic": "Bitcoin Signed Message:\n",

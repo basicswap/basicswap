@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "particl",
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
+        "mexc.com": "PARTUSDT",
     },
     "message_magic": "Bitcoin Signed Message:\n",
     "blocks_target": 60 * 2,

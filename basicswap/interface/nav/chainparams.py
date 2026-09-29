@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "nav-coin",
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
+        # "mexc.com": N/A  # not listed on MEXC
     },
     "message_magic": "Navcoin Signed Message:\n",
     "blocks_target": 30,

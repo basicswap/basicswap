@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "namecoin",
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
+        # "mexc.com": N/A  # not listed on MEXC
     },
     "message_magic": "Namecoin Signed Message:\n",
     "blocks_target": 60 * 10,

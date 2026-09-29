@@ -15,6 +15,7 @@ params = {
         # "coingecko.com": "wownero",  # last updated 2025-09-08, 4x the market price
         # "kraken.com": N/A  # not listed on Kraken
         # "kucoin.com": N/A  # not listed on KuCoin
+        # "mexc.com": N/A  # not listed on MEXC
     },
     "client": "wow",
     "blocks_target": 60 * 5,

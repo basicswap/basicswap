@@ -13,6 +13,7 @@ params = {
         "coingecko.com": "decred",
         "kraken.com": "DCRUSD",
         "kucoin.com": "DCR-USDT",
+        "mexc.com": "DCRUSDT",
     },
     "message_magic": "Decred Signed Message:\n",
     "blocks_target": 60 * 5,

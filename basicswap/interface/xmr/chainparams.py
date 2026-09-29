@@ -15,6 +15,7 @@ params = {
         "coingecko.com": "monero",
         "kraken.com": "XXMRZUSD",
         "kucoin.com": "XMR-USDT",
+        "mexc.com": "XMRUSDT",
     },
     "client": "xmr",
     "blocks_target": 60 * 2,
