@@ -597,8 +597,11 @@ class FIROInterface(BTCInterface):
         current_height: int = chain_blocks
         block_hash = self.rpc("getblockhash", [current_height])
 
-        script_hash: bytes = self.decodeAddress(addr_find)
-        find_scriptPubKey = self.getDestForScriptHash(script_hash)
+        addr_data: bytes = decodeAddress(addr_find)
+        if addr_data[0] == self.chainparams_network()["pubkey_address"]:
+            find_scriptPubKey = self.getScriptForPubkeyHash(addr_data[1:])
+        else:
+            find_scriptPubKey = self.getDestForScriptHash(addr_data[1:])
 
         while current_height > height_start:
             block_hash = self.rpc("getblockhash", [current_height])
