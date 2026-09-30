@@ -1,3 +1,55 @@
+0.18.10
+==============
+
+**Rates**
+- CoinGecko's API has changed, see
+  [CoinGecko API authentication](https://docs.coingecko.com/v3.0.1/reference/authentication).
+- BasicSwap no longer ships a CoinGecko API key.
+  - Add your own under Settings, Charts Configuration,
+    and set CoinGecko Plan to Demo or Pro to match it.
+  - See [doc/notes.md](notes.md#coingecko-steps-for-user).
+  - Without a key, prices come from the other oracles and price charts stay empty.
+- Kraken, KuCoin, MEXC, CoinLore, CoinPaprika and neroswap back up CoinGecko.  They are
+  tried in that order, and each coin takes its rate from the first enabled oracle that has
+  a fresh one.  Each oracle can be turned off under Settings, Oracles.
+- A rate older than 15 minutes is ignored when the oracle reports its age (CoinGecko,
+  CoinPaprika and neroswap).
+- An oracle that returns a rate limit backs off on its own, and the others carry on.
+
+**Security / hardening**
+- The CoinGecko API key is sent in a request header instead of the URL.
+
+**Fixes**
+- When one transaction pays more than one watched script, each one is found.  The scan
+  could skip a script after processing the one before it.
+- A Decred lock tx output past output 1 is found when the tx is in the wallet.  Only
+  outputs 0 and 1 were checked, so the lock tx could go unseen.
+- New databases store text columns as TEXT.  SQLite gave the old STRING type numeric
+  affinity.  Existing databases keep their old column types.
+
+**Daemon updates**
+- Particl Core  v27.2.5 -> v27.2.6
+
+**Upgrade notes**
+- `/json/rates` and `/json/rateslist` return `oracle` and `oracle_error` in place of
+  `coingecko` and `coingecko_error`.  Scripts that read the old keys need updating,
+  including createoffers.py from earlier releases.
+- All oracles are enabled by default.  The AMM prices offers from whichever oracle supplies
+  the rate, which can be a single exchange's last trade when CoinGecko has none.  Turn off
+  any oracle you don't want the AMM to rely on.
+
+
+0.18.9
+==============
+
+**Fixes**
+- The websocket server no longer logs an "SSL failed" warning about the key and cert
+  paths, or a traceback, when a client fails the TLS handshake.
+
+**Daemon updates**
+- Particl Core  v27.2.4 -> v27.2.5
+
+
 0.18.8
 ==============
 

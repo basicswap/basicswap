@@ -9,7 +9,6 @@ import os
 import sqlite3
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
 from coincurve import PrivateKey, PublicKey
 from Crypto.Cipher import ChaCha20_Poly1305  # pycryptodome
 
@@ -54,13 +53,13 @@ class WalletManager:
     ELECTRUM_GAP_LIMIT = 20
 
     def __init__(self, swap_client, log):
-        self._gap_limits: Dict[Coins, int] = {}
+        self._gap_limits: dict[Coins, int] = {}
         self._swap_client = swap_client
         self._log = log
         self._seed: bytes = None
-        self._master_keys: Dict[Coins, bytes] = {}
-        self._external_chains: Dict[Coins, ExtKeyPair] = {}
-        self._internal_chains: Dict[Coins, ExtKeyPair] = {}
+        self._master_keys: dict[Coins, bytes] = {}
+        self._external_chains: dict[Coins, ExtKeyPair] = {}
+        self._internal_chains: dict[Coins, ExtKeyPair] = {}
         self._initialized: set = set()
         self._migration_in_progress: set = set()
         self._balance_sync_lock = threading.Lock()
@@ -105,7 +104,7 @@ class WalletManager:
 
         self._log.debug(f"WalletManager: {Coins(coin_type).name} initialized")
 
-    def getDepositAddress(self, coin_type: Coins) -> Optional[str]:
+    def getDepositAddress(self, coin_type: Coins) -> str | None:
         return self.getAddress(coin_type, index=0, internal=False)
 
     def isInitialized(self, coin_type: Coins) -> bool:
@@ -124,7 +123,7 @@ class WalletManager:
 
     def _deriveAddress(
         self, coin_type: Coins, index: int, internal: bool = False
-    ) -> Tuple[str, str, bytes]:
+    ) -> tuple[str, str, bytes]:
         key = self._deriveKey(coin_type, index, internal)
         pubkey = PublicKey.from_secret(key).format()
         pkh = hash160(pubkey)
@@ -319,7 +318,7 @@ class WalletManager:
 
     def getAddress(
         self, coin_type: Coins, index: int, internal: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -336,7 +335,7 @@ class WalletManager:
 
     def getAddressAtIndex(
         self, coin_type: Coins, index: int, internal: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         if not self.isInitialized(coin_type):
             return None
 
@@ -348,7 +347,7 @@ class WalletManager:
 
     def discoverAddress(
         self, coin_type: Coins, address: str, max_index: int = 1000
-    ) -> Optional[Tuple[int, bool]]:
+    ) -> tuple[int, bool] | None:
         if not self.isInitialized(coin_type):
             return None
 
@@ -439,7 +438,7 @@ class WalletManager:
         include_watch_only: bool = True,
         funded_only: bool = False,
         watch_only_require_key: bool = False,
-    ) -> List[str]:
+    ) -> list[str]:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -473,7 +472,7 @@ class WalletManager:
         except Exception:
             return []
 
-    def getExistingInternalAddress(self, coin_type: Coins) -> Optional[str]:
+    def getExistingInternalAddress(self, coin_type: Coins) -> str | None:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -487,7 +486,7 @@ class WalletManager:
         except Exception:
             return None
 
-    def getNewInternalAddress(self, coin_type: Coins) -> Optional[str]:
+    def getNewInternalAddress(self, coin_type: Coins) -> str | None:
         if coin_type not in self._initialized:
             return None
 
@@ -537,7 +536,7 @@ class WalletManager:
             if cursor:
                 self._swap_client.closeDB(cursor, commit=False)
 
-    def getAddressInfo(self, coin_type: Coins, address: str) -> Optional[dict]:
+    def getAddressInfo(self, coin_type: Coins, address: str) -> dict | None:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -718,7 +717,7 @@ class WalletManager:
         min_balance: int,
         include_internal: bool = False,
         max_cache_age: int = 120,
-    ) -> Optional[tuple]:
+    ) -> tuple | None:
         if not self.isInitialized(coin_type):
             return None
 
@@ -777,7 +776,7 @@ class WalletManager:
         except Exception:
             return False
 
-    def getPrivateKey(self, coin_type: Coins, address: str) -> Optional[bytes]:
+    def getPrivateKey(self, coin_type: Coins, address: str) -> bytes | None:
         if not self.isInitialized(coin_type):
             return None
         try:
@@ -835,7 +834,7 @@ class WalletManager:
             # Treated as untrusted, so a failure here only costs a confirmation.
             return set()
 
-    def getSignableAddresses(self, coin_type: Coins) -> Dict[str, str]:
+    def getSignableAddresses(self, coin_type: Coins) -> dict[str, str]:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -1064,7 +1063,7 @@ class WalletManager:
 
     def _decodeWIF(
         self, wif: str, coin_type: Coins = None
-    ) -> Optional[bytes]:  # noqa: ARG002
+    ) -> bytes | None:  # noqa: ARG002
         try:
             decoded = self._b58decode_check(wif)
             if len(decoded) == 33:
@@ -1152,8 +1151,8 @@ class WalletManager:
     def runMigration(
         self,
         coin_type: Coins,
-        full_node_addresses: Optional[List[str]] = None,
-        cached_address: Optional[str] = None,
+        full_node_addresses: list[str] | None = None,
+        cached_address: str | None = None,
         num_addresses: int = 20,
     ) -> int:
         if not self.isInitialized(coin_type):
@@ -1279,7 +1278,7 @@ class WalletManager:
         finally:
             self._swap_client.closeDB(cursor, commit=False)
 
-    def getSeedID(self, coin_type: Coins) -> Optional[str]:
+    def getSeedID(self, coin_type: Coins) -> str | None:
         master_key = self._master_keys.get(coin_type)
         if master_key is None:
             return None
@@ -1302,15 +1301,13 @@ class WalletManager:
 
     def getKeyForAddress(
         self, coin_type: Coins, address: str
-    ) -> Optional[Tuple[bytes, bytes]]:
+    ) -> tuple[bytes, bytes] | None:
         key = self.getPrivateKey(coin_type, address)
         if key is None:
             return None
         return (key, PublicKey.from_secret(key).format())
 
-    def findAddressByScripthash(
-        self, coin_type: Coins, scripthash: str
-    ) -> Optional[str]:
+    def findAddressByScripthash(self, coin_type: Coins, scripthash: str) -> str | None:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -1332,7 +1329,7 @@ class WalletManager:
         except Exception:
             return None
 
-    def getAllScripthashes(self, coin_type: Coins) -> List[str]:
+    def getAllScripthashes(self, coin_type: Coins) -> list[str]:
         try:
             conn = sqlite3.connect(self._swap_client.sqlite_file)
             cursor = conn.cursor()
@@ -1441,7 +1438,7 @@ class WalletManager:
         finally:
             self._swap_client.closeDB(cursor, commit=False)
 
-    def getAddressesForSubscription(self, coin_type: Coins) -> List[Tuple[str, str]]:
+    def getAddressesForSubscription(self, coin_type: Coins) -> list[tuple[str, str]]:
         cursor = self._swap_client.openDB()
         try:
             result = [
@@ -1629,7 +1626,7 @@ class WalletManager:
             if cursor is None:
                 self._swap_client.closeDB(use_cursor, commit=False)
 
-    def getLockedUTXOs(self, coin_type: Coins) -> List[dict]:
+    def getLockedUTXOs(self, coin_type: Coins) -> list[dict]:
         cursor = self._swap_client.openDB()
         try:
             now = int(time.time())
@@ -1736,7 +1733,7 @@ class WalletManager:
 
     def getCachedTxConfirmations(
         self, coin_type: Coins, txid: str
-    ) -> Optional[Tuple[int, int]]:
+    ) -> tuple[int, int] | None:
 
         cursor = self._swap_client.openDB()
         try:
@@ -1834,7 +1831,7 @@ class WalletManager:
         tx_type: str = "outgoing",
         amount: int = 0,
         fee: int = 0,
-        addresses: List[str] = None,
+        addresses: list[str] = None,
         bid_id: bytes = None,
     ) -> bool:
         cursor = self._swap_client.openDB()
@@ -1892,7 +1889,7 @@ class WalletManager:
 
     def getPendingTxs(
         self, coin_type: Coins, include_confirmed: bool = False
-    ) -> List[dict]:
+    ) -> list[dict]:
         cursor = self._swap_client.openDB()
         try:
             results = self._swap_client.query(

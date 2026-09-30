@@ -1643,9 +1643,7 @@ def js_coinprices(self, url_split, post_string, is_json) -> bytes:
     if have_data_entry(post_data, "currency_to"):
         currency_to = fiatFromTicker(get_data_entry(post_data, "currency_to"))
 
-    rate_source: str = "coingecko.com"
-    if have_data_entry(post_data, "source"):
-        rate_source = get_data_entry(post_data, "source")
+    rate_source = get_data_entry_or(post_data, "source", None)
 
     match_input_key: bool = toBool(
         get_data_entry_or(post_data, "match_input_key", "true")
@@ -1684,7 +1682,13 @@ def js_coinprices(self, url_split, post_string, is_json) -> bytes:
         else:
             rv[int(k)] = v
     return bytes(
-        json.dumps({"currency": currency_to.name, "source": rate_source, "rates": rv}),
+        json.dumps(
+            {
+                "currency": currency_to.name,
+                "source": rate_source or "oracle",
+                "rates": rv,
+            }
+        ),
         "UTF-8",
     )
 
@@ -1695,9 +1699,7 @@ def js_coinvolume(self, url_split, post_string, is_json) -> bytes:
     if not have_data_entry(post_data, "coins"):
         raise ValueError("Requires coins list.")
 
-    rate_source: str = "coingecko.com"
-    if have_data_entry(post_data, "source"):
-        rate_source = get_data_entry(post_data, "source")
+    rate_source = get_data_entry_or(post_data, "source", None)
 
     match_input_key: bool = toBool(
         get_data_entry_or(post_data, "match_input_key", "true")
@@ -1736,7 +1738,7 @@ def js_coinvolume(self, url_split, post_string, is_json) -> bytes:
         else:
             rv[int(k)] = v
     return bytes(
-        json.dumps({"source": rate_source, "data": rv}),
+        json.dumps({"source": rate_source or "oracle", "data": rv}),
         "UTF-8",
     )
 

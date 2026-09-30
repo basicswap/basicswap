@@ -23,7 +23,6 @@ from basicswap.chainparams import chainparams, Coins, isKnownCoinName
 from basicswap.network.simplex_chat import startSimplexClient
 from basicswap.ui.util import getCoinName
 from basicswap.util.daemon import Daemon
-from typing import Set
 
 initial_logger = logging.getLogger()
 initial_logger.level = logging.DEBUG
@@ -349,7 +348,7 @@ def mainLoop(daemons, update: bool = True):
 def runClient(
     data_dir: str,
     chain: str,
-    start_only_coins: Set[str],
+    start_only_coins: set[str],
     log_prefix: str = "BasicSwap",
     extra_opts=dict(),
 ) -> int:

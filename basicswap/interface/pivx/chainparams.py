@@ -9,6 +9,15 @@ from basicswap.util import COIN
 params = {
     "name": "pivx",
     "ticker": "PIVX",
+    "rate_ids": {
+        "coingecko.com": "pivx",
+        # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
+        "mexc.com": "PIVXUSDT",
+        "coinlore.com": "103",
+        # "coinpaprika.com": "pivx-pivx",  # averages in off market XT and CoinEx rates, 11-16% high
+        # "neroswap.com": N/A  # not listed on neroswap
+    },
     "display_name": "PIVX",
     "message_magic": "DarkNet Signed Message:\n",
     "blocks_target": 60 * 1,
