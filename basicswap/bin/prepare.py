@@ -494,39 +494,42 @@ def testOnionLink():
     logger.info("Onion links work.")
 
 
-def prepareCore(coin, version_data, settings, data_dir, extra_opts={}):
-    version, version_tag, signers = version_data
+def prepareCore(coin, settings, extra_opts={}):
+    prepare_module = coin_prepare_modules.get(coin)
+    if prepare_module is None:
+        raise ValueError("Unknown coin")
+    bin_dir = os.path.expanduser(settings["chainclients"][coin]["bindir"])
+    prepareRelease(prepare_module, bin_dir, extra_opts)
+
+
+def prepareRelease(prepare_module, bin_dir, extra_opts={}):
+    name = prepare_module.name
+    version = prepare_module.version + prepare_module.version_tag
+    signers = prepare_module.signers.keys()
 
     passed: bool = False
     for signer in signers:
         try:
-            tryPrepareCore(
-                coin, version_data, signer, settings, data_dir, extra_opts=extra_opts
-            )
+            tryPrepareRelease(prepare_module, signer, bin_dir, extra_opts=extra_opts)
             passed = True
             break
         except Exception as e:
             if len(signers) < 2:
                 raise
             logger.warning(
-                f"Prepare core failed: {coin} v{version}{version_tag} - Signer: {signer}. Error: {e}"
+                f"Prepare core failed: {name} v{version} - Signer: {signer}. Error: {e}"
             )
     if passed is False:
-        raise RuntimeError(f"Prepare core failed: {coin} v{version}{version_tag}")
+        raise RuntimeError(f"Prepare core failed: {name} v{version}")
 
 
-def tryPrepareCore(coin, version_data, signer, settings, data_dir, extra_opts={}):
-    version, version_tag, signers = version_data
-    logger.info(f"Prepare core: {coin} v{version}{version_tag} - Signer: {signer}")
+def tryPrepareRelease(prepare_module, signing_key_name, bin_dir, extra_opts={}):
+    logger.info(
+        f"Prepare core: {prepare_module.name} v{prepare_module.version}{prepare_module.version_tag} - Signer: {signing_key_name}"
+    )
 
-    bin_dir = os.path.expanduser(settings["chainclients"][coin]["bindir"])
     if not os.path.exists(bin_dir):
         os.makedirs(bin_dir)
-
-    signing_key_name = signer
-    prepare_module = coin_prepare_modules.get(coin)
-    if prepare_module is None:
-        raise ValueError("Unknown coin")
 
     release_path, assert_path, assert_sig_path = prepare_module.downloadCore(
         extra_opts["prepare_ctx"],
@@ -1743,9 +1746,7 @@ def main():
             settings["chainclients"][add_coin] = chainclients[add_coin]
 
             if not no_cores:
-                prepareCore(
-                    add_coin, known_coins[add_coin], settings, data_dir, extra_opts
-                )
+                prepareCore(add_coin, settings, extra_opts)
 
             if not (prepare_bin_only or upgrade_cores):
                 prepareDataDir(
@@ -1984,7 +1985,7 @@ def main():
             save_config(old_config_path, settings, add_options=False)
 
             for c in with_coins:
-                prepareCore(c, known_coins[c], settings, data_dir, extra_opts)
+                prepareCore(c, settings, extra_opts)
                 current_coin_settings = chainclients[c]
                 current_version = current_coin_settings["core_version_no"]
                 current_version_group = current_coin_settings.get(
@@ -2061,7 +2062,7 @@ def main():
 
     if not no_cores:
         for c in with_coins:
-            prepareCore(c, known_coins[c], settings, data_dir, extra_opts)
+            prepareCore(c, settings, extra_opts)
 
     if prepare_bin_only:
         logger.info("Done.")

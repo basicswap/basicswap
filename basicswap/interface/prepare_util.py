@@ -136,11 +136,11 @@ def getFileHash(file_path: str, print_progress: bool = False, logger=None) -> st
 
 
 @dataclass
-class CoinPrepareModule:
-    """Base class for the per-coin provisioning interface exported by interface/*/core.py.
+class ReleasePrepareModule:
+    """Base class for downloading and verifying a signed third party release.
 
-    Each coin subclasses this, overrides the methods and exports an instance
-    named prepare_module for bin/prepare.py.
+    bin/prepare.py runs downloadCore, verifyCoreHash, verifyCoreSignature
+    and extractCore in that order.
     """
 
     name: str
@@ -148,6 +148,99 @@ class CoinPrepareModule:
     version_tag: str
     signers: dict  # signer name -> expected key fingerprints
     ticker: str = ""
+
+    def downloadCore(
+        self,
+        ctx: PrepareContext,
+        bin_dir: str,
+        signing_key_name: str,
+        extra_opts: dict,
+    ) -> tuple:
+        """Returns (release_path, assert_path, assert_sig_path)."""
+        raise NotImplementedError()
+
+    def getPubkeyFilename(self, signing_key_name: str) -> str:
+        return f"{self.name}_{signing_key_name}.pgp"
+
+    def getPubkeyUrls(self, ctx: PrepareContext) -> list:
+        return []
+
+    def getAllPubkeyUrls(self, ctx: PrepareContext) -> list:
+        pubkeyurls = self.getPubkeyUrls(ctx)
+        if self.ticker != "":
+            extra_pubkey_url: str = os.getenv(f"{self.ticker}_ADD_PUBKEY_URL", "")
+            if extra_pubkey_url != "":
+                pubkeyurls.append(extra_pubkey_url)
+        return pubkeyurls
+
+    def ensureValidSignatureBy(
+        self,
+        ctx: PrepareContext,
+        result,
+        signing_key_name: str,
+        signers=None,
+        filepath=None,
+    ) -> None:
+        ensureValidSignatureBy(
+            result, signing_key_name, signers or self.signers, ctx.logger, filepath
+        )
+
+    def verifyCoreHash(
+        self, ctx: PrepareContext, release_path: str, assert_path: str
+    ) -> str:
+        release_hash: str = getFileHash(release_path)
+        ctx.logger.info(f"{os.path.basename(release_path)} hash: {release_hash}")
+        ensureFileHashInFile(release_hash, assert_path, ctx.logger)
+        return release_hash
+
+    def verifyCoreSignature(
+        self,
+        ctx: PrepareContext,
+        gpg,
+        release_path: str,
+        assert_path: str,
+        assert_sig_path: str,
+        signing_key_name: str,
+        extra_opts: dict,
+    ) -> None:
+        """Verify the downloaded release, raises on failure.
+
+        Default implementation covers a detached signature over the assert
+        file.  Releases with inline-signed hash files override this method,
+        ending with an ensureValidSignatureBy call.
+        """
+        pubkey_filename = self.getPubkeyFilename(signing_key_name)
+        pubkeyurls = self.getAllPubkeyUrls(ctx)
+
+        ensurePubkey(
+            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
+        )
+
+        with open(assert_sig_path, "rb") as fp:
+            verified = gpg.verify_file(fp, assert_path)
+
+        self.ensureValidSignatureBy(
+            ctx, verified, signing_key_name, filepath=assert_path
+        )
+
+    def extractCore(
+        self,
+        ctx: PrepareContext,
+        bin_dir: str,
+        release_path: str,
+        extra_opts: dict,
+    ) -> None:
+        raise NotImplementedError()
+
+
+@dataclass
+class CoinPrepareModule(ReleasePrepareModule):
+    """Base class for the per-coin provisioning interface exported by interface/*/core.py.
+
+    Each coin subclasses this, overrides the methods and exports an instance
+    named prepare_module for bin/prepare.py.
+    """
+
     rpc_user: str = ""
     rpc_password: str = ""
     onion_port: int = 0
@@ -234,70 +327,6 @@ class CoinPrepareModule:
             ctx.download_file(assert_sig_url, assert_sig_path)
 
         return release_path, assert_path, assert_sig_path
-
-    def getPubkeyFilename(self, signing_key_name: str) -> str:
-        return f"{self.name}_{signing_key_name}.pgp"
-
-    def getPubkeyUrls(self, ctx: PrepareContext) -> list:
-        return []
-
-    def getAllPubkeyUrls(self, ctx: PrepareContext) -> list:
-        pubkeyurls = self.getPubkeyUrls(ctx)
-        if self.ticker != "":
-            extra_pubkey_url: str = os.getenv(f"{self.ticker}_ADD_PUBKEY_URL", "")
-            if extra_pubkey_url != "":
-                pubkeyurls.append(extra_pubkey_url)
-        return pubkeyurls
-
-    def ensureValidSignatureBy(
-        self,
-        ctx: PrepareContext,
-        result,
-        signing_key_name: str,
-        signers=None,
-        filepath=None,
-    ) -> None:
-        ensureValidSignatureBy(
-            result, signing_key_name, signers or self.signers, ctx.logger, filepath
-        )
-
-    def verifyCoreHash(
-        self, ctx: PrepareContext, release_path: str, assert_path: str
-    ) -> str:
-        release_hash: str = getFileHash(release_path)
-        ctx.logger.info(f"{os.path.basename(release_path)} hash: {release_hash}")
-        ensureFileHashInFile(release_hash, assert_path, ctx.logger)
-        return release_hash
-
-    def verifyCoreSignature(
-        self,
-        ctx: PrepareContext,
-        gpg,
-        release_path: str,
-        assert_path: str,
-        assert_sig_path: str,
-        signing_key_name: str,
-        extra_opts: dict,
-    ) -> None:
-        """Verify the downloaded release, raises on failure.
-
-        Default implementation covers a detached signature over the assert
-        file.  Coins with inline-signed hash files override this method,
-        ending with an ensureValidSignatureBy call.
-        """
-        pubkey_filename = self.getPubkeyFilename(signing_key_name)
-        pubkeyurls = self.getAllPubkeyUrls(ctx)
-
-        ensurePubkey(
-            gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
-        )
-
-        with open(assert_sig_path, "rb") as fp:
-            verified = gpg.verify_file(fp, assert_path)
-
-        self.ensureValidSignatureBy(
-            ctx, verified, signing_key_name, filepath=assert_path
-        )
 
     def getExtractBins(self) -> list:
         bins = [self.name + "d", self.name + "-cli", self.name + "-tx"]
