@@ -18,6 +18,7 @@ from basicswap.chainparams import (
     Coins,
 )
 from basicswap.db import (
+    Concepts,
     DirectMessageRoute,
     NetworkPortal,
     SmsgAddress,
@@ -26,11 +27,11 @@ from basicswap.messages_npb import (
     MessagePortalOffer,
     MessagePortalSend,
 )
-from basicswap.network.simplex import (
-    closeSimplexChat,
+from basicswap.network.simplex.routes import sendSimplexRouteMsg
+from basicswap.network.simplex.simplex import (
+    closeSimplexRoute,
     encryptMsg,
     forwardSimplexMsg,
-    getResponseData,
     initialiseSimplexNetwork,
     readSimplexMsgs,
     sendSimplexMsg,
@@ -78,6 +79,10 @@ class BSXNetwork:
                 "expire_message_routes_after", 48 * 3600, 10 * 60, 31 * 86400
             )
         )  # Seconds
+        self._connect_request_times = []
+        self._max_connect_requests_per_hour = self.settings.get(
+            "max_connect_requests_per_hour", 30
+        )
         self.check_smsg_seconds = self.get_int_setting(
             "check_smsg_seconds", 10, 1, 10 * 60
         )
@@ -535,55 +540,17 @@ class BSXNetwork:
 
         message_route = self.getMessageRoute(2, addr_from, addr_to, cursor=cursor)
         if message_route:
-            network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
-            net_i = network["ws_thread"]
-
-            remote_name = None
-            route_data = json.loads(message_route.route_data.decode("UTF-8"))
-            if "localDisplayName" in route_data:
-                remote_name = route_data["localDisplayName"]
-            else:
-                pccConnId = route_data["pccConnId"]
-                self.log.debug(f"Finding name for Simplex chat, ID: {pccConnId}")
-                cmd_id = net_i.send_command("/chats")
-                response = net_i.wait_for_command_response(cmd_id)
-                for chat in getResponseData(response, "chats"):
-                    if (
-                        "chatInfo" not in chat
-                        or "type" not in chat["chatInfo"]
-                        or chat["chatInfo"]["type"] != "direct"
-                    ):
-                        continue
-                    try:
-                        if (
-                            chat["chatInfo"]["contact"]["activeConn"]["connId"]
-                            == pccConnId
-                        ):
-                            remote_name = chat["chatInfo"]["contact"][
-                                "localDisplayName"
-                            ]
-                            break
-                    except Exception as e:
-                        self.log.debug(f"Error parsing chat: {e}")
-
-            if remote_name is None:
-                raise RuntimeError(
-                    f"Unable to find remote name for simplex direct chat, pccConnId: {pccConnId}"
-                )
-
-            message_id = sendSimplexMsg(
+            return sendSimplexRouteMsg(
                 self,
-                network,
+                message_route,
                 addr_from,
                 addr_to,
-                bytes.fromhex(payload_hex),
+                payload_hex,
                 msg_valid,
                 cursor,
                 timestamp,
                 deterministic,
-                to_user_name=remote_name,
             )
-            return message_id
 
         smsg_difficulty: int = 0x1EFFFFFF
         if self._have_smsg_rpc and self._smsg_payload_version >= 2:
@@ -767,41 +734,8 @@ class BSXNetwork:
         self.callrpc("smsgimport", [smsg_msg.hex(), options])
         self.num_smsg_messages_sent += 1
 
-    def processContactDisconnected(self, event_data) -> None:
-        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
-        connId = getResponseData(event_data, "contact")["activeConn"]["connId"]
-        self.log.info(f"Direct message route disconnected, connId: {connId}")
-        closeSimplexChat(self, net_i, connId)
-
-        query_str = "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes"
-        try:
-            cursor = self.openDB()
-
-            rows = cursor.execute(query_str).fetchall()
-
-            for row in rows:
-                record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = (
-                    row
-                )
-                route_data = json.loads(route_data.decode("UTF-8"))
-
-                if connId == route_data["pccConnId"]:
-                    self.log.debug(f"Removing direct message route: {record_id}.")
-                    cursor.execute(
-                        "DELETE FROM direct_message_routes WHERE record_id = :record_id ",
-                        {"record_id": record_id},
-                    )
-                    break
-        finally:
-            self.closeDB(cursor)
-
     def closeMessageRoute(self, record_id, network_id, route_data, cursor):
-        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
-
-        connId = route_data["pccConnId"]
-
-        self.log.info(f"Closing Simplex chat, id: {connId}")
-        closeSimplexChat(self, net_i, connId)
+        closeSimplexRoute(self, route_data)
 
         self.log.debug(f"Removing direct message route: {record_id}.")
         cursor.execute(
@@ -812,6 +746,88 @@ class BSXNetwork:
 
     def getSmsgMsgPayloadVersion(self, msg) -> int:
         return msg.get("payloadversion", self._smsg_payload_version)
+
+    def checkConnectRequestRateLimit(self) -> None:
+        now_rl: int = self.getTime()
+        self._connect_request_times = [
+            t for t in self._connect_request_times if now_rl - t < 3600
+        ]
+        ensure(
+            len(self._connect_request_times) < self._max_connect_requests_per_hour,
+            "Connection request rate limit exceeded",
+        )
+        self._connect_request_times.append(now_rl)
+
+    def expireMessageRoutes(self) -> None:
+        if self._is_locked is True:
+            self.log.debug("Not expiring message routes while system is locked")
+            return
+
+        num_removed: int = 0
+        now: int = self.getTime()
+        cursor = self.openDB()
+        try:
+            query_str = (
+                "SELECT record_id, network_id, created_at, active_ind, route_data FROM direct_message_routes "
+                + "WHERE 1 = 1 "
+            )
+            rows = cursor.execute(query_str).fetchall()
+            for row in rows:
+                record_id, network_id, created_at, active_ind, route_data = row
+
+                route_data = json.loads(route_data.decode("UTF-8"))
+
+                if now - created_at < self._expire_message_routes_after:
+                    continue
+
+                # unestablished routes
+                if active_ind == 2:
+                    pass
+                else:
+                    query_str = (
+                        "SELECT MAX(created_at) FROM direct_message_route_links "
+                        + "WHERE direct_message_route_id = :message_route_id "
+                    )
+                    max_link_created_at = cursor.execute(
+                        query_str, {"message_route_id": record_id}
+                    ).fetchone()[0]
+
+                    if now - max_link_created_at < self._expire_message_routes_after:
+                        continue
+
+                    query_str = (
+                        "SELECT COUNT(*) FROM direct_message_route_links rl "
+                        + "INNER JOIN bids b ON b.bid_id = rl.linked_id "
+                        + "INNER JOIN bidstates s ON s.state_id = b.state "
+                        + "WHERE rl.direct_message_route_id = :message_route_id AND rl.linked_type = :link_type_bid "
+                        + "AND (b.in_progress OR s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))"
+                    )
+                    num_active_bids = cursor.execute(
+                        query_str,
+                        {
+                            "message_route_id": record_id,
+                            "link_type_bid": Concepts.BID,
+                            "now": now,
+                        },
+                    ).fetchone()[0]
+                    if num_active_bids > 0:
+                        self.log.warning(
+                            f"Not expiring message route {record_id} with {num_active_bids} active bids."
+                        )
+                        continue
+
+                self.closeMessageRoute(record_id, network_id, route_data, cursor)
+                num_removed += 1
+        finally:
+            self.closeDB(cursor)
+
+        if num_removed > 0:
+            self.log.info(
+                "Expired {} message route{}.".format(
+                    num_removed,
+                    "s" if num_removed != 1 else "",
+                )
+            )
 
     def getSmsgMsgBytes(self, msg) -> bytes:
         payload_version = self.getSmsgMsgPayloadVersion(msg)

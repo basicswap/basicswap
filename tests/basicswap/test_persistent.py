@@ -105,7 +105,6 @@ SIMPLEX_SERVER_ADDRESS = os.getenv(
 SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", "5225"))
 SIMPLEX_GROUP_LINK = os.getenv("SIMPLEX_GROUP_LINK", "")
 SIMPLEX_CLIENT_PATH = os.path.expanduser(os.getenv("SIMPLEX_CLIENT_PATH", ""))
-SIMPLEX_SERVER_SOCKS_PROXY = os.getenv("SIMPLEX_SERVER_SOCKS_PROXY", "")
 
 logger = logging.getLogger()
 logger.level = logging.DEBUG
@@ -538,8 +537,6 @@ def modifyConfig(test_path, i):
             "group_link": SIMPLEX_GROUP_LINK,
             "enabled": True,
         }
-        if SIMPLEX_SERVER_SOCKS_PROXY != "":
-            simplex_options["socks_proxy_override"] = SIMPLEX_SERVER_SOCKS_PROXY
 
         settings["networks"] = [simplex_options]
 
