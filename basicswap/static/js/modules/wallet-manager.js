@@ -8,11 +8,7 @@ const WalletManager = (function() {
     apiTimeout: 30000,
     debounceDelay: 300,
     cacheMinInterval: 60 * 1000,
-    defaultTTL: 300,
-    priceSource: {
-      primary: 'coingecko.com',
-      enabledSources: ['coingecko.com']
-    }
+    defaultTTL: 300
   };
 
   const stateKeys = {
@@ -37,22 +33,6 @@ const WalletManager = (function() {
     return window.CoinManager.getSymbol(fullName) || fullName;
   }
 
-  function getCoingeckoId(coinName) {
-    if (!window.CoinManager) {
-      console.warn('[WalletManager] CoinManager not available');
-      return coinName;
-    }
-
-    const coin = window.CoinManager.getCoinByAnyIdentifier(coinName);
-
-    if (!coin) {
-      console.warn(`[WalletManager] No coin found for: ${coinName}`);
-      return coinName;
-    }
-
-    return coin.symbol;
-  }
-
   async function fetchPrices(forceUpdate = false) {
     const now = Date.now();
     const timeSinceLastFetch = now - state.lastFetchTime;
@@ -68,10 +48,6 @@ const WalletManager = (function() {
     for (let attempt = 0; attempt < config.maxRetries; attempt++) {
       try {
         const processedData = {};
-        const currentSource = config.priceSource.primary;
-
-        const shouldIncludeWow = currentSource === 'coingecko.com';
-
         const coinsToFetch = [];
         const processedCoins = new Set();
 
@@ -84,10 +60,10 @@ const WalletManager = (function() {
                                coinName.includes('Particl') ? 'Particl' :
                                coinName;
 
-          const coinId = getCoingeckoId(adjustedName);
+          const symbol = getShortName(adjustedName);
 
-          if (coinId && (shouldIncludeWow || coinId !== 'WOW')) {
-            coinsToFetch.push(coinId);
+          if (symbol) {
+            coinsToFetch.push(symbol);
             processedCoins.add(coinName);
           }
         });
@@ -99,7 +75,6 @@ const WalletManager = (function() {
         if (window.ApiManager) {
           mainData = await window.ApiManager.makeRequest("/json/coinprices", "POST", {}, {
             coins: fetchCoinsString,
-            source: currentSource,
             ttl: config.defaultTTL
           });
         } else {
@@ -108,7 +83,6 @@ const WalletManager = (function() {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
               coins: fetchCoinsString,
-              source: currentSource,
               ttl: config.defaultTTL
             })
           });
@@ -129,14 +103,14 @@ const WalletManager = (function() {
                                  coinName.includes('Particl') ? 'Particl' :
                                  coinName;
 
-            const coinId = getCoingeckoId(adjustedName);
-            const price = mainData.rates[coinId];
+            const symbol = getShortName(adjustedName);
+            const price = mainData.rates[symbol];
 
             if (price) {
               const coinKey = coinName.toLowerCase().replace(' ', '-');
               processedData[coinKey] = {
                 usd: price,
-                btc: coinId === 'BTC' ? 1 : price / (mainData.rates.BTC || 1)
+                btc: symbol === 'BTC' ? 1 : price / (mainData.rates.BTC || 1)
               };
             }
           });
@@ -148,18 +122,6 @@ const WalletManager = (function() {
       } catch (error) {
         lastError = error;
         console.error(`Price fetch attempt ${attempt + 1} failed:`, error);
-
-        if (attempt === config.maxRetries - 1 &&
-            config.priceSource.fallback &&
-            config.priceSource.fallback !== config.priceSource.primary) {
-          const temp = config.priceSource.primary;
-          config.priceSource.primary = config.priceSource.fallback;
-          config.priceSource.fallback = temp;
-
-          console.warn(`Switching to fallback source: ${config.priceSource.primary}`);
-          attempt = -1;
-          continue;
-        }
 
         if (attempt < config.maxRetries - 1) {
           const delay = Math.min(config.baseDelay * Math.pow(2, attempt), 10000);
@@ -609,23 +571,6 @@ const WalletManager = (function() {
 
     toggleBalances: function() {
       return toggleBalances();
-    },
-
-    setPriceSource: function(primarySource, fallbackSource = null) {
-      if (!config.priceSource.enabledSources.includes(primarySource)) {
-        throw new Error(`Invalid primary source: ${primarySource}`);
-      }
-
-      if (fallbackSource && !config.priceSource.enabledSources.includes(fallbackSource)) {
-        throw new Error(`Invalid fallback source: ${fallbackSource}`);
-      }
-
-      config.priceSource.primary = primarySource;
-      if (fallbackSource) {
-        config.priceSource.fallback = fallbackSource;
-      }
-
-      return this;
     },
 
     getConfig: function() {

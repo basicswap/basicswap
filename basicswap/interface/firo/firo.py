@@ -550,8 +550,7 @@ class FIROInterface(BTCInterface):
 
         sum_value: int = 0
         for outpoint in utxos:
-            txout = self.rpc("gettxout", [outpoint[0].hex(), outpoint[1]])
-            sum_value += self.make_int(txout["value"])
+            sum_value += self.getTxOut(outpoint[0], outpoint[1]).nValue
 
         return sum_value
 

@@ -24,12 +24,6 @@
   <!-- Custom styles -->
   <link type="text/css" media="all" href="/static/css/style.css?v={{ static_v }}" rel="stylesheet">
   <script>
-    function getAPIKeys() {
-      return {
-        coinGecko: "{{ coingecko_api_key|safe }}"
-      };
-    }
-
     (function() {
       Object.defineProperty(window, 'ws_port', {
         value: "{{ ws_port|safe }}",

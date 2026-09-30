@@ -12,7 +12,6 @@ import logging
 import random
 import traceback
 
-from typing import List, Optional
 
 from basicswap.basicswap_util import (
     ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
@@ -940,9 +939,19 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             return None
 
         found_vout = None
-        # Search for txo at vout 0 and 1 if vout is not known
         if vout is None:
-            test_range = range(2)
+            # dcrd runs without txindex, so only the wallet can list a mined
+            # tx's outputs. Search a tx it lacks at vout 0 and 1.
+            wallet_tx = self.getWalletTransaction(txid)
+            if wallet_tx is None:
+                test_range = range(2)
+            else:
+                txjs = self.decodeRawTransaction(wallet_tx.hex())
+                test_range = [
+                    txo["n"]
+                    for txo in txjs["vout"]
+                    if txo["scriptPubKey"].get("addresses") == [dest_address]
+                ]
         else:
             test_range = (vout,)
         for try_vout in test_range:
@@ -1892,10 +1901,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script_pk = self.getScriptDest(script)
         return findOutput(tx, script_pk)
 
-    def getScriptLockTxDummyWitness(self, script: bytes) -> List[bytes]:
+    def getScriptLockTxDummyWitness(self, script: bytes) -> list[bytes]:
         return [bytes(72), bytes(72), bytes(len(script))]
 
-    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes) -> List[bytes]:
+    def getScriptLockRefundSpendTxDummyWitness(self, script: bytes) -> list[bytes]:
         return [bytes(72), bytes(72), bytes(len(script))]
 
     def extractLeaderSig(self, tx_bytes: bytes) -> bytes:
@@ -2228,11 +2237,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         self,
         lock_type: int,
         encoded_sequence: int,
-        parent_block_height: Optional[int],
-        parent_block_time: Optional[int],
-        chain_height: Optional[int] = None,
-        chain_mtp: Optional[int] = None,
-        coin_mtp: Optional[int] = None,
+        parent_block_height: int | None,
+        parent_block_time: int | None,
+        chain_height: int | None = None,
+        chain_mtp: int | None = None,
+        coin_mtp: int | None = None,
     ) -> bool:
         if parent_block_height is None or parent_block_height < 1:
             return False
@@ -2260,8 +2269,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def isAbsLockTimeMature(
         self,
         nlocktime: int,
-        chain_height: Optional[int] = None,
-        chain_mtp: Optional[int] = None,
+        chain_height: int | None = None,
+        chain_mtp: int | None = None,
     ) -> bool:
         if nlocktime == 0:
             return True

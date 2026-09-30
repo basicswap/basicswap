@@ -23,7 +23,6 @@ import time
 import urllib.parse
 import zmq
 
-from typing import List
 from urllib.request import urlopen
 
 import basicswap.config as cfg
@@ -401,7 +400,7 @@ def getRemoteFileLength(url: str) -> (int, bool):
 
 
 def downloadRelease(
-    url_in: str | List[str], path: str, extra_opts, timeout: int = 10
+    url_in: str | list[str], path: str, extra_opts, timeout: int = 10
 ) -> None:
     # If file exists at path compare it's size to the content length at the url
     # and attempt to resume download if file size is below expected.

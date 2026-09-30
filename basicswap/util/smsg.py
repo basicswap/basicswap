@@ -11,7 +11,6 @@ import secrets
 import time
 
 
-from typing import Union, Dict
 from coincurve.keys import (
     PublicKey,
     PrivateKey,
@@ -193,7 +192,7 @@ def smsgEncrypt(
 
 def smsgDecrypt(
     privkey_to: bytes, encrypted_message: bytes, output_dict: bool = False
-) -> Union[bytes, Dict]:
+) -> bytes | dict:
     # Without lz4
 
     ensure(len(encrypted_message) > SMSG_HDR_LEN, "smsg_message shorter than header")

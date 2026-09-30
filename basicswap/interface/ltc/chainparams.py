@@ -9,6 +9,15 @@ from basicswap.util import COIN
 params = {
     "name": "litecoin",
     "ticker": "LTC",
+    "rate_ids": {
+        "coingecko.com": "litecoin",
+        "kraken.com": "XLTCZUSD",
+        "kucoin.com": "LTC-USDT",
+        "mexc.com": "LTCUSDT",
+        # "coinlore.com": "1",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "ltc-litecoin",
+        "neroswap.com": "LTC",
+    },
     "message_magic": "Litecoin Signed Message:\n",
     "blocks_target": 150,
     "decimal_places": 8,

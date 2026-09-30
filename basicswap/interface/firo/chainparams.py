@@ -9,6 +9,15 @@ from basicswap.util import COIN
 params = {
     "name": "firo",
     "ticker": "FIRO",
+    "rate_ids": {
+        "coingecko.com": "zcoin",
+        # "kraken.com": N/A  # not listed on Kraken
+        # "kucoin.com": N/A  # not listed on KuCoin
+        "mexc.com": "FIROUSDT",
+        # "coinlore.com": "46573",  # no per-coin timestamp, used only where CoinPaprika is unreliable
+        "coinpaprika.com": "firo-firo",
+        # "neroswap.com": N/A  # not listed on neroswap
+    },
     "message_magic": "Zcoin Signed Message:\n",
     "blocks_target": 150,
     "decimal_places": 8,

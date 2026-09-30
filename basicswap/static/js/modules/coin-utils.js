@@ -37,7 +37,7 @@ const CoinUtils = (function() {
     function getCanonicalName(coin) {
         if (!coin) return null;
         const lower = coin.toString().toLowerCase().trim();
-        
+
         for (const [canonical, aliases] of Object.entries(COIN_ALIASES)) {
             if (aliases.includes(lower)) {
                 return canonical;
@@ -58,7 +58,7 @@ const CoinUtils = (function() {
                     if (priceData['bitcoincash']) return 'bitcoincash';
                     return 'bitcoin-cash';
                 }
-                
+
                 if (canonical === 'particl') {
                     if (priceData['part']) return 'part';
                     if (priceData['particl']) return 'particl';
@@ -132,7 +132,7 @@ const CoinUtils = (function() {
 
             const canonical = getCanonicalName(coinName);
             const symbol = this.getCoinSymbol(canonical);
-            
+
             if (!symbol) return null;
 
             const imagePath = `/static/images/coins/${symbol.toLowerCase()}.png`;
@@ -141,20 +141,6 @@ const CoinUtils = (function() {
 
         getPriceKey: function(coin, priceData = null) {
             return this.normalizeCoinName(coin, priceData);
-        },
-
-        getCoingeckoId: function(coinName) {
-            if (!coinName) return null;
-
-            if (window.CoinManager) {
-                const coin = window.CoinManager.getCoinByAnyIdentifier(coinName);
-                if (coin && coin.coingeckoId) {
-                    return coin.coingeckoId;
-                }
-            }
-
-            const canonical = getCanonicalName(coinName);
-            return canonical;
         },
 
         formatCoinAmount: function(amount, decimals = 8) {

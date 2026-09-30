@@ -6,7 +6,6 @@
 
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
 
 from .util import TemporaryError
 
@@ -14,12 +13,12 @@ from .util import TemporaryError
 class WalletBackend(ABC):
 
     @abstractmethod
-    def getBalance(self, addresses: List[str]) -> Dict[str, int]:
+    def getBalance(self, addresses: list[str]) -> dict[str, int]:
         pass
 
     def findAddressWithBalance(
-        self, addresses: List[str], min_balance: int
-    ) -> Optional[tuple]:
+        self, addresses: list[str], min_balance: int
+    ) -> tuple | None:
         balances = self.getBalance(addresses)
         for addr, balance in balances.items():
             if balance >= min_balance:
@@ -28,8 +27,8 @@ class WalletBackend(ABC):
 
     @abstractmethod
     def getUnspentOutputs(
-        self, addresses: List[str], min_confirmations: int = 0
-    ) -> List[dict]:
+        self, addresses: list[str], min_confirmations: int = 0
+    ) -> list[dict]:
         pass
 
     @abstractmethod
@@ -37,11 +36,11 @@ class WalletBackend(ABC):
         pass
 
     @abstractmethod
-    def getTransaction(self, txid: str) -> Optional[dict]:
+    def getTransaction(self, txid: str) -> dict | None:
         pass
 
     @abstractmethod
-    def getTransactionRaw(self, txid: str) -> Optional[str]:
+    def getTransactionRaw(self, txid: str) -> str | None:
         pass
 
     @abstractmethod
@@ -57,7 +56,7 @@ class WalletBackend(ABC):
         pass
 
     @abstractmethod
-    def getAddressHistory(self, address: str) -> List[dict]:
+    def getAddressHistory(self, address: str) -> list[dict]:
         pass
 
 
@@ -68,7 +67,7 @@ class FullNodeBackend(WalletBackend):
         self._coin_type = coin_type
         self._log = log
 
-    def getBalance(self, addresses: List[str]) -> Dict[str, int]:
+    def getBalance(self, addresses: list[str]) -> dict[str, int]:
         result = {}
         for addr in addresses:
             result[addr] = 0
@@ -85,8 +84,8 @@ class FullNodeBackend(WalletBackend):
         return result
 
     def getUnspentOutputs(
-        self, addresses: List[str], min_confirmations: int = 0
-    ) -> List[dict]:
+        self, addresses: list[str], min_confirmations: int = 0
+    ) -> list[dict]:
         try:
             utxos = self._rpc("listunspent", [min_confirmations, 9999999, addresses])
             result = []
@@ -109,13 +108,13 @@ class FullNodeBackend(WalletBackend):
     def broadcastTransaction(self, tx_hex: str) -> str:
         return self._rpc("sendrawtransaction", [tx_hex])
 
-    def getTransaction(self, txid: str) -> Optional[dict]:
+    def getTransaction(self, txid: str) -> dict | None:
         try:
             return self._rpc("getrawtransaction", [txid, True])
         except Exception:
             return None
 
-    def getTransactionRaw(self, txid: str) -> Optional[str]:
+    def getTransactionRaw(self, txid: str) -> str | None:
         try:
             return self._rpc("getrawtransaction", [txid, False])
         except Exception:
@@ -140,7 +139,7 @@ class FullNodeBackend(WalletBackend):
         except Exception:
             return False
 
-    def getAddressHistory(self, address: str) -> List[dict]:
+    def getAddressHistory(self, address: str) -> list[dict]:
         return []
 
     def importAddress(self, address: str, label: str = "", rescan: bool = False):
@@ -272,7 +271,7 @@ class ElectrumBackend(WalletBackend):
 
         return scripthash_from_address(address, self._network_params)
 
-    def getBalance(self, addresses: List[str]) -> Dict[str, int]:
+    def getBalance(self, addresses: list[str]) -> dict[str, int]:
         result = {}
         for addr in addresses:
             result[addr] = 0
@@ -311,7 +310,7 @@ class ElectrumBackend(WalletBackend):
 
         return result
 
-    def getDetailedBalance(self, addresses: List[str]) -> Dict[str, dict]:
+    def getDetailedBalance(self, addresses: list[str]) -> dict[str, dict]:
         result = {}
         for addr in addresses:
             result[addr] = {"confirmed": 0, "unconfirmed": 0}
@@ -396,8 +395,8 @@ class ElectrumBackend(WalletBackend):
         return result
 
     def findAddressWithBalance(
-        self, addresses: List[str], min_balance: int
-    ) -> Optional[tuple]:
+        self, addresses: list[str], min_balance: int
+    ) -> tuple | None:
         if not addresses:
             return None
 
@@ -439,8 +438,8 @@ class ElectrumBackend(WalletBackend):
         return None
 
     def getUnspentOutputs(
-        self, addresses: List[str], min_confirmations: int = 0
-    ) -> List[dict]:
+        self, addresses: list[str], min_confirmations: int = 0
+    ) -> list[dict]:
         result = []
         if not addresses:
             return result
@@ -521,13 +520,13 @@ class ElectrumBackend(WalletBackend):
                 raise
         return None
 
-    def getTransaction(self, txid: str) -> Optional[dict]:
+    def getTransaction(self, txid: str) -> dict | None:
         try:
             return self._call("blockchain.transaction.get", [txid, True])
         except Exception:
             return None
 
-    def getTransactionRaw(self, txid: str) -> Optional[str]:
+    def getTransactionRaw(self, txid: str) -> str | None:
         try:
             tx_hex = self._call("blockchain.transaction.get", [txid, False])
             return tx_hex
@@ -546,7 +545,7 @@ class ElectrumBackend(WalletBackend):
             for stale in list(self._tx_detail_cache.keys())[:overflow]:
                 self._tx_detail_cache.pop(stale, None)
 
-    def getTransactionBatch(self, txids: List[str]) -> Dict[str, Optional[dict]]:
+    def getTransactionBatch(self, txids: list[str]) -> dict[str, dict | None]:
         result = {}
         if not txids:
             return result
@@ -585,7 +584,7 @@ class ElectrumBackend(WalletBackend):
 
         return result
 
-    def getTransactionBatchRaw(self, txids: List[str]) -> Dict[str, Optional[str]]:
+    def getTransactionBatchRaw(self, txids: list[str]) -> dict[str, str | None]:
         result = {}
         if not txids:
             return result
@@ -694,7 +693,7 @@ class ElectrumBackend(WalletBackend):
             return self._server.recently_reconnected(grace_seconds)
         return False
 
-    def getAddressHistory(self, address: str) -> List[dict]:
+    def getAddressHistory(self, address: str) -> list[dict]:
         if self._isUnsupportedAddress(address):
             return []
         try:
@@ -709,7 +708,7 @@ class ElectrumBackend(WalletBackend):
         except Exception:
             return []
 
-    def getAddressHistoryBatch(self, addresses: List[str]) -> Dict[str, List[dict]]:
+    def getAddressHistoryBatch(self, addresses: list[str]) -> dict[str, list[dict]]:
         result = {addr: [] for addr in addresses}
 
         addr_to_scripthash = {}
@@ -741,7 +740,7 @@ class ElectrumBackend(WalletBackend):
 
         return result
 
-    def getAddressHistoryBackground(self, address: str) -> List[dict]:
+    def getAddressHistoryBackground(self, address: str) -> list[dict]:
         if self._isUnsupportedAddress(address):
             return []
         try:
@@ -759,8 +758,8 @@ class ElectrumBackend(WalletBackend):
             return []
 
     def getBatchUnspent(
-        self, scripthashes: List[str], min_confirmations: int = 0
-    ) -> Dict[str, List[dict]]:
+        self, scripthashes: list[str], min_confirmations: int = 0
+    ) -> dict[str, list[dict]]:
         # A partial or failed result must never read as "no UTXOs": callers size
         # spends against this and would treat it as an empty wallet.
         if not scripthashes:

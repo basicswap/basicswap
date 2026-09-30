@@ -202,8 +202,8 @@ class TestFunctions(BaseTest):
         assert bid1["ticker_to"] == ci_to.ticker()
         assert abs(ci_from.make_int(bid0["amt_from"]) - amt_swap) <= tolerance
         assert abs(ci_from.make_int(bid1["amt_from"]) - amt_swap) <= tolerance
-        assert abs(ci_to.make_int(bid0["bid_rate"]) - rate_swap) <= tolerance
-        assert abs(ci_to.make_int(bid1["bid_rate"]) - rate_swap) <= tolerance
+        assert abs(ci_to.make_int(bid0["bid_rate"]) - offer.rate) <= tolerance
+        assert abs(ci_to.make_int(bid1["bid_rate"]) - offer.rate) <= tolerance
         assert bid0["reverse_bid"] == reverse_bid
         assert bid1["reverse_bid"] == reverse_bid
 

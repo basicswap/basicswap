@@ -253,7 +253,7 @@ const AddrFromHint = {
 };
 
 const FeeEstimate = {
-    fee: null, 
+    fee: null,
     feeStr: null,
     pairKey: null,
     refresh: function() {
@@ -349,8 +349,8 @@ const RateManager = {
 
         Ajax.post('/json/rates', params,
             (response) => {
-                if (response.coingecko && response.coingecko.rate_inferred) {
-                    DOM.setValue('rate', toPlainDecimal(response.coingecko.rate_inferred));
+                if (response.oracle && response.oracle.rate_inferred) {
+                    DOM.setValue('rate', toPlainDecimal(response.oracle.rate_inferred));
                     RateManager.setRate('rate');
                 } else {
                     DOM.setValue('rate', 'Error: No rate available');
@@ -1044,8 +1044,8 @@ const MarketRate = {
         Ajax.post('/json/rates', 'coin_from=' + encodeURIComponent(p.cf) +
             '&coin_to=' + encodeURIComponent(p.ct),
             (response) => {
-                if (response && response.coingecko && response.coingecko.rate_inferred) {
-                    this.inferred = parseFloat(response.coingecko.rate_inferred);
+                if (response && response.oracle && response.oracle.rate_inferred) {
+                    this.inferred = parseFloat(response.oracle.rate_inferred);
                     this.autofill();
                     this.render();
                 }
