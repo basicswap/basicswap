@@ -70,6 +70,7 @@ from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
 from basicswap.interface.nav.core import prepare_module as nav_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
+from basicswap.network.nostr.prepare import prepare_module as nostr_prepare
 from basicswap.network.simplex.prepare import prepare_module as simplex_prepare
 
 coin_prepare_modules = {
@@ -160,7 +161,7 @@ disabled_coins = [
     "navcoin",
 ]
 
-known_networks = ["smsg", "simplex"]
+known_networks = ["smsg", "simplex", "nostr"]
 disabled_networks = []
 
 
@@ -446,16 +447,22 @@ def importPubkey(gpg, pubkey_filename, pubkeyurls):
             logging.warning(f"Import from url failed: {e}")
 
 
-def addNetworkConfig(network_config_list: list, network_settings: dict) -> None:
+def addNetworkConfig(
+    network_config_list: list, network_settings: dict, network_defaults: dict = {}
+) -> None:
     # Merge into an existing entry, keeping settings prepare does not manage.
     network_type: str = network_settings["type"]
     for i, network in enumerate(network_config_list):
         if network.get("type", "unknown") == network_type:
             if network.get("enabled", True) is True:
                 logger.warning(f"Network {network_type} is already active.")
-            network_config_list[i] = {**network, **network_settings}
+            network_config_list[i] = {
+                **network_defaults,
+                **network,
+                **network_settings,
+            }
             return
-    network_config_list.append(dict(network_settings))
+    network_config_list.append({**network_defaults, **network_settings})
 
 
 def testTorConnection():
@@ -1785,18 +1792,22 @@ def main():
         if len(network_config_list) < 1:
             network_config_list = [{"type": "smsg", "enabled": True}]
 
+        network_defaults = {}
         if network_name == "simplex":
             network_settings = simplex_prepare.getConfigSegment(prepare_ctx)
             if not no_cores:
                 prepareRelease(
                     simplex_prepare, simplex_prepare.getBinDir(prepare_ctx), extra_opts
                 )
+        elif network_name == "nostr":
+            network_settings = nostr_prepare.getConfigSegment(prepare_ctx)
+            network_defaults = nostr_prepare.getConfigDefaults()
         elif network_name == "smsg":
             network_settings = {"type": "smsg", "enabled": True}
         else:
             raise ValueError(f"Unknown network {network_name}")
 
-        addNetworkConfig(network_config_list, network_settings)
+        addNetworkConfig(network_config_list, network_settings, network_defaults)
         settings["networks"] = network_config_list
         save_config(config_path, settings)
         logger.info(f"Done. Network {network_name} successfully added.")
@@ -1810,6 +1821,26 @@ def main():
         if len(network_config_list) < 1:
             network_config_list = [{"type": "smsg", "enabled": True}]
 
+        found_network: bool = False
+        num_enabled: int = 0
+        for network in network_config_list:
+            if network.get("enabled", True) is True:
+                num_enabled += 1
+        for network in network_config_list:
+            network_type: str = network.get("type", "unknown")
+            if network_type == network_name:
+                found_network = True
+                if network.get("enabled", True) is False:
+                    logger.warning(f"Network {network_type} is already disabled.")
+                elif num_enabled <= 1:
+                    exitWithError("Cannot disable the last enabled network.")
+                else:
+                    network["enabled"] = False
+        if found_network is False:
+            exitWithError(f"Network {network_name} not found in config.")
+
+        settings["networks"] = network_config_list
+        save_config(config_path, settings)
         logger.info(f"Done. Network {network_name} successfully disabled.")
         return 0
 

@@ -107,7 +107,7 @@ def processSimplexConnectRequest(self, net_i, req_data, offer, cursor) -> None:
         "Invalid characters in connection request",
     )
 
-    self.checkConnectRequestRateLimit()
+    self.checkConnectRequestRateLimit(int(MessageNetworks.SIMPLEX))
 
     cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
     response = net_i.wait_for_command_response(cmd_id)

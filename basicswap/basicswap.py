@@ -35,6 +35,7 @@ from .basicswap_util import (
     AutomationOverrideOptions,
     BidStates,
     canAcceptBidState,
+    ConnectionRequestTypes,
     DebugTypes,
     describeEventEntry,
     EventLogTypes,
@@ -178,6 +179,14 @@ from .explorers import (
     ExplorerInsight,
     ExplorerBitAps,
     ExplorerChainz,
+)
+from .network.nostr.nostr import newNostrRouteKey
+from .network.nostr.client import MAX_POW_TARGET_BITS
+from .network.nostr.prepare import prepare_module as nostr_prepare
+from .network.nostr.routes import (
+    prepareNostrMessageRoute,
+    processConnectRequestAck,
+    processNostrConnectRequest,
 )
 from .network.simplex.routes import (
     prepareSimplexMessageRoute,
@@ -474,6 +483,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.check_delayed_auto_accept_seconds = self.get_int_setting(
             "check_delayed_auto_accept_seconds", 60, 1, 20 * 60
         )
+        self.check_pending_routes_seconds = self.get_int_setting(
+            "check_pending_routes_seconds", 30, 1, 10 * 60
+        )
+        self._connect_req_retry_seconds = self.get_int_setting(
+            "connect_req_retry_seconds", 30, 5, 60 * 60
+        )
+        self._connect_req_max_retry_seconds = 10 * 60
+        self._connect_req_max_attempts = self.get_int_setting(
+            "connect_req_max_attempts", 6, 1, 20
+        )
         if "allowed_hosts" in self.settings:
             self.settings["allowed_hosts"] = normalize_allowed_hosts(
                 self.settings["allowed_hosts"]
@@ -488,6 +507,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._last_checked_watched = 0
         self._last_checked_split_messages = 0
         self._last_checked_delayed_auto_accept = 0
+        self._last_checked_pending_routes = 0
         self._last_checked_pending_sweeps = 0
         self._pending_sweeps = {}
         self._possibly_revoked_offers = collections.deque([], maxlen=1000)
@@ -5891,7 +5911,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             self.saveBidInSession(bid_id, bid, cursor)
 
-            self.log.info(f"Sent BID {self.log.id(bid_id)}")
+            if bid.state == BidStates.CONNECT_REQ_SENT:
+                self.log.info(
+                    f"BID {self.log.id(bid_id)} waiting for direct message route"
+                )
+            else:
+                self.log.info(f"Sent BID {self.log.id(bid_id)}")
             return bid_id
         finally:
             self.closeDB(cursor)
@@ -6499,7 +6524,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # )
         else:
             network_id: int = networkTypeToID(message_nets)
-        if network_id not in (MessageNetworks.SIMPLEX,):
+        if network_id not in (MessageNetworks.SIMPLEX, MessageNetworks.NOSTR):
             return None, False
         try:
             net_i = self.getActiveNetworkInterface(network_id)
@@ -6509,6 +6534,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 f"Not using route - network interface not found for {network_id}.",
             )
             return None, False
+
+        if network_id == MessageNetworks.NOSTR:
+            return prepareNostrMessageRoute(
+                self,
+                net_i,
+                req_data,
+                addr_from,
+                addr_to,
+                cursor,
+                valid_for_seconds,
+                message_nets,
+            )
 
         return prepareSimplexMessageRoute(
             self,
@@ -6709,7 +6746,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.saveBidInSession(xmr_swap.bid_id, bid, cursor, xmr_swap)
                 self.commitDB()
 
-                self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
+                if bid.state == BidStates.CONNECT_REQ_SENT:
+                    self.log.info(
+                        f"ADS_BID_LF {self.logIDB(xmr_swap.bid_id)} waiting for direct message route"
+                    )
+                else:
+                    self.log.info(f"Sent ADS_BID_LF {self.logIDB(xmr_swap.bid_id)}")
                 return xmr_swap.bid_id
 
             xmr_swap = XmrSwap()
@@ -6878,7 +6920,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             self.saveBidInSession(bid.bid_id, bid, cursor, xmr_swap)
-            self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
+            if bid.state == BidStates.CONNECT_REQ_SENT:
+                self.log.info(
+                    f"XMR_BID_FL {self.logIDB(xmr_swap.bid_id)} waiting for direct message route"
+                )
+            else:
+                self.log.info(f"Sent XMR_BID_FL {self.logIDB(xmr_swap.bid_id)}")
             return xmr_swap.bid_id
         finally:
             self.closeDB(cursor)
@@ -11799,11 +11846,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
         conn_id = msg["conn_id"]
         query_str = (
-            "SELECT record_id, network_id, route_data FROM direct_message_routes"
+            "SELECT record_id, network_id, route_data FROM direct_message_routes "
+            + "WHERE network_id = :network_id"
         )
         try:
             use_cursor = self.openDB(cursor)
-            rows = use_cursor.execute(query_str).fetchall()
+            rows = use_cursor.execute(
+                query_str, {"network_id": int(MessageNetworks.SIMPLEX)}
+            ).fetchall()
 
             for row in rows:
                 record_id, network_id, route_data = row
@@ -14095,7 +14145,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         max_dleag_proof_len: int = 48893  # coincurve.dleag.dleag_proof_len()
         network_type: str = msg.get("msg_net", "smsg")
-        if network_type == "simplex":
+        if network_type in ("simplex", "nostr"):
             max_data_size: int = 11000
             min_data_size: int = 9000
         else:
@@ -14478,10 +14528,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         req_data = json.loads(msg_data.request_data)
 
+        if msg_data.request_type == ConnectionRequestTypes.ACK:
+            processConnectRequestAck(self, msg, msg_data, req_data)
+            return
+
         offer_id = bytes.fromhex(req_data["offer_id"])
         bidder_addr = req_data["bsx_address"]
 
-        net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
+        network_id: int = int(msg_data.network_type)
+        ensure(
+            network_id in (MessageNetworks.SIMPLEX, MessageNetworks.NOSTR),
+            f"Unsupported connect request network: {network_id}",
+        )
+        net_i = self.getActiveNetworkInterface(network_id)
         try:
             cursor = self.openDB()
             offer = self.getOffer(offer_id, cursor)
@@ -14490,7 +14549,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(msg["from"] == bidder_addr, "Mismatched from address")
             ensure(msg["to"] == offer.addr_from, "Mismatched to address")
 
-            processSimplexConnectRequest(self, net_i, req_data, offer, cursor)
+            if network_id == MessageNetworks.NOSTR:
+                processNostrConnectRequest(self, net_i, msg, req_data, offer, cursor)
+            else:
+                processSimplexConnectRequest(self, net_i, req_data, offer, cursor)
         finally:
             self.closeDB(cursor)
 
@@ -14500,6 +14562,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid, offer = self.getBidAndOffer(bid_id, cursor)
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
+
+        if bid.state != BidStates.CONNECT_REQ_SENT:
+            self.log.debug(
+                f"Bid {self.log.id(bid_id)} is not waiting for a route, state {BidStates(bid.state).name}."
+            )
+            return
+        if bid.expire_at <= self.getTime():
+            self.log.info(f"Not sending expired bid {self.log.id(bid_id)}.")
+            return
 
         coin_from = Coins(offer.coin_from)
         coin_to = Coins(offer.coin_to)
@@ -14537,8 +14608,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             network_type: str = msg.get("msg_net", "smsg")
             if network_type == "smsg":
                 self.num_smsg_messages_received += 1
-            elif network_type == "simplex":
-                pass  # Counted earlier, split between group and direct
+            elif network_type in ("simplex", "nostr"):
+                pass  # Counted when parsed
             else:
                 self.log.warning(f"processMsg unknown network: {network_type}")
             msg_type: int = int(msg["hex"][:2], 16)
@@ -14903,6 +14974,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if now - self._last_checked_actions >= self.check_actions_seconds:
                 self.checkQueuedActions()
                 self._last_checked_actions = now
+
+            if (
+                now - self._last_checked_pending_routes
+                >= self.check_pending_routes_seconds
+            ):
+                self.checkPendingMessageRoutes()
+                self._last_checked_pending_routes = now
 
             if (
                 now - self._last_checked_split_messages
@@ -15275,6 +15353,188 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     settings_changed = True
 
             if settings_changed:
+                settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+                settings_path_new = settings_path + ".new"
+                shutil.copyfile(settings_path, settings_path + ".last")
+                with open(settings_path_new, "w") as fp:
+                    json.dump(settings_copy, fp, indent=4)
+                shutil.move(settings_path_new, settings_path)
+                self.settings = settings_copy
+        return settings_changed, suggest_reboot
+
+    def editNetworkSettings(self, network_type: str, data):
+        self.log.info(f"Updating network settings {network_type}.")
+        ensure(
+            network_type in ("smsg", "simplex", "nostr"),
+            f"Unknown network type {network_type}",
+        )
+        settings_changed = False
+        suggest_reboot = False
+        with self.mxDB:
+            settings_copy = copy.deepcopy(self.settings)
+            network_config_list = settings_copy.get("networks", [])
+            if len(network_config_list) < 1:
+                network_config_list = [{"type": "smsg", "enabled": True}]
+                settings_copy["networks"] = network_config_list
+
+            network = None
+            for n in network_config_list:
+                if n.get("type", "unknown") == network_type:
+                    network = n
+                    break
+            if network is None:
+                if data.get("add") is True:
+                    if network_type == "nostr":
+                        network = {
+                            **nostr_prepare.getConfigDefaults(),
+                            **nostr_prepare.getConfigSegment(None),
+                        }
+                    elif network_type == "smsg":
+                        network = {"type": "smsg", "enabled": True}
+                    else:
+                        raise ValueError(
+                            f"Network {network_type} cannot be added from the UI. "
+                            f"Use basicswap-prepare --addnetwork={network_type} first."
+                        )
+                    network_config_list.append(network)
+                    settings_changed = True
+                    suggest_reboot = True
+                elif network_type == "smsg":
+                    network = {"type": "smsg", "enabled": False}
+                    network_config_list.append(network)
+                else:
+                    raise ValueError(
+                        f"Network {network_type} is not configured. Use basicswap-prepare --addnetwork={network_type} first."
+                    )
+
+            if "enabled" in data:
+                new_value = data["enabled"]
+                ensure(isinstance(new_value, bool), "New enabled value not boolean")
+                if new_value is False:
+                    num_enabled: int = sum(
+                        1 for n in network_config_list if n.get("enabled", True)
+                    )
+                    if num_enabled <= 1 and network.get("enabled", True):
+                        raise ValueError("Cannot disable the last enabled network.")
+                if network.get("enabled", True) != new_value:
+                    network["enabled"] = new_value
+                    settings_changed = True
+                    suggest_reboot = True
+
+            if network_type == "nostr":
+                if "relays" in data:
+                    new_value = data["relays"]
+                    ensure(isinstance(new_value, list), "New relays value not a list")
+                    ensure(len(new_value) > 0, "At least one relay is required")
+                    for relay in new_value:
+                        ensure(
+                            isinstance(relay, str)
+                            and relay.startswith(("ws://", "wss://")),
+                            f"Invalid relay url: {relay}",
+                        )
+                    if network.get("relays", []) != new_value:
+                        network["relays"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "pow_target" in data:
+                    new_value = data["pow_target"]
+                    ensure(
+                        isinstance(new_value, int), "New pow_target value not integer"
+                    )
+                    ensure(
+                        0 <= new_value <= MAX_POW_TARGET_BITS,
+                        f"pow_target must be between 0 and {MAX_POW_TARGET_BITS}",
+                    )
+                    if network.get("pow_target", 0) != new_value:
+                        network["pow_target"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "min_incoming_pow" in data:
+                    new_value = data["min_incoming_pow"]
+                    ensure(
+                        isinstance(new_value, int),
+                        "New min_incoming_pow value not integer",
+                    )
+                    ensure(
+                        0 <= new_value <= MAX_POW_TARGET_BITS,
+                        f"min_incoming_pow must be between 0 and {MAX_POW_TARGET_BITS}",
+                    )
+                    if network.get("min_incoming_pow", 0) != new_value:
+                        network["min_incoming_pow"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if data.get("regenerate_key", False) is True:
+                    network["private_key"] = newNostrRouteKey()[0]
+                    settings_changed = True
+                    suggest_reboot = True
+
+            if network_type == "simplex":
+                if "server_address" in data:
+                    new_value = data["server_address"]
+                    ensure(
+                        isinstance(new_value, str) and new_value.startswith("smp://"),
+                        "Invalid server address",
+                    )
+                    if network.get("server_address", "") != new_value:
+                        network["server_address"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "ws_port" in data:
+                    new_value = data["ws_port"]
+                    ensure(isinstance(new_value, int), "New ws_port value not integer")
+                    ensure(1 <= new_value <= 65535, "Invalid ws_port")
+                    if network.get("ws_port", 0) != new_value:
+                        network["ws_port"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+                if "group_link" in data:
+                    new_value = data["group_link"]
+                    ensure(isinstance(new_value, str), "Invalid group link")
+                    ensure(new_value.strip() != "", "Group link must not be empty")
+                    if network.get("group_link", "") != new_value:
+                        network["group_link"] = new_value
+                        settings_changed = True
+                        suggest_reboot = True
+
+            if settings_changed:
+                settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
+                settings_path_new = settings_path + ".new"
+                shutil.copyfile(settings_path, settings_path + ".last")
+                with open(settings_path_new, "w") as fp:
+                    json.dump(settings_copy, fp, indent=4)
+                shutil.move(settings_path_new, settings_path)
+                self.settings = settings_copy
+        return settings_changed, suggest_reboot
+
+    def editBridgeNetworksSetting(self, enabled: bool):
+        ensure(isinstance(enabled, bool), "New bridge_networks value not boolean")
+        self.log.info(f"Setting bridge_networks: {enabled}.")
+        settings_changed = False
+        suggest_reboot = False
+        with self.mxDB:
+            settings_copy = copy.deepcopy(self.settings)
+            if settings_copy.get("bridge_networks", False) != enabled:
+                if enabled:
+                    num_enabled: int = sum(
+                        1
+                        for n in settings_copy.get(
+                            "networks", [{"type": "smsg", "enabled": True}]
+                        )
+                        if n.get("enabled", True)
+                    )
+                    if num_enabled < 2:
+                        raise ValueError(
+                            "Bridging requires at least two enabled networks."
+                        )
+                settings_copy["bridge_networks"] = enabled
+                settings_changed = True
+                suggest_reboot = True
+
                 settings_path = os.path.join(self.data_dir, cfg.CONFIG_FILENAME)
                 settings_path_new = settings_path + ".new"
                 shutil.copyfile(settings_path, settings_path + ".last")

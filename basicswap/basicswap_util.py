@@ -45,6 +45,7 @@ class KeyTypes(IntEnum):
 class MessageNetworks(IntEnum):
     SMSG = auto()
     SIMPLEX = auto()
+    NOSTR = auto()
 
 
 class MessageNetworkLinkTypes(IntEnum):
@@ -285,6 +286,7 @@ class NotificationTypes(IntEnum):
 
 class ConnectionRequestTypes(IntEnum):
     BID = 1
+    ACK = 2
 
 
 class AutomationOverrideOptions(IntEnum):

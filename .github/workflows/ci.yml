@@ -169,6 +169,7 @@ jobs:
       run: |
         pytest tests/basicswap/test_other.py
         pytest tests/basicswap/test_prepare_simplex.py
+        pytest tests/basicswap/test_nostr.py
 
   prepare-cores:
     needs: lint
@@ -216,6 +217,7 @@ jobs:
               pytest tests/basicswap/test_other.py
               pytest tests/basicswap/test_amm_config_api.py
               pytest tests/basicswap/test_prepare_simplex.py
+              pytest tests/basicswap/test_nostr.py
           - name: test_prepare
             command: |
               export PYTHONPATH=$(pwd)

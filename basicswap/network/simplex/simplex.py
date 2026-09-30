@@ -28,7 +28,6 @@ from basicswap.util.address import (
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes, MessageNetworks
-from basicswap.db import Concepts
 
 
 def encode_base64(data: bytes) -> str:
@@ -231,10 +230,12 @@ def encryptMsg(
     timestamp=None,
     deterministic=False,
     difficulty_target=0x1EFFFFFF,
+    pubkey_to: bytes = None,
 ) -> bytes:
     self.log.debug("encryptMsg")
 
-    pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
+    if pubkey_to is None:
+        pubkey_to = self.getPubkeyForAddress(cursor, addr_to)
     privkey_from = self.getPrivkeyForAddress(cursor, addr_from)
 
     payload_format: int = 2
@@ -337,16 +338,26 @@ def decryptSimplexMsg(self, msg_data):
     except Exception as e:  # noqa: F841
         pass
 
-    # Try with all active bid/offer addresses
     query: str = """SELECT DISTINCT address FROM (
         SELECT b.bid_addr AS address FROM bids b
                JOIN bidstates s ON b.state = s.state_id
-               WHERE b.active_ind = 1
+               WHERE b.active_ind = 1 AND b.was_sent = 1
                      AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
         UNION
-        SELECT addr_from AS address FROM offers WHERE active_ind = 1 AND expire_at > :now
+        SELECT o.addr_from AS address FROM bids b
+               JOIN bidstates s ON b.state = s.state_id
+               JOIN offers o ON o.offer_id = b.offer_id
+               WHERE b.active_ind = 1 AND b.was_received = 1
+                     AND (s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))
         UNION
-        SELECT addr AS address FROM smsgaddresses WHERE active_ind = 1 AND use_type = :local_portal
+        SELECT addr_from AS address FROM offers
+               WHERE active_ind = 1 AND was_sent = 1 AND expire_at > :now
+        UNION
+        SELECT smsg_addr_local AS address FROM direct_message_routes
+               WHERE active_ind = 2
+        UNION
+        SELECT addr AS address FROM smsgaddresses
+               WHERE active_ind = 1 AND use_type IN (:local_portal, :recv_offer)
         )"""
 
     now: int = self.getTime()
@@ -354,7 +365,12 @@ def decryptSimplexMsg(self, msg_data):
     try:
         cursor = self.openDB()
         addr_rows = cursor.execute(
-            query, {"now": now, "local_portal": AddressTypes.PORTAL_LOCAL}
+            query,
+            {
+                "now": now,
+                "local_portal": AddressTypes.PORTAL_LOCAL,
+                "recv_offer": AddressTypes.RECV_OFFER,
+            },
         ).fetchall()
         decrypted = None
         for row in addr_rows:
@@ -432,9 +448,11 @@ def processSimplexContactConnected(self, event_data) -> None:
 
         query_str = (
             "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
-            + "WHERE active_ind = 2"
+            + "WHERE active_ind = 2 AND network_id = :network_id"
         )
-        rows = cursor.execute(query_str).fetchall()
+        rows = cursor.execute(
+            query_str, {"network_id": int(MessageNetworks.SIMPLEX)}
+        ).fetchall()
 
         found_direct_message_route = None
         for row in rows:
@@ -451,26 +469,7 @@ def processSimplexContactConnected(self, event_data) -> None:
                 break
 
         if found_direct_message_route:
-            query_str = (
-                "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
-                + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
-            )
-            rows = cursor.execute(
-                query_str, {"route_id": found_direct_message_route}
-            ).fetchall()
-            for row in rows:
-                record_id, linked_type, linked_id = row
-
-                if linked_type == Concepts.BID:
-                    self.routeEstablishedForBid(linked_id, cursor)
-                    query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
-                    cursor.execute(query, {"record_id": record_id})
-                elif linked_type == Concepts.OFFER:
-                    pass
-                else:
-                    self.log.warning(
-                        f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
-                    )
+            self.dispatchPendingRouteBids(found_direct_message_route, cursor)
         else:
             self.log.warning(
                 f"Unknown direct message route connected, connId: {connId}"
@@ -485,11 +484,16 @@ def processSimplexContactDisconnected(self, event_data) -> None:
     self.log.info(f"Direct message route disconnected, connId: {connId}")
     closeSimplexChat(self, net_i, connId)
 
-    query_str = "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes"
+    query_str = (
+        "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
+        + "WHERE network_id = :network_id"
+    )
     try:
         cursor = self.openDB()
 
-        rows = cursor.execute(query_str).fetchall()
+        rows = cursor.execute(
+            query_str, {"network_id": int(MessageNetworks.SIMPLEX)}
+        ).fetchall()
 
         for row in rows:
             record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = row
