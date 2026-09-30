@@ -35,7 +35,6 @@ from .basicswap_util import (
     AutomationOverrideOptions,
     BidStates,
     canAcceptBidState,
-    ConnectionRequestTypes,
     DebugTypes,
     describeEventEntry,
     EventLogTypes,
@@ -155,7 +154,6 @@ from .db import (
     Concepts,
     create_db,
     CURRENT_DB_VERSION,
-    DirectMessageRoute,
     DirectMessageRouteLink,
     EventLog,
     getOrderByStr,
@@ -181,11 +179,11 @@ from .explorers import (
     ExplorerBitAps,
     ExplorerChainz,
 )
-from .network.simplex import (
-    encryptMsg,
-    getJoinedSimplexLink,
-    getResponseData,
+from .network.simplex.routes import (
+    prepareSimplexMessageRoute,
+    processSimplexConnectRequest,
 )
+from .network.simplex.simplex import encryptMsg
 from .network.bsx_network import BSXNetwork, networkTypeToID
 from .network.util import getMsgPubkey
 import basicswap.config as cfg
@@ -627,10 +625,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._bid_expired_leeway = 5
 
         self.swaps_in_progress = dict()
-        self._connect_request_times = []
-        self._max_connect_requests_per_hour = self.settings.get(
-            "max_connect_requests_per_hour", 30
-        )
 
         self.threads = []
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(
@@ -6516,64 +6510,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return None, False
 
-        # Look for active route
-        message_route = self.getMessageRoute(1, addr_from, addr_to, cursor=cursor)
-        self.log.debug(f"Using active message route: {message_route}")
-        if message_route:
-            return message_route.record_id, True
-
-        # Look for route being established
-        message_route = self.getMessageRoute(2, addr_from, addr_to, cursor=cursor)
-        self.log.debug(f"Waiting for message route: {message_route}")
-        if message_route:
-            return message_route.record_id, False
-
-        cmd_id = net_i.send_command("/connect")
-        response = net_i.wait_for_command_response(cmd_id)
-        connReqInvitation = getJoinedSimplexLink(response)
-        pccConnId = getResponseData(response, "connection")["pccConnId"]
-        req_data["bsx_address"] = addr_from
-        req_data["connection_req"] = connReqInvitation
-
-        msg_buf = ConnectReqMessage()
-        msg_buf.network_type = MessageNetworks.SIMPLEX
-        msg_buf.network_data = b"bsx"
-        msg_buf.request_type = ConnectionRequestTypes.BID
-        msg_buf.request_data = json.dumps(req_data).encode("UTF-8")
-
-        bid_bytes = msg_buf.to_bytes()
-        payload_hex = str.format("{:02x}", MessageTypes.CONNECT_REQ) + bid_bytes.hex()
-
-        msg_valid: int = max(self.SMSG_SECONDS_IN_HOUR, valid_for_seconds)
-        connect_req_msgid = self.sendMessage(
+        return prepareSimplexMessageRoute(
+            self,
+            net_i,
+            req_data,
             addr_from,
             addr_to,
-            payload_hex,
-            msg_valid,
             cursor,
-            message_nets=message_nets,
+            valid_for_seconds,
+            message_nets,
         )
-
-        now: int = self.getTime()
-        message_route = DirectMessageRoute(
-            active_ind=2,
-            network_id=network_id,
-            linked_type=Concepts.OFFER,
-            smsg_addr_local=addr_from,
-            smsg_addr_remote=addr_to,
-            route_data=json.dumps(
-                {
-                    "connection_req": connReqInvitation,
-                    "connect_req_msgid": connect_req_msgid.hex(),
-                    "pccConnId": pccConnId,
-                }
-            ).encode("UTF-8"),
-            created_at=now,
-        )
-        message_route_id = self.add(message_route, cursor)
-
-        self.log.info(f"Sent CONNECT_REQ {self.logIDB(connect_req_msgid)}")
-        return message_route_id, False
 
     def postXmrBid(
         self, offer_id: bytes, amount: int, addr_send_from: str = None, extra_options={}
@@ -10893,77 +10839,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if chain_blocks > 0:
             c["last_height_checked"] = chain_blocks
 
-    def expireMessageRoutes(self) -> None:
-        if self._is_locked is True:
-            self.log.debug("Not expiring message routes while system is locked")
-            return
-
-        num_removed: int = 0
-        now: int = self.getTime()
-        cursor = self.openDB()
-        try:
-            query_str = (
-                "SELECT record_id, network_id, created_at, active_ind, route_data FROM direct_message_routes "
-                + "WHERE 1 = 1 "
-            )
-            rows = cursor.execute(query_str).fetchall()
-            for row in rows:
-                record_id, network_id, created_at, active_ind, route_data = row
-
-                route_data = json.loads(route_data.decode("UTF-8"))
-
-                if now - created_at < self._expire_message_routes_after:
-                    continue
-
-                # unestablished routes
-                if active_ind == 2:
-                    pass
-                else:
-                    query_str = (
-                        "SELECT MAX(created_at) FROM direct_message_route_links "
-                        + "WHERE direct_message_route_id = :message_route_id "
-                    )
-                    max_link_created_at = cursor.execute(
-                        query_str, {"message_route_id": record_id}
-                    ).fetchone()[0]
-
-                    if now - max_link_created_at < self._expire_message_routes_after:
-                        continue
-
-                    query_str = (
-                        "SELECT COUNT(*) FROM direct_message_route_links rl "
-                        + "INNER JOIN bids b ON b.bid_id = rl.linked_id "
-                        + "INNER JOIN bidstates s ON s.state_id = b.state "
-                        + "WHERE rl.direct_message_route_id = :message_route_id AND rl.linked_type = :link_type_bid "
-                        + "AND (b.in_progress OR s.in_progress OR (s.swap_ended = 0 AND b.expire_at > :now))"
-                    )
-                    num_active_bids = cursor.execute(
-                        query_str,
-                        {
-                            "message_route_id": record_id,
-                            "link_type_bid": Concepts.BID,
-                            "now": now,
-                        },
-                    ).fetchone()[0]
-                    if num_active_bids > 0:
-                        self.log.warning(
-                            f"Not expiring message route {record_id} with {num_active_bids} active bids."
-                        )
-                        continue
-
-                self.closeMessageRoute(record_id, network_id, route_data, cursor)
-                num_removed += 1
-        finally:
-            self.closeDB(cursor)
-
-        if num_removed > 0:
-            self.log.info(
-                "Expired {} message route{}.".format(
-                    num_removed,
-                    "s" if num_removed != 1 else "",
-                )
-            )
-
     def expireMessages(self) -> None:
         if self._is_locked is True:
             self.log.debug("Not expiring messages while system is locked")
@@ -12936,6 +12811,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+        except TemporaryError:
+            # Nothing is persisted before the send, leave the queued action to retry
+            raise
         except Exception as e:  # noqa: F841
             if self.debug:
                 self.log.error(traceback.format_exc())
@@ -14612,129 +14490,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(msg["from"] == bidder_addr, "Mismatched from address")
             ensure(msg["to"] == offer.addr_from, "Mismatched to address")
 
-            self.log.debug(
-                f"Opening direct message route from {offer.addr_from} to {bidder_addr}"
-            )
-            message_route = self.getMessageRoute(
-                2, bidder_addr, offer.addr_from, cursor=cursor
-            )
-            if message_route:
-                raise ValueError("Direct message route already exists")
-
-            connReqInvitation = req_data["connection_req"]
-            ensure(
-                isinstance(connReqInvitation, str), "Invalid connection request type"
-            )
-            ensure(
-                0 < len(connReqInvitation) <= 4096, "Invalid connection request length"
-            )
-            ensure(
-                all(33 <= ord(c) <= 126 for c in connReqInvitation),
-                "Invalid characters in connection request",
-            )
-
-            now_rl: int = self.getTime()
-            self._connect_request_times = [
-                t for t in self._connect_request_times if now_rl - t < 3600
-            ]
-            ensure(
-                len(self._connect_request_times) < self._max_connect_requests_per_hour,
-                "Connection request rate limit exceeded",
-            )
-            self._connect_request_times.append(now_rl)
-
-            cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
-            response = net_i.wait_for_command_response(cmd_id)
-            pccConnId = getResponseData(response, "connection")["pccConnId"]
-
-            now: int = self.getTime()
-            message_route = DirectMessageRoute(
-                active_ind=2,
-                network_id=2,
-                linked_type=Concepts.OFFER,
-                smsg_addr_local=offer.addr_from,
-                smsg_addr_remote=bidder_addr,
-                route_data=json.dumps(
-                    {"connection_req": connReqInvitation, "pccConnId": pccConnId}
-                ).encode("UTF-8"),
-                created_at=now,
-            )
-            message_route_id = self.add(message_route, cursor)
-
-            message_route_link = DirectMessageRouteLink(
-                active_ind=1,
-                direct_message_route_id=message_route_id,
-                linked_type=Concepts.OFFER,
-                linked_id=offer_id,
-                created_at=now,
-            )
-            self.add(message_route_link, cursor)
-
-        finally:
-            self.closeDB(cursor)
-
-    def processContactConnected(self, event_data) -> None:
-        contact_data = getResponseData(event_data, "contact")
-        connId = contact_data["activeConn"]["connId"]
-        localDisplayName = contact_data["localDisplayName"]
-        self.log.debug(
-            f"Processing Contact Connected event, ID: {connId}, contact name: {localDisplayName}."
-        )
-
-        try:
-            cursor = self.openDB()
-
-            query_str = (
-                "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
-                + "WHERE active_ind = 2"
-            )
-            rows = cursor.execute(query_str).fetchall()
-
-            found_direct_message_route = None
-            for row in rows:
-                record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data = (
-                    row
-                )
-                route_data = json.loads(route_data.decode("UTF-8"))
-
-                if connId == route_data["pccConnId"]:
-                    self.log.debug(
-                        f"Direct message route established local: {smsg_addr_local}, remote: {smsg_addr_remote}."
-                    )
-                    # route_data["localDisplayName"] = localDisplayName
-
-                    cursor.execute(query_str)
-                    # query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
-                    query = "UPDATE direct_message_routes SET active_ind = 1 WHERE record_id = :record_id "
-                    cursor.execute(query, {"record_id": record_id})
-                    found_direct_message_route = record_id
-                    break
-
-            if found_direct_message_route:
-                query_str = (
-                    "SELECT record_id, linked_type, linked_id FROM direct_message_route_links "
-                    + "WHERE active_ind = 1 AND direct_message_route_id = :route_id"
-                )
-                rows = cursor.execute(
-                    query_str, {"route_id": found_direct_message_route}
-                ).fetchall()
-                for row in rows:
-                    record_id, linked_type, linked_id = row
-
-                    if linked_type == Concepts.BID:
-                        self.routeEstablishedForBid(linked_id, cursor)
-                        query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
-                        cursor.execute(query, {"record_id": record_id})
-                    elif linked_type == Concepts.OFFER:
-                        pass
-                    else:
-                        self.log.warning(
-                            f"Unknown direct_message_route_link type: {linked_type}, {self.log.id(linked_id)}."
-                        )
-            else:
-                self.log.warning(
-                    f"Unknown direct message route connected, connId: {connId}"
-                )
+            processSimplexConnectRequest(self, net_i, req_data, offer, cursor)
         finally:
             self.closeDB(cursor)
 

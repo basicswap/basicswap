@@ -20,7 +20,7 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import chainparams, Coins, isKnownCoinName
-from basicswap.network.simplex_chat import startSimplexClient
+from basicswap.network.simplex.client import startSimplexNetworkClient
 from basicswap.ui.util import getCoinName
 from basicswap.util.daemon import Daemon
 
@@ -408,26 +408,9 @@ def runClient(
                     continue
                 network_type: str = network.get("type", "unknown")
                 if network_type == "simplex":
-                    simplex_dir = os.path.join(data_dir, "simplex")
-                    log_level = "debug" if swap_client.debug else "info"
-                    socks_proxy = None
-                    if "socks_proxy_override" in network:
-                        socks_proxy = network["socks_proxy_override"]
-                    elif swap_client.use_tor_proxy:
-                        socks_proxy = (
-                            f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"
-                        )
-
                     daemons.append(
-                        startSimplexClient(
-                            network["client_path"],
-                            simplex_dir,
-                            network["server_address"],
-                            network["ws_port"],
-                            logger,
-                            swap_client.delay_event,
-                            socks_proxy=socks_proxy,
-                            log_level=log_level,
+                        startSimplexNetworkClient(
+                            swap_client, network, data_dir, logger
                         )
                     )
                     pid = daemons[-1].handle.pid

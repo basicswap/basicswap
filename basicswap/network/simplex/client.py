@@ -156,3 +156,22 @@ def startSimplexClient(
         opened_files,
         "simplex-chat",
     )
+
+
+def startSimplexNetworkClient(swap_client, network, data_dir: str, logger):
+    simplex_dir = os.path.join(data_dir, "simplex")
+    log_level = "debug" if swap_client.debug else "info"
+    socks_proxy = None
+    if swap_client.use_tor_proxy:
+        socks_proxy = f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"
+
+    return startSimplexClient(
+        network["client_path"],
+        simplex_dir,
+        network["server_address"],
+        network["ws_port"],
+        logger,
+        swap_client.delay_event,
+        socks_proxy=socks_proxy,
+        log_level=log_level,
+    )

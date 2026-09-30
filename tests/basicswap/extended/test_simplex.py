@@ -47,7 +47,7 @@ from basicswap.basicswap import (
 )
 from basicswap.chainparams import Coins
 
-from basicswap.network.simplex import (
+from basicswap.network.simplex.simplex import (
     getJoinedSimplexLink,
     getNewSimplexLink,
     getResponseData,
@@ -55,7 +55,7 @@ from basicswap.network.simplex import (
     waitForResponse,
     WebSocketThread,
 )
-from basicswap.network.simplex_chat import startSimplexClient
+from basicswap.network.simplex.client import startSimplexClient
 from tests.basicswap.util.common import (
     stopDaemons,
     wait_for_bid,
@@ -391,7 +391,16 @@ class TestSimplex(unittest.TestCase):
             with open(os.path.join(client2_dir, "chats_after_delete.txt"), "w") as fp:
                 fp.write(json.dumps(response, indent=4))
 
-            assert len(getResponseData(response, "chats")) == 4
+            # simplex-chat v7 removes deleted contacts from the chat list
+            chat_names = []
+            for chat in getResponseData(response, "chats"):
+                chat_info = chat["chatInfo"]
+                if chat_info["type"] == "group":
+                    chat_names.append("#" + chat_info["groupInfo"]["localDisplayName"])
+                elif chat_info["type"] == "direct":
+                    chat_names.append("@" + chat_info["contact"]["localDisplayName"])
+            assert "#bsx" in chat_names
+            assert "@user_1" not in chat_names
 
         finally:
             for t in threads:
