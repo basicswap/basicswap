@@ -102,6 +102,15 @@ const CoinManager = (function() {
             icon: 'Namecoin.png'
         },
         {
+            symbol: 'VMESH',
+            name: 'vargamesh',
+            displayName: 'VargaMesh',
+            aliases: ['vmesh', 'vargamesh', 'varga mesh'],
+            priceKey: 'vargamesh',
+            historicalDays: 30,
+            icon: 'VargaMesh.png'
+        },
+        {
             symbol: 'WOW',
             name: 'wownero',
             displayName: 'Wownero',
