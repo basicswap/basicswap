@@ -42,7 +42,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
-    VMESH = 19
+    VMESH = 22
 
 
 class Fiat(IntEnum):
