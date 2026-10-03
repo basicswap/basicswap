@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 39
+CURRENT_DB_VERSION = 40
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -460,6 +460,8 @@ class XmrSwap(Table):
     kbsf_dleag = Column("blob")
     # The received message whose proof the split messages complete
     split_parent_msg_id = Column("blob")
+    # Set once the accept is built and saved: a retry re-sends it, never rebuilds
+    accept_prepared_at = Column("integer")
 
     vkbv = Column("blob")  # chain b view private key
     pkbv = Column("blob")  # chain b view public key
