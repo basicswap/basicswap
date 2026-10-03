@@ -1,3 +1,72 @@
+0.19.0
+==============
+
+**Smart Buy (beta)**
+- New Smart Buy page.  Enter an amount to pay or to receive, and BasicSwap finds the
+  cheapest way to fill it from the open offers, split over at most the number of bids you
+  choose.
+- Cap the price against the market rate or the best offer, set how long each bid may wait,
+  or pick the offers yourself.
+- The bids page groups a Smart Buy's bids together, and the History tab lists past Smart
+  Buys.
+- Each bid funds its lock from its own coins, so bids placed together don't compete for the
+  same wallet outputs.
+- Bids placed together send their coin B locks in one transaction, and secret-hash bids
+  that share a secret settle in one transaction.  A bid waits a bounded time for the rest
+  of its group, then goes without the stragglers.
+- API: `POST /json/bids/plan` finds a fill without placing anything, and
+  `POST /json/bids/bulk` places its bids.  Bid listings include `plan_id` and
+  `plan_target`.
+
+**Networks**
+- Nostr can carry offers and swap messages, alongside or instead of SMSG and SimpleX.  Add
+  it under Settings, Networks, or with `basicswap-prepare --addnetwork=nostr`
+  (`NOSTR_RELAYS` and `NOSTR_POW_TARGET` override the defaults).  Each swap signs with its
+  own key pair, relays are reached through Tor when Tor is enabled, and plaintext `ws://`
+  relays used without a proxy are logged as a warning.  See [doc/nostr.md](nostr.md).
+- More than one message network can be enabled at once.  `basicswap-prepare --addnetwork`
+  no longer disables the others, and `--disablenetwork` won't disable the last one.
+- Settings has a Networks tab: enable or disable each network, and set the Nostr relays and
+  PoW target, the SimpleX server, port and group link, and network bridging.
+- SimpleX moves to SimpleX Chat v7.  The group link defaults to the official BasicSwap
+  group, and changing it switches groups at the next restart.  Sends retry while
+  simplex-chat is unreachable instead of failing the bid.  See
+  [doc/simplex.md](simplex.md).
+- `/json/networks` lists the message networks and whether each is enabled and active.
+
+**Fixes**
+- Monero and Wownero redeem fees are estimated at the rate the wallet will pay, and reverse
+  offers use the right fee rate.  This corrects the redeem fee on the offers page and the
+  costs Smart Buy compares.
+- An offerer that retries an adaptor-sig accept re-sends the accept it built the first time
+  instead of building a new one, for reverse bids too.  A rebuilt accept carried a new lock
+  transaction and proof, so the bidder and offerer could end up on different accepts and
+  the swap failed.
+- The split messages that carry a Monero-family swap's proofs now name the message they
+  complete, so the parts of two accepts for one bid can't be mixed.
+- A bidder still receiving an accept takes a later one for the same bid, instead of
+  refusing it.  From offerers on earlier versions, whose parts don't name their message,
+  it only switches to an accept sent a second or more later.
+- `basicswap-prepare` reads `SIMPLEX_SERVER_ADDRESS` from the `SIMPLEX_CHAT_VERSION`
+  environment variable.
+
+**Daemon updates**
+- Firo  v0.14.18.0 -> v0.14.18.1
+- SimpleX Chat  v6.3.5 -> v7.0.0
+
+**GUI**
+- GUI bumped to v4.1.0.
+
+**Upgrade notes**
+- The database is upgraded to version 40 on the first start.
+- SimpleX Chat 7.0.0's signed release manifest lists only the Ubuntu x86_64 build, so
+  prepare can't verify the download on other platforms.  Place a binary at
+  `bin/simplex/simplex-chat` and add the network with `--nocores`, see
+  [doc/simplex.md](simplex.md).
+- Nodes already running SimpleX record their configured group link as joined at the first
+  start, so change the group link only after that restart.
+
+
 0.18.10
 ==============
 
