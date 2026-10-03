@@ -12793,6 +12793,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             BidStates.BID_SENT,
             BidStates.BID_RECEIVED,
             BidStates.BID_REQUEST_ACCEPTED,
+            BidStates.BID_RECEIVING_ACC,
         ]
         if bid.was_sent and offer.was_sent:
             allowed_states.append(
@@ -12802,6 +12803,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.state in allowed_states,
             f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
+
+        if bid.state == BidStates.BID_RECEIVING_ACC:
+            current_id: bytes = xmr_swap.split_parent_msg_id
+            current_sent: int = int.from_bytes(current_id[:8], byteorder="big")
+            if current_id == bytes.fromhex(msg["msgid"]):
+                self.log.info(
+                    f"Ignoring a repeat adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}."
+                )
+                return
+            if msg["sent"] < current_sent:
+                self.log.info(
+                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent before the one being received."
+                )
+                return
+            self.log.info(
+                f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
+            )
 
         try:
             pkal: bytes = msg_data.pkal
