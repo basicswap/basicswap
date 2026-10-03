@@ -12804,8 +12804,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
 
+        replace_unlinked: bool = False
         if bid.state == BidStates.BID_RECEIVING_ACC:
             current_id: bytes = xmr_swap.split_parent_msg_id
+            if current_id is None:
+                self.log.info(
+                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}, the one being received was stored without its message id."
+                )
+                return
             current_sent: int = int.from_bytes(current_id[:8], byteorder="big")
             if current_id == bytes.fromhex(msg["msgid"]):
                 self.log.info(
@@ -12817,6 +12823,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent before the one being received."
                 )
                 return
+            linked: bool = (
+                min(offer.protocol_version, bid.protocol_version)
+                >= PROTOCOL_VERSION_SPLIT_PARENT
+            )
+            # Unlinked parts are told apart by send time alone
+            if not linked and msg["sent"] == current_sent:
+                self.log.info(
+                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent in the same second as the one being received."
+                )
+                return
+            replace_unlinked = not linked
             self.log.info(
                 f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
             )
@@ -12985,7 +13002,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.al_lock_refund_tx_sig = al_lock_refund_tx_sig
 
             bid.setState(BidStates.BID_RECEIVING_ACC)
-            self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap)
+            cursor = self.openDB()
+            try:
+                if replace_unlinked:
+                    cursor.execute(
+                        "DELETE FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND addr_from = :addr_from AND parent_msg_id IS NULL AND created_at < :sent",
+                        {
+                            "bid_id": bid.bid_id,
+                            "msg_type": int(XmrSplitMsgTypes.BID_ACCEPT),
+                            "addr_from": addr_from,
+                            "sent": msg["sent"],
+                        },
+                    )
+                self.saveBid(bid.bid_id, bid, xmr_swap=xmr_swap, cursor=cursor)
+            finally:
+                self.closeDB(cursor)
 
             if ci_to.curve_type() != Curves.ed25519:
                 try:
@@ -14607,22 +14638,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ):
             cursor = self.openDB()
             try:
+                chunk_key = {
+                    "bid_id": msg_data.msg_id,
+                    "msg_type": msg_data.msg_type,
+                    "msg_sequence": msg_data.sequence,
+                    "addr_from": msg["from"],
+                    "parent_msg_id": parent_msg_id,
+                }
                 q = cursor.execute(
-                    "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence AND addr_from = :addr_from AND parent_msg_id IS :parent_msg_id",
-                    {
-                        "bid_id": msg_data.msg_id,
-                        "msg_type": msg_data.msg_type,
-                        "msg_sequence": msg_data.sequence,
-                        "addr_from": msg["from"],
-                        "parent_msg_id": parent_msg_id,
-                    },
+                    "SELECT COUNT(*), MAX(created_at) FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence AND addr_from = :addr_from AND parent_msg_id IS :parent_msg_id",
+                    chunk_key,
                 ).fetchone()
                 num_exists = q[0]
                 if num_exists > 0:
-                    self.log.warning(
-                        f"Ignoring duplicate xmr_split_data entry: ({self.logIDM(msg_data.msg_id)}, {msg_data.msg_type}, {msg_data.sequence})."
+                    # Unlinked parts are stored at their send time, and a later one replaces
+                    if parent_msg_id is not None or q[1] >= msg["sent"]:
+                        self.log.warning(
+                            f"Ignoring duplicate xmr_split_data entry: ({self.logIDM(msg_data.msg_id)}, {msg_data.msg_type}, {msg_data.sequence})."
+                        )
+                        return
+                    cursor.execute(
+                        "DELETE FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND msg_sequence = :msg_sequence AND addr_from = :addr_from AND parent_msg_id IS NULL",
+                        chunk_key,
                     )
-                    return
 
                 dbr = XmrSplitData()
                 dbr.addr_from = msg["from"]
@@ -14632,7 +14670,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 dbr.msg_sequence = msg_data.sequence
                 dbr.dleag = msg_data.dleag
                 dbr.parent_msg_id = parent_msg_id
-                dbr.created_at = now
+                dbr.created_at = now if parent_msg_id else msg["sent"]
                 self.add(dbr, cursor, upsert=True)
             finally:
                 self.closeDB(cursor)
