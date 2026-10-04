@@ -887,7 +887,7 @@ def test_particl_encryption(data_dir, settings, chain, use_tor_proxy, extra_opts
                     extra_config=extra_config,
                 )
             )
-            swap_client.setDaemonPID(c, daemons[-1].handle.pid)
+            swap_client.setDaemon(c, daemons[-1])
         swap_client.setCoinRunParams(c)
         swap_client.createCoinInterface(c)
         swap_client.waitForDaemonRPC(c, with_wallet=True)
@@ -982,7 +982,7 @@ def initialise_wallets(
                             extra_config=extra_config,
                         )
                     )
-                swap_client.setDaemonPID(c, daemons[-1].handle.pid)
+                swap_client.setDaemon(c, daemons[-1])
             swap_client.setCoinRunParams(c)
             swap_client.createCoinInterface(c)
 

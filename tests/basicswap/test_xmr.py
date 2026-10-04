@@ -679,11 +679,11 @@ class BaseTest(unittest.TestCase):
                     log_name=f"BasicSwap{i}",
                 )
                 cls.swap_clients.append(sc)
-                sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
-                sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
+                sc.setDaemon(Coins.BTC, cls.btc_daemons[i])
+                sc.setDaemon(Coins.PART, cls.part_daemons[i])
 
                 if cls.start_ltc_nodes:
-                    sc.setDaemonPID(Coins.LTC, cls.ltc_daemons[i].handle.pid)
+                    sc.setDaemon(Coins.LTC, cls.ltc_daemons[i])
                 cls.addPIDInfo(sc, i)
 
                 sc.start()
