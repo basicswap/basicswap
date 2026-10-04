@@ -7494,7 +7494,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci_from = self.ci(coin_from)
             ci_to = self.ci(coin_to)
 
-            if xmr_swap.accept_prepared_at is not None:
+            if xmr_swap.intent_accept_prepared_at is not None:
                 self.log.info(
                     f"Resending the prepared accept for bid {self.log.id(bid_id)}"
                 )
@@ -7569,7 +7569,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
             ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
-            xmr_swap.accept_prepared_at = now
+            xmr_swap.intent_accept_prepared_at = now
             self.saveBidInSession(
                 bid_id, bid, use_cursor, xmr_swap=xmr_swap, notify=False
             )
