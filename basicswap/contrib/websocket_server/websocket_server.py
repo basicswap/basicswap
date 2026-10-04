@@ -285,7 +285,7 @@ class WebSocketHandler(StreamRequestHandler):
 
     def __init__(self, socket, addr, server):
         self.server = server
-        self.timeout = 1000  # Must set a timeout or rfile.read timesout in the tests
+        self.timeout = 240  # Must set a timeout or rfile.read timesout in the tests
         assert not hasattr(self, "_send_lock"), "_send_lock already exists"
         self._send_lock = threading.Lock()
         if server.key and server.cert:
@@ -342,6 +342,9 @@ class WebSocketHandler(StreamRequestHandler):
         try:
             b1, b2 = self.read_bytes(2)
         except TimeoutError:
+            # A makefile() reader that timed out refuses every later read
+            self.rfile = self.connection.makefile("rb", self.rbufsize)
+            self.send_text("", OPCODE_PING)
             return
         except SocketError as e:  # to be replaced with ConnectionResetError for py3
             if e.errno == errno.ECONNRESET:
