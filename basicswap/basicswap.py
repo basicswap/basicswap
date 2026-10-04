@@ -942,7 +942,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "use_segwit": chain_client_settings.get("use_segwit", default_segwit),
             "use_csv": chain_client_settings.get("use_csv", default_csv),
             "core_version_group": chain_client_settings.get("core_version_group", 0),
-            "pid": None,
+            "daemon": None,
             "core_version": None,
             "explorers": [],
             "chain_lookups": chain_client_settings.get("chain_lookups", "local"),
@@ -1331,6 +1331,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Reading {Coins(coin).name} rpc credentials from auth cookie {authcookiepath}",
             )
+            daemon = cc["daemon"]
+            daemon_pid = None if daemon is None else daemon.handle.pid
             # Wait for daemon to start
             # Test pids to ensure authcookie is read for the correct process
             datadir_pid = -1
@@ -1342,10 +1344,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     else:
                         with open(pidfilepath, "rb") as fp:
                             datadir_pid = int(fp.read().decode("UTF-8"))
-                        ensure(datadir_pid == cc["pid"], "Mismatched pid")
+                        ensure(datadir_pid == daemon_pid, "Mismatched pid")
                     ensure(os.path.exists(authcookiepath), "Missing auth cookie file")
                     break
                 except Exception as e:
+                    if daemon is not None and daemon.handle.poll() is not None:
+                        self.log.error(
+                            f"{daemon.name} exited during startup with code {daemon.handle.returncode}:\n{daemon.readOutput()}"
+                        )
+                        raise ValueError("Error, terminating")
                     if self.debug:
                         self.log.warning(f"Error, iteration {i}: {e}")
                     self.delay_event.wait(0.5)
@@ -1353,7 +1360,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if (
                     os.name != "nt" or cc["core_version_group"] > 17
                 ):  # Litecoin on windows doesn't write a pid file
-                    ensure(datadir_pid == cc["pid"], "Mismatched pid")
+                    ensure(datadir_pid == daemon_pid, "Mismatched pid")
                 with open(authcookiepath, "rb") as fp:
                     cc["rpcauth"] = escape_rpcauth(fp.read().decode("UTF-8"))
             except Exception as e:
@@ -1362,7 +1369,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     Coins(coin).name,
                     authcookiepath,
                     datadir_pid,
-                    cc["pid"],
+                    daemon_pid,
                     str(e),
                 )
                 raise ValueError("Error, terminating")

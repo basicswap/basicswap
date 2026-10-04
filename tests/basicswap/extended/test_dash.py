@@ -404,9 +404,9 @@ class Test(unittest.TestCase):
                 basicswap_dir, settings, "regtest", log_name="BasicSwap{}".format(i)
             )
             cls.swap_clients.append(sc)
-            sc.setDaemonPID(Coins.BTC, cls.daemons[0].handle.pid)
-            sc.setDaemonPID(Coins.DASH, cls.daemons[1].handle.pid)
-            sc.setDaemonPID(Coins.PART, cls.daemons[2 + i].handle.pid)
+            sc.setDaemon(Coins.BTC, cls.daemons[0])
+            sc.setDaemon(Coins.DASH, cls.daemons[1])
+            sc.setDaemon(Coins.PART, cls.daemons[2 + i])
 
             waitForRPC(dashRpc, delay_event, rpc_command="getblockchaininfo")
             if len(dashRpc("listwallets")) < 1:

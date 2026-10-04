@@ -165,7 +165,7 @@ class Test(BaseTest):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.PIVX, cls.pivx_daemons[i].handle.pid)
+        sc.setDaemon(Coins.PIVX, cls.pivx_daemons[i])
 
     @classmethod
     def prepareExtraCoins(cls):

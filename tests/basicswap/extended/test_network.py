@@ -324,8 +324,8 @@ class Test(unittest.TestCase):
                     log_name="BasicSwap{}".format(i),
                 )
                 cls.swap_clients.append(sc)
-                sc.setDaemonPID(Coins.BTC, cls.btc_daemons[i].handle.pid)
-                sc.setDaemonPID(Coins.PART, cls.part_daemons[i].handle.pid)
+                sc.setDaemon(Coins.BTC, cls.btc_daemons[i])
+                sc.setDaemon(Coins.PART, cls.part_daemons[i])
                 sc.start()
 
             cls.btc_addr = callnoderpc(

@@ -251,8 +251,8 @@ class TestSimplexGroupSwitch(BaseTest):
             "regtest",
             log_name=f"BasicSwap{node_id}",
         )
-        sc.setDaemonPID(Coins.BTC, cls.btc_daemons[node_id].handle.pid)
-        sc.setDaemonPID(Coins.PART, cls.part_daemons[node_id].handle.pid)
+        sc.setDaemon(Coins.BTC, cls.btc_daemons[node_id])
+        sc.setDaemon(Coins.PART, cls.part_daemons[node_id])
         try:
             sc.start()
         except Exception:

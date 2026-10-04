@@ -179,7 +179,7 @@ class Test(BaseTest):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.WOW, cls.wow_daemons[i].handle.pid)
+        sc.setDaemon(Coins.WOW, cls.wow_daemons[i])
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
