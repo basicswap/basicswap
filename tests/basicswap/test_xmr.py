@@ -446,6 +446,7 @@ class BaseTest(unittest.TestCase):
                     # Load mnemonics after all nodes have started to avoid staking getting stuck in TryToSync
                     rpc = make_rpc_func(i)
                     waitForRPC(rpc, test_delay_event)
+                    rpc("reservebalance", [True, 1000000])
                     if i == 0:
                         rpc(
                             "extkeyimportmaster",
@@ -474,7 +475,10 @@ class BaseTest(unittest.TestCase):
                             {"stakecombinethreshold": 100, "stakesplitthreshold": 200},
                         ],
                     )
-                    rpc("reservebalance", [False])
+                # Only node 0 stakes. Competing regtest stakes can spend outputs that
+                # exist on one branch only, the other nodes then mark that branch
+                # invalid and never reorg onto it.
+                callnoderpc(0, "reservebalance", [False])
 
             btc_wallet_bin = "bitcoin-wallet" + (".exe" if os.name == "nt" else "")
             for i in range(NUM_BTC_NODES):
@@ -1492,6 +1496,7 @@ class Test(BaseTest):
             bid_id,
             BidStates.SWAP_COMPLETED,
             sent=True,
+            wait_for=180,
         )
 
     def test_01b_part_xmr_competing_accept_chunks(self):
@@ -2372,9 +2377,6 @@ class Test(BaseTest):
         assert float(js_1["balance"]) > 200.0
         node1_anon_before = js_1["anon_balance"] + js_1["anon_pending"]
 
-        callnoderpc(
-            1, "reservebalance", [True, 1000000]
-        )  # Stop staking to avoid conflicts (input used by tx->anon staked before tx gets in the chain)
         post_json = {
             "value": 100,
             "address": js_1["stealth_address"],
@@ -2396,7 +2398,6 @@ class Test(BaseTest):
         js_1 = read_json_api(1801, "wallets/part")
         node1_anon_before = js_1["anon_balance"] + js_1["anon_pending"]
 
-        callnoderpc(1, "reservebalance", [False])
         post_json = {
             "value": 10,
             "address": js_0["stealth_address"],
