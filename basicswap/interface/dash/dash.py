@@ -119,8 +119,13 @@ class DASHInterface(BTCInterface):
 
         return None
 
-    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
-        super().unlockWallet(password, check_seed)
+    def unlockWallet(
+        self,
+        password: str,
+        check_seed: bool = True,
+        encrypt_if_unencrypted: bool = False,
+    ) -> None:
+        super().unlockWallet(password, check_seed, encrypt_if_unencrypted)
         if self._wallet_v20_compatible:
             # Store password for initialiseWallet
             self._wallet_passphrase = password
