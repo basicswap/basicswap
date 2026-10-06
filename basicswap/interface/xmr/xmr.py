@@ -949,10 +949,18 @@ class XMRInterface(CoinInterface):
         except Exception as e:  # noqa: F841
             self._wallet_password = orig_password
             raise
+        self._wallet_password = new_password
 
-    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
+    def unlockWallet(
+        self,
+        password: str,
+        check_seed: bool = True,
+        encrypt_if_unencrypted: bool = False,
+    ) -> None:
         self._log.info("unlockWallet - {}".format(self.ticker()))
         self._wallet_password = password
+        if encrypt_if_unencrypted:
+            self.encryptIfUnencrypted(password)
 
         if check_seed and not self._have_checked_seed:
             self._sc.checkWalletSeed(self.coin_type())
@@ -960,6 +968,23 @@ class XMRInterface(CoinInterface):
     def lockWallet(self) -> None:
         self._log.info("lockWallet - {}".format(self.ticker()))
         self._wallet_password = None
+
+    def encryptIfUnencrypted(self, password: str) -> None:
+        with self._mx_wallet:
+            self._cached_main_wallet_address = None
+            try:
+                self.openWallet(self._wallet_filename)
+                return
+            except Exception as e:
+                if "invalid password" not in str(e).lower():
+                    raise
+        # Left without a password by a password change that failed partway
+        self._log.warning(f"{self.coin_name()} wallet has no password, setting it.")
+        self._wallet_password = ""
+        try:
+            self.changeWalletPassword("", password)
+        finally:
+            self._wallet_password = password
 
     def isAddressMine(self, address: str) -> bool:
         try:

@@ -4954,7 +4954,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             "walletpassphrasechange", [old_password, new_password], timeout=120
         )
 
-    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
+    def unlockWallet(
+        self,
+        password: str,
+        check_seed: bool = True,
+        encrypt_if_unencrypted: bool = False,
+    ) -> None:
         if password == "":
             return
         self._log.info(f"unlockWallet - {self.ticker()}")
@@ -5028,10 +5033,19 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 self.setWalletSeedWarning(False)
                 check_seed = False
 
+        if encrypt_if_unencrypted:
+            self.encryptIfUnencrypted(password)
         if self.isWalletEncrypted():
             self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
         if check_seed:
             self._sc.checkWalletSeed(self.coin_type())
+
+    def encryptIfUnencrypted(self, password: str) -> None:
+        if self.isWalletEncrypted():
+            return
+        # Left unencrypted by a password change that failed partway
+        self._log.warning(f"{self.coin_name()} wallet is unencrypted, encrypting.")
+        self.changeWalletPassword("", password)
 
     def lockWallet(self):
         self._log.info(f"lockWallet - {self.ticker()}")

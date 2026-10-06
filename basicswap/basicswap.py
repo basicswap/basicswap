@@ -1959,7 +1959,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ] + [c for c in self.activeCoins() if c != Coins.PART]
         if Coins.LTC in coins_list:
             if self.coin_clients[Coins.LTC].get("connection_type") != "electrum":
-                coins_list.append(Coins.LTC_MWEB)
+                coins_list.insert(coins_list.index(Coins.LTC) + 1, Coins.LTC_MWEB)
         return coins_list
 
     def changeWalletPasswords(
@@ -1987,10 +1987,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             except Exception as e:  # noqa: F841
                 raise ValueError("Failed to unlock {}".format(ci.coin_name()))
 
+        changed = []
         for c in coins_list:
             if coin and c != coin:
                 continue
-            self.ci(c).changeWalletPassword(old_password, new_password)
+            try:
+                self.ci(c).changeWalletPassword(old_password, new_password)
+            except Exception as e:
+                self.log.error(f"Failed to change password for {getCoinName(c)}: {e}")
+                if old_password != "":
+                    self._revertWalletPasswords(changed, old_password, new_password)
+                raise
+            changed.append(c)
 
         # Update cached state
         if coin is None or coin == Coins.PART:
@@ -1998,17 +2006,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 Coins.PART
             ).isWalletEncryptedLocked()
 
+    def _revertWalletPasswords(
+        self, coins_list, old_password: str, new_password: str
+    ) -> None:
+        for c in reversed(coins_list):
+            try:
+                self.ci(c).changeWalletPassword(new_password, old_password)
+            except Exception as e:
+                self.log.error(
+                    f"Failed to revert password for {getCoinName(c)}, it uses the new password: {e}"
+                )
+
     def unlockWallets(self, password: str, coin=None) -> None:
         try:
             self._read_zmq_queue = False
+            # Set once Particl has verified the password
+            encrypt_if_unencrypted: bool = False
             for c in self.getListOfWalletCoins():
                 if coin and c != coin:
                     continue
                 try:
-                    self.ci(c).unlockWallet(password)
+                    self.ci(c).unlockWallet(
+                        password, encrypt_if_unencrypted=encrypt_if_unencrypted
+                    )
                 except Exception as e:  # noqa: F841
                     self.log.warning(f"Failed to unlock wallet {getCoinName(c)}")
                     raise
+                if c == Coins.PART:
+                    encrypt_if_unencrypted = self.ci(c).isWalletEncrypted()
 
             if coin is None or coin == Coins.PART:
                 self._is_locked = False
