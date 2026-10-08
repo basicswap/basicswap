@@ -9,7 +9,9 @@ from hashlib import sha1
 import logging
 from socket import SHUT_RDWR, error as SocketError
 import errno
+import socket
 import threading
+from collections import deque
 from socketserver import ThreadingMixIn, TCPServer, StreamRequestHandler
 
 from .thread import WebsocketServerThread
@@ -129,6 +131,7 @@ class WebsocketServer(ThreadingMixIn, TCPServer, API):
     allow_reuse_address = True
     daemon_threads = True  # comment to keep threads alive until finished
     max_pending_handshakes = MAX_PENDING_HANDSHAKES
+    send_queue_bytes = 0
 
     def __init__(self, origin_check, host='127.0.0.1', port=0, loglevel=logging.WARNING, key=None, cert=None):
         logger.setLevel(loglevel)
@@ -327,6 +330,66 @@ class WebSocketHandler(StreamRequestHandler):
         self.keep_alive = True
         self.handshake_done = False
         self.valid_client = False
+        self._send_queue = None
+        if self.server.send_queue_bytes > 0:
+            self._send_queue = deque()
+            self._send_queued = 0
+            self._send_closed = False
+            self._send_cond = threading.Condition()
+            self._writer = threading.Thread(target=self._drain_send_queue, daemon=True)
+            self._writer.start()
+
+    def _write(self, data):
+        if self._send_queue is None:
+            with self._send_lock:
+                self.request.sendall(data)
+            return
+        with self._send_cond:
+            if self._send_closed:
+                raise ConnectionError("Connection closed")
+            if self._send_queued + len(data) <= self.server.send_queue_bytes:
+                self._send_queue.append(data)
+                self._send_queued += len(data)
+                self._send_cond.notify()
+                return
+            self._send_closed = True
+            self._send_queue.clear()
+            self._send_cond.notify()
+        logger.warning(f"Send queue full for {self.client_address}, disconnecting")
+        self.keep_alive = False
+        try:
+            self.request.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        raise ConnectionError("Send queue full")
+
+    def _drain_send_queue(self):
+        while True:
+            with self._send_cond:
+                while not self._send_queue and not self._send_closed:
+                    self._send_cond.wait()
+                if not self._send_queue:
+                    return
+                data = self._send_queue.popleft()
+                self._send_queued -= len(data)
+            try:
+                with self._send_lock:
+                    self.request.sendall(data)
+            except OSError:
+                with self._send_cond:
+                    self._send_closed = True
+                    self._send_queue.clear()
+                self.keep_alive = False
+                return
+
+    def _stop_send_queue(self, flush_seconds=2):
+        if self._send_queue is None:
+            return
+        with self._send_cond:
+            self._send_closed = True
+            self._send_cond.notify()
+        if self._writer is not threading.current_thread():
+            self._writer.join(flush_seconds)
 
     def handle(self):
         while self.keep_alive:
@@ -432,8 +495,7 @@ class WebSocketHandler(StreamRequestHandler):
         # Send CLOSE with status & reason
         header.append(FIN | OPCODE_CLOSE_CONN)
         header.append(payload_length)
-        with self._send_lock:
-            self.request.send(header + payload)
+        self._write(header + payload)
 
     def send_bytes(self, message, opcode=OPCODE_BINARY):
         header  = bytearray()
@@ -461,8 +523,7 @@ class WebSocketHandler(StreamRequestHandler):
             raise Exception("Message is too big. Consider breaking it into chunks.")
             return
 
-        with self._send_lock:
-            self.request.send(header + payload)
+        self._write(header + payload)
 
     def send_text(self, message, opcode=OPCODE_TEXT):
         """
@@ -505,8 +566,7 @@ class WebSocketHandler(StreamRequestHandler):
             raise Exception("Message is too big. Consider breaking it into chunks.")
             return
 
-        with self._send_lock:
-            self.request.send(header + payload)
+        self._write(header + payload)
 
     def _read_handshake_line(self):
         self._handshake_lines += 1
@@ -606,6 +666,7 @@ class WebSocketHandler(StreamRequestHandler):
         return response_key.decode('ASCII')
 
     def finish(self):
+        self._stop_send_queue()
         self.server._client_left_(self)
 
 
