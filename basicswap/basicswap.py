@@ -7517,7 +7517,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.ensureWalletCanSend(
                 ci_to,
                 offer.swap_type,
-                offer.amount_from,
+                bid.amount_to,
                 estimated_fee,
                 for_offer=False,
             )
