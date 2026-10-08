@@ -6,7 +6,7 @@ ENV LANG=C.UTF-8 \
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates git python3-pip libpython3-dev python3-venv pkg-config gcc libc-dev cmake ninja-build
+        ca-certificates git python3-pip libpython3-dev python3-venv pkg-config gcc libc-dev cmake ninja-build unzip
 
 # Create python venv
 RUN python3 -m venv $VIRTUAL_ENV
@@ -14,12 +14,22 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 ARG BASICSWAP_REPO=https://github.com/basicswap/basicswap.git
 ARG BASICSWAP_COMMIT=277b46b0278f1cc76199f7e847988647a1b36e38
-RUN git init -q /basicswap && \
+ARG BASICSWAP_DIR=basicswap-master
+# The glob keeps COPY from failing when no local basicswap.zip is given
+COPY entrypoint.sh basicswap.zi[p] /tmp/src/
+RUN if [ -f /tmp/src/basicswap.zip ]; then \
+        cd /tmp/src && \
+        unzip -q basicswap.zip && \
+        mv "$BASICSWAP_DIR" /basicswap; \
+    else \
+        git init -q /basicswap && \
+        cd /basicswap && \
+        git fetch -q --depth 1 "$BASICSWAP_REPO" "$BASICSWAP_COMMIT" && \
+        git checkout -q --detach FETCH_HEAD && \
+        test "$(git rev-parse HEAD)" = "$BASICSWAP_COMMIT" && \
+        rm -rf .git; \
+    fi && \
     cd /basicswap && \
-    git fetch -q --depth 1 "$BASICSWAP_REPO" "$BASICSWAP_COMMIT" && \
-    git checkout -q --detach FETCH_HEAD && \
-    test "$(git rev-parse HEAD)" = "$BASICSWAP_COMMIT" && \
-    rm -rf .git && \
     pip3 install -r requirements.txt --require-hashes && \
     pip3 install .
 
