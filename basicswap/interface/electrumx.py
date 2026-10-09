@@ -576,6 +576,7 @@ def scripthash_from_address(address, network_params):
     from basicswap.util.address import decodeAddress
     from basicswap.contrib.test_framework.script import (
         CScript,
+        CScriptOp,
         OP_DUP,
         OP_HASH160,
         OP_EQUALVERIFY,
@@ -607,7 +608,7 @@ def scripthash_from_address(address, network_params):
         hrp = network_params.get("hrp", "bc")
         witver, witprog = bech32_decode(hrp, address)
         if witver is not None:
-            script = CScript([OP_0, bytes(witprog)])
+            script = CScript([CScriptOp.encode_op_n(witver), bytes(witprog)])
             return scripthash_from_script(bytes(script))
     raise ValueError(f"Unable to decode address: {address}")
 
