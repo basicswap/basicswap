@@ -600,7 +600,9 @@ def scripthash_from_address(address, network_params):
 
         return scripthash_from_script(bytes(script))
     except Exception:
-        from basicswap.contrib.test_framework.segwit_addr import decode as bech32_decode
+        from basicswap.contrib.test_framework.segwit_addr import (
+            decode_segwit_address as bech32_decode,
+        )
 
         hrp = network_params.get("hrp", "bc")
         witver, witprog = bech32_decode(hrp, address)
