@@ -916,17 +916,6 @@ class TestFunctions(BaseTest):
         ci_from = swap_clients[id_bidder].ci(coin_from)
         ci_to = swap_clients[id_bidder].ci(coin_to)
 
-        # A Particl maker stakes its bsx_wallet, so without reserving it can
-        # spend its own lock funds into an immature coinstake before accepting.
-        # Node 0 must keep staking to advance the chain, so only reserve the
-        # other makers.
-        if coin_from == Coins.PART:
-            for maker_id, _ in makers:
-                if maker_id != self.node_a_id:
-                    callnoderpc(
-                        maker_id, "reservebalance", [True, 1000000], "bsx_wallet"
-                    )
-
         # The bidder pays coin_to, so is the follower and publishes the coin B locks.
         self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1801)
         for maker_id, amount in makers:
@@ -1570,11 +1559,6 @@ class TestFunctions(BaseTest):
         ci_to = swap_clients[id_bidder].ci(coin_to)
         leg_amount: float = 1.0
 
-        # The maker stakes its bsx_wallet and would spend its own initiate funds
-        # into an immature coinstake before sending them.
-        if coin_from == Coins.PART:
-            callnoderpc(id_maker, "reservebalance", [True, 1000000], "bsx_wallet")
-
         self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
         self.prepare_balance(
             coin_from, num_legs * leg_amount + 10.0, 1800 + id_maker, 1800
@@ -1747,9 +1731,6 @@ class TestFunctions(BaseTest):
         ci_from = swap_clients[id_bidder].ci(coin_from)
         ci_to = swap_clients[id_bidder].ci(coin_to)
         leg_amount: float = 1.0
-
-        if coin_from == Coins.PART:
-            callnoderpc(id_maker, "reservebalance", [True, 1000000], "bsx_wallet")
 
         self.prepare_balance(coin_to, 100.0, 1800 + id_bidder, 1800)
         self.prepare_balance(coin_from, 2 * leg_amount + 10.0, 1800 + id_maker, 1800)
