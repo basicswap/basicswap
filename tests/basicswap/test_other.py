@@ -33,7 +33,7 @@ from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.db import create_db_, DBMethods, KnownIdentity
 from basicswap.util import h2b
 from basicswap.util.address import decodeAddress, toWIF
-from basicswap.util.crypto import ripemd160, hash160, blake256
+from basicswap.util.crypto import ripemd160, hash160, blake256, sha256
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.network import (
@@ -49,6 +49,7 @@ from basicswap.util_xmr import (
     encode_address as xmr_encode_address,
 )
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.electrumx import scripthash_from_address
 from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
 from tests.basicswap.util.mnemonics import mnemonics
@@ -73,8 +74,10 @@ from basicswap.rpc import Jsonrpc, escape_rpcauth
 from basicswap.messages_npb import (
     BidMessage,
 )
+from basicswap.contrib.test_framework import segwit_addr
 from basicswap.contrib.test_framework.script import (
     CScript,
+    CScriptOp,
     hash160 as hash160_btc,
     OP_CHECKMULTISIG,
     SegwitV0SignatureHash,
@@ -639,6 +642,33 @@ class Test(unittest.TestCase):
         pk = h2b("02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6")
         addr = ci.pubkey_to_address(pk)
         assert addr == "mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8"
+
+    def test_dest_for_address_keeps_the_witness_version(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        program = bytes(range(32))
+        for version in (0, 1):
+            address = segwit_addr.encode_segwit_address(hrp, version, program)
+            script = ci.getDestForAddress(address)
+            assert script == CScript([CScriptOp.encode_op_n(version), program])
+
+    def test_dest_for_address_accepts_uppercase(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        address = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        assert ci.getDestForAddress(address.upper()) == ci.getDestForAddress(address)
+
+    def test_scripthash_from_address_keeps_the_witness_version(self):
+        ci = self.ci_btc()
+        network_params = ci.chainparams_network()
+        program = bytes(range(32))
+        for version in (0, 1):
+            address = segwit_addr.encode_segwit_address(
+                network_params["hrp"], version, program
+            )
+            script = CScript([CScriptOp.encode_op_n(version), program])
+            expected = sha256(bytes(script))[::-1].hex()
+            assert scripthash_from_address(address, network_params) == expected
 
     def test_dleag(self):
         ci = self.ci_xmr()

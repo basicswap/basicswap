@@ -2837,7 +2837,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 from basicswap.util.crypto import hash160
                 from basicswap.contrib.test_framework.script import (
                     CScript,
-                    OP_0,
                     SIGHASH_ALL,
                     SegwitV0SignatureHash,
                 )
@@ -2885,20 +2884,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     )
                     tx.vin.append(CTxIn(outpoint, b"", 0xFFFFFFFF))
 
-                from basicswap.contrib import segwit_addr
-                from basicswap.chainparams import chainparams
-
-                coin_params = chainparams.get(coin_type, {})
-                network_params = coin_params.get(
-                    self.chain, coin_params.get("mainnet", {})
-                )
-                hrp = network_params.get("hrp", "bc")
-                witver, witprog = segwit_addr.decode(hrp, rpc_address)
-                if witver is None:
-                    self.log.error(f"Cannot decode address {rpc_address}")
-                    return None
-
-                output_script = CScript([OP_0, bytes(witprog)])
+                output_script = self.ci(coin_type).getDestForAddress(rpc_address)
                 tx.vout.append(CTxOut(send_amount, output_script))
 
                 from basicswap.contrib.test_framework.messages import (

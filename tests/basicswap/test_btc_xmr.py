@@ -33,7 +33,6 @@ from basicswap.multibid import (
 from basicswap.util import make_int
 from basicswap.util.address import (
     b58decode,
-    bech32Decode,
     decodeAddress,
 )
 from basicswap.util.extkey import ExtKeyPair
@@ -50,6 +49,7 @@ from tests.basicswap.util.common import (
     wait_for_none_active,
     BTC_BASE_RPC_PORT,
 )
+from basicswap.contrib.test_framework import segwit_addr
 from basicswap.contrib.test_framework.descriptors import descsum_create
 from basicswap.contrib.test_framework.messages import (
     from_hex,
@@ -3206,8 +3206,10 @@ class BasicSwapTest(TestFunctions):
             assert addr == self.expected_addresses["external"]
         else:
             addr_decoded = ci.decodeAddress(addr)
-            expected_decoded = bech32Decode(
-                "bcrt", self.expected_addresses["external"], for_segwit=True
+            expected_decoded = bytes(
+                segwit_addr.decode_segwit_address(
+                    "bcrt", self.expected_addresses["external"]
+                )[1]
             )
             assert addr_decoded == expected_decoded
 
@@ -3225,8 +3227,10 @@ class BasicSwapTest(TestFunctions):
             assert addr_change == self.expected_addresses["internal"]
         else:
             addr_decoded = ci.decodeAddress(addr_change)
-            expected_decoded = bech32Decode(
-                "bcrt", self.expected_addresses["internal"], for_segwit=True
+            expected_decoded = bytes(
+                segwit_addr.decode_segwit_address(
+                    "bcrt", self.expected_addresses["internal"]
+                )[1]
             )
             assert addr_decoded == expected_decoded
 

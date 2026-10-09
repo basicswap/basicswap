@@ -1305,15 +1305,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def decodeAddress(self, address: str) -> bytes:
         bech32_prefix = self.chainparams_network()["hrp"]
-        if len(bech32_prefix) > 0 and address.startswith(bech32_prefix + "1"):
-            return bytes(segwit_addr.decode(bech32_prefix, address)[1])
+        if len(bech32_prefix) > 0 and address.lower().startswith(bech32_prefix + "1"):
+            return bytes(segwit_addr.decode_segwit_address(bech32_prefix, address)[1])
         return decodeAddress(address)[1:]
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:
         bech32_prefix = self.chainparams_network()["hrp"]
         version = 0
         pkh = hash160(pk)
-        return segwit_addr.encode(bech32_prefix, version, pkh)
+        return segwit_addr.encode_segwit_address(bech32_prefix, version, pkh)
 
     def encode_secret_extkey(self, ek_data: bytes, prefix=None) -> str:
         ensure(len(ek_data) == 74, "Invalid extkey size")
@@ -1349,16 +1349,17 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         bech32_prefix = self.chainparams_network()["hrp"]
         version = 0
         program = script[2:]  # strip version and length
-        return segwit_addr.encode(bech32_prefix, version, program)
+        return segwit_addr.encode_segwit_address(bech32_prefix, version, program)
 
     def encodeScriptDest(self, script: bytes) -> str:
         return self.encode_p2wsh(script)
 
     def getDestForAddress(self, address: str) -> bytes:
         bech32_prefix: str | None = self.chainparams_network().get("hrp", None)
-        if bech32_prefix and address.startswith(bech32_prefix + "1"):
-            _, witprog = segwit_addr.decode(bech32_prefix, address)
-            return CScript([OP_0, bytes(witprog)])
+        if bech32_prefix and address.lower().startswith(bech32_prefix + "1"):
+            version, witprog = segwit_addr.decode_segwit_address(bech32_prefix, address)
+            ensure(witprog is not None, "Invalid segwit address")
+            return CScript([CScriptOp.encode_op_n(version), bytes(witprog)])
 
         addr_data = decodeAddress(address)
         prefix_byte = addr_data[0]
@@ -1411,10 +1412,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return toWIF(wif_prefix, key_bytes)
 
     def encodeSegwitAddress(self, key_hash: bytes) -> str:
-        return segwit_addr.encode(self.chainparams_network()["hrp"], 0, key_hash)
+        return segwit_addr.encode_segwit_address(
+            self.chainparams_network()["hrp"], 0, key_hash
+        )
 
     def decodeSegwitAddress(self, addr: str) -> bytes:
-        return bytes(segwit_addr.decode(self.chainparams_network()["hrp"], addr)[1])
+        return bytes(
+            segwit_addr.decode_segwit_address(self.chainparams_network()["hrp"], addr)[
+                1
+            ]
+        )
 
     def decodeKey(self, k: str) -> bytes:
         return decodeWif(k)
@@ -4212,7 +4219,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     and out.scriptPubKey[1] == 20
                 ):
                     pkh = bytes(out.scriptPubKey[2:22])
-                    addr = segwit_addr.encode(bech32_prefix, 0, pkh)
+                    addr = segwit_addr.encode_segwit_address(bech32_prefix, 0, pkh)
                     scriptPubKey["address"] = addr
                 elif (
                     len(out.scriptPubKey) == 34
@@ -4220,7 +4227,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     and out.scriptPubKey[1] == 32
                 ):
                     script_hash = bytes(out.scriptPubKey[2:34])
-                    addr = segwit_addr.encode(bech32_prefix, 0, script_hash)
+                    addr = segwit_addr.encode_segwit_address(
+                        bech32_prefix, 0, script_hash
+                    )
                     scriptPubKey["address"] = addr
             except Exception as e:
                 self._log.debug(
