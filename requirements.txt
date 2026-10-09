@@ -122,9 +122,9 @@ pysocks==1.7.1 \
     --hash=sha256:2725bd0a9925919b9b51739eea5f9e2bae91e83288108a9ad338b2e3a4435ee5 \
     --hash=sha256:3f8804571ebe159c380ac6de37643bb4685970655d3bba243530d6558b799aa0
     # via -r requirements.in
-python-gnupg==0.5.6 \
-    --hash=sha256:5743e96212d38923fc19083812dc127907e44dbd3bcf0db4d657e291d3c21eac \
-    --hash=sha256:b5050a55663d8ab9fcc8d97556d229af337a87a3ebebd7054cbd8b7e2043394a
+python-gnupg==0.5.7 \
+    --hash=sha256:73ea46219f992b361eb1ce54cb0968101670654454916a3ee5df8bb9bf0cc8cc \
+    --hash=sha256:dc7afba57a9bc50163c27c726c66cb2fc9692248597f5201f4f7d9eb6097dd1d
     # via -r requirements.in
 pyzmq==27.2.0 \
     --hash=sha256:00e73942ef12cecbc7951c4a9104bb8ffaed742abb13af2da6833d90dd368cef \
