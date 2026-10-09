@@ -959,7 +959,14 @@ class XMRInterface(CoinInterface):
 
     def lockWallet(self) -> None:
         self._log.info("lockWallet - {}".format(self.ticker()))
-        self._wallet_password = None
+        with self._mx_wallet:
+            self._wallet_password = None
+            self._cached_main_wallet_address = None
+            try:
+                self.rpc_wallet("close_wallet")
+            except Exception as e:
+                if "No wallet file" not in str(e):
+                    raise
 
     def isAddressMine(self, address: str) -> bool:
         try:
