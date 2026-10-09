@@ -652,6 +652,12 @@ class Test(unittest.TestCase):
             script = ci.getDestForAddress(address)
             assert script == CScript([CScriptOp.encode_op_n(version), program])
 
+    def test_dest_for_address_accepts_uppercase(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        address = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        assert ci.getDestForAddress(address.upper()) == ci.getDestForAddress(address)
+
     def test_scripthash_from_address_keeps_the_witness_version(self):
         ci = self.ci_btc()
         network_params = ci.chainparams_network()
