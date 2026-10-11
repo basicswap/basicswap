@@ -11140,13 +11140,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return self.checkForSpendsElectrum(coin_type, c)
 
         # TODO: Check for spends on watchonly txns where possible
+        ci = self.ci(coin_type)
         if self.coin_clients[coin_type].get("have_spent_index", False):
             # TODO: batch getspentinfo
             for o in c["watched_outputs"]:
                 found_spend = None
                 try:
-                    found_spend = self.callcoinrpc(
-                        Coins.PART,
+                    found_spend = ci.rpc(
                         "getspentinfo",
                         [{"txid": o.txid_hex, "index": o.vout}],
                     )
@@ -11164,15 +11164,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Found spend in spentindex {self.logIDT(o.txid_hex)} {o.vout} in {self.logIDT(spend_txid)} {spend_n}"
                     )
-                    spend_txn = self.callcoinrpc(
-                        Coins.PART, "getrawtransaction", [spend_txid, True]
-                    )
+                    spend_txn = ci.rpc("getrawtransaction", [spend_txid, True])
                     self.processSpentOutput(
                         coin_type, o, spend_txid, spend_n, spend_txn
                     )
+            for t in c["watched_transactions"]:
+                if t.block_hash is not None:
+                    continue
+                try:
+                    tx = ci.rpc("getrawtransaction", [t.txid_hex, True])
+                except Exception as ex:
+                    if "No such mempool or blockchain transaction" not in str(ex):
+                        self.log.warning(f"getrawtransaction {ex}")
+                    continue
+                block_hash = tx.get("blockhash", None)
+                if block_hash is None:
+                    continue
+                block_height: int = ci.getBlockHeader(block_hash)["height"]
+                self.processFoundTransaction(
+                    t, block_hash, block_height, ci.getChainHeight()
+                )
+            # watched_scripts are not searched here, so they are missed on a coin with a spent index
             return
 
-        ci = self.ci(coin_type)
         chain_blocks = ci.getChainHeight()
         last_height_checked: int = c["last_height_checked"]
         block_check_min_time: int = c["block_check_min_time"]
