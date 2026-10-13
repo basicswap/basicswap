@@ -13,3 +13,6 @@ class NMCInterface(BTCInterface):
     @staticmethod
     def coin_type():
         return Coins.NMC
+
+    def supportsTaproot(self) -> bool:
+        return False

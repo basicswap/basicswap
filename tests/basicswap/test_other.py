@@ -53,6 +53,13 @@ from basicswap.interface.nmc.nmc import NMCInterface
 from basicswap.interface.bch.bch import BCHInterface
 from basicswap.interface.bch.contrib.cashaddress import Address
 from basicswap.interface.bch.contrib.script import OP_HASH256
+from basicswap.interface.dash.dash import DASHInterface
+from basicswap.interface.doge.doge import DOGEInterface
+from basicswap.interface.firo.firo import FIROInterface
+from basicswap.interface.nav.nav import NAVInterface
+from basicswap.interface.part.part import PARTInterface
+from basicswap.interface.pivx.pivx import PIVXInterface
+from basicswap.protocols.xmr_swap_1 import XmrSwapInterface
 from basicswap.interface.electrumx import scripthash_from_address
 from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
@@ -774,18 +781,114 @@ class Test(unittest.TestCase):
             tx = ci.loadTx(published[-1])
             assert bytes(tx.vout[0].scriptPubKey) == bytes(expected)
 
-    def test_swap_dest_refuses_addresses_paid_as_another_type(self):
+    def test_swap_dest_is_a_key_hash_or_a_script_peers_accept(self):
+        settings = {"rpcport": 0, "rpcauth": "none"}
+        settings.update(REQUIRED_SETTINGS)
         ci = self.ci_btc()
-        hrp = ci.chainparams_network()["hrp"]
+        ci_part = PARTInterface(settings, "regtest")
+        ci_doge = DOGEInterface(settings, "regtest")
+        ci_nmc = NMCInterface(settings, "regtest")
+
         pk = ci.getPubkey(ci.getNewRandomKey())
         pkh = hash160(pk)
-        assert ci.decodeSwapDest(segwit_addr.encode_segwit_address(hrp, 0, pkh)) == pkh
-        for address in (
-            ci.encode_p2sh(CScript([pk, OP_CHECKSIG])),
-            ci.pubkey_to_address(pk),
-        ):
+        redeem_script = CScript([pk, OP_CHECKSIG])
+        program = bytes(range(32))
+        p2pkh = CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
+        p2sh = CScript([OP_HASH160, hash160(redeem_script), OP_EQUAL])
+        p2wpkh = CScript([CScriptOp.encode_op_n(0), pkh])
+        p2wsh = CScript([CScriptOp.encode_op_n(0), program])
+        p2tr = CScript([CScriptOp.encode_op_n(1), program])
+
+        def segwit(ci, version, data):
+            hrp = ci.chainparams_network()["hrp"]
+            return segwit_addr.encode_segwit_address(hrp, version, data)
+
+        accepted = (
+            (ci, ci.pubkey_to_address(pk), p2pkh),
+            (ci, ci.encode_p2sh(redeem_script), p2sh),
+            (ci, segwit(ci, 0, pkh), pkh),
+            (ci, segwit(ci, 0, program), p2wsh),
+            (ci, segwit(ci, 1, program), p2tr),
+            (ci_part, ci_part.pubkey_to_address(pk), pkh),
+            (ci_part, ci_part.encode_p2sh(redeem_script), p2sh),
+            (ci_part, segwit(ci_part, 0, pkh), p2wpkh),
+            (ci_part, segwit(ci_part, 0, program), p2wsh),
+            (ci_doge, ci_doge.pubkey_to_address(pk), pkh),
+            (ci_doge, ci_doge.encode_p2sh(redeem_script), p2sh),
+        )
+        for coin_ci, address, expected in accepted:
+            assert coin_ci.decodeSwapDest(address) == bytes(expected), address
+
+        refused = (
+            (ci, segwit(ci, 2, program)),
+            (ci_part, segwit(ci_part, 1, program)),
+            (ci_doge, segwit(ci_doge, 0, pkh)),
+            (ci_nmc, segwit(ci_nmc, 1, program)),
+        )
+        for coin_ci, address in refused:
             with self.assertRaises(ValueError):
-                ci.decodeSwapDest(address)
+                coin_ci.decodeSwapDest(address)
+        for coin_ci in (ci_part, ci_nmc):
+            with self.assertRaises(ValueError):
+                coin_ci.getDestForAddress(segwit(coin_ci, 1, program))
+
+    def test_txo_dest_types_follow_each_coin(self):
+        def ci_for(cls):
+            settings = {"rpcport": 0, "rpcauth": "none"}
+            settings.update(REQUIRED_SETTINGS)
+            return cls(settings, "regtest")
+
+        hash20 = bytes(range(20))
+        hash32 = bytes(range(32))
+        scripts = {
+            "p2pkh": CScript([OP_DUP, OP_HASH160, hash20, OP_EQUALVERIFY, OP_CHECKSIG]),
+            "p2sh": CScript([OP_HASH160, hash20, OP_EQUAL]),
+            "p2wpkh": CScript([CScriptOp.encode_op_n(0), hash20]),
+            "p2wsh": CScript([CScriptOp.encode_op_n(0), hash32]),
+            "p2tr": CScript([CScriptOp.encode_op_n(1), hash32]),
+        }
+        expected = (
+            (self.ci_btc(), {"p2pkh", "p2sh", "p2wpkh", "p2wsh", "p2tr"}),
+            (ci_for(NMCInterface), {"p2pkh", "p2sh", "p2wpkh", "p2wsh"}),
+            (ci_for(PARTInterface), {"p2pkh", "p2sh", "p2wpkh", "p2wsh"}),
+            (ci_for(NAVInterface), {"p2pkh", "p2sh", "p2wpkh", "p2wsh"}),
+            (ci_for(DOGEInterface), {"p2pkh", "p2sh"}),
+            (ci_for(DASHInterface), {"p2pkh", "p2sh"}),
+            (ci_for(FIROInterface), {"p2pkh", "p2sh"}),
+            (ci_for(PIVXInterface), {"p2pkh", "p2sh"}),
+            (ci_for(BCHInterface), {"p2wpkh", "p2wsh"}),
+        )
+        for coin_ci, accepted in expected:
+            for name, script in scripts.items():
+                assert coin_ci.isValidTxoDest(bytes(script)) == (name in accepted), (
+                    coin_ci.coin_name(),
+                    name,
+                )
+
+    def test_lock_spend_pays_a_script_swap_dest(self):
+        ci = self.ci_btc()
+        program = bytes(range(32))
+        for dest in (
+            bytes(
+                CScript([OP_DUP, OP_HASH160, program[:20], OP_EQUALVERIFY, OP_CHECKSIG])
+            ),
+            bytes(CScript([OP_HASH160, program[:20], OP_EQUAL])),
+            bytes(CScript([CScriptOp.encode_op_n(0), program])),
+            bytes(CScript([CScriptOp.encode_op_n(1), program])),
+        ):
+            Kal = ci.getPubkey(ci.getNewRandomKey())
+            Kaf = ci.getPubkey(ci.getNewRandomKey())
+            script_lock = XmrSwapInterface().genScriptLockTxScript(ci, Kal, Kaf)
+            tx_lock = CTransaction()
+            tx_lock.vin.append(CTxIn(COutPoint(1, 0)))
+            tx_lock.vout.append(CTxOut(200000, ci.getScriptDest(script_lock)))
+            spend_tx = ci.createSCLockSpendTx(
+                tx_lock.serialize(), script_lock, dest, 1000
+            )
+            assert bytes(ci.loadTx(spend_tx).vout[0].scriptPubKey) == dest
+            assert ci.verifySCLockSpendTx(
+                spend_tx, tx_lock.serialize(), script_lock, dest, 1000
+            )
 
     def test_bch_dest_for_address_follows_the_address_type(self):
         bch_coin_settings = {"rpcport": 0, "rpcauth": "none"}

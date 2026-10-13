@@ -14,6 +14,7 @@ from Crypto.Cipher import ChaCha20_Poly1305  # pycryptodome
 
 from .chainparams import Coins
 from .contrib.test_framework import segwit_addr
+from .contrib.test_framework.script import CScript, CScriptOp
 from .db_wallet import (
     WalletAddress,
     WalletLockedUTXO,
@@ -1124,9 +1125,10 @@ class WalletManager:
         version, data = segwit_addr.decode_segwit_address(
             self._getHRP(coin_type), address
         )
-        if data is None or version != 0 or len(data) != 20:
+        if data is None:
             return ""
-        return sha256(bytes([0x00, 0x14]) + bytes(data))[::-1].hex()
+        script = CScript([CScriptOp.encode_op_n(version), bytes(data)])
+        return sha256(bytes(script))[::-1].hex()
 
     def needsMigration(self, coin_type: Coins) -> bool:
         cursor = self._swap_client.openDB()

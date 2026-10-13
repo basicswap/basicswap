@@ -141,6 +141,9 @@ class NAVInterface(BTCInterface):
 
         return CScript([OP_HASH160, script_hash, OP_EQUAL])
 
+    def supportsTaproot(self) -> bool:
+        return False
+
     def getInputScriptForPubkeyHash(self, pkh: bytes) -> bytearray:
         script = CScript([OP_0, pkh])
         return bytes((len(script),)) + script

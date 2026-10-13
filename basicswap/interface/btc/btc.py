@@ -1314,7 +1314,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
 
     def supportsTaproot(self) -> bool:
-        return self.coin_type() in (Coins.BTC, Coins.LTC)
+        return True
 
     def decodeAddress(self, address: str) -> bytes:
         if self.isSegwitAddress(address):
@@ -1398,13 +1398,19 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return CScript([OP_DUP, OP_HASH160, addr_hash, OP_EQUALVERIFY, OP_CHECKSIG])
 
     def decodeSwapDest(self, address: str) -> bytes:
-        pkh: bytes = self.decodeAddress(address)
+        dest_script: bytes = bytes(self.getDestForAddress(address))
+        if not self.isScriptP2TR(dest_script):
+            pkh: bytes = self.decodeAddress(address)
+            if (
+                len(pkh) == 20
+                and bytes(self.getScriptForPubkeyHash(pkh)) == dest_script
+            ):
+                return pkh
         ensure(
-            bytes(self.getScriptForPubkeyHash(pkh))
-            == bytes(self.getDestForAddress(address)),
-            f"{self.coin_name()} swap destination must be a pubkey hash address of the type the swap pays: {address}",
+            self.isValidTxoDest(dest_script),
+            f"{self.coin_name()} cannot pay a swap to {address}",
         )
-        return pkh
+        return dest_script
 
     def addressToScripthash(self, address: str) -> str:
         script = self.getDestForAddress(address)
@@ -1556,10 +1562,25 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return False
         return True
 
+    def isScriptP2TR(self, script: bytes) -> bool:
+        if len(script) != 34:
+            return False
+        if script[0] != OP_1:
+            return False
+        if script[1] != 32:
+            return False
+        return True
+
     def isValidTxoDest(self, script: bytes) -> bool:
+        if self.isScriptP2PKH(script):
+            return True
+        if self.isScriptP2SH(script):
+            return True
         if self.isScriptP2WPKH(script):
             return True
         if self.isScriptP2WSH(script):
+            return True
+        if self.supportsTaproot() and self.isScriptP2TR(script):
             return True
         return False
 
@@ -5295,9 +5316,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # paid to a key derived for the swap has to name a destination instead,
         # or the coin stays on a key the wallet knows nothing about.
         dest_script: bytes = (
-            prevout_script
-            if addr_to is None
-            else self.getScriptForPubkeyHash(self.decodeAddress(addr_to))
+            prevout_script if addr_to is None else self.getDestForAddress(addr_to)
         )
         tx.vout.append(self.txoType()(0, dest_script))
 
