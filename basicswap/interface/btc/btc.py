@@ -1177,8 +1177,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def isValidAddress(self, address: str) -> bool:
         if self._connection_type == "electrum":
             try:
-                self.decodeAddress(address)
+                self.getDestForAddress(address)
                 return True
+            except Exception:
+                return False
+
+        # validateaddress accepts every witness version, not only those this coin can pay
+        if self.isSegwitAddress(address):
+            try:
+                self.getDestForAddress(address)
             except Exception:
                 return False
 
@@ -1301,12 +1308,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
 
     def isSegwitAddress(self, address: str) -> bool:
-        return address.startswith(self.chainparams_network()["hrp"] + "1")
+        bech32_prefix: str = self.chainparams_network().get("hrp", "")
+        return len(bech32_prefix) > 0 and address.lower().startswith(
+            bech32_prefix + "1"
+        )
+
+    def supportsTaproot(self) -> bool:
+        return self.coin_type() in (Coins.BTC, Coins.LTC)
 
     def decodeAddress(self, address: str) -> bytes:
-        bech32_prefix = self.chainparams_network()["hrp"]
-        if len(bech32_prefix) > 0 and address.lower().startswith(bech32_prefix + "1"):
-            return bytes(segwit_addr.decode_segwit_address(bech32_prefix, address)[1])
+        if self.isSegwitAddress(address):
+            version, program = segwit_addr.decode_segwit_address(
+                self.chainparams_network()["hrp"], address
+            )
+            ensure(program is not None, "Invalid segwit address")
+            ensure(version == 0, f"Not a version 0 segwit address: {address}")
+            return bytes(program)
         return decodeAddress(address)[1:]
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:
@@ -1359,6 +1376,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if bech32_prefix and address.lower().startswith(bech32_prefix + "1"):
             version, witprog = segwit_addr.decode_segwit_address(bech32_prefix, address)
             ensure(witprog is not None, "Invalid segwit address")
+            ensure(
+                version == 0
+                or (version == 1 and len(witprog) == 32 and self.supportsTaproot()),
+                f"{self.coin_name()} cannot pay a version {version} segwit address",
+            )
             return CScript([CScriptOp.encode_op_n(version), bytes(witprog)])
 
         addr_data = decodeAddress(address)
@@ -3567,7 +3589,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
             spend_value = actual_value
 
-        pkh_to = self.decodeAddress(address_to)
+        dest_script: bytes = (
+            self.getDestForAddress(address_to)
+            if self.isSegwitAddress(address_to)
+            else self.getScriptForPubkeyHash(self.decodeAddress(address_to))
+        )
 
         tx = CTransaction()
         tx.nVersion = self.txVersion()
@@ -3582,7 +3608,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 scriptSig=self.getScriptScriptSig(script_lock),
             )
         )
-        tx.vout.append(self.txoType()(spend_value, self.getScriptForPubkeyHash(pkh_to)))
+        tx.vout.append(self.txoType()(spend_value, dest_script))
 
         pay_fee = self.getBLockSpendTxFee(tx, b_fee)
         tx.vout[0].nValue = spend_value - pay_fee
@@ -4229,6 +4255,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     script_hash = bytes(out.scriptPubKey[2:34])
                     addr = segwit_addr.encode_segwit_address(
                         bech32_prefix, 0, script_hash
+                    )
+                    scriptPubKey["address"] = addr
+                elif (
+                    len(out.scriptPubKey) == 34
+                    and out.scriptPubKey[0] == OP_1
+                    and out.scriptPubKey[1] == 32
+                    and self.supportsTaproot()
+                ):
+                    addr = segwit_addr.encode_segwit_address(
+                        bech32_prefix, 1, bytes(out.scriptPubKey[2:34])
                     )
                     scriptPubKey["address"] = addr
             except Exception as e:

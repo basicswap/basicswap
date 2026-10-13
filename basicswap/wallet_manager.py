@@ -1121,8 +1121,10 @@ class WalletManager:
         return bytes(a ^ b for a, b in zip(encrypted_key, self._getXorKey(coin_type)))
 
     def _computeScripthash(self, coin_type: Coins, address: str) -> str:
-        _, data = segwit_addr.decode_segwit_address(self._getHRP(coin_type), address)
-        if data is None:
+        version, data = segwit_addr.decode_segwit_address(
+            self._getHRP(coin_type), address
+        )
+        if data is None or version != 0 or len(data) != 20:
             return ""
         return sha256(bytes([0x00, 0x14]) + bytes(data))[::-1].hex()
 

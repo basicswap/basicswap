@@ -49,6 +49,7 @@ from basicswap.util_xmr import (
     encode_address as xmr_encode_address,
 )
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.nmc.nmc import NMCInterface
 from basicswap.interface.electrumx import scripthash_from_address
 from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
@@ -669,6 +670,65 @@ class Test(unittest.TestCase):
             script = CScript([CScriptOp.encode_op_n(version), program])
             expected = sha256(bytes(script))[::-1].hex()
             assert scripthash_from_address(address, network_params) == expected
+
+    def test_decode_address_refuses_non_v0(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        program = bytes(range(20))
+        v0_address = segwit_addr.encode_segwit_address(hrp, 0, program)
+        assert ci.decodeAddress(v0_address) == program
+        v1_address = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        with self.assertRaises(ValueError):
+            ci.decodeAddress(v1_address)
+
+    def test_dest_for_address_refuses_unpayable_versions(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        for version, program in ((1, bytes(range(20))), (2, bytes(range(32)))):
+            address = segwit_addr.encode_segwit_address(hrp, version, program)
+            with self.assertRaises(ValueError):
+                ci.getDestForAddress(address)
+
+        nmc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        nmc_coin_settings.update(REQUIRED_SETTINGS)
+        ci_nmc = NMCInterface(nmc_coin_settings, "regtest")
+        nmc_hrp = ci_nmc.chainparams_network()["hrp"]
+        taproot = segwit_addr.encode_segwit_address(nmc_hrp, 1, bytes(range(32)))
+        with self.assertRaises(ValueError):
+            ci_nmc.getDestForAddress(taproot)
+
+    def test_is_valid_address_checks_the_witness_version(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        taproot = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        future = segwit_addr.encode_segwit_address(hrp, 2, bytes(range(32)))
+
+        ci.rpc_wallet = lambda method, params=None: {"isvalid": True}
+        assert ci.isValidAddress(taproot) is True
+        assert ci.isValidAddress(future) is False
+
+        ci._connection_type = "electrum"
+        assert ci.isValidAddress(taproot) is True
+        assert ci.isValidAddress(future) is False
+
+        nmc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        nmc_coin_settings.update(REQUIRED_SETTINGS)
+        ci_nmc = NMCInterface(nmc_coin_settings, "regtest")
+        ci_nmc.rpc_wallet = lambda method, params=None: {"isvalid": True}
+        nmc_hrp = ci_nmc.chainparams_network()["hrp"]
+        nmc_taproot = segwit_addr.encode_segwit_address(nmc_hrp, 1, bytes(range(32)))
+        assert ci_nmc.isValidAddress(nmc_taproot) is False
+
+    def test_describe_tx_names_taproot_outputs(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        program = bytes(range(32))
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(1, 0)))
+        tx.vout.append(CTxOut(1000, CScript([CScriptOp.encode_op_n(1), program])))
+        rv = ci._describeTxLocal(tx.serialize().hex())
+        expected = segwit_addr.encode_segwit_address(hrp, 1, program)
+        assert rv["vout"][0]["scriptPubKey"]["address"] == expected
 
     def test_dleag(self):
         ci = self.ci_xmr()
