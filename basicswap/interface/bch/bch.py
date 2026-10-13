@@ -155,6 +155,18 @@ class BCHInterface(BTCInterface):
     def decodeAddress(self, address: str) -> bytes:
         return bytes(Address.from_string(address).payload)
 
+    def getDestForAddress(self, address: str) -> bytes:
+        addr = Address.from_string(address)
+        payload = bytes(addr.payload)
+        address_type: str = addr.version.split("-")[0]
+        if address_type == "P2PKH":
+            return self.getScriptForPubkeyHash(payload)
+        if address_type == "P2SH20":
+            return CScript([OP_HASH160, payload, OP_EQUAL])
+        if address_type == "P2SH32":
+            return CScript([OP_HASH256, payload, OP_EQUAL])
+        raise ValueError(f"Unknown address type {addr.version}")
+
     def encodeSegwitAddress(self, script):
         raise ValueError("Segwit not supported")
 

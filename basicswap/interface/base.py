@@ -348,6 +348,9 @@ class Secp256k1Interface(CoinInterface, AdaptorSigInterface):
         if len(address_hash) == 20:
             return True
 
+    def decodeSwapDest(self, address: str) -> bytes:
+        return self.decodeAddress(address)
+
     def getMedianTimePastAtHeight(self, height: int) -> int | None:
         # BIP68 measures time based relative locks from the median time past of the
         # block before the one containing the output being spent, not its header time

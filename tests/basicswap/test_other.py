@@ -50,6 +50,9 @@ from basicswap.util_xmr import (
 )
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.interface.nmc.nmc import NMCInterface
+from basicswap.interface.bch.bch import BCHInterface
+from basicswap.interface.bch.contrib.cashaddress import Address
+from basicswap.interface.bch.contrib.script import OP_HASH256
 from basicswap.interface.electrumx import scripthash_from_address
 from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
@@ -81,6 +84,11 @@ from basicswap.contrib.test_framework.script import (
     CScriptOp,
     hash160 as hash160_btc,
     OP_CHECKMULTISIG,
+    OP_CHECKSIG,
+    OP_DUP,
+    OP_EQUAL,
+    OP_EQUALVERIFY,
+    OP_HASH160,
     SegwitV0SignatureHash,
     SIGHASH_ALL,
 )
@@ -729,6 +737,71 @@ class Test(unittest.TestCase):
         rv = ci._describeTxLocal(tx.serialize().hex())
         expected = segwit_addr.encode_segwit_address(hrp, 1, program)
         assert rv["vout"][0]["scriptPubKey"]["address"] == expected
+
+    def test_spend_b_lock_pays_what_the_address_means(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        pk = ci.getPubkey(ci.getNewRandomKey())
+        redeem_script = CScript([pk, OP_CHECKSIG])
+        program = bytes(range(32))
+        cases = (
+            (
+                ci.encode_p2sh(redeem_script),
+                CScript([OP_HASH160, hash160(redeem_script), OP_EQUAL]),
+            ),
+            (
+                ci.pubkey_to_address(pk),
+                CScript([OP_DUP, OP_HASH160, hash160(pk), OP_EQUALVERIFY, OP_CHECKSIG]),
+            ),
+            (
+                segwit_addr.encode_segwit_address(hrp, 0, hash160(pk)),
+                CScript([CScriptOp.encode_op_n(0), hash160(pk)]),
+            ),
+            (
+                segwit_addr.encode_segwit_address(hrp, 1, program),
+                CScript([CScriptOp.encode_op_n(1), program]),
+            ),
+        )
+        published = []
+        ci.getBLockTxo = lambda txid, vout, script_pk: (0, 100000)
+        ci.getBLockSpendTxFee = lambda tx, fee: 1000
+        ci.signTxWithKey = lambda tx, key, prev_amount=None: tx
+        ci.publishTx = lambda tx: published.append(tx) or "00" * 32
+        for address, expected in cases:
+            ci.spendBLockTx(
+                bytes(32), address, None, ci.getNewRandomKey(), 100000, 1000, 0
+            )
+            tx = ci.loadTx(published[-1])
+            assert bytes(tx.vout[0].scriptPubKey) == bytes(expected)
+
+    def test_swap_dest_refuses_addresses_paid_as_another_type(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        pk = ci.getPubkey(ci.getNewRandomKey())
+        pkh = hash160(pk)
+        assert ci.decodeSwapDest(segwit_addr.encode_segwit_address(hrp, 0, pkh)) == pkh
+        for address in (
+            ci.encode_p2sh(CScript([pk, OP_CHECKSIG])),
+            ci.pubkey_to_address(pk),
+        ):
+            with self.assertRaises(ValueError):
+                ci.decodeSwapDest(address)
+
+    def test_bch_dest_for_address_follows_the_address_type(self):
+        bch_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        bch_coin_settings.update(REQUIRED_SETTINGS)
+        ci = BCHInterface(bch_coin_settings, "regtest")
+        hash20 = bytes(range(20))
+        hash32 = bytes(range(32))
+        p2pkh = Address("P2PKH-REGTEST", list(hash20)).cash_address()
+        p2sh20 = Address("P2SH20-REGTEST", list(hash20)).cash_address()
+        p2sh32 = Address("P2SH32-REGTEST", list(hash32)).cash_address()
+        assert ci.getDestForAddress(p2pkh) == ci.getScriptForPubkeyHash(hash20)
+        assert ci.getDestForAddress(p2sh20) == CScript([OP_HASH160, hash20, OP_EQUAL])
+        assert ci.getDestForAddress(p2sh32) == CScript([OP_HASH256, hash32, OP_EQUAL])
+        assert ci.decodeSwapDest(p2pkh) == hash20
+        with self.assertRaises(ValueError):
+            ci.decodeSwapDest(p2sh20)
 
     def test_dleag(self):
         ci = self.ci_xmr()

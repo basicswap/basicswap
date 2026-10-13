@@ -1397,6 +1397,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         else:
             return CScript([OP_DUP, OP_HASH160, addr_hash, OP_EQUALVERIFY, OP_CHECKSIG])
 
+    def decodeSwapDest(self, address: str) -> bytes:
+        pkh: bytes = self.decodeAddress(address)
+        ensure(
+            bytes(self.getScriptForPubkeyHash(pkh))
+            == bytes(self.getDestForAddress(address)),
+            f"{self.coin_name()} swap destination must be a pubkey hash address of the type the swap pays: {address}",
+        )
+        return pkh
+
     def addressToScripthash(self, address: str) -> str:
         script = self.getDestForAddress(address)
         return sha256(script)[::-1].hex()
@@ -3589,11 +3598,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
             spend_value = actual_value
 
-        dest_script: bytes = (
-            self.getDestForAddress(address_to)
-            if self.isSegwitAddress(address_to)
-            else self.getScriptForPubkeyHash(self.decodeAddress(address_to))
-        )
+        dest_script: bytes = self.getDestForAddress(address_to)
 
         tx = CTransaction()
         tx.nVersion = self.txVersion()
