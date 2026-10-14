@@ -984,7 +984,10 @@ class XMRInterface(CoinInterface):
                 return
             except Exception as e:
                 if "invalid password" not in str(e).lower():
-                    raise
+                    self._log.warning(
+                        f"Could not open {self.coin_name()} wallet to check its password: {e}"
+                    )
+                    return
         # Left without a password by a password change that failed partway
         self._log.warning(f"{self.coin_name()} wallet has no password, setting it.")
         self._wallet_password = ""
