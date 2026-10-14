@@ -1373,8 +1373,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def getDestForAddress(self, address: str) -> bytes:
         bech32_prefix: str | None = self.chainparams_network().get("hrp", None)
-        if bech32_prefix and address.lower().startswith(bech32_prefix + "1"):
-            version, witprog = segwit_addr.decode_segwit_address(bech32_prefix, address)
+        if self.isSegwitAddress(address):
+            version, witprog = segwit_addr.decode_segwit_address(
+                self.chainparams_network()["hrp"], address
+            )
             ensure(witprog is not None, "Invalid segwit address")
             ensure(
                 version == 0

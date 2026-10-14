@@ -234,10 +234,6 @@ class BCHInterface(BTCInterface):
         return False
 
     def isValidTxoDest(self, script: bytes) -> bool:
-        if self.isScriptP2WPKH(script):
-            return True
-        if self.isScriptP2WSH(script):
-            return True
         return False
 
     def encodeScriptDest(self, script_dest: bytes) -> str:

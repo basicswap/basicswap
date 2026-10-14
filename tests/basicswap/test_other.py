@@ -856,7 +856,7 @@ class Test(unittest.TestCase):
             (ci_for(DASHInterface), {"p2pkh", "p2sh"}),
             (ci_for(FIROInterface), {"p2pkh", "p2sh"}),
             (ci_for(PIVXInterface), {"p2pkh", "p2sh"}),
-            (ci_for(BCHInterface), {"p2wpkh", "p2wsh"}),
+            (ci_for(BCHInterface), set()),
         )
         for coin_ci, accepted in expected:
             for name, script in scripts.items():
