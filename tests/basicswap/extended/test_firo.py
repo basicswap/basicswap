@@ -176,7 +176,7 @@ class Test(BaseTest):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.FIRO, cls.firo_daemons[i].handle.pid)
+        sc.setDaemon(Coins.FIRO, cls.firo_daemons[i])
 
     @classmethod
     def prepareExtraCoins(cls):

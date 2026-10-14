@@ -576,7 +576,7 @@ def runClient(
                 )
                 pid = daemons[-1].handle.pid
                 pids.append((c, pid))
-                swap_client.setDaemonPID(c, pid)
+                swap_client.setDaemon(c, daemons[-1])
                 swap_client.log.info(f"Started {filename} {pid}")
         if len(pids) > 0:
             with open(pids_path, "w") as fd:

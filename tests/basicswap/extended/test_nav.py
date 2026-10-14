@@ -189,7 +189,7 @@ class Test(TestFunctions):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.NAV, cls.nav_daemons[i].handle.pid)
+        sc.setDaemon(Coins.NAV, cls.nav_daemons[i])
 
     @classmethod
     def sync_blocks(cls, wait_for: int = 20, num_nodes: int = 3) -> None:

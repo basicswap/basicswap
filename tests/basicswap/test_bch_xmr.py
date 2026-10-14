@@ -175,7 +175,7 @@ class TestBCH(BasicSwapTest):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.BCH, cls.bch_daemons[i].handle.pid)
+        sc.setDaemon(Coins.BCH, cls.bch_daemons[i])
 
     @classmethod
     def prepareExtraCoins(cls):

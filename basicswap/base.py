@@ -246,13 +246,13 @@ class BaseApp(DBMethods):
         except Exception as e:
             self.log.warning(f"Failed to save settings: {e}")
 
-    def setDaemonPID(self, name, pid) -> None:
+    def setDaemon(self, name, daemon) -> None:
         if isinstance(name, Coins):
-            self.coin_clients[name]["pid"] = pid
+            self.coin_clients[name]["daemon"] = daemon
             return
         for c, v in self.coin_clients.items():
             if v["name"] == name:
-                v["pid"] = pid
+                v["daemon"] = daemon
 
     def getChainDatadirPath(self, coin) -> str:
         datadir = self.coin_clients[coin]["datadir"]

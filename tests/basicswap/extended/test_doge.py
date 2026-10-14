@@ -154,7 +154,7 @@ class Test(TestFunctions):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemonPID(Coins.DOGE, cls.doge_daemons[i].handle.pid)
+        sc.setDaemon(Coins.DOGE, cls.doge_daemons[i])
 
     @classmethod
     def sync_blocks(cls, wait_for: int = 20, num_nodes: int = 3) -> None:
