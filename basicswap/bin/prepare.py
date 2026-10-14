@@ -1465,7 +1465,13 @@ def main():
 
     # Automatically enable usetorproxy for certain commands if it's set in basicswap config
     if (
-        not (initwalletsonly or enable_tor or disable_tor or disable_coin)
+        not (
+            initwalletsonly
+            or enable_tor
+            or disable_tor
+            or disable_coin
+            or extra_opts.get("disablenetwork")
+        )
         and not use_tor_proxy
         and os.path.exists(config_path)
     ):
