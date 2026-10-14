@@ -1036,9 +1036,13 @@ class NAVInterface(BTCInterface):
             )
         )
 
-        tx.vout.append(
-            self.txoType()(locked_coin, self.getScriptForPubkeyHash(pkh_dest))
-        )
+        if self.isValidAddressHash(pkh_dest):
+            script_out: bytes = self.getScriptForPubkeyHash(pkh_dest)
+        elif self.isValidTxoDest(pkh_dest):
+            script_out: bytes = pkh_dest
+        else:
+            raise ValueError("Unknown pkh_dest type")
+        tx.vout.append(self.txoType()(locked_coin, script_out))
 
         dummy_witness_stack = self.getScriptLockTxDummyWitness(script_lock)
         witness_bytes = self.getWitnessStackSerialisedLength(dummy_witness_stack)
