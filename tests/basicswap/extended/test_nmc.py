@@ -170,7 +170,7 @@ class TestNMC(BasicSwapTest):
 
     @classmethod
     def addPIDInfo(cls, sc, i):
-        sc.setDaemon(Coins.DCR, cls.nmc_daemons[i])
+        sc.setDaemon(Coins.NMC, cls.nmc_daemons[i])
 
     @classmethod
     def addCoinSettings(cls, settings, datadir, node_id):
