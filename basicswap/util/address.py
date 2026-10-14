@@ -4,7 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from basicswap.contrib.segwit_addr import bech32_decode, convertbits, bech32_encode
 from basicswap.util.crypto import ripemd160, sha256
 
 __b58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -90,25 +89,6 @@ def toWIF(prefix_byte: int, b: bytes, compressed: bool = True) -> str:
 
 def getKeyID(key_data: bytes) -> bytes:
     return ripemd160(sha256(key_data))
-
-
-def bech32Decode(hrp: str, addr: str, for_segwit: bool = False) -> bytes:
-    hrpgot, data = bech32_decode(addr)
-    if hrpgot != hrp:
-        return None
-    if for_segwit:
-        data = data[1:]
-    decoded = convertbits(data, 5, 8, False)
-    if decoded is None or len(decoded) < 2 or len(decoded) > 40:
-        return None
-    return bytes(decoded)
-
-
-def bech32Encode(hrp: str, data: bytes) -> str:
-    ret = bech32_encode(hrp, convertbits(data, 8, 5))
-    if bech32Decode(hrp, ret) is None:
-        return None
-    return ret
 
 
 def decodeAddress(address: str) -> bytes:

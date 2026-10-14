@@ -174,6 +174,9 @@ class PARTInterface(BTCInterface):
     def getScriptForPubkeyHash(self, pkh: bytes) -> CScript:
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
+    def supportsTaproot(self) -> bool:
+        return False
+
     def isValidTxoDest(self, script: bytes) -> bool:
         if self.isScriptP2PKH(script):
             return True

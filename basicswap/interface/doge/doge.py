@@ -59,6 +59,16 @@ class DOGEInterface(BTCInterface):
         # Return P2PKH
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
+    def supportsTaproot(self) -> bool:
+        return False
+
+    def isValidTxoDest(self, script: bytes) -> bool:
+        if self.isScriptP2PKH(script):
+            return True
+        if self.isScriptP2SH(script):
+            return True
+        return False
+
     def encodeScriptDest(self, script_dest: bytes) -> str:
         # Extract hash from script
         script_hash = script_dest[2:-1]

@@ -14,6 +14,7 @@ from Crypto.Cipher import ChaCha20_Poly1305  # pycryptodome
 
 from .chainparams import Coins
 from .contrib.test_framework import segwit_addr
+from .contrib.test_framework.script import CScript, CScriptOp
 from .db_wallet import (
     WalletAddress,
     WalletLockedUTXO,
@@ -127,7 +128,7 @@ class WalletManager:
         key = self._deriveKey(coin_type, index, internal)
         pubkey = PublicKey.from_secret(key).format()
         pkh = hash160(pubkey)
-        address = segwit_addr.encode(self._getHRP(coin_type), 0, pkh)
+        address = segwit_addr.encode_segwit_address(self._getHRP(coin_type), 0, pkh)
         scripthash = sha256(bytes([0x00, 0x14]) + pkh)[::-1].hex()
         return address, scripthash, pubkey
 
@@ -919,7 +920,9 @@ class WalletManager:
         try:
             pubkey = PublicKey.from_secret(private_key).format()
             if (
-                segwit_addr.encode(self._getHRP(coin_type), 0, hash160(pubkey))
+                segwit_addr.encode_segwit_address(
+                    self._getHRP(coin_type), 0, hash160(pubkey)
+                )
                 != address
             ):
                 return False
@@ -1119,10 +1122,13 @@ class WalletManager:
         return bytes(a ^ b for a, b in zip(encrypted_key, self._getXorKey(coin_type)))
 
     def _computeScripthash(self, coin_type: Coins, address: str) -> str:
-        _, data = segwit_addr.decode(self._getHRP(coin_type), address)
+        version, data = segwit_addr.decode_segwit_address(
+            self._getHRP(coin_type), address
+        )
         if data is None:
             return ""
-        return sha256(bytes([0x00, 0x14]) + bytes(data))[::-1].hex()
+        script = CScript([CScriptOp.encode_op_n(version), bytes(data)])
+        return sha256(bytes(script))[::-1].hex()
 
     def needsMigration(self, coin_type: Coins) -> bool:
         cursor = self._swap_client.openDB()

@@ -95,6 +95,16 @@ class DASHInterface(BTCInterface):
         # Return P2PKH
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
 
+    def supportsTaproot(self) -> bool:
+        return False
+
+    def isValidTxoDest(self, script: bytes) -> bool:
+        if self.isScriptP2PKH(script):
+            return True
+        if self.isScriptP2SH(script):
+            return True
+        return False
+
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes

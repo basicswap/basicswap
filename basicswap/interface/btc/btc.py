@@ -1177,8 +1177,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def isValidAddress(self, address: str) -> bool:
         if self._connection_type == "electrum":
             try:
-                self.decodeAddress(address)
+                self.getDestForAddress(address)
                 return True
+            except Exception:
+                return False
+
+        # validateaddress accepts every witness version, not only those this coin can pay
+        if self.isSegwitAddress(address):
+            try:
+                self.getDestForAddress(address)
             except Exception:
                 return False
 
@@ -1301,19 +1308,29 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
 
     def isSegwitAddress(self, address: str) -> bool:
-        return address.startswith(self.chainparams_network()["hrp"] + "1")
+        bech32_prefix: str = self.chainparams_network().get("hrp", "")
+        return len(bech32_prefix) > 0 and address.lower().startswith(
+            bech32_prefix + "1"
+        )
+
+    def supportsTaproot(self) -> bool:
+        return True
 
     def decodeAddress(self, address: str) -> bytes:
-        bech32_prefix = self.chainparams_network()["hrp"]
-        if len(bech32_prefix) > 0 and address.startswith(bech32_prefix + "1"):
-            return bytes(segwit_addr.decode(bech32_prefix, address)[1])
+        if self.isSegwitAddress(address):
+            version, program = segwit_addr.decode_segwit_address(
+                self.chainparams_network()["hrp"], address
+            )
+            ensure(program is not None, "Invalid segwit address")
+            ensure(version == 0, f"Not a version 0 segwit address: {address}")
+            return bytes(program)
         return decodeAddress(address)[1:]
 
     def pubkey_to_segwit_address(self, pk: bytes) -> str:
         bech32_prefix = self.chainparams_network()["hrp"]
         version = 0
         pkh = hash160(pk)
-        return segwit_addr.encode(bech32_prefix, version, pkh)
+        return segwit_addr.encode_segwit_address(bech32_prefix, version, pkh)
 
     def encode_secret_extkey(self, ek_data: bytes, prefix=None) -> str:
         ensure(len(ek_data) == 74, "Invalid extkey size")
@@ -1349,16 +1366,23 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         bech32_prefix = self.chainparams_network()["hrp"]
         version = 0
         program = script[2:]  # strip version and length
-        return segwit_addr.encode(bech32_prefix, version, program)
+        return segwit_addr.encode_segwit_address(bech32_prefix, version, program)
 
     def encodeScriptDest(self, script: bytes) -> str:
         return self.encode_p2wsh(script)
 
     def getDestForAddress(self, address: str) -> bytes:
-        bech32_prefix: str | None = self.chainparams_network().get("hrp", None)
-        if bech32_prefix and address.startswith(bech32_prefix + "1"):
-            _, witprog = segwit_addr.decode(bech32_prefix, address)
-            return CScript([OP_0, bytes(witprog)])
+        if self.isSegwitAddress(address):
+            version, witprog = segwit_addr.decode_segwit_address(
+                self.chainparams_network()["hrp"], address
+            )
+            ensure(witprog is not None, "Invalid segwit address")
+            ensure(
+                version == 0
+                or (version == 1 and len(witprog) == 32 and self.supportsTaproot()),
+                f"{self.coin_name()} cannot pay a version {version} segwit address",
+            )
+            return CScript([CScriptOp.encode_op_n(version), bytes(witprog)])
 
         addr_data = decodeAddress(address)
         prefix_byte = addr_data[0]
@@ -1373,6 +1397,21 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return CScript([OP_HASH160, addr_hash, OP_EQUAL])
         else:
             return CScript([OP_DUP, OP_HASH160, addr_hash, OP_EQUALVERIFY, OP_CHECKSIG])
+
+    def decodeSwapDest(self, address: str) -> bytes:
+        dest_script: bytes = bytes(self.getDestForAddress(address))
+        if not self.isScriptP2TR(dest_script):
+            pkh: bytes = self.decodeAddress(address)
+            if (
+                len(pkh) == 20
+                and bytes(self.getScriptForPubkeyHash(pkh)) == dest_script
+            ):
+                return pkh
+        ensure(
+            self.isValidTxoDest(dest_script),
+            f"{self.coin_name()} cannot pay a swap to {address}",
+        )
+        return dest_script
 
     def addressToScripthash(self, address: str) -> str:
         script = self.getDestForAddress(address)
@@ -1411,10 +1450,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return toWIF(wif_prefix, key_bytes)
 
     def encodeSegwitAddress(self, key_hash: bytes) -> str:
-        return segwit_addr.encode(self.chainparams_network()["hrp"], 0, key_hash)
+        return segwit_addr.encode_segwit_address(
+            self.chainparams_network()["hrp"], 0, key_hash
+        )
 
     def decodeSegwitAddress(self, addr: str) -> bytes:
-        return bytes(segwit_addr.decode(self.chainparams_network()["hrp"], addr)[1])
+        return bytes(
+            segwit_addr.decode_segwit_address(self.chainparams_network()["hrp"], addr)[
+                1
+            ]
+        )
 
     def decodeKey(self, k: str) -> bytes:
         return decodeWif(k)
@@ -1518,10 +1563,25 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return False
         return True
 
+    def isScriptP2TR(self, script: bytes) -> bool:
+        if len(script) != 34:
+            return False
+        if script[0] != OP_1:
+            return False
+        if script[1] != 32:
+            return False
+        return True
+
     def isValidTxoDest(self, script: bytes) -> bool:
+        if self.isScriptP2PKH(script):
+            return True
+        if self.isScriptP2SH(script):
+            return True
         if self.isScriptP2WPKH(script):
             return True
         if self.isScriptP2WSH(script):
+            return True
+        if self.supportsTaproot() and self.isScriptP2TR(script):
             return True
         return False
 
@@ -3560,7 +3620,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
             spend_value = actual_value
 
-        pkh_to = self.decodeAddress(address_to)
+        dest_script: bytes = self.getDestForAddress(address_to)
 
         tx = CTransaction()
         tx.nVersion = self.txVersion()
@@ -3575,7 +3635,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 scriptSig=self.getScriptScriptSig(script_lock),
             )
         )
-        tx.vout.append(self.txoType()(spend_value, self.getScriptForPubkeyHash(pkh_to)))
+        tx.vout.append(self.txoType()(spend_value, dest_script))
 
         pay_fee = self.getBLockSpendTxFee(tx, b_fee)
         tx.vout[0].nValue = spend_value - pay_fee
@@ -4212,7 +4272,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     and out.scriptPubKey[1] == 20
                 ):
                     pkh = bytes(out.scriptPubKey[2:22])
-                    addr = segwit_addr.encode(bech32_prefix, 0, pkh)
+                    addr = segwit_addr.encode_segwit_address(bech32_prefix, 0, pkh)
                     scriptPubKey["address"] = addr
                 elif (
                     len(out.scriptPubKey) == 34
@@ -4220,7 +4280,19 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     and out.scriptPubKey[1] == 32
                 ):
                     script_hash = bytes(out.scriptPubKey[2:34])
-                    addr = segwit_addr.encode(bech32_prefix, 0, script_hash)
+                    addr = segwit_addr.encode_segwit_address(
+                        bech32_prefix, 0, script_hash
+                    )
+                    scriptPubKey["address"] = addr
+                elif (
+                    len(out.scriptPubKey) == 34
+                    and out.scriptPubKey[0] == OP_1
+                    and out.scriptPubKey[1] == 32
+                    and self.supportsTaproot()
+                ):
+                    addr = segwit_addr.encode_segwit_address(
+                        bech32_prefix, 1, bytes(out.scriptPubKey[2:34])
+                    )
                     scriptPubKey["address"] = addr
             except Exception as e:
                 self._log.debug(
@@ -5245,9 +5317,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # paid to a key derived for the swap has to name a destination instead,
         # or the coin stays on a key the wallet knows nothing about.
         dest_script: bytes = (
-            prevout_script
-            if addr_to is None
-            else self.getScriptForPubkeyHash(self.decodeAddress(addr_to))
+            prevout_script if addr_to is None else self.getDestForAddress(addr_to)
         )
         tx.vout.append(self.txoType()(0, dest_script))
 

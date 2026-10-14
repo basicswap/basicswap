@@ -911,7 +911,7 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                         post_data, "destination_address"
                     )
                 else:
-                    extra_options["dest_af"] = ci_from.decodeAddress(
+                    extra_options["dest_af"] = ci_from.decodeSwapDest(
                         get_data_entry(post_data, "destination_address")
                     )
             if have_data_entry(post_data, "destination_script"):

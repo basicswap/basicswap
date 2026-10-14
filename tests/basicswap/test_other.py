@@ -6,6 +6,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from io import BytesIO
 import hashlib
 import logging
 import os
@@ -29,11 +30,12 @@ from basicswap.basicswap import (
     SwapTypes,
 )
 from basicswap.base import BaseApp
+from basicswap.chainparams import coins_without_segwit, scriptless_coins
 from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.db import create_db_, DBMethods, KnownIdentity
 from basicswap.util import h2b
 from basicswap.util.address import decodeAddress, toWIF
-from basicswap.util.crypto import ripemd160, hash160, blake256
+from basicswap.util.crypto import ripemd160, hash160, blake256, sha256
 from basicswap.util.extkey import ExtKeyPair
 from basicswap.util.integer import encode_varint, decode_varint
 from basicswap.util.network import (
@@ -49,6 +51,20 @@ from basicswap.util_xmr import (
     encode_address as xmr_encode_address,
 )
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.nmc.nmc import NMCInterface
+from basicswap.interface.bch.bch import BCHInterface
+from basicswap.interface.bch.contrib.cashaddress import Address
+from basicswap.interface.bch.contrib.script import OP_HASH256
+from basicswap.interface.dash.dash import DASHInterface
+from basicswap.interface.doge.doge import DOGEInterface
+from basicswap.interface.firo.firo import FIROInterface
+from basicswap.interface.ltc.ltc import LTCInterface
+from basicswap.interface.nav.contrib.mininode import CTransaction as NAVTransaction
+from basicswap.interface.nav.nav import NAVInterface
+from basicswap.interface.part.part import PARTInterface
+from basicswap.interface.pivx.pivx import PIVXInterface
+from basicswap.protocols.xmr_swap_1 import XmrSwapInterface
+from basicswap.interface.electrumx import scripthash_from_address
 from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
 from tests.basicswap.util.mnemonics import mnemonics
@@ -73,10 +89,17 @@ from basicswap.rpc import Jsonrpc, escape_rpcauth
 from basicswap.messages_npb import (
     BidMessage,
 )
+from basicswap.contrib.test_framework import segwit_addr
 from basicswap.contrib.test_framework.script import (
     CScript,
+    CScriptOp,
     hash160 as hash160_btc,
     OP_CHECKMULTISIG,
+    OP_CHECKSIG,
+    OP_DUP,
+    OP_EQUAL,
+    OP_EQUALVERIFY,
+    OP_HASH160,
     SegwitV0SignatureHash,
     SIGHASH_ALL,
 )
@@ -639,6 +662,280 @@ class Test(unittest.TestCase):
         pk = h2b("02c26a344e7d21bcc6f291532679559f2fd234c881271ff98714855edc753763a6")
         addr = ci.pubkey_to_address(pk)
         assert addr == "mj6SdSxmWRmdDqR5R3FfZmRiLmQfQAsLE8"
+
+    def test_dest_for_address_keeps_the_witness_version(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        program = bytes(range(32))
+        for version in (0, 1):
+            address = segwit_addr.encode_segwit_address(hrp, version, program)
+            script = ci.getDestForAddress(address)
+            assert script == CScript([CScriptOp.encode_op_n(version), program])
+
+    def test_dest_for_address_accepts_uppercase(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        address = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        assert ci.getDestForAddress(address.upper()) == ci.getDestForAddress(address)
+
+    def test_scripthash_from_address_keeps_the_witness_version(self):
+        ci = self.ci_btc()
+        network_params = ci.chainparams_network()
+        program = bytes(range(32))
+        for version in (0, 1):
+            address = segwit_addr.encode_segwit_address(
+                network_params["hrp"], version, program
+            )
+            script = CScript([CScriptOp.encode_op_n(version), program])
+            expected = sha256(bytes(script))[::-1].hex()
+            assert scripthash_from_address(address, network_params) == expected
+
+    def test_decode_address_refuses_non_v0(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        program = bytes(range(20))
+        v0_address = segwit_addr.encode_segwit_address(hrp, 0, program)
+        assert ci.decodeAddress(v0_address) == program
+        v1_address = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        with self.assertRaises(ValueError):
+            ci.decodeAddress(v1_address)
+
+    def test_dest_for_address_refuses_unpayable_versions(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        for version, program in ((1, bytes(range(20))), (2, bytes(range(32)))):
+            address = segwit_addr.encode_segwit_address(hrp, version, program)
+            with self.assertRaises(ValueError):
+                ci.getDestForAddress(address)
+
+        nmc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        nmc_coin_settings.update(REQUIRED_SETTINGS)
+        ci_nmc = NMCInterface(nmc_coin_settings, "regtest")
+        nmc_hrp = ci_nmc.chainparams_network()["hrp"]
+        taproot = segwit_addr.encode_segwit_address(nmc_hrp, 1, bytes(range(32)))
+        with self.assertRaises(ValueError):
+            ci_nmc.getDestForAddress(taproot)
+
+    def test_is_valid_address_checks_the_witness_version(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        taproot = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
+        future = segwit_addr.encode_segwit_address(hrp, 2, bytes(range(32)))
+
+        ci.rpc_wallet = lambda method, params=None: {"isvalid": True}
+        assert ci.isValidAddress(taproot) is True
+        assert ci.isValidAddress(future) is False
+
+        ci._connection_type = "electrum"
+        assert ci.isValidAddress(taproot) is True
+        assert ci.isValidAddress(future) is False
+
+        nmc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        nmc_coin_settings.update(REQUIRED_SETTINGS)
+        ci_nmc = NMCInterface(nmc_coin_settings, "regtest")
+        ci_nmc.rpc_wallet = lambda method, params=None: {"isvalid": True}
+        nmc_hrp = ci_nmc.chainparams_network()["hrp"]
+        nmc_taproot = segwit_addr.encode_segwit_address(nmc_hrp, 1, bytes(range(32)))
+        assert ci_nmc.isValidAddress(nmc_taproot) is False
+
+    def test_describe_tx_names_taproot_outputs(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        program = bytes(range(32))
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(1, 0)))
+        tx.vout.append(CTxOut(1000, CScript([CScriptOp.encode_op_n(1), program])))
+        rv = ci._describeTxLocal(tx.serialize().hex())
+        expected = segwit_addr.encode_segwit_address(hrp, 1, program)
+        assert rv["vout"][0]["scriptPubKey"]["address"] == expected
+
+    def test_spend_b_lock_pays_what_the_address_means(self):
+        ci = self.ci_btc()
+        hrp = ci.chainparams_network()["hrp"]
+        pk = ci.getPubkey(ci.getNewRandomKey())
+        redeem_script = CScript([pk, OP_CHECKSIG])
+        program = bytes(range(32))
+        cases = (
+            (
+                ci.encode_p2sh(redeem_script),
+                CScript([OP_HASH160, hash160(redeem_script), OP_EQUAL]),
+            ),
+            (
+                ci.pubkey_to_address(pk),
+                CScript([OP_DUP, OP_HASH160, hash160(pk), OP_EQUALVERIFY, OP_CHECKSIG]),
+            ),
+            (
+                segwit_addr.encode_segwit_address(hrp, 0, hash160(pk)),
+                CScript([CScriptOp.encode_op_n(0), hash160(pk)]),
+            ),
+            (
+                segwit_addr.encode_segwit_address(hrp, 1, program),
+                CScript([CScriptOp.encode_op_n(1), program]),
+            ),
+        )
+        published = []
+        ci.getBLockTxo = lambda txid, vout, script_pk: (0, 100000)
+        ci.getBLockSpendTxFee = lambda tx, fee: 1000
+        ci.signTxWithKey = lambda tx, key, prev_amount=None: tx
+        ci.publishTx = lambda tx: published.append(tx) or "00" * 32
+        for address, expected in cases:
+            ci.spendBLockTx(
+                bytes(32), address, None, ci.getNewRandomKey(), 100000, 1000, 0
+            )
+            tx = ci.loadTx(published[-1])
+            assert bytes(tx.vout[0].scriptPubKey) == bytes(expected)
+
+    def test_swap_dest_is_a_key_hash_or_a_script_peers_accept(self):
+        settings = {"rpcport": 0, "rpcauth": "none"}
+        settings.update(REQUIRED_SETTINGS)
+        ci = self.ci_btc()
+        ci_part = PARTInterface(settings, "regtest")
+        ci_doge = DOGEInterface(settings, "regtest")
+        ci_nmc = NMCInterface(settings, "regtest")
+
+        pk = ci.getPubkey(ci.getNewRandomKey())
+        pkh = hash160(pk)
+        redeem_script = CScript([pk, OP_CHECKSIG])
+        program = bytes(range(32))
+        p2pkh = CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])
+        p2sh = CScript([OP_HASH160, hash160(redeem_script), OP_EQUAL])
+        p2wpkh = CScript([CScriptOp.encode_op_n(0), pkh])
+        p2wsh = CScript([CScriptOp.encode_op_n(0), program])
+        p2tr = CScript([CScriptOp.encode_op_n(1), program])
+
+        def segwit(ci, version, data):
+            hrp = ci.chainparams_network()["hrp"]
+            return segwit_addr.encode_segwit_address(hrp, version, data)
+
+        accepted = (
+            (ci, ci.pubkey_to_address(pk), p2pkh),
+            (ci, ci.encode_p2sh(redeem_script), p2sh),
+            (ci, segwit(ci, 0, pkh), pkh),
+            (ci, segwit(ci, 0, program), p2wsh),
+            (ci, segwit(ci, 1, program), p2tr),
+            (ci_part, ci_part.pubkey_to_address(pk), pkh),
+            (ci_part, ci_part.encode_p2sh(redeem_script), p2sh),
+            (ci_part, segwit(ci_part, 0, pkh), p2wpkh),
+            (ci_part, segwit(ci_part, 0, program), p2wsh),
+            (ci_doge, ci_doge.pubkey_to_address(pk), pkh),
+            (ci_doge, ci_doge.encode_p2sh(redeem_script), p2sh),
+        )
+        for coin_ci, address, expected in accepted:
+            assert coin_ci.decodeSwapDest(address) == bytes(expected), address
+
+        refused = (
+            (ci, segwit(ci, 2, program)),
+            (ci_part, segwit(ci_part, 1, program)),
+            (ci_doge, segwit(ci_doge, 0, pkh)),
+            (ci_nmc, segwit(ci_nmc, 1, program)),
+        )
+        for coin_ci, address in refused:
+            with self.assertRaises(ValueError):
+                coin_ci.decodeSwapDest(address)
+        for coin_ci in (ci_part, ci_nmc):
+            with self.assertRaises(ValueError):
+                coin_ci.getDestForAddress(segwit(coin_ci, 1, program))
+
+    def test_lock_spend_pays_every_swap_dest_a_coin_accepts(self):
+        def ci_for(cls):
+            settings = {"rpcport": 0, "rpcauth": "none"}
+            settings.update(REQUIRED_SETTINGS)
+            ci = cls(settings, "regtest")
+            ci._log = BSXLogger("test")
+            return ci
+
+        hash20 = bytes(range(20))
+        hash32 = bytes(range(32))
+        dests = [hash20] + [
+            bytes(script)
+            for script in (
+                CScript([OP_DUP, OP_HASH160, hash20, OP_EQUALVERIFY, OP_CHECKSIG]),
+                CScript([OP_HASH160, hash20, OP_EQUAL]),
+                CScript([CScriptOp.encode_op_n(0), hash20]),
+                CScript([CScriptOp.encode_op_n(0), hash32]),
+                CScript([CScriptOp.encode_op_n(1), hash32]),
+                CScript([CScriptOp.encode_op_n(2), hash32]),
+            )
+        ]
+        fee = 1000
+        for cls in (
+            BTCInterface,
+            LTCInterface,
+            NMCInterface,
+            PARTInterface,
+            NAVInterface,
+            DOGEInterface,
+            DASHInterface,
+            FIROInterface,
+            PIVXInterface,
+            BCHInterface,
+        ):
+            ci = ci_for(cls)
+            if ci.coin_type() in coins_without_segwit + scriptless_coins:
+                continue
+            for dest in dests:
+                if not BasicSwap.isValidSwapDest(None, ci, dest):
+                    continue
+                Kal = ci.getPubkey(ci.getNewRandomKey())
+                Kaf = ci.getPubkey(ci.getNewRandomKey())
+                lock_args = {}
+                if cls is BCHInterface:
+                    refund_script = ci.genScriptLockTxScript(
+                        ci,
+                        Kal,
+                        Kaf,
+                        mining_fee=fee,
+                        out_1=ci.getScriptForPubkeyHash(bytes(range(20, 40))),
+                        out_2=ci.getScriptForPubkeyHash(dest),
+                        public_key=Kaf,
+                        timelock=24,
+                    )
+                    lock_args = {
+                        "mining_fee": fee,
+                        "out_1": ci.getScriptForPubkeyHash(dest),
+                        "out_2": ci.scriptToP2SH32LockingBytecode(refund_script),
+                        "public_key": Kal,
+                        "timelock": 48,
+                    }
+                script_lock = XmrSwapInterface().genScriptLockTxScript(
+                    ci, Kal, Kaf, **lock_args
+                )
+                lock_bytes = ci.createSCLockTx(200000, script_lock)
+                if cls is NAVInterface:
+                    # NAV's loadTx drops allow_witness, which an input-less tx needs
+                    tx_lock = NAVTransaction()
+                    tx_lock.deserialize(BytesIO(lock_bytes), allow_witness=False)
+                else:
+                    tx_lock = ci.loadTx(lock_bytes, allow_witness=False)
+                tx_lock.vin.append(CTxIn(COutPoint(1, 0)))
+                tx_lock_bytes = tx_lock.serialize()
+                spend_tx = ci.createSCLockSpendTx(tx_lock_bytes, script_lock, dest, fee)
+                pays = dest
+                if ci.isValidAddressHash(dest):
+                    pays = bytes(ci.getScriptForPubkeyHash(dest))
+                assert bytes(ci.loadTx(spend_tx).vout[0].scriptPubKey) == pays, (
+                    ci.coin_name(),
+                    dest.hex(),
+                )
+                assert ci.verifySCLockSpendTx(
+                    spend_tx, tx_lock_bytes, script_lock, dest, fee
+                ), (ci.coin_name(), dest.hex())
+
+    def test_bch_dest_for_address_follows_the_address_type(self):
+        bch_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        bch_coin_settings.update(REQUIRED_SETTINGS)
+        ci = BCHInterface(bch_coin_settings, "regtest")
+        hash20 = bytes(range(20))
+        hash32 = bytes(range(32))
+        p2pkh = Address("P2PKH-REGTEST", list(hash20)).cash_address()
+        p2sh20 = Address("P2SH20-REGTEST", list(hash20)).cash_address()
+        p2sh32 = Address("P2SH32-REGTEST", list(hash32)).cash_address()
+        assert ci.getDestForAddress(p2pkh) == ci.getScriptForPubkeyHash(hash20)
+        assert ci.getDestForAddress(p2sh20) == CScript([OP_HASH160, hash20, OP_EQUAL])
+        assert ci.getDestForAddress(p2sh32) == CScript([OP_HASH256, hash32, OP_EQUAL])
+        assert ci.decodeSwapDest(p2pkh) == hash20
+        with self.assertRaises(ValueError):
+            ci.decodeSwapDest(p2sh20)
 
     def test_dleag(self):
         ci = self.ci_xmr()
