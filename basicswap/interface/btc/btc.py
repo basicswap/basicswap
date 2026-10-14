@@ -1372,7 +1372,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return self.encode_p2wsh(script)
 
     def getDestForAddress(self, address: str) -> bytes:
-        bech32_prefix: str | None = self.chainparams_network().get("hrp", None)
         if self.isSegwitAddress(address):
             version, witprog = segwit_addr.decode_segwit_address(
                 self.chainparams_network()["hrp"], address

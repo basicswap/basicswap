@@ -6,6 +6,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+from io import BytesIO
 import hashlib
 import logging
 import os
@@ -29,6 +30,7 @@ from basicswap.basicswap import (
     SwapTypes,
 )
 from basicswap.base import BaseApp
+from basicswap.chainparams import coins_without_segwit, scriptless_coins
 from basicswap.contrib.mnemonic import Mnemonic
 from basicswap.db import create_db_, DBMethods, KnownIdentity
 from basicswap.util import h2b
@@ -56,6 +58,8 @@ from basicswap.interface.bch.contrib.script import OP_HASH256
 from basicswap.interface.dash.dash import DASHInterface
 from basicswap.interface.doge.doge import DOGEInterface
 from basicswap.interface.firo.firo import FIROInterface
+from basicswap.interface.ltc.ltc import LTCInterface
+from basicswap.interface.nav.contrib.mininode import CTransaction as NAVTransaction
 from basicswap.interface.nav.nav import NAVInterface
 from basicswap.interface.part.part import PARTInterface
 from basicswap.interface.pivx.pivx import PIVXInterface
@@ -832,63 +836,90 @@ class Test(unittest.TestCase):
             with self.assertRaises(ValueError):
                 coin_ci.getDestForAddress(segwit(coin_ci, 1, program))
 
-    def test_txo_dest_types_follow_each_coin(self):
+    def test_lock_spend_pays_every_swap_dest_a_coin_accepts(self):
         def ci_for(cls):
             settings = {"rpcport": 0, "rpcauth": "none"}
             settings.update(REQUIRED_SETTINGS)
-            return cls(settings, "regtest")
+            ci = cls(settings, "regtest")
+            ci._log = BSXLogger("test")
+            return ci
 
         hash20 = bytes(range(20))
         hash32 = bytes(range(32))
-        scripts = {
-            "p2pkh": CScript([OP_DUP, OP_HASH160, hash20, OP_EQUALVERIFY, OP_CHECKSIG]),
-            "p2sh": CScript([OP_HASH160, hash20, OP_EQUAL]),
-            "p2wpkh": CScript([CScriptOp.encode_op_n(0), hash20]),
-            "p2wsh": CScript([CScriptOp.encode_op_n(0), hash32]),
-            "p2tr": CScript([CScriptOp.encode_op_n(1), hash32]),
-        }
-        expected = (
-            (self.ci_btc(), {"p2pkh", "p2sh", "p2wpkh", "p2wsh", "p2tr"}),
-            (ci_for(NMCInterface), {"p2pkh", "p2sh", "p2wpkh", "p2wsh"}),
-            (ci_for(PARTInterface), {"p2pkh", "p2sh", "p2wpkh", "p2wsh"}),
-            (ci_for(NAVInterface), {"p2pkh", "p2sh", "p2wpkh", "p2wsh"}),
-            (ci_for(DOGEInterface), {"p2pkh", "p2sh"}),
-            (ci_for(DASHInterface), {"p2pkh", "p2sh"}),
-            (ci_for(FIROInterface), {"p2pkh", "p2sh"}),
-            (ci_for(PIVXInterface), {"p2pkh", "p2sh"}),
-            (ci_for(BCHInterface), set()),
-        )
-        for coin_ci, accepted in expected:
-            for name, script in scripts.items():
-                assert coin_ci.isValidTxoDest(bytes(script)) == (name in accepted), (
-                    coin_ci.coin_name(),
-                    name,
-                )
-
-    def test_lock_spend_pays_a_script_swap_dest(self):
-        ci = self.ci_btc()
-        program = bytes(range(32))
-        for dest in (
-            bytes(
-                CScript([OP_DUP, OP_HASH160, program[:20], OP_EQUALVERIFY, OP_CHECKSIG])
-            ),
-            bytes(CScript([OP_HASH160, program[:20], OP_EQUAL])),
-            bytes(CScript([CScriptOp.encode_op_n(0), program])),
-            bytes(CScript([CScriptOp.encode_op_n(1), program])),
+        dests = [hash20] + [
+            bytes(script)
+            for script in (
+                CScript([OP_DUP, OP_HASH160, hash20, OP_EQUALVERIFY, OP_CHECKSIG]),
+                CScript([OP_HASH160, hash20, OP_EQUAL]),
+                CScript([CScriptOp.encode_op_n(0), hash20]),
+                CScript([CScriptOp.encode_op_n(0), hash32]),
+                CScript([CScriptOp.encode_op_n(1), hash32]),
+                CScript([CScriptOp.encode_op_n(2), hash32]),
+            )
+        ]
+        fee = 1000
+        for cls in (
+            BTCInterface,
+            LTCInterface,
+            NMCInterface,
+            PARTInterface,
+            NAVInterface,
+            DOGEInterface,
+            DASHInterface,
+            FIROInterface,
+            PIVXInterface,
+            BCHInterface,
         ):
-            Kal = ci.getPubkey(ci.getNewRandomKey())
-            Kaf = ci.getPubkey(ci.getNewRandomKey())
-            script_lock = XmrSwapInterface().genScriptLockTxScript(ci, Kal, Kaf)
-            tx_lock = CTransaction()
-            tx_lock.vin.append(CTxIn(COutPoint(1, 0)))
-            tx_lock.vout.append(CTxOut(200000, ci.getScriptDest(script_lock)))
-            spend_tx = ci.createSCLockSpendTx(
-                tx_lock.serialize(), script_lock, dest, 1000
-            )
-            assert bytes(ci.loadTx(spend_tx).vout[0].scriptPubKey) == dest
-            assert ci.verifySCLockSpendTx(
-                spend_tx, tx_lock.serialize(), script_lock, dest, 1000
-            )
+            ci = ci_for(cls)
+            if ci.coin_type() in coins_without_segwit + scriptless_coins:
+                continue
+            for dest in dests:
+                if not BasicSwap.isValidSwapDest(None, ci, dest):
+                    continue
+                Kal = ci.getPubkey(ci.getNewRandomKey())
+                Kaf = ci.getPubkey(ci.getNewRandomKey())
+                lock_args = {}
+                if cls is BCHInterface:
+                    refund_script = ci.genScriptLockTxScript(
+                        ci,
+                        Kal,
+                        Kaf,
+                        mining_fee=fee,
+                        out_1=ci.getScriptForPubkeyHash(bytes(range(20, 40))),
+                        out_2=ci.getScriptForPubkeyHash(dest),
+                        public_key=Kaf,
+                        timelock=24,
+                    )
+                    lock_args = {
+                        "mining_fee": fee,
+                        "out_1": ci.getScriptForPubkeyHash(dest),
+                        "out_2": ci.scriptToP2SH32LockingBytecode(refund_script),
+                        "public_key": Kal,
+                        "timelock": 48,
+                    }
+                script_lock = XmrSwapInterface().genScriptLockTxScript(
+                    ci, Kal, Kaf, **lock_args
+                )
+                lock_bytes = ci.createSCLockTx(200000, script_lock)
+                if cls is NAVInterface:
+                    # NAV's loadTx drops allow_witness, which an input-less tx needs
+                    tx_lock = NAVTransaction()
+                    tx_lock.deserialize(BytesIO(lock_bytes), allow_witness=False)
+                else:
+                    tx_lock = ci.loadTx(lock_bytes, allow_witness=False)
+                tx_lock.vin.append(CTxIn(COutPoint(1, 0)))
+                tx_lock_bytes = tx_lock.serialize()
+                spend_tx = ci.createSCLockSpendTx(tx_lock_bytes, script_lock, dest, fee)
+                pays = dest
+                if ci.isValidAddressHash(dest):
+                    pays = bytes(ci.getScriptForPubkeyHash(dest))
+                assert bytes(ci.loadTx(spend_tx).vout[0].scriptPubKey) == pays, (
+                    ci.coin_name(),
+                    dest.hex(),
+                )
+                assert ci.verifySCLockSpendTx(
+                    spend_tx, tx_lock_bytes, script_lock, dest, fee
+                ), (ci.coin_name(), dest.hex())
 
     def test_bch_dest_for_address_follows_the_address_type(self):
         bch_coin_settings = {"rpcport": 0, "rpcauth": "none"}
