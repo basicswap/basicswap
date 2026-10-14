@@ -15,7 +15,7 @@ from basicswap.interface.prepare_util import (
     setBinExecPermissions,
 )
 
-SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "7.0.0")
+SIMPLEX_CHAT_VERSION = os.getenv("SIMPLEX_CHAT_VERSION", "7.0.3")
 SIMPLEX_WS_PORT = int(os.getenv("SIMPLEX_WS_PORT", 5225))
 SIMPLEX_SERVER_ADDRESS = os.getenv(
     "SIMPLEX_SERVER_ADDRESS",
