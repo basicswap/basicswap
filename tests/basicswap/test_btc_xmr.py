@@ -6,9 +6,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import os
 import random
 import logging
 import unittest
+
+from unittest.mock import patch
 
 from basicswap.basicswap import (
     BidStates,
@@ -4327,6 +4330,74 @@ class TestBTC(BasicSwapTest):
             jsw = read_json_api(1800, f"wallets/{coin}")
             assert jsw["encrypted"] is True
             assert jsw["locked"] is False
+
+    def test_010_wallet_encryption_recovers(self):
+        password = "notapassword456"
+
+        def assert_needs_password(ci) -> None:
+            is_xmr = ci.coin_type() == Coins.XMR
+            wrong = "" if is_xmr else "wrongpassword"
+            for attempt, opens in ((wrong, False), (password, True)):
+                ci.lockWallet()
+                try:
+                    ci.unlockWallet(attempt, check_seed=False)
+                    if is_xmr:
+                        ci.getMainWalletAddress()
+                    opened = True
+                except Exception:
+                    opened = False
+                assert opened is opens, (ci.coin_name(), attempt)
+
+        sc = self.swap_clients[0]
+        if not sc.ci(Coins.PART).isWalletEncrypted():
+            sc.changeWalletPasswords("", password)
+        sc.unlockWallets(password)
+        coins = sc.getListOfWalletCoins()
+
+        with patch.object(
+            sc.ci(coins[-1]), "changeWalletPassword", side_effect=ValueError("test")
+        ):
+            with self.assertRaises(ValueError):
+                sc.changeWalletPasswords(password, "notapassword789")
+        for c in coins:
+            assert_needs_password(sc.ci(c))
+
+        ci_xmr = sc.ci(Coins.XMR)
+        ci_xmr.changeWalletPassword(password, "")
+        sc.lockWallets()
+        sc.unlockWallets(password)
+        assert_needs_password(ci_xmr)
+
+        sc.lockWallets()
+        wallet_path = os.path.join(
+            sc.getChainClientSettings(Coins.XMR)["datadir"],
+            "wallets",
+            ci_xmr._wallet_filename,
+        )
+        assert os.path.isfile(wallet_path)
+        for path in (wallet_path, wallet_path + ".keys"):
+            os.rename(path, path + ".moved")
+        try:
+            sc.unlockWallets(password)
+        finally:
+            for path in (wallet_path, wallet_path + ".keys"):
+                os.rename(path + ".moved", path)
+        assert_needs_password(ci_xmr)
+        sc.unlockWallets(password)
+
+        sc2 = self.swap_clients[2]
+        coins2 = sc2.getListOfWalletCoins()
+        assert sc2.getLockedState()[0] is False
+        with patch.object(
+            sc2.ci(coins2[1]), "changeWalletPassword", side_effect=ValueError("test")
+        ):
+            with self.assertRaises(ValueError):
+                sc2.changeWalletPasswords("", password)
+        assert sc2.getLockedState()[0] is True
+        sc2.unlockWallets(password)
+        for c in coins2:
+            assert_needs_password(sc2.ci(c))
+        sc2.unlockWallets(password)
 
     def test_01_full_swap(self):
         abandon_all_swaps(test_delay_event, self.swap_clients[0])
