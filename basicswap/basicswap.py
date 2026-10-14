@@ -1995,23 +1995,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Failed to unlock {}".format(ci.coin_name()))
 
         changed = []
-        for c in coins_list:
-            if coin and c != coin:
-                continue
-            try:
-                self.ci(c).changeWalletPassword(old_password, new_password)
-            except Exception as e:
-                self.log.error(f"Failed to change password for {getCoinName(c)}: {e}")
-                if old_password != "":
-                    self._revertWalletPasswords(changed, old_password, new_password)
-                raise
-            changed.append(c)
-
-        # Update cached state
-        if coin is None or coin == Coins.PART:
-            self._is_encrypted, self._is_locked = self.ci(
-                Coins.PART
-            ).isWalletEncryptedLocked()
+        try:
+            for c in coins_list:
+                if coin and c != coin:
+                    continue
+                try:
+                    self.ci(c).changeWalletPassword(old_password, new_password)
+                except Exception as e:
+                    self.log.error(
+                        f"Failed to change password for {getCoinName(c)}: {e}"
+                    )
+                    if old_password != "":
+                        self._revertWalletPasswords(changed, old_password, new_password)
+                    raise
+                changed.append(c)
+        finally:
+            # Update cached state
+            if coin is None or coin == Coins.PART:
+                self._is_encrypted, self._is_locked = self.ci(
+                    Coins.PART
+                ).isWalletEncryptedLocked()
 
     def _revertWalletPasswords(
         self, coins_list, old_password: str, new_password: str
