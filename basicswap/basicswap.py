@@ -9072,6 +9072,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
+                # A lock publish that errored may still have reached the chain
+                if (
+                    bid.xmr_b_lock_tx is None
+                    and was_sent
+                    and self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
+                ):
+                    self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                 if bid.xmr_b_lock_tx is None:
                     # Nothing was locked on chain B, there is nothing to recover.
                     rv = True  # Remove from swaps_in_progress
@@ -13458,6 +13465,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
         was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
 
+        if bid.state != BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+            self.log.warning(
+                f"Not sending coin B lock tx for adaptor-sig bid {self.log.id(bid_id)} in state {BidStates(bid.state).name}."
+            )
+            return
+
+        lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
+        if (
+            lock_remaining is not None
+            and lock_remaining < self._sc_lock_release_min_margin
+        ):
+            # The leader won't release, so the lock could only be recovered
+            if (
+                self.countBidEvents(
+                    bid, EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, cursor
+                )
+                < 1
+            ):
+                self.log.error(
+                    f"Not sending coin B lock tx for adaptor-sig bid {self.log.id(bid_id)}, "
+                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_release_min_margin}."
+                )
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE,
+                    "",
+                    cursor,
+                )
+            return
+
         if self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent) is True:
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
             return
@@ -13561,6 +13598,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         leg_swaps = []
         for leg in batch:
+            if (
+                leg.lock_remaining_seconds is not None
+                and leg.lock_remaining_seconds < self._sc_lock_release_min_margin
+            ):
+                continue
             if (
                 self.getPreFundedTx(
                     Concepts.BID, leg.bid_id, TxTypes.PTX_PRE_FUNDED, cursor=cursor
