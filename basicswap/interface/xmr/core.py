@@ -15,10 +15,10 @@ from basicswap.interface.prepare_util import (
     getOSDirNames,
 )
 
-MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.5.1")
+MONERO_VERSION = os.getenv("MONERO_VERSION", "0.18.5.4")
 MONERO_VERSION_TAG = os.getenv("MONERO_VERSION_TAG", "")
 XMR_SITE_COMMIT = (
-    "76f3846db3442be40676fd2e5432dd809d44ea3f"  # Lock hashes.txt to monero version
+    "947eb388c5028baea0dacb56cdd37b25710f2b55"  # Lock hashes.txt to monero version
 )
 monero_signers = {"binaryfate": ("81AC591FE9C4B65C5806AFC3F0AF4D462A0BDF92",)}
 
