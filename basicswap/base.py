@@ -425,6 +425,10 @@ class BaseApp(DBMethods):
     def setMockTimeOffset(self, new_offset: int) -> None:
         self.log.warning(f"Setting mocktime to {new_offset}")
         self.mock_time_offset = new_offset
+        # checkForUpdates times itself with time.time()
+        for name in list(vars(self)):
+            if name.startswith("_last_checked_") and name != "_last_checked_updates":
+                setattr(self, name, 0)
 
     def get_clamped_int_from(
         self,
