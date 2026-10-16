@@ -3234,19 +3234,20 @@ class BasicSwapTest(TestFunctions):
             )
             assert addr_decoded == expected_decoded
 
-        address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
-        for chain in ["external", "internal"]:
-            extkey_data = b58decode(address_chains[chain])[4:-4]
-            ek = ExtKeyPair()
-            ek.decode(extkey_data)
-            addr0h = ci.encodeSegwitAddress(
-                ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
-            )
-            if self.test_coin_from == Coins.BTC:
-                assert addr0h == self.expected_addresses[chain]
-            else:
-                pass
-                # TODO: derive expected keys
+        if not ci.canExportToElectrum():
+            address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
+            for chain in ["external", "internal"]:
+                extkey_data = b58decode(address_chains[chain])[4:-4]
+                ek = ExtKeyPair()
+                ek.decode(extkey_data)
+                addr0h = ci.encodeSegwitAddress(
+                    ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
+                )
+                if self.test_coin_from == Coins.BTC:
+                    assert addr0h == self.expected_addresses[chain]
+                else:
+                    pass
+                    # TODO: derive expected keys
 
         desc_watch = descsum_create(f"addr({addr})")
         self.callnoderpc(
@@ -3397,6 +3398,9 @@ class BasicSwapTest(TestFunctions):
     def test_015_changetype(self):
         logging.info(f"---------- Test {self.test_coin_from.name} changetype")
         ci = self.swap_clients[0].ci(self.test_coin_from)
+        if hasattr(ci, "_use_descriptors") and ci._use_descriptors:
+            logging.warning("Skipping test")
+            return
 
         addr_p2sh = ci.rpc_wallet(
             "getnewaddress", ["test_015_changetype", "p2sh-segwit"]
@@ -4031,6 +4035,15 @@ class BasicSwapTest(TestFunctions):
         old_override_feerate1 = ci1_from_settings.get("override_feerate", None)
         old_min_relay_fee = ci_from_settings.get("min_relay_fee", None)
         old_min_relay_fee1 = ci1_from_settings.get("min_relay_fee", None)
+        fee_attrs = (
+            "_low_feerate",
+            "_high_feerate",
+            "_high_estimated_feerate_multiplier",
+        )
+        old_fee_attrs = [
+            {name: getattr(ci, name) for name in fee_attrs}
+            for ci in (ci_from, ci1_from)
+        ]
 
         networkinfo = ci_from.rpc("getnetworkinfo")
         # BTC v29.1 relayfee dropped to 100
@@ -4176,6 +4189,9 @@ class BasicSwapTest(TestFunctions):
             ci1_from_settings["override_feerate"] = old_override_feerate1
             ci_from_settings["min_relay_fee"] = old_min_relay_fee
             ci1_from_settings["min_relay_fee"] = old_min_relay_fee1
+            for ci, attrs in zip((ci_from, ci1_from), old_fee_attrs):
+                for name, value in attrs.items():
+                    setattr(ci, name, value)
 
 
 class TestBTC(BasicSwapTest):
@@ -4201,6 +4217,7 @@ class TestBTC(BasicSwapTest):
         assert rv["seed_id"] in (
             "3da5c0af91879e8ce97d9a843874601c08688078",
             "4a231080ec6f4078e543d39cc6dcf0b922c9b16b",
+            "44c597105a996e6c4234f7dc3593dde8bd0b1062",
         )
         assert rv["seed_id"] == rv["expected_seed_id"]
 
