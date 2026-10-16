@@ -958,9 +958,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             # Bitcoin Core 30 removed these fields from getwalletinfo.
             balances = self.rpc_wallet("getbalances")["mine"]
             rv.setdefault("balance", balances["trusted"])
-            rv.setdefault(
-                "unconfirmed_balance", balances["untrusted_pending"]
-            )
+            rv.setdefault("unconfirmed_balance", balances["untrusted_pending"])
             rv.setdefault("immature_balance", balances["immature"])
 
         rv["encrypted"] = "unlocked_until" in rv
