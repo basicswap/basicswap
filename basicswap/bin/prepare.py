@@ -8,6 +8,7 @@
 
 import base64
 import contextlib
+import getpass
 import gnupg
 import json
 import logging
@@ -301,7 +302,7 @@ def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> 
 
 def getDescriptorWalletOption(coin_params):
     ticker: str = coin_params["ticker"]
-    default_option: bool = True if ticker in ("NMC",) else False
+    default_option: bool = True if ticker in ("BTC", "NMC") else False
     return toBool(os.getenv(ticker + "_USE_DESCRIPTORS", default_option))
 
 
@@ -824,6 +825,9 @@ def printHelp():
     )
     print("--initwalletsonly        Setup coin wallets only.")
     print(
+        "--migratewallets         Migrate legacy wallets to descriptor wallets where possible.  Optionally use alongside --withcoin="
+    )
+    print(
         "--keysdirpath            Speed up tests by preloading all PGP keys in directory."
     )
     print(
@@ -1105,6 +1109,98 @@ def initialise_wallets(
     return extended_keys
 
 
+def start_migration_daemons(swap_client, coin_names, settings, prepare_ctx, daemons):
+    daemon_args = ["-noconnect", "-nodnsseed"]
+    if not swap_client.use_tor_proxy:
+        # Cannot set -bind or -whitebind together with -listen=0
+        daemon_args.append("-nolisten")
+    for coin_name in coin_names:
+        module = coin_prepare_modules[coin_name]
+        coin_settings = settings["chainclients"][coin_name]
+        c = swap_client.getCoinIdFromName(coin_name)
+        if coin_settings["manage_daemon"]:
+            filename: str = getCoreBinName(c, coin_settings, coin_name + "d")
+            coin_args = module.getWalletInitDaemonArgs(
+                prepare_ctx, swap_client, c, coin_settings
+            )
+            coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
+            daemons.append(
+                startDaemon(
+                    coin_settings["datadir"],
+                    coin_settings["bindir"],
+                    filename,
+                    daemon_args + coin_args,
+                    extra_config={"stdout_to_file": True, "coin_name": coin_name},
+                )
+            )
+            swap_client.setDaemon(c, daemons[-1])
+        swap_client.setCoinRunParams(c)
+        swap_client.createCoinInterface(c)
+
+
+def unlock_seed_wallet(swap_client, seed_coin, prepare_ctx) -> None:
+    c = swap_client.getCoinIdFromName(seed_coin)
+    swap_client.waitForDaemonRPC(c, with_wallet=True)
+    if not swap_client.ci(c).isWalletEncrypted():
+        return
+    if prepare_ctx.wallet_encryption_pwd == "":
+        if not sys.stdin.isatty():
+            raise ValueError(
+                "Must set WALLET_ENCRYPTION_PWD to migrate wallets when the Particl wallet is encrypted"
+            )
+        prepare_ctx.wallet_encryption_pwd = getpass.getpass(
+            "Wallet encryption password: "
+        )
+        if prepare_ctx.wallet_encryption_pwd == "":
+            raise ValueError("No wallet encryption password entered")
+    swap_client.ci(c).unlockWallet(prepare_ctx.wallet_encryption_pwd)
+
+
+def migrate_wallets(migrate_coins, data_dir, settings, chain, extra_opts, config_path):
+    prepare_ctx = extra_opts["prepare_ctx"]
+    swap_client = None
+    daemons = []
+    try:
+        swap_client = BasicSwap(data_dir, settings, chain, transient_instance=True)
+        seed_coin: str = next(
+            name
+            for name, module in coin_prepare_modules.items()
+            if module.provides_master_key
+        )
+        start_coins = [seed_coin] + [c for c in migrate_coins if c != seed_coin]
+        start_migration_daemons(
+            swap_client, start_coins, settings, prepare_ctx, daemons
+        )
+        unlock_seed_wallet(swap_client, seed_coin, prepare_ctx)
+
+        for coin_name in migrate_coins:
+            coin_settings = settings["chainclients"][coin_name]
+            c = swap_client.getCoinIdFromName(coin_name)
+            swap_client.waitForDaemonRPC(c, with_wallet=False)
+            coin_params = chainparams[c]
+            watch_wallet_name: str = getWalletName(
+                coin_params,
+                "bsx_watch",
+                prefix_override=f"{coin_params['ticker']}_WATCH",
+            )
+            try:
+                coin_prepare_modules[coin_name].migrateWallet(
+                    prepare_ctx, swap_client, c, coin_settings, watch_wallet_name
+                )
+            finally:
+                save_config(config_path, settings)
+    finally:
+        if swap_client:
+            swap_client.finalise()
+            del swap_client
+        for d in daemons:
+            finalise_daemon(d)
+
+
+def check_seed_wallet_password(data_dir, settings, chain, extra_opts):
+    migrate_wallets([], data_dir, settings, chain, extra_opts, None)
+
+
 def load_config(config_path):
     if not os.path.exists(config_path):
         exitWithError("{} does not exist".format(config_path))
@@ -1213,6 +1309,7 @@ def main():
     enable_tor = False
     disable_tor = False
     initwalletsonly = False
+    migratewallets = False
     tor_control_password = None
     client_auth_pwd_value = None
     disable_client_auth_flag = False
@@ -1293,6 +1390,9 @@ def main():
             continue
         if name == "initwalletsonly":
             initwalletsonly = True
+            continue
+        if name == "migratewallets":
+            migratewallets = True
             continue
         if name == "dashv20compatible":
             extra_opts["dash_v20_compatible"] = True
@@ -1646,6 +1746,27 @@ def main():
         print("Done.")
         return 0
 
+    if migratewallets:
+        settings = load_config(config_path)
+        check_coins = with_coins if with_coins_changed else settings["chainclients"]
+        migrate_coins = [
+            coin_name
+            for coin_name in check_coins
+            if coin_prepare_modules[coin_name].hasLegacyWallet(
+                settings["chainclients"][coin_name]
+            )
+        ]
+        if len(migrate_coins) < 1:
+            logger.info("No legacy wallets to migrate.")
+            return 0
+        logger.info("Migrating wallets: {}".format(", ".join(migrate_coins)))
+        migrate_wallets(
+            migrate_coins, data_dir, settings, chain, extra_opts, config_path
+        )
+
+        print("Done.")
+        return 0
+
     if enable_tor:
         logger.info("Enabling TOR")
         settings = load_config(config_path)
@@ -1915,6 +2036,17 @@ def main():
             old_config_path = config_path[:-5] + "_" + str(int(time.time())) + ".json"
             save_config(old_config_path, settings, add_options=False)
 
+            migrate_coins = [
+                c
+                for c in with_coins
+                if coin_prepare_modules[c].needsWalletMigration(
+                    settings["chainclients"][c],
+                    settings["chainclients"][c].get("core_version_no", ""),
+                )
+            ]
+            if len(migrate_coins) > 0:
+                check_seed_wallet_password(data_dir, settings, chain, extra_opts)
+
             for c in with_coins:
                 prepareCore(c, settings, extra_opts)
                 current_coin_settings = chainclients[c]
@@ -1928,6 +2060,12 @@ def main():
                         "core_version_group"
                     ] = current_version_group
                 save_config(config_path, settings)
+
+            if len(migrate_coins) > 0:
+                logger.info("Migrating wallets: {}".format(", ".join(migrate_coins)))
+                migrate_wallets(
+                    migrate_coins, data_dir, settings, chain, extra_opts, config_path
+                )
 
             logger.info("Done.")
             return 0

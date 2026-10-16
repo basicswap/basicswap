@@ -2191,6 +2191,9 @@ class BasicSwapTest(TestFunctions):
             "---------- Test {} p2sh nested segwit".format(self.test_coin_from.name)
         )
         ci = self.swap_clients[0].ci(self.test_coin_from)
+        if hasattr(ci, "_use_descriptors") and ci._use_descriptors:
+            logging.warning("Skipping test")
+            return
 
         addr_p2sh_segwit = ci.rpc_wallet(
             "getnewaddress", ["segwit test", "p2sh-segwit"]
@@ -2552,7 +2555,7 @@ class BasicSwapTest(TestFunctions):
         ci1 = self.swap_clients[1].ci(self.test_coin_from)
 
         addr = ci.rpc_wallet("getnewaddress", ["watchonly test", "bech32"])
-        ci1.rpc_wallet("importaddress", [addr, "", False])
+        ci1.importWatchOnlyAddress(addr, "")
         txid = ci.rpc_wallet("sendtoaddress", [addr, 1.0])
         tx_hex = ci.rpc(
             "getrawtransaction",
@@ -2566,19 +2569,16 @@ class BasicSwapTest(TestFunctions):
                 tx_hex,
             ],
         )
-        ro = ci1.rpc_wallet(
+        ro = ci1.rpc_wallet_watch(
             "gettransaction",
             [
                 txid,
             ],
         )
         assert ro["txid"] == txid
-        balances = ci1.rpc_wallet("getbalances")
-        assert (
-            balances["watchonly"]["trusted"]
-            + balances["watchonly"]["untrusted_pending"]
-            >= 1.0
-        )
+        balances = ci1.rpc_wallet_watch("getbalances")
+        watched = balances["mine" if ci1._use_descriptors else "watchonly"]
+        assert watched["trusted"] + watched["untrusted_pending"] >= 1.0
 
     def test_006_getblock_verbosity(self):
         logging.info(
@@ -3451,7 +3451,7 @@ class BasicSwapTest(TestFunctions):
         lock_tx = ci0.signTxWithWallet(lock_tx)
         script_addr: str = ci0.encodeScriptDest(ci0.getScriptDest(lock_tx_script))
 
-        ci1.rpc_wallet_watch("importaddress", [script_addr])
+        ci1.importWatchOnlyAddress(script_addr, "")
 
         try:
             mining_address: str = self.getMiningAddr()
