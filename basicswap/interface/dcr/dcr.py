@@ -421,7 +421,12 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         # Clear initial password
         self._sc.editSettings(self.coin_name().lower(), {"wallet_pwd": ""})
 
-    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
+    def unlockWallet(
+        self,
+        password: str,
+        check_seed: bool = True,
+        encrypt_if_unencrypted: bool = False,
+    ) -> None:
         if password == "":
             return
         self._log.info("unlockWallet - {}".format(self.ticker()))

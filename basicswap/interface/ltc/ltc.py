@@ -267,7 +267,7 @@ class LTCInterfaceMWEB(LTCInterface):
     def has_mweb_wallet(self) -> bool:
         return "mweb" in self.rpc("listwallets")
 
-    def init_wallet(self, password=None):
+    def init_wallet(self, password=None, encrypt_if_unencrypted: bool = False):
         # If system is encrypted mweb wallet will be created at first unlock
 
         wallet_name: str = self._rpc_wallet
@@ -299,6 +299,8 @@ class LTCInterfaceMWEB(LTCInterface):
                     raise
 
         if password is not None:
+            if encrypt_if_unencrypted:
+                self.encryptIfUnencrypted(password)
             # Max timeout value, ~3 years
             self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
 
@@ -312,7 +314,12 @@ class LTCInterfaceMWEB(LTCInterface):
                 self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
             self.rpc_wallet("keypoolrefill")
 
-    def unlockWallet(self, password: str, check_seed: bool = True) -> None:
+    def unlockWallet(
+        self,
+        password: str,
+        check_seed: bool = True,
+        encrypt_if_unencrypted: bool = False,
+    ) -> None:
         if password == "":
             return
         self._log.info("unlockWallet - {}".format(self.ticker()))
@@ -321,8 +328,10 @@ class LTCInterfaceMWEB(LTCInterface):
             return
 
         if not self.has_mweb_wallet():
-            self.init_wallet(password)
+            self.init_wallet(password, encrypt_if_unencrypted)
         else:
+            if encrypt_if_unencrypted:
+                self.encryptIfUnencrypted(password)
             self.rpc_wallet("walletpassphrase", [password, 100000000], timeout=120)
             if self.getWalletSeedIDRetry() == "Not found":
                 self._log.info(f"Initializing HD seed for {self.coin_name()}.")
