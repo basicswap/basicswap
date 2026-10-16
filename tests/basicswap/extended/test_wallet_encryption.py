@@ -42,6 +42,7 @@ from basicswap.util.extkey import ExtKeyPair
 from basicswap.contrib.test_framework.descriptors import descsum_create
 
 bin_path = os.path.expanduser(os.getenv("TEST_BIN_PATH", ""))
+legacy_bin_path = os.path.expanduser(os.getenv("TEST_BTC_LEGACY_BIN_PATH", ""))
 test_base_path = os.path.expanduser(os.getenv("TEST_PATH", "/tmp/test_basicswap"))
 
 delay_event = threading.Event()
@@ -717,14 +718,14 @@ class Test(unittest.TestCase):
     def test_btc_wallets_with_module(self):
         import berkeleydb
 
-        if not os.path.exists(bin_path):
-            raise ValueError("TEST_BIN_PATH not set.")
+        if not os.path.exists(legacy_bin_path):
+            raise ValueError("TEST_BTC_LEGACY_BIN_PATH not set.")
         test_path = os.path.join(test_base_path, "test_btc_wallets_with_module")
         if os.path.exists(test_path):
             shutil.rmtree(test_path)
         os.makedirs(test_path)
         self.write_btc_conf(test_path)
-        daemon_path = os.path.join(bin_path, "bitcoin", "bitcoind")
+        daemon_path = os.path.join(legacy_bin_path, "bitcoin", "bitcoind")
         args = [
             daemon_path,
             "-datadir=" + test_path,
@@ -769,7 +770,7 @@ class Test(unittest.TestCase):
             )
 
             walletdir = os.path.join(test_path, "regtest", "wallets", "bdb_wallet")
-            walletpath = os.path.join(walletdir, "bsx_wallet")
+            walletpath = os.path.join(walletdir, "wallet.dat")
 
             db = berkeleydb.db.DB()
             db.open(
@@ -812,10 +813,10 @@ class Test(unittest.TestCase):
                 ],
             )
 
-            bkp_path = os.path.join(walletdir, "bsx_wallet" + ".bkp")
+            bkp_path = os.path.join(walletdir, "wallet.dat" + ".bkp")
             for i in range(1000):
                 if os.path.exists(bkp_path):
-                    bkp_path = os.path.join(walletdir, "bsx_wallet" + f".bkp{i}")
+                    bkp_path = os.path.join(walletdir, "wallet.dat" + f".bkp{i}")
 
             assert os.path.exists(bkp_path) is False
             if os.path.isfile(walletpath):
@@ -874,14 +875,14 @@ class Test(unittest.TestCase):
             bitcoind_process.wait(timeout=30)
 
     def test_btc_wallets_without_module(self):
-        if not os.path.exists(bin_path):
-            raise ValueError("TEST_BIN_PATH not set.")
+        if not os.path.exists(legacy_bin_path):
+            raise ValueError("TEST_BTC_LEGACY_BIN_PATH not set.")
         test_path = os.path.join(test_base_path, "test_btc_wallets_without_module")
         if os.path.exists(test_path):
             shutil.rmtree(test_path)
         os.makedirs(test_path)
         self.write_btc_conf(test_path)
-        daemon_path = os.path.join(bin_path, "bitcoin", "bitcoind")
+        daemon_path = os.path.join(legacy_bin_path, "bitcoin", "bitcoind")
         args = [
             daemon_path,
             "-datadir=" + test_path,
@@ -940,7 +941,7 @@ class Test(unittest.TestCase):
             )
             logging.info(f"Looking for hdchain for {seedid_bytes.hex()}")
             walletdir = os.path.join(test_path, "regtest", "wallets", "bdb_wallet2")
-            walletpath = os.path.join(walletdir, "bsx_wallet")
+            walletpath = os.path.join(walletdir, "wallet.dat")
             found_hdchain = False
             max_key_count = 4000000  # arbitrary
             with open(walletpath, "rb") as fp:
