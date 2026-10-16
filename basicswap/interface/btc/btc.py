@@ -432,7 +432,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 wallets = self.rpc("listwallets")
             except Exception as e:
                 self._log.debug(f'Error loading wallet "{self._rpc_wallet}": {e}.')
-                if "does not exist" in str(e) or "Path does not exist" in str(e):
+                if "legacy wallet" in str(e).lower():
+                    self._log.error(
+                        f'{self.coin_name()} wallet "{self._rpc_wallet}" is a legacy wallet.  Stop BasicSwap and run basicswap-prepare --migratewallets.'
+                    )
+                elif "does not exist" in str(e) or "Path does not exist" in str(e):
                     try:
                         wallet_dirs = self.rpc("listwalletdir")
                         existing = [w["name"] for w in wallet_dirs.get("wallets", [])]
@@ -841,26 +845,35 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 desc_external = descsum_create(f"wpkh({ek_encoded}/{path}/0/*)")
                 desc_internal = descsum_create(f"wpkh({ek_encoded}/{path}/1/*)")
 
-            rv = self.rpc_wallet(
-                "importdescriptors",
-                [
-                    [
-                        {"desc": desc_external, "timestamp": "now", "active": True},
+            rescan_from = "now" if restore_time == -1 else restore_time
+            descriptors = [
+                {"desc": desc_external, "timestamp": "now", "active": True},
+                {
+                    "desc": desc_internal,
+                    "timestamp": rescan_from,
+                    "active": True,
+                    "internal": True,
+                },
+            ]
+            if not self._use_legacy_key_paths:
+                # Keys from legacy wallets (created from sethdseed)
+                for chain in (0, 1):
+                    descriptors.append(
                         {
-                            "desc": desc_internal,
-                            "timestamp": "now" if restore_time == -1 else restore_time,
-                            "active": True,
-                            "internal": True,
-                        },
-                    ],
-                ],
-            )
+                            "desc": descsum_create(
+                                f"combo({ek_encoded}/0h/{chain}h/*h)"
+                            ),
+                            "timestamp": rescan_from,
+                            "active": False,
+                        }
+                    )
+            rv = self.rpc_wallet("importdescriptors", [descriptors])
 
             num_successful: int = 0
             for entry in rv:
                 if entry.get("success", False) is True:
                     num_successful += 1
-            if num_successful != 2:
+            if num_successful != len(descriptors):
                 self._log.error(f"Failed to import descriptors: {rv}.")
                 raise ValueError("Failed to import descriptors.")
         else:
@@ -1229,7 +1242,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return True
             if self._use_descriptors:
                 wo_addr_info = self.rpc_wallet_watch("getaddressinfo", [address])
-                if wo_addr_info["iswatchonly"]:
+                if wo_addr_info["ismine"]:
                     return True
         except Exception as e:
             self._log.debug(f"isAddressMine RPC check failed: {e}")
@@ -3684,6 +3697,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self.rpc_wallet("importaddress", [address, label, False])
 
     def isWatchOnlyAddress(self, address: str) -> bool:
+        if self._use_descriptors:
+            return self.rpc_wallet_watch("getaddressinfo", [address])["ismine"]
         addr_info = self.rpc_wallet("getaddressinfo", [address])
         return addr_info["iswatchonly"]
 

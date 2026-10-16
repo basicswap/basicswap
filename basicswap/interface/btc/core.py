@@ -19,7 +19,7 @@ from basicswap.interface.prepare_util import (
     getFileHash,
 )
 
-BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "29.4")
+BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "31.1")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
 bitcoin_signers = {
     "laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",),
@@ -119,11 +119,77 @@ class BTCPrepare(CoinPrepareModule):
         settings: dict,
         extra_opts: dict,
     ) -> None:
-        fp.write("deprecatedrpc=create_bdb\n")
+        if not settings["chainclients"][self.name].get("use_descriptors", False):
+            fp.write("deprecatedrpc=create_bdb\n")
         fp.write("prune=2000\n")
         fp.write("changetype=bech32\n")
         fp.write("fallbackfee=0.0002\n")
         self.writeRpcAuth(fp, salt)
+
+    def hasLegacyWallet(self, core_settings: dict) -> bool:
+        if core_settings.get("connection_type") == "electrum":
+            return False
+        return not core_settings.get("use_descriptors", False)
+
+    def needsWalletMigration(self, core_settings: dict, from_version: str) -> bool:
+        if not self.hasLegacyWallet(core_settings):
+            return False
+        from_major: str = from_version.split(".")[0]
+        if from_major.isdigit() and int(from_major) >= 30:
+            return False
+        return int(self.version.split(".")[0]) >= 30
+
+    def migrateWallet(
+        self,
+        ctx: PrepareContext,
+        swap_client,
+        coin_id,
+        core_settings: dict,
+        watch_wallet_name: str,
+    ) -> None:
+        wallet_name: str = core_settings.get("wallet_name", "wallet.dat")
+        ctx.logger.info(
+            f'Migrating {self.name.capitalize()} wallet "{wallet_name}" to descriptors.'
+        )
+        params = [wallet_name]
+        if ctx.wallet_encryption_pwd != "":
+            params.append(ctx.wallet_encryption_pwd)
+        rv = swap_client.ci(coin_id).rpc("migratewallet", params, timeout=3600)
+
+        backup_path: str = rv["backup_path"]
+        ctx.logger.info(f"Legacy wallet backup: {backup_path}")
+        if core_settings.get("manage_daemon", False) and not os.path.isfile(
+            backup_path
+        ):
+            ctx.logger.error(f"Legacy wallet backup not found: {backup_path}")
+
+        if "watchonly_name" in rv:
+            watch_wallet_name = rv["watchonly_name"]
+        else:
+            ctx.logger.info(
+                f'Creating wallet "{watch_wallet_name}" for {self.name.capitalize()}.'
+            )
+            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
+            swap_client.callcoinrpc(
+                coin_id,
+                "createwallet",
+                [watch_wallet_name, True, True, "", False, True, True],
+            )
+
+        core_settings["use_descriptors"] = True
+        core_settings["watch_wallet_name"] = watch_wallet_name
+        core_settings.pop("use_legacy_key_paths", None)
+        coin_client = swap_client.coin_clients[coin_id]
+        coin_client["use_descriptors"] = True
+        coin_client["watch_wallet_name"] = watch_wallet_name
+        coin_client.pop("use_legacy_key_paths", None)
+        swap_client.createCoinInterface(coin_id)
+
+        swap_client.storeSeedIDForCoin(swap_client.getWalletKey(coin_id, 1), coin_id)
+        if not swap_client.checkWalletSeed(coin_id):
+            ctx.logger.error(
+                f"{self.name.capitalize()} wallet seed check failed after migration."
+            )
 
     def prepareDataDir(
         self,
