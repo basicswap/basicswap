@@ -431,7 +431,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 wallets = self.rpc("listwallets")
             except Exception as e:
                 self._log.debug(f'Error loading wallet "{self._rpc_wallet}": {e}.')
-                if "does not exist" in str(e) or "Path does not exist" in str(e):
+                if "legacy wallet" in str(e).lower():
+                    self._log.error(
+                        f'{self.coin_name()} wallet "{self._rpc_wallet}" is a legacy wallet.  Stop BasicSwap and run basicswap-prepare --migratewallets.'
+                    )
+                elif "does not exist" in str(e) or "Path does not exist" in str(e):
                     try:
                         wallet_dirs = self.rpc("listwalletdir")
                         existing = [w["name"] for w in wallet_dirs.get("wallets", [])]
@@ -840,26 +844,35 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 desc_external = descsum_create(f"wpkh({ek_encoded}/{path}/0/*)")
                 desc_internal = descsum_create(f"wpkh({ek_encoded}/{path}/1/*)")
 
-            rv = self.rpc_wallet(
-                "importdescriptors",
-                [
-                    [
-                        {"desc": desc_external, "timestamp": "now", "active": True},
+            rescan_from = "now" if restore_time == -1 else restore_time
+            descriptors = [
+                {"desc": desc_external, "timestamp": "now", "active": True},
+                {
+                    "desc": desc_internal,
+                    "timestamp": rescan_from,
+                    "active": True,
+                    "internal": True,
+                },
+            ]
+            if not self._use_legacy_key_paths:
+                # Keys from legacy wallets (created from sethdseed)
+                for chain in (0, 1):
+                    descriptors.append(
                         {
-                            "desc": desc_internal,
-                            "timestamp": "now" if restore_time == -1 else restore_time,
-                            "active": True,
-                            "internal": True,
-                        },
-                    ],
-                ],
-            )
+                            "desc": descsum_create(
+                                f"combo({ek_encoded}/0h/{chain}h/*h)"
+                            ),
+                            "timestamp": rescan_from,
+                            "active": False,
+                        }
+                    )
+            rv = self.rpc_wallet("importdescriptors", [descriptors])
 
             num_successful: int = 0
             for entry in rv:
                 if entry.get("success", False) is True:
                     num_successful += 1
-            if num_successful != 2:
+            if num_successful != len(descriptors):
                 self._log.error(f"Failed to import descriptors: {rv}.")
                 raise ValueError("Failed to import descriptors.")
         else:
@@ -951,6 +964,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             }
 
         rv = self.rpc_wallet("getwalletinfo")
+        if self.coin_type() == Coins.BTC and any(
+            field not in rv
+            for field in ("balance", "unconfirmed_balance", "immature_balance")
+        ):
+            # Bitcoin Core 30 removed these fields from getwalletinfo.
+            balances = self.rpc_wallet("getbalances")["mine"]
+            rv.setdefault("balance", balances["trusted"])
+            rv.setdefault("unconfirmed_balance", balances["untrusted_pending"])
+            rv.setdefault("immature_balance", balances["immature"])
+
         rv["encrypted"] = "unlocked_until" in rv
         rv["locked"] = rv.get("unlocked_until", 1) <= 0
         rv["locked_utxos"] = len(self.rpc_wallet("listlockunspent"))
@@ -1218,7 +1241,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return True
             if self._use_descriptors:
                 wo_addr_info = self.rpc_wallet_watch("getaddressinfo", [address])
-                if wo_addr_info["iswatchonly"]:
+                if wo_addr_info["ismine"]:
                     return True
         except Exception as e:
             self._log.debug(f"isAddressMine RPC check failed: {e}")
@@ -3565,12 +3588,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     f"spendBLockTx: Failed to fetch tx {self._log.id(chain_b_lock_txid)} from backend"
                 )
             return locked_n, actual_value
-        wtx = self.rpc_wallet_watch(
-            "gettransaction",
-            [
-                chain_b_lock_txid.hex(),
-            ],
-        )
+        try:
+            wtx = self.rpc_wallet_watch("gettransaction", [chain_b_lock_txid.hex()])
+        except ValueError as e:
+            if "Invalid or non-wallet transaction id" not in str(e):
+                raise
+            wtx = self.rpc_wallet("gettransaction", [chain_b_lock_txid.hex()])
         lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
         locked_n = findOutput(lock_tx, script_pk)
         if locked_n is not None:
@@ -3672,6 +3695,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self.rpc_wallet("importaddress", [address, label, False])
 
     def isWatchOnlyAddress(self, address: str) -> bool:
+        if self._use_descriptors:
+            return self.rpc_wallet_watch("getaddressinfo", [address])["ismine"]
         addr_info = self.rpc_wallet("getaddressinfo", [address])
         return addr_info["iswatchonly"]
 
@@ -3774,7 +3799,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self._log.info(
                 f"Rescanning {self.coin_name()} chain from height: {rescan_from}"
             )
-            self.rpc_wallet("rescanblockchain", [rescan_from])
+            self.rpc_wallet_watch("rescanblockchain", [rescan_from])
 
         invalid_txids: list[str] = []
         return_txid = True if txid is None else False

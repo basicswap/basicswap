@@ -546,6 +546,22 @@ class CoinPrepareModule(ReleasePrepareModule):
     def getPostInitWarning(self, ctx: PrepareContext) -> str | None:
         return None
 
+    def hasLegacyWallet(self, core_settings: dict) -> bool:
+        return False
+
+    def needsWalletMigration(self, core_settings: dict, from_version: str) -> bool:
+        return False
+
+    def migrateWallet(
+        self,
+        ctx: PrepareContext,
+        swap_client,
+        coin_id,
+        core_settings: dict,
+        watch_wallet_name: str,
+    ) -> None:
+        raise ValueError(f"No wallet migration for {self.name.capitalize()}")
+
     def ensureWallet(
         self,
         ctx: PrepareContext,

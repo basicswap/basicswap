@@ -59,6 +59,7 @@ class WalletManager:
         self._log = log
         self._seed: bytes = None
         self._master_keys: dict[Coins, bytes] = {}
+        self._root_extkeys: dict[Coins, ExtKeyPair] = {}
         self._external_chains: dict[Coins, ExtKeyPair] = {}
         self._internal_chains: dict[Coins, ExtKeyPair] = {}
         self._initialized: set = set()
@@ -92,6 +93,7 @@ class WalletManager:
                 f"root_key must be bytes or ExtKeyPair, got {type(root_key)}"
             )
 
+        self._root_extkeys[coin_type] = ek
         bip44_coin = self.BIP84_COIN_TYPES.get(coin_type, 0)
         ext_path = f"84h/{bip44_coin}h/0h/0"
         int_path = f"84h/{bip44_coin}h/0h/1"
@@ -1026,13 +1028,17 @@ class WalletManager:
                 if self.getPrivateKey(coin_type, address):
                     continue
                 try:
-                    wif = rpc_callback("dumpprivkey", [address])
-                    if wif:
-                        privkey = self._decodeWIF(wif, coin_type)
-                        if privkey and self.importAddressWithKey(
-                            coin_type, address, privkey, source="rpc_migration"
-                        ):
-                            imported += 1
+                    try:
+                        wif = rpc_callback("dumpprivkey", [address])
+                        privkey = self._decodeWIF(wif, coin_type) if wif else None
+                    except Exception:
+                        privkey = self._deriveKeyAtHDKeyPath(
+                            coin_type, rpc_callback("getaddressinfo", [address])
+                        )
+                    if privkey and self.importAddressWithKey(
+                        coin_type, address, privkey, source="rpc_migration"
+                    ):
+                        imported += 1
                 except Exception:
                     pass
 
@@ -1043,6 +1049,15 @@ class WalletManager:
         except Exception as e:
             self._log.warning(f"importKeysFromRPC error: {e}")
             return imported
+
+    def _deriveKeyAtHDKeyPath(self, coin_type: Coins, addr_info: dict) -> bytes | None:
+        path: str = addr_info.get("hdkeypath", "")
+        if not path.startswith("m/") or coin_type not in self._root_extkeys:
+            return None
+        key = self._root_extkeys[coin_type].derive_path(path[2:])._key
+        pkh = hash160(PublicKey.from_secret(key).format())
+        address = segwit_addr.encode_segwit_address(self._getHRP(coin_type), 0, pkh)
+        return key if address == addr_info.get("address") else None
 
     def _b58decode(self, s: str) -> bytes:
         ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
