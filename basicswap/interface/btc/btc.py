@@ -3590,12 +3590,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     f"spendBLockTx: Failed to fetch tx {self._log.id(chain_b_lock_txid)} from backend"
                 )
             return locked_n, actual_value
-        wtx = self.rpc_wallet_watch(
-            "gettransaction",
-            [
-                chain_b_lock_txid.hex(),
-            ],
-        )
+        try:
+            wtx = self.rpc_wallet_watch("gettransaction", [chain_b_lock_txid.hex()])
+        except ValueError as e:
+            if "Invalid or non-wallet transaction id" not in str(e):
+                raise
+            wtx = self.rpc_wallet("gettransaction", [chain_b_lock_txid.hex()])
         lock_tx = self.loadTx(bytes.fromhex(wtx["hex"]))
         locked_n = findOutput(lock_tx, script_pk)
         if locked_n is not None:
@@ -3801,7 +3801,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self._log.info(
                 f"Rescanning {self.coin_name()} chain from height: {rescan_from}"
             )
-            self.rpc_wallet("rescanblockchain", [rescan_from])
+            self.rpc_wallet_watch("rescanblockchain", [rescan_from])
 
         invalid_txids: list[str] = []
         return_txid = True if txid is None else False
