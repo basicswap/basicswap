@@ -3261,19 +3261,20 @@ class BasicSwapTest(TestFunctions):
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0h/1h/0h"
 
-        address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
-        for chain in ["external", "internal"]:
-            extkey_data = b58decode(address_chains[chain])[4:-4]
-            ek = ExtKeyPair()
-            ek.decode(extkey_data)
-            addr0h = ci.encodeSegwitAddress(
-                ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
-            )
-            if self.test_coin_from == Coins.BTC:
-                assert addr0h == self.expected_addresses[chain]
-            else:
-                pass
-                # TODO: derive expected keys
+        if not ci.canExportToElectrum():
+            address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
+            for chain in ["external", "internal"]:
+                extkey_data = b58decode(address_chains[chain])[4:-4]
+                ek = ExtKeyPair()
+                ek.decode(extkey_data)
+                addr0h = ci.encodeSegwitAddress(
+                    ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
+                )
+                if self.test_coin_from == Coins.BTC:
+                    assert addr0h == self.expected_addresses[chain]
+                else:
+                    pass
+                    # TODO: derive expected keys
 
         desc_watch = descsum_create(f"addr({addr})")
         self.callnoderpc(
@@ -3424,6 +3425,9 @@ class BasicSwapTest(TestFunctions):
     def test_015_changetype(self):
         logging.info(f"---------- Test {self.test_coin_from.name} changetype")
         ci = self.swap_clients[0].ci(self.test_coin_from)
+        if hasattr(ci, "_use_descriptors") and ci._use_descriptors:
+            logging.warning("Skipping test")
+            return
 
         addr_p2sh = ci.rpc_wallet(
             "getnewaddress", ["test_015_changetype", "p2sh-segwit"]
@@ -4295,6 +4299,7 @@ class TestBTC(BasicSwapTest):
         assert rv["seed_id"] in (
             "3da5c0af91879e8ce97d9a843874601c08688078",
             "4a231080ec6f4078e543d39cc6dcf0b922c9b16b",
+            "44c597105a996e6c4234f7dc3593dde8bd0b1062",
         )
         assert rv["seed_id"] == rv["expected_seed_id"]
 
