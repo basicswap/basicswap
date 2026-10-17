@@ -480,6 +480,8 @@ def describeBid(
                 if tx_type in (
                     TxTypes.XMR_SWAP_A_LOCK_REFUND,
                     TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND,
+                    TxTypes.XMR_SWAP_B_LOCK_SPEND,
+                    TxTypes.XMR_SWAP_B_LOCK_REFUND,
                 ):
                     continue
                 txns.append({"type": strTxType(tx_type), "txid": tx.txid.hex()})
