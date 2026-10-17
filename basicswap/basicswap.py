@@ -8963,10 +8963,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
 
                 if BidStates(bid.state) == BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED:
-                    txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
-
-                    found_tx = ci_to.findConfirmedTxnByHash(txid_hex)
-                    if found_tx is not None:
+                    if self.isBLockSpendConfirmed(
+                        ci_to, bid, ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B, cursor
+                    ):
                         self.log.info(
                             f"Found coin b lock recover tx bid {self.log.id(bid_id)}"
                         )
@@ -9072,6 +9071,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
+                # A lock publish that errored may still have reached the chain
+                if (
+                    bid.xmr_b_lock_tx is None
+                    and was_sent
+                    and self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
+                ):
+                    self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                 if bid.xmr_b_lock_tx is None:
                     # Nothing was locked on chain B, there is nothing to recover.
                     rv = True  # Remove from swaps_in_progress
@@ -9456,10 +9462,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                     self.commitDB()
             elif state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
-                txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
-
-                found_tx = ci_to.findConfirmedTxnByHash(txid_hex)
-                if found_tx is not None:
+                if self.isBLockSpendConfirmed(
+                    ci_to, bid, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, cursor
+                ):
                     self.log.info(
                         f"Found coin b lock spend tx bid {self.log.id(bid_id)}"
                     )
@@ -9476,9 +9481,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.xmr_b_lock_tx is not None
                     and bid.xmr_b_lock_tx.spend_txid is not None
                 ):
-                    txid_hex = bid.xmr_b_lock_tx.spend_txid.hex()
-                    found_tx = ci_to.findConfirmedTxnByHash(txid_hex)
-                    if found_tx is not None:
+                    if self.isBLockSpendConfirmed(
+                        ci_to, bid, ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B, cursor
+                    ):
                         self.log.info(
                             f"Found coin b lock spend tx bid {self.log.id(bid_id)}"
                         )
@@ -13458,6 +13463,36 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
         was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
 
+        if bid.state != BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+            self.log.warning(
+                f"Not sending coin B lock tx for adaptor-sig bid {self.log.id(bid_id)} in state {BidStates(bid.state).name}."
+            )
+            return
+
+        lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
+        if (
+            lock_remaining is not None
+            and lock_remaining < self._sc_lock_release_min_margin
+        ):
+            # The leader won't release, so the lock could only be recovered
+            if (
+                self.countBidEvents(
+                    bid, EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, cursor
+                )
+                < 1
+            ):
+                self.log.error(
+                    f"Not sending coin B lock tx for adaptor-sig bid {self.log.id(bid_id)}, "
+                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_release_min_margin}."
+                )
+                self.logBidEvent(
+                    bid.bid_id,
+                    EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE,
+                    "",
+                    cursor,
+                )
+            return
+
         if self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent) is True:
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
             return
@@ -13561,6 +13596,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         leg_swaps = []
         for leg in batch:
+            if (
+                leg.lock_remaining_seconds is not None
+                and leg.lock_remaining_seconds < self._sc_lock_release_min_margin
+            ):
+                continue
             if (
                 self.getPreFundedTx(
                     Concepts.BID, leg.bid_id, TxTypes.PTX_PRE_FUNDED, cursor=cursor
@@ -13964,6 +14004,48 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
 
+    def isBLockSpendConfirmed(self, ci_to, bid, spend_action, cursor) -> bool:
+        spend_txid: bytes = bid.xmr_b_lock_tx.spend_txid
+        if ci_to.coin_type() not in self.xmr_based_coins:
+            return ci_to.findConfirmedTxnByHash(spend_txid.hex()) is not None
+        depth = ci_to.getTxDepth(spend_txid)
+        # Restricted nodes hide txs still in the Dandelion++ stem phase
+        if (
+            depth is None
+            and int(time.time()) - bid.xmr_b_lock_tx.state_time > 60
+            and self.countQueuedActions(cursor, bid.bid_id, spend_action) < 1
+        ):
+            self.log.warning(
+                f"Coin B lock spend tx {self.logIDT(spend_txid)} for bid {self.log.id(bid.bid_id)} not found by the {ci_to.coin_name()} daemon, resending."
+            )
+            self.logBidEvent(
+                bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_MISSING, "", cursor
+            )
+            self.createActionInSession(
+                self.get_delay_retry_seconds(), spend_action, bid.bid_id, cursor
+            )
+            self.commitDB()
+        return depth is not None and depth > ci_to.blocks_confirmed
+
+    def sendBLockSpendTx(
+        self, ci_to, bid, tx_type, cursor, *args, **kwargs
+    ) -> tuple[bytes, bool]:
+        if ci_to.coin_type() not in self.xmr_based_coins:
+            return ci_to.spendBLockTx(*args, **kwargs), True
+        spend_tx = bid.txns.get(tx_type)
+        if spend_tx is None:
+            txid, tx = ci_to.createBLockSpendTx(*args, **kwargs)
+            if tx is None:
+                return txid, False
+            spend_tx = SwapTx(bid_id=bid.bid_id, tx_type=tx_type, txid=txid, tx_data=tx)
+            bid.txns[tx_type] = spend_tx
+            self.add(spend_tx, cursor, upsert=True)
+            self.commitDB()
+        if ci_to.getTxDepth(spend_tx.txid) is not None:
+            return spend_tx.txid, False
+        ci_to.publishTx(spend_tx.tx_data)
+        return spend_tx.txid, True
+
     def redeemXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
         # Leader redeeming B lock tx
         self.log.debug(
@@ -13974,13 +14056,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
 
-        if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
-            self.log.debug(
-                f"Coin B lock tx already redeemed for bid {self.log.id(bid_id)}, "
-                f"txid: {bid.xmr_b_lock_tx.spend_txid.hex()}"
-            )
-            return
-
         offer, xmr_offer = self.getXmrOfferFromSession(cursor, bid.offer_id)
         ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
@@ -13988,6 +14063,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
         coin_to = Coins(offer.coin_from if reverse_bid else offer.coin_to)
+
+        if (
+            bid.xmr_b_lock_tx
+            and bid.xmr_b_lock_tx.spend_txid
+            and (
+                coin_to not in self.xmr_based_coins
+                or bid.state
+                in (
+                    BidStates.SWAP_COMPLETED,
+                    BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
+                )
+            )
+        ):
+            self.log.debug(
+                f"Coin B lock tx already redeemed for bid {self.log.id(bid_id)}, "
+                f"txid: {bid.xmr_b_lock_tx.spend_txid.hex()}"
+            )
+            return
+
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
@@ -14058,7 +14152,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             lock_tx_vout = bid.getLockTXBVout()
-            txid = ci_to.spendBLockTx(
+            txid, published = self.sendBLockSpendTx(
+                ci_to,
+                bid,
+                TxTypes.XMR_SWAP_B_LOCK_SPEND,
+                cursor,
                 xmr_swap.b_lock_tx_id,
                 address_to,
                 xmr_swap.vkbv,
@@ -14068,12 +14166,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid.chain_b_height_start,
                 lock_tx_vout=lock_tx_vout,
             )
-            self.log.debug(
-                f"Submitted lock B spend txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
-            )
-            self.logBidEvent(
-                bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, "", cursor
-            )
+            if published:
+                self.log.debug(
+                    f"Submitted lock B spend txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                )
+                self.logBidEvent(
+                    bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_PUBLISHED, "", cursor
+                )
         except Exception as ex:
             error_msg = (
                 f"spendBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
@@ -14120,7 +14219,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if bid.xmr_b_lock_tx:
             bid.xmr_b_lock_tx.setState(TxStates.TX_REDEEMED)
 
-        if not is_redeem_address_owned:
+        if not is_redeem_address_owned and coin_to not in self.xmr_based_coins:
             # The spend won't be seen in the wallet, there is nothing to wait for
             if using_mercy:
                 bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY)
@@ -14200,7 +14299,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             lock_tx_vout = bid.getLockTXBVout()
-            txid = ci_to.spendBLockTx(
+            txid, published = self.sendBLockSpendTx(
+                ci_to,
+                bid,
+                TxTypes.XMR_SWAP_B_LOCK_REFUND,
+                cursor,
                 xmr_swap.b_lock_tx_id,
                 address_to,
                 xmr_swap.vkbv,
@@ -14213,12 +14316,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     True if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND else False
                 ),
             )
-            self.log.debug(
-                f"Submitted lock B refund txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
-            )
-            self.logBidEvent(
-                bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, "", cursor
-            )
+            if published:
+                self.log.debug(
+                    f"Submitted lock B refund txn {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                )
+                self.logBidEvent(
+                    bid.bid_id, EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED, "", cursor
+                )
         except Exception as ex:
             error_msg = f"spendBLockTx refund failed for bid {self.log.id(bid_id)} with error {ex}"
             num_retries = self.countBidEvents(
