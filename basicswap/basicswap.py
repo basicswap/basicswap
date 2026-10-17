@@ -11377,7 +11377,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "SELECT b.bid_id FROM bids AS b, bidstates AS s "
                 + "WHERE b.active_ind = 1 AND s.state_id = b.state "
                 + " AND s.can_timeout AND b.state_time + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now "
-                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_sent_event_type)"
+                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type IN (:tx_sent_event_type, :itx_sent_event_type))"
             )
             q = cursor.execute(
                 query_str,
@@ -11388,6 +11388,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "event_linked_type": int(Concepts.BID),
                     "tx_mempool_event_type": EventLogTypes.LOCK_TX_A_IN_MEMPOOL,
                     "tx_sent_event_type": EventLogTypes.LOCK_TX_A_PUBLISHED,
+                    "itx_sent_event_type": EventLogTypes.ITX_PUBLISHED,
                 },
             )
             for row in q:
