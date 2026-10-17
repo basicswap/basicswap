@@ -949,7 +949,11 @@ class XMRInterface(CoinInterface):
         except Exception as e:  # noqa: F841
             self._wallet_password = orig_password
             raise
-        self._wallet_password = new_password
+        # Setting the first password leaves the wallet locked, as encryptwallet does
+        if old_password == "":
+            self.lockWallet()
+        else:
+            self._wallet_password = new_password
 
     def unlockWallet(
         self,
