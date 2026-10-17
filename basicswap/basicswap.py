@@ -14190,7 +14190,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     f"Chain B lock tx still confirming {lock_tx_depth} / {ci_to.depth_spendable()}."
                 )
 
-            if offer.coin_to in self.xmr_based_coins:
+            if coin_to in self.xmr_based_coins:
                 address_to = self.getCachedMainWalletAddress(ci_to, cursor)
             elif coin_to in (Coins.PART_BLIND, Coins.PART_ANON):
                 address_to = self.getCachedStealthAddressForCoin(coin_to, cursor)
