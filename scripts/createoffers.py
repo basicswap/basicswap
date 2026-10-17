@@ -33,6 +33,8 @@ Create offers
             "offer_valid_seconds": Seconds that the generated offers will be valid for.
             "automation_strategy": Auto accept bids setting - "accept_all", "accept_known", or "none" (default: "accept_all")
             "adjust_rates_based_on_market": Per-offer setting to adjust rates based on existing market offers (default: false)
+            "max_oracle_divergence_percent": Optional. Skip creating the offer this cycle if the orderbook rate
+                                             diverges from the oracle rate by more than this percent (must be > 0).
             "amount_step": REQUIRED - Offer size increment for privacy. Must be between 0.001 and "amount".
                           This prevents revealing exact wallet balance by creating stepped offers.
                           Example: 150 LTC balance, 100 LTC offer, 5 LTC increment, 76 LTC min balance = creates 70 LTC offer.
@@ -407,6 +409,19 @@ def readConfig(args, known_coins):
             print("Setting ratetweakpercent to 0 for offer", offer_template["name"])
             offer_template["ratetweakpercent"] = 0
             num_changes += 1
+        if "max_oracle_divergence_percent" in offer_template:
+            try:
+                offer_template["max_oracle_divergence_percent"] = float(
+                    offer_template["max_oracle_divergence_percent"]
+                )
+                if offer_template["max_oracle_divergence_percent"] <= 0:
+                    raise ValueError()
+            except (TypeError, ValueError):
+                print(
+                    f"Ignoring max_oracle_divergence_percent for {offer_template['name']} - must be a number > 0"
+                )
+                del offer_template["max_oracle_divergence_percent"]
+                num_changes += 1
         if "amount_variable" not in offer_template:
             print("Setting amount_variable to True for offer", offer_template["name"])
             offer_template["amount_variable"] = True
@@ -742,6 +757,23 @@ def should_bid_on_offer(offer, strategy):
         return True  # For now same as aggressive (TODO)
 
     return False
+
+
+def check_market_oracle_divergence(market_rate, oracle_rate, max_divergence_percent):
+    # Return the percent divergence of market_rate from oracle_rate when it
+    # exceeds max_divergence_percent, else None (check disabled or not computable).
+    if (
+        max_divergence_percent is None
+        or max_divergence_percent <= 0
+        or market_rate is None
+        or oracle_rate is None
+        or oracle_rate <= 0
+    ):
+        return None
+    divergence = abs(market_rate - oracle_rate) / oracle_rate * 100.0
+    if divergence > max_divergence_percent:
+        return divergence
+    return None
 
 
 def process_offers(args, config, script_state) -> None:
@@ -1120,14 +1152,19 @@ def process_offers(args, config, script_state) -> None:
                 )
                 continue
 
+        max_oracle_divergence = offer_template.get("max_oracle_divergence_percent")
+
         oracle_rate = None
-        # Get oracle rates if needed (for "true", "false", "all", and unknown modes)
+        # Get oracle rates if needed (for "true", "false", "all", and unknown modes,
+        # and for "only"/"minrate" when the divergence guard is enabled)
         if is_part_to_part:
             use_rate = 1.0
             print("Using fixed rate 1.0 for PART to PART (or variants)")
             offer_template["adjust_rates_based_on_market"] = "static"
 
-        elif adjust_rates_value not in ["only", "minrate", "static"]:
+        elif adjust_rates_value not in ["only", "minrate", "static"] or (
+            max_oracle_divergence is not None and adjust_rates_value != "static"
+        ):
             try:
                 rates = read_json_api(
                     "rates",
@@ -1363,6 +1400,18 @@ def process_offers(args, config, script_state) -> None:
                 print(f"Using oracle rate only: {oracle_rate}")
             else:
                 print(f"Oracle rate unavailable. Skipping {offer_template['name']}")
+                continue
+
+        if adjust_rates_value in ["true", "only", "all", "minrate"]:
+            divergence = check_market_oracle_divergence(
+                market_rate, oracle_rate, max_oracle_divergence
+            )
+            if divergence is not None:
+                print(
+                    f"Skipping {offer_template['name']} - market rate {market_rate}"
+                    f" diverges {divergence:.2f}% from oracle rate {oracle_rate}"
+                    f" (max: {max_oracle_divergence}%)"
+                )
                 continue
 
         # Apply ratetweakpercent
