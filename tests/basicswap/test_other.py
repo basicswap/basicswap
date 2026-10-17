@@ -32,7 +32,7 @@ from basicswap.basicswap import (
 from basicswap.base import BaseApp
 from basicswap.chainparams import coins_without_segwit, scriptless_coins
 from basicswap.contrib.mnemonic import Mnemonic
-from basicswap.db import create_db_, DBMethods, KnownIdentity
+from basicswap.db import Bid, create_db_, DBMethods, KnownIdentity, Offer, SwapTx
 from basicswap.util import h2b
 from basicswap.util.address import decodeAddress, toWIF
 from basicswap.util.crypto import ripemd160, hash160, blake256, sha256
@@ -63,7 +63,9 @@ from basicswap.interface.nav.contrib.mininode import CTransaction as NAVTransact
 from basicswap.interface.nav.nav import NAVInterface
 from basicswap.interface.part.part import PARTInterface
 from basicswap.interface.pivx.pivx import PIVXInterface
+from basicswap.protocols.atomic_swap_1 import buildContractScript
 from basicswap.protocols.xmr_swap_1 import XmrSwapInterface
+from basicswap.script import OpCodes
 from basicswap.interface.electrumx import scripthash_from_address
 from basicswap.util.logging import BSXLogger
 from basicswap.interface.xmr.xmr import XMRInterface
@@ -2083,6 +2085,121 @@ class Test(unittest.TestCase):
                 sc.validateOfferLockValue,
                 *case,
             )
+
+        del sc
+
+    def test_ptx_lock_margin(self):
+        basicswap_dir = "/tmp/bsx_test_other"
+        if not os.path.exists(basicswap_dir):
+            os.makedirs(basicswap_dir)
+
+        k = PrivateKey()
+        settings = {
+            "network_key": toWIF(PREFIX_SECRET_KEY_REGTEST, k.secret),
+            "network_pubkey": k.public_key.format().hex(),
+        }
+        sc = BasicSwap(
+            basicswap_dir,
+            settings,
+            "regtest",
+            log_name="bsx_test_other",
+        )
+
+        secret_hash = sha256(secrets.token_bytes(32))
+        pkh_buyer = secrets.token_bytes(20)
+        pkh_seller = secrets.token_bytes(20)
+        lock_value: int = 4 * 60 * 60
+
+        offer = Offer(
+            coin_from=Coins.PIVX,
+            coin_to=Coins.DASH,
+            lock_type=TxLockTypes.ABS_LOCK_TIME,
+            lock_value=lock_value,
+        )
+        accepted_at: int = sc.getTime()
+        bid = Bid()
+        bid.initiate_tx = SwapTx(
+            script=buildContractScript(
+                accepted_at + lock_value,
+                secret_hash,
+                pkh_buyer,
+                pkh_seller,
+                OpCodes.OP_CHECKLOCKTIMEVERIFY,
+            )
+        )
+
+        def abs_participate_script(itx_block_time: int) -> bytearray:
+            return buildContractScript(
+                itx_block_time + lock_value // 2,
+                secret_hash,
+                pkh_seller,
+                pkh_buyer,
+                OpCodes.OP_CHECKLOCKTIMEVERIFY,
+            )
+
+        sc.ensurePTxLockMargin(
+            bid, offer, abs_participate_script(accepted_at + sc._sc_lock_tx_timeout)
+        )
+        # The seller held the initiate txn back for half the lock
+        self.assertRaisesRegex(
+            ValueError,
+            "too close",
+            sc.ensurePTxLockMargin,
+            bid,
+            offer,
+            abs_participate_script(accepted_at + lock_value // 2),
+        )
+        sc.setMockTimeOffset(lock_value - 10 * 60)
+        self.assertRaisesRegex(
+            ValueError,
+            "too close",
+            sc.ensurePTxLockMargin,
+            bid,
+            offer,
+            abs_participate_script(accepted_at + 60),
+        )
+        sc.setMockTimeOffset(0)
+
+        ci = self.ci_btc()
+        sc.coin_clients[Coins.BTC] = {"interface": ci}
+        offer = Offer(
+            coin_from=Coins.BTC,
+            coin_to=Coins.LTC,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_TIME,
+            lock_value=lock_value,
+        )
+        itx_mtp: int = 1700000000
+        bid = Bid()
+        bid.initiate_tx = SwapTx(
+            script=buildContractScript(
+                ci.getExpectedSequence(offer.lock_type, lock_value),
+                secret_hash,
+                pkh_buyer,
+                pkh_seller,
+            ),
+            block_height=100,
+            block_time=itx_mtp,
+        )
+        participate_script = buildContractScript(
+            ci.getExpectedSequence(offer.lock_type, lock_value // 2),
+            secret_hash,
+            pkh_seller,
+            pkh_buyer,
+        )
+        ci.getMedianTimePastAtHeight = lambda height: itx_mtp
+
+        ci.getChainMedianTime = lambda: itx_mtp + 10 * 60
+        sc.ensurePTxLockMargin(bid, offer, participate_script)
+        # The buyer was offline for half the lock
+        ci.getChainMedianTime = lambda: itx_mtp + lock_value // 2
+        self.assertRaisesRegex(
+            ValueError,
+            "too close",
+            sc.ensurePTxLockMargin,
+            bid,
+            offer,
+            participate_script,
+        )
 
         del sc
 
