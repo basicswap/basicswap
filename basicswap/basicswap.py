@@ -560,6 +560,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._sc_lock_release_min_margin = self.get_int_setting(
             "sc_lock_release_min_margin", 3600, 600, 24 * 3600
         )  # Seconds
+        self._redeem_rebroadcast_seconds = self.get_int_setting(
+            "redeem_rebroadcast_seconds", 10 * 60, 1, 24 * 3600
+        )  # Seconds
         self._sc_lock_spend_min_margin = self.get_int_setting(
             "sc_lock_spend_min_margin", 3600, 600, 24 * 3600
         )  # Seconds
@@ -660,6 +663,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         self.swaps_in_progress = dict()
+        self._redeem_published_at = dict()
 
         self.threads = []
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(
@@ -8482,17 +8486,79 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if bid.was_received:
             ci_to = self.ci(offer.coin_to)
             txn = self.createRedeemTxn(ci_to.coin_type(), bid)
-            txid = ci_to.publishTx(bytes.fromhex(txn))
+            redeem_tx = self.publishRedeemTxn(
+                ci_to, bid, TxTypes.PTX_REDEEM, bytes.fromhex(txn)
+            )
             self.log.debug(
-                f"Submitted participate redeem tx {self.logIDT(txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
+                f"Submitted participate redeem tx {self.logIDT(redeem_tx.txid)} to {ci_to.coin_name()} chain for bid {self.log.id(bid_id)}."
             )
             self.logEvent(
                 Concepts.BID, bid.bid_id, EventLogTypes.PTX_REDEEM_PUBLISHED, "", None
             )
             # TX_REDEEMED will be set when spend is detected
-            # TODO: Wait for depth?
 
         # bid saved in checkBidState
+
+    def publishRedeemTxn(self, ci, bid, tx_type, txn: bytes) -> SwapTx:
+        """Store a redeem txn so checkRedeemTxns can rebroadcast it, then publish
+        it; a failed publish is retried there."""
+        redeem_tx = SwapTx(
+            bid_id=bid.bid_id,
+            tx_type=tx_type,
+            txid=ci.getTxid(txn),
+            tx_data=txn,
+        )
+        bid.txns = {**bid.txns, tx_type: redeem_tx}
+        self._redeem_published_at[(bid.bid_id, tx_type)] = self.getTime()
+        if bid.debug_ind == DebugTypes.SKIP_FIRST_REDEEM_BROADCAST:
+            self.log.debug(
+                f"Not publishing redeem tx {self.logIDT(redeem_tx.txid)} for debugging {self.log.id(bid.bid_id)}"
+            )
+            self.logBidEvent(
+                bid.bid_id,
+                EventLogTypes.DEBUG_TWEAK_APPLIED,
+                f"ind {bid.debug_ind}",
+                None,
+            )
+            return redeem_tx
+        try:
+            ci.publishTx(txn)
+        except Exception as e:
+            self.log.warning(
+                f"Publishing redeem tx {self.logIDT(redeem_tx.txid)} for bid {self.log.id(bid.bid_id)} failed, will retry: {e}"
+            )
+        return redeem_tx
+
+    def checkRedeemTxns(self, bid, offer) -> bool:
+        """Rebroadcast this node's redeem txns until each has blocks_confirmed
+        confirmations, True once all have."""
+        all_confirmed: bool = True
+        now: int = self.getTime()
+        for tx_type, coin_type in (
+            (TxTypes.ITX_REDEEM, offer.coin_from),
+            (TxTypes.PTX_REDEEM, offer.coin_to),
+        ):
+            redeem_tx = bid.txns.get(tx_type)
+            if redeem_tx is None:
+                continue
+            ci = self.ci(coin_type)
+            if ci.findConfirmedTxnByHash(redeem_tx.txid.hex()) is not None:
+                continue
+            all_confirmed = False
+            published_at = self._redeem_published_at.get((bid.bid_id, tx_type), 0)
+            if now - published_at < self._redeem_rebroadcast_seconds:
+                continue
+            self._redeem_published_at[(bid.bid_id, tx_type)] = now
+            try:
+                ci.publishTx(redeem_tx.tx_data)
+                self.log.info(
+                    f"Rebroadcast redeem tx {self.logIDT(redeem_tx.txid)} to {ci.coin_name()} chain for bid {self.log.id(bid.bid_id)}."
+                )
+            except Exception as e:
+                self.log.debug(
+                    f"Rebroadcasting redeem tx {self.logIDT(redeem_tx.txid)} for bid {self.log.id(bid.bid_id)}: {e}"
+                )
+        return all_confirmed
 
     def getTotalBalance(self, coin_type) -> int:
         try:
@@ -9998,11 +10064,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.warning(f"checkBidState unknown state {state}")
 
         if state > BidStates.BID_ACCEPTED:
+            redeems_confirmed: bool = self.checkRedeemTxns(bid, offer)
             # Wait for spend of all known swap txns
             itx_state = bid.getITxState()
             ptx_state = bid.getPTxState()
-            if (itx_state is None or itx_state >= TxStates.TX_REDEEMED) and (
-                ptx_state is None or ptx_state >= TxStates.TX_REDEEMED
+            if (
+                redeems_confirmed
+                and (itx_state is None or itx_state >= TxStates.TX_REDEEMED)
+                and (ptx_state is None or ptx_state >= TxStates.TX_REDEEMED)
             ):
                 self.log.info(f"Swap completed for bid {self.log.id(bid_id)}")
 
