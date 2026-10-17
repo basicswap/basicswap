@@ -4034,6 +4034,12 @@ class BasicSwapTest(TestFunctions):
         old_override_feerate1 = ci1_from_settings.get("override_feerate", None)
         old_min_relay_fee = ci_from_settings.get("min_relay_fee", None)
         old_min_relay_fee1 = ci1_from_settings.get("min_relay_fee", None)
+        old_low_feerate = ci_from._low_feerate
+        old_low_feerate1 = ci1_from._low_feerate
+        old_high_feerate = ci_from._high_feerate
+        old_high_feerate1 = ci1_from._high_feerate
+        old_high_multiplier = ci_from._high_estimated_feerate_multiplier
+        old_high_multiplier1 = ci1_from._high_estimated_feerate_multiplier
 
         networkinfo = ci_from.rpc("getnetworkinfo")
         # BTC v29.1 relayfee dropped to 100
@@ -4179,6 +4185,12 @@ class BasicSwapTest(TestFunctions):
             ci1_from_settings["override_feerate"] = old_override_feerate1
             ci_from_settings["min_relay_fee"] = old_min_relay_fee
             ci1_from_settings["min_relay_fee"] = old_min_relay_fee1
+            ci_from._low_feerate = old_low_feerate
+            ci1_from._low_feerate = old_low_feerate1
+            ci_from._high_feerate = old_high_feerate
+            ci1_from._high_feerate = old_high_feerate1
+            ci_from._high_estimated_feerate_multiplier = old_high_multiplier
+            ci1_from._high_estimated_feerate_multiplier = old_high_multiplier1
 
 
 class TestBTC(BasicSwapTest):
