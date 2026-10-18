@@ -6055,6 +6055,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         return min(max(expected, ready_timeout), MAX_CONFIRM_WAIT_SECONDS)
 
+    def getBLockMinMargin(self, ci_to) -> int:
+        """Least time left on the coin A refund timelock to send a coin B lock
+        with, the release and spend margins are checked again once it confirms."""
+        expected: int = int(
+            ci_to.blocks_confirmed
+            * ci_to.chainparams()["blocks_target"]
+            * CONFIRM_INTERVAL_MULTIPLE
+        )
+        return (
+            max(self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin)
+            + expected
+        )
+
     def getLegLockRemaining(self, leg, leg_offer, reverse_bid: bool, cursor):
         """Seconds left on a ready leg's coin A lock refund timelock, or None
         when it cannot be determined."""
@@ -13471,11 +13484,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return
 
+        lock_margin: int = self.getBLockMinMargin(ci_to)
         lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
-        if (
-            lock_remaining is not None
-            and lock_remaining < self._sc_lock_release_min_margin
-        ):
+        if lock_remaining is not None and lock_remaining < lock_margin:
             # The leader won't release, so the lock could only be recovered
             if (
                 self.countBidEvents(
@@ -13485,7 +13496,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ):
                 self.log.error(
                     f"Not sending coin B lock tx for adaptor-sig bid {self.log.id(bid_id)}, "
-                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_release_min_margin}."
+                    f"refund timelock too close: {lock_remaining} < {lock_margin}."
                 )
                 self.logBidEvent(
                     bid.bid_id,
@@ -13600,7 +13611,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for leg in batch:
             if (
                 leg.lock_remaining_seconds is not None
-                and leg.lock_remaining_seconds < self._sc_lock_release_min_margin
+                and leg.lock_remaining_seconds < lock_margin
             ):
                 continue
             if (
