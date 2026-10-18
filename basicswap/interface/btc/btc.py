@@ -2476,6 +2476,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                         utxo.get("txid", ""),
                         utxo.get("vout", 0),
                         cursor=cursor,
+                        bid_id=bid_id,
                     ):
                         raise ValueError(
                             "UTXO reserved by a concurrent operation, retry funding"
