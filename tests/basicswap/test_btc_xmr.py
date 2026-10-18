@@ -500,6 +500,12 @@ class TestFunctions(BaseTest):
             for e in swap_client.getEvents(Concepts.BID, bid_id)
         )
 
+    def _clear_mock_time(self, swap_client) -> None:
+        swap_client.setMockTimeOffset(0)
+        # update() stamped these with the mocked time, which holds off its checks
+        for name in [k for k in vars(swap_client) if k.startswith("_last_checked_")]:
+            setattr(swap_client, name, 0)
+
     def _assert_mercy_waits_for_swipe(
         self, bid_id, id_leader: int, id_follower: int, chain_a_coin
     ) -> None:
@@ -2086,7 +2092,7 @@ class TestFunctions(BaseTest):
         finally:
             self.continueMining()
             for node_id in (id_leader, id_follower):
-                swap_clients[node_id].setMockTimeOffset(0)
+                self._clear_mock_time(swap_clients[node_id])
                 swap_clients[node_id].check_expired_seconds = old_check_expired_seconds
 
     def do_test_10_underfunded_lock_a(self, coin_from, coin_to):
@@ -3995,7 +4001,7 @@ class BasicSwapTest(TestFunctions):
             )
         finally:
             swap_clients[0].check_expired_seconds = old_check_expired_seconds
-            swap_clients[0].setMockTimeOffset(0)
+            self._clear_mock_time(swap_clients[0])
 
     def test_08_insufficient_funds(self):
         self.do_test_08_insufficient_funds(self.test_coin_from, Coins.XMR)
