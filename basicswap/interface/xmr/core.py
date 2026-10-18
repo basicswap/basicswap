@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import platform
 
 from basicswap.interface.xmr.chainparams import params
 from basicswap.interface.prepare_util import (
@@ -78,11 +79,12 @@ class XMRPrepare(CoinPrepareModule):
         release_filename = f"{self.name}-{self.version}-{ctx.bin_arch}.{use_file_ext}"
 
         os_name, _ = getOSDirNames(ctx.bin_arch)
+        architecture = "x64"
         if os_name == "osx":
             os_name = "mac"
-
-        architecture = "x64"
-        if "aarch64" in ctx.bin_arch:
+            if platform.machine() == "arm64":
+                architecture = "armv8"
+        elif "aarch64" in ctx.bin_arch:
             architecture = "armv8"
         elif "arm" in ctx.bin_arch:
             architecture = "armv7"
