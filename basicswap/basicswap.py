@@ -9293,6 +9293,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         cursor, bid_id, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B
                     )
                     < 1
+                    and self.countBidEvents(
+                        bid, EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, cursor
+                    )
+                    < 1
                 ):
                     delay = self.get_delay_event_seconds()
                     self.log.info(
