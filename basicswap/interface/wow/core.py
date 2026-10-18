@@ -69,7 +69,6 @@ class WOWPrepare(XMRPrepare):
         extra_opts: dict,
     ) -> tuple:
         use_file_ext = "tar.bz2" if ctx.file_ext == "tar.gz" else ctx.file_ext
-        release_filename = f"{self.name}-{self.version}-{ctx.bin_arch}.{use_file_ext}"
 
         os_name, _ = getOSDirNames(ctx.bin_arch)
         architecture = ctx.bin_arch
@@ -84,7 +83,8 @@ class WOWPrepare(XMRPrepare):
                 machine = "x86_64"
             architecture = machine + "-w64-mingw32"
 
-        release_url = f"https://codeberg.org/wownero/wownero/releases/download/v{self.version}/wownero-{architecture}-v{self.version}.{use_file_ext}"
+        release_filename = f"wownero-{architecture}-v{self.version}.{use_file_ext}"
+        release_url = f"https://codeberg.org/wownero/wownero/releases/download/v{self.version}/{release_filename}"
         release_path = os.path.join(bin_dir, release_filename)
         ctx.download_release(release_url, release_path, extra_opts)
 
