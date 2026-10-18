@@ -923,6 +923,10 @@ class TestBCH(BasicSwapTest):
         logging.info(f"---------- Test {self.test_coin.name} p2sh-p2wsh")
         logging.info("Skipped")
 
+    test_013_descriptor_wallet = None
+    test_015_changetype = None
+    test_016_gettransaction = None
+
     def test_01_a_full_swap(self):
         super().test_01_a_full_swap()
 
