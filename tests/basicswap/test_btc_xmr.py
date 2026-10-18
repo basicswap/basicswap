@@ -627,6 +627,13 @@ class TestFunctions(BaseTest):
             coin_to if reverse_bid else coin_from
         )._altruistic = (with_mercy or stranded_payout)
 
+        default_watch_timeout = swap_clients[id_leader]._mercy_watch_timeout_blocks
+        self.addCleanup(
+            setattr,
+            swap_clients[id_leader],
+            "_mercy_watch_timeout_blocks",
+            default_watch_timeout,
+        )
         # A leader that is never sent a mercy tx holds the bid open until the
         # watch times out, don't wait out the default for it here.
         swap_clients[id_leader]._mercy_watch_timeout_blocks = 100 if with_mercy else 6
