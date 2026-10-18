@@ -7904,8 +7904,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         """Seconds the initiate txn refund stays locked after the participate txn
         refund unlocks, or None for the block lock types."""
         if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            itx = bid.initiate_tx
+            if itx is not None and itx.block_height and itx.block_time is None:
+                # A failed header fetch at confirmation leaves block_time unset
+                self.setTxBlockInfoFromHeight(
+                    self.ci(offer.coin_from), itx, itx.block_height
+                )
             itx_remaining = self.getITxLockRemaining(bid, offer, None)
-            ensure(itx_remaining is not None, "Initiate txn lock remaining unknown")
+            if itx_remaining is None:
+                raise TemporaryError("Initiate txn lock remaining unknown")
             return itx_remaining - offer.lock_value // 2
         if offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
             ptx_unlock: int = max(
@@ -8365,6 +8372,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def initiateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
         self.log.debug(f"initiateTxnConfirmed for bid {self.log.id(bid_id)}")
+        participate_script = self.deriveParticipateScript(bid_id, bid, offer)
+        ci_to = self.ci(offer.coin_to)
+        batched_ptx: bool = bool(bid.plan_id) and hasattr(ci_to, "fundHTLCTxs")
+        if bid.was_sent and bid.participate_tx is None and not batched_ptx:
+            # Before the state changes, so a retry finds the bid still accepted
+            self.ensurePTxLockMargin(bid, offer, participate_script)
+
         bid.setState(BidStates.SWAP_INITIATED)
         bid.setITxState(TxStates.TX_CONFIRMED)
 
@@ -8382,16 +8396,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return  # Bid saved in checkBidState
 
         # Seller first mode, buyer participates
-        participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         if bid.was_sent:
-            ci_to = self.ci(offer.coin_to)
             if bid.participate_tx is not None:
                 # A plan leg holds a script-only tx until its queued action sends it.
                 if bid.participate_tx.txid is not None:
                     self.log.warning(
                         f"Participate tx {self.log.id(bid.participate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
                     )
-            elif bid.plan_id and hasattr(ci_to, "fundHTLCTxs"):
+            elif batched_ptx:
                 bid.participate_tx = SwapTx(
                     bid_id=bid_id,
                     tx_type=TxTypes.PTX,
@@ -8400,7 +8412,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 delay = self.get_delay_event_seconds()
                 self.createAction(delay, ActionTypes.SEND_PARTICIPATE_TX, bid_id)
             else:
-                self.ensurePTxLockMargin(bid, offer, participate_script)
                 self.log.debug(
                     f"Preparing participate txn for bid {self.log.id(bid_id)}"
                 )
