@@ -1006,6 +1006,9 @@ class XMRInterface(CoinInterface):
         if rv["status"] != "OK":
             raise ValueError(f"send_raw_transaction failed: {rv['reason']}")
 
+    def isTxDoubleSpendError(self, err_str: str) -> bool:
+        return "double spend" in err_str
+
     def getTransaction(self, txid: bytes):
         return self.rpc2(
             "get_transactions",
