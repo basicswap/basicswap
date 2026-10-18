@@ -19,6 +19,7 @@ from basicswap.interface.btc.btc import (
     extractScriptLockRefundScriptValues,
     findOutput,
     find_vout_for_address_from_txobj,
+    MAX_PROOF_UTXOS,
 )
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
@@ -214,7 +215,7 @@ class NAVInterface(BTCInterface):
                 (utxo_amount, u["txid"], u["vout"])
             )
 
-        max_utxos: int = 4
+        max_utxos: int = MAX_PROOF_UTXOS
 
         viable_addrs = []
         for addr, data in unspents_by_addr.items():
@@ -314,6 +315,7 @@ class NAVInterface(BTCInterface):
         sum_value: int = 0
         for outpoint in utxos:
             txout = self.rpc("gettxout", [outpoint[0].hex(), outpoint[1]])
+            ensure(txout is not None, "Proof of funds outpoint is spent or unknown")
             ensure(
                 bytes.fromhex(txout["scriptPubKey"]["hex"]) in signer_dests,
                 "Proof of funds output does not pay the signing address",

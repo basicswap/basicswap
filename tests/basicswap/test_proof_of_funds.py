@@ -6,7 +6,7 @@
 
 import unittest
 
-from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.btc.btc import BTCInterface, MAX_PROOF_UTXOS
 from basicswap.interface.dcr.dcr import DCRInterface
 from basicswap.interface.firo.firo import FIROInterface
 from basicswap.interface.nav.nav import NAVInterface
@@ -102,7 +102,9 @@ def make_outpoint_interface(cls, scripts: dict, use_segwit: bool = False):
 
     def rpc(method, params=None):
         assert method == "gettxout"
-        script = scripts[(bytes.fromhex(params[0]), params[1])]
+        script = scripts.get((bytes.fromhex(params[0]), params[1]))
+        if script is None:
+            return None
         return {"value": 1.0, "scriptPubKey": {"hex": script.hex()}}
 
     ci.rpc = rpc
@@ -113,6 +115,7 @@ class VerifyOutpointProofOfFundsTest(unittest.TestCase):
     def check_coin(self, cls, signer_scripts, tree=()):
         own = [(bytes([i + 1]) * 32, i) + tree for i in range(len(signer_scripts))]
         other = (bytes([9]) * 32, 0) + tree
+        spent = (bytes([8]) * 32, 0) + tree
         scripts = {o[:2]: s for o, s in zip(own, signer_scripts)}
         scripts[other[:2]] = p2pkh(OTHER_PKH)
         ci = make_outpoint_interface(cls, scripts)
@@ -124,6 +127,27 @@ class VerifyOutpointProofOfFundsTest(unittest.TestCase):
             ci.verifyProofOfFunds(address, SIGNATURE, own + [other], COMMIT_BYTES)
         with self.assertRaisesRegex(ValueError, "Duplicate proof of funds outpoint"):
             ci.verifyProofOfFunds(address, SIGNATURE, own + own[:1], COMMIT_BYTES)
+        with self.assertRaisesRegex(ValueError, "spent or unknown"):
+            ci.verifyProofOfFunds(address, SIGNATURE, own + [spent], COMMIT_BYTES)
+
+    def test_outpoints_are_capped(self):
+        for cls, tree in ((BTCInterface, ()), (DCRInterface, (0,))):
+            ci = make_outpoint_interface(cls, {})
+            outpoints = [
+                (bytes([i + 1]) * 32, i) + tree for i in range(MAX_PROOF_UTXOS + 1)
+            ]
+            encoded = ci.encodeProofUtxos(outpoints[:MAX_PROOF_UTXOS])
+            self.assertEqual(ci.decodeProofUtxos(encoded), outpoints[:MAX_PROOF_UTXOS])
+            with self.assertRaisesRegex(
+                ValueError, "Too many proof of funds outpoints"
+            ):
+                ci.decodeProofUtxos(ci.encodeProofUtxos(outpoints))
+
+    def test_dcr_truncated_outpoints(self):
+        ci = make_outpoint_interface(DCRInterface, {})
+        outpoints = [(bytes([i + 1]) * 32, i, 0) for i in range(MAX_PROOF_UTXOS)]
+        encoded = ci.encodeProofUtxos(outpoints)
+        self.assertEqual(ci.decodeProofUtxos(encoded[:-4]), outpoints[:-1])
 
     def test_nav(self):
         self.check_coin(NAVInterface, [p2pkh(SIGNER_PKH), p2sh_p2wpkh(SIGNER_PKH)])
