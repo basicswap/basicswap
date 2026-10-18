@@ -1383,7 +1383,9 @@ class TestFunctions(BaseTest):
                 raise ValueError("Test stopped.")
             test_delay_event.wait(1)
             unspents = [
-                u for u in ci.rpc_wallet("listunspent", [1]) if u["amount"] >= value
+                u
+                for u in ci.rpc_wallet("listunspent", [1])
+                if u["spendable"] and u["amount"] >= value
             ]
             if len(unspents) >= count:
                 return
@@ -1841,7 +1843,7 @@ class TestFunctions(BaseTest):
         balance_from_before: float = self.getBalance(jsw, coin_from)
         self.prepare_balance(
             coin_to,
-            balance_from_before * 3,
+            round(balance_from_before * 3, 8),
             1800 + id_bidder,
             1801 if coin_to in (Coins.XMR,) else 1800,
         )
@@ -3238,17 +3240,26 @@ class BasicSwapTest(TestFunctions):
             wallet=new_wallet_name,
         )
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
-        assert addr_info["hdkeypath"] == "m/0h/1h/0h"
-        if self.test_coin_from == Coins.BTC:
-            assert addr_change == self.expected_addresses["internal"]
-        else:
-            addr_decoded = ci.decodeAddress(addr_change)
-            expected_decoded = bytes(
+        # Node 0's wallet shares this seed and may have used the first change keys
+        assert addr_info["hdkeypath"].startswith("m/0h/1h/")
+
+        addr_change_0h: str = ci.encodeSegwitAddress(
+            bytes(
                 segwit_addr.decode_segwit_address(
                     "bcrt", self.expected_addresses["internal"]
                 )[1]
             )
-            assert addr_decoded == expected_decoded
+        )
+        addr_info = self.callnoderpc(
+            "getaddressinfo",
+            [
+                addr_change_0h,
+            ],
+            wallet=new_wallet_name,
+        )
+        assert addr_info["ismine"] is True
+        assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
+        assert addr_info["hdkeypath"] == "m/0h/1h/0h"
 
         address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
         for chain in ["external", "internal"]:
