@@ -76,7 +76,6 @@ class XMRPrepare(CoinPrepareModule):
         extra_opts: dict,
     ) -> tuple:
         use_file_ext = "tar.bz2" if ctx.file_ext == "tar.gz" else ctx.file_ext
-        release_filename = f"{self.name}-{self.version}-{ctx.bin_arch}.{use_file_ext}"
 
         os_name, _ = getOSDirNames(ctx.bin_arch)
         architecture = "x64"
@@ -89,7 +88,10 @@ class XMRPrepare(CoinPrepareModule):
         elif "arm" in ctx.bin_arch:
             architecture = "armv7"
 
-        release_url = f"https://downloads.getmonero.org/cli/monero-{os_name}-{architecture}-v{self.version}.{use_file_ext}"
+        release_filename = (
+            f"monero-{os_name}-{architecture}-v{self.version}.{use_file_ext}"
+        )
+        release_url = f"https://downloads.getmonero.org/cli/{release_filename}"
         release_path = os.path.join(bin_dir, release_filename)
         ctx.download_release(release_url, release_path, extra_opts)
 
