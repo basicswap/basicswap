@@ -12743,6 +12743,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}")
         xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid.bid_id)}")
+        ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -12994,6 +12995,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         ensure(msg["to"] == addr_to, "Received on incorrect address")
         ensure(msg["from"] == addr_from, "Sent from incorrect address")
+        ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         allowed_states = [
             BidStates.BID_SENT,
