@@ -831,10 +831,16 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             signature,
         )
         ensure(passed is True, "Proof of funds signature invalid")
+        ensure(len(set(utxos)) == len(utxos), "Duplicate proof of funds outpoint")
 
+        signer_dest = self.getPubkeyHashDest(self.decodeAddress(address))
         sum_value: int = 0
         for outpoint in utxos:
             txout = self.rpc("gettxout", [outpoint[0].hex(), outpoint[1], outpoint[2]])
+            ensure(
+                bytes.fromhex(txout["scriptPubKey"]["hex"]) == signer_dest,
+                "Proof of funds output does not pay the signing address",
+            )
             sum_value += self.make_int(txout["value"])
 
         return sum_value

@@ -562,13 +562,20 @@ class FIROInterface(BTCInterface):
             signature,
         )
         ensure(passed is True, "Proof of funds signature invalid")
+        ensure(len(set(utxos)) == len(utxos), "Duplicate proof of funds outpoint")
 
         if self.using_segwit():
             address = self.encodeSegwitAddress(decodeAddress(address)[1:])
 
+        signer_dest = bytes(self.getScriptForPubkeyHash(self.decodeAddress(address)))
         sum_value: int = 0
         for outpoint in utxos:
-            sum_value += self.getTxOut(outpoint[0], outpoint[1]).nValue
+            txout = self.getTxOut(outpoint[0], outpoint[1])
+            ensure(
+                bytes(txout.scriptPubKey) == signer_dest,
+                "Proof of funds output does not pay the signing address",
+            )
+            sum_value += txout.nValue
 
         return sum_value
 
