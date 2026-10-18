@@ -5216,6 +5216,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             if block_height > 0:
                 confirmations = max(0, chain_height - block_height + 1)
                 if confirmations >= self.blocks_confirmed:
+                    if (
+                        self._verifyTxMerkleElectrum(backend, txid_hex, block_height)
+                        is not True
+                    ):
+                        return None
                     self._log.debug(
                         f"_findConfirmedTxnByHashElectrum found tx {txid_hex[:16]}... "
                         f"height={block_height}, confirmations={confirmations}"
