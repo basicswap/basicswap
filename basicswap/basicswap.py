@@ -219,6 +219,8 @@ PROTOCOL_VERSION_SPLIT_PARENT = 7
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
 
+SMSG_TIME_LEEWAY = 24
+
 
 def validOfferStateToReceiveBid(offer_state):
     if offer_state == OfferStates.OFFER_RECEIVED:
@@ -11919,6 +11921,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if msg["sent"] + offer_data.time_valid < now:
             self.log.debug("Ignoring expired offer.")
             return
+        if msg.get("msg_net", "smsg") != "smsg":
+            ensure(
+                msg["ttl"] == max(self.SMSG_SECONDS_IN_HOUR, offer_data.time_valid),
+                "Offer ttl doesn't match its time_valid",
+            )
 
         self.validateMessageNets(offer_data.message_nets)
 
@@ -12124,7 +12131,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         f"for offer: {self.log.id(msg_data.offer_msg_id)}."
                     )
                     return
-                if self.storeOfferRevoke(msg_data.offer_msg_id, msg_data.signature):
+                if self.storeOfferRevoke(msg_data.offer_msg_id, msg["from"]):
                     self.log.debug(
                         f"Offer not found to revoke: {self.log.id(msg_data.offer_msg_id)}."
                     )
@@ -15494,6 +15501,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pass  # Counted when parsed
             else:
                 self.log.warning(f"processMsg unknown network: {network_type}")
+            if msg["sent"] > self.getTime() + SMSG_TIME_LEEWAY:
+                self.log.warning(
+                    f"Ignoring message {self.log.id(msg['msgid'])} sent in the future."
+                )
+                return
             msg_type: int = int(msg["hex"][:2], 16)
 
             if msg_type == MessageTypes.OFFER:
@@ -17905,25 +17917,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return True
         return False
 
-    def storeOfferRevoke(self, offer_id: bytes, sig) -> bool:
-        for pair in self._possibly_revoked_offers:
-            if offer_id == pair[0]:
-                return False
+    def storeOfferRevoke(self, offer_id: bytes, addr_from: str) -> bool:
+        if (offer_id, addr_from) in self._possibly_revoked_offers:
+            return False
         self.log.debug(f"Storing revoke request for offer: {self.log.id(offer_id)}.")
-        self._possibly_revoked_offers.appendleft((offer_id, sig))
+        self._possibly_revoked_offers.appendleft((offer_id, addr_from))
         return True
 
-    def isOfferRevoked(self, offer_id: bytes, offer_addr_from) -> bool:
-        for pair in self._possibly_revoked_offers:
-            if offer_id == pair[0]:
-                signature_enc = base64.b64encode(pair[1]).decode("UTF-8")
-                passed = self.ci(Coins.PART).verifyMessage(
-                    offer_addr_from, offer_id.hex() + "_revoke", signature_enc
-                )
-                return (
-                    True if passed is True else False
-                )  # _possibly_revoked_offers should not contain duplicates
-        return False
+    def isOfferRevoked(self, offer_id: bytes, offer_addr_from: str) -> bool:
+        return (offer_id, offer_addr_from) in self._possibly_revoked_offers
 
     def updateBidInProgress(self, bid):
         swap_in_progress = self.swaps_in_progress.get(bid.bid_id, None)

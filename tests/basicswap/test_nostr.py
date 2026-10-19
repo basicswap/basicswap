@@ -2394,5 +2394,76 @@ class TestNostrPrepare(unittest.TestCase):
         assert nostr["private_key"] == key
 
 
+class TestSmsgReplayGates(BasicSwapFixture):
+
+    def offerSmsg(self, ttl: int, time_valid: int) -> tuple:
+        from basicswap.basicswap import PROTOCOL_VERSION_ADAPTOR_SIG
+        from basicswap.basicswap_util import MessageTypes
+        from basicswap.chainparams import Coins
+        from basicswap.messages_npb import OfferMessage
+        from basicswap.util.smsg import smsgEncrypt
+
+        offer = OfferMessage()
+        offer.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
+        offer.coin_from = Coins.PART
+        offer.coin_to = Coins.BTC
+        offer.amount_from = 100000000
+        offer.amount_to = 100000000
+        offer.time_valid = time_valid
+        payload = bytes((MessageTypes.OFFER,)) + offer.to_bytes()
+        k_to = PrivateKey()
+        smsg = smsgEncrypt(
+            PrivateKey().secret, k_to.public_key.format(), payload, smsg_ttl=ttl
+        )
+        return smsg, k_to
+
+    def processOffer(self, smsg: bytes, k_to) -> None:
+        from unittest import mock
+        from basicswap.util.smsg import smsgDecrypt
+
+        msg = smsgDecrypt(k_to.secret, smsg, output_dict=True)
+        msg["msg_net"] = "nostr"
+        self.sc._smsg_payload_version = 2
+        with (
+            mock.patch.object(self.sc, "ci"),
+            mock.patch.object(self.sc, "validateSwapType"),
+            mock.patch.object(self.sc, "validateOfferAmounts"),
+            mock.patch.object(self.sc, "validateOfferLockValue"),
+            mock.patch.object(self.sc, "validateOfferValidTime"),
+            mock.patch.object(
+                self.sc, "validateMessageNets", side_effect=StopIteration
+            ),
+        ):
+            self.sc.processOffer(msg)
+
+    def test_offer_ttl_must_match_time_valid(self):
+        from basicswap.util.smsg import smsgGetID
+
+        smsg, k_to = self.offerSmsg(4 * 3600, 4 * 3600)
+        with self.assertRaises(StopIteration):
+            self.processOffer(smsg, k_to)
+
+        replayed = smsg[:19] + (4 * 3600 + 1).to_bytes(4, "little") + smsg[23:]
+        assert smsgGetID(replayed) != smsgGetID(smsg)
+        with self.assertRaisesRegex(ValueError, "ttl doesn't match"):
+            self.processOffer(replayed, k_to)
+
+    def test_future_message_ignored(self):
+        from unittest import mock
+        from basicswap.basicswap_util import MessageTypes
+
+        now = self.sc.getTime()
+        msg = {
+            "msgid": "00" * 28,
+            "hex": "{:02x}".format(MessageTypes.OFFER),
+            "msg_net": "nostr",
+        }
+        with mock.patch.object(self.sc, "processOffer") as process_offer:
+            self.sc.processMsg(dict(msg, sent=now + 60))
+            process_offer.assert_not_called()
+            self.sc.processMsg(dict(msg, sent=now))
+            process_offer.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
