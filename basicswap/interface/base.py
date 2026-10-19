@@ -94,7 +94,7 @@ class CoinInterface:
         return None
 
     def getSpendableOutputs(self):
-        # Confirmed, unlocked outputs, or None when the coin cannot preselect inputs.
+        # Trusted, unlocked outputs, or None when the coin cannot preselect inputs.
         return None
 
     @staticmethod
