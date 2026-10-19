@@ -311,6 +311,12 @@ class Bid(Table, StateRows):
             return self.xmr_b_lock_tx.vout
         return None
 
+    def getTxnByTxid(self, txid: bytes):
+        for swap_tx in self.txns.values():
+            if swap_tx.txid == txid:
+                return swap_tx
+        return None
+
 
 class SwapTx(Table, StateRows):
     __tablename__ = "transactions"

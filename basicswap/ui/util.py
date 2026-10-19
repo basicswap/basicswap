@@ -456,24 +456,45 @@ def describeBid(
                     }
                 )
             if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
+                confirms = None
+                spend_tx = bid.getTxnByTxid(bid.xmr_b_lock_tx.spend_txid)
+                chain_height = swap_client.coin_clients[ci_follower.coin_type()][
+                    "chain_height"
+                ]
+                if chain_height and spend_tx and spend_tx.chain_height:
+                    confirms = (chain_height - spend_tx.chain_height) + 1
                 txns.append(
                     {
                         "type": "Chain B Lock Spend",
                         "txid": bid.xmr_b_lock_tx.spend_txid.hex(),
+                        "confirms": confirms,
                     }
                 )
+            chain_a_height = swap_client.coin_clients[ci_leader.coin_type()][
+                "chain_height"
+            ]
             if xmr_swap.a_lock_refund_tx:
+                confirms = None
+                refund_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND)
+                if chain_a_height and refund_tx and refund_tx.block_height:
+                    confirms = (chain_a_height - refund_tx.block_height) + 1
                 txns.append(
                     {
                         "type": strTxType(TxTypes.XMR_SWAP_A_LOCK_REFUND),
                         "txid": xmr_swap.a_lock_refund_tx_id.hex(),
+                        "confirms": confirms,
                     }
                 )
             if xmr_swap.a_lock_refund_spend_tx:
+                confirms = None
+                refund_spend_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND)
+                if chain_a_height and refund_spend_tx and refund_spend_tx.chain_height:
+                    confirms = (chain_a_height - refund_spend_tx.chain_height) + 1
                 txns.append(
                     {
                         "type": strTxType(TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND),
                         "txid": xmr_swap.a_lock_refund_spend_tx_id.hex(),
+                        "confirms": confirms,
                     }
                 )
             for tx_type, tx in bid.txns.items():

@@ -702,6 +702,12 @@ class XMRInterface(CoinInterface):
             return 0
         return self.getChainHeight() - tx["block_height"]
 
+    def getTxBlockHeight(self, txid: bytes) -> int | None:
+        rv = self.getTransaction(txid)
+        if txid.hex() in rv.get("missed_tx", []) or rv["txs"][0]["in_pool"]:
+            return None
+        return rv["txs"][0]["block_height"]
+
     def spendBLockTx(self, *args, **kwargs) -> bytes:
         txid, tx = self.createBLockSpendTx(*args, **kwargs)
         if tx is not None:
