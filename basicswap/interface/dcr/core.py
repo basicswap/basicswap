@@ -14,13 +14,12 @@ from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
     exitWithError,
+    getOSDirNames,
 )
 
 DCR_VERSION = os.getenv("DCR_VERSION", "2.1.7")
 DCR_VERSION_TAG = os.getenv("DCR_VERSION_TAG", "")
 decred_signers = {"decred_release": ("F516ADB7A069852C7C28A02D6D897EDF518A031D",)}
-
-USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
 
 DCR_RPC_HOST = os.getenv("DCR_RPC_HOST", "127.0.0.1")
 DCR_RPC_PORT = int(os.getenv("DCR_RPC_PORT", 9109))
@@ -57,12 +56,15 @@ class DCRPrepare(CoinPrepareModule):
         }
 
     def getArchName(self, ctx: PrepareContext, os_name: str, use_guix: bool) -> str:
-        if USE_PLATFORM == "Darwin":
+        if os_name == "osx":
+            if platform.machine() == "arm64":
+                return "darwin-arm64"
             return "darwin-amd64"
-        elif USE_PLATFORM == "Windows":
+        elif os_name == "win":
             return "windows-amd64"
-        machine: str = platform.machine()
-        if "arm" in machine:
+        if "aarch64" in ctx.bin_arch:
+            return "linux-arm64"
+        if "arm" in ctx.bin_arch:
             return "linux-arm"
         return "linux-amd64"
 
@@ -73,7 +75,8 @@ class DCRPrepare(CoinPrepareModule):
         signing_key_name: str,
         extra_opts: dict,
     ) -> tuple:
-        arch_name = self.getArchName(ctx, "", False)
+        os_name, _ = getOSDirNames(ctx.bin_arch)
+        arch_name = self.getArchName(ctx, os_name, False)
         extra_opts["arch_name"] = arch_name
 
         release_filename = f"decred-{self.version}-{arch_name}.{ctx.file_ext}"

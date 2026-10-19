@@ -7,6 +7,7 @@
 import hashlib
 import mmap
 import os
+import platform
 import stat
 import sys
 import tarfile
@@ -257,6 +258,8 @@ class CoinPrepareModule(ReleasePrepareModule):
 
     def getArchName(self, ctx: PrepareContext, os_name: str, use_guix: bool) -> str:
         if os_name == "osx" and use_guix:
+            if platform.machine() == "arm64":
+                return "arm64-apple-darwin"
             return "x86_64-apple-darwin"
         return ctx.bin_arch
 

@@ -9,7 +9,7 @@ import platform
 
 from basicswap.interface.wow.chainparams import params
 from basicswap.interface.xmr.core import XMRPrepare
-from basicswap.interface.prepare_util import PrepareContext
+from basicswap.interface.prepare_util import PrepareContext, getOSDirNames
 
 WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
 WOWNERO_VERSION_TAG = os.getenv("WOWNERO_VERSION_TAG", "")
@@ -17,8 +17,6 @@ WOW_SITE_COMMIT = (
     "5400b3fa3e76eab2788d8e93edbb70846a62e57a"  # Lock hashes.txt to wownero version
 )
 wownero_signers = {"wowario": ("AB3A2F725818FCFF2794841C793504B449C69220",)}
-
-USE_PLATFORM = os.getenv("USE_PLATFORM", platform.system())
 
 WOW_RPC_HOST = os.getenv("WOW_RPC_HOST", "127.0.0.1")
 WOW_RPC_PORT = int(os.getenv("WOW_RPC_PORT", 34598))
@@ -71,21 +69,22 @@ class WOWPrepare(XMRPrepare):
         extra_opts: dict,
     ) -> tuple:
         use_file_ext = "tar.bz2" if ctx.file_ext == "tar.gz" else ctx.file_ext
-        release_filename = f"{self.name}-{self.version}-{ctx.bin_arch}.{use_file_ext}"
 
+        os_name, _ = getOSDirNames(ctx.bin_arch)
         architecture = ctx.bin_arch
-        machine: str = platform.machine()
-        if USE_PLATFORM == "Darwin":
-            if "arm64" in machine:
+        if os_name == "osx":
+            if platform.machine() == "arm64":
                 architecture = "aarch64-apple-darwin11"
             else:
                 architecture = "x86_64-apple-darwin11"
-        elif USE_PLATFORM == "Windows":
+        elif os_name == "win":
+            machine: str = platform.machine()
             if machine == "AMD64":
                 machine = "x86_64"
             architecture = machine + "-w64-mingw32"
 
-        release_url = f"https://codeberg.org/wownero/wownero/releases/download/v{self.version}/wownero-{architecture}-v{self.version}.{use_file_ext}"
+        release_filename = f"wownero-{architecture}-v{self.version}.{use_file_ext}"
+        release_url = f"https://codeberg.org/wownero/wownero/releases/download/v{self.version}/{release_filename}"
         release_path = os.path.join(bin_dir, release_filename)
         ctx.download_release(release_url, release_path, extra_opts)
 
