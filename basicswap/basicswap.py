@@ -14177,7 +14177,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.commitDB()
         if ci_to.getTxDepth(spend_tx.txid) is not None:
             return spend_tx.txid, False
-        ci_to.publishTx(spend_tx.tx_data)
+        try:
+            ci_to.publishTx(spend_tx.tx_data)
+        except Exception as e:
+            if (
+                ci_to.is_transient_error(e)
+                or self.is_transient_error(e)
+                or ci_to.isTxDoubleSpendError(str(e))
+            ):
+                raise
+            # Built with do_not_relay, so its outputs are still unspent in the wallet
+            del bid.txns[tx_type]
+            cursor.execute(
+                "DELETE FROM transactions WHERE bid_id = :bid_id AND tx_type = :tx_type",
+                {"bid_id": bid.bid_id, "tx_type": int(tx_type)},
+            )
+            self.commitDB()
+            raise TemporaryError(
+                f"{ci_to.coin_name()} daemon rejected the coin B lock spend tx, rebuilding it: {e}"
+            )
         return spend_tx.txid, True
 
     def redeemXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
