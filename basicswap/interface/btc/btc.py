@@ -5021,11 +5021,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
             self.rpc("loadwallet", [self._rpc_wallet])
 
-            if hdchain_replaced:
+            if hdchain_replaced or self._use_descriptors:
                 self.unlockWallet(password, check_seed=False)
                 seed_id_after_restore: str = self.getWalletSeedID()
                 if seed_id_after_restore == seed_id_before:
-                    self.newKeypool()
+                    if hdchain_replaced:
+                        self.newKeypool()
                 else:
                     self._log.warning(
                         f"Expected seed id not found: {seed_id_before}, have {seed_id_after_restore}."
