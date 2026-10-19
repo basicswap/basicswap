@@ -177,7 +177,6 @@ from .multibid import (
     CONFIRM_INTERVAL_MULTIPLE,
     MAX_CONFIRM_WAIT_SECONDS,
     MIN_LEG_TIMEOUT_SECONDS,
-    PEER_CONFIRM_ALLOWANCE_SECONDS,
     plan_batch_decision,
     plan_htlc_batch,
 )
@@ -6057,18 +6056,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         return min(max(expected, ready_timeout), MAX_CONFIRM_WAIT_SECONDS)
 
+    def getConfirmAllowance(self, ci) -> int:
+        """Seconds to allow for a txn to reach blocks_confirmed."""
+        return int(
+            ci.blocks_confirmed
+            * ci.chainparams()["blocks_target"]
+            * CONFIRM_INTERVAL_MULTIPLE
+        )
+
     def getBLockMinMargin(self, ci_to) -> int:
         """Least time left on the coin A refund timelock to send a coin B lock
         with, the release and spend margins are checked again once it confirms."""
-        expected: int = int(
-            ci_to.blocks_confirmed
-            * ci_to.chainparams()["blocks_target"]
-            * CONFIRM_INTERVAL_MULTIPLE
-        )
-        return (
-            max(self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin)
-            + expected
-        )
+        return max(
+            self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin
+        ) + self.getConfirmAllowance(ci_to)
 
     def getLegLockRemaining(self, leg, leg_offer, reverse_bid: bool, cursor):
         """Seconds left on a ready leg's coin A lock refund timelock, or None
@@ -7921,7 +7922,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             itx_remaining = self.getITxLockRemaining(bid, offer, None)
             if itx_remaining is None:
                 raise TemporaryError("Initiate txn lock remaining unknown")
-            return itx_remaining - offer.lock_value // 2
+            # The participate txn refund timelock starts once it confirms
+            return (
+                itx_remaining
+                - offer.lock_value // 2
+                - self.getConfirmAllowance(self.ci(offer.coin_to))
+            )
         if offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
             ptx_unlock: int = max(
                 atomic_swap_1.extractScriptLockValue(participate_script),
@@ -7938,7 +7944,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         the initiate txn."""
         margin = self.getPTxLockMargin(bid, offer, participate_script)
         ensure(
-            margin is None or margin > PEER_CONFIRM_ALLOWANCE_SECONDS,
+            margin is None
+            or margin > self.getConfirmAllowance(self.ci(offer.coin_from)),
             f"Initiate txn refund too close to the participate txn refund: {margin}s",
         )
 
