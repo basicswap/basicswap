@@ -773,6 +773,9 @@ def printHelp():
     print(
         "--upgradecores           Upgrade all coin cores present in basicswap.json. Optionally use alongside --withcoin= or --withoutcoin="
     )
+    print(
+        "--uselatest=             With --upgradecores, upgrade the coin's core from an older version line, such as Bitcoin Core 29.x, to the latest release. Implies --withcoin="
+    )
     print("--preparebinonly         Don't prepare settings or datadirs.")
     print(
         "--nocores                Don't download and extract any coin or network clients."
@@ -1305,6 +1308,7 @@ def main():
     print_versions = False
     prepare_bin_only = False
     upgrade_cores = False
+    use_latest_coins = set()
     no_cores = False
     enable_tor = False
     disable_tor = False
@@ -1420,6 +1424,13 @@ def main():
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
                     ensure_coin_valid(coin, test_disabled=False)
                     with_coins.discard(coin)
+                with_coins_changed = True
+                continue
+            if name == "uselatest":
+                for coin in [s.strip().lower() for s in s[1].split(",")]:
+                    ensure_coin_valid(coin)
+                    use_latest_coins.add(coin)
+                    with_coins.add(coin)
                 with_coins_changed = True
                 continue
             if name == "addcoin":
@@ -2002,8 +2013,15 @@ def main():
                     exitWithError(f"{coin_name} not found in basicswap.json")
                 coin_settings = settings["chainclients"][coin_name]
 
-                current_version = current_coin_settings["core_version_no"]
                 have_version = coin_settings.get("core_version_no", "")
+                coin_module = coin_prepare_modules[coin_name]
+                coin_module.setUpgradeVersion(
+                    have_version, coin_name in use_latest_coins
+                )
+                current_coin_settings["core_version_no"] = (
+                    coin_module.version + coin_module.version_tag
+                )
+                current_version = current_coin_settings["core_version_no"]
 
                 current_version_group = current_coin_settings.get(
                     "core_version_group", ""

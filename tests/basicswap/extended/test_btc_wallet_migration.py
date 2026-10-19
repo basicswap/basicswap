@@ -285,7 +285,7 @@ class Test(unittest.TestCase):
         self.add_current_release(datadir, with_bins=False)
         exitcode, output = prepare(
             datadir,
-            ["--upgradecores", "-withcoin=bitcoin"],
+            ["--upgradecores", "-uselatest=bitcoin"],
             "upgrade",
             {"WALLET_ENCRYPTION_PWD": TEST_PWD},
         )
@@ -299,7 +299,7 @@ class Test(unittest.TestCase):
         )
         self.add_current_release(datadir, with_bins=False)
         exitcode, output = prepare(
-            datadir, ["--upgradecores", "-withcoin=bitcoin"], "upgrade_nopwd", {}
+            datadir, ["--upgradecores", "-uselatest=bitcoin"], "upgrade_nopwd", {}
         )
         assert exitcode != 0
         assert "Must set WALLET_ENCRYPTION_PWD" in output
@@ -310,12 +310,28 @@ class Test(unittest.TestCase):
 
         exitcode, output = prepare(
             datadir,
-            ["--upgradecores", "-withcoin=bitcoin"],
+            ["--upgradecores", "-uselatest=bitcoin"],
             "upgrade",
             {"WALLET_ENCRYPTION_PWD": TEST_PWD},
         )
         assert exitcode == 0, output
         self.check_migrated(datadir, "bsx_wallet", addr, watch_addr, balances, True)
+
+    def test_upgrade_keeps_legacy_version(self):
+        datadir = self.make_legacy_install(
+            "upgrade_keeps_legacy", False, "bsx_wallet", False
+        )[0]
+        exitcode, output = prepare(
+            datadir,
+            ["--upgradecores", "-withcoin=bitcoin"],
+            "upgrade_legacy",
+            {"BITCOIN_LEGACY_VERSION": legacy_version},
+        )
+        assert exitcode == 0, output
+        assert "v" + legacy_version in bitcoind_version(datadir)
+        settings = read_settings(datadir)["chainclients"]["bitcoin"]
+        assert settings["core_version_no"] == legacy_version
+        assert settings.get("use_descriptors", False) is False
 
     def test_migrate_unencrypted_old_wallet_name(self):
         datadir, addr, watch_addr, balances = self.make_legacy_install(

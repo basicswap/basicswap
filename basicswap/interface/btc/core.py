@@ -21,6 +21,7 @@ from basicswap.interface.prepare_util import (
 
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "31.1")
 BITCOIN_VERSION_TAG = os.getenv("BITCOIN_VERSION_TAG", "")
+BITCOIN_LEGACY_VERSION = os.getenv("BITCOIN_LEGACY_VERSION", "29.4")
 bitcoin_signers = {
     "laanwj": ("9DEAE0DC7063249FB05474681E4AED62986CD25D",),
     "hebasto": ("D1DBF2C4B96F2DEBF4C16654410108112E7EA81F",),
@@ -138,6 +139,13 @@ class BTCPrepare(CoinPrepareModule):
         if from_major.isdigit() and int(from_major) >= 30:
             return False
         return int(self.version.split(".")[0]) >= 30
+
+    def setUpgradeVersion(self, have_version: str, use_latest: bool) -> None:
+        have_major: str = have_version.split(".")[0]
+        if use_latest or (have_major.isdigit() and int(have_major) >= 30):
+            return
+        self.version = BITCOIN_LEGACY_VERSION
+        self.version_tag = ""
 
     def migrateWallet(
         self,
