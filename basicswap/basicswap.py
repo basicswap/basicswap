@@ -7918,12 +7918,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         """Seconds the initiate txn refund stays locked after the participate txn
         refund unlocks, or None for the block lock types."""
         if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
-            itx = bid.initiate_tx
-            if itx is not None and itx.block_height and itx.block_time is None:
-                # A failed header fetch at confirmation leaves block_time unset
-                self.setTxBlockInfoFromHeight(
-                    self.ci(offer.coin_from), itx, itx.block_height
-                )
             itx_remaining = self.getITxLockRemaining(bid, offer, None)
             if itx_remaining is None:
                 raise TemporaryError("Initiate txn lock remaining unknown")
@@ -8389,7 +8383,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         ci_to = self.ci(offer.coin_to)
         batched_ptx: bool = bool(bid.plan_id) and hasattr(ci_to, "fundHTLCTxs")
-        if bid.was_sent and bid.participate_tx is None and not batched_ptx:
+        if bid.was_sent and bid.participate_tx is None:
             # Before the state changes, so a retry finds the bid still accepted
             self.ensurePTxLockMargin(bid, offer, participate_script)
 
@@ -9986,7 +9980,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.initiate_tx.chain_height = self.setLastHeightCheckedStart(
                         coin_from, tx_height
                     )
-                    self.setTxBlockInfoFromHeight(ci_from, bid.initiate_tx, tx_height)
 
                     self.addWatchedOutput(
                         coin_from,
@@ -10000,6 +9993,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         or bid.getITxState() < TxStates.TX_SENT
                     ):
                         bid.setITxState(TxStates.TX_SENT)
+                    save_bid = True
+
+                if (
+                    bid.initiate_tx.block_time is None
+                    and tx_height is not None
+                    and tx_height > 0
+                ):
+                    self.setTxBlockInfoFromHeight(ci_from, bid.initiate_tx, tx_height)
                     save_bid = True
 
                 if (
