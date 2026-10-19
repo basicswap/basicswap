@@ -555,6 +555,11 @@ class CoinPrepareModule(ReleasePrepareModule):
     def needsWalletMigration(self, core_settings: dict, from_version: str) -> bool:
         return False
 
+    def checkWalletBeforeMigration(
+        self, ctx: PrepareContext, swap_client, coin_id, core_settings: dict
+    ) -> None:
+        pass
+
     def setUpgradeVersion(self, have_version: str, use_latest: bool) -> None:
         pass
 

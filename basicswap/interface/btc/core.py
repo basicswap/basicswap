@@ -150,6 +150,20 @@ class BTCPrepare(CoinPrepareModule):
     def getVersionNote(self) -> str:
         return f" ({BITCOIN_LEGACY_VERSION} for --upgradecores of a pre-30 install without -uselatest={self.name})"
 
+    def checkWalletBeforeMigration(
+        self, ctx: PrepareContext, swap_client, coin_id, core_settings: dict
+    ) -> None:
+        ci = swap_client.ci(coin_id)
+        wallet_name: str = core_settings.get("wallet_name", "wallet.dat")
+        if wallet_name not in ci.rpc("listwallets"):
+            ci.rpc("loadwallet", [wallet_name])
+        wallet_seed_id: str = ci.getWalletSeedID()
+        root_seed_id: str = ci.getSeedHash(swap_client.getWalletKey(coin_id, 1)).hex()
+        if wallet_seed_id != root_seed_id:
+            raise ValueError(
+                f"{self.name.capitalize()} wallet seed id {wallet_seed_id} is not derived from the Particl wallet's default account ({root_seed_id}). Rerun with --noseedcheck to migrate it as it is."
+            )
+
     def migrateWallet(
         self,
         ctx: PrepareContext,

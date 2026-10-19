@@ -777,6 +777,9 @@ def printHelp():
     print(
         "--uselatest=             With --upgradecores, upgrade the coin's core from an older version line, such as Bitcoin Core 29.x, to the latest release. Implies --withcoin="
     )
+    print(
+        "--noseedcheck            With --upgradecores, migrate a wallet that isn't derived from the Particl wallet's default account."
+    )
     print("--preparebinonly         Don't prepare settings or datadirs.")
     print(
         "--nocores                Don't download and extract any coin or network clients."
@@ -1160,7 +1163,15 @@ def unlock_seed_wallet(swap_client, seed_coin, prepare_ctx) -> None:
     swap_client.ci(c).unlockWallet(prepare_ctx.wallet_encryption_pwd)
 
 
-def migrate_wallets(migrate_coins, data_dir, settings, chain, extra_opts, config_path):
+def migrate_wallets(
+    migrate_coins,
+    data_dir,
+    settings,
+    chain,
+    extra_opts,
+    config_path,
+    check_only: bool = False,
+):
     prepare_ctx = extra_opts["prepare_ctx"]
     swap_client = None
     daemons = []
@@ -1181,6 +1192,11 @@ def migrate_wallets(migrate_coins, data_dir, settings, chain, extra_opts, config
             coin_settings = settings["chainclients"][coin_name]
             c = swap_client.getCoinIdFromName(coin_name)
             swap_client.waitForDaemonRPC(c, with_wallet=False)
+            if check_only:
+                coin_prepare_modules[coin_name].checkWalletBeforeMigration(
+                    prepare_ctx, swap_client, c, coin_settings
+                )
+                continue
             coin_params = chainparams[c]
             watch_wallet_name: str = getWalletName(
                 coin_params,
@@ -1201,8 +1217,12 @@ def migrate_wallets(migrate_coins, data_dir, settings, chain, extra_opts, config
             finalise_daemon(d)
 
 
-def check_seed_wallet_password(data_dir, settings, chain, extra_opts):
-    migrate_wallets([], data_dir, settings, chain, extra_opts, None)
+def check_wallets_before_migration(
+    migrate_coins, data_dir, settings, chain, extra_opts
+):
+    migrate_wallets(
+        migrate_coins, data_dir, settings, chain, extra_opts, None, check_only=True
+    )
 
 
 def load_config(config_path):
@@ -1365,6 +1385,9 @@ def main():
             continue
         if name == "noextractover":
             extra_opts["extract_core_overwrite"] = False
+            continue
+        if name == "noseedcheck":
+            extra_opts["check_wallet_seed"] = False
             continue
         if name == "usetorproxy":
             use_tor_proxy = True
@@ -2069,7 +2092,13 @@ def main():
                 )
             ]
             if len(migrate_coins) > 0:
-                check_seed_wallet_password(data_dir, settings, chain, extra_opts)
+                check_wallets_before_migration(
+                    migrate_coins if extra_opts.get("check_wallet_seed", True) else [],
+                    data_dir,
+                    settings,
+                    chain,
+                    extra_opts,
+                )
 
             for c in with_coins:
                 prepareCore(c, settings, extra_opts)
