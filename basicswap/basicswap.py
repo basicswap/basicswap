@@ -8587,16 +8587,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 f"Publishing redeem tx {self.logIDT(txid)} for bid {self.log.id(bid.bid_id)} failed, will retry: {e}"
             )
 
-    def rebroadcastRedeemTxn(self, ci, bid, tx_type, txn: bytes) -> bool:
-        """True once txn has blocks_confirmed confirmations, else rebroadcasts it
-        every redeem_rebroadcast_seconds."""
+    def rebroadcastRedeemTxn(self, ci, bid, tx_type, txn: bytes) -> dict | None:
+        """The confirmed tx once txn has blocks_confirmed confirmations, else
+        None, rebroadcasting it every redeem_rebroadcast_seconds."""
         txid = ci.getTxid(txn)
-        if ci.findConfirmedTxnByHash(txid.hex()) is not None:
-            return True
+        found = ci.findConfirmedTxnByHash(txid.hex())
+        if found is not None:
+            return found
         now: int = self.getTime()
         published_at = self._redeem_published_at.get((bid.bid_id, tx_type), 0)
         if now - published_at < self._redeem_rebroadcast_seconds:
-            return False
+            return None
         self._redeem_published_at[(bid.bid_id, tx_type)] = now
         try:
             ci.publishTx(txn)
@@ -8607,7 +8608,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Rebroadcasting redeem tx {self.logIDT(txid)} for bid {self.log.id(bid.bid_id)}: {e}"
             )
-        return False
+        return None
 
     def checkRedeemTxns(self, bid, offer) -> bool:
         """Rebroadcast this node's script swap redeem txns until each has
@@ -9195,7 +9196,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if state == BidStates.SWAP_COMPLETED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_REFUNDED:
-                rv = True  # Remove from swaps_in_progress
+                refund_spend_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND)
+                if (
+                    was_received
+                    and not was_sent
+                    and refund_spend_tx is not None
+                    and TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns
+                ):
+                    found = self.rebroadcastRedeemTxn(
+                        ci_from,
+                        bid,
+                        TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND,
+                        xmr_swap.a_lock_refund_spend_tx,
+                    )
+                    if found:
+                        refund_spend_tx.chain_height = found["height"]
+                        self.add(refund_spend_tx, cursor, upsert=True)
+                        self.logBidEvent(
+                            bid.bid_id,
+                            EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_CONFIRMED,
+                            "",
+                            cursor,
+                        )
+                        rv = True  # Remove from swaps_in_progress
+                else:
+                    rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY:
