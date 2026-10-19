@@ -558,6 +558,9 @@ class CoinPrepareModule(ReleasePrepareModule):
     def setUpgradeVersion(self, have_version: str, use_latest: bool) -> None:
         pass
 
+    def getVersionNote(self) -> str:
+        return ""
+
     def migrateWallet(
         self,
         ctx: PrepareContext,

@@ -745,7 +745,8 @@ def printVersion(with_coins):
         if with_coins_changed and coin not in with_coins:
             continue
         postfix = " (Disabled)" if coin in disabled_coins else ""
-        print(f"\t{coin.capitalize()}: {version[0]}{version[1]}{postfix}")
+        note = coin_prepare_modules[coin].getVersionNote()
+        print(f"\t{coin.capitalize()}: {version[0]}{version[1]}{note}{postfix}")
 
 
 def printHelp():
@@ -2015,6 +2016,7 @@ def main():
 
                 have_version = coin_settings.get("core_version_no", "")
                 coin_module = coin_prepare_modules[coin_name]
+                latest_version = coin_module.version + coin_module.version_tag
                 coin_module.setUpgradeVersion(
                     have_version, coin_name in use_latest_coins
                 )
@@ -2031,6 +2033,10 @@ def main():
                 logger.info(
                     f"{coin_name}: have {have_version}, current {current_version}."
                 )
+                if current_version != latest_version:
+                    logger.info(
+                        f"  Staying on {current_version}, use -uselatest={coin_name} to update to {latest_version} now."
+                    )
                 if not BSX_UPDATE_UNMANAGED and not (
                     coin_settings.get("manage_daemon", False)
                     or coin_settings.get("manage_wallet_daemon", False)
