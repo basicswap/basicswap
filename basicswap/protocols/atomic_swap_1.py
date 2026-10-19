@@ -123,6 +123,10 @@ def extractScriptSecretHash(script):
     return script[7:39]
 
 
+def extractScriptLockValue(script) -> int:
+    return decodeScriptNum(script, 64)[0]
+
+
 def redeemITx(self, bid_id: bytes, cursor):
     bid, offer = self.swaps_in_progress.get(bid_id) or self.getBidAndOffer(
         bid_id, cursor

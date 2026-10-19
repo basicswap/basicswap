@@ -884,6 +884,47 @@ class Test(BaseTest):
         assert compare_bid_states(offerer_states, self.states_offerer_sh[1]) is True
         assert bidder_states[-1][1] == "Bid Abandoned"
 
+    def test_05_refund_slow_itx(self):
+        logging.info("---------- Test refund after a slow initiate txn, LTC to BTC")
+        swap_clients = self.swap_clients
+
+        offer_id = swap_clients[0].postOffer(
+            Coins.LTC,
+            Coins.BTC,
+            10 * COIN,
+            0.1 * COIN,
+            10 * COIN,
+            SwapTypes.SELLER_FIRST,
+            TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+            10,
+        )
+
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        offer = swap_clients[1].getOffer(offer_id)
+        bid_id = swap_clients[1].postBid(offer_id, offer.amount_from)
+
+        wait_for_bid(test_delay_event, swap_clients[0], bid_id)
+        read_json_api(1801, "bids/{}".format(bid_id.hex()), {"abandon": True})
+
+        try:
+            pause_event.clear()
+            swap_clients[0].acceptBid(bid_id)
+            swap_clients[0].setMockTimeOffset(swap_clients[0]._sc_lock_tx_timeout)
+            swap_clients[0].checkAcceptedBids()
+        finally:
+            swap_clients[0].setMockTimeOffset(0)
+            pause_event.set()
+
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[0],
+            bid_id,
+            BidStates.SWAP_COMPLETED,
+            wait_for=80,
+        )
+        js_0_bid = read_json_api(1800, "bids/{}".format(bid_id.hex()))
+        assert js_0_bid["itx_state"] == "Refunded"
+
     def test_06_self_bid(self):
         logging.info("---------- Test same client, BTC to LTC")
         swap_clients = self.swap_clients

@@ -177,6 +177,7 @@ from .multibid import (
     CONFIRM_INTERVAL_MULTIPLE,
     MAX_CONFIRM_WAIT_SECONDS,
     MIN_LEG_TIMEOUT_SECONDS,
+    PEER_CONFIRM_ALLOWANCE_SECONDS,
     plan_batch_decision,
     plan_htlc_batch,
 )
@@ -7903,6 +7904,40 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             leg.initiate_tx.block_time,
         )
 
+    def getPTxLockMargin(self, bid, offer, participate_script: bytearray) -> int | None:
+        """Seconds the initiate txn refund stays locked after the participate txn
+        refund unlocks, or None for the block lock types."""
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            itx = bid.initiate_tx
+            if itx is not None and itx.block_height and itx.block_time is None:
+                # A failed header fetch at confirmation leaves block_time unset
+                self.setTxBlockInfoFromHeight(
+                    self.ci(offer.coin_from), itx, itx.block_height
+                )
+            itx_remaining = self.getITxLockRemaining(bid, offer, None)
+            if itx_remaining is None:
+                raise TemporaryError("Initiate txn lock remaining unknown")
+            return itx_remaining - offer.lock_value // 2
+        if offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
+            ptx_unlock: int = max(
+                atomic_swap_1.extractScriptLockValue(participate_script),
+                self.getTime(),
+            )
+            return (
+                atomic_swap_1.extractScriptLockValue(bid.initiate_tx.script)
+                - ptx_unlock
+            )
+        return None
+
+    def ensurePTxLockMargin(self, bid, offer, participate_script: bytearray) -> None:
+        """Refuse a participate txn the seller could still redeem after refunding
+        the initiate txn."""
+        margin = self.getPTxLockMargin(bid, offer, participate_script)
+        ensure(
+            margin is None or margin > PEER_CONFIRM_ALLOWANCE_SECONDS,
+            f"Initiate txn refund too close to the participate txn refund: {margin}s",
+        )
+
     def sendPlanParticipateTx(self, bid_id: bytes, cursor) -> None:
         """Send this leg's participate txn together with every sibling leg of the
         same plan that is also waiting to send one, as a single transaction."""
@@ -7918,6 +7953,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         ci_to = self.ci(offer.coin_to)
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
+        self.ensurePTxLockMargin(bid, offer, participate_script)
 
         ready_timeout: int = self._plan_leg_timeout
         stored_timeout = self.getStringKV(
@@ -7953,13 +7989,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             leg_offer = self.queryOne(Offer, cursor, {"offer_id": leg.offer_id})
             if leg_offer is None or leg_offer.coin_to != offer.coin_to:
                 continue
-            legs.append(
-                (
-                    leg,
-                    leg_offer,
-                    self.deriveParticipateScript(leg.bid_id, leg, leg_offer),
+            leg_script = self.deriveParticipateScript(leg.bid_id, leg, leg_offer)
+            try:
+                self.ensurePTxLockMargin(leg, leg_offer, leg_script)
+            except ValueError as e:
+                self.log.warning(
+                    f"Leaving bid {self.log.id(leg.bid_id)} out of the participate tx: {e}"
                 )
-            )
+                continue
+            legs.append((leg, leg_offer, leg_script))
 
         htlcs = [(participate_script, bid.amount_to)] + [
             (script, leg.amount_to) for leg, _, script in legs
@@ -8338,6 +8376,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def initiateTxnConfirmed(self, bid_id: bytes, bid, offer) -> None:
         self.log.debug(f"initiateTxnConfirmed for bid {self.log.id(bid_id)}")
+        participate_script = self.deriveParticipateScript(bid_id, bid, offer)
+        ci_to = self.ci(offer.coin_to)
+        batched_ptx: bool = bool(bid.plan_id) and hasattr(ci_to, "fundHTLCTxs")
+        if bid.was_sent and bid.participate_tx is None and not batched_ptx:
+            # Before the state changes, so a retry finds the bid still accepted
+            self.ensurePTxLockMargin(bid, offer, participate_script)
+
         bid.setState(BidStates.SWAP_INITIATED)
         bid.setITxState(TxStates.TX_CONFIRMED)
 
@@ -8355,16 +8400,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return  # Bid saved in checkBidState
 
         # Seller first mode, buyer participates
-        participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         if bid.was_sent:
-            ci_to = self.ci(offer.coin_to)
             if bid.participate_tx is not None:
                 # A plan leg holds a script-only tx until its queued action sends it.
                 if bid.participate_tx.txid is not None:
                     self.log.warning(
                         f"Participate tx {self.log.id(bid.participate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
                     )
-            elif bid.plan_id and hasattr(ci_to, "fundHTLCTxs"):
+            elif batched_ptx:
                 bid.participate_tx = SwapTx(
                     bid_id=bid_id,
                     tx_type=TxTypes.PTX,
@@ -11450,7 +11493,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "SELECT b.bid_id FROM bids AS b, bidstates AS s "
                 + "WHERE b.active_ind = 1 AND s.state_id = b.state "
                 + " AND s.can_timeout AND b.state_time + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now "
-                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_sent_event_type)"
+                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type IN (:tx_sent_event_type, :itx_sent_event_type))"
             )
             q = cursor.execute(
                 query_str,
@@ -11461,6 +11504,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "event_linked_type": int(Concepts.BID),
                     "tx_mempool_event_type": EventLogTypes.LOCK_TX_A_IN_MEMPOOL,
                     "tx_sent_event_type": EventLogTypes.LOCK_TX_A_PUBLISHED,
+                    "itx_sent_event_type": EventLogTypes.ITX_PUBLISHED,
                 },
             )
             for row in q:
