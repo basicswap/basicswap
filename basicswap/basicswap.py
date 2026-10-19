@@ -595,10 +595,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "price_fetch_interval", 5 * 60, 60, 60 * 60
         )
 
-        self._max_transient_errors = self.settings.get(
-            "max_transient_errors", 100
-        )  # Number of retries before a bid will stop when encountering transient errors.
-
         # Keep sensitive info out of the log file (WIP)
         self.log.safe_logs = self.settings.get("safe_logs", False)
         if self.log.safe_logs and self.debug:
@@ -9373,31 +9369,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid_changed = self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 except Exception as e:
                     if ci_to.is_transient_error(e):
-                        rpc_error_count = self.countBidEvents(
-                            bid, EventLogTypes.LOCK_TX_B_RPC_ERROR, cursor
+                        self.log.warning(
+                            f"Bid {self.log.id(bid_id)}: Temporary RPC error checking lock tx B: {e}"
                         )
-                        if rpc_error_count < 10:
-                            self.log.warning(
-                                f"Bid {self.log.id(bid_id)}: Temporary RPC error checking lock tx B ({rpc_error_count + 1}/10): {e}"
-                            )
-                            self.logBidEvent(
-                                bid.bid_id,
-                                EventLogTypes.LOCK_TX_B_RPC_ERROR,
-                                str(e),
-                                cursor,
-                            )
-                        else:
-                            self.log.error(
-                                f"Bid {self.log.id(bid_id)}: Too many consecutive RPC errors ({rpc_error_count}), aborting swap"
-                            )
-                            bid.setState(BidStates.BID_ERROR)
-                            self.logBidEvent(
-                                bid.bid_id,
-                                EventLogTypes.ERROR,
-                                f"Persistent RPC error after {rpc_error_count} attempts: {e}",
-                                cursor,
-                            )
-                            bid_changed = True
                     else:
                         raise
 
@@ -13780,16 +13754,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             error_msg = (
                 f"publishBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
             )
-            num_retries = self.countBidEvents(
-                bid, EventLogTypes.FAILED_TX_B_LOCK_PUBLISH, cursor
-            )
-            if num_retries > 0:
-                error_msg += f", retry no. {num_retries} / {self._max_transient_errors}"
             self.log.error(error_msg)
 
-            if num_retries < self._max_transient_errors and (
-                ci_to.is_transient_error(ex) or self.is_transient_error(ex)
-            ):
+            if ci_to.is_transient_error(ex) or self.is_transient_error(ex):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
                     f"Retrying sending adaptor-sig swap chain B lock tx for bid {self.log.id(bid_id)} in {delay} seconds."
@@ -14230,16 +14197,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             error_msg = (
                 f"spendBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
             )
-            num_retries = self.countBidEvents(
-                bid, EventLogTypes.FAILED_TX_B_SPEND, cursor
-            )
-            if num_retries > 0:
-                error_msg += f", retry no. {num_retries} / {self._max_transient_errors}"
             self.log.error(error_msg)
 
-            if num_retries < self._max_transient_errors and (
-                ci_to.is_transient_error(ex) or self.is_transient_error(ex)
-            ):
+            if ci_to.is_transient_error(ex) or self.is_transient_error(ex):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
                     f"Retrying sending adaptor-sig swap chain B spend tx for bid {self.log.id(bid_id)} in {delay} seconds."
@@ -14373,17 +14333,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
         except Exception as ex:
             error_msg = f"spendBLockTx refund failed for bid {self.log.id(bid_id)} with error {ex}"
-            num_retries = self.countBidEvents(
-                bid, EventLogTypes.FAILED_TX_B_REFUND, cursor
-            )
-            if num_retries > 0:
-                error_msg += f", retry no. {num_retries} / {self._max_transient_errors}"
             self.log.error(error_msg)
 
             str_error = str(ex)
-            if num_retries < self._max_transient_errors and (
-                ci_to.is_transient_error(ex) or self.is_transient_error(ex)
-            ):
+            if ci_to.is_transient_error(ex) or self.is_transient_error(ex):
                 delay = self.get_delay_retry_seconds()
                 self.log.info(
                     f"Retrying sending adaptor-sig swap chain B refund tx for bid {self.log.id(bid_id)} in {delay} seconds."
