@@ -109,6 +109,7 @@ from basicswap.rpc import make_rpc_func, openrpc
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = 1 << 22
 SEQUENCE_LOCKTIME_MASK = 0x0000FFFF
+MAX_PROOF_UTXOS = 4
 
 
 def ensure_op(v, err_string="Bad opcode"):
@@ -4720,6 +4721,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         proof_utxos = []
         if len(msg_utxos) > 0:
             num_utxos = len(msg_utxos) // 34
+            ensure(num_utxos <= MAX_PROOF_UTXOS, "Too many proof of funds outpoints")
             p: int = 0
             for i in range(num_utxos):
                 proof_utxos.append(
@@ -4751,18 +4753,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     )
                     return total
                 except Exception as e:
-                    self._log.warning(
-                        f"Electrum balance check failed: {e}, skipping balance verification"
-                    )
-                    return 10**18
+                    self._log.warning(f"Electrum balance check failed: {e}")
+                    raise ValueError("Proof of funds balance check failed") from e
 
         try:
             return self.getUTXOBalance(address)
         except Exception as e:
-            self._log.warning(
-                f"scantxoutset failed: {e}, skipping balance verification (signature valid)"
-            )
-            return 10**18
+            self._log.warning(f"scantxoutset failed: {e}")
+            raise ValueError("Proof of funds balance check failed") from e
 
     def isWalletEncrypted(self) -> bool:
         if self._connection_type == "electrum":

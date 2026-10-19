@@ -8,7 +8,11 @@
 import hashlib
 import random
 
-from basicswap.interface.btc.btc import BTCInterface, find_vout_for_address_from_txobj
+from basicswap.interface.btc.btc import (
+    BTCInterface,
+    find_vout_for_address_from_txobj,
+    MAX_PROOF_UTXOS,
+)
 from basicswap.util import (
     i2b,
     ensure,
@@ -481,7 +485,7 @@ class FIROInterface(BTCInterface):
                 (utxo_amount, u["txid"], u["vout"])
             )
 
-        max_utxos: int = 4
+        max_utxos: int = MAX_PROOF_UTXOS
 
         viable_addrs = []
         for addr, data in unspents_by_addr.items():
@@ -562,13 +566,21 @@ class FIROInterface(BTCInterface):
             signature,
         )
         ensure(passed is True, "Proof of funds signature invalid")
+        ensure(len(set(utxos)) == len(utxos), "Duplicate proof of funds outpoint")
 
         if self.using_segwit():
             address = self.encodeSegwitAddress(decodeAddress(address)[1:])
 
+        signer_dest = bytes(self.getScriptForPubkeyHash(self.decodeAddress(address)))
         sum_value: int = 0
         for outpoint in utxos:
-            sum_value += self.getTxOut(outpoint[0], outpoint[1]).nValue
+            txout = self.getTxOut(outpoint[0], outpoint[1])
+            ensure(txout is not None, "Proof of funds outpoint is spent or unknown")
+            ensure(
+                bytes(txout.scriptPubKey) == signer_dest,
+                "Proof of funds output does not pay the signing address",
+            )
+            sum_value += txout.nValue
 
         return sum_value
 

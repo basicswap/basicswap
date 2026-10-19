@@ -19,6 +19,7 @@ from basicswap.interface.btc.btc import (
     extractScriptLockRefundScriptValues,
     findOutput,
     find_vout_for_address_from_txobj,
+    MAX_PROOF_UTXOS,
 )
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
@@ -214,7 +215,7 @@ class NAVInterface(BTCInterface):
                 (utxo_amount, u["txid"], u["vout"])
             )
 
-        max_utxos: int = 4
+        max_utxos: int = MAX_PROOF_UTXOS
 
         viable_addrs = []
         for addr, data in unspents_by_addr.items():
@@ -267,7 +268,7 @@ class NAVInterface(BTCInterface):
             addr_info = self.rpc(
                 "validateaddress",
                 [
-                    addr,
+                    sign_for_addr,
                 ],
             )
             if "isscript" in addr_info and addr_info["isscript"] and "hex" in addr_info:
@@ -302,13 +303,23 @@ class NAVInterface(BTCInterface):
             signature,
         )
         ensure(passed is True, "Proof of funds signature invalid")
+        ensure(len(set(utxos)) == len(utxos), "Duplicate proof of funds outpoint")
 
-        if self.using_segwit():
-            address = self.encodeSegwitAddress(self.decodeAddress(address)[1:])
+        pkh: bytes = self.decodeAddress(address)
+        # The wallet can hold either form, both are spent with the signing key
+        signer_dests = (
+            bytes(self.getScriptForP2PKH(pkh)),
+            bytes(self.getScriptForPubkeyHash(pkh)),
+        )
 
         sum_value: int = 0
         for outpoint in utxos:
             txout = self.rpc("gettxout", [outpoint[0].hex(), outpoint[1]])
+            ensure(txout is not None, "Proof of funds outpoint is spent or unknown")
+            ensure(
+                bytes.fromhex(txout["scriptPubKey"]["hex"]) in signer_dests,
+                "Proof of funds output does not pay the signing address",
+            )
             sum_value += self.make_int(txout["value"])
 
         return sum_value

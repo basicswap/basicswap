@@ -27,6 +27,7 @@ from basicswap.interface.utils import FeeValidator
 from basicswap.interface.btc.btc import (
     extractScriptLockScriptValues,
     extractScriptLockRefundScriptValues,
+    MAX_PROOF_UTXOS,
 )
 from basicswap.util import (
     ensure,
@@ -721,7 +722,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 (utxo_amount, u["txid"], u["vout"], u["tree"])
             )
 
-        max_utxos: int = 4
+        max_utxos: int = MAX_PROOF_UTXOS
 
         viable_addrs = []
         for addr, data in unspents_by_addr.items():
@@ -801,7 +802,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def decodeProofUtxos(self, msg_utxos):
         proof_utxos = []
         if len(msg_utxos) > 0:
-            num_utxos = len(msg_utxos) // 34
+            num_utxos = len(msg_utxos) // 35
+            ensure(num_utxos <= MAX_PROOF_UTXOS, "Too many proof of funds outpoints")
             p: int = 0
             for i in range(num_utxos):
                 proof_utxos.append(
@@ -831,10 +833,17 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             signature,
         )
         ensure(passed is True, "Proof of funds signature invalid")
+        ensure(len(set(utxos)) == len(utxos), "Duplicate proof of funds outpoint")
 
+        signer_dest = self.getPubkeyHashDest(self.decodeAddress(address))
         sum_value: int = 0
         for outpoint in utxos:
             txout = self.rpc("gettxout", [outpoint[0].hex(), outpoint[1], outpoint[2]])
+            ensure(txout is not None, "Proof of funds outpoint is spent or unknown")
+            ensure(
+                bytes.fromhex(txout["scriptPubKey"]["hex"]) == signer_dest,
+                "Proof of funds output does not pay the signing address",
+            )
             sum_value += self.make_int(txout["value"])
 
         return sum_value
