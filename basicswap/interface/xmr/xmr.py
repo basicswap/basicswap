@@ -693,41 +693,22 @@ class XMRInterface(CoinInterface):
                         rv = -1
             return rv
 
-    def findConfirmedTxnByHash(self, txid: str):
-        # TODO: Use get_transfer_by_txid and sending wallet when destination address is not owned
-        with self._mx_wallet:
-            self.openWallet(self._wallet_filename)
-            self.rpc_wallet("refresh")
-            self._log.debug(f"Refreshing {self.coin_name()} wallet")
-
-            try:
-                current_height: int = self.getChainHeight()
-                self._log.info(
-                    f"findConfirmedTxnByHash {self.ticker_str()} current_height {current_height}\nhash: {txid}"
-                )
-            except Exception as e:
-                self._log.info("rpc failed %s", str(e))
-                current_height = (
-                    None  # If the transfer is available it will be deep enough
-                )
-
-            params = {"transfer_type": "available"}
-            rv = self.rpc_wallet("incoming_transfers", params)
-            if "transfers" in rv:
-                for transfer in rv["transfers"]:
-                    if transfer["tx_hash"] == txid and (
-                        current_height is None
-                        or current_height - transfer["block_height"]
-                        > self.blocks_confirmed
-                    ):
-                        return {
-                            "txid": transfer["tx_hash"],
-                            "amount": transfer["amount"],
-                            "height": transfer["block_height"],
-                        }
+    def getTxDepth(self, txid: bytes) -> int | None:
+        rv = self.getTransaction(txid)
+        if txid.hex() in rv.get("missed_tx", []):
             return None
+        tx = rv["txs"][0]
+        if tx["in_pool"]:
+            return 0
+        return self.getChainHeight() - tx["block_height"]
 
-    def spendBLockTx(
+    def spendBLockTx(self, *args, **kwargs) -> bytes:
+        txid, tx = self.createBLockSpendTx(*args, **kwargs)
+        if tx is not None:
+            self.publishTx(tx)
+        return txid
+
+    def createBLockSpendTx(
         self,
         chain_b_lock_txid: bytes,
         address_to: str,
@@ -738,8 +719,11 @@ class XMRInterface(CoinInterface):
         restore_height: int,
         spend_actual_balance: bool = False,
         lock_tx_vout=None,
-    ) -> bytes:
+    ) -> tuple[bytes, bytes | None]:
         """
+        Returns the txid and the unrelayed tx, or None in place of the tx
+        when the lock was already spent.
+
         Notes:
         "Error: No unlocked balance in the specified subaddress(es)" can mean not enough funds after tx fee.
         """
@@ -786,7 +770,7 @@ class XMRInterface(CoinInterface):
 
                         # Should check for address_to, but only the from address is found in the output
                         if txns[0]["address"] == address_b58:
-                            return bytes.fromhex(txid)
+                            return bytes.fromhex(txid), None
 
                 self._log.error(
                     "wallet {} balance {}, expected {}".format(
@@ -815,13 +799,15 @@ class XMRInterface(CoinInterface):
                 )
                 raise TemporaryError("Invalid unlocked_balance")
 
-            params = {"address": address_to}
+            params = {"address": address_to, "do_not_relay": True, "get_tx_hex": True}
             if self._fee_priority > 0:
                 params["priority"] = self._fee_priority
 
             rv = self.rpc_wallet("sweep_all", params)
 
-            return bytes.fromhex(rv["tx_hash_list"][0])
+            return bytes.fromhex(rv["tx_hash_list"][0]), bytes.fromhex(
+                rv["tx_blob_list"][0]
+            )
 
     def withdrawCoin(
         self, value, addr_to: str, sweepall: bool, estimate_fee: bool = False
@@ -1016,6 +1002,13 @@ class XMRInterface(CoinInterface):
     def ensureFunds(self, amount: int) -> None:
         if self.getSpendableBalance() < amount:
             raise ValueError("Balance too low")
+
+    def publishTx(self, tx: bytes) -> None:
+        rv = self.rpc2("send_raw_transaction", {"tx_as_hex": tx.hex()})
+        if rv["status"] == "BUSY":
+            raise TemporaryError("send_raw_transaction: daemon busy")
+        if rv["status"] != "OK":
+            raise ValueError(f"send_raw_transaction failed: {rv['reason']}")
 
     def getTransaction(self, txid: bytes):
         return self.rpc2(

@@ -242,6 +242,7 @@ class EventLogTypes(IntEnum):
     MERCY_TX_UNUSABLE = auto()
     SWIPE_PAYOUT_SWEPT = auto()
     LOCK_TX_B_ABANDONED_LOCK_CLOSE = auto()
+    LOCK_TX_B_SPEND_TX_MISSING = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -571,6 +572,8 @@ def describeEventEntry(event_type, event_msg):
         return "Lock tx B spend tx seen in chain"
     if event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_SEEN:
         return "Lock tx B refund tx seen in chain"
+    if event_type == EventLogTypes.LOCK_TX_B_SPEND_TX_MISSING:
+        return "Lock tx B spend tx not found by daemon, resending"
 
 
 def getVoutByAddress(txjs, p2sh):
