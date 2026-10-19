@@ -652,6 +652,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
         self._force_db_upgrade = self.settings.get("force_db_upgrade", False)
         self._bid_expired_leeway = 5
+        self._bid_accept_leeway = 30
         self._plan_leg_timeout = self.get_int_setting(
             "plan_leg_timeout",
             10 * 60,
@@ -6246,7 +6247,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # Ensure bid is still valid
             now: int = self.getTime()
-            ensure(bid.expire_at > now, "Bid expired")
+            ensure(bid.expire_at > now + self._bid_accept_leeway, "Bid expired")
             ensure(
                 canAcceptBidState(bid.state),
                 "Wrong bid state: {}".format(BidStates(bid.state).name),
@@ -7114,7 +7115,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
             ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
             ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
-            ensure(bid.expire_at > now, "Bid expired")
+            ensure(bid.expire_at > now + self._bid_accept_leeway, "Bid expired")
 
             last_bid_state = bid.state
             if last_bid_state == BidStates.SWAP_DELAYING:
@@ -7504,7 +7505,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, xmr_swap = self.getXmrBidFromSession(use_cursor, bid_id)
             ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
             ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid_id)}.")
-            ensure(bid.expire_at > now, "Bid expired")
+            ensure(bid.expire_at > now + self._bid_accept_leeway, "Bid expired")
 
             last_bid_state = bid.state
             if last_bid_state == BidStates.SWAP_DELAYING:
@@ -12743,7 +12744,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}")
         xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
         ensure(xmr_swap, f"Adaptor-sig swap not found: {self.log.id(bid.bid_id)}")
-        ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
@@ -12995,7 +12995,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         ensure(msg["to"] == addr_to, "Received on incorrect address")
         ensure(msg["from"] == addr_from, "Sent from incorrect address")
-        ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         allowed_states = [
             BidStates.BID_SENT,
@@ -13045,6 +13044,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.info(
                 f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
             )
+
+        ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         try:
             pkal: bytes = msg_data.pkal
@@ -15255,6 +15256,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.state in allowed_states,
             f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
+        ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         ci_from = self.ci(offer.coin_to)
         ci_to = self.ci(offer.coin_from)
