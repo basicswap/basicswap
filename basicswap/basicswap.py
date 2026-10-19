@@ -10119,7 +10119,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         bid.setPTxState(TxStates.TX_SENT)
 
                 bid.participate_tx.conf = found["depth"]
-                if found["height"] > 0 and bid.participate_tx.block_height is None:
+                if found["height"] > 0 and bid.participate_tx.block_time is None:
                     self.setTxBlockInfoFromHeight(
                         ci_to, bid.participate_tx, found["height"]
                     )
@@ -10228,10 +10228,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if (
             should_try_refund_ptx
             and bid.participate_tx is not None
-            and bid.participate_tx.block_height is None
+            and bid.participate_tx.block_time is None
         ):
             self.log.debug(
-                f"PTX: {self.logIDT(bid.participate_tx.txid)} block height not known, bid: {self.log.id(bid_id)}"
+                f"PTX: {self.logIDT(bid.participate_tx.txid)} block time not known, bid: {self.log.id(bid_id)}"
             )
             # An invalid ptx, won't be confirmed, check block height here
             ptx_info = ci_to.getTxOutInfo(
