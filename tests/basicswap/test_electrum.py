@@ -1540,6 +1540,43 @@ class TestElectrumDepthHeightRace(unittest.TestCase):
         self.assertEqual(rv["depth"], 1)
 
 
+class FindConfirmedStubBackend:
+    def __init__(self, server, tx_height, chain_height):
+        self._server = server
+        self._tx_height = tx_height
+        self._chain_height = chain_height
+
+    def getTransaction(self, txid):
+        return {"height": self._tx_height}
+
+    def getBlockHeight(self):
+        return self._chain_height
+
+
+class TestElectrumFindConfirmedTxn(unittest.TestCase):
+    def make_interface(self, server):
+        ci = BTCInterface.__new__(BTCInterface)
+        ci._log = StubLog()
+        ci._merkle_verified = {}
+        ci.blocks_confirmed = 1
+        backend = FindConfirmedStubBackend(server, tx_height=1, chain_height=10)
+        ci.getBackend = lambda: backend
+        return ci
+
+    def test_proved_height_confirms(self):
+        ci = self.make_interface(
+            MerkleStubServer({"merkle": [], "pos": 0}, GENESIS_HEADER_HEX)
+        )
+        rv = ci._findConfirmedTxnByHashElectrum(GENESIS_COINBASE_TXID)
+        self.assertEqual(rv["height"], 1)
+
+    def test_unproved_height_does_not_confirm(self):
+        ci = self.make_interface(
+            MerkleStubServer({"merkle": ["cc" * 32], "pos": 0}, GENESIS_HEADER_HEX)
+        )
+        self.assertIsNone(ci._findConfirmedTxnByHashElectrum(GENESIS_COINBASE_TXID))
+
+
 class TestElectrumMedianTime(unittest.TestCase):
     def test_successful_fetch(self):
         timestamps = list(range(1000, 1011))

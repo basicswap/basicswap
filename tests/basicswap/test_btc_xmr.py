@@ -3537,6 +3537,61 @@ class BasicSwapTest(TestFunctions):
         self.prepare_balance(Coins.XMR, 100.0, 1800, 1801)
         self.do_test_01_full_swap(Coins.XMR, self.test_coin_from)
 
+    def test_01_e_dropped_lock_spend(self):
+        if not self.has_segwit:
+            return
+        coin_from = self.test_coin_from
+        logging.info(
+            f"---------- Test {coin_from.name} to XMR, follower lock spend dropped once"
+        )
+        swap_clients = self.swap_clients
+        ci_from = swap_clients[0].ci(coin_from)
+        ci_to = swap_clients[0].ci(Coins.XMR)
+
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 20.0), r=1)
+        offer_id = swap_clients[0].postOffer(
+            coin_from,
+            Coins.XMR,
+            amt_swap,
+            rate_swap,
+            amt_swap,
+            SwapTypes.XMR_SWAP,
+            auto_accept_bids=True,
+        )
+        wait_for_offer(test_delay_event, swap_clients[1], offer_id)
+        bid_id = swap_clients[1].postXmrBid(offer_id, amt_swap)
+        swap_clients[1].setBidDebugInd(bid_id, DebugTypes.SKIP_FIRST_REDEEM_BROADCAST)
+
+        rebroadcast_seconds = swap_clients[1]._redeem_rebroadcast_seconds
+        try:
+            swap_clients[1]._redeem_rebroadcast_seconds = 10
+            wait_for_event(
+                test_delay_event,
+                swap_clients[1],
+                Concepts.BID,
+                bid_id,
+                EventLogTypes.DEBUG_TWEAK_APPLIED,
+                wait_for=180,
+            )
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[0],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                wait_for=180,
+            )
+            wait_for_bid(
+                test_delay_event,
+                swap_clients[1],
+                bid_id,
+                BidStates.SWAP_COMPLETED,
+                sent=True,
+                wait_for=60,
+            )
+        finally:
+            swap_clients[1]._redeem_rebroadcast_seconds = rebroadcast_seconds
+
     def test_01_c_full_swap_to_part(self):
         if not self.has_segwit:
             return

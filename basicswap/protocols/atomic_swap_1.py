@@ -20,6 +20,7 @@ from basicswap.script import (
 from basicswap.basicswap_util import (
     EventLogTypes,
     SwapTypes,
+    TxTypes,
 )
 from . import ProtocolInterface
 
@@ -123,17 +124,22 @@ def extractScriptSecretHash(script):
 
 
 def redeemITx(self, bid_id: bytes, cursor):
-    bid, offer = self.getBidAndOffer(bid_id, cursor)
+    bid, offer = self.swaps_in_progress.get(bid_id) or self.getBidAndOffer(
+        bid_id, cursor
+    )
     ci_from = self.ci(offer.coin_from)
 
     txn = self.createRedeemTxn(
         ci_from.coin_type(), bid, for_txn_type="initiate", cursor=cursor
     )
-    txid = ci_from.publishTx(bytes.fromhex(txn))
+    redeem_tx = self.publishRedeemTxn(
+        ci_from, bid, TxTypes.ITX_REDEEM, bytes.fromhex(txn)
+    )
 
-    bid.initiate_tx.spend_txid = bytes.fromhex(txid)
+    bid.initiate_tx.spend_txid = redeem_tx.txid
+    self.saveBidInSession(bid_id, bid, cursor)
     self.log.debug(
-        f"Submitted initiate redeem txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.logIDB(bid_id)}"
+        f"Submitted initiate redeem txn {self.logIDT(redeem_tx.txid)} to {ci_from.coin_name()} chain for bid {self.logIDB(bid_id)}"
     )
     self.logEvent(Concepts.BID, bid_id, EventLogTypes.ITX_REDEEM_PUBLISHED, "", cursor)
 

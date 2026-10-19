@@ -296,7 +296,7 @@ class BCHInterface(BTCInterface):
     def findConfirmedTxnByHash(self, txid_hex: str):
         # Only works for wallet txns
         try:
-            rv = self.rpc("gettransaction", [txid_hex])
+            rv = self.rpc_wallet("gettransaction", [txid_hex])
         except Exception as e:  # noqa: F841
             self._log.debug(
                 "findConfirmedTxnByHash getrawtransaction failed: {}".format(txid_hex)

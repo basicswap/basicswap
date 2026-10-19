@@ -273,6 +273,7 @@ class DebugTypes(IntEnum):
     DONT_SEND_COIN_B_LOCK = auto()
     DONT_RELEASE_COIN_A_LOCK = auto()
     MAKE_INVALID_MERCY_TX = auto()
+    SKIP_FIRST_REDEEM_BROADCAST = auto()
 
 
 class NotificationTypes(IntEnum):
