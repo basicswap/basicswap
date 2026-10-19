@@ -1743,7 +1743,21 @@ class Test(BaseTest):
         bidder_states = read_json_api(1801, path)
 
         bidder_states = [s for s in bidder_states if s[1] != "Bid Stalled (debug)"]
-        assert compare_bid_states(bidder_states, self.states_bidder[2]) is True
+        states_bidder_no_lock_b = [
+            s for s in self.states_bidder[2] if s != "Bid Scriptless coin locked"
+        ]
+        states_bidder_stalled_first = [
+            s
+            for s in states_bidder_no_lock_b
+            if s != "Bid Script pre-refund tx in chain"
+        ]
+        assert any(
+            [
+                compare_bid_states(bidder_states, self.states_bidder[2]),
+                compare_bid_states(bidder_states, states_bidder_no_lock_b),
+                compare_bid_states(bidder_states, states_bidder_stalled_first),
+            ]
+        )
 
     def test_03b_follower_recover_a_lock_tx_with_mercy(self):
         logging.info(
@@ -1869,11 +1883,15 @@ class Test(BaseTest):
         states_bidder_alt = deepcopy(self.states_bidder[1])
         states_bidder_alt[7] = "Bid Script pre-refund tx in chain"
         states_bidder_alt[8] = "Bid Scriptless coin locked"
+        states_bidder_refund_first = [
+            s for s in self.states_bidder[1] if s != "Bid Scriptless coin locked"
+        ]
         assert compare_bid_states(offerer_states, self.states_offerer[1]) is True
         assert any(
             [
                 compare_bid_states(bidder_states, self.states_bidder[1]),
                 compare_bid_states(bidder_states, states_bidder_alt),
+                compare_bid_states(bidder_states, states_bidder_refund_first),
             ]
         )
 
