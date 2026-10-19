@@ -9324,9 +9324,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.logBidEvent(
                         bid.bid_id, EventLogTypes.LOCK_TX_A_SEEN, "", cursor
                     )
-                    self.setTxBlockInfoFromHeight(
-                        ci_from, bid.xmr_a_lock_tx, lock_tx_chain_info["height"]
-                    )
                     bid.xmr_a_lock_tx.setState(TxStates.TX_IN_CHAIN)
 
                     bid_changed = True
@@ -9336,8 +9333,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ):
                     bid.xmr_a_lock_tx.chain_height = lock_tx_chain_info["height"]
                     bid_changed = True
+                if (
+                    bid.xmr_a_lock_tx.block_time is None
+                    and lock_tx_chain_info["height"] != 0
+                ):
+                    self.setTxBlockInfoFromHeight(
+                        ci_from, bid.xmr_a_lock_tx, lock_tx_chain_info["height"]
+                    )
+                    bid_changed = True
 
-                if lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed:
+                # Later states read the refund timelock from block_time
+                if (
+                    lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed
+                    and bid.xmr_a_lock_tx.block_time is not None
+                ):
                     self.logBidEvent(
                         bid.bid_id, EventLogTypes.LOCK_TX_A_CONFIRMED, "", cursor
                     )
