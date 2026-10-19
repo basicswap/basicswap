@@ -379,6 +379,15 @@ class XMRInterface(CoinInterface):
                     continue
                 raise
 
+    def isChainSynced(self) -> bool:
+        info = self.rpc2("get_info", timeout=self._rpctimeout)
+        target_height = info.get("target_height", 0)
+        daemon_height = info.get("height", 0)
+        if target_height > 0 and target_height > daemon_height:
+            return False
+        wallet_height = self.rpc_wallet("get_height")["height"]
+        return wallet_height + 2 >= daemon_height
+
     def getWalletInfo(self):
         with self._mx_wallet:
             try:
@@ -691,6 +700,17 @@ class XMRInterface(CoinInterface):
                             )
                         )
                         rv = -1
+
+            if rv is None:
+                synced: bool = False
+                try:
+                    synced = self.isChainSynced()
+                except Exception as e:
+                    self._log.debug(f"findTxB isChainSynced failed: {e}")
+                if not synced:
+                    raise TemporaryError(
+                        "findTxB: chain/wallet not fully synced, refusing to report the coin B lock tx as missing"
+                    )
             return rv
 
     def getTxDepth(self, txid: bytes) -> int | None:
