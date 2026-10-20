@@ -13,7 +13,7 @@ import traceback
 import websocket
 
 
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
 
 from basicswap.util.smsg import (
     smsgEncrypt,
@@ -28,6 +28,8 @@ from basicswap.util.address import (
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes, MessageNetworks
+
+MAX_RECV_QUEUE_SIZE: int = 5000
 
 
 def encode_base64(data: bytes) -> str:
@@ -55,13 +57,14 @@ class WebSocketThread(threading.Thread):
         self.connection_id: int = 0  # Incremented on each (re)connect
         self.delay_event = threading.Event()
 
-        self.recv_queue = Queue()
-        self.cmd_recv_queue = Queue()
-        self.delayed_events_queue = Queue()
+        self.recv_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
+        self.cmd_recv_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
+        self.delayed_events_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
 
         self.ignore_events: bool = False
 
         self.num_messages_received: int = 0
+        self.num_messages_dropped: int = 0
         self.last_error_str: str = ""
         self._stopping: bool = False
 
@@ -79,7 +82,18 @@ class WebSocketThread(threading.Thread):
                 message = self.delayed_events_queue.get(block=False)
             except Empty:
                 break
-            self.recv_queue.put(message)
+            self.queue_put(self.recv_queue, message)
+
+    def queue_put(self, q, message) -> None:
+        try:
+            q.put(message, block=False)
+        except Full:
+            self.num_messages_dropped += 1
+            if self.num_messages_dropped == 1:
+                if self.logger:
+                    self.logger.warning("Simplex receive queue full, dropping events")
+                else:
+                    print(f"{self.tag} - Receive queue full, dropping events")
 
     def on_message(self, ws, message):
         if self.logger:
@@ -88,10 +102,10 @@ class WebSocketThread(threading.Thread):
             print(f"{self.tag} - Received msg")
 
         if message.startswith('{"corrId"'):
-            self.cmd_recv_queue.put(message)
+            self.queue_put(self.cmd_recv_queue, message)
         else:
             self.num_messages_received += 1
-            self.recv_queue.put(message)
+            self.queue_put(self.recv_queue, message)
 
     def queue_get(self):
         try:
@@ -523,7 +537,7 @@ def processEvent(self, ws_thread, msg_type: str, data) -> bool:
     if ws_thread.ignore_events:
         if msg_type not in ("contactConnected", "contactDeletedByContact"):
             return False
-        ws_thread.delayed_events_queue.put(json.dumps(data))
+        ws_thread.queue_put(ws_thread.delayed_events_queue, json.dumps(data))
         return True
 
     if msg_type == "contactConnected":
@@ -566,8 +580,6 @@ def readSimplexMsgs(self, network):
             self.log.debug(f"readSimplexMsgs error: {e}")
             if self.debug:
                 self.log.error(traceback.format_exc())
-
-        self.delay_event.wait(0.05)
 
 
 def getResponseData(data, tag=None):

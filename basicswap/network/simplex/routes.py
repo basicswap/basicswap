@@ -95,7 +95,7 @@ def processSimplexConnectRequest(self, net_i, req_data, offer, cursor) -> None:
     self.log.debug(
         f"Opening direct message route from {offer.addr_from} to {bidder_addr}"
     )
-    message_route = self.getMessageRoute(2, bidder_addr, offer.addr_from, cursor=cursor)
+    message_route = self.getMessageRoute(2, offer.addr_from, bidder_addr, cursor=cursor)
     if message_route:
         raise ValueError("Direct message route already exists")
 
@@ -107,7 +107,7 @@ def processSimplexConnectRequest(self, net_i, req_data, offer, cursor) -> None:
         "Invalid characters in connection request",
     )
 
-    self.checkConnectRequestRateLimit(int(MessageNetworks.SIMPLEX))
+    self.checkConnectRequestRateLimit(int(MessageNetworks.SIMPLEX), bidder_addr)
 
     cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
     response = net_i.wait_for_command_response(cmd_id)
