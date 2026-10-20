@@ -246,6 +246,8 @@ def json_requires_post(url_split) -> bool:
         return True
     if route == "offers" and len(url_split) > 3 and url_split[3] == "new":
         return True
+    if route == "smsgaddresses" and len(url_split) > 3 and url_split[3] != "":
+        return True
     return False
 
 
@@ -581,10 +583,12 @@ class HttpHandler(BaseHTTPRequestHandler):
         else:
             args_dict["current_page"] = "index"
 
-        shutdown_token = os.urandom(8).hex()
-        with self.server.session_lock:
-            self.server.session_tokens["shutdown"] = shutdown_token
-        args_dict["shutdown_token"] = shutdown_token
+        issue_tokens = is_authenticated or getattr(self, "_basic_auth_ok", False)
+        if issue_tokens:
+            shutdown_token = os.urandom(8).hex()
+            with self.server.session_lock:
+                self.server.session_tokens["shutdown"] = shutdown_token
+            args_dict["shutdown_token"] = shutdown_token
 
         if is_authenticated:
             try:
@@ -634,7 +638,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             template.render(
                 title=self.server.title,
                 h2=self.server.title,
-                form_id=self.server.session_tokens["csrf"],
+                form_id=self.server.session_tokens["csrf"] if issue_tokens else "",
                 **args_dict,
             ),
             "UTF-8",
@@ -1052,6 +1056,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         if self.server.allow_cors:
             self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Type", content_type)
+        if content_type.startswith("text/html"):
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
         if extra_headers:
             for header_tuple in extra_headers:
                 self.send_header(header_tuple[0], header_tuple[1])
@@ -1095,6 +1102,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"error": error}).encode("utf-8"))
             return b""
 
+        self._basic_auth_ok = basic_auth_ok
         if not basic_auth_ok and page not in exempt_pages:
             if not self.is_authenticated():
                 if page == "json":

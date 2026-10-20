@@ -31,6 +31,25 @@ amm_port = 12700
 amm_debug = False
 amm_ui_debug = False
 
+AMM_CONFIG_FORM_MARKERS = (
+    "save_global_settings",
+    "add_offer",
+    "add_bid",
+    "save_config",
+    "create_default",
+    "prune_state",
+)
+
+
+def amm_form_allowed(handler, post_string, err_messages) -> bool:
+    """Control form posts must carry the form token"""
+    form_data = parse.parse_qs(
+        post_string.decode("utf-8") if isinstance(post_string, bytes) else post_string
+    )
+    if any(marker in form_data for marker in AMM_CONFIG_FORM_MARKERS):
+        return True
+    return handler.checkForm(post_string, "amm", err_messages) is not None
+
 
 def ensure_amm_dir(swap_client):
     """Ensure the AMM directory exists in the datadir"""
@@ -58,7 +77,7 @@ def get_amm_script_path(swap_client):
     return os.path.join(swap_client.data_dir, "basicswap", "scripts", "createoffers.py")
 
 
-def log_capture_thread(process, swap_client):
+def log_capture_thread(process, swap_client, api_token):
     """Thread to capture and store logs from the AMM process"""
     global amm_status
 
@@ -127,6 +146,8 @@ def log_capture_thread(process, swap_client):
         amm_status = "stopped"
         amm_log_buffer.append("AMM process has stopped.")
         swap_client.log.info("AMM process has stopped.")
+        if swap_client._amm_api_token == api_token:
+            swap_client._amm_api_token = None
 
 
 def check_existing_amm_processes():
@@ -285,7 +306,8 @@ def start_amm_process(
     # Give the AMM an ephemeral API token via the environment so its login
     # credential never has to be written to disk.
     amm_api_token = secrets.token_urlsafe(32)
-    swap_client._amm_api_token = amm_api_token
+    with amm_log_lock:
+        swap_client._amm_api_token = amm_api_token
 
     try:
         amm_process = subprocess.Popen(
@@ -309,7 +331,9 @@ def start_amm_process(
             amm_log_buffer.append(f"Using state file: {state_path}")
 
         log_thread = threading.Thread(
-            target=log_capture_thread, args=(amm_process, swap_client), daemon=True
+            target=log_capture_thread,
+            args=(amm_process, swap_client, amm_api_token),
+            daemon=True,
         )
         log_thread.start()
 
@@ -680,7 +704,11 @@ def page_amm(self, _, post_string):
         except Exception as e:
             err_messages.append(f"Failed to create default config file: {str(e)}")
 
-    if post_string and self.command == "POST":
+    if (
+        post_string
+        and self.command == "POST"
+        and amm_form_allowed(self, post_string, err_messages)
+    ):
         try:
             form_data = parse.parse_qs(
                 post_string.decode("utf-8")
@@ -737,13 +765,8 @@ def page_amm(self, _, post_string):
                 else:
                     err_messages.append(msg)
 
-            is_control_action = (
-                "save_global_settings" not in form_data
-                and "add_offer" not in form_data
-                and "add_bid" not in form_data
-                and "save_config" not in form_data
-                and "create_default" not in form_data
-                and "prune_state" not in form_data
+            is_control_action = not any(
+                marker in form_data for marker in AMM_CONFIG_FORM_MARKERS
             )
 
             if is_control_action:
