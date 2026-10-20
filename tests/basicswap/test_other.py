@@ -1947,6 +1947,18 @@ class Test(unittest.TestCase):
         assert ws_thread.cmd_recv_queue.qsize() == 1
         assert ws_thread.num_messages_dropped == 1
 
+    def test_simplex_frame_limits_installed(self):
+        from types import SimpleNamespace
+        import websocket
+        from basicswap.network.nostr.client import BoundedFrameBuffer
+        from basicswap.network.simplex import simplex
+
+        ws_thread = simplex.WebSocketThread("ws://127.0.0.1:1", logger=logger)
+        ws_sock = websocket.WebSocket()
+        ws_thread.on_open(SimpleNamespace(sock=ws_sock))
+        assert isinstance(ws_sock.frame_buffer, BoundedFrameBuffer)
+        assert ws_sock.frame_buffer.max_frame_len == simplex.MAX_EVENT_LEN
+
     def test_portal_smsg_difficulty_bound(self):
         from basicswap.basicswap_util import MessageNetworks
         from basicswap.messages_npb import MessagePortalOffer

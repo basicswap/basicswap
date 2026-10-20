@@ -28,8 +28,10 @@ from basicswap.util.address import (
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes, MessageNetworks
+from basicswap.network.nostr.client import installFrameLimits
 
 MAX_RECV_QUEUE_SIZE: int = 5000
+MAX_EVENT_LEN: int = 256 * 1024
 
 
 def encode_base64(data: bytes) -> str:
@@ -150,6 +152,14 @@ class WebSocketThread(threading.Thread):
         self.connection_id += 1
         self.connected = True
         self.last_error_str = ""
+        try:
+            if getattr(ws, "sock", None) is not None:
+                installFrameLimits(ws.sock, MAX_EVENT_LEN)
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Simplex ws - Could not install frame limits: {e}")
+            else:
+                print(f"{self.tag}: Could not install frame limits: {e}")
 
     def send_command(self, cmd_str: str):
         with self.mutex:
