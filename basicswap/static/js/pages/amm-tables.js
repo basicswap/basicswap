@@ -1,4 +1,6 @@
 const AmmTablesManager = (function() {
+    const escapeHtml = (value) => window.config.utils.escapeHtml(String(value ?? ''));
+
     const config = {
         refreshInterval: 30000,
         debug: false
@@ -102,9 +104,9 @@ const AmmTablesManager = (function() {
 
     function getCoinDisplayName(coinId) {
         if (window.CoinManager && window.CoinManager.getDisplayName) {
-            return window.CoinManager.getDisplayName(coinId) || coinId;
+            return escapeHtml(window.CoinManager.getDisplayName(coinId) || coinId);
         }
-        return coinId;
+        return escapeHtml(coinId);
     }
 
     function createSwapColumn(coinFrom, coinTo) {
@@ -117,13 +119,13 @@ const AmmTablesManager = (function() {
             <td class="py-0 px-0 text-right text-sm">
                 <div class="flex items-center justify-center monospace">
                     <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                        <img class="h-12" src="/static/images/coins/${toImage}" alt="${toDisplayName}">
+                        <img class="h-12" src="/static/images/coins/${escapeHtml(toImage)}" alt="${toDisplayName}">
                     </span>
                     <svg aria-hidden="true" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                     </svg>
                     <span class="inline-flex mr-3 ml-3 align-middle items-center justify-center w-18 h-20 rounded">
-                        <img class="h-12" src="/static/images/coins/${fromImage}" alt="${fromDisplayName}">
+                        <img class="h-12" src="/static/images/coins/${escapeHtml(fromImage)}" alt="${fromDisplayName}">
                     </span>
                 </div>
             </td>
@@ -201,7 +203,7 @@ const AmmTablesManager = (function() {
             </svg>${label}`;
         const classes = 'mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
         if (linkId) {
-            return `<a href="/offer/${linkId}" class="${classes} hover:underline">${inner}</a>`;
+            return `<a href="/offer/${escapeHtml(linkId)}" class="${classes} hover:underline">${inner}</a>`;
         }
         return `<span class="${classes}">${inner}</span>`;
     }
@@ -288,11 +290,13 @@ const AmmTablesManager = (function() {
                 : (activeOffers[name] && Array.isArray(activeOffers[name]) ? activeOffers[name].length : 0);
 
             const staleBadge = getStaleOfferBadge(staleOfferIds, offerDetails);
+            const safeName = escapeHtml(name);
+            const safeId = escapeHtml(offer.id || '');
 
             tableHtml += `
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                     <td class="py-3 pl-4 text-center">
-                        <div class="font-medium">${name}</div>
+                        <div class="font-medium">${safeName}</div>
                     </td>
                     ${createSwapColumn(coinFrom, coinTo)}
                     <td class="py-3 px-4 text-right">
@@ -346,19 +350,19 @@ const AmmTablesManager = (function() {
                                 <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                     <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
                                 </svg>
-                                Step: ${amountStep}
+                                Step: ${escapeHtml(amountStep)}
                             </div>
                         </div>
                     </td>
                     <td class="py-3 px-4 text-center">
                         <div class="flex flex-col items-center gap-1">
                             <label class="relative inline-flex items-center cursor-pointer" title="Toggle enabled">
-                                <input type="checkbox" class="sr-only peer amm-enable-toggle" data-type="offer" data-name="${name}" data-id="${offer.id || ''}" ${enabled ? 'checked' : ''}>
+                                <input type="checkbox" class="sr-only peer amm-enable-toggle" data-type="offer" data-name="${safeName}" data-id="${safeId}" ${enabled ? 'checked' : ''}>
                                 <div class="w-9 h-5 rounded-full relative ${enabled ? 'bg-green-500 dark:bg-green-600' : 'bg-red-500 dark:bg-red-700'} after:content-[''] after:absolute after:top-[2px] ${enabled ? 'after:left-[18px]' : 'after:left-[2px]'} after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                                 <span class="ml-2 text-xs font-medium ${enabled ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}">${enabled ? 'Enabled' : 'Disabled'}</span>
                             </label>
                             ${activeOffersCount > 0 ? `
-                            <a href="/offer/${offerIds[0] || ''}" class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:underline">
+                            <a href="/offer/${escapeHtml(offerIds[0] || '')}" class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:underline">
                                 ${activeOffersCount} Running Offer${activeOffersCount !== 1 ? 's' : ''}
                             </a>` : ''}
                             ${exhausted ? `
@@ -368,7 +372,7 @@ const AmmTablesManager = (function() {
                             ${activeOffersCount > 0 ? '' : staleBadge}
                             ${offerMode === 'one_time' || offerMode === 'fixed_total' ? `
                             <button type="button" class="reset-amm-item mt-1 inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 focus:ring-0 focus:outline-none"
-                                title="Reset budget (start fresh)" data-type="offer" data-id="${offer.id || ''}" data-name="${name}">
+                                title="Reset budget (start fresh)" data-type="offer" data-id="${safeId}" data-name="${safeName}">
                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"></path></svg>
                                 Reset
                             </button>` : ''}
@@ -377,13 +381,13 @@ const AmmTablesManager = (function() {
                     <td class="py-3 px-4 text-center">
                         <div class="flex items-center justify-center space-x-2">
                             <button type="button" class="edit-amm-item text-gray-500 hover:text-gray-700 dark:text-white dark:hover:text-gray-300 focus:ring-0 focus:outline-none"
-                                data-type="offer" data-id="${offer.id || ''}" data-name="${name}">
+                                data-type="offer" data-id="${safeId}" data-name="${safeName}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
                                 </svg>
                             </button>
                             <button type="button" class="delete-amm-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 focus:ring-0 focus:outline-none"
-                                data-type="offer" data-id="${offer.id || ''}" data-name="${name}">
+                                data-type="offer" data-id="${safeId}" data-name="${safeName}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                 </svg>
@@ -454,11 +458,13 @@ const AmmTablesManager = (function() {
                 ? bidRt.active_bid_count
                 : (activeBids[name] && Array.isArray(activeBids[name]) ? activeBids[name].length : 0);
             const useBalanceBidding = bid.use_balance_bidding !== undefined ? bid.use_balance_bidding : false;
+            const safeName = escapeHtml(name);
+            const safeId = escapeHtml(bid.id || '');
 
             tableHtml += `
                 <tr class="relative opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                     <td class="py-3 px-4">
-                        <div class="font-medium">${name}</div>
+                        <div class="font-medium">${safeName}</div>
                     </td>
                     ${createSwapColumn(coinTo, coinFrom)}
                     <td class="py-3 px-4 text-right">
@@ -498,12 +504,12 @@ const AmmTablesManager = (function() {
                     <td class="py-3 px-4 text-center">
                         <div class="flex flex-col items-center gap-1">
                             <label class="relative inline-flex items-center cursor-pointer" title="Toggle enabled">
-                                <input type="checkbox" class="sr-only peer amm-enable-toggle" data-type="bid" data-name="${name}" data-id="${bid.id || ''}" ${enabled ? 'checked' : ''}>
+                                <input type="checkbox" class="sr-only peer amm-enable-toggle" data-type="bid" data-name="${safeName}" data-id="${safeId}" ${enabled ? 'checked' : ''}>
                                 <div class="w-9 h-5 rounded-full relative ${enabled ? 'bg-green-500 dark:bg-green-600' : 'bg-red-500 dark:bg-red-700'} after:content-[''] after:absolute after:top-[2px] ${enabled ? 'after:left-[18px]' : 'after:left-[2px]'} after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                                 <span class="ml-2 text-xs font-medium ${enabled ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}">${enabled ? 'Enabled' : 'Disabled'}</span>
                             </label>
                             ${activeBidsCount > 0 ? (bidIds[0] ? `
-                            <a href="/bid/${bidIds[0]}" class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:underline">
+                            <a href="/bid/${escapeHtml(bidIds[0])}" class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:underline">
                                 ${activeBidsCount} Running Bid${activeBidsCount !== 1 ? 's' : ''}
                             </a>` : `
                             <span class="mt-1 inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
@@ -514,13 +520,13 @@ const AmmTablesManager = (function() {
                     <td class="py-3 px-4 text-center">
                         <div class="flex items-center justify-center space-x-2">
                             <button type="button" class="edit-amm-item text-gray-500 hover:text-gray-700 dark:text-white dark:hover:text-gray-300 focus:ring-0 focus:outline-none"
-                                data-type="bid" data-id="${bid.id || ''}" data-name="${name}">
+                                data-type="bid" data-id="${safeId}" data-name="${safeName}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path>
                                 </svg>
                             </button>
                             <button type="button" class="delete-amm-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 focus:ring-0 focus:outline-none"
-                                data-type="bid" data-id="${bid.id || ''}" data-name="${name}">
+                                data-type="bid" data-id="${safeId}" data-name="${safeName}">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                     <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
                                 </svg>

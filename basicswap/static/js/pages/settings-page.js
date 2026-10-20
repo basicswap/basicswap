@@ -2,6 +2,8 @@
 (function() {
   'use strict';
 
+  const escapeHtml = (value) => window.config.utils.escapeHtml(String(value ?? ''));
+
   const SettingsPage = {
     confirmCallback: null,
     triggerElement: null,
@@ -782,7 +784,7 @@
     .then(response => response.json())
     .then(data => {
       if (data.error) {
-        listContainer.innerHTML = `<div class="text-sm text-red-500">${data.error}</div>`;
+        listContainer.innerHTML = `<div class="text-sm text-red-500">${escapeHtml(data.error)}</div>`;
       } else {
         let html = '';
 
@@ -791,7 +793,7 @@
             <div class="flex items-center mb-4 p-3 bg-gray-100 dark:bg-gray-600 border border-gray-200 dark:border-gray-500 rounded-lg">
               <span class="w-2 h-2 bg-green-500 rounded-full mr-3 animate-pulse"></span>
               <span class="text-sm text-gray-900 dark:text-white">
-                Connected to: <span class="font-mono font-medium">${data.current_server.host}:${data.current_server.port}</span>
+                Connected to: <span class="font-mono font-medium">${escapeHtml(data.current_server.host)}:${escapeHtml(data.current_server.port)}</span>
               </span>
             </div>`;
         }
@@ -809,16 +811,16 @@
             const statusDot = srv.online ? 'bg-green-500' : 'bg-gray-400';
             html += `
                 <div class="flex items-center justify-between py-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg cursor-pointer add-server-btn transition-colors border border-transparent hover:border-blue-500"
-                     data-coin="${coin}" data-host="${srv.host}" data-port="${srv.port}" data-type="clearnet">
+                     data-coin="${escapeHtml(coin)}" data-host="${escapeHtml(srv.host)}" data-port="${escapeHtml(srv.port)}" data-type="clearnet">
                   <div class="flex items-center flex-1 min-w-0">
                     <svg class="w-4 h-4 mr-2 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
-                    <span class="font-mono text-sm text-gray-900 dark:text-white truncate">${srv.host}:${srv.port}</span>
+                    <span class="font-mono text-sm text-gray-900 dark:text-white truncate">${escapeHtml(srv.host)}:${escapeHtml(srv.port)}</span>
                   </div>
                   <div class="flex items-center ml-3">
                     <span class="w-2 h-2 ${statusDot} rounded-full mr-2"></span>
-                    <span class="text-xs ${statusClass}">${statusText}</span>
+                    <span class="text-xs ${statusClass}">${escapeHtml(statusText)}</span>
                   </div>
                 </div>`;
           });
@@ -840,16 +842,16 @@
             const statusDot = srv.online ? 'bg-green-500' : 'bg-gray-400';
             html += `
                 <div class="flex items-center justify-between py-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg cursor-pointer add-server-btn transition-colors border border-transparent hover:border-blue-500"
-                     data-coin="${coin}" data-host="${srv.host}" data-port="${srv.port}" data-type="onion">
+                     data-coin="${escapeHtml(coin)}" data-host="${escapeHtml(srv.host)}" data-port="${escapeHtml(srv.port)}" data-type="onion">
                   <div class="flex items-center flex-1 min-w-0">
                     <svg class="w-4 h-4 mr-2 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
-                    <span class="font-mono text-sm text-gray-900 dark:text-white truncate" title="${srv.host}">${srv.host.substring(0, 24)}...:${srv.port}</span>
+                    <span class="font-mono text-sm text-gray-900 dark:text-white truncate" title="${escapeHtml(srv.host)}">${escapeHtml(srv.host.substring(0, 24))}...:${escapeHtml(srv.port)}</span>
                   </div>
                   <div class="flex items-center ml-3">
                     <span class="w-2 h-2 ${statusDot} rounded-full mr-2"></span>
-                    <span class="text-xs ${statusClass}">${statusText}</span>
+                    <span class="text-xs ${statusClass}">${escapeHtml(statusText)}</span>
                   </div>
                 </div>`;
           });
@@ -859,7 +861,7 @@
         }
 
         if (!data.clearnet_servers?.length && !data.onion_servers?.length) {
-          const serverName = data.current_server ? `${data.current_server.host}:${data.current_server.port}` : 'The connected server';
+          const serverName = escapeHtml(data.current_server ? `${data.current_server.host}:${data.current_server.port}` : 'The connected server');
           html = `<div class="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">No servers discovered. <span class="font-mono">${serverName}</span> does not return peer lists.</div>`;
         } else {
           html += `<div class="text-xs text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200 dark:border-gray-600">Click a server to add it to your list</div>`;
@@ -899,7 +901,7 @@
       panel.classList.remove('hidden');
     })
     .catch(err => {
-      listContainer.innerHTML = `<div class="text-xs text-red-500">Failed to discover servers: ${err.message}</div>`;
+      listContainer.innerHTML = `<div class="text-xs text-red-500">Failed to discover servers: ${escapeHtml(err.message)}</div>`;
       panel.classList.remove('hidden');
     })
     .finally(() => {

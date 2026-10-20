@@ -2312,6 +2312,11 @@ def js_electrum_discover(self, url_split, post_string, is_json) -> bytes:
                 "UTF-8",
             )
 
+    from .interface.electrumx import is_valid_peer_host
+
+    discovered_servers = [
+        s for s in discovered_servers if is_valid_peer_host(s.get("host"))
+    ]
     onion_servers = [s for s in discovered_servers if s.get("is_onion")]
     clearnet_servers = [s for s in discovered_servers if not s.get("is_onion")]
 

@@ -6,6 +6,7 @@
 
 import datetime as dt
 import json
+import math
 import urllib.error
 
 from .basicswap_util import fiatTicker
@@ -31,6 +32,26 @@ rate_source_names = {
     "coinpaprika.com": "CoinPaprika",
     "neroswap.com": "neroswap",
 }
+
+
+def _finite(value) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def filterValidRates(rates: dict) -> dict:
+    valid = {}
+    for coin_id, (rate, volume_24h, price_change_24h) in rates.items():
+        price = _finite(rate)
+        if price is None or price <= 0:
+            continue
+        valid[coin_id] = (rate, _finite(volume_24h), _finite(price_change_24h))
+    return valid
 
 
 def getExchangeName(coin_id: int, exchange_name: str):

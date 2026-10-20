@@ -629,7 +629,7 @@ function ensureToastContainer() {
             <div class="flex items-center ml-3 text-sm font-medium text-gray-900 dark:text-white">
               ${coinIconHtml}
               <div class="flex flex-col">
-                <span class="font-semibold">${title}</span>
+                <span class="font-semibold">${window.config.utils.escapeHtml(String(title ?? ''))}</span>
                 ${options.subtitle ? `<span class="text-xs text-gray-500 dark:text-gray-400">${options.subtitle}</span>` : ''}
               </div>
             </div>

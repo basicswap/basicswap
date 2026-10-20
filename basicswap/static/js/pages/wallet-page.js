@@ -1,6 +1,8 @@
 (function() {
   'use strict';
 
+  const escapeHtml = (value) => window.config.utils.escapeHtml(String(value ?? ''));
+
   const WalletPage = {
     confirmCallback: null,
     triggerElement: null,
@@ -554,23 +556,23 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <div class="flex items-center gap-3">
                     <span class="inline-flex items-center gap-1 py-1 px-2 rounded-full text-xs font-semibold ${typeClass}">
-                      ${typeIcon} ${tx.type}
+                      ${typeIcon} ${escapeHtml(tx.type)}
                     </span>
                     ${classBadges[tx.tx_class] ? `<span class="inline-flex items-center py-1 px-2 rounded-full text-xs font-semibold ${classBadges[tx.tx_class].cls}">${classBadges[tx.tx_class].label}</span>` : ''}
                     ${tx.is_swap ? `<span class="inline-flex items-center py-1 px-2 rounded-full text-xs font-semibold bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300">Swap</span>` : ''}
                     <span class="font-semibold ${amountClass}">
-                      ${amountPrefix}${tx.amount} ${ticker.toUpperCase()}
+                      ${amountPrefix}${escapeHtml(tx.amount)} ${escapeHtml(ticker.toUpperCase())}
                     </span>
                   </div>
                   <div class="flex items-center gap-4 text-sm">
-                    <span class="${confirmClass}">${tx.confirmations} Confirmations</span>
-                    <span class="text-gray-500 dark:text-gray-400">${tx.timestamp}</span>
+                    <span class="${confirmClass}">${escapeHtml(tx.confirmations)} Confirmations</span>
+                    <span class="text-gray-500 dark:text-gray-400">${escapeHtml(tx.timestamp)}</span>
                   </div>
                 </div>
                 ${tx.address ? `
                 <div class="flex items-center gap-2 mb-2">
                   <span class="text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0">Address:</span>
-                  <span class="font-mono text-xs text-gray-700 dark:text-gray-200 break-all flex-1">${tx.address}</span>
+                  <span class="font-mono text-xs text-gray-700 dark:text-gray-200 break-all flex-1">${escapeHtml(tx.address)}</span>
                   <button class="copy-address-btn p-1.5 hover:bg-gray-100 dark:hover:bg-gray-500 rounded flex-shrink-0 focus:outline-none focus:ring-0" title="Copy Address">
                     <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
@@ -580,7 +582,7 @@
                 ` : ''}
                 <div class="flex items-center gap-2">
                   <span class="text-xs text-gray-500 dark:text-gray-400 w-16 flex-shrink-0">Txid:</span>
-                  <span class="font-mono text-xs text-gray-700 dark:text-gray-200 break-all flex-1">${tx.txid}</span>
+                  <span class="font-mono text-xs text-gray-700 dark:text-gray-200 break-all flex-1">${escapeHtml(tx.txid)}</span>
                   <button class="copy-txid-btn p-1.5 hover:bg-gray-100 dark:hover:bg-gray-500 rounded flex-shrink-0 focus:outline-none focus:ring-0" title="Copy Transaction ID">
                     <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>

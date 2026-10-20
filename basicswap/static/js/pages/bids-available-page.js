@@ -148,7 +148,7 @@ const createIdentityTooltip = (identity) => {
             ${identity.label ? `
                 <div class="border-b border-gray-400 pb-2">
                     <div class="text-white text-xs tracking-wide font-semibold">Label:</div>
-                    <div class="text-white">${identity.label}</div>
+                    <div class="text-white">${window.config.utils.escapeHtml(identity.label)}</div>
                 </div>
             ` : ''}
 
@@ -162,7 +162,7 @@ const createIdentityTooltip = (identity) => {
             ${identity.note ? `
                 <div class="space-y-1">
                     <div class="text-white text-xs tracking-wide font-semibold">Note:</div>
-                    <div class="text-white text-sm italic">${identity.note}</div>
+                    <div class="text-white text-sm italic">${window.config.utils.escapeHtml(identity.note)}</div>
                 </div>
             ` : ''}
 
@@ -315,7 +315,7 @@ const createBidTableRow = async (bid) => {
                                 <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
                             </svg>
                             <span class="monospace ${identity?.label ? 'dark:text-white' : 'dark:text-white'}">
-                                ${identity?.label || formatAddress(bid.addr_from)}
+                                ${identity?.label ? window.config.utils.escapeHtml(identity.label) : formatAddress(bid.addr_from)}
                             </span>
                         </a>
                     </div>
@@ -471,7 +471,7 @@ const createBidTableRow = async (bid) => {
 
 const getDisplayText = (identity, address) => {
     if (identity?.label) {
-        return identity.label;
+        return window.config.utils.escapeHtml(identity.label);
     }
     return formatAddress(address);
 };
