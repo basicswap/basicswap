@@ -978,7 +978,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if coin in (Coins.BTC, Coins.FIRO, Coins.LTC):
             if not chain_client_settings.get("min_relay_fee"):
-                chain_client_settings["min_relay_fee"] = 0.00001
+                chain_client_settings["min_relay_fee"] = (
+                    0.000001 if coin == Coins.BTC else 0.00001
+                )
 
         if coin == Coins.PART:
             self.coin_clients[coin]["anon_tx_ring_size"] = chain_client_settings.get(
