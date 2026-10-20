@@ -80,6 +80,7 @@ class BaseApp(DBMethods):
         self.delay_event = threading.Event()
         self.chainstate_delay_event = threading.Event()
 
+        self._network = None
         self.prepareLogging()
         self.log.info(f"Network: {self.chain}")
 
