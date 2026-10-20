@@ -77,7 +77,10 @@ from tests.basicswap.util.common import (
 from basicswap.config import DEFAULT_ALTRUISTIC
 from basicswap.basicswap_util import (
     ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
+    AddressTypes,
+    MessageNetworks,
     TxLockTypes,
+    XmrSplitMsgTypes,
 )
 from basicswap.util import (
     make_int,
@@ -89,8 +92,11 @@ from basicswap.util import (
 from basicswap.rpc import Jsonrpc, escape_rpcauth
 from basicswap.messages_npb import (
     BidMessage,
+    MessagePortalOffer,
     OfferRevokeMessage,
+    XmrSplitMessage,
 )
+from basicswap.network.bsx_network import BSXNetwork
 from basicswap.contrib.test_framework import segwit_addr
 from basicswap.contrib.test_framework.script import (
     CScript,
@@ -3361,6 +3367,189 @@ class Test(unittest.TestCase):
         revoke(maker, maker_addr)
         assert len(sc._possibly_revoked_offers) == 2
         assert BasicSwap.isOfferRevoked(sc, offer_id, maker_addr) is True
+
+    def test_split_chunks_need_their_bid_or_offer(self):
+        sc = DBMethods()
+        sc.sqlite_file = ":memory:"
+        sc.mxDB = threading.RLock()
+        sc.log = BSXLogger("test")
+        sc._max_early_split_chunks = 1000
+        sc._max_early_split_chunks_per_sender = 2
+        sc._max_split_chunks_per_bid = 60
+        now: int = 1800000000
+        sc.getTime = lambda: now
+        sc.getSmsgMsgBytes = lambda msg: msg["payload"]
+        sc.getSplitChunkRefusal = lambda *args: BasicSwap.getSplitChunkRefusal(
+            sc, *args
+        )
+
+        offer_id = secrets.token_bytes(28)
+        bid_id = secrets.token_bytes(28)
+        cursor = sc.openDB()
+        try:
+            create_db_(sc._db_con, logger)
+            offer = Offer(
+                offer_id=offer_id,
+                addr_from="offer_addr",
+                was_sent=True,
+                active_ind=1,
+                expire_at=now + 600,
+            )
+            sc.add(offer, cursor)
+            sc.add(Bid(bid_id=bid_id, offer_id=offer_id, bid_addr="bid_addr"), cursor)
+
+            def send_chunk(
+                chunk_bid_id, msg_type, addr_from, addr_to, parent_msg_id=None
+            ) -> int:
+                msg_data = XmrSplitMessage(
+                    msg_id=chunk_bid_id,
+                    msg_type=msg_type,
+                    sequence=1,
+                    dleag=bytes(100),
+                    parent_msg_id=parent_msg_id or chunk_bid_id,
+                )
+                msg = {
+                    "msgid": secrets.token_bytes(28).hex(),
+                    "from": addr_from,
+                    "to": addr_to,
+                    "sent": now,
+                    "payload": msg_data.to_bytes(),
+                }
+                BasicSwap.processXmrSplitMessage(sc, msg)
+                return cursor.execute("SELECT COUNT(*) FROM xmr_split_data").fetchone()[
+                    0
+                ]
+
+            BID, ACCEPT = XmrSplitMsgTypes.BID, XmrSplitMsgTypes.BID_ACCEPT
+            assert send_chunk(bid_id, ACCEPT, "other_addr", "bid_addr") == 0
+            assert send_chunk(bid_id, ACCEPT, "offer_addr", "bid_addr") == 1
+            assert send_chunk(bid_id, BID, "bid_addr", "offer_addr") == 2
+            unknown_bid_id = secrets.token_bytes(28)
+            assert send_chunk(unknown_bid_id, ACCEPT, "offer_addr", "bid_addr") == 2
+            assert send_chunk(unknown_bid_id, BID, "early_addr", "other_addr") == 2
+            assert send_chunk(unknown_bid_id, BID, "early_addr", "offer_addr") == 3
+            assert (
+                send_chunk(secrets.token_bytes(28), BID, "early_addr", "offer_addr")
+                == 4
+            )
+            assert (
+                send_chunk(secrets.token_bytes(28), BID, "early_addr", "offer_addr")
+                == 4
+            )
+            assert (
+                send_chunk(secrets.token_bytes(28), BID, "early_addr_2", "offer_addr")
+                == 5
+            )
+            sc._max_early_split_chunks = 3
+            assert (
+                send_chunk(secrets.token_bytes(28), BID, "early_addr_3", "offer_addr")
+                == 5
+            )
+
+            sc._max_split_chunks_per_bid = 3
+            for expect_rows in (6, 6):
+                assert (
+                    send_chunk(
+                        bid_id,
+                        ACCEPT,
+                        "offer_addr",
+                        "bid_addr",
+                        secrets.token_bytes(28),
+                    )
+                    == expect_rows
+                )
+        finally:
+            sc.closeDB(cursor)
+
+    def test_portals_capped_and_forgotten(self):
+        sc = DBMethods()
+        sc.sqlite_file = ":memory:"
+        sc.mxDB = threading.RLock()
+        sc.log = BSXLogger("test")
+        now: int = 1800000000
+        sc.getTime = lambda: now
+        sc.getSmsgMsgBytes = lambda msg: msg["payload"]
+        sc.getActiveNetwork = lambda network_id: {"bridged": [{"type": "simplex"}]}
+        sc.own_portals = {}
+        sc.known_portals = {}
+        sc.active_networks = []
+        sc._is_locked = False
+        sc._have_smsg_rpc = False
+        sc._portal_time_valid = 30 * 60
+        sc._max_known_portals = 2
+        sc._forget_portals_after = 86400 * 7
+
+        cursor = sc.openDB()
+        try:
+            create_db_(sc._db_con, logger)
+
+            def offer_portal(addr_portal: str, time_valid: int = 30 * 60) -> int:
+                msg_data = MessagePortalOffer(
+                    network_type_from=MessageNetworks.SMSG,
+                    network_type_to=MessageNetworks.SIMPLEX,
+                    portal_address_to=b"network_addr",
+                    time_valid=time_valid,
+                )
+                msg = {
+                    "msgid": secrets.token_bytes(28).hex(),
+                    "msg_net": "smsg",
+                    "sent": now,
+                    "from": addr_portal,
+                    "pubkey_from": "02" + "11" * 32,
+                    "payload": msg_data.to_bytes(),
+                }
+                BSXNetwork.processPortalOffer(sc, msg)
+                return cursor.execute(
+                    "SELECT COUNT(*) FROM network_portals"
+                ).fetchone()[0]
+
+            def portal_addrs() -> list:
+                return [
+                    r[0]
+                    for r in cursor.execute(
+                        "SELECT addr FROM smsgaddresses ORDER BY addr"
+                    ).fetchall()
+                ]
+
+            def pick() -> str | None:
+                portal = BSXNetwork.pickPortal(
+                    sc, sc.known_portals[MessageNetworks.SMSG][MessageNetworks.SIMPLEX]
+                )
+                return None if portal is None else portal.address_from
+
+            cursor.execute(
+                "INSERT INTO smsgaddresses (addr, use_type) VALUES ('bid_addr', :use_type)",
+                {"use_type": int(AddressTypes.BID)},
+            )
+            assert offer_portal("portal_1", time_valid=86400) == 1
+            assert (
+                cursor.execute("SELECT time_valid FROM network_portals").fetchone()[0]
+                == 30 * 60
+            )
+            assert offer_portal("portal_2") == 2
+            assert offer_portal("portal_3") == 2
+            assert offer_portal("portal_1") == 2
+
+            now += 3600
+            assert offer_portal("portal_3") == 3
+            assert pick() == "portal_3"
+            now += 3600
+            assert pick() == "portal_3"
+
+            now += 86400 * 7
+            assert offer_portal("portal_2") == 3
+            BSXNetwork.updateNetworkBridges(sc, now)
+            assert cursor.execute(
+                "SELECT address_from FROM network_portals"
+            ).fetchall() == [("portal_2",)]
+            assert portal_addrs() == ["bid_addr", "portal_2"]
+            assert pick() == "portal_2"
+            assert (
+                len(sc.known_portals[MessageNetworks.SMSG][MessageNetworks.SIMPLEX])
+                == 1
+            )
+        finally:
+            sc.closeDB(cursor)
 
 
 if __name__ == "__main__":

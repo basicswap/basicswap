@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 41
+CURRENT_DB_VERSION = 42
 CURRENT_DB_DATA_VERSION = 10
 
 
@@ -524,6 +524,8 @@ class XmrSplitData(Table):
     dleag = Column("blob")
     created_at = Column("integer")
     parent_msg_id = Column("blob")
+
+    index = Index("xmr_split_data_bid_id_index", "bid_id")
 
 
 class RevokedMessage(Table):
