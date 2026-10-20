@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import queue
+import re
 import select
 import socket
 import ssl
@@ -18,6 +19,10 @@ from basicswap.util import TemporaryError
 
 CERT_PINS_FILENAME = "electrum_cert_pins.json"
 MAX_RESPONSE_LEN: int = 10 * 1024 * 1024
+TXID_LIST_METHODS = (
+    "blockchain.scripthash.get_history",
+    "blockchain.scripthash.listunspent",
+)
 
 
 def _is_private_address(host: str) -> bool:
@@ -28,6 +33,16 @@ def _is_private_address(host: str) -> bool:
         return addr.is_private or addr.is_loopback or addr.is_link_local
     except ValueError:
         return host == "localhost"
+
+
+def _has_valid_txids(method: str, result) -> bool:
+    if method not in TXID_LIST_METHODS or not isinstance(result, list):
+        return True
+    for entry in result:
+        txid = entry.get("tx_hash") if isinstance(entry, dict) else None
+        if not isinstance(txid, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", txid):
+            return False
+    return True
 
 
 def _is_public_host(host: str) -> bool:
@@ -551,16 +566,17 @@ class ElectrumConnection:
                     with self._io_lock:
                         self._socket.sendall((json.dumps(request) + "\n").encode())
                 result = self._receive_response_async(request_id, timeout=timeout)
-                return result
             else:
                 request_id = self._send_request(method, params)
                 result = self._receive_response_sync(request_id, timeout=timeout)
-                return result
         except (ssl.SSLError, OSError, ConnectionError) as e:
             _close_socket_safe(self._socket)
             self._connected = False
             self._socket = None
             raise TemporaryError(f"Connection error: {e}")
+        if not _has_valid_txids(method, result):
+            raise ValueError(f"{method} returned an invalid txid")
+        return result
 
     def call_batch(self, requests):
         if not self.is_connected():
@@ -590,9 +606,9 @@ class ElectrumConnection:
             responses = self._receive_batch_responses(request_ids)
 
             results = []
-            for req_id in request_ids:
+            for (method, _), req_id in zip(requests, request_ids):
                 resp = responses.get(req_id, {})
-                if "error" in resp:
+                if "error" in resp or not _has_valid_txids(method, resp.get("result")):
                     results.append(None)
                 else:
                     results.append(resp.get("result"))

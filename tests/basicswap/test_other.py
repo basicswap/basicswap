@@ -2191,6 +2191,45 @@ class Test(unittest.TestCase):
             assert server.ping_server("electrum.example.org", 50002) == 1.0
         assert pins.get("bitcoin", "electrum.example.org:50002") is None
 
+    def test_electrum_txids_checked(self):
+        import json
+        import socket
+        from basicswap.interface.electrumx import ElectrumConnection
+
+        valid = [{"tx_hash": "ab" * 32, "height": 1}]
+        invalid = (
+            [{"tx_hash": "<img src=x onerror=alert(1)>", "height": 1}],
+            [{"tx_hash": "ab" * 31, "height": 1}],
+            [{"height": 1}],
+        )
+
+        def stub_connection(results):
+            conn = ElectrumConnection("127.0.0.1", 0, use_ssl=False)
+            conn._socket, peer = socket.socketpair()
+            conn._connected = True
+            for request_id, result in enumerate(results, 1):
+                response = {"jsonrpc": "2.0", "id": request_id, "result": result}
+                peer.sendall((json.dumps(response) + "\n").encode())
+            return conn, peer
+
+        for method in (
+            "blockchain.scripthash.get_history",
+            "blockchain.scripthash.listunspent",
+        ):
+            conn, peer = stub_connection([valid])
+            assert conn.call(method, ["00" * 32]) == valid
+            peer.close()
+            for result in invalid:
+                conn, peer = stub_connection([result])
+                with self.assertRaisesRegex(ValueError, "invalid txid"):
+                    conn.call(method, ["00" * 32])
+                peer.close()
+
+                conn, peer = stub_connection([valid, result])
+                requests = [(method, ["00" * 32]), (method, ["11" * 32])]
+                assert conn.call_batch(requests) == [valid, None]
+                peer.close()
+
     def test_validateSwapType(self):
         logging.info("---------- Test validateSwapType")
         basicswap_dir = "/tmp/bsx_test_other"
