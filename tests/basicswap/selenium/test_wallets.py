@@ -10,10 +10,12 @@ import json
 import time
 
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from urllib.request import urlopen
 
 from basicswap.util import dumpje
-from util import get_driver
+from util import click_option, get_driver
 
 
 def test_wallets(driver):
@@ -40,38 +42,46 @@ def test_wallets(driver):
     url = base_url + "/wallet"
     driver.get(url)
     h2 = driver.find_element(By.TAG_NAME, "h2")
-    assert "Error" in h2.text
+    assert "error" in h2.text.lower()
     p1 = driver.find_element(By.TAG_NAME, "p")
     assert "Wallet not specified" in p1.text
 
     url = base_url + "/wallet/NOCOIN"
     driver.get(url)
     h2 = driver.find_element(By.TAG_NAME, "h2")
-    assert "Error" in h2.text
+    assert "error" in h2.text.lower()
     p1 = driver.find_element(By.TAG_NAME, "p")
     assert "Unknown coin" in p1.text
 
     driver.get(base_url + "/wallets")
     time.sleep(1)
     driver.refresh()
-    driver.find_element(By.ID, "refresh").click()
+    driver.refresh()
     time.sleep(1)
     driver.refresh()
 
     print("Finding deposit address of node 2")
     driver.get(node2_url + "/wallet/PART")
-    e = driver.find_element(By.ID, "deposit_address")
+    e = driver.find_element(By.ID, "main_deposit_address")
     node2_deposit_address = e.text
 
     print("Withdrawing from node 1")
     driver.get(base_url + "/wallet/PART")
     driver.find_element(By.NAME, f"to_{part_id}").send_keys(node2_deposit_address)
     driver.find_element(By.NAME, f"amt_{part_id}").send_keys("10")
+    for name in (f"withdraw_type_from_{part_id}", f"withdraw_type_to_{part_id}"):
+        click_option(driver.find_element(By.NAME, name), "Plain")
     driver.find_element(By.NAME, f"withdraw_{part_id}").click()
-    driver.switch_to.alert.accept()
-    time.sleep(1)
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.ID, "confirmYes"))
+    ).click()
+    WebDriverWait(driver, 30).until(
+        lambda d: d.find_elements(By.CLASS_NAME, "infomsg")
+        or d.find_elements(By.CLASS_NAME, "error_msg")
+    )
     elements = driver.find_elements(By.CLASS_NAME, "infomsg")
-    assert len(elements) == 1
+    errors = [e.text for e in driver.find_elements(By.CLASS_NAME, "error_msg")]
+    assert len(elements) == 1, errors
     e = elements[0]
     assert "Withdrew 10 rtPART (plain to plain) to address" in e.text
 
@@ -105,7 +115,7 @@ def test_wallets(driver):
             break
         except Exception:
             continue
-        driver.find_element(By.ID, "refresh").click()
+        driver.refresh()
         time.sleep(2)
         found = True
     assert found
