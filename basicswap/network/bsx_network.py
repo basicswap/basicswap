@@ -141,10 +141,6 @@ class BSXNetwork:
         super().__init__(data_dir=data_dir, settings=settings, **kwargs)
 
     def finalise(self):
-        if self._network:
-            self._network.stopNetwork()
-            self._network = None
-
         if self.zmqContext:
             self.zmqContext.destroy()
 
@@ -286,15 +282,6 @@ class BSXNetwork:
 
         finally:
             self.closeDB(cursor)
-
-    def add_connection(self, host, port, peer_pubkey):
-        self.log.info(f"add_connection {host} {port} {peer_pubkey.hex()}.")
-        self._network.add_connection(host, port, peer_pubkey)
-
-    def get_network_info(self):
-        if not self._network:
-            return {"Error": "Not Initialised"}
-        return self._network.get_info()
 
     def getNetworksInfo(self) -> list:
         network_config_list = self.settings.get("networks", [])
