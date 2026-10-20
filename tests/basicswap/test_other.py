@@ -3489,6 +3489,7 @@ class Test(unittest.TestCase):
                     network_type_to=MessageNetworks.SIMPLEX,
                     portal_address_to=b"network_addr",
                     time_valid=time_valid,
+                    smsg_difficulty=0x1EFFFFFF,
                 )
                 msg = {
                     "msgid": secrets.token_bytes(28).hex(),
