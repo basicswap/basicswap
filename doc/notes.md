@@ -59,7 +59,15 @@ Or, on the BSX host machine create a tunnel to the node:
 
 ## SSH Tunnel to Remote BasicSwap Node
 
-While basicswap can be configured to host on an external interface:
+BasicSwap is not designed to run on the open web.  Anyone who can reach its UI or API
+controls the wallets, including withdrawals.  Keep the UI and websocket ports on loopback,
+as the defaults do ('htmlhost' and 'wshost' 127.0.0.1; the Docker setups publish them to
+the host's 127.0.0.1 only), never expose them to the internet or any network you don't
+fully trust, and use an ssh tunnel (below) to reach a node on another machine.
+
+If you host it on another interface anyway, on a network you trust, set a UI password
+first with `basicswap-prepare --client-auth-password=...`.  It can be configured to
+host on an external interface:
 
 If not using docker by changing 'htmlhost' and 'wshost' in basicswap.json
 For docker change 'HTML_PORT' and 'WS_PORT' in the .env file in the same dir as docker-compose.yml
