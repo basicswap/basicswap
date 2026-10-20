@@ -14,7 +14,6 @@ import threading
 import traceback
 import sys
 from urllib import parse
-from urllib.request import Request, urlopen
 from basicswap import AMM_VERSION
 from .util import listAvailableCoinsWithBalances
 
@@ -505,30 +504,6 @@ def get_amm_active_count(swap_client, debug_override=False):
             if debug_enabled:
                 swap_client.log.error(f"Error getting network offers: {str(e)}")
                 swap_client.log.error(traceback.format_exc())
-
-        if len(active_network_offers) == 0:
-            try:
-                global amm_host, amm_port
-                if "amm_host" not in globals() or "amm_port" not in globals():
-                    amm_host = "127.0.0.1"
-                    amm_port = 12700
-
-                api_url = f"http://{amm_host}:{amm_port}/api/v1/offers"
-
-                req = Request(api_url)
-                response = urlopen(req)
-                data = json.loads(response.read().decode("utf-8"))
-
-                if "offers" in data:
-                    for offer in data["offers"]:
-                        if "id" in offer:
-                            offer_id = offer["id"]
-                            active_network_offers[offer_id] = True
-
-            except Exception as e:
-                if debug_enabled:
-                    swap_client.log.error(f"Error getting offers via API: {str(e)}")
-                    swap_client.log.error(traceback.format_exc())
 
         if "offers" in state_data:
             for template_id, offers in state_data["offers"].items():

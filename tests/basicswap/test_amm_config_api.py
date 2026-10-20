@@ -210,6 +210,34 @@ class AmmBidRuntimeTest(unittest.TestCase):
         self.assertEqual(runtime["bid_b"]["bid_ids"], [])
 
 
+class AmmActiveCountTest(unittest.TestCase):
+    def test_no_request_without_network_offers(self):
+        import json
+        import tempfile
+        from unittest import mock
+        from basicswap.ui import page_amm
+
+        class Process:
+            def poll(self):
+                return None
+
+        with tempfile.TemporaryDirectory() as data_dir:
+            swap_client = mock.MagicMock()
+            swap_client.data_dir = data_dir
+            swap_client.debug = False
+            swap_client.listOffers.return_value = []
+            with open(page_amm.get_amm_state_path(swap_client), "w") as fp:
+                json.dump({"offers": {}}, fp)
+            with (
+                mock.patch.object(page_amm, "amm_process", Process()),
+                mock.patch(
+                    "socket.create_connection", side_effect=AssertionError
+                ) as connect,
+            ):
+                self.assertEqual(page_amm.get_amm_active_count(swap_client), 0)
+            connect.assert_not_called()
+
+
 class _FakeCi:
     @staticmethod
     def format_amount(sats):

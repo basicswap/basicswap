@@ -14,6 +14,7 @@ import hashlib
 import secrets
 import traceback
 import threading
+import time
 import http.client
 import base64
 
@@ -83,6 +84,11 @@ from .ui.page_debug import page_debug
 SESSION_COOKIE_NAME = "basicswap_session_id"
 LOGIN_NEXT_COOKIE_NAME = "basicswap_login_next"
 SESSION_DURATION_MINUTES = 15
+MAX_POST_BYTES = 10 * 1024 * 1024
+MAX_REFUSED_POST_BYTES = 64 * 1024
+MAX_HTTP_HANDLERS = 256
+HTTP_SOCKET_TIMEOUT = 300
+POST_BODY_TIMEOUT = 60
 
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
@@ -242,6 +248,8 @@ def json_requires_post(url_split) -> bool:
 
 
 class HttpHandler(BaseHTTPRequestHandler):
+    timeout = HTTP_SOCKET_TIMEOUT
+
     def _get_session_cookie(self):
         if "Cookie" in self.headers:
             cookie = SimpleCookie(self.headers["Cookie"])
@@ -1397,10 +1405,52 @@ class HttpHandler(BaseHTTPRequestHandler):
         finally:
             pass
 
+    def _post_may_be_accepted(self) -> bool:
+        if not self.is_allowed_host():
+            return False
+        return "Authorization" in self.headers or self.is_authenticated()
+
+    def _read_post_body(self, content_length: int) -> bytes | None:
+        deadline = time.monotonic() + POST_BODY_TIMEOUT
+        chunks = []
+        remaining = content_length
+        try:
+            while remaining > 0:
+                time_left = deadline - time.monotonic()
+                if time_left <= 0:
+                    return None
+                self.connection.settimeout(time_left)
+                chunk = self.rfile.read1(min(remaining, 65536))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+        except TimeoutError:
+            return None
+        finally:
+            self.connection.settimeout(self.timeout)
+        return b"".join(chunks)
+
     def do_POST(self):
         try:
-            content_length = int(self.headers.get("Content-Length", 0))
-            post_string = self.rfile.read(content_length)
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                content_length = -1
+            if content_length < 0:
+                self.send_error(400, "Invalid Content-Length")
+                return
+            if self._post_may_be_accepted():
+                max_bytes = MAX_POST_BYTES
+            else:
+                max_bytes = MAX_REFUSED_POST_BYTES
+            if content_length > max_bytes:
+                self.send_error(413)
+                return
+            post_string = self._read_post_body(content_length)
+            if post_string is None:
+                self.send_error(408)
+                return
 
             is_json = True if "json" in self.headers.get("Content-Type", "") else False
             response = self.handle_http(200, self.path, post_string, is_json)
@@ -1442,6 +1492,7 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
 
         self.session_lock = threading.Lock()
         self.msg_id_lock = threading.Lock()
+        self._handler_slots = threading.BoundedSemaphore(MAX_HTTP_HANDLERS)
 
         self.timeout = 60
         ThreadingHTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)
@@ -1465,6 +1516,18 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
             self.handle_request()
         self.socket.close()
         self.swap_client.log.info("HTTP server stopped.")
+
+    def process_request(self, request, client_address):
+        if not self._handler_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._handler_slots.release()
 
     def run(self):
         self.serve_forever()
