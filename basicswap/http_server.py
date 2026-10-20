@@ -189,6 +189,39 @@ JSON_GET_ALLOWED = frozenset(
 # Read sub-commands of /wallets/<coin>/<cmd>; every other wallet sub-command
 # mutates and requires POST.
 JSON_WALLET_GET_CMDS = frozenset({"listaddresses", "mwebbalance"})
+# Every request scripts/createoffers.py sends; "*" matches one path component.
+AMM_API_REQUESTS = frozenset(
+    {
+        ("GET", "coins"),
+        ("GET", "wallets/*"),
+        ("GET", "sentoffers/*"),
+        ("GET", "bids/*"),
+        ("GET", "identities/*"),
+        ("POST", "offers"),
+        ("POST", "offers/new"),
+        ("POST", "sentoffers"),
+        ("POST", "revokeoffer/*"),
+        ("POST", "bids"),
+        ("POST", "bids/new"),
+        ("POST", "sentbids"),
+        ("POST", "rates"),
+        ("POST", "offerfeeestimate"),
+        ("POST", "validateamount"),
+    }
+)
+
+
+def amm_request_allowed(method: str, url_split) -> bool:
+    if len(url_split) < 3 or url_split[1] != "json":
+        return False
+    path = url_split[2:]
+    for allowed_method, pattern in AMM_API_REQUESTS:
+        parts = pattern.split("/")
+        if allowed_method != method or len(parts) != len(path):
+            continue
+        if all((p == "*" and c != "") or p == c for p, c in zip(parts, path)):
+            return True
+    return False
 
 
 def json_requires_post(url_split) -> bool:
@@ -995,6 +1028,11 @@ class HttpHandler(BaseHTTPRequestHandler):
                 amm_token = getattr(swap_client, "_amm_api_token", None)
                 client_auth_hash = swap_client.settings.get("client_auth_hash")
                 if amm_token and hmac.compare_digest(password, amm_token):
+                    if not amm_request_allowed(self.command, url_split):
+                        self.putHeaders(403, "application/json")
+                        return json.dumps(
+                            {"error": "Not allowed for the AMM token"}
+                        ).encode("utf-8")
                     basic_auth_ok = True
                 elif client_auth_hash and verify_rfc2440_password(
                     client_auth_hash, password

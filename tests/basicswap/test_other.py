@@ -1647,6 +1647,99 @@ class Test(unittest.TestCase):
                 settings,
             )
 
+    def test_amm_token_scope(self):
+        import ast
+        import base64
+        from unittest import mock
+        from basicswap.http_server import HttpHandler, amm_request_allowed
+
+        script = os.path.join(
+            os.path.dirname(__file__), "..", "..", "scripts", "createoffers.py"
+        )
+        with open(script) as fp:
+            tree = ast.parse(fp.read())
+        requests = set()
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in ("read_json_api", "read_json_api_wallet")
+            ):
+                continue
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant):
+                path = arg.value
+            elif isinstance(arg, ast.JoinedStr):
+                path = "".join(
+                    v.value if isinstance(v, ast.Constant) else "x" for v in arg.values
+                )
+            else:
+                path = arg.func.value.value.replace("{}", "x")
+            requests.add(("POST" if len(node.args) > 1 else "GET", path))
+        assert len(requests) > 10
+        for method, path in requests:
+            assert amm_request_allowed(method, ["", "json"] + path.split("/")), (
+                method,
+                path,
+            )
+
+        class SwapClient:
+            def __init__(self):
+                self.settings = {"client_auth_hash": rfc2440_hash_password("password")}
+                self._amm_api_token = "amm-token"
+                self.log = logging
+
+        class Srv:
+            host_name = "127.0.0.1"
+            port_no = 12700
+
+            def __init__(self):
+                self.swap_client = SwapClient()
+
+        class Stub(HttpHandler):
+            def __init__(self, command, path, password):
+                creds = base64.b64encode(f"amm:{password}".encode()).decode()
+                self.command = command
+                self.path = path
+                self.headers = {
+                    "Host": "127.0.0.1:12700",
+                    "Authorization": "Basic " + creds,
+                }
+                self.server = Srv()
+                self.status = None
+
+            def putHeaders(self, status_code, content_type, extra_headers=None):
+                self.status = status_code
+
+        def request(command, path, password="amm-token"):
+            handler = Stub(command, path, password)
+            post_string = b"{}" if command == "POST" else ""
+            response = handler.handle_http(200, path, post_string, True)
+            return handler.status, response
+
+        with mock.patch(
+            "basicswap.http_server.js_url_to_function",
+            return_value=lambda *args: b"dispatched",
+        ):
+            assert request("GET", "/json/coins") == (200, b"dispatched")
+            assert request("POST", "/json/offers/new") == (200, b"dispatched")
+            for command, path in (
+                ("POST", "/json/wallets/btc/withdraw"),
+                ("POST", "/json/getcoinseed"),
+                ("POST", "/json/identities/x"),
+                ("POST", "/json/bids/x"),
+                ("GET", "/json/wallettransactions/btc"),
+                ("POST", "/rpc"),
+                ("GET", "/settings"),
+            ):
+                status, response = request(command, path)
+                assert status == 403, (command, path)
+                assert b"AMM token" in response
+            assert request("POST", "/json/wallets/btc/withdraw", "password") == (
+                200,
+                b"dispatched",
+            )
+
     def test_checkform_csrf_token(self):
         from basicswap.http_server import HttpHandler
 
