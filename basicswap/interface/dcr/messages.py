@@ -132,12 +132,16 @@ class CTransaction:
             o += 4
             self.expiry = int.from_bytes(data[o : o + 4], "little")
             o += 4
+            if o > len(data):
+                raise ValueError("Truncated transaction")
 
         if ser_type == TxSerializeType.NoWitness:
             return
 
         num_wit_scripts, nb = decode_compactsize(data, o)
         o += nb
+        if num_wit_scripts > len(data) - o:
+            raise ValueError("Witness count exceeds the transaction size")
 
         if ser_type == TxSerializeType.OnlyWitness:
             self.vin = [CTxIn() for _ in range(num_wit_scripts)]
@@ -157,6 +161,8 @@ class CTransaction:
             o += nb
             txi.signature_script = data[o : o + script_bytes]
             o += script_bytes
+        if o > len(data):
+            raise ValueError("Truncated transaction")
 
     def serialize(self, ser_type=TxSerializeType.Full) -> bytes:
         data = bytes()

@@ -104,6 +104,14 @@ def hash256(s):
     return sha256(sha256(s))
 
 
+class StrictBytesIO(BytesIO):
+    def read(self, size=-1):
+        data = super().read(size)
+        if size is not None and size >= 0 and len(data) != size:
+            raise ValueError("Unexpected end of data")
+        return data
+
+
 def ser_compact_size(l):
     r = b""
     if l < 253:
@@ -656,7 +664,9 @@ class CTransaction:
                 self.vout.append(txo)
 
             self.wit.vtxinwit = [CTxInWitness() for i in range(len(self.vin))]
-            self.wit.deserialize(f)
+            # Absent when serialized without witness
+            if f.tell() < len(f.getbuffer()):
+                self.wit.deserialize(f)
 
             self.sha256 = None
             self.hash = None
