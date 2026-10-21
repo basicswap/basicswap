@@ -14201,11 +14201,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if height and spend_tx is not None:
                 self.setBLockSpendHeight(bid, spend_tx, spend_action, height, cursor)
             return True
-        depth = ci_to.getTxDepth(spend_txid)
+        depth, height = ci_to.getTxDepthAndHeight(spend_txid)
         if depth and spend_tx is not None and spend_tx.chain_height is None:
-            self.setBLockSpendHeight(
-                bid, spend_tx, spend_action, ci_to.getTxBlockHeight(spend_txid), cursor
-            )
+            self.setBLockSpendHeight(bid, spend_tx, spend_action, height, cursor)
         # Restricted nodes hide txs still in the Dandelion++ stem phase
         if (
             depth is None
