@@ -1713,6 +1713,8 @@ class Test(unittest.TestCase):
         password = {"client_auth_hash": rfc2440_hash_password("password")}
         handler = post({"Content-Length": "5"}, b"hello")
         assert handler.handled == b"hello" and handler.errors == []
+        handler = post({"Content-Length": "10"}, b"hello")
+        assert handler.errors == [400] and handler.handled is None
         assert post({}).handled == b""
         for value in ("-1", "abc"):
             handler = post({"Content-Length": value}, b"hello")

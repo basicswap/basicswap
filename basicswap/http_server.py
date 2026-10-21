@@ -1437,7 +1437,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             return False
         return self.basic_auth() in ("amm", "operator") or self.is_authenticated()
 
-    def _read_post_body(self, content_length: int) -> bytes | None:
+    def _read_post_body(self, content_length: int) -> bytes:
         deadline = time.monotonic() + POST_BODY_TIMEOUT
         chunks = []
         remaining = content_length
@@ -1445,15 +1445,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             while remaining > 0:
                 time_left = deadline - time.monotonic()
                 if time_left <= 0:
-                    return None
+                    raise TimeoutError
                 self.connection.settimeout(time_left)
                 chunk = self.rfile.read1(min(remaining, 65536))
                 if not chunk:
-                    break
+                    raise EOFError
                 chunks.append(chunk)
                 remaining -= len(chunk)
-        except TimeoutError:
-            return None
         finally:
             self.connection.settimeout(self.timeout)
         return b"".join(chunks)
@@ -1474,9 +1472,13 @@ class HttpHandler(BaseHTTPRequestHandler):
             if content_length > max_bytes:
                 self.send_error(413)
                 return
-            post_string = self._read_post_body(content_length)
-            if post_string is None:
+            try:
+                post_string = self._read_post_body(content_length)
+            except TimeoutError:
                 self.send_error(408)
+                return
+            except EOFError:
+                self.send_error(400, "Incomplete request body")
                 return
 
             is_json = True if "json" in self.headers.get("Content-Type", "") else False
