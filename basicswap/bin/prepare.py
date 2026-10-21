@@ -2041,7 +2041,7 @@ def main():
                 coin_module = coin_prepare_modules[coin_name]
                 latest_version = coin_module.version + coin_module.version_tag
                 coin_module.setUpgradeVersion(
-                    have_version, coin_name in use_latest_coins
+                    coin_settings, coin_name in use_latest_coins
                 )
                 current_coin_settings["core_version_no"] = (
                     coin_module.version + coin_module.version_tag

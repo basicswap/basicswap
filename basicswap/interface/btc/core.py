@@ -140,9 +140,10 @@ class BTCPrepare(CoinPrepareModule):
             return False
         return int(self.version.split(".")[0]) >= 30
 
-    def setUpgradeVersion(self, have_version: str, use_latest: bool) -> None:
-        have_major: str = have_version.split(".")[0]
-        if use_latest or (have_major.isdigit() and int(have_major) >= 30):
+    def setUpgradeVersion(self, core_settings: dict, use_latest: bool) -> None:
+        if use_latest or not self.needsWalletMigration(
+            core_settings, core_settings.get("core_version_no", "")
+        ):
             return
         self.version = BITCOIN_LEGACY_VERSION
         self.version_tag = ""

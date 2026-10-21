@@ -560,7 +560,7 @@ class CoinPrepareModule(ReleasePrepareModule):
     ) -> None:
         pass
 
-    def setUpgradeVersion(self, have_version: str, use_latest: bool) -> None:
+    def setUpgradeVersion(self, core_settings: dict, use_latest: bool) -> None:
         pass
 
     def getVersionNote(self) -> str:
