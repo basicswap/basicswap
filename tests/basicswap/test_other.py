@@ -1339,8 +1339,14 @@ class Test(unittest.TestCase):
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
                 self.send_response(200)
-                self.end_headers()
                 try:
+                    if self.path == "/slowheaders":
+                        self.flush_headers()
+                        for _ in range(20):
+                            self.wfile.write(b"X-Slow: x\r\n")
+                            self.wfile.flush()
+                            time.sleep(0.1)
+                    self.end_headers()
                     if self.path == "/big":
                         self.wfile.write(b"x" * 2048)
                         return
@@ -1364,9 +1370,9 @@ class Test(unittest.TestCase):
             with mock.patch("basicswap.base.READ_URL_MAX_BYTES", 1024):
                 with self.assertRaises(ValueError):
                     BaseApp.readURL(app, url + "/big")
-            with mock.patch("basicswap.base.READ_URL_MAX_SECONDS", 0.5):
+            for path in ("/slow", "/slowheaders"):
                 with self.assertRaises(TimeoutError):
-                    BaseApp.readURL(app, url + "/slow")
+                    BaseApp.readURL(app, url + path, timeout=0.5)
         finally:
             server.shutdown()
             server.server_close()

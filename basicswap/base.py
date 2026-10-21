@@ -94,28 +94,95 @@ class PublicHTTPSConnection(http.client.HTTPSConnection):
         self._create_connection = create_public_connection
 
 
-class PublicHTTPHandler(urllib.request.HTTPHandler):
+class RequestDeadline:
+    # Shuts the request's sockets down when time is up, so a server trickling
+    # the headers or body can't hold the read open past the deadline.
+    def __init__(self, seconds: float):
+        self.lock = threading.Lock()
+        self.socks = []
+        self.expired = False
+        self.timer = threading.Timer(seconds, self.expire)
+
+    def __enter__(self):
+        self.timer.start()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.timer.cancel()
+        if self.expired:
+            raise TimeoutError("URL read timed out.") from exc
+
+    def track(self, sock) -> None:
+        with self.lock:
+            self.socks.append(sock)
+            if self.expired:
+                shutdown_socket(sock)
+
+    def expire(self) -> None:
+        with self.lock:
+            self.expired = True
+            for sock in self.socks:
+                shutdown_socket(sock)
+
+
+def shutdown_socket(sock) -> None:
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+
+
+class DeadlineHandlerMixin:
+    def __init__(self, deadline: RequestDeadline, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.deadline = deadline
+
+    def do_open(self, http_class, req, **http_conn_args):
+        def build(*args, **kwargs):
+            conn = http_class(*args, **kwargs)
+            connect = conn.connect
+
+            def tracked_connect():
+                connect()
+                self.deadline.track(conn.sock)
+
+            conn.connect = tracked_connect
+            return conn
+
+        return super().do_open(build, req, **http_conn_args)
+
+
+class DeadlineHTTPHandler(DeadlineHandlerMixin, urllib.request.HTTPHandler):
+    pass
+
+
+class DeadlineHTTPSHandler(DeadlineHandlerMixin, urllib.request.HTTPSHandler):
+    pass
+
+
+class DeadlineSocksiPyHandler(DeadlineHandlerMixin, SocksiPyHandler):
+    pass
+
+
+class PublicHTTPHandler(DeadlineHTTPHandler):
     def http_open(self, req):
         return self.do_open(PublicHTTPConnection, req)
 
 
-class PublicHTTPSHandler(urllib.request.HTTPSHandler):
+class PublicHTTPSHandler(DeadlineHTTPSHandler):
     def https_open(self, req):
         return self.do_open(PublicHTTPSConnection, req, context=self._context)
 
 
 READ_URL_MAX_BYTES = 10 * 1024 * 1024
-READ_URL_MAX_SECONDS = 120
 
 
-def read_response(response, max_bytes: int, deadline: float) -> bytes:
+def read_response(response, max_bytes: int) -> bytes:
     data = bytearray()
     while chunk := response.read1(65536):
         data += chunk
         if len(data) > max_bytes:
             raise ValueError("URL response too large.")
-        if time.monotonic() > deadline:
-            raise TimeoutError("URL read timed out.")
     return bytes(data)
 
 
@@ -433,27 +500,40 @@ class BaseApp(DBMethods):
     ) -> bytes:
         if not is_url_scheme_allowed(url):
             raise ValueError("Unsupported URL scheme.")
-        deadline = time.monotonic() + READ_URL_MAX_SECONDS
-        open_handler = None
-        if self.use_tor_proxy:
-            open_handler = SocksiPyHandler(
-                socks.PROXY_TYPE_SOCKS5, self.tor_proxy_host, self.tor_proxy_port
-            )
+        deadline = RequestDeadline(timeout)
         # Tor egresses via the SOCKS proxy (rdns), so local resolution can't vet
         # the real destination; the scheme allowlist above still applies.
-        build_args = [open_handler] if self.use_tor_proxy else []
-        if check_public and not self.use_tor_proxy:
-            build_args.append(PublicOnlyRedirectHandler())
+        if self.use_tor_proxy:
+            build_args = [
+                DeadlineSocksiPyHandler(
+                    deadline,
+                    socks.PROXY_TYPE_SOCKS5,
+                    self.tor_proxy_host,
+                    self.tor_proxy_port,
+                )
+            ]
+        elif check_public:
+            build_args = [PublicOnlyRedirectHandler()]
             # An HTTP(S) proxy resolves the host itself, so only a direct
             # connection can be bound to the vetted address.
-            if not {"http", "https"} & urllib.request.getproxies().keys():
-                build_args += [PublicHTTPHandler(), PublicHTTPSHandler()]
+            if {"http", "https"} & urllib.request.getproxies().keys():
+                build_args += [
+                    DeadlineHTTPHandler(deadline),
+                    DeadlineHTTPSHandler(deadline),
+                ]
+            else:
+                build_args += [
+                    PublicHTTPHandler(deadline),
+                    PublicHTTPSHandler(deadline),
+                ]
+        else:
+            build_args = [DeadlineHTTPHandler(deadline), DeadlineHTTPSHandler(deadline)]
         opener = urllib.request.build_opener(*build_args)
         if headers is None:
             opener.addheaders = [("User-agent", "Mozilla/5.0")]
         request = urllib.request.Request(url, headers=headers)
-        with opener.open(request, timeout=timeout) as response:
-            return read_response(response, READ_URL_MAX_BYTES, deadline)
+        with deadline, opener.open(request, timeout=timeout) as response:
+            return read_response(response, READ_URL_MAX_BYTES)
 
     def logException(self, message: str) -> None:
         self.log.error(message)
