@@ -2311,6 +2311,7 @@ class TestNostrHandshake(BasicSwapFixture):
             "resp": {
                 "Right": {
                     "contact": {
+                        "contactId": 7,
                         "activeConn": {"connId": "conn-77"},
                         "localDisplayName": "peer",
                     }

@@ -149,34 +149,11 @@ def sendSimplexRouteMsg(
     deterministic,
 ) -> bytes:
     network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
-    net_i = network["ws_thread"]
 
-    remote_name = None
     route_data = json.loads(message_route.route_data.decode("UTF-8"))
-    if "localDisplayName" in route_data:
-        remote_name = route_data["localDisplayName"]
-    else:
-        pccConnId = route_data["pccConnId"]
-        self.log.debug(f"Finding name for Simplex chat, ID: {pccConnId}")
-        cmd_id = net_i.send_command("/chats")
-        response = net_i.wait_for_command_response(cmd_id)
-        for chat in getResponseData(response, "chats"):
-            if (
-                "chatInfo" not in chat
-                or "type" not in chat["chatInfo"]
-                or chat["chatInfo"]["type"] != "direct"
-            ):
-                continue
-            try:
-                if chat["chatInfo"]["contact"]["activeConn"]["connId"] == pccConnId:
-                    remote_name = chat["chatInfo"]["contact"]["localDisplayName"]
-                    break
-            except Exception as e:
-                self.log.debug(f"Error parsing chat: {e}")
-
-    if remote_name is None:
+    if "contactId" not in route_data:
         raise RuntimeError(
-            f"Unable to find remote name for simplex direct chat, pccConnId: {pccConnId}"
+            f"Simplex direct chat not connected, pccConnId: {route_data['pccConnId']}"
         )
 
     message_id = sendSimplexMsg(
@@ -189,6 +166,6 @@ def sendSimplexRouteMsg(
         cursor,
         timestamp,
         deterministic,
-        to_user_name=remote_name,
+        to_contact_id=route_data["contactId"],
     )
     return message_id
