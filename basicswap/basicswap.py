@@ -15489,9 +15489,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 offers_to_expire.add(offer_id)
                 self._expiring_offers.pop(i)
 
-        if (
-            now - self._last_checked_expiring_bids_offers
-            >= self.check_expiring_bids_offers_seconds
+        if self.checkDue(
+            now,
+            self._last_checked_expiring_bids_offers,
+            self.check_expiring_bids_offers_seconds,
         ):
             check_records = True
             self._last_checked_expiring_bids_offers = now
@@ -15647,7 +15648,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.expireBidsAndOffers(now)
 
             to_remove = []
-            if now - self._last_checked_progress >= self.check_progress_seconds:
+            if self.checkDue(
+                now, self._last_checked_progress, self.check_progress_seconds
+            ):
                 for bid_id, v in list(self.swaps_in_progress.items()):
                     bid, offer = v
                     try:
@@ -15691,7 +15694,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 self._last_checked_progress = now
 
-            if now - self._last_checked_watched >= self.check_watched_seconds:
+            if self.checkDue(
+                now, self._last_checked_watched, self.check_watched_seconds
+            ):
                 try:
                     self.checkWatched()
                 except Exception as ex:
@@ -15699,7 +15704,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 finally:
                     self._last_checked_watched = now
 
-            if now - self._last_checked_expired >= self.check_expired_seconds:
+            if self.checkDue(
+                now, self._last_checked_expired, self.check_expired_seconds
+            ):
                 self.expireMessages()
                 self.expireMessageRoutes()
                 self.expireDBRecords()
@@ -15760,28 +15767,32 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.log.addHandler(stream_fp)
                         self.log.info("Log file rotated.")
 
-            if now - self._last_checked_actions >= self.check_actions_seconds:
+            if self.checkDue(
+                now, self._last_checked_actions, self.check_actions_seconds
+            ):
                 self.checkQueuedActions()
                 self._last_checked_actions = now
 
-            if (
-                now - self._last_checked_pending_routes
-                >= self.check_pending_routes_seconds
+            if self.checkDue(
+                now,
+                self._last_checked_pending_routes,
+                self.check_pending_routes_seconds,
             ):
                 self.checkPendingMessageRoutes()
                 self._last_checked_pending_routes = now
 
-            if (
-                now - self._last_checked_split_messages
-                >= self.check_split_messages_seconds
+            if self.checkDue(
+                now,
+                self._last_checked_split_messages,
+                self.check_split_messages_seconds,
             ):
                 self.checkSplitMessages()
                 self._last_checked_split_messages = now
 
-            if (
-                len(to_remove) > 0
-                or now - self._last_checked_delayed_auto_accept
-                >= self.check_delayed_auto_accept_seconds
+            if len(to_remove) > 0 or self.checkDue(
+                now,
+                self._last_checked_delayed_auto_accept,
+                self.check_delayed_auto_accept_seconds,
             ):
                 self.checkDelayedAutoAccept()
                 self._last_checked_delayed_auto_accept = now
@@ -15789,7 +15800,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if now - self._last_checked_updates >= self.check_updates_seconds:
                 self.checkForUpdates()
 
-            if now - self._last_checked_pending_sweeps >= 60:
+            if self.checkDue(now, self._last_checked_pending_sweeps, 60):
                 self._retryPendingSweeps()
                 self._last_checked_pending_sweeps = now
 
