@@ -136,7 +136,9 @@ def make_check_state_client(ci, bid, xmr_swap):
     )
     sc.ci = lambda coin: ci
     sc.add = lambda obj, cursor, upsert=False: sc.saved.append(obj)
-    sc.setTxBlockInfoFromHeight = lambda ci_, tx, height: None
+    sc.setTxBlockInfoFromHeight = lambda ci_, tx, height: setattr(
+        tx, "block_height", height
+    )
     sc.findTxB = lambda ci_, xmr_swap_, bid_, cursor, was_sent: False
     sc.countQueuedActions = lambda cursor, bid_id, action_type: 0
     sc.haveDebugInd = lambda bid_id, ind: False
@@ -174,12 +176,28 @@ class TestAdsRecoveryRefundDepth(unittest.TestCase):
 
         self.assertEqual(refund_tx.state, TxStates.TX_IN_CHAIN)
         self.assertEqual(refund_tx.states_set, [TxStates.TX_IN_CHAIN])
+        self.assertEqual(refund_tx.block_height, 100)
         assert sc is not None
 
     def test_evicted_refund_reverts_to_mempool_state(self):
         refund_tx = StubTx(state=TxStates.TX_CONFIRMED)
         self.run_check(refund_tx, {"height": 0, "depth": 0})
 
+        self.assertEqual(refund_tx.state, TxStates.TX_IN_MEMPOOL)
+        self.assertIsNone(refund_tx.block_height)
+
+    def test_reorged_unconfirmed_refund_takes_the_new_block(self):
+        refund_tx = StubTx(state=TxStates.TX_IN_CHAIN, block_height=100)
+        self.run_check(refund_tx, {"height": 101, "depth": 1})
+
+        self.assertEqual(refund_tx.block_height, 101)
+        self.assertEqual(refund_tx.state, TxStates.TX_IN_CHAIN)
+
+    def test_unconfirmed_refund_back_in_mempool_clears_block(self):
+        refund_tx = StubTx(state=TxStates.TX_IN_CHAIN, block_height=100)
+        self.run_check(refund_tx, {"height": 0, "depth": 0})
+
+        self.assertIsNone(refund_tx.block_height)
         self.assertEqual(refund_tx.state, TxStates.TX_IN_MEMPOOL)
 
     def test_still_confirmed_no_state_change(self):

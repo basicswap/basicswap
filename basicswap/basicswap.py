@@ -8895,20 +8895,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if refund_tx_chain_info is not None:
                     bid_changed: bool = False
                     refund_tx_depth = refund_tx_chain_info.get("depth", 0)
+                    found_height: int = refund_tx_chain_info["height"]
                     if (
                         refund_tx.state in (None, TxStates.TX_NONE, TxStates.TX_SENT)
-                        and refund_tx_chain_info["height"] == 0
+                        and found_height == 0
                     ):
                         refund_tx.setState(TxStates.TX_IN_MEMPOOL)
                         bid_changed = True
-                    if (
-                        not refund_tx.block_height
-                        and refund_tx_chain_info["height"] != 0
-                    ):
-                        self.setTxBlockInfoFromHeight(
-                            ci_from, refund_tx, refund_tx_chain_info["height"]
-                        )
-                        refund_tx.setState(TxStates.TX_IN_CHAIN)
+                    # A reorg can move the tx to another block or back to the mempool
+                    if found_height != 0 and refund_tx.block_height != found_height:
+                        self.setTxBlockInfoFromHeight(ci_from, refund_tx, found_height)
+                        if not was_confirmed:
+                            refund_tx.setState(TxStates.TX_IN_CHAIN)
+                        bid_changed = True
+                    elif found_height == 0 and refund_tx.block_height:
+                        refund_tx.block_hash = None
+                        refund_tx.block_height = None
+                        refund_tx.block_time = None
+                        if not was_confirmed:
+                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
                         bid_changed = True
                     if refund_tx_depth >= ci_from.blocks_confirmed:
                         if not was_confirmed:
@@ -8924,16 +8929,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.log.warning(
                             f"Lock refund tx {self.logIDT(refund_tx.txid)} dropped below depth {ci_from.blocks_confirmed} (now {refund_tx_depth}) for bid {self.log.id(bid_id)}."
                         )
-                        if refund_tx_chain_info["height"] != 0:
-                            self.setTxBlockInfoFromHeight(
-                                ci_from, refund_tx, refund_tx_chain_info["height"]
-                            )
-                            refund_tx.setState(TxStates.TX_IN_CHAIN)
-                        else:
-                            refund_tx.block_hash = None
-                            refund_tx.block_height = None
-                            refund_tx.block_time = None
-                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                        refund_tx.setState(
+                            TxStates.TX_IN_CHAIN
+                            if found_height != 0
+                            else TxStates.TX_IN_MEMPOOL
+                        )
                         bid_changed = True
                     if bid_changed:
                         self.add(refund_tx, cursor, upsert=True)
