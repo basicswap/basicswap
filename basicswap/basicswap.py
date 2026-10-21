@@ -8924,11 +8924,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.log.warning(
                             f"Lock refund tx {self.logIDT(refund_tx.txid)} dropped below depth {ci_from.blocks_confirmed} (now {refund_tx_depth}) for bid {self.log.id(bid_id)}."
                         )
-                        refund_tx.setState(
-                            TxStates.TX_IN_CHAIN
-                            if refund_tx_chain_info["height"] != 0
-                            else TxStates.TX_IN_MEMPOOL
-                        )
+                        if refund_tx_chain_info["height"] != 0:
+                            self.setTxBlockInfoFromHeight(
+                                ci_from, refund_tx, refund_tx_chain_info["height"]
+                            )
+                            refund_tx.setState(TxStates.TX_IN_CHAIN)
+                        else:
+                            refund_tx.block_hash = None
+                            refund_tx.block_height = None
+                            refund_tx.block_time = None
+                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
                         bid_changed = True
                     if bid_changed:
                         self.add(refund_tx, cursor, upsert=True)
