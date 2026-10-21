@@ -50,7 +50,7 @@ def filterValidRates(rates: dict) -> dict:
         price = _finite(rate)
         if price is None or price <= 0:
             continue
-        valid[coin_id] = (rate, _finite(volume_24h), _finite(price_change_24h))
+        valid[coin_id] = (price, _finite(volume_24h), _finite(price_change_24h))
     return valid
 
 

@@ -1759,7 +1759,7 @@ class Test(unittest.TestCase):
         }
         assert filterValidRates(rates) == {
             1: (100.5, 1000.0, -2.5),
-            8: ("12.5", None, None),
+            8: (12.5, None, None),
         }
 
         class Cursor:
