@@ -1,4 +1,4 @@
-FROM i_swapclient as install_stage
+FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=litecoin --withoutcoin=particl && \
     find /coin_bin -name *.tar.gz -delete
@@ -6,9 +6,9 @@ RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=litecoin --
 FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .
 
-ENV LITECOIN_DATA /data
+ENV LITECOIN_DATA=/data
 
-RUN groupadd -r litecoin && useradd -r -m -g litecoin litecoin \
+RUN groupadd -g 1000 litecoin && useradd -u 1000 -m -g litecoin litecoin \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \

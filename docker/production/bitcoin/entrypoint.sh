@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-if [[ "$1" == "bitcoin-cli" || "$1" == "bitcoin-tx" || "$1" == "bitcoind" || "$1" == "test_bitcoin" ]]; then
+if [[ "${1##*/}" == "bitcoin-cli" || "${1##*/}" == "bitcoin-tx" || "${1##*/}" == "bitcoind" || "${1##*/}" == "test_bitcoin" ]]; then
 	mkdir -p "$BITCOIN_DATA"
+	find "$BITCOIN_DATA" ! -user bitcoin -exec chown -h bitcoin:bitcoin {} +
 
 	chown -h bitcoin:bitcoin /home/bitcoin/.bitcoin
 	exec gosu bitcoin "$@"

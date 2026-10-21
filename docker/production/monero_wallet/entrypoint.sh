@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-if [[ "$1" == "monero-wallet-rpc" ]]; then
+if [[ "${1##*/}" == "monero-wallet-rpc" ]]; then
 	mkdir -p "$MONERO_DATA"
+	find "$MONERO_DATA" ! -user monero -exec chown -h monero:monero {} +
 
-	chown -h monero_wallet:monero_wallet /data
-	exec gosu monero_wallet "$@"
+	exec gosu monero "$@"
 else
 	exec "$@"
 fi

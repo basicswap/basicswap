@@ -1,4 +1,4 @@
-FROM i_swapclient as install_stage
+FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=firo --withoutcoins=particl && \
     find /coin_bin -name *.tar.gz -delete
@@ -6,9 +6,9 @@ RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=firo --with
 FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .
 
-ENV FIRO_DATA /data
+ENV FIRO_DATA=/data
 
-RUN groupadd -r firo && useradd -r -m -g firo firo \
+RUN groupadd -g 1000 firo && useradd -u 1000 -m -g firo firo \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \

@@ -1,4 +1,4 @@
-FROM i_swapclient as install_stage
+FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=monero --withoutcoins=particl
 
@@ -6,9 +6,9 @@ FROM debian:trixie-slim
 
 COPY --from=install_stage /coin_bin .
 
-ENV MONERO_DATA /data
+ENV MONERO_DATA=/data
 
-RUN groupadd -r monero && useradd -r -m -g monero monero \
+RUN groupadd -g 1000 monero && useradd -u 1000 -m -g monero monero \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \

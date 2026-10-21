@@ -1,6 +1,6 @@
 # https://github.com/NicolasDorier/docker-bitcoin/blob/master/README.md
 
-FROM i_swapclient as install_stage
+FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoin --withoutcoins=particl && \
     find /coin_bin -name *.tar.gz -delete
@@ -8,9 +8,9 @@ RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=bitcoin --w
 FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .
 
-ENV BITCOIN_DATA /data
+ENV BITCOIN_DATA=/data
 
-RUN groupadd -r bitcoin && useradd -r -m -g bitcoin bitcoin \
+RUN groupadd -g 1000 bitcoin && useradd -u 1000 -m -g bitcoin bitcoin \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \

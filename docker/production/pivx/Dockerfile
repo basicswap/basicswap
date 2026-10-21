@@ -1,4 +1,4 @@
-FROM i_swapclient as install_stage
+FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=pivx --withoutcoins=particl && \
     find /coin_bin -name *.tar.gz -delete
@@ -6,9 +6,9 @@ RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=pivx --with
 FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .
 
-ENV PIVX_DATA /data
+ENV PIVX_DATA=/data
 
-RUN groupadd -r pivx && useradd -r -m -g pivx pivx \
+RUN groupadd -g 1000 pivx && useradd -u 1000 -m -g pivx pivx \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \
