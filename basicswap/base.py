@@ -430,7 +430,6 @@ class BaseApp(DBMethods):
         timeout: int = 120,
         headers={},
         check_public: bool = False,
-        max_bytes: int = READ_URL_MAX_BYTES,
     ) -> bytes:
         if not is_url_scheme_allowed(url):
             raise ValueError("Unsupported URL scheme.")
@@ -454,7 +453,7 @@ class BaseApp(DBMethods):
             opener.addheaders = [("User-agent", "Mozilla/5.0")]
         request = urllib.request.Request(url, headers=headers)
         with opener.open(request, timeout=timeout) as response:
-            return read_response(response, max_bytes, deadline)
+            return read_response(response, READ_URL_MAX_BYTES, deadline)
 
     def logException(self, message: str) -> None:
         self.log.error(message)

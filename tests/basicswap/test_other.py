@@ -1359,9 +1359,11 @@ class Test(unittest.TestCase):
         url = f"http://127.0.0.1:{server.server_address[1]}"
         app = SimpleNamespace(use_tor_proxy=False)
         try:
-            assert BaseApp.readURL(app, url + "/big", max_bytes=2048) == b"x" * 2048
-            with self.assertRaises(ValueError):
-                BaseApp.readURL(app, url + "/big", max_bytes=1024)
+            with mock.patch("basicswap.base.READ_URL_MAX_BYTES", 2048):
+                assert BaseApp.readURL(app, url + "/big") == b"x" * 2048
+            with mock.patch("basicswap.base.READ_URL_MAX_BYTES", 1024):
+                with self.assertRaises(ValueError):
+                    BaseApp.readURL(app, url + "/big")
             with mock.patch("basicswap.base.READ_URL_MAX_SECONDS", 0.5):
                 with self.assertRaises(TimeoutError):
                     BaseApp.readURL(app, url + "/slow")
