@@ -128,7 +128,7 @@ class BTCPrepare(CoinPrepareModule):
         self.writeRpcAuth(fp, salt)
 
     def hasLegacyWallet(self, core_settings: dict) -> bool:
-        if core_settings.get("connection_type") == "electrum":
+        if core_settings.get("connection_type") != "rpc":
             return False
         return not core_settings.get("use_descriptors", False)
 
