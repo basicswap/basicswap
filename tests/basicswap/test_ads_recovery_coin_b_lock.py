@@ -50,6 +50,7 @@ def make_xmr_interface(
     ci._mx_wallet = threading.Lock()
     ci._addr_prefix = 18
     ci._rpctimeout = 60
+    ci._chain_synced_until = 0
     ci.getPubkey = lambda k: b"\x02" * 32
     ci.openWallet = lambda name: None
     ci.createWallet = lambda params: None
