@@ -269,6 +269,28 @@ class HttpHandler(BaseHTTPRequestHandler):
         finally:
             self._header_timer.cancel()
 
+    def basic_auth(self) -> str | None:
+        # "amm", "operator", "invalid", "malformed", or None without a Basic header
+        auth_header = self.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Basic "):
+            return None
+        swap_client = self.server.swap_client
+        try:
+            encoded_creds = auth_header.split(" ", 1)[1]
+            decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
+            _, password = decoded_creds.split(":", 1)
+
+            amm_token = getattr(swap_client, "_amm_api_token", None)
+            if amm_token and hmac.compare_digest(password, amm_token):
+                return "amm"
+            client_auth_hash = swap_client.settings.get("client_auth_hash")
+            if client_auth_hash and verify_rfc2440_password(client_auth_hash, password):
+                return "operator"
+            return "invalid"
+        except Exception as e:
+            swap_client.log.error(f"Error processing Basic Auth header: {e}")
+            return "malformed"
+
     def _drop_slow_request(self) -> None:
         try:
             self.connection.shutdown(socket.SHUT_RDWR)
@@ -1049,49 +1071,29 @@ class HttpHandler(BaseHTTPRequestHandler):
             return b"Host not allowed"
 
         exempt_pages = ["login", "static", "error", "info"]
-        auth_header = self.headers.get("Authorization")
+        basic_auth = self.basic_auth()
         basic_auth_ok = False
-
-        if auth_header and auth_header.startswith("Basic "):
-            try:
-                encoded_creds = auth_header.split(" ", 1)[1]
-                decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
-                _, password = decoded_creds.split(":", 1)
-
-                amm_token = getattr(swap_client, "_amm_api_token", None)
-                client_auth_hash = swap_client.settings.get("client_auth_hash")
-                if amm_token and hmac.compare_digest(password, amm_token):
-                    if not amm_request_allowed(self.command, url_split):
-                        self.putHeaders(403, "application/json")
-                        return json.dumps(
-                            {"error": "Not allowed for the AMM token"}
-                        ).encode("utf-8")
-                    basic_auth_ok = True
-                elif client_auth_hash and verify_rfc2440_password(
-                    client_auth_hash, password
-                ):
-                    basic_auth_ok = True
-                else:
-                    self.send_response(401)
-                    self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(
-                        json.dumps({"error": "Invalid Basic Auth credentials"}).encode(
-                            "utf-8"
-                        )
-                    )
-                    return b""
-            except Exception as e:
-                swap_client.log.error(f"Error processing Basic Auth header: {e}")
-                self.send_response(401)
-                self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(
-                    json.dumps({"error": "Malformed Basic Auth header"}).encode("utf-8")
+        if basic_auth == "amm":
+            if not amm_request_allowed(self.command, url_split):
+                self.putHeaders(403, "application/json")
+                return json.dumps({"error": "Not allowed for the AMM token"}).encode(
+                    "utf-8"
                 )
-                return b""
+            basic_auth_ok = True
+        elif basic_auth == "operator":
+            basic_auth_ok = True
+        elif basic_auth is not None:
+            error = (
+                "Malformed Basic Auth header"
+                if basic_auth == "malformed"
+                else "Invalid Basic Auth credentials"
+            )
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": error}).encode("utf-8"))
+            return b""
 
         if not basic_auth_ok and page not in exempt_pages:
             if not self.is_authenticated():
@@ -1433,7 +1435,7 @@ class HttpHandler(BaseHTTPRequestHandler):
     def _post_may_be_accepted(self) -> bool:
         if not self.is_allowed_host():
             return False
-        return "Authorization" in self.headers or self.is_authenticated()
+        return self.basic_auth() in ("amm", "operator") or self.is_authenticated()
 
     def _read_post_body(self, content_length: int) -> bytes | None:
         deadline = time.monotonic() + POST_BODY_TIMEOUT

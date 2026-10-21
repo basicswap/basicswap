@@ -1663,11 +1663,14 @@ class Test(unittest.TestCase):
             peer.close()
 
     def test_http_post_limits(self):
+        import base64
         from unittest import mock
         from basicswap import http_server
         from basicswap.http_server import HttpHandler
 
         class SwapClient:
+            log = logging
+
             def __init__(self, settings):
                 self.settings = settings
 
@@ -1722,8 +1725,18 @@ class Test(unittest.TestCase):
         body = b"x" * size
         handler = post({"Content-Length": str(size)}, body, password)
         assert handler.errors == [413] and handler.handled is None
+        for creds in ("x", base64.b64encode(b"user:wrong").decode()):
+            handler = post(
+                {"Content-Length": str(size), "Authorization": f"Basic {creds}"},
+                body,
+                password,
+            )
+            assert handler.errors == [413] and handler.handled is None, creds
+        creds = base64.b64encode(b"user:password").decode()
         handler = post(
-            {"Content-Length": str(size), "Authorization": "Basic x"}, body, password
+            {"Content-Length": str(size), "Authorization": f"Basic {creds}"},
+            body,
+            password,
         )
         assert handler.handled == body
         assert post({"Content-Length": "5"}, b"hello", password).handled == b"hello"
