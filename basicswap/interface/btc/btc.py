@@ -965,7 +965,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             }
 
         rv = self.rpc_wallet("getwalletinfo")
-        if self.coin_type() == Coins.BTC and any(
+        if any(
             field not in rv
             for field in ("balance", "unconfirmed_balance", "immature_balance")
         ):
