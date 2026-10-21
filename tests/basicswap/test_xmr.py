@@ -1386,7 +1386,7 @@ class Test(BaseTest):
         assert rv[0]["addr_to"] == new_address
 
         # Disable all
-        json_rv = read_json_api(1800, "smsgaddresses/disableall")
+        json_rv = read_json_api(1800, "smsgaddresses/disableall", {})
         assert json_rv["num_disabled"] >= 1
 
     def test_01_part_xmr(self):
