@@ -1947,6 +1947,51 @@ class Test(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ci.loadTx(tx_bytes[:-cut])
 
+    def test_nav_pivx_tx_parser_rejects_short_data(self):
+        from basicswap.interface.nav.contrib.mininode import (
+            COutPoint as NAVOutPoint,
+            CTxIn as NAVTxIn,
+            CTxOut as NAVTxOut,
+        )
+        from basicswap.interface.pivx.contrib.messages import (
+            COutPoint as PIVXOutPoint,
+            CTransaction as PIVXTransaction,
+            CTxIn as PIVXTxIn,
+            CTxOut as PIVXTxOut,
+            SaplingTxData,
+        )
+
+        nav_tx = NAVTransaction()
+        nav_tx.nVersion = 2
+        nav_tx.nTime = 1
+        nav_tx.vin.append(NAVTxIn(NAVOutPoint(1, 0), b"\x51"))
+        nav_tx.vout.append(NAVTxOut(1000, b"\x51"))
+        nav_tx.strDZeel = b"hello"
+
+        sap_data = SaplingTxData()
+        sap_data.pre = b"\x01"
+        sap_data.valueBalance = 0
+        sap_data.vShieldedSpend = []
+        sap_data.vShieldedOutput = []
+        sap_data.bindingSig = b"\x00" * 64
+        pivx_tx = PIVXTransaction()
+        pivx_tx.nVersion = 3
+        pivx_tx.nType = 1
+        pivx_tx.vin.append(PIVXTxIn(PIVXOutPoint(1, 0), b"\x51"))
+        pivx_tx.vout.append(PIVXTxOut(1000, b"\x51"))
+        pivx_tx.sapData = sap_data
+        pivx_tx.extraData = b"hello"
+
+        for cls, tx in ((NAVInterface, nav_tx), (PIVXInterface, pivx_tx)):
+            settings = {"rpcport": 0, "rpcauth": "none"}
+            settings.update(REQUIRED_SETTINGS)
+            ci = cls(settings, "regtest")
+            tx_bytes = tx.serialize()
+            assert ci.loadTx(tx_bytes).serialize() == tx_bytes
+            for cut in (1, 3):
+                with self.assertRaises(ValueError):
+                    ci.loadTx(tx_bytes[:-cut])
+
     def test_part_tx_parser_witness_optional(self):
         from basicswap.contrib.test_framework.messages import (
             CTxInWitness,

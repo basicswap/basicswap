@@ -5,13 +5,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from io import BytesIO
-
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.util.address import decodeAddress
 from basicswap.interface.pivx.contrib.messages import CTransaction
+from basicswap.contrib.test_framework.messages import StrictBytesIO
 from basicswap.contrib.test_framework.script import (
     CScript,
     OP_DUP,
@@ -127,7 +126,7 @@ class PIVXInterface(BTCInterface):
     def loadTx(self, tx_bytes: bytes, allow_witness: bool = True) -> CTransaction:
         # Load tx from bytes to internal representation
         tx = CTransaction()
-        tx.deserialize(BytesIO(tx_bytes))
+        tx.deserialize(StrictBytesIO(tx_bytes))
         return tx
 
     def getScriptForPubkeyHash(self, pkh: bytes) -> bytearray:

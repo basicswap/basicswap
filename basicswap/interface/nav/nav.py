@@ -8,7 +8,6 @@
 import random
 import hashlib
 
-from io import BytesIO
 from coincurve.keys import (
     PublicKey,
     PrivateKey,
@@ -24,6 +23,7 @@ from basicswap.interface.btc.btc import (
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins
 from basicswap.contrib.mnemonic import Mnemonic
+from basicswap.contrib.test_framework.messages import StrictBytesIO
 from basicswap.interface.nav.contrib.mininode import (
     CTxIn,
     CTxOut,
@@ -174,7 +174,7 @@ class NAVInterface(BTCInterface):
     def loadTx(self, tx_bytes: bytes, allow_witness: bool = True) -> CTransaction:
         # Load tx from bytes to internal representation
         tx = CTransaction()
-        tx.deserialize(BytesIO(tx_bytes))
+        tx.deserialize(StrictBytesIO(tx_bytes))
         return tx
 
     def signTx(
