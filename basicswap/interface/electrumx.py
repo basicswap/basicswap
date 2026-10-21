@@ -170,7 +170,7 @@ class ElectrumConnection:
         self._coin_name = coin_name
         self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
         self._public_only = public_only
-        self._oversize_callback = None
+        self._misbehaving_callback = None
         self._socket = None
         self._request_id = 0
         self._lock = threading.Lock()
@@ -404,17 +404,19 @@ class ElectrumConnection:
         """Register callback for header height updates. Callback receives height as argument."""
         self._header_callback = callback
 
-    def register_oversize_callback(self, callback):
-        self._oversize_callback = callback
+    def register_misbehaving_callback(self, callback):
+        self._misbehaving_callback = callback
 
-    def _check_buffer_len(self, buffer: bytes) -> None:
-        if len(buffer) <= MAX_RESPONSE_LEN:
-            return
+    def _drop_misbehaving(self, reason: str) -> None:
         _close_socket_safe(self._socket)
         self._connected = False
-        if self._oversize_callback:
-            self._oversize_callback()
-        raise ConnectionError(f"Electrum response exceeds {MAX_RESPONSE_LEN} bytes")
+        if self._misbehaving_callback:
+            self._misbehaving_callback(reason)
+        raise ConnectionError(reason)
+
+    def _check_buffer_len(self, buffer: bytes) -> None:
+        if len(buffer) > MAX_RESPONSE_LEN:
+            self._drop_misbehaving(f"response exceeds {MAX_RESPONSE_LEN} bytes")
 
     def _send_request(self, method, params=None):
         if params is None:
@@ -569,13 +571,13 @@ class ElectrumConnection:
             else:
                 request_id = self._send_request(method, params)
                 result = self._receive_response_sync(request_id, timeout=timeout)
+            if not _has_valid_txids(method, result):
+                self._drop_misbehaving(f"{method} returned an invalid txid")
         except (ssl.SSLError, OSError, ConnectionError) as e:
             _close_socket_safe(self._socket)
             self._connected = False
             self._socket = None
             raise TemporaryError(f"Connection error: {e}")
-        if not _has_valid_txids(method, result):
-            raise ValueError(f"{method} returned an invalid txid")
         return result
 
     def call_batch(self, requests):
@@ -608,7 +610,9 @@ class ElectrumConnection:
             results = []
             for (method, _), req_id in zip(requests, request_ids):
                 resp = responses.get(req_id, {})
-                if "error" in resp or not _has_valid_txids(method, resp.get("result")):
+                if not _has_valid_txids(method, resp.get("result")):
+                    self._drop_misbehaving(f"{method} returned an invalid txid")
+                if "error" in resp:
                     results.append(None)
                 else:
                     results.append(resp.get("result"))
@@ -845,10 +849,8 @@ class ElectrumServer:
                 cert_pins=self._cert_pins,
                 coin_name=self._coin_name,
             )
-            conn.register_oversize_callback(
-                lambda: self._blacklist_server(
-                    server, f"response over {MAX_RESPONSE_LEN} bytes"
-                )
+            conn.register_misbehaving_callback(
+                lambda reason: self._blacklist_server(server, reason)
             )
             conn.connect()
             connect_time = (time.time() - start_time) * 1000

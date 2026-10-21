@@ -2059,7 +2059,7 @@ class Test(unittest.TestCase):
             conn._socket, peer = socket.socketpair()
             conn._connected = True
             oversized = []
-            conn.register_oversize_callback(lambda: oversized.append(True))
+            conn.register_misbehaving_callback(lambda reason: oversized.append(True))
 
             def send():
                 try:
@@ -2110,7 +2110,7 @@ class Test(unittest.TestCase):
             mock.patch.object(ElectrumServer, "_subscribe_headers"),
         ):
             assert server._try_connect_server(server._servers[0])
-        server._connection._oversize_callback()
+        server._connection._misbehaving_callback("test")
         assert [s["host"] for s in server.get_sorted_servers()] == [
             "electrum2.example.com"
         ]
@@ -2240,6 +2240,7 @@ class Test(unittest.TestCase):
         import json
         import socket
         from basicswap.interface.electrumx import ElectrumConnection
+        from basicswap.util import TemporaryError
 
         valid = [{"tx_hash": "ab" * 32, "height": 1}]
         invalid = (
@@ -2248,10 +2249,13 @@ class Test(unittest.TestCase):
             [{"height": 1}],
         )
 
+        dropped = []
+
         def stub_connection(results):
             conn = ElectrumConnection("127.0.0.1", 0, use_ssl=False)
             conn._socket, peer = socket.socketpair()
             conn._connected = True
+            conn.register_misbehaving_callback(dropped.append)
             for request_id, result in enumerate(results, 1):
                 response = {"jsonrpc": "2.0", "id": request_id, "result": result}
                 peer.sendall((json.dumps(response) + "\n").encode())
@@ -2266,14 +2270,18 @@ class Test(unittest.TestCase):
             peer.close()
             for result in invalid:
                 conn, peer = stub_connection([result])
-                with self.assertRaisesRegex(ValueError, "invalid txid"):
+                with self.assertRaisesRegex(TemporaryError, "invalid txid"):
                     conn.call(method, ["00" * 32])
+                assert not conn.is_connected()
                 peer.close()
 
                 conn, peer = stub_connection([valid, result])
                 requests = [(method, ["00" * 32]), (method, ["11" * 32])]
-                assert conn.call_batch(requests) == [valid, None]
+                with self.assertRaisesRegex(TemporaryError, "invalid txid"):
+                    conn.call_batch(requests)
+                assert not conn.is_connected()
                 peer.close()
+        assert len(dropped) == 2 * 2 * len(invalid)
 
     def test_validateSwapType(self):
         logging.info("---------- Test validateSwapType")
