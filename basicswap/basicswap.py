@@ -197,6 +197,7 @@ from .network.nostr.routes import (
     processConnectRequestAck,
     processNostrConnectRequest,
 )
+from .network.simplex.client import isValidSmpServerAddress
 from .network.simplex.routes import (
     prepareSimplexMessageRoute,
     processSimplexConnectRequest,
@@ -16413,7 +16414,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if "server_address" in data:
                     new_value = data["server_address"]
                     ensure(
-                        isinstance(new_value, str) and new_value.startswith("smp://"),
+                        isinstance(new_value, str)
+                        and isValidSmpServerAddress(new_value),
                         "Invalid server address",
                     )
                     if network.get("server_address", "") != new_value:

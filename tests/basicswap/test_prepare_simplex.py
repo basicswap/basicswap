@@ -25,6 +25,7 @@ import websocket
 from unittest import mock
 
 import basicswap.bin.prepare as prepare
+import basicswap.network.simplex.client as simplex_client
 import basicswap.network.simplex.prepare as simplex_prepare_mod
 from basicswap.interface.prepare_util import PrepareContext
 from basicswap.network.simplex.simplex import (
@@ -702,6 +703,27 @@ class TestAddNetwork(unittest.TestCase):
         ensureSimplexGroup(app, ws, simplex)
         assert ws.commands == ["/groups"]
         assert simplex["joined_group_link"] == GROUP_LINK_A
+
+
+class TestSimplexClientInit(unittest.TestCase):
+    def test_init_runs_without_a_shell_on_windows(self):
+        args = [
+            "simplex-chat",
+            "-d",
+            "simplex_client_data",
+            "-e",
+            "/help",
+            "-s",
+            "smp://hash@host&calc.exe",
+        ]
+        with (
+            mock.patch.object(simplex_client.os, "name", "nt"),
+            mock.patch.object(simplex_client.subprocess, "Popen") as popen,
+        ):
+            popen.return_value.poll.return_value = 0
+            simplex_client.initSimplexClient(args, logger, mock.Mock())
+        assert popen.call_args.args[0] == args
+        assert popen.call_args.kwargs.get("shell", False) is False
 
 
 if __name__ == "__main__":
