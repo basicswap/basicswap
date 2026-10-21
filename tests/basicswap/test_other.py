@@ -2206,10 +2206,8 @@ class Test(unittest.TestCase):
 
             with mock.patch("socket.getaddrinfo", side_effect=rebind):
                 assert server.ping_server("rebind.example.com", port, ssl=False) is None
-            peer, _ = listener.accept()
-            peer.settimeout(2)
-            assert peer.recv(4096) == b""
-            peer.close()
+            with self.assertRaises(socket.timeout):
+                listener.accept()
         finally:
             listener.close()
 

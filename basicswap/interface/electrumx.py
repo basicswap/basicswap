@@ -205,15 +205,35 @@ class ElectrumConnection:
                     f"Electrum connecting via proxy {self._proxy_host}:{self._proxy_port} to {self._host}:{self._port}"
                 )
             return sock
-        sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
-        if self._public_only and not _is_public_host(sock.getpeername()[0]):
-            _close_socket_safe(sock)
-            raise ValueError(f"{self._host} resolved to a non-public address")
+        if self._public_only:
+            sock = self._connect_public()
+        else:
+            sock = socket.create_connection(
+                (self._host, self._port), timeout=self._timeout
+            )
         if self._log and self._proxy_host and self._proxy_port:
             self._log.debug(
                 f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
             )
         return sock
+
+    def _connect_public(self):
+        addrs = [
+            sockaddr[:2]
+            for *_, sockaddr in socket.getaddrinfo(
+                self._host, self._port, type=socket.SOCK_STREAM
+            )
+            if _is_public_host(sockaddr[0])
+        ]
+        if len(addrs) < 1:
+            raise ValueError(f"{self._host} has no public address")
+        last_error = None
+        for addr in addrs:
+            try:
+                return socket.create_connection(addr, timeout=self._timeout)
+            except OSError as e:
+                last_error = e
+        raise last_error
 
     def server_key(self) -> str:
         return f"{self._host}:{self._port}"
