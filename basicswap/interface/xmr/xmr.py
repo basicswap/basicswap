@@ -27,7 +27,15 @@ from coincurve.dleag import (
 from basicswap.interface.base import (
     Curves,
 )
-from basicswap.util import i2b, b2i, b2h, dumpj, ensure, TemporaryError
+from basicswap.util import (
+    i2b,
+    b2i,
+    b2h,
+    dumpj,
+    ensure,
+    ChainNotSyncedError,
+    TemporaryError,
+)
 from basicswap.util.network import is_private_ip_address
 from basicswap.rpc_xmr import make_xmr_rpc_func, make_xmr_rpc2_func
 from basicswap.chainparams import Coins
@@ -708,7 +716,7 @@ class XMRInterface(CoinInterface):
                 except Exception as e:
                     self._log.debug(f"findTxB isChainSynced failed: {e}")
                 if not synced:
-                    raise TemporaryError(
+                    raise ChainNotSyncedError(
                         "findTxB: chain/wallet not fully synced, refusing to report the coin B lock tx as missing"
                     )
             return rv

@@ -101,6 +101,7 @@ from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
     BalanceError,
+    ChainNotSyncedError,
     DeserialiseNum,
     InactiveCoin,
     LockedCoinError,
@@ -9393,7 +9394,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 try:
                     bid_changed = self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 except Exception as e:
-                    if "not fully synced" in str(e):
+                    if isinstance(e, ChainNotSyncedError):
                         self.log.warning(
                             f"Bid {self.log.id(bid_id)}: Waiting for {ci_to.coin_name()} to sync before checking lock tx B."
                         )

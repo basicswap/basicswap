@@ -21,6 +21,10 @@ class TemporaryError(ValueError):
     pass
 
 
+class ChainNotSyncedError(TemporaryError):
+    pass
+
+
 class AutomationConstraint(ValueError):
     pass
 
