@@ -1,7 +1,8 @@
 FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=decred --withoutcoins=particl && \
-    find /coin_bin -name *.tar.gz -delete
+    find /coin_bin -name *.tar.gz -delete && \
+    chmod -R a+rX /coin_bin
 
 FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .

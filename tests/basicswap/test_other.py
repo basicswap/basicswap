@@ -2386,6 +2386,35 @@ class Test(unittest.TestCase):
                     )
                     prepare_dir.assert_called_once()
 
+    def test_entry_points_set_private_umask(self):
+        import importlib.util
+        from unittest import mock
+        import basicswap.bin.prepare as prepare
+        import basicswap.bin.run as run
+
+        script_path = os.path.join(
+            os.path.dirname(__file__), "..", "..", "scripts", "createoffers.py"
+        )
+        spec = importlib.util.spec_from_file_location("createoffers", script_path)
+        createoffers = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(createoffers)
+
+        orig_umask = os.umask(0o022)
+        try:
+            for main in (prepare.main, run.main, createoffers.main):
+                os.umask(0o022)
+                with (
+                    mock.patch("sys.argv", ["prog", "--version"]),
+                    mock.patch("sys.stdout"),
+                ):
+                    try:
+                        main()
+                    except SystemExit:
+                        pass
+                assert os.umask(0o022) == 0o077, main.__module__
+        finally:
+            os.umask(orig_umask)
+
 
 if __name__ == "__main__":
     unittest.main()

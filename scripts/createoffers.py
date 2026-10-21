@@ -2142,6 +2142,7 @@ def prune_script_state(now, args, config, script_state):
 
 def main():
     global read_json_api, read_json_api_wallet
+    os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "-v",

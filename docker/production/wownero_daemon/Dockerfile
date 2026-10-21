@@ -1,6 +1,7 @@
 FROM i_swapclient AS install_stage
 
-RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=wownero --withoutcoins=particl
+RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=wownero --withoutcoins=particl && \
+    chmod -R a+rX /coin_bin
 
 FROM debian:trixie-slim
 

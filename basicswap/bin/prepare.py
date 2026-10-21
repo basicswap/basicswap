@@ -1316,6 +1316,7 @@ def ensure_network_valid(network_name: str, test_disabled: bool = True) -> None:
 
 def main():
     global use_tor_proxy, with_coins_changed
+    os.umask(0o077)
     setTorrcVars()
     data_dir = None
     bin_dir = None
