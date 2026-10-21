@@ -1170,7 +1170,7 @@ def migrate_wallets(
     chain,
     extra_opts,
     config_path,
-    check_only: bool = False,
+    check_seed: bool = False,
 ):
     prepare_ctx = extra_opts["prepare_ctx"]
     swap_client = None
@@ -1192,11 +1192,10 @@ def migrate_wallets(
             coin_settings = settings["chainclients"][coin_name]
             c = swap_client.getCoinIdFromName(coin_name)
             swap_client.waitForDaemonRPC(c, with_wallet=False)
-            if check_only:
+            if check_seed:
                 coin_prepare_modules[coin_name].checkWalletBeforeMigration(
                     prepare_ctx, swap_client, c, coin_settings
                 )
-                continue
             coin_params = chainparams[c]
             watch_wallet_name: str = getWalletName(
                 coin_params,
@@ -1215,14 +1214,6 @@ def migrate_wallets(
             del swap_client
         for d in daemons:
             finalise_daemon(d)
-
-
-def check_wallets_before_migration(
-    migrate_coins, data_dir, settings, chain, extra_opts
-):
-    migrate_wallets(
-        migrate_coins, data_dir, settings, chain, extra_opts, None, check_only=True
-    )
 
 
 def load_config(config_path):
@@ -2091,13 +2082,18 @@ def main():
                     settings["chainclients"][c].get("core_version_no", ""),
                 )
             ]
+            # The old core still loads the legacy wallet, so a failed migration
+            # leaves the install as it was
             if len(migrate_coins) > 0:
-                check_wallets_before_migration(
-                    migrate_coins if extra_opts.get("check_wallet_seed", True) else [],
+                logger.info("Migrating wallets: {}".format(", ".join(migrate_coins)))
+                migrate_wallets(
+                    migrate_coins,
                     data_dir,
                     settings,
                     chain,
                     extra_opts,
+                    config_path,
+                    check_seed=extra_opts.get("check_wallet_seed", True),
                 )
 
             for c in with_coins:
@@ -2113,12 +2109,6 @@ def main():
                         "core_version_group"
                     ] = current_version_group
                 save_config(config_path, settings)
-
-            if len(migrate_coins) > 0:
-                logger.info("Migrating wallets: {}".format(", ".join(migrate_coins)))
-                migrate_wallets(
-                    migrate_coins, data_dir, settings, chain, extra_opts, config_path
-                )
 
             logger.info("Done.")
             return 0

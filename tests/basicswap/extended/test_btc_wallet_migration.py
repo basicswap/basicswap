@@ -256,10 +256,12 @@ class Test(unittest.TestCase):
         finally:
             node.stop()
 
+        # Core 29 writes the backup into the wallet's directory, 31 beside it
         wallets_dir = os.path.join(settings["datadir"], "regtest", "wallets")
         assert any(
             f.startswith(wallet_name + "_") and f.endswith(".legacy.bak")
-            for f in os.listdir(wallets_dir)
+            for _, _, files in os.walk(wallets_dir)
+            for f in files
         )
 
         args = ["basicswap-run", "-regtest=1", "-datadir=" + datadir]
