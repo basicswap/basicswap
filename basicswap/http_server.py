@@ -17,6 +17,7 @@ import threading
 import time
 import http.client
 import base64
+import socket
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -89,6 +90,7 @@ MAX_REFUSED_POST_BYTES = 64 * 1024
 MAX_HTTP_HANDLERS = 256
 HTTP_SOCKET_TIMEOUT = 300
 POST_BODY_TIMEOUT = 60
+HEADER_TIMEOUT = 30
 
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
@@ -249,6 +251,29 @@ def json_requires_post(url_split) -> bool:
 
 class HttpHandler(BaseHTTPRequestHandler):
     timeout = HTTP_SOCKET_TIMEOUT
+
+    def handle_one_request(self):
+        # The socket timeout restarts on every byte, so a trickled request line
+        # or header would hold a handler slot indefinitely.
+        self._header_timer = threading.Timer(HEADER_TIMEOUT, self._drop_slow_request)
+        self._header_timer.daemon = True
+        self._header_timer.start()
+        try:
+            super().handle_one_request()
+        finally:
+            self._header_timer.cancel()
+
+    def parse_request(self) -> bool:
+        try:
+            return super().parse_request()
+        finally:
+            self._header_timer.cancel()
+
+    def _drop_slow_request(self) -> None:
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
 
     def _get_session_cookie(self):
         if "Cookie" in self.headers:
