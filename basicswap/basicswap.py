@@ -14220,7 +14220,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.get_delay_retry_seconds(), spend_action, bid.bid_id, cursor
             )
             self.commitDB()
-        return depth is not None and depth > ci_to.blocks_confirmed
+        return depth is not None and depth >= ci_to.blocks_confirmed
 
     def sendBLockSpendTx(
         self, ci_to, bid, tx_type, cursor, *args, **kwargs
