@@ -20,7 +20,7 @@ Copy and edit .env config:
     cp example.env .env
 
 
-Optionally set random RPC passwords:
+Set random RPC passwords, example.env leaves them empty and basicswap-prepare refuses an empty one:
 
     for KEY in $(grep -o '^.*_RPC_PWD' .env)
     do

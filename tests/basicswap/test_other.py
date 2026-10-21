@@ -2361,6 +2361,31 @@ class Test(unittest.TestCase):
         url = Jsonrpc.constructUrl(auth, host, port, "new_wallet")
         assert url == "https://user:p%40ss@127.0.0.1:1234/wallet/new_wallet"
 
+    def test_prepare_refuses_empty_rpc_password(self):
+        from unittest import mock
+        import basicswap.bin.prepare as prepare
+
+        prepare_module = prepare.coin_prepare_modules["bitcoin"]
+        for core_settings, refused in (
+            ({"rpcuser": "user", "rpcpassword": ""}, True),
+            ({"walletrpcuser": "user", "walletrpcpassword": ""}, True),
+            ({"rpcuser": "", "rpcpassword": ""}, False),
+            ({"rpcuser": "user", "rpcpassword": "pwd"}, False),
+        ):
+            settings = {"chainclients": {"bitcoin": core_settings}}
+            with mock.patch.object(prepare_module, "prepareDataDir") as prepare_dir:
+                if refused:
+                    with self.assertRaises(SystemExit):
+                        prepare.prepareDataDir(
+                            "bitcoin", settings, "regtest", None, {"prepare_ctx": None}
+                        )
+                    prepare_dir.assert_not_called()
+                else:
+                    prepare.prepareDataDir(
+                        "bitcoin", settings, "regtest", None, {"prepare_ctx": None}
+                    )
+                    prepare_dir.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

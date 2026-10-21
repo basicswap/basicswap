@@ -596,6 +596,18 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     if prepare_module is None:
         raise ValueError("Unknown coin")
 
+    core_settings = settings["chainclients"][coin]
+    for user_key, password_key in (
+        ("rpcuser", "rpcpassword"),
+        ("walletrpcuser", "walletrpcpassword"),
+    ):
+        if core_settings.get(user_key, "") != "" and not core_settings.get(
+            password_key, ""
+        ):
+            exitWithError(
+                f"The {coin} {user_key} is set but its {password_key} is empty"
+            )
+
     prepare_module.prepareDataDir(
         extra_opts["prepare_ctx"], settings, chain, extra_opts
     )
