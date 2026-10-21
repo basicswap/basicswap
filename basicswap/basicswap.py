@@ -1910,7 +1910,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return
 
             latest_tag = tags_data[0].get("name", "").lstrip("v")
-            if not latest_tag:
+            if not all(p.isascii() and p.isdigit() for p in latest_tag.split(".")):
                 self.log.warning("Could not determine latest version from GitHub tags")
                 return
 
