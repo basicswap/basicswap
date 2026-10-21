@@ -1350,6 +1350,26 @@ class Test(unittest.TestCase):
         assert "timed out after 120 seconds" in logs.output[-1]
         assert not any("00ff" in line for line in logs.output)
 
+    def test_prepare_read_secret(self):
+        import io
+        from unittest import mock
+        from basicswap.bin.prepare import readSecret
+
+        with mock.patch("sys.stdin", io.StringIO("word1 word2\n")):
+            assert readSecret("Particl mnemonic: ") == "word1 word2"
+        tty = mock.Mock(isatty=lambda: True)
+        with (
+            mock.patch("sys.stdin", tty),
+            mock.patch("getpass.getpass", side_effect=["pwd", "pwd"]),
+        ):
+            assert readSecret("Password: ", confirm=True) == "pwd"
+        with (
+            mock.patch("sys.stdin", tty),
+            mock.patch("getpass.getpass", side_effect=["pwd", "other"]),
+        ):
+            with self.assertRaises(SystemExit):
+                readSecret("Password: ", confirm=True)
+
     def test_is_public_url(self):
         # Non-http(s) schemes and internal hosts must be rejected; a public IP
         # literal (resolves to itself, no DNS needed) must be accepted.

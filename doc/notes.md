@@ -66,7 +66,7 @@ the host's 127.0.0.1 only), never expose them to the internet or any network you
 fully trust, and use an ssh tunnel (below) to reach a node on another machine.
 
 If you host it on another interface anyway, on a network you trust, set a UI password
-first with `basicswap-prepare --client-auth-password=...`.  It can be configured to
+first with `basicswap-prepare --client-auth-password`.  It can be configured to
 host on an external interface:
 
 If not using docker by changing 'htmlhost' and 'wshost' in basicswap.json

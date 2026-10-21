@@ -11,4 +11,4 @@ To import a wallet created on DASH v20 use basicswap-prepare with the --dashv20c
 
 Example:
 
-    basicswap-prepare --withcoins=dash --particl_mnemonic="..." --dashv20compatible
+    basicswap-prepare --withcoins=dash --particl_mnemonic --dashv20compatible

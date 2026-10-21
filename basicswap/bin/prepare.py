@@ -258,6 +258,16 @@ default_socket_timeout = socket.getdefaulttimeout()
 default_socket_getaddrinfo = socket.getaddrinfo
 
 
+def readSecret(prompt: str, confirm: bool = False) -> str:
+    # getpass reads the terminal even when stdin is redirected
+    if not sys.stdin.isatty():
+        return sys.stdin.readline().rstrip("\r\n")
+    value = getpass.getpass(prompt)
+    if confirm and getpass.getpass("Repeat " + prompt[0].lower() + prompt[1:]) != value:
+        exitWithError("The entries do not match")
+    return value
+
+
 def shouldManageDaemon(prefix: str) -> bool:
     """
     If the user sets a COIN _RPC_HOST or PORT variable, set manage_daemon for COIN to false.
@@ -772,6 +782,9 @@ def printHelp():
         + '                         "auto" to create a wallet automatically - No mnemonic.'
         + '                         "none" to disable wallet initialisation.'
     )
+    print(
+        "--particl_mnemonic       Prompt for the recovery phrase, or read it from stdin when that isn't a terminal."
+    )
     print("--withcoin=              Prepare system to run daemon for coin.")
     print("--withoutcoin=           Do not prepare system to run daemon for coin.")
     print("--addcoin=               Add coin to existing setup.")
@@ -850,6 +863,9 @@ def printHelp():
         "--dashv20compatible      Generate the same DASH wallet seed as for DASH v20 - Use only when importing an existing seed."
     )
     print("--client-auth-password=  Set or update the password to protect the web UI.")
+    print(
+        "--client-auth-password   Prompt for the web UI password, or read it from stdin when that isn't a terminal."
+    )
     print("--disable-client-auth    Remove password protection from the web UI.")
     print(
         "--light                  Use light wallet mode (Electrum) for all supported coins."
@@ -1438,6 +1454,10 @@ def main():
                 continue
             if name == "particl_mnemonic":
                 particl_wallet_mnemonic = s[1].strip('"')
+                if particl_wallet_mnemonic not in ("auto", "none"):
+                    logger.warning(
+                        "The mnemonic is visible in the process list, pass --particl_mnemonic alone to be prompted for it."
+                    )
                 continue
             if name in ("withcoin", "withcoins"):
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
@@ -1504,6 +1524,9 @@ def main():
                 continue
             if name == "client-auth-password":
                 client_auth_pwd_value = s[1].strip('"')
+                logger.warning(
+                    "The password is visible in the process list, pass --client-auth-password alone to be prompted for it."
+                )
                 continue
 
         if name == "disable-client-auth":
@@ -1511,6 +1534,16 @@ def main():
             continue
         if name == "light":
             light_mode = True
+            continue
+        if name == "particl_mnemonic":
+            particl_wallet_mnemonic = readSecret("Particl mnemonic: ").strip()
+            if particl_wallet_mnemonic == "":
+                exitWithError("No mnemonic entered")
+            continue
+        if name == "client-auth-password":
+            client_auth_pwd_value = readSecret("Client auth password: ", confirm=True)
+            if client_auth_pwd_value == "":
+                exitWithError("No password entered")
             continue
         if name.endswith("-mode") and len(s) == 2:
             coin_prefix = name[:-5]
