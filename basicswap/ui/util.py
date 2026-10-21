@@ -436,18 +436,19 @@ def describeBid(
                         "txid": bid.xmr_a_lock_spend_tx.txid.hex(),
                     }
                 )
+            chain_b_height = swap_client.coin_clients[ci_follower.coin_type()][
+                "chain_height"
+            ]
+            # XMR-based chain heights count blocks, so the difference is the depth
+            chain_b_offset: int = (
+                0 if ci_follower.coin_type() in swap_client.xmr_based_coins else 1
+            )
             if bid.xmr_b_lock_tx:
                 confirms = None
-                if (
-                    swap_client.coin_clients[ci_follower.coin_type()]["chain_height"]
-                    and bid.xmr_b_lock_tx.chain_height
-                ):
+                if chain_b_height and bid.xmr_b_lock_tx.chain_height:
                     confirms = (
-                        swap_client.coin_clients[ci_follower.coin_type()][
-                            "chain_height"
-                        ]
-                        - bid.xmr_b_lock_tx.chain_height
-                    ) + 1
+                        chain_b_height - bid.xmr_b_lock_tx.chain_height + chain_b_offset
+                    )
                 txns.append(
                     {
                         "type": "Chain B Lock",
@@ -458,11 +459,8 @@ def describeBid(
             if bid.xmr_b_lock_tx and bid.xmr_b_lock_tx.spend_txid:
                 confirms = None
                 spend_tx = bid.getTxnByTxid(bid.xmr_b_lock_tx.spend_txid)
-                chain_height = swap_client.coin_clients[ci_follower.coin_type()][
-                    "chain_height"
-                ]
-                if chain_height and spend_tx and spend_tx.chain_height:
-                    confirms = (chain_height - spend_tx.chain_height) + 1
+                if chain_b_height and spend_tx and spend_tx.chain_height:
+                    confirms = chain_b_height - spend_tx.chain_height + chain_b_offset
                 txns.append(
                     {
                         "type": "Chain B Lock Spend",
