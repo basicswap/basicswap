@@ -1296,10 +1296,18 @@ class BSXNetwork:
         if portal_data.network_type_from != network_received_on:
             raise RuntimeError("Network from must match network received on.")
         smsg_difficulty: int = portal_data.smsg_difficulty
+        min_target: int = uint256_from_compact(MAX_PORTAL_SMSG_DIFFICULTY)
+        if self._have_smsg_rpc:
+            # Stakers can raise the smsg difficulty past the fixed cap
+            min_target = min(
+                min_target,
+                uint256_from_compact(self.callrpc("smsggetdifficulty", [-1, True])),
+            )
         # uint256_from_compact can't decode exponents below 3, all far too hard
-        if smsg_difficulty >> 24 < 3 or uint256_from_compact(
-            smsg_difficulty
-        ) < uint256_from_compact(MAX_PORTAL_SMSG_DIFFICULTY):
+        if (
+            smsg_difficulty >> 24 < 3
+            or uint256_from_compact(smsg_difficulty) < min_target
+        ):
             self.log.debug(
                 f"Ignoring portal, smsg difficulty {smsg_difficulty:x} is too high."
             )

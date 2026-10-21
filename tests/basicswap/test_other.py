@@ -1976,6 +1976,7 @@ class Test(unittest.TestCase):
         sc.known_portals = {}
         sc._portal_time_valid = 30 * 60
         sc._max_known_portals = 20
+        sc._have_smsg_rpc = False
 
         cursor = sc.openDB()
         try:
