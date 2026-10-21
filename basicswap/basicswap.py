@@ -15667,12 +15667,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.log.warning(
                                 f"checkBidState {self.log.id(bid_id)} {ex}."
                             )
-                            self.logBidEvent(
-                                bid_id,
-                                EventLogTypes.SYSTEM_WARNING,
-                                "No connection to daemon",
-                                cursor=None,
-                            )
+                            if not isinstance(ex, ChainNotSyncedError):
+                                self.logBidEvent(
+                                    bid_id,
+                                    EventLogTypes.SYSTEM_WARNING,
+                                    "No connection to daemon",
+                                    cursor=None,
+                                )
                         else:
                             self.log.error(f"checkBidState {self.log.id(bid_id)} {ex}.")
                             self.setBidError(bid, str(ex))
