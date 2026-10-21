@@ -94,7 +94,7 @@ def checkPARTZmqConfigBeforeStart(part_settings, swap_settings):
         logger.debug(f"Error checking PART ZMQ config: {e}")
 
 
-SECRET_ARG_NAMES = ("hdseed", "pass", "password", "rpcpassword", "daemon-login")
+SECRET_ARG_NAMES = ("hdseed", "pass", "daemon-login")
 
 
 def redactArgs(args) -> str:
