@@ -3530,6 +3530,53 @@ class Test(unittest.TestCase):
                     )
                     prepare_dir.assert_called_once()
 
+    def test_prepare_fails_when_wallet_not_encrypted(self):
+        from unittest import mock
+        import basicswap.bin.prepare as prepare
+
+        seed_module = mock.Mock(provides_master_key=True, creates_wallet=False)
+        seed_module.startsInitDaemon.return_value = False
+        coin_module = mock.Mock(provides_master_key=False, creates_wallet=False)
+        coin_module.startsInitDaemon.return_value = False
+        coin_module.needsPostInitPasswordChange.return_value = True
+        coin_module.getPostInitWarning.return_value = None
+        modules = {"particl": seed_module, "monero": coin_module}
+        coin_ids = {"particl": Coins.PART, "monero": Coins.XMR}
+        settings = {"chainclients": {"particl": {}, "monero": {}}}
+
+        for is_encrypted, refused in (
+            (mock.Mock(return_value=True), False),
+            (mock.Mock(return_value=False), True),
+            (mock.Mock(side_effect=ValueError("rpc error")), True),
+            (None, True),
+        ):
+            ci = mock.Mock()
+            ci.changeWalletPassword.side_effect = ValueError("rpc error")
+            if is_encrypted is None:
+                del ci.isWalletEncrypted
+            else:
+                ci.isWalletEncrypted = is_encrypted
+            swap_client = mock.Mock(xmr_based_coins=(Coins.XMR,))
+            swap_client.getCoinIdFromName.side_effect = coin_ids.get
+            swap_client.ci.return_value = ci
+            with (
+                mock.patch.object(prepare, "BasicSwap", return_value=swap_client),
+                mock.patch.object(prepare, "WALLET_ENCRYPTION_PWD", "test.123"),
+                mock.patch.dict(prepare.coin_prepare_modules, modules, clear=True),
+            ):
+                args = (None, ["monero"], "", settings, "regtest", False)
+                extra_opts = {"prepare_ctx": mock.Mock()}
+                if refused:
+                    with self.assertRaisesRegex(
+                        ValueError, "Failed to encrypt wallet for Monero"
+                    ):
+                        prepare.initialise_wallets(*args, extra_opts=extra_opts)
+                else:
+                    prepare.initialise_wallets(*args, extra_opts=extra_opts)
+            ci.changeWalletPassword.assert_called_once_with(
+                "", "test.123", check_seed_if_encrypt=False
+            )
+
     def test_entry_points_set_private_umask(self):
         import importlib.util
         from unittest import mock

@@ -941,6 +941,7 @@ def initialise_wallets(
     extended_keys = {}
 
     coins_failed_to_initialise = []
+    coins_failed_to_encrypt = []
 
     try:
         swap_client = BasicSwap(data_dir, settings, chain, transient_instance=True)
@@ -1050,12 +1051,20 @@ def initialise_wallets(
             except Exception as e:
                 coins_failed_to_initialise.append((coin_name, c, e))
             if WALLET_ENCRYPTION_PWD != "" and module.needsPostInitPasswordChange():
+                ci = swap_client.ci(c)
                 try:
-                    swap_client.ci(c).changeWalletPassword(
+                    ci.changeWalletPassword(
                         "", WALLET_ENCRYPTION_PWD, check_seed_if_encrypt=False
                     )
-                except Exception as e:  # noqa: F841
+                except Exception as e:
                     logger.warning(f"changeWalletPassword failed for {coin_name}.")
+                    # An earlier run may have encrypted the wallet
+                    try:
+                        encrypted = ci.isWalletEncrypted()
+                    except Exception:
+                        encrypted = False
+                    if not encrypted:
+                        coins_failed_to_encrypt.append((c, e))
 
         zprv_prefix = 0x04B2430C if chain == "mainnet" else 0x045F18BC
         for coin_name in with_coins:
@@ -1092,6 +1101,8 @@ def initialise_wallets(
             )
         else:
             raise ValueError(f"Failed to initialise wallet for {getCoinName(c)}: {e}")
+    for c, e in coins_failed_to_encrypt:
+        raise ValueError(f"Failed to encrypt wallet for {getCoinName(c)}: {e}")
 
     for coin_name in with_coins:
         warning = coin_prepare_modules[coin_name].getPostInitWarning(prepare_ctx)
