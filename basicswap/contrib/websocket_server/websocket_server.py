@@ -7,10 +7,9 @@ import ssl
 from base64 import b64encode
 from hashlib import sha1
 import logging
-from socket import error as SocketError
+from socket import SHUT_RDWR, error as SocketError
 import errno
 import threading
-import time
 from socketserver import ThreadingMixIn, TCPServer, StreamRequestHandler
 
 from .thread import WebsocketServerThread
@@ -290,6 +289,7 @@ class WebSocketHandler(StreamRequestHandler):
         assert not hasattr(self, "_send_lock"), "_send_lock already exists"
         self._send_lock = threading.Lock()
         if server.key and server.cert:
+            # The TLS handshake applies the timeout to the whole handshake
             socket.settimeout(HANDSHAKE_TIMEOUT)
             try:
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -303,7 +303,24 @@ class WebSocketHandler(StreamRequestHandler):
                 # Continuing unwrapped would speak plaintext on a TLS port.
                 logger.debug(f"TLS handshake failed from {addr}: {e}")
                 return
+        self._start_handshake_timer(socket)
         StreamRequestHandler.__init__(self, socket, addr, server)
+
+    def _start_handshake_timer(self, sock):
+        # Socket timeouts restart on every byte, so a trickled HTTP handshake
+        # is bounded by shutting the socket down instead.
+        self._handshake_timer = threading.Timer(
+            HANDSHAKE_TIMEOUT, self._drop_slow_handshake, args=(sock,)
+        )
+        self._handshake_timer.daemon = True
+        self._handshake_timer.start()
+
+    @staticmethod
+    def _drop_slow_handshake(sock):
+        try:
+            sock.shutdown(SHUT_RDWR)
+        except OSError:
+            pass
 
     def setup(self):
         StreamRequestHandler.setup(self)
@@ -490,13 +507,14 @@ class WebSocketHandler(StreamRequestHandler):
 
     def _read_handshake_line(self):
         self._handshake_lines += 1
-        remaining = self._handshake_deadline - time.monotonic()
-        if self._handshake_lines > MAX_HANDSHAKE_LINES or remaining <= 0:
+        if self._handshake_lines > MAX_HANDSHAKE_LINES:
             return None
         try:
-            self.connection.settimeout(remaining)
             line = self.rfile.readline(4096)
         except OSError:
+            return None
+        # End of stream, or a line too long to finish
+        if not line.endswith(b"\n"):
             return None
         self._handshake_bytes += len(line)
         if self._handshake_bytes > MAX_HANDSHAKE_BYTES:
@@ -505,7 +523,6 @@ class WebSocketHandler(StreamRequestHandler):
 
     def read_http_headers(self):
         headers = {}
-        self._handshake_deadline = time.monotonic() + HANDSHAKE_TIMEOUT
         self._handshake_lines = 0
         self._handshake_bytes = 0
         # first line should be HTTP GET
@@ -525,19 +542,20 @@ class WebSocketHandler(StreamRequestHandler):
             if not sep:
                 continue
             headers[head.lower().strip()] = value.strip()
-        self.connection.settimeout(self.timeout)
         return headers
 
     def handshake(self):
         with self.server._handshake_lock:
             limit = self.server.max_pending_handshakes
             if limit is not None and self.server._pending_handshakes >= limit:
+                self._handshake_timer.cancel()
                 self.keep_alive = False
                 return
             self.server._pending_handshakes += 1
         try:
             headers = self.read_http_headers()
         finally:
+            self._handshake_timer.cancel()
             with self.server._handshake_lock:
                 self.server._pending_handshakes -= 1
         if headers is None:

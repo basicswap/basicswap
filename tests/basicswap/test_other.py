@@ -1533,6 +1533,7 @@ class Test(unittest.TestCase):
 
         def make_handler(data: bytes):
             handler = WebSocketHandler.__new__(WebSocketHandler)
+            handler._handshake_timer = threading.Timer(1000, lambda: None)
             handler.rfile = io.BytesIO(data)
             handler.connection = Connection()
             handler.server = Server()
@@ -1572,6 +1573,7 @@ class Test(unittest.TestCase):
             handler.request = handler.connection = sock
             handler.rfile = sock.makefile("rb")
             handler.timeout = 1000
+            handler._start_handshake_timer(sock)
             peer.sendall(data)
             return handler, peer
 
@@ -1593,10 +1595,22 @@ class Test(unittest.TestCase):
             peer.close()
 
         with mock.patch.object(ws, "HANDSHAKE_TIMEOUT", 0.2):
-            handler, peer = handler_for(b"GET / HTTP/1.1\r\nHost: localhost\r\n")
+            handler, peer = handler_for(b"GET / HTTP/1.1\r\nHost: localhost\r\nX: ")
+            stop = threading.Event()
+
+            def trickle():
+                while not stop.is_set():
+                    try:
+                        peer.sendall(b"y")
+                    except OSError:
+                        return
+                    time.sleep(0.05)
+
+            threading.Thread(target=trickle, daemon=True).start()
             start = time.monotonic()
             assert handler.read_http_headers() is None
             assert time.monotonic() - start < 2
+            stop.set()
             peer.close()
 
         class Srv:
