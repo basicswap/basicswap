@@ -219,7 +219,7 @@ PROTOCOL_VERSION_SPLIT_PARENT = 7
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
 
-SMSG_TIME_LEEWAY = 24
+MSG_TIME_LEEWAY = 2 * 60
 
 
 def validOfferStateToReceiveBid(offer_state):
@@ -15503,7 +15503,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.log.warning(f"processMsg unknown network: {network_type}")
             if (
                 network_type != "smsg"
-                and msg["sent"] > self.getTime() + SMSG_TIME_LEEWAY
+                and msg["sent"] > self.getTime() + MSG_TIME_LEEWAY
             ):
                 self.log.warning(
                     f"Ignoring message {self.log.id(msg['msgid'])} sent in the future."

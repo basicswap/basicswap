@@ -2459,7 +2459,7 @@ class TestSmsgReplayGates(BasicSwapFixture):
             "msg_net": "nostr",
         }
         with mock.patch.object(self.sc, "processOffer") as process_offer:
-            self.sc.processMsg(dict(msg, sent=now + 60))
+            self.sc.processMsg(dict(msg, sent=now + 3 * 60))
             process_offer.assert_not_called()
             self.sc.processMsg(dict(msg, sent=now))
             process_offer.assert_called_once()
