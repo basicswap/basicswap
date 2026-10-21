@@ -5,6 +5,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import http.client
 import json
 import logging
 import os
@@ -35,6 +36,7 @@ from .util import (
     TemporaryError,
 )
 from .util.network import (
+    is_public_ip_address,
     is_public_url,
     is_url_scheme_allowed,
 )
@@ -61,6 +63,60 @@ class PublicOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
                 newurl, code, "Redirect to non-public address blocked", headers, fp
             )
         return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def create_public_connection(address, timeout, source_address=None):
+    # Connects to the addresses vetted here, not to a second DNS answer.
+    host, port = address
+    addrinfo = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    if not addrinfo or not all(
+        is_public_ip_address(sockaddr[0]) for *_, sockaddr in addrinfo
+    ):
+        raise ValueError("URL host not permitted.")
+    err = None
+    for *_, sockaddr in addrinfo:
+        try:
+            return socket.create_connection(sockaddr[:2], timeout, source_address)
+        except OSError as e:
+            err = e
+    raise err
+
+
+class PublicHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_connection = create_public_connection
+
+
+class PublicHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_connection = create_public_connection
+
+
+class PublicHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(PublicHTTPConnection, req)
+
+
+class PublicHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(PublicHTTPSConnection, req, context=self._context)
+
+
+READ_URL_MAX_BYTES = 10 * 1024 * 1024
+READ_URL_MAX_SECONDS = 120
+
+
+def read_response(response, max_bytes: int, deadline: float) -> bytes:
+    data = bytearray()
+    while chunk := response.read1(65536):
+        data += chunk
+        if len(data) > max_bytes:
+            raise ValueError("URL response too large.")
+        if time.monotonic() > deadline:
+            raise TimeoutError("URL read timed out.")
+    return bytes(data)
 
 
 class BaseApp(DBMethods):
@@ -369,10 +425,16 @@ class BaseApp(DBMethods):
         socket.setdefaulttimeout(self.default_socket_timeout)
 
     def readURL(
-        self, url: str, timeout: int = 120, headers={}, check_public: bool = False
+        self,
+        url: str,
+        timeout: int = 120,
+        headers={},
+        check_public: bool = False,
+        max_bytes: int = READ_URL_MAX_BYTES,
     ) -> bytes:
         if not is_url_scheme_allowed(url):
             raise ValueError("Unsupported URL scheme.")
+        deadline = time.monotonic() + READ_URL_MAX_SECONDS
         open_handler = None
         if self.use_tor_proxy:
             open_handler = SocksiPyHandler(
@@ -383,11 +445,16 @@ class BaseApp(DBMethods):
         build_args = [open_handler] if self.use_tor_proxy else []
         if check_public and not self.use_tor_proxy:
             build_args.append(PublicOnlyRedirectHandler())
+            # An HTTP(S) proxy resolves the host itself, so only a direct
+            # connection can be bound to the vetted address.
+            if not {"http", "https"} & urllib.request.getproxies().keys():
+                build_args += [PublicHTTPHandler(), PublicHTTPSHandler()]
         opener = urllib.request.build_opener(*build_args)
         if headers is None:
             opener.addheaders = [("User-agent", "Mozilla/5.0")]
         request = urllib.request.Request(url, headers=headers)
-        return opener.open(request, timeout=timeout).read()
+        with opener.open(request, timeout=timeout) as response:
+            return read_response(response, max_bytes, deadline)
 
     def logException(self, message: str) -> None:
         self.log.error(message)

@@ -1321,10 +1321,109 @@ class Test(unittest.TestCase):
             ("http://10.0.0.5", False),
             ("http://192.168.1.1/", False),
             ("https://[::1]/", False),
+            ("http://100.64.0.1", False),
+            ("http://224.0.0.1", False),
+            ("http://[ff02::1]/", False),
+            ("http://[::ffff:10.0.0.5]/", False),
             ("https://8.8.8.8", True),
         ]
         for url, is_public in test_urls:
             assert is_public_url(url) is is_public
+
+    def test_read_url_limits(self):
+        import http.server
+        import time
+        from types import SimpleNamespace
+        from unittest import mock
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.end_headers()
+                try:
+                    if self.path == "/big":
+                        self.wfile.write(b"x" * 2048)
+                        return
+                    for _ in range(20):
+                        self.wfile.write(b"x")
+                        self.wfile.flush()
+                        time.sleep(0.1)
+                except OSError:
+                    pass
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        app = SimpleNamespace(use_tor_proxy=False)
+        try:
+            assert BaseApp.readURL(app, url + "/big", max_bytes=2048) == b"x" * 2048
+            with self.assertRaises(ValueError):
+                BaseApp.readURL(app, url + "/big", max_bytes=1024)
+            with mock.patch("basicswap.base.READ_URL_MAX_SECONDS", 0.5):
+                with self.assertRaises(TimeoutError):
+                    BaseApp.readURL(app, url + "/slow")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_read_url_pinned(self):
+        import http.server
+        import socket
+        from types import SimpleNamespace
+        from unittest import mock
+
+        hosts = []
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                hosts.append(self.headers["Host"])
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"ok")
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        port = server.server_address[1]
+        real_getaddrinfo = socket.getaddrinfo
+
+        def getaddrinfo(host, *args, **kwargs):
+            if host == "rebind.example":
+                host = "127.0.0.1"
+            return real_getaddrinfo(host, *args, **kwargs)
+
+        url = f"http://rebind.example:{port}/"
+        app = SimpleNamespace(use_tor_proxy=False)
+        try:
+            with (
+                mock.patch("socket.getaddrinfo", getaddrinfo),
+                mock.patch("urllib.request.getproxies", return_value={}),
+            ):
+                with self.assertRaises(ValueError):
+                    BaseApp.readURL(app, url, check_public=True)
+                assert hosts == []
+                with mock.patch(
+                    "basicswap.base.is_public_ip_address", return_value=True
+                ):
+                    assert BaseApp.readURL(app, url, check_public=True) == b"ok"
+                assert hosts == [f"rebind.example:{port}"]
+            with mock.patch(
+                "urllib.request.getproxies",
+                return_value={"http": f"http://127.0.0.1:{port}"},
+            ):
+                assert (
+                    BaseApp.readURL(app, "http://rebind.example/", check_public=True)
+                    == b"ok"
+                )
+            assert hosts[-1] == "rebind.example"
+        finally:
+            server.shutdown()
+            server.server_close()
 
     def test_normalize_allowed_hosts(self):
         from basicswap.util.network import normalize_allowed_hosts
