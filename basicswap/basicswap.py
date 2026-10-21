@@ -15501,7 +15501,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pass  # Counted when parsed
             else:
                 self.log.warning(f"processMsg unknown network: {network_type}")
-            if msg["sent"] > self.getTime() + SMSG_TIME_LEEWAY:
+            if (
+                network_type != "smsg"
+                and msg["sent"] > self.getTime() + SMSG_TIME_LEEWAY
+            ):
                 self.log.warning(
                     f"Ignoring message {self.log.id(msg['msgid'])} sent in the future."
                 )
