@@ -18,6 +18,7 @@ import shutil
 import signal
 import socket
 import socks
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -873,6 +874,10 @@ def finalise_daemon(d):
         for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
             if fp:
                 fp.close()
+    except subprocess.TimeoutExpired as e:
+        logging.info(
+            f"Error stopping {d.name}, process {d.handle.pid}: timed out after {e.timeout} seconds"
+        )
     except Exception as e:
         logging.info(f"Error stopping {d.name}, process {d.handle.pid}: {e}")
 

@@ -1309,6 +1309,47 @@ class Test(unittest.TestCase):
         for url, allowed in test_urls:
             assert is_url_scheme_allowed(url) is allowed
 
+    def test_redact_secrets_for_logs(self):
+        from basicswap.bin.run import redactArgs
+        from basicswap.rpc import redact_url
+
+        args = [
+            "/bin/firod",
+            "-datadir=/data/firo",
+            "-hdseed=00ff",
+            '--pass="pwd"',
+            "--daemon-login",
+            "user:pwd",
+            "--trusted-daemon",
+        ]
+        assert redactArgs(args) == (
+            "/bin/firod -datadir=/data/firo -hdseed=*** --pass=*** "
+            "--daemon-login *** --trusted-daemon"
+        )
+        assert (
+            redact_url("http://user:pwd@127.0.0.1:19792/wallet/w")
+            == "http://127.0.0.1:19792/wallet/w"
+        )
+        assert redact_url("http://127.0.0.1:19792/") == "http://127.0.0.1:19792/"
+        assert (
+            redact_url("http://user:p/w?x#y@z@127.0.0.1:19792/")
+            == "http://127.0.0.1:19792/"
+        )
+
+    def test_prepare_stop_timeout_hides_args(self):
+        import subprocess
+        from types import SimpleNamespace
+        from basicswap.bin.prepare import finalise_daemon
+
+        def wait(timeout):
+            raise subprocess.TimeoutExpired(["firod", "-hdseed=00ff"], timeout)
+
+        handle = SimpleNamespace(pid=1, send_signal=lambda sig: None, wait=wait)
+        with self.assertLogs(level="INFO") as logs:
+            finalise_daemon(SimpleNamespace(name="firod", handle=handle, files=[]))
+        assert "timed out after 120 seconds" in logs.output[-1]
+        assert not any("00ff" in line for line in logs.output)
+
     def test_is_public_url(self):
         # Non-http(s) schemes and internal hosts must be rejected; a public IP
         # literal (resolves to itself, no DNS needed) must be accepted.

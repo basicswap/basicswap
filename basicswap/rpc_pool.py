@@ -7,7 +7,7 @@
 import queue
 import threading
 import time
-from basicswap.rpc import Jsonrpc
+from basicswap.rpc import Jsonrpc, redact_url
 
 
 class RPCConnectionPool:
@@ -73,7 +73,7 @@ class RPCConnectionPool:
         except queue.Empty:
             if self.logger:
                 self.logger.warning(
-                    f"RPC pool: timeout waiting for connection, creating temporary connection for {self.url}"
+                    f"RPC pool: timeout waiting for connection, creating temporary connection for {redact_url(self.url)}"
                 )
             return Jsonrpc(self.url)
 

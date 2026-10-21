@@ -1534,7 +1534,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 t.start()
 
         self.log.debug(
-            f"network_key {self.network_key}\nnetwork_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"
+            f"network_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"
         )
 
         self.startNetworks()
