@@ -14,6 +14,8 @@ import logging
 import os
 import random
 import secrets
+import tarfile
+import tempfile
 import threading
 import unittest
 
@@ -53,6 +55,7 @@ from basicswap.util_xmr import (
     encode_address as xmr_encode_address,
 )
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.btc.core import checkTarMembers
 from basicswap.interface.nmc.nmc import NMCInterface
 from basicswap.interface.bch.bch import BCHInterface
 from basicswap.interface.bch.contrib.cashaddress import Address
@@ -3784,6 +3787,67 @@ class Test(unittest.TestCase):
             )
         finally:
             sc.closeDB(cursor)
+
+    def test_fastsync_tar_members(self):
+        def makeTar(*members):
+            buf = BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as ft:
+                for name, member_type, linkname, *mode in members:
+                    info = tarfile.TarInfo(name)
+                    info.type = member_type
+                    info.mode = mode[0] if mode else 0o755
+                    info.linkname = linkname
+                    data = b"x" if member_type == tarfile.REGTYPE else b""
+                    info.size = len(data)
+                    ft.addfile(info, BytesIO(data))
+            buf.seek(0)
+            return tarfile.open(fileobj=buf)
+
+        unfiltered = (
+            {"filter": "fully_trusted"} if hasattr(tarfile, "data_filter") else {}
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data_dir = os.path.join(tmp_dir, "bitcoin")
+            os.makedirs(data_dir)
+            with makeTar(
+                ("blocks", tarfile.DIRTYPE, ""),
+                ("blocks/blk00000.dat", tarfile.REGTYPE, ""),
+                ("chainstate/link", tarfile.SYMTYPE, "../blocks/blk00000.dat"),
+                ("chainstate/hard", tarfile.LNKTYPE, "blocks/blk00000.dat"),
+                ("blocks/suid", tarfile.REGTYPE, "", 0o6777),
+                ("blocks/noperm", tarfile.REGTYPE, "", 0o000),
+                ("sticky", tarfile.DIRTYPE, "", 0o1777),
+            ) as ft:
+                ft.extractall(
+                    path=data_dir, members=checkTarMembers(ft, data_dir), **unfiltered
+                )
+            for name in ("link", "hard"):
+                with open(os.path.join(data_dir, "chainstate", name), "rb") as fp:
+                    assert fp.read() == b"x"
+            for name, mode in (
+                ("blocks/suid", 0o755),
+                ("blocks/noperm", 0o600),
+                ("sticky", 0o755),
+            ):
+                assert os.stat(os.path.join(data_dir, name)).st_mode & 0o7777 == mode
+
+            for member in (
+                ("../outside", tarfile.REGTYPE, ""),
+                (os.path.join(tmp_dir, "outside"), tarfile.REGTYPE, ""),
+                ("blocks/up", tarfile.SYMTYPE, "../../outside"),
+                ("blocks/abs", tarfile.SYMTYPE, os.path.join(tmp_dir, "outside")),
+                ("blocks/hard", tarfile.LNKTYPE, "../outside"),
+                ("blocks/fifo", tarfile.FIFOTYPE, ""),
+            ):
+                with makeTar(member) as ft:
+                    with self.assertRaises(ValueError):
+                        ft.extractall(
+                            path=data_dir,
+                            members=checkTarMembers(ft, data_dir),
+                            **unfiltered,
+                        )
+            assert os.listdir(tmp_dir) == ["bitcoin"]
+            assert not os.path.lexists(os.path.join(data_dir, "blocks", "up"))
 
 
 if __name__ == "__main__":
