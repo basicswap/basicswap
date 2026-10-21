@@ -814,7 +814,7 @@ def printHelp():
         )
     )
     print(
-        "--trustremotenode        Set trusted-daemon for XMR, defaults to auto: true when daemon rpchost value is a private ip address else false"
+        "--trustremotenode        Set trusted-daemon for XMR and WOW, default:true, =false for untrusted. --enabletor and --disabletor default to auto: true when daemon rpchost value is a private ip address else false"
     )
     print(
         "--noextractover          Prevent extracting cores if files exist.  Speeds up tests"
