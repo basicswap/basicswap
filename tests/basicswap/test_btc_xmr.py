@@ -108,7 +108,7 @@ class TestFunctions(BaseTest):
             coin_ticker: str = "PART"
             balance_type: str = "anon_balance"
             unconfirmed_name: str = "anon_pending"
-        elif coin in (Coins.NAV, Coins.PART):
+        elif coin == Coins.PART:
             # PART stakes during the tests, moving the staked output's whole
             # value out of the spendable balance until the coinstake matures.
             coin_wallet = js_wallets[coin.name]
