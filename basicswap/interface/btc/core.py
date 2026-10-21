@@ -149,7 +149,7 @@ class BTCPrepare(CoinPrepareModule):
         self.version_tag = ""
 
     def getVersionNote(self) -> str:
-        return f" ({BITCOIN_LEGACY_VERSION} for --upgradecores of a pre-30 install without -uselatest={self.name})"
+        return f" ({BITCOIN_LEGACY_VERSION} for --upgradecores of a pre-30 legacy wallet without --uselatest={self.name})"
 
     def checkWalletBeforeMigration(
         self, ctx: PrepareContext, swap_client, coin_id, core_settings: dict

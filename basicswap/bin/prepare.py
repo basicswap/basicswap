@@ -2049,7 +2049,7 @@ def main():
                 )
                 if current_version != latest_version:
                     logger.info(
-                        f"  Staying on {current_version}, use -uselatest={coin_name} to update to {latest_version} now."
+                        f"  Staying on {current_version}, use --uselatest={coin_name} to update to {latest_version} now."
                     )
                 if not BSX_UPDATE_UNMANAGED and not (
                     coin_settings.get("manage_daemon", False)

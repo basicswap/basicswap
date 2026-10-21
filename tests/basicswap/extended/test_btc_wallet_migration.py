@@ -287,7 +287,7 @@ class Test(unittest.TestCase):
         self.add_current_release(datadir, with_bins=False)
         exitcode, output = prepare(
             datadir,
-            ["--upgradecores", "-uselatest=bitcoin"],
+            ["--upgradecores", "--uselatest=bitcoin"],
             "upgrade",
             {"WALLET_ENCRYPTION_PWD": TEST_PWD},
         )
@@ -301,7 +301,7 @@ class Test(unittest.TestCase):
         )
         self.add_current_release(datadir, with_bins=False)
         exitcode, output = prepare(
-            datadir, ["--upgradecores", "-uselatest=bitcoin"], "upgrade_nopwd", {}
+            datadir, ["--upgradecores", "--uselatest=bitcoin"], "upgrade_nopwd", {}
         )
         assert exitcode != 0
         assert "Must set WALLET_ENCRYPTION_PWD" in output
@@ -312,7 +312,7 @@ class Test(unittest.TestCase):
 
         exitcode, output = prepare(
             datadir,
-            ["--upgradecores", "-uselatest=bitcoin"],
+            ["--upgradecores", "--uselatest=bitcoin"],
             "upgrade",
             {"WALLET_ENCRYPTION_PWD": TEST_PWD},
         )
