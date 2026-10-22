@@ -11106,10 +11106,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 continue
 
             if c.get("connection_type") == "electrum":
-                if (
-                    k not in self._electrum_spend_check_futures
-                    or self._electrum_spend_check_futures[k].done()
-                ):
+                if k not in self._electrum_spend_check_futures:
                     self._electrum_spend_check_futures[k] = self.thread_pool.submit(
                         self._fetchSpendsElectrum,
                         k,
