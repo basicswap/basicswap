@@ -251,6 +251,7 @@ class XMRInterface(CoinInterface):
                 pass
 
     def _openWallet(self, filename):
+        self._chain_synced_until = 0
         params = {"filename": filename}
         if self._wallet_password is not None:
             params["password"] = self._wallet_password
@@ -260,7 +261,7 @@ class XMRInterface(CoinInterface):
         except Exception as e:
             if "no connection to daemon" in str(e):
                 self._log.debug(f"{self.coin_name()} {e}")
-                return  # Bypass refresh error to allow startup with a busy daemon
+                return  # Allow startup with a busy daemon
             if any(
                 x in str(e)
                 for x in (
@@ -309,6 +310,9 @@ class XMRInterface(CoinInterface):
 
             self.rpc_wallet("open_wallet", params)
             self._log.debug(f"Attempting to open {self.coin_name()} wallet")
+
+        if self._network == "regtest":
+            self.rpc_wallet("auto_refresh", {"enable": True, "period": 1})
 
     def initialiseWallet(
         self, key_view: bytes, key_spend: bytes, restore_height=None
@@ -421,8 +425,6 @@ class XMRInterface(CoinInterface):
                 raise
 
             rv = {}
-            self.rpc_wallet("refresh")
-            self._log.debug(f"Refreshing {self.coin_name()} wallet")
             balance_info = self.rpc_wallet("get_balance")
 
             rv["wallet_blocks"] = self.rpc_wallet("get_height")["height"]
@@ -557,8 +559,8 @@ class XMRInterface(CoinInterface):
     ) -> bytes:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
+            self.rpc_wallet("refresh")
 
             Kbv = self.getPubkey(kbv)
             shared_addr: str = xmr_util.encode_address(Kbv, Kbs, self._addr_prefix)
@@ -658,8 +660,8 @@ class XMRInterface(CoinInterface):
                 self.createWallet(params)
                 self.openWallet(address_b58)
 
-            self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
+            self.rpc_wallet("refresh")
 
             """
             # Debug
@@ -783,8 +785,8 @@ class XMRInterface(CoinInterface):
                 self.createWallet(params)
                 self.openWallet(wallet_filename)
 
-            self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
+            self.rpc_wallet("refresh")
             rv = self.rpc_wallet("get_balance")
             try:
                 open_wallet_addr = self.rpc_wallet("get_address")["address"]
@@ -849,8 +851,8 @@ class XMRInterface(CoinInterface):
     ) -> str:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            self.rpc_wallet("refresh")
             self._log.debug(f"Refreshing {self.coin_name()} wallet")
+            self.rpc_wallet("refresh")
 
             if sweepall:
                 balance = self.rpc_wallet("get_balance")
@@ -930,8 +932,8 @@ class XMRInterface(CoinInterface):
                         self.createWallet(params)
                         self.openWallet(address_b58)
 
-                self.rpc_wallet("refresh")
                 self._log.debug(f"Refreshing {self.coin_name()} wallet")
+                self.rpc_wallet("refresh")
 
                 rv = self.rpc_wallet(
                     "get_transfers",
@@ -945,8 +947,8 @@ class XMRInterface(CoinInterface):
     def getSpendableBalance(self) -> int:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
-            self.rpc_wallet("refresh")
-            self._log.debug(f"Refreshing {self.coin_name()} wallet")
+            if not self.isChainSynced():
+                raise TemporaryError(f"{self.coin_name()} wallet is syncing")
 
             balance_info = self.rpc_wallet("get_balance")
             return balance_info["unlocked_balance"]
