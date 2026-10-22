@@ -579,6 +579,7 @@ def writeTorSettings(fp, coin, coin_settings, tor_control_password):
     if coin in ("decred",):
         return
 
+    fp.write(f"onion={TOR_PROXY_HOST}:{TOR_PROXY_PORT}\n")
     onionport = coin_settings["onionport"]
     fp.write(f"torpassword={tor_control_password}\n")
     fp.write(f"torcontrol={TOR_PROXY_HOST}:{TOR_CONTROL_PORT}\n")
@@ -718,7 +719,7 @@ def modify_tor_config(
     # Backup
     shutil.copyfile(config_path, config_path + ".last")
 
-    tor_settings = ("proxy=", "torpassword=", "torcontrol=", "bind=")
+    tor_settings = ("proxy=", "onion=", "torpassword=", "torcontrol=", "bind=")
     with open(config_path, "w") as fp:
         with open(config_path + ".last") as fp_in:
             # Disable tor first
