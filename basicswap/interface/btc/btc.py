@@ -5696,11 +5696,20 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
             chain_tip_height = self.getChainHeight()
             block_height: int = chain_tip_height - (confirmations - 1)
-            block_hash: bytes = bytes.fromhex(tx_info["blockhash"])
+            if (
+                self._verifyTxMerkleElectrum(backend, txid.hex(), block_height)
+                is not True
+            ):
+                return None
+            header = self._readHeaderElectrum(
+                self._headerSyncElectrum(backend), block_height
+            )
+            if header is None:
+                return None
             return {
-                "block_hash": block_hash,
+                "block_hash": bytes.fromhex(hash_header(header)),
                 "block_height": block_height,
-                "block_time": tx_info["blocktime"],
+                "block_time": header["timestamp"],
             }
         except Exception as e:
             self._log.debug(f"_findConfirmedTxnByHashElectrum failed: {e}")
