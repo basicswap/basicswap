@@ -74,6 +74,7 @@ from basicswap.chainparams import (
     coins_without_segwit,
     scriptless_coins,
 )
+from basicswap.util import toBool
 from basicswap.util.daemon import Daemon
 from basicswap.wallet_manager import WalletManager
 from basicswap.contrib.test_framework.messages import CTransaction
@@ -761,6 +762,9 @@ class Test(TestFunctions):
             "DAEMON_POLL_INTERVAL_MEMPOOL": "1000",
             "LOG_FORMAT": "%(asctime)s %(levelname)s:%(name)s:%(message)s",
         }
+        if not toBool(os.getenv("ELECTRUMX_THROTTLE", False)):
+            electrumx_env["COST_SOFT_LIMIT"] = "0"
+            electrumx_env["COST_HARD_LIMIT"] = "0"
         stdout_dest = open(f"{ELECTRUMX_DATADIR}/electrumx.log", "w")
         stderr_dest = stdout_dest
         cls.daemons.append(
