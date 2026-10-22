@@ -985,6 +985,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "electrum_port",
             "electrum_ssl",
             "electrum_poll_interval",
+            "max_electrum_servers",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -1216,6 +1217,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "electrum_clearnet_servers", None
             )
             onion_servers = self.coin_clients[coin].get("electrum_onion_servers", None)
+            max_servers = self.coin_clients[coin].get(
+                "max_electrum_servers", self.settings.get("max_electrum_servers", 2)
+            )
 
             backend = ElectrumBackend(
                 coin,
@@ -1226,6 +1230,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 proxy_host=proxy_host,
                 proxy_port=proxy_port,
                 cert_pins=self.getElectrumCertPins(),
+                max_servers=max_servers,
             )
             interface.setBackend(backend)
             ticker = interface.ticker() if hasattr(interface, "ticker") else str(coin)

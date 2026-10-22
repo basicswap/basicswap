@@ -162,6 +162,7 @@ class ElectrumBackend(WalletBackend):
         proxy_host=None,
         proxy_port=None,
         cert_pins=None,
+        max_servers: int = 1,
     ):
         from basicswap.interface.electrumx import ElectrumServer
         from basicswap.chainparams import Coins, chainparams
@@ -191,6 +192,7 @@ class ElectrumBackend(WalletBackend):
             proxy_host=proxy_host,
             proxy_port=proxy_port,
             cert_pins=cert_pins,
+            max_servers=max_servers,
         )
 
         self._realtime_callback = None

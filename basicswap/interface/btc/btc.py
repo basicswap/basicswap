@@ -18,6 +18,8 @@ import threading
 import time
 import traceback
 
+from pathlib import Path
+
 from basicswap.basicswap_util import (
     getVoutByAddress,
     getVoutByScriptPubKey,
@@ -49,9 +51,16 @@ from basicswap.util.crypto import (
     hash160,
     sha256,
 )
-from basicswap.util.merkle import (
-    check_header_pow,
-    verify_tx_merkle_proof,
+from basicswap.interface.electrum_blockchain import (
+    BlockchainManager,
+    ChainConflict,
+    ChainResolutionMode,
+    HeaderNet,
+    HeaderSync,
+    MerkleVerificationFailure,
+    hash_header,
+    is_valid_tx,
+    verify_tx_is_in_block,
 )
 from coincurve.keys import (
     PrivateKey,
@@ -345,8 +354,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._pending_utxos_lock = threading.Lock()
         self._utxo_reserve_lock = threading.RLock()
         self._merkle_verified: dict[str, int] = {}
+        self._merkle_block_hashes: dict[str, str] = {}
+        self._header_bc_mgr = None
+        self._header_syncs: dict[str, HeaderSync] = {}
+        self._header_sync_lock = threading.Lock()
         self._median_time_cache: int | None = None
-        self._median_time_cache_height: int | None = None
 
     def setBackend(self, backend) -> None:
         self._backend = backend
@@ -534,16 +546,13 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def getBlockchainInfo(self):
         if self.useBackend():
-            height = self._backend.getBlockHeight()
-            return {"blocks": height, "verificationprogress": 1.0}
+            return {"blocks": self.getChainHeight(), "verificationprogress": 1.0}
         return self.rpc("getblockchaininfo")
 
     def getChainHeight(self) -> int:
         if self.useBackend():
-            self._log.debug("getChainHeight: using backend getBlockHeight")
-            height = self._backend.getBlockHeight()
-            self._log.debug(f"getChainHeight: got height={height}")
-            return height
+            sync = self._headerSyncElectrum(self._backend)
+            return sync.bc_mgr.get_best_chain().height()
         return self.rpc("getblockcount")
 
     def getTxLocktime(self, tx_data: bytes) -> int:
@@ -567,65 +576,36 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return None
 
     def _getChainMedianTimeElectrum(self) -> int | None:
-        import struct
-
         backend = self.getBackend()
         if not backend:
             self._log.warning("getChainMedianTime: no electrum backend available")
             return None
-        try:
-            height = backend.getBlockHeight()
-            if (
-                self._median_time_cache is not None
-                and self._median_time_cache_height == height
-            ):
-                return self._median_time_cache
-            start = max(0, height - 10)
-            count = height - start + 1
-            result = backend._server.call("blockchain.block.headers", [start, count])
-            header_bytes = bytes.fromhex(result["hex"])
-            returned = min(result.get("count", count), len(header_bytes) // 80)
-            if returned < 1:
-                raise ValueError("No headers returned")
-            times = [
-                struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
-                for i in range(returned)
-            ]
-            times.sort()
-            mtp = times[len(times) // 2]
-            self._median_time_cache = mtp
-            self._median_time_cache_height = height
-            return mtp
-        except Exception as e:
-            self._log.warning(f"getChainMedianTime electrum error: {e}")
-            return None
+        return self._medianTimePastElectrum(backend, None)
 
     def _getMedianTimePastAtHeight(self, height: int) -> int | None:
         if self._connection_type != "electrum":
             return super()._getMedianTimePastAtHeight(height)
 
-        import struct
-
         backend = self.getBackend()
         if not backend:
             self._log.warning("getMedianTimePastAtHeight: no electrum backend")
             return None
-        try:
-            start = max(0, height - 10)
-            count = height - start + 1
-            result = backend._server.call("blockchain.block.headers", [start, count])
-            header_bytes = bytes.fromhex(result["hex"])
-            returned = min(result.get("count", count), len(header_bytes) // 80)
-            if returned < 1:
-                raise ValueError("No headers returned")
-            times = sorted(
-                struct.unpack("<I", header_bytes[i * 80 + 68 : i * 80 + 72])[0]
-                for i in range(returned)
-            )
-            return times[len(times) // 2]
-        except Exception as e:
-            self._log.warning(f"getMedianTimePastAtHeight electrum error: {e}")
+        return self._medianTimePastElectrum(backend, height)
+
+    def _medianTimePastElectrum(self, backend, height: int | None) -> int | None:
+        sync = self._headerSyncElectrum(backend)
+        if height is None:
+            height = sync.bc_mgr.get_best_chain().height()
+        if height < 0:
             return None
+        times = []
+        for h in range(max(0, height - 10), height + 1):
+            header = self._readHeaderElectrum(sync, h)
+            if header is None:
+                return None
+            times.append(header["timestamp"])
+        times.sort()
+        return times[len(times) // 2]
 
     def isCsvLockMature(
         self,
@@ -702,28 +682,34 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if not backend:
             raise ValueError("No electrum backend available")
 
-        import struct
-
-        header_hex = backend._server.call("blockchain.block.header", [height])
-        header_bytes = bytes.fromhex(header_hex)
-        block_time = struct.unpack("<I", header_bytes[68:72])[0]
-        block_hash = sha256(sha256(header_bytes))[::-1].hex()
-        return {"height": height, "hash": block_hash, "time": block_time}
-
-    @staticmethod
-    def _checkHeaderPoW(header_bytes: bytes) -> bool:
-        return check_header_pow(header_bytes)
+        header = self._readHeaderElectrum(self._headerSyncElectrum(backend), height)
+        if header is None:
+            raise ValueError(f"No verified header at height {height}")
+        return {
+            "height": height,
+            "hash": hash_header(header),
+            "time": header["timestamp"],
+        }
 
     def _verifyTxMerkleElectrum(
         self, backend, txid_hex: str, block_height: int
     ) -> bool | None:
         # True: proof verified. False: server returned a proof that does not
-        # match the header (or header PoW is invalid) - fail closed.
+        # match the header - fail closed.
         # None: could not fetch a proof (transient error or stale height) -
         # treat as unverified but do not cache the result.
         if block_height <= 0:
             return None
-        if self._merkle_verified.get(txid_hex) == block_height:
+        header = self._readHeaderElectrum(
+            self._headerSyncElectrum(backend), block_height
+        )
+        if header is None:
+            return None
+        block_hash = hash_header(header)
+        if (
+            self._merkle_verified.get(txid_hex) == block_height
+            and self._merkle_block_hashes.get(txid_hex) == block_hash
+        ):
             return True
         try:
             proof = backend._server.get_merkle(txid_hex, block_height)
@@ -732,27 +718,154 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     f"Merkle proof missing for {self._log.id(txid_hex)} at height {block_height}"
                 )
                 return None
-            header_hex = backend._server.call("blockchain.block.header", [block_height])
-            header_bytes = bytes.fromhex(header_hex)
-            if not self._checkHeaderPoW(header_bytes):
-                self._log.error(
-                    f"Block header PoW invalid at height {block_height} for {self._log.id(txid_hex)}"
+            if proof.get("block_height", block_height) != block_height:
+                self._log.debug(
+                    f"Merkle proof for {self._log.id(txid_hex)} is at height {proof.get('block_height')}, not {block_height}"
                 )
-                return False
-            if not verify_tx_merkle_proof(
-                txid_hex, header_bytes, proof["merkle"], proof["pos"]
-            ):
-                self._log.error(
-                    f"Merkle proof mismatch for {self._log.id(txid_hex)} at height {block_height}"
-                )
-                return False
+                return None
+            verify_tx_is_in_block(
+                txid_hex,
+                proof["merkle"],
+                proof["pos"],
+                header,
+                block_height,
+                self._isValidTxBytes,
+            )
+        except MerkleVerificationFailure as e:
+            self._log.error(
+                f"Merkle verification failed for {self._log.id(txid_hex)} at height {block_height}: {e}"
+            )
+            backend._server.failover(str(e))
+            return False
         except Exception as e:
             self._log.debug(
                 f"Merkle verification could not complete for {self._log.id(txid_hex)} at height {block_height}: {e}"
             )
             return None
         self._merkle_verified[txid_hex] = block_height
+        self._merkle_block_hashes[txid_hex] = block_hash
         return True
+
+    def _electrumCheckpointsDir(self) -> str:
+        return os.path.join(os.path.dirname(__file__), "checkpoints")
+
+    def _electrumCheckpoints(self) -> list:
+        path = os.path.join(self._electrumCheckpointsDir(), f"{self._network}.json")
+        if not os.path.exists(path):
+            return []
+        with open(path) as fp:
+            return json.load(fp)
+
+    def _electrumHeaderNet(self) -> HeaderNet:
+        return HeaderNet(
+            genesis=self.chainparams_network()["genesis_hash"],
+            checkpoints=self._electrumCheckpoints(),
+            testnet=self._network != "mainnet",
+            max_target=0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+            first_target=0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+            target_timespan=14 * 24 * 60 * 60,
+        )
+
+    def _isValidTxBytes(self, data: bytes) -> bool:
+        return is_valid_tx(data)
+
+    def _headerSyncElectrum(self, backend) -> HeaderSync:
+        server = backend._server
+        with self._header_sync_lock:
+            if self._header_bc_mgr is None:
+                self._header_bc_mgr = BlockchainManager(
+                    headers_dir=Path(
+                        self._sc.data_dir,
+                        "electrum_headers",
+                        self.chainparams()["name"],
+                        self._network,
+                    ),
+                    net=self._electrumHeaderNet(),
+                    log=self._log,
+                )
+            bc_mgr = self._header_bc_mgr
+            tips = {}
+            try:
+                primary_tip: int = backend.getBlockHeight()
+                tips = server.get_server_tips()
+                tips[server.primary_key()] = primary_tip
+            except Exception as e:
+                self._log.warning(f"{self.coin_name()} header sync failed: {e}")
+            for key, tip in tips.items():
+                if key is None:
+                    continue
+                sync = self._header_syncs.get(key)
+                if sync is None:
+                    sync = HeaderSync(bc_mgr, server.server_caller(key), self._log)
+                    self._header_syncs[key] = sync
+                if sync.tip == tip and bc_mgr.check_header(sync.tip_header):
+                    continue
+                try:
+                    header = sync.get_block_header(
+                        tip, mode=ChainResolutionMode.CATCHUP
+                    )
+                    sync.process_header_at_tip(tip, header)
+                except ChainConflict as e:
+                    self._log.warning(
+                        f"{self.coin_name()} electrum server {key} chain refused: {e}"
+                    )
+                    self._header_syncs.pop(key, None)
+                    server.drop_server(key, str(e))
+                except Exception as e:
+                    self._log.warning(
+                        f"{self.coin_name()} header sync from {key} failed: {e}"
+                    )
+                    if key != server.primary_key():
+                        self._header_syncs.pop(key, None)
+                        server.drop_server(key, str(e))
+            if tips:
+                for key in list(self._header_syncs):
+                    if key not in tips:
+                        self._header_syncs.pop(key)
+                self._switchLaggingServerElectrum(server)
+            primary_key = server.primary_key()
+            sync = self._header_syncs.get(primary_key)
+            if sync is None:
+                sync = HeaderSync(bc_mgr, server.server_caller(primary_key), self._log)
+            return sync
+
+    def _switchLaggingServerElectrum(self, server) -> None:
+        best = self._header_bc_mgr.get_best_chain()
+        primary_key = server.primary_key()
+        primary = self._header_syncs.get(primary_key)
+        if (
+            primary is not None
+            and primary.blockchain is best
+            and best.height() - primary.tip <= 1
+        ):
+            return
+        best_header = best.header_at_tip()
+        if best_header is None:
+            return
+        for key, sync in self._header_syncs.items():
+            if key == primary_key or sync.tip_header is None:
+                continue
+            if sync.blockchain is best and hash_header(sync.tip_header) == hash_header(
+                best_header
+            ):
+                self._log.info(
+                    f"{self.coin_name()} electrum server {primary_key} is lagging or on another chain, switching to {key}"
+                )
+                server.switch_primary(key)
+                return
+
+    def _readHeaderElectrum(self, sync: HeaderSync, height: int) -> dict | None:
+        chain = sync.bc_mgr.get_best_chain()
+        header = chain.read_header(height)
+        if header is None and height <= chain.net.max_checkpoint():
+            try:
+                with sync.bc_mgr.bhi_lock:
+                    sync.request_chunk_below_max_checkpoint(height=height)
+            except Exception as e:
+                self._log.debug(f"Headers at {height} unavailable: {e}")
+                return None
+            header = sync.bc_mgr.get_best_chain().read_header(height)
+        return header
 
     def getBestBlockHash(self) -> str:
         if self._connection_type == "electrum":
@@ -5231,7 +5344,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         try:
             tx_info = backend.getTransaction(txid_hex)
-            chain_height = backend.getBlockHeight()
+            chain_height = (
+                self._headerSyncElectrum(backend).bc_mgr.get_best_chain().height()
+            )
             block_height = 0
             confirmations = 0
             tx_hex = None

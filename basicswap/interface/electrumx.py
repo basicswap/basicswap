@@ -758,9 +758,14 @@ class ElectrumServer:
         proxy_host=None,
         proxy_port=None,
         cert_pins=None,
+        max_servers: int = 1,
     ):
         self._coin_name = coin_name
         self._log = log
+        self._max_servers = max(1, int(max_servers))
+        self._extra_connections = {}
+        self._server_tips = {}
+        self._extras_lock = threading.Lock()
         self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
         self._connection = None
         self._current_server_idx = 0
@@ -1045,6 +1050,195 @@ class ElectrumServer:
                 f"Blacklisted server {key} for {self._rate_limit_backoff}s: {reason}"
             )
 
+    def _primary_key(self) -> str | None:
+        if not self._current_server_host:
+            return None
+        return f"{self._current_server_host}:{self._current_server_port}"
+
+    def _on_extra_header(self, key: str, height: int) -> None:
+        self._server_tips[key] = height
+
+    def _open_extra(self, server):
+        key = self._get_server_key(server)
+        conn = ElectrumConnection(
+            server["host"],
+            server["port"],
+            server.get("ssl", True),
+            log=self._log,
+            proxy_host=self._proxy_host,
+            proxy_port=self._proxy_port,
+            cert_pins=self._cert_pins,
+            coin_name=self._coin_name,
+        )
+        conn.connect()
+        try:
+            conn._start_listener()
+            conn.register_header_callback(
+                lambda h, key=key: self._on_extra_header(key, h)
+            )
+            result = conn.call("blockchain.headers.subscribe", [], timeout=20)
+        except Exception:
+            conn.disconnect()
+            raise
+        if isinstance(result, dict) and result.get("height", 0) > 0:
+            self._server_tips[key] = result["height"]
+        return conn
+
+    def _maintain_extras(self) -> None:
+        if self._max_servers <= 1 or self._stopping or self._connection is None:
+            return
+        primary_key = self._primary_key()
+        with self._extras_lock:
+            dropped = [
+                (key, conn)
+                for key, conn in self._extra_connections.items()
+                if key == primary_key or not conn.is_connected()
+            ]
+            for key, _ in dropped:
+                self._extra_connections.pop(key, None)
+                if key != primary_key:
+                    self._server_tips.pop(key, None)
+            have = set(self._extra_connections)
+        for _, conn in dropped:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+        # Connect outside the lock, callers on the update loop read the extras
+        for server in self.get_sorted_servers():
+            if len(have) >= self._max_servers - 1:
+                break
+            if self._stopping or not self._keepalive_running:
+                break
+            key = self._get_server_key(server)
+            if key == primary_key or key in have:
+                continue
+            try:
+                conn = self._open_extra(server)
+            except Exception as e:
+                self._update_server_score(server, success=False)
+                if self._log:
+                    self._log.debug(f"Extra Electrum server {key} unavailable: {e}")
+                continue
+            with self._extras_lock:
+                keep = (
+                    self._keepalive_running
+                    and not self._stopping
+                    and key != self._primary_key()
+                    and key not in self._extra_connections
+                )
+                if keep:
+                    self._extra_connections[key] = conn
+            if not keep:
+                if key != self._primary_key():
+                    self._server_tips.pop(key, None)
+                try:
+                    conn.disconnect()
+                except Exception:
+                    pass
+                continue
+            have.add(key)
+
+    def get_server_tips(self) -> dict:
+        primary_key = self._primary_key()
+        with self._extras_lock:
+            live = set(self._extra_connections)
+        if primary_key and self._connection is not None:
+            live.add(primary_key)
+        return {k: v for k, v in self._server_tips.items() if k in live}
+
+    def primary_key(self) -> str | None:
+        return self._primary_key()
+
+    def call_on(self, key: str, method, params=None, timeout=10):
+        if key == self._primary_key():
+            return self.call(method, params, timeout=timeout)
+        with self._extras_lock:
+            conn = self._extra_connections.get(key)
+        if conn is None or not conn.is_connected():
+            raise TemporaryError(f"Electrum server {key} not connected")
+        return conn.call(method, params, timeout=timeout)
+
+    def server_caller(self, key: str):
+        server = self
+
+        class _Caller:
+            def call(self, method, params=None):
+                return server.call_on(key, method, params)
+
+        return _Caller()
+
+    def drop_server(self, key: str, reason: str) -> None:
+        if key == self._primary_key():
+            self.failover(reason)
+            return
+        with self._extras_lock:
+            conn = self._extra_connections.pop(key, None)
+            self._server_tips.pop(key, None)
+        for server in self._servers:
+            if self._get_server_key(server) == key:
+                self._blacklist_server(server, reason)
+        if conn:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+
+    def switch_primary(self, key: str) -> bool:
+        with self._lock:
+            return self._switch_primary_locked(key, keep_old=True)
+
+    def _switch_primary_locked(self, key: str, keep_old: bool) -> bool:
+        with self._extras_lock:
+            conn = self._extra_connections.pop(key, None)
+        if conn is None or not conn.is_connected():
+            return False
+        server = next(s for s in self._servers if self._get_server_key(s) == key)
+        old_key = self._primary_key()
+        old_conn = self._connection
+        self._connection = conn
+        self._current_server_idx = self._servers.index(server)
+        self._current_server_host = server["host"]
+        self._current_server_port = server["port"]
+        self._last_activity = time.time()
+        conn.register_header_callback(self._on_header_update)
+        self._subscribed_height = self._server_tips.get(key, 0)
+        if self._realtime_enabled:
+            self._start_realtime_listener()
+        if old_conn is not None:
+            if keep_old and old_key and old_conn.is_connected():
+                old_conn.register_header_callback(
+                    lambda h, k=old_key: self._on_extra_header(k, h)
+                )
+                with self._extras_lock:
+                    self._extra_connections[old_key] = old_conn
+            else:
+                self._server_tips.pop(old_key, None)
+                try:
+                    old_conn.disconnect()
+                except Exception:
+                    pass
+        if self._log:
+            self._log.info(
+                f"Switched to Electrum server: {server['host']}:{server['port']}"
+            )
+        return True
+
+    def failover(self, reason: str) -> bool:
+        with self._lock:
+            if self._current_server_host:
+                self._blacklist_server(
+                    self._get_server(self._current_server_idx), reason
+                )
+            self._subscribed_height = 0
+            with self._extras_lock:
+                extra_keys = list(self._extra_connections)
+            for key in extra_keys:
+                if self._switch_primary_locked(key, keep_old=False):
+                    return True
+            self._server_tips.pop(self._primary_key(), None)
+            return self._reconnect(prefer_current=False)
+
     def _is_rate_limit_error(self, error_msg: str) -> bool:
         rate_limit_patterns = [
             "excessive resource usage",
@@ -1057,6 +1251,9 @@ class ElectrumServer:
         return any(pattern in error_lower for pattern in rate_limit_patterns)
 
     def _on_header_update(self, height: int):
+        primary_key = self._primary_key()
+        if primary_key:
+            self._server_tips[primary_key] = height
         if height > self._subscribed_height:
             self._subscribed_height = height
             self._subscribed_height_time = time.time()
@@ -1126,6 +1323,7 @@ class ElectrumServer:
     def _keepalive_loop(self):
         while self._keepalive_running:
             try:
+                self._maintain_extras()
                 for _ in range(self._keepalive_interval):
                     if not self._keepalive_running:
                         return
@@ -1353,6 +1551,14 @@ class ElectrumServer:
 
     def disconnect(self):
         self._stop_keepalive()
+        with self._extras_lock:
+            extras = list(self._extra_connections.values())
+            self._extra_connections.clear()
+        for conn in extras:
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
         lock_acquired = self._lock.acquire(timeout=5)
         if lock_acquired:
             try:
