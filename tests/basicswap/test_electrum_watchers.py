@@ -128,6 +128,36 @@ class ElectrumWatcherMerkleTest(unittest.TestCase):
         rv = ci.checkWatchedScript(WATCHED_SCRIPT)
         self.assertIsNone(rv)
 
+    def test_output_spend_with_other_txid_ignored(self):
+        other_spend = CTransaction()
+        other_spend.vin = self.spend_tx.vin
+        other_spend.vout.append(CTxOut(8000, bytes([0x00, 0x14]) + b"\x33" * 20))
+        self.txs[self.spend_tx.hash] = other_spend.serialize().hex()
+        ci = make_interface(self.txs, self.history)
+        calls = []
+        set_verifier(ci, True, calls)
+        self.assertIsNone(ci.checkWatchedOutput(self.watched_tx.hash, 0))
+        self.assertEqual(calls, [])
+
+    def test_watched_tx_with_other_txid_ignored(self):
+        self.txs[self.watched_tx.hash] = self.spend_tx.serialize().hex()
+        ci = make_interface(self.txs, self.history)
+        calls = []
+        set_verifier(ci, True, calls)
+        self.assertIsNone(ci.checkWatchedOutput(self.watched_tx.hash, 0))
+        self.assertEqual(calls, [])
+
+    def test_script_tx_with_other_txid_ignored(self):
+        other_tx = CTransaction()
+        other_tx.vin.append(CTxIn(COutPoint(2, 0)))
+        other_tx.vout.append(CTxOut(10000, WATCHED_SCRIPT))
+        self.txs[self.watched_tx.hash] = other_tx.serialize().hex()
+        ci = make_interface(self.txs, self.history[:1])
+        calls = []
+        set_verifier(ci, True, calls)
+        self.assertIsNone(ci.checkWatchedScript(WATCHED_SCRIPT))
+        self.assertEqual(calls, [])
+
     def test_mempool_height_not_verified(self):
         history = [
             {"tx_hash": self.watched_tx.hash, "height": 0},

@@ -350,6 +350,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def setBackend(self, backend) -> None:
         self._backend = backend
+        if hasattr(backend, "setTxidFunction"):
+            backend.setTxidFunction(lambda tx_hex: self.getTxid(tx_hex).hex())
         self._log.debug(f"{self.coin_name()} using backend: {type(backend).__name__}")
 
     def getBackend(self):
@@ -4050,6 +4052,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 return None
 
             tx = self.loadTx(bytes.fromhex(tx_hex))
+            if self.getTxid(tx).hex() != txid_hex:
+                self._log.warning(
+                    f"checkWatchedOutput: server returned another tx for {self._log.id(txid_hex)}"
+                )
+                return None
             script_hex = tx.vout[vout].scriptPubKey.hex()
             scripthash = self.scriptToScripthash(bytes.fromhex(script_hex))
 
@@ -4071,6 +4078,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     if not spend_hex:
                         continue
                     spend_tx = self.loadTx(bytes.fromhex(spend_hex))
+                    if self.getTxid(spend_tx).hex() != tx_entry["tx_hash"]:
+                        continue
                     for i, inp in enumerate(spend_tx.vin):
                         inp_txid = f"{inp.prevout.hash:064x}"
                         if inp_txid == txid_hex and inp.prevout.n == vout:
@@ -4120,6 +4129,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 if not tx_hex:
                     continue
                 tx = self.loadTx(bytes.fromhex(tx_hex))
+                if self.getTxid(tx).hex() != tx_entry["tx_hash"]:
+                    continue
                 for i, out in enumerate(tx.vout):
                     if out.scriptPubKey == script:
                         height = tx_entry.get("height", 0)

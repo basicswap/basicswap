@@ -1577,6 +1577,79 @@ class TestElectrumFindConfirmedTxn(unittest.TestCase):
         self.assertIsNone(ci._findConfirmedTxnByHashElectrum(GENESIS_COINBASE_TXID))
 
 
+class TxStubServer:
+    def __init__(self, txs):
+        self._txs = txs
+
+    def call(self, method, params, timeout=10):
+        tx = self._txs.get(params[0])
+        if params[1] and isinstance(tx, str):
+            return {"hex": tx}
+        return tx
+
+    def call_batch(self, calls, timeout=15):
+        return [self.call(method, params) for method, params in calls]
+
+
+class TestElectrumBackendTxid(unittest.TestCase):
+    def setUp(self):
+        from basicswap.wallet_backend import ElectrumBackend
+        from basicswap.contrib.test_framework.messages import COutPoint, CTxIn, CTxOut
+        from tests.basicswap.util.common import REQUIRED_SETTINGS
+
+        txs = []
+        for i in range(2):
+            tx = CTransaction()
+            tx.vin.append(CTxIn(COutPoint(i + 1, 0)))
+            tx.vout.append(CTxOut(1000, bytes([0x00, 0x14]) + bytes([i]) * 20))
+            tx.rehash()
+            txs.append(tx)
+        self.tx1, self.tx2 = txs
+        self.tx2_hex = self.tx2.serialize().hex()
+
+        settings = dict(REQUIRED_SETTINGS)
+        settings.update(
+            {"rpcport": 0, "rpcauth": "none", "connection_type": "electrum"}
+        )
+        self.ci = BTCInterface(settings, "regtest")
+        backend = ElectrumBackend.__new__(ElectrumBackend)
+        backend._log = StubLog()
+        backend._background_mode = False
+        backend._txid_fn = None
+        backend._tx_detail_cache = {}
+        backend._tx_detail_cache_max = 10
+        backend._server = TxStubServer(
+            {
+                self.tx1.hash: self.tx2_hex,
+                self.tx2.hash: self.tx2_hex,
+                "cc" * 32: {"confirmations": 1},
+            }
+        )
+        self.ci.setBackend(backend)
+        self.backend = backend
+
+    def test_raw_tx_must_match_txid(self):
+        self.assertIsNone(self.backend.getTransactionRaw(self.tx1.hash))
+        self.assertEqual(self.backend.getTransactionRaw(self.tx2.hash), self.tx2_hex)
+
+    def test_verbose_tx_must_carry_matching_hex(self):
+        self.assertIsNone(self.backend.getTransaction(self.tx1.hash))
+        self.assertIsNone(self.backend.getTransaction("cc" * 32))
+        self.assertEqual(
+            self.backend.getTransaction(self.tx2.hash)["hex"], self.tx2_hex
+        )
+
+    def test_batches_drop_mismatched_txs(self):
+        txids = [self.tx1.hash, self.tx2.hash]
+        self.assertEqual(
+            self.backend.getTransactionBatchRaw(txids),
+            {self.tx1.hash: None, self.tx2.hash: self.tx2_hex},
+        )
+        batch = self.backend.getTransactionBatch(txids)
+        self.assertIsNone(batch[self.tx1.hash])
+        self.assertEqual(batch[self.tx2.hash]["hex"], self.tx2_hex)
+
+
 class TestElectrumMedianTime(unittest.TestCase):
     def test_successful_fetch(self):
         timestamps = list(range(1000, 1011))
