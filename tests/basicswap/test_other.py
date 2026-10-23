@@ -2250,6 +2250,13 @@ class Test(unittest.TestCase):
             "regtest",
             log_name="bsx_test_other",
         )
+        ci = self.ci_btc()
+        ltc_coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        ltc_coin_settings.update(REQUIRED_SETTINGS)
+        sc.coin_clients[Coins.BTC] = {"interface": ci}
+        sc.coin_clients[Coins.LTC] = {
+            "interface": LTCInterface(ltc_coin_settings, "regtest")
+        }
 
         secret_hash = sha256(secrets.token_bytes(32))
         pkh_buyer = secrets.token_bytes(20)
@@ -2257,8 +2264,8 @@ class Test(unittest.TestCase):
         lock_value: int = 4 * 60 * 60
 
         offer = Offer(
-            coin_from=Coins.PIVX,
-            coin_to=Coins.DASH,
+            coin_from=Coins.BTC,
+            coin_to=Coins.LTC,
             lock_type=TxLockTypes.ABS_LOCK_TIME,
             lock_value=lock_value,
         )
@@ -2306,8 +2313,6 @@ class Test(unittest.TestCase):
         )
         sc.setMockTimeOffset(0)
 
-        ci = self.ci_btc()
-        sc.coin_clients[Coins.BTC] = {"interface": ci}
         offer = Offer(
             coin_from=Coins.BTC,
             coin_to=Coins.LTC,

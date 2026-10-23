@@ -178,7 +178,6 @@ from .multibid import (
     CONFIRM_INTERVAL_MULTIPLE,
     MAX_CONFIRM_WAIT_SECONDS,
     MIN_LEG_TIMEOUT_SECONDS,
-    PEER_CONFIRM_ALLOWANCE_SECONDS,
     plan_batch_decision,
     plan_htlc_batch,
 )
@@ -6062,18 +6061,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         return min(max(expected, ready_timeout), MAX_CONFIRM_WAIT_SECONDS)
 
+    def getConfirmAllowance(self, ci) -> int:
+        """Seconds to allow for a txn to reach blocks_confirmed."""
+        return int(
+            ci.blocks_confirmed
+            * ci.chainparams()["blocks_target"]
+            * CONFIRM_INTERVAL_MULTIPLE
+        )
+
     def getBLockMinMargin(self, ci_to) -> int:
         """Least time left on the coin A refund timelock to send a coin B lock
         with, the release and spend margins are checked again once it confirms."""
-        expected: int = int(
-            ci_to.blocks_confirmed
-            * ci_to.chainparams()["blocks_target"]
-            * CONFIRM_INTERVAL_MULTIPLE
-        )
-        return (
-            max(self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin)
-            + expected
-        )
+        return max(
+            self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin
+        ) + self.getConfirmAllowance(ci_to)
 
     def getLegLockRemaining(self, leg, leg_offer, reverse_bid: bool, cursor):
         """Seconds left on a ready leg's coin A lock refund timelock, or None
@@ -7923,16 +7924,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         """Seconds the initiate txn refund stays locked after the participate txn
         refund unlocks, or None for the block lock types."""
         if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
-            itx = bid.initiate_tx
-            if itx is not None and itx.block_height and itx.block_time is None:
-                # A failed header fetch at confirmation leaves block_time unset
-                self.setTxBlockInfoFromHeight(
-                    self.ci(offer.coin_from), itx, itx.block_height
-                )
             itx_remaining = self.getITxLockRemaining(bid, offer, None)
             if itx_remaining is None:
                 raise TemporaryError("Initiate txn lock remaining unknown")
-            return itx_remaining - offer.lock_value // 2
+            # The participate txn refund timelock starts once it confirms
+            return (
+                itx_remaining
+                - offer.lock_value // 2
+                - self.getConfirmAllowance(self.ci(offer.coin_to))
+            )
         if offer.lock_type == TxLockTypes.ABS_LOCK_TIME:
             ptx_unlock: int = max(
                 atomic_swap_1.extractScriptLockValue(participate_script),
@@ -7949,7 +7949,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         the initiate txn."""
         margin = self.getPTxLockMargin(bid, offer, participate_script)
         ensure(
-            margin is None or margin > PEER_CONFIRM_ALLOWANCE_SECONDS,
+            margin is None
+            or margin > self.getConfirmAllowance(self.ci(offer.coin_from)),
             f"Initiate txn refund too close to the participate txn refund: {margin}s",
         )
 
@@ -8394,7 +8395,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         ci_to = self.ci(offer.coin_to)
         batched_ptx: bool = bool(bid.plan_id) and hasattr(ci_to, "fundHTLCTxs")
-        if bid.was_sent and bid.participate_tx is None and not batched_ptx:
+        if bid.was_sent and bid.participate_tx is None:
             # Before the state changes, so a retry finds the bid still accepted
             self.ensurePTxLockMargin(bid, offer, participate_script)
 
@@ -9364,9 +9365,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.logBidEvent(
                         bid.bid_id, EventLogTypes.LOCK_TX_A_SEEN, "", cursor
                     )
-                    self.setTxBlockInfoFromHeight(
-                        ci_from, bid.xmr_a_lock_tx, lock_tx_chain_info["height"]
-                    )
                     bid.xmr_a_lock_tx.setState(TxStates.TX_IN_CHAIN)
 
                     bid_changed = True
@@ -9376,8 +9374,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ):
                     bid.xmr_a_lock_tx.chain_height = lock_tx_chain_info["height"]
                     bid_changed = True
+                if (
+                    bid.xmr_a_lock_tx.block_time is None
+                    and lock_tx_chain_info["height"] != 0
+                ):
+                    self.setTxBlockInfoFromHeight(
+                        ci_from, bid.xmr_a_lock_tx, lock_tx_chain_info["height"]
+                    )
+                    bid_changed = True
 
-                if lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed:
+                # Later states read the refund timelock from block_time
+                if (
+                    lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed
+                    and bid.xmr_a_lock_tx.block_time is not None
+                ):
                     self.logBidEvent(
                         bid.bid_id, EventLogTypes.LOCK_TX_A_CONFIRMED, "", cursor
                     )
@@ -10034,7 +10044,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     bid.initiate_tx.chain_height = self.setLastHeightCheckedStart(
                         coin_from, tx_height
                     )
-                    self.setTxBlockInfoFromHeight(ci_from, bid.initiate_tx, tx_height)
 
                     self.addWatchedOutput(
                         coin_from,
@@ -10048,6 +10057,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         or bid.getITxState() < TxStates.TX_SENT
                     ):
                         bid.setITxState(TxStates.TX_SENT)
+                    save_bid = True
+
+                if (
+                    bid.initiate_tx.block_time is None
+                    and tx_height is not None
+                    and tx_height > 0
+                ):
+                    self.setTxBlockInfoFromHeight(ci_from, bid.initiate_tx, tx_height)
                     save_bid = True
 
                 if (
@@ -10159,7 +10176,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         bid.setPTxState(TxStates.TX_SENT)
 
                 bid.participate_tx.conf = found["depth"]
-                if found["height"] > 0 and bid.participate_tx.block_height is None:
+                if found["height"] > 0 and bid.participate_tx.block_time is None:
                     self.setTxBlockInfoFromHeight(
                         ci_to, bid.participate_tx, found["height"]
                     )
@@ -10268,10 +10285,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if (
             should_try_refund_ptx
             and bid.participate_tx is not None
-            and bid.participate_tx.block_height is None
+            and bid.participate_tx.block_time is None
         ):
             self.log.debug(
-                f"PTX: {self.logIDT(bid.participate_tx.txid)} block height not known, bid: {self.log.id(bid_id)}"
+                f"PTX: {self.logIDT(bid.participate_tx.txid)} block time not known, bid: {self.log.id(bid_id)}"
             )
             # An invalid ptx, won't be confirmed, check block height here
             ptx_info = ci_to.getTxOutInfo(
