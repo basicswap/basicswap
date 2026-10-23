@@ -1566,9 +1566,21 @@ class Test(unittest.TestCase):
             WebSocketHandler,
         )
 
+        class Connection:
+            def settimeout(self, timeout):
+                pass
+
+        class Server:
+            _handshake_lock = threading.Lock()
+            _pending_handshakes = 0
+            max_pending_handshakes = None
+
         def make_handler(data: bytes):
             handler = WebSocketHandler.__new__(WebSocketHandler)
+            handler._handshake_timer = threading.Timer(1000, lambda: None)
             handler.rfile = io.BytesIO(data)
+            handler.connection = Connection()
+            handler.server = Server()
             handler.keep_alive = True
             handler.handshake_done = False
             handler.valid_client = False
@@ -1591,6 +1603,297 @@ class Test(unittest.TestCase):
         handler = make_handler(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
         handler.handshake()
         assert handler.keep_alive is False
+
+    def test_ws_handshake_limits(self):
+        import socket
+        import time
+        from unittest import mock
+        from basicswap.contrib.websocket_server import websocket_server as ws
+
+        def handler_for(data):
+            sock, peer = socket.socketpair()
+            sock.settimeout(3)
+            handler = ws.WebSocketHandler.__new__(ws.WebSocketHandler)
+            handler.request = handler.connection = sock
+            handler.rfile = sock.makefile("rb")
+            handler.timeout = 1000
+            handler._start_handshake_timer(sock)
+            peer.sendall(data)
+            return handler, peer
+
+        request = b"GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\n\r\n"
+        handler, peer = handler_for(request)
+        assert handler.read_http_headers() == {
+            "host": "localhost",
+            "upgrade": "websocket",
+        }
+        peer.close()
+
+        for data in (
+            b"GET / HTTP/1.1\r\n" + b"X-Repeat: y\r\n" * 200 + b"\r\n",
+            b"GET / HTTP/1.1\r\n" + b"no colon\r\n" * 200 + b"\r\n",
+            b"GET / HTTP/1.1\r\n" + (b"X: " + b"y" * 4000 + b"\r\n") * 20 + b"\r\n",
+        ):
+            handler, peer = handler_for(data)
+            assert handler.read_http_headers() is None
+            peer.close()
+
+        with mock.patch.object(ws, "HANDSHAKE_TIMEOUT", 0.2):
+            handler, peer = handler_for(b"GET / HTTP/1.1\r\nHost: localhost\r\nX: ")
+            stop = threading.Event()
+
+            def trickle():
+                while not stop.is_set():
+                    try:
+                        peer.sendall(b"y")
+                    except OSError:
+                        return
+                    time.sleep(0.05)
+
+            threading.Thread(target=trickle, daemon=True).start()
+            start = time.monotonic()
+            assert handler.read_http_headers() is None
+            assert time.monotonic() - start < 2
+            stop.set()
+            peer.close()
+
+        class Srv:
+            _handshake_lock = threading.Lock()
+            _pending_handshakes = ws.MAX_PENDING_HANDSHAKES
+            max_pending_handshakes = ws.MAX_PENDING_HANDSHAKES
+
+        handler, peer = handler_for(request)
+        handler.server = Srv()
+        handler.keep_alive = True
+        handler.handshake()
+        assert handler.keep_alive is False
+        assert Srv._pending_handshakes == ws.MAX_PENDING_HANDSHAKES
+        assert handler.rfile.readline() == b"GET / HTTP/1.1\r\n"
+        peer.close()
+
+        checked = []
+
+        class Uncapped(Srv):
+            max_pending_handshakes = None
+
+            def origin_check(self, headers):
+                checked.append(headers)
+                return True
+
+        handler, peer = handler_for(request)
+        handler.server = Uncapped()
+        handler.keep_alive = True
+        handler.handshake()
+        assert checked == [{"host": "localhost", "upgrade": "websocket"}]
+        assert Uncapped._pending_handshakes == ws.MAX_PENDING_HANDSHAKES
+        peer.close()
+
+    def test_ws_tls_handshake_timeout(self):
+        import socket
+        import ssl
+        from unittest import mock
+        from basicswap.contrib.websocket_server import websocket_server as ws
+
+        timeouts = []
+
+        class Context:
+            def __init__(self, protocol):
+                pass
+
+            def load_cert_chain(self, cert, key):
+                pass
+
+            def wrap_socket(self, sock, server_side):
+                timeouts.append(sock.gettimeout())
+                raise ssl.SSLError("handshake timed out")
+
+        class Srv:
+            key = "key.pem"
+            cert = "cert.pem"
+
+        sock, peer = socket.socketpair()
+        try:
+            with mock.patch.object(ws.ssl, "SSLContext", Context):
+                ws.WebSocketHandler(sock, ("127.0.0.1", 1), Srv())
+            assert timeouts == [ws.HANDSHAKE_TIMEOUT]
+        finally:
+            sock.close()
+            peer.close()
+
+    def test_http_post_limits(self):
+        import base64
+        from unittest import mock
+        from basicswap import http_server
+        from basicswap.http_server import HttpHandler
+
+        class SwapClient:
+            log = logging
+
+            def __init__(self, settings):
+                self.settings = settings
+
+        class Srv:
+            host_name = "127.0.0.1"
+            port_no = 12700
+
+            def __init__(self, settings):
+                self.swap_client = SwapClient(settings)
+                self.session_lock = threading.Lock()
+                self.active_sessions = {}
+
+        class Connection:
+            def settimeout(self, timeout):
+                pass
+
+        class Stub(HttpHandler):
+            def __init__(self, headers, body, settings):
+                self.headers = {"Host": "127.0.0.1:12700", **headers}
+                self.connection = Connection()
+                self.rfile = BytesIO(body)
+                self.wfile = BytesIO()
+                self.path = "/json/coins"
+                self.server = Srv(settings)
+                self.errors = []
+                self.handled = None
+
+            def send_error(self, code, message=None, explain=None):
+                self.errors.append(code)
+
+            def handle_http(self, status_code, path, post_string="", is_json=False):
+                self.handled = post_string
+                return b""
+
+        def post(headers, body=b"", settings=None):
+            handler = Stub(headers, body, settings or {})
+            handler.do_POST()
+            return handler
+
+        password = {"client_auth_hash": rfc2440_hash_password("password")}
+        handler = post({"Content-Length": "5"}, b"hello")
+        assert handler.handled == b"hello" and handler.errors == []
+        handler = post({"Content-Length": "10"}, b"hello")
+        assert handler.errors == [400] and handler.handled is None
+        assert post({}).handled == b""
+        for value in ("-1", "abc"):
+            handler = post({"Content-Length": value}, b"hello")
+            assert handler.errors == [400] and handler.handled is None, value
+        with mock.patch.object(http_server, "MAX_POST_BYTES", 10):
+            handler = post({"Content-Length": "11"}, b"x" * 11)
+            assert handler.errors == [413] and handler.handled is None
+
+        size = http_server.MAX_REFUSED_POST_BYTES + 1
+        body = b"x" * size
+        handler = post({"Content-Length": str(size)}, body, password)
+        assert handler.errors == [413] and handler.handled is None
+        for creds in ("x", base64.b64encode(b"user:wrong").decode()):
+            handler = post(
+                {"Content-Length": str(size), "Authorization": f"Basic {creds}"},
+                body,
+                password,
+            )
+            assert handler.errors == [413] and handler.handled is None, creds
+        creds = base64.b64encode(b"user:password").decode()
+        handler = post(
+            {"Content-Length": str(size), "Authorization": f"Basic {creds}"},
+            body,
+            password,
+        )
+        assert handler.handled == body
+        assert post({"Content-Length": "5"}, b"hello", password).handled == b"hello"
+        handler = post({"Content-Length": str(size), "Host": "evil.example"}, body)
+        assert handler.errors == [413] and handler.handled is None
+
+    def test_http_post_body_deadline(self):
+        import socket
+        import time
+        from unittest import mock
+        from basicswap import http_server
+        from basicswap.http_server import HttpHandler
+
+        sock, peer = socket.socketpair()
+        sock.settimeout(3)
+
+        class SwapClient:
+            settings = {}
+
+        class Srv:
+            host_name = "127.0.0.1"
+            port_no = 12700
+            swap_client = SwapClient()
+
+        class Stub(HttpHandler):
+            def __init__(self):
+                self.headers = {"Host": "127.0.0.1:12700", "Content-Length": "100"}
+                self.connection = sock
+                self.rfile = sock.makefile("rb")
+                self.server = Srv()
+                self.errors = []
+                self.handled = None
+
+            def send_error(self, code, message=None, explain=None):
+                self.errors.append(code)
+
+            def handle_http(self, status_code, path, post_string="", is_json=False):
+                self.handled = post_string
+                return b""
+
+        stop = threading.Event()
+
+        def trickle():
+            while not stop.is_set():
+                try:
+                    peer.sendall(b"x")
+                except OSError:
+                    return
+                time.sleep(0.05)
+
+        threading.Thread(target=trickle, daemon=True).start()
+        try:
+            with mock.patch.object(http_server, "POST_BODY_TIMEOUT", 0.3):
+                handler = Stub()
+                start = time.monotonic()
+                handler.do_POST()
+            assert handler.errors == [408] and handler.handled is None
+            assert time.monotonic() - start < 2
+        finally:
+            stop.set()
+            peer.close()
+            sock.close()
+
+    def test_http_handler_cap(self):
+        import time
+        from unittest import mock
+        from basicswap.http_server import HttpThread
+
+        class SwapClient:
+            debug = False
+
+        server = HttpThread("127.0.0.1", 0, False, SwapClient())
+        try:
+            server._handler_slots = threading.BoundedSemaphore(1)
+            finished = threading.Event()
+            with (
+                mock.patch.object(
+                    server, "finish_request", side_effect=lambda *a: finished.set()
+                ),
+                mock.patch.object(server, "shutdown_request") as shutdown,
+            ):
+                assert server._handler_slots.acquire(blocking=False)
+                server.process_request("request", ("127.0.0.1", 1))
+                assert not finished.wait(1)
+                shutdown.assert_called_once_with("request")
+
+                server._handler_slots.release()
+                server.process_request("request", ("127.0.0.1", 1))
+                assert finished.wait(5)
+                for _ in range(50):
+                    if server._handler_slots.acquire(blocking=False):
+                        break
+                    time.sleep(0.1)
+                else:
+                    raise AssertionError("handler slot not released")
+        finally:
+            server.server_close()
 
     def test_is_allowed_host(self):
         from basicswap.http_server import HttpHandler

@@ -14,8 +14,10 @@ import hashlib
 import secrets
 import traceback
 import threading
+import time
 import http.client
 import base64
+import socket
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -83,6 +85,12 @@ from .ui.page_debug import page_debug
 SESSION_COOKIE_NAME = "basicswap_session_id"
 LOGIN_NEXT_COOKIE_NAME = "basicswap_login_next"
 SESSION_DURATION_MINUTES = 15
+MAX_POST_BYTES = 10 * 1024 * 1024
+MAX_REFUSED_POST_BYTES = 64 * 1024
+MAX_HTTP_HANDLERS = 256
+HTTP_SOCKET_TIMEOUT = 300
+POST_BODY_TIMEOUT = 60
+HEADER_TIMEOUT = 30
 
 env = Environment(
     loader=PackageLoader("basicswap", "templates"),
@@ -242,6 +250,53 @@ def json_requires_post(url_split) -> bool:
 
 
 class HttpHandler(BaseHTTPRequestHandler):
+    timeout = HTTP_SOCKET_TIMEOUT
+
+    def handle_one_request(self):
+        # The socket timeout restarts on every byte, so a trickled request line
+        # or header would hold a handler slot indefinitely.
+        self._header_timer = threading.Timer(HEADER_TIMEOUT, self._drop_slow_request)
+        self._header_timer.daemon = True
+        self._header_timer.start()
+        try:
+            super().handle_one_request()
+        finally:
+            self._header_timer.cancel()
+
+    def parse_request(self) -> bool:
+        try:
+            return super().parse_request()
+        finally:
+            self._header_timer.cancel()
+
+    def basic_auth(self) -> str | None:
+        # "amm", "operator", "invalid", "malformed", or None without a Basic header
+        auth_header = self.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Basic "):
+            return None
+        swap_client = self.server.swap_client
+        try:
+            encoded_creds = auth_header.split(" ", 1)[1]
+            decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
+            _, password = decoded_creds.split(":", 1)
+
+            amm_token = getattr(swap_client, "_amm_api_token", None)
+            if amm_token and hmac.compare_digest(password, amm_token):
+                return "amm"
+            client_auth_hash = swap_client.settings.get("client_auth_hash")
+            if client_auth_hash and verify_rfc2440_password(client_auth_hash, password):
+                return "operator"
+            return "invalid"
+        except Exception as e:
+            swap_client.log.error(f"Error processing Basic Auth header: {e}")
+            return "malformed"
+
+    def _drop_slow_request(self) -> None:
+        try:
+            self.connection.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
     def _get_session_cookie(self):
         if "Cookie" in self.headers:
             cookie = SimpleCookie(self.headers["Cookie"])
@@ -1016,49 +1071,29 @@ class HttpHandler(BaseHTTPRequestHandler):
             return b"Host not allowed"
 
         exempt_pages = ["login", "static", "error", "info"]
-        auth_header = self.headers.get("Authorization")
+        basic_auth = self.basic_auth()
         basic_auth_ok = False
-
-        if auth_header and auth_header.startswith("Basic "):
-            try:
-                encoded_creds = auth_header.split(" ", 1)[1]
-                decoded_creds = base64.b64decode(encoded_creds).decode("utf-8")
-                _, password = decoded_creds.split(":", 1)
-
-                amm_token = getattr(swap_client, "_amm_api_token", None)
-                client_auth_hash = swap_client.settings.get("client_auth_hash")
-                if amm_token and hmac.compare_digest(password, amm_token):
-                    if not amm_request_allowed(self.command, url_split):
-                        self.putHeaders(403, "application/json")
-                        return json.dumps(
-                            {"error": "Not allowed for the AMM token"}
-                        ).encode("utf-8")
-                    basic_auth_ok = True
-                elif client_auth_hash and verify_rfc2440_password(
-                    client_auth_hash, password
-                ):
-                    basic_auth_ok = True
-                else:
-                    self.send_response(401)
-                    self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(
-                        json.dumps({"error": "Invalid Basic Auth credentials"}).encode(
-                            "utf-8"
-                        )
-                    )
-                    return b""
-            except Exception as e:
-                swap_client.log.error(f"Error processing Basic Auth header: {e}")
-                self.send_response(401)
-                self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(
-                    json.dumps({"error": "Malformed Basic Auth header"}).encode("utf-8")
+        if basic_auth == "amm":
+            if not amm_request_allowed(self.command, url_split):
+                self.putHeaders(403, "application/json")
+                return json.dumps({"error": "Not allowed for the AMM token"}).encode(
+                    "utf-8"
                 )
-                return b""
+            basic_auth_ok = True
+        elif basic_auth == "operator":
+            basic_auth_ok = True
+        elif basic_auth is not None:
+            error = (
+                "Malformed Basic Auth header"
+                if basic_auth == "malformed"
+                else "Invalid Basic Auth credentials"
+            )
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="Basicswap"')
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": error}).encode("utf-8"))
+            return b""
 
         if not basic_auth_ok and page not in exempt_pages:
             if not self.is_authenticated():
@@ -1397,10 +1432,54 @@ class HttpHandler(BaseHTTPRequestHandler):
         finally:
             pass
 
+    def _post_may_be_accepted(self) -> bool:
+        if not self.is_allowed_host():
+            return False
+        return self.basic_auth() in ("amm", "operator") or self.is_authenticated()
+
+    def _read_post_body(self, content_length: int) -> bytes:
+        deadline = time.monotonic() + POST_BODY_TIMEOUT
+        chunks = []
+        remaining = content_length
+        try:
+            while remaining > 0:
+                time_left = deadline - time.monotonic()
+                if time_left <= 0:
+                    raise TimeoutError
+                self.connection.settimeout(time_left)
+                chunk = self.rfile.read1(min(remaining, 65536))
+                if not chunk:
+                    raise EOFError
+                chunks.append(chunk)
+                remaining -= len(chunk)
+        finally:
+            self.connection.settimeout(self.timeout)
+        return b"".join(chunks)
+
     def do_POST(self):
         try:
-            content_length = int(self.headers.get("Content-Length", 0))
-            post_string = self.rfile.read(content_length)
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                content_length = -1
+            if content_length < 0:
+                self.send_error(400, "Invalid Content-Length")
+                return
+            if self._post_may_be_accepted():
+                max_bytes = MAX_POST_BYTES
+            else:
+                max_bytes = MAX_REFUSED_POST_BYTES
+            if content_length > max_bytes:
+                self.send_error(413)
+                return
+            try:
+                post_string = self._read_post_body(content_length)
+            except TimeoutError:
+                self.send_error(408)
+                return
+            except EOFError:
+                self.send_error(400, "Incomplete request body")
+                return
 
             is_json = True if "json" in self.headers.get("Content-Type", "") else False
             response = self.handle_http(200, self.path, post_string, is_json)
@@ -1442,6 +1521,7 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
 
         self.session_lock = threading.Lock()
         self.msg_id_lock = threading.Lock()
+        self._handler_slots = threading.BoundedSemaphore(MAX_HTTP_HANDLERS)
 
         self.timeout = 60
         ThreadingHTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)
@@ -1465,6 +1545,18 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
             self.handle_request()
         self.socket.close()
         self.swap_client.log.info("HTTP server stopped.")
+
+    def process_request(self, request, client_address):
+        if not self._handler_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._handler_slots.release()
 
     def run(self):
         self.serve_forever()
