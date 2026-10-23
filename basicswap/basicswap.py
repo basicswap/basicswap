@@ -4256,6 +4256,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
     ) -> None:
+        if ci.coin_type() in self.xmr_based_coins:
+            estimated_fee = ci.estLockTxsFee(ensure_balance, 1)
         balance_msg: str = (
             f"{ci.format_amount(ensure_balance)} {ci.coin_name()} with estimated fee {ci.format_amount(estimated_fee)}"
         )
