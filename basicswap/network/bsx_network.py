@@ -120,6 +120,8 @@ class BSXNetwork:
         self._smsg_rpc_bulk_limit = self.get_int_setting("smsg_rpc_bulk_limit", 5000, 1)
         self._last_checked_bridges = 0
         self._forget_portals_after = 86400 * 7
+        self._portal_time_valid = 30 * 60
+        self._max_known_portals = self.get_int_setting("max_known_portals", 20, 1, 1000)
 
         self._zmq_queue_enabled = self.settings.get("zmq_queue_enabled", True)
         self._poll_smsg = self.settings.get("poll_smsg", False)
@@ -803,16 +805,7 @@ class BSXNetwork:
 
                 if network_type_to not in portals_from:
                     portals_from[network_type_to] = []
-                portals_from_to = portals_from[network_type_to]
-                use_portal = None
-                for portal in portals_from_to:
-                    if use_portal is None:
-                        use_portal = portal
-                    else:
-                        # TODO:  Pick better
-                        if portal.num_issues < use_portal.num_issues:
-                            use_portal = portal
-
+                use_portal = self.pickPortal(portals_from[network_type_to])
                 if use_portal is None:
                     self.log.warning(
                         f"Could not pick portal to network {network_type_to}, msg {self.logIDM(net_message_id)}"
@@ -1115,6 +1108,24 @@ class BSXNetwork:
 
         self.processMsg(msg)
 
+    def pickPortal(self, portals: list):
+        now: int = self.getTime()
+        live_portals = [
+            portal for portal in portals if portal.time_start + portal.time_valid >= now
+        ]
+        if len(live_portals) < 1:
+            # Portals are refreshed after they expire
+            return max(portals, key=lambda portal: portal.time_start, default=None)
+        use_portal = None
+        for portal in live_portals:
+            if use_portal is None:
+                use_portal = portal
+            else:
+                # TODO:  Pick better
+                if portal.num_issues < use_portal.num_issues:
+                    use_portal = portal
+        return use_portal
+
     def newPortal(self, network_from_id, network_to_id, now):
         addr_to: str = self.network_addr
         cursor = self.openDB()
@@ -1124,7 +1135,12 @@ class BSXNetwork:
             )
             portal = NetworkPortal()
             portal.set(
-                now, 30 * 60, network_from_id, network_to_id, addr_portal, addr_to
+                now,
+                self._portal_time_valid,
+                network_from_id,
+                network_to_id,
+                addr_portal,
+                addr_to,
             )
             portal.created_at = now
             portal.own_portal = True
@@ -1341,7 +1357,8 @@ class BSXNetwork:
             return
 
         now: int = self.getTime()
-        if time_start + portal_data.time_valid < now:
+        time_valid: int = min(portal_data.time_valid, self._portal_time_valid)
+        if time_start + time_valid < now:
             self.log.warning("Offered portal is expired.")
             return
 
@@ -1355,10 +1372,21 @@ class BSXNetwork:
                 },
             )
             if received_portal is None:
+                portals_from_to = self.known_portals.get(
+                    portal_data.network_type_from, {}
+                ).get(portal_data.network_type_to, [])
+                num_live: int = sum(
+                    1
+                    for portal in portals_from_to
+                    if portal.time_start + portal.time_valid >= now
+                )
+                if num_live >= self._max_known_portals:
+                    self.log.debug(f"Ignoring portal, {num_live} are already known.")
+                    return
                 received_portal = NetworkPortal()
                 received_portal.set(
                     time_start,
-                    portal_data.time_valid,
+                    time_valid,
                     portal_data.network_type_from,
                     portal_data.network_type_to,
                     addr_portal,
@@ -1369,7 +1397,7 @@ class BSXNetwork:
                 received_portal.num_refreshes += 1
             received_portal.smsg_difficulty = portal_data.smsg_difficulty
             received_portal.time_start = time_start
-            received_portal.time_valid = portal_data.time_valid
+            received_portal.time_valid = time_valid
 
             self.add(received_portal, cursor, upsert=True)
 
@@ -1476,12 +1504,22 @@ class BSXNetwork:
                     if portal.time_start + portal.time_valid <= now - (5 * 60):
                         self.refreshPortal(portal)
 
+        time_delete: int = now - self._forget_portals_after
         cursor = self.openDB()
         try:
             query: str = "DELETE FROM network_portals WHERE time_start < :time_delete"
-            cursor.execute(query, {"time_delete": now - self._forget_portals_after})
+            cursor.execute(query, {"time_delete": time_delete})
+            cursor.execute(
+                "DELETE FROM smsgaddresses WHERE use_type = :use_type AND addr NOT IN (SELECT address_from FROM network_portals)",
+                {"use_type": int(AddressTypes.PORTAL)},
+            )
         finally:
             self.closeDB(cursor)
+        for portals_from in self.known_portals.values():
+            for network_to, portals in portals_from.items():
+                portals_from[network_to] = [
+                    portal for portal in portals if portal.time_start >= time_delete
+                ]
         self._last_checked_bridges = now
 
     def updateNetwork(self) -> None:

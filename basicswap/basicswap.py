@@ -572,6 +572,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._mercy_watch_timeout_blocks = self.get_int_setting(
             "mercy_watch_timeout_blocks", 100, 6, 10000
         )  # Blocks, the swiper waits blocks_confirmed before sending
+        self._max_early_split_chunks_per_sender = self.get_int_setting(
+            "max_early_split_chunks_per_sender", 60, 6, 10000
+        )  # Rows stored before their bid arrives
+        self._max_early_split_chunks = self.get_int_setting(
+            "max_early_split_chunks", 1000, 6, 100000
+        )  # Rows stored before their bid arrives
+        self._max_split_chunks_per_bid = self.get_int_setting(
+            "max_split_chunks_per_bid", 60, 6, 10000
+        )  # Rows
 
         self._max_logfile_bytes = self.settings.get(
             "max_logfile_size", 100
@@ -14978,6 +14987,43 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             or row.parent_msg_id == xmr_swap.split_parent_msg_id
         )
 
+    def getSplitChunkRefusal(
+        self, cursor, msg, msg_type: int, bid_id: bytes, now: int
+    ) -> str | None:
+        q = cursor.execute(
+            "SELECT b.bid_addr, o.addr_from FROM bids b JOIN offers o ON o.offer_id = b.offer_id WHERE b.bid_id = :bid_id",
+            {"bid_id": bid_id},
+        ).fetchone()
+        if q is not None:
+            if (msg["from"], msg["to"]) not in ((q[0], q[1]), (q[1], q[0])):
+                return "not sent between the bid's addresses"
+            q = cursor.execute(
+                "SELECT COUNT(*) FROM xmr_split_data WHERE bid_id = :bid_id",
+                {"bid_id": bid_id},
+            ).fetchone()
+            if q[0] >= self._max_split_chunks_per_bid:
+                return f"{q[0]} chunks already stored for the bid"
+            return None
+
+        # Messages can arrive out of order, a bid's chunks before the bid
+        if msg_type != XmrSplitMsgTypes.BID:
+            return "unknown bid"
+        q = cursor.execute(
+            "SELECT COUNT(*) FROM offers WHERE addr_from = :addr_to AND was_sent = 1 AND active_ind = 1 AND expire_at > :now",
+            {"addr_to": msg["to"], "now": now},
+        ).fetchone()
+        if q[0] < 1:
+            return "unknown bid, not sent to an active offer"
+        q = cursor.execute(
+            "SELECT COUNT(*), SUM(addr_from = :addr_from) FROM xmr_split_data WHERE bid_id NOT IN (SELECT bid_id FROM bids)",
+            {"addr_from": msg["from"]},
+        ).fetchone()
+        if q[0] >= self._max_early_split_chunks:
+            return f"{q[0]} chunks already wait for their bids"
+        if (q[1] or 0) >= self._max_early_split_chunks_per_sender:
+            return f"{q[1]} chunks from the sender already wait for their bids"
+        return None
+
     def processXmrSplitMessage(self, msg) -> None:
         self.log.debug("Processing xmr split msg {}".format(self.log.id(msg["msgid"])))
         now: int = self.getTime()
@@ -15012,14 +15058,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             f"Split message sequence too high: {msg_data.sequence}",
         )
 
-        # TODO: Wait for bid msg to arrive first
-
         if (
             msg_data.msg_type == XmrSplitMsgTypes.BID
             or msg_data.msg_type == XmrSplitMsgTypes.BID_ACCEPT
         ):
             cursor = self.openDB()
             try:
+                refusal = self.getSplitChunkRefusal(
+                    cursor, msg, msg_data.msg_type, msg_data.msg_id, now
+                )
+                if refusal is not None:
+                    self.log.debug(
+                        f"Ignoring xmr split msg {self.log.id(msg['msgid'])}: {refusal}."
+                    )
+                    return
                 chunk_key = {
                     "bid_id": msg_data.msg_id,
                     "msg_type": msg_data.msg_type,
