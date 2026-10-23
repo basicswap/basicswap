@@ -4280,6 +4280,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pi = self.pi(swap_type)
                 _ = pi.getFundedInitiateTxTemplate(ci, ensure_balance, False)
                 # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
+        except TemporaryError:
+            raise
         except Exception as e:
             type_str = "offer" if for_offer else "bid"
             err_msg = f"Insufficient funds for {type_str} of {balance_msg}."
@@ -4779,6 +4781,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             ci = self.ci(Coins(offer.coin_from))
             balance: int = ci.getSpendableBalance()
+        except TemporaryError:
+            raise
         except Exception as e:
             self.log.warning(f"Wallet floor check unavailable: {e}")
             return
@@ -12259,6 +12263,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
             try:
                 self.validateOfferWalletFloor(offer, bid_amount, use_cursor, bid.bid_id)
+            except TemporaryError as e:
+                raise AutomationConstraintTemporary(str(e))
             except ValueError:
                 raise AutomationConstraint(
                     "Bid would take wallet below the offer's reserve floor"
