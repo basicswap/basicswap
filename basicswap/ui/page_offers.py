@@ -1123,6 +1123,11 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
         else:
             balance_key = "balance"
         data["coin_to_balance"] = coin_to_wallet[balance_key]
+        if coin_to_variant in swap_client.xmr_based_coins:
+            try:
+                data["coin_to_balance"] = ci_to.format_amount(ci_to.estMaxLockAmount(1))
+            except Exception as e:
+                swap_client.log.warning(f"Bid max unavailable: {e}")
 
         bid_can_subfee: bool = True
         if offer.swap_type != SwapTypes.XMR_SWAP:
