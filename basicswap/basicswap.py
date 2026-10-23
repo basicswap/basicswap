@@ -8593,16 +8593,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 f"Publishing redeem tx {self.logIDT(txid)} for bid {self.log.id(bid.bid_id)} failed, will retry: {e}"
             )
 
-    def rebroadcastRedeemTxn(self, ci, bid, tx_type, txn: bytes) -> bool:
-        """True once txn has blocks_confirmed confirmations, else rebroadcasts it
-        every redeem_rebroadcast_seconds."""
+    def rebroadcastRedeemTxn(self, ci, bid, tx_type, txn: bytes) -> dict | None:
+        """The confirmed tx once txn has blocks_confirmed confirmations, else
+        None, rebroadcasting it every redeem_rebroadcast_seconds."""
         txid = ci.getTxid(txn)
-        if ci.findConfirmedTxnByHash(txid.hex()) is not None:
-            return True
+        found = ci.findConfirmedTxnByHash(txid.hex())
+        if found is not None:
+            return found
         now: int = self.getTime()
         published_at = self._redeem_published_at.get((bid.bid_id, tx_type), 0)
         if now - published_at < self._redeem_rebroadcast_seconds:
-            return False
+            return None
         self._redeem_published_at[(bid.bid_id, tx_type)] = now
         try:
             ci.publishTx(txn)
@@ -8613,7 +8614,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(
                 f"Rebroadcasting redeem tx {self.logIDT(txid)} for bid {self.log.id(bid.bid_id)}: {e}"
             )
-        return False
+        return None
 
     def checkRedeemTxns(self, bid, offer) -> bool:
         """Rebroadcast this node's script swap redeem txns until each has
@@ -9212,7 +9213,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if state == BidStates.SWAP_COMPLETED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_REFUNDED:
-                rv = True  # Remove from swaps_in_progress
+                refund_spend_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND)
+                if (
+                    was_received
+                    and not was_sent
+                    and refund_spend_tx is not None
+                    and TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE not in bid.txns
+                ):
+                    found = self.rebroadcastRedeemTxn(
+                        ci_from,
+                        bid,
+                        TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND,
+                        xmr_swap.a_lock_refund_spend_tx,
+                    )
+                    if found:
+                        refund_spend_tx.chain_height = found["height"]
+                        self.add(refund_spend_tx, cursor, upsert=True)
+                        self.logBidEvent(
+                            bid.bid_id,
+                            EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_CONFIRMED,
+                            "",
+                            cursor,
+                        )
+                        rv = True  # Remove from swaps_in_progress
+                else:
+                    rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY:
@@ -9622,7 +9647,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         f"Found coin b lock spend tx bid {self.log.id(bid_id)}"
                     )
                     self.logBidEvent(
-                        bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN, "", cursor
+                        bid.bid_id,
+                        EventLogTypes.LOCK_TX_B_SPEND_TX_CONFIRMED,
+                        "",
+                        cursor,
                     )
                     rv = True  # Remove from swaps_in_progress
                     bid.setState(BidStates.SWAP_COMPLETED)
@@ -9642,7 +9670,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         )
                         self.logBidEvent(
                             bid.bid_id,
-                            EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN,
+                            EventLogTypes.LOCK_TX_B_SPEND_TX_CONFIRMED,
                             "",
                             cursor,
                         )
@@ -14163,11 +14191,44 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.bid_id, EventLogTypes.LOCK_TX_A_SPEND_TX_PUBLISHED, "", cursor
         )
 
+    def setBLockSpendHeight(
+        self, bid, spend_tx, spend_action, height: int | None, cursor
+    ) -> None:
+        if height is None:
+            return
+        first_seen: bool = spend_tx.chain_height is None
+        spend_tx.chain_height = height
+        self.add(spend_tx, cursor, upsert=True)
+        if first_seen and spend_action == ActionTypes.REDEEM_XMR_SWAP_LOCK_TX_B:
+            self.logBidEvent(
+                bid.bid_id, EventLogTypes.LOCK_TX_B_SPEND_TX_SEEN, "", cursor
+            )
+
     def isBLockSpendConfirmed(self, ci_to, bid, spend_action, cursor) -> bool:
         spend_txid: bytes = bid.xmr_b_lock_tx.spend_txid
+        spend_tx = bid.getTxnByTxid(spend_txid)
         if ci_to.coin_type() not in self.xmr_based_coins:
-            return ci_to.findConfirmedTxnByHash(spend_txid.hex()) is not None
-        depth = ci_to.getTxDepth(spend_txid)
+            found = ci_to.findConfirmedTxnByHash(spend_txid.hex())
+            if found is None:
+                return False
+            height = found.get("height")
+            if height and spend_tx is None:
+                tx_type = (
+                    TxTypes.XMR_SWAP_B_LOCK_REFUND
+                    if spend_action == ActionTypes.RECOVER_XMR_SWAP_LOCK_TX_B
+                    else TxTypes.XMR_SWAP_B_LOCK_SPEND
+                )
+                if tx_type not in bid.txns:
+                    spend_tx = SwapTx(
+                        bid_id=bid.bid_id, tx_type=tx_type, txid=spend_txid
+                    )
+                    bid.txns[tx_type] = spend_tx
+            if height and spend_tx is not None:
+                self.setBLockSpendHeight(bid, spend_tx, spend_action, height, cursor)
+            return True
+        depth, height = ci_to.getTxDepthAndHeight(spend_txid)
+        if depth and spend_tx is not None and spend_tx.chain_height is None:
+            self.setBLockSpendHeight(bid, spend_tx, spend_action, height, cursor)
         # Restricted nodes hide txs still in the Dandelion++ stem phase
         if (
             depth is None
@@ -14184,7 +14245,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.get_delay_retry_seconds(), spend_action, bid.bid_id, cursor
             )
             self.commitDB()
-        return depth is not None and depth > ci_to.blocks_confirmed
+        return depth is not None and depth >= ci_to.blocks_confirmed
 
     def sendBLockSpendTx(
         self, ci_to, bid, tx_type, cursor, *args, **kwargs

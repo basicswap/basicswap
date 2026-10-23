@@ -5398,7 +5398,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             [
                 OP_DUP,
                 OP_HASH160,
-                prevout_script[2:22],
+                self.pkh(self.getPubkey(key)),
                 OP_EQUALVERIFY,
                 OP_CHECKSIG,
             ]

@@ -731,13 +731,16 @@ class XMRInterface(CoinInterface):
             return rv
 
     def getTxDepth(self, txid: bytes) -> int | None:
+        return self.getTxDepthAndHeight(txid)[0]
+
+    def getTxDepthAndHeight(self, txid: bytes) -> tuple[int | None, int | None]:
         rv = self.getTransaction(txid)
         if txid.hex() in rv.get("missed_tx", []):
-            return None
+            return None, None
         tx = rv["txs"][0]
         if tx["in_pool"]:
-            return 0
-        return self.getChainHeight() - tx["block_height"]
+            return 0, None
+        return self.getChainHeight() - tx["block_height"], tx["block_height"]
 
     def spendBLockTx(self, *args, **kwargs) -> bytes:
         txid, tx = self.createBLockSpendTx(*args, **kwargs)
