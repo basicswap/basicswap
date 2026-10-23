@@ -27,7 +27,15 @@ from coincurve.dleag import (
 from basicswap.interface.base import (
     Curves,
 )
-from basicswap.util import i2b, b2i, b2h, dumpj, ensure, TemporaryError
+from basicswap.util import (
+    i2b,
+    b2i,
+    b2h,
+    dumpj,
+    ensure,
+    ChainNotSyncedError,
+    TemporaryError,
+)
 from basicswap.util.network import is_private_ip_address
 from basicswap.rpc_xmr import make_xmr_rpc_func, make_xmr_rpc2_func
 from basicswap.chainparams import Coins
@@ -35,6 +43,7 @@ from basicswap.interface.xmr.chainparams import XMR_COIN
 from basicswap.interface.base import CoinInterface
 
 ed25519_l = 2**252 + 27742317777372353535851937790883648493
+CHAIN_SYNCED_CACHE_SECONDS: int = 30
 
 
 class XMRInterface(CoinInterface):
@@ -169,6 +178,7 @@ class XMRInterface(CoinInterface):
         self._walletrpctimeoutlong = coin_settings.get("walletrpctimeoutlong", 600)
         self._num_chaininfo_retries = coin_settings.get("numchaininforetries", 20)
         self._chaininfo_retry_delay = coin_settings.get("chaininforetrydelay", 1)
+        self._chain_synced_until: float = 0
 
         self.rpc = make_xmr_rpc_func(
             coin_settings["rpcport"],
@@ -378,6 +388,20 @@ class XMRInterface(CoinInterface):
                     time.sleep(self._chaininfo_retry_delay)
                     continue
                 raise
+
+    def isChainSynced(self) -> bool:
+        if time.monotonic() < self._chain_synced_until:
+            return True
+        info = self.rpc2("get_info", timeout=self._rpctimeout)
+        target_height = info.get("target_height", 0)
+        daemon_height = info.get("height", 0)
+        if target_height > 0 and target_height > daemon_height:
+            return False
+        wallet_height = self.rpc_wallet("get_height")["height"]
+        if wallet_height + 2 < daemon_height:
+            return False
+        self._chain_synced_until = time.monotonic() + CHAIN_SYNCED_CACHE_SECONDS
+        return True
 
     def getWalletInfo(self):
         with self._mx_wallet:
@@ -691,6 +715,17 @@ class XMRInterface(CoinInterface):
                             )
                         )
                         rv = -1
+
+            if rv is None:
+                synced: bool = False
+                try:
+                    synced = self.isChainSynced()
+                except Exception as e:
+                    self._log.debug(f"findTxB isChainSynced failed: {e}")
+                if not synced:
+                    raise ChainNotSyncedError(
+                        "findTxB: chain/wallet not fully synced, refusing to report the coin B lock tx as missing"
+                    )
             return rv
 
     def getTxDepth(self, txid: bytes) -> int | None:

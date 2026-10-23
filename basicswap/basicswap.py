@@ -101,6 +101,7 @@ from .util import (
     AutomationConstraint,
     AutomationConstraintTemporary,
     BalanceError,
+    ChainNotSyncedError,
     DeserialiseNum,
     InactiveCoin,
     LockedCoinError,
@@ -8883,39 +8884,40 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 refund_tx = bid.txns[TxTypes.XMR_SWAP_A_LOCK_REFUND]
 
                 # Track the depth of the lock refund tx.
-                refund_tx_depth: int = 0
-                if refund_tx.state == TxStates.TX_CONFIRMED:
-                    refund_tx_depth = ci_from.blocks_confirmed
-                else:
-                    refund_tx_chain_info = ci_from.getLockTxHeight(
-                        refund_tx.txid,
-                        ci_from.getSCLockScriptAddress(
-                            xmr_swap.a_lock_refund_tx_script
-                        ),
-                        ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
-                        bid.chain_a_height_start,
-                        vout=refund_tx.vout,
-                    )
-                    if refund_tx_chain_info is not None:
-                        bid_changed: bool = False
-                        refund_tx_depth = refund_tx_chain_info.get("depth", 0)
-                        if (
-                            refund_tx.state
-                            in (None, TxStates.TX_NONE, TxStates.TX_SENT)
-                            and refund_tx_chain_info["height"] == 0
-                        ):
-                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
-                            bid_changed = True
-                        if (
-                            not refund_tx.block_height
-                            and refund_tx_chain_info["height"] != 0
-                        ):
-                            self.setTxBlockInfoFromHeight(
-                                ci_from, refund_tx, refund_tx_chain_info["height"]
-                            )
+                was_confirmed: bool = refund_tx.state == TxStates.TX_CONFIRMED
+                refund_tx_depth: int = ci_from.blocks_confirmed if was_confirmed else 0
+                refund_tx_chain_info = ci_from.getLockTxHeight(
+                    refund_tx.txid,
+                    ci_from.getSCLockScriptAddress(xmr_swap.a_lock_refund_tx_script),
+                    ci_from.getLockRefundTxSwapOutputValue(bid, xmr_swap),
+                    bid.chain_a_height_start,
+                    vout=refund_tx.vout,
+                )
+                if refund_tx_chain_info is not None:
+                    bid_changed: bool = False
+                    refund_tx_depth = refund_tx_chain_info.get("depth", 0)
+                    found_height: int = refund_tx_chain_info["height"]
+                    if (
+                        refund_tx.state in (None, TxStates.TX_NONE, TxStates.TX_SENT)
+                        and found_height == 0
+                    ):
+                        refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                        bid_changed = True
+                    # A reorg can move the tx to another block or back to the mempool
+                    if found_height != 0 and refund_tx.block_height != found_height:
+                        self.setTxBlockInfoFromHeight(ci_from, refund_tx, found_height)
+                        if not was_confirmed:
                             refund_tx.setState(TxStates.TX_IN_CHAIN)
-                            bid_changed = True
-                        if refund_tx_depth >= ci_from.blocks_confirmed:
+                        bid_changed = True
+                    elif found_height == 0 and refund_tx.block_height:
+                        refund_tx.block_hash = None
+                        refund_tx.block_height = None
+                        refund_tx.block_time = None
+                        if not was_confirmed:
+                            refund_tx.setState(TxStates.TX_IN_MEMPOOL)
+                        bid_changed = True
+                    if refund_tx_depth >= ci_from.blocks_confirmed:
+                        if not was_confirmed:
                             self.logBidEvent(
                                 bid.bid_id,
                                 EventLogTypes.LOCK_TX_A_REFUND_TX_CONFIRMED,
@@ -8924,9 +8926,19 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             )
                             refund_tx.setState(TxStates.TX_CONFIRMED)
                             bid_changed = True
-                        if bid_changed:
-                            self.add(refund_tx, cursor, upsert=True)
-                            self.commitDB()
+                    elif was_confirmed:
+                        self.log.warning(
+                            f"Lock refund tx {self.logIDT(refund_tx.txid)} dropped below depth {ci_from.blocks_confirmed} (now {refund_tx_depth}) for bid {self.log.id(bid_id)}."
+                        )
+                        refund_tx.setState(
+                            TxStates.TX_IN_CHAIN
+                            if found_height != 0
+                            else TxStates.TX_IN_MEMPOOL
+                        )
+                        bid_changed = True
+                    if bid_changed:
+                        self.add(refund_tx, cursor, upsert=True)
+                        self.commitDB()
 
                 if was_received:
                     if bid.debug_ind == DebugTypes.BID_DONT_SPEND_COIN_A_LOCK_REFUND:
@@ -9388,7 +9400,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 try:
                     bid_changed = self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 except Exception as e:
-                    if ci_to.is_transient_error(e):
+                    if isinstance(e, ChainNotSyncedError):
+                        self.log.warning(
+                            f"Bid {self.log.id(bid_id)}: Waiting for {ci_to.coin_name()} to sync before checking lock tx B."
+                        )
+                    elif ci_to.is_transient_error(e):
                         self.log.warning(
                             f"Bid {self.log.id(bid_id)}: Temporary RPC error checking lock tx B: {e}"
                         )
@@ -15663,12 +15679,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             self.log.warning(
                                 f"checkBidState {self.log.id(bid_id)} {ex}."
                             )
-                            self.logBidEvent(
-                                bid_id,
-                                EventLogTypes.SYSTEM_WARNING,
-                                "No connection to daemon",
-                                cursor=None,
-                            )
+                            if not isinstance(ex, ChainNotSyncedError):
+                                self.logBidEvent(
+                                    bid_id,
+                                    EventLogTypes.SYSTEM_WARNING,
+                                    "No connection to daemon",
+                                    cursor=None,
+                                )
                         else:
                             self.log.error(f"checkBidState {self.log.id(bid_id)} {ex}.")
                             self.setBidError(bid, str(ex))
