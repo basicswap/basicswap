@@ -1325,7 +1325,9 @@ class Test(unittest.TestCase):
             ("http://224.0.0.1", False),
             ("http://[ff02::1]/", False),
             ("http://[::ffff:10.0.0.5]/", False),
+            ("http://[64:ff9b::a00:5]/", False),
             ("https://8.8.8.8", True),
+            ("http://[64:ff9b::808:808]/", True),
         ]
         for url, is_public in test_urls:
             assert is_public_url(url) is is_public

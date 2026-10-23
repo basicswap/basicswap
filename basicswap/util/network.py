@@ -38,6 +38,9 @@ def is_loopback_address(addr: str) -> bool:
         return False
 
 
+NAT64_WELL_KNOWN_PREFIX = ipaddress.ip_network("64:ff9b::/96")
+
+
 def is_public_ip_address(addr: str) -> bool:
     try:
         ip = ipaddress.ip_address(addr)
@@ -45,6 +48,8 @@ def is_public_ip_address(addr: str) -> bool:
         return False
     if ip.version == 6 and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
+    elif ip.version == 6 and ip in NAT64_WELL_KNOWN_PREFIX:
+        ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
     return ip.is_global and not ip.is_multicast
 
 
