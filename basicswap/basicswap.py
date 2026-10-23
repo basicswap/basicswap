@@ -1315,6 +1315,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.firo.firo import FIROInterface
 
             return FIROInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.DIVI:
+            from .interface.divi.divi import DIVIInterface
+
+            return DIVIInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError("Unknown coin type")
 
@@ -8211,16 +8215,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     txsize = len(redeem_txn) // 2
                     self.log.debug(f"size paid, actual size {tx_vsize} {txsize}")
                     ensure(tx_vsize >= txsize, "underpaid fee")
-                elif ci.use_tx_vsize():
-                    self.log.debug(
-                        "vsize paid, actual vsize %d %d", tx_vsize, redeem_txjs["vsize"]
-                    )
-                    ensure(tx_vsize >= redeem_txjs["vsize"], "underpaid fee")
                 else:
+                    size_key: str = "vsize" if ci.use_tx_vsize() else "size"
+                    # Older daemons (eg Divi) omit both from
+                    # decoderawtransaction; the raw hex gives the same answer
+                    # for a chain with no witness data.
+                    actual_size: int = redeem_txjs.get(size_key, len(redeem_txn) // 2)
                     self.log.debug(
-                        "size paid, actual size %d %d", tx_vsize, redeem_txjs["size"]
+                        "%s paid, actual %s %d %d",
+                        size_key,
+                        size_key,
+                        tx_vsize,
+                        actual_size,
                     )
-                    ensure(tx_vsize >= redeem_txjs["size"], "underpaid fee")
+                    ensure(tx_vsize >= actual_size, "underpaid fee")
 
             redeem_txid = ci.getTxid(bytes.fromhex(redeem_txn))
             self.log.debug(
@@ -8366,16 +8374,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     txsize = len(refund_txn) // 2
                     self.log.debug(f"size paid, actual size {tx_vsize} {txsize}")
                     ensure(tx_vsize >= txsize, "underpaid fee")
-                elif ci.use_tx_vsize():
-                    self.log.debug(
-                        "vsize paid, actual vsize %d %d", tx_vsize, refund_txjs["vsize"]
-                    )
-                    ensure(tx_vsize >= refund_txjs["vsize"], "underpaid fee")
                 else:
+                    size_key: str = "vsize" if ci.use_tx_vsize() else "size"
+                    # Older daemons (eg Divi) omit both from
+                    # decoderawtransaction; the raw hex gives the same answer
+                    # for a chain with no witness data.
+                    actual_size: int = refund_txjs.get(size_key, len(refund_txn) // 2)
                     self.log.debug(
-                        "size paid, actual size %d %d", tx_vsize, refund_txjs["size"]
+                        "%s paid, actual %s %d %d",
+                        size_key,
+                        size_key,
+                        tx_vsize,
+                        actual_size,
                     )
-                    ensure(tx_vsize >= refund_txjs["size"], "underpaid fee")
+                    ensure(tx_vsize >= actual_size, "underpaid fee")
 
             refund_txid = ci.getTxid(bytes.fromhex(refund_txn))
             prev_txid = ci.getTxid(bytes.fromhex(txn))

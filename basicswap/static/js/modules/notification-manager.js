@@ -283,7 +283,8 @@ function ensureToastContainer() {
       13: 'FIRO',
       15: 'LTC (MWEB)',
       17: 'BCH',
-      18: 'DOGE'
+      18: 'DOGE',
+      19: 'DIVI'
     };
     return coinMap[coinId] || `Coin ${coinId}`;
   }
@@ -304,7 +305,8 @@ function ensureToastContainer() {
       13: 100000000,    // FIRO - 8 decimals
       15: 100000000,    // LTC (MWEB) - 8 decimals
       17: 100000000,    // BCH - 8 decimals
-      18: 100000000     // DOGE - 8 decimals
+      18: 100000000,    // DOGE - 8 decimals
+      19: 100000000     // DIVI - 8 decimals
     };
 
     const divisor = divisors[coinId] || 100000000;
