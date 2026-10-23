@@ -847,7 +847,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
             rescan_from = "now" if restore_time == -1 else restore_time
             descriptors = [
-                {"desc": desc_external, "timestamp": "now", "active": True},
+                {"desc": desc_external, "timestamp": rescan_from, "active": True},
                 {
                     "desc": desc_internal,
                     "timestamp": rescan_from,
