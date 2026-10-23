@@ -471,9 +471,14 @@ class DIVIInterface(BTCInterface):
         getaddressutxos answers the same question without involving the
         wallet at all.  It needs addressindex=1 in divi.conf, which
         prepare.py writes.
+
+        IronDivi answers the same call by scanning the UTXO set, which takes
+        about 7 s on mainnet, so the default 10 s RPC timeout is too tight.
         """
         try:
-            utxos = self.rpc("getaddressutxos", [{"addresses": [dest_address]}])
+            utxos = self.rpc(
+                "getaddressutxos", [{"addresses": [dest_address]}], timeout=60
+            )
         except Exception as e:
             self._log.error(
                 f"{self.ticker()} getaddressutxos failed for "
