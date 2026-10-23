@@ -716,60 +716,62 @@ def page_amm(self, _, post_string):
                 else post_string
             )
 
-            if "start" in form_data:
-                amm_host = form_data.get("host", ["127.0.0.1"])[0]
-                amm_port = int(form_data.get("port", ["12700"])[0])
-                amm_ui_debug = "debug" in form_data
-                amm_debug = amm_ui_debug
-
-                success, msg = start_amm_process(
-                    swap_client, amm_host, amm_port, debug=amm_debug
-                )
-                if success:
-                    messages.append(msg)
-                else:
-                    err_messages.append(msg)
-
-            elif "force_start" in form_data:
-                amm_host = form_data.get("host", ["127.0.0.1"])[0]
-                amm_port = int(form_data.get("port", ["12700"])[0])
-                amm_ui_debug = "debug" in form_data
-                amm_debug = amm_ui_debug
-
-                success, msg = start_amm_process_force(
-                    swap_client, amm_host, amm_port, debug=amm_debug
-                )
-                if success:
-                    messages.append(f"Force started: {msg}")
-                else:
-                    err_messages.append(f"Force start failed: {msg}")
-
-            elif "stop" in form_data:
-                success, msg = stop_amm_process(swap_client)
-                if success:
-                    messages.append(msg)
-                else:
-                    err_messages.append(msg)
-
-            elif "check_processes" in form_data:
-                existing_pids = check_existing_amm_processes()
-                if existing_pids:
-                    messages.append(f"Found existing AMM processes: {existing_pids}")
-                else:
-                    messages.append("No existing AMM processes found")
-
-            elif "kill_orphans" in form_data:
-                success, msg = kill_existing_amm_processes(swap_client)
-                if success:
-                    messages.append(msg)
-                else:
-                    err_messages.append(msg)
-
             is_control_action = not any(
                 marker in form_data for marker in AMM_CONFIG_FORM_MARKERS
             )
 
             if is_control_action:
+                if "start" in form_data:
+                    amm_host = form_data.get("host", ["127.0.0.1"])[0]
+                    amm_port = int(form_data.get("port", ["12700"])[0])
+                    amm_ui_debug = "debug" in form_data
+                    amm_debug = amm_ui_debug
+
+                    success, msg = start_amm_process(
+                        swap_client, amm_host, amm_port, debug=amm_debug
+                    )
+                    if success:
+                        messages.append(msg)
+                    else:
+                        err_messages.append(msg)
+
+                elif "force_start" in form_data:
+                    amm_host = form_data.get("host", ["127.0.0.1"])[0]
+                    amm_port = int(form_data.get("port", ["12700"])[0])
+                    amm_ui_debug = "debug" in form_data
+                    amm_debug = amm_ui_debug
+
+                    success, msg = start_amm_process_force(
+                        swap_client, amm_host, amm_port, debug=amm_debug
+                    )
+                    if success:
+                        messages.append(f"Force started: {msg}")
+                    else:
+                        err_messages.append(f"Force start failed: {msg}")
+
+                elif "stop" in form_data:
+                    success, msg = stop_amm_process(swap_client)
+                    if success:
+                        messages.append(msg)
+                    else:
+                        err_messages.append(msg)
+
+                elif "check_processes" in form_data:
+                    existing_pids = check_existing_amm_processes()
+                    if existing_pids:
+                        messages.append(
+                            f"Found existing AMM processes: {existing_pids}"
+                        )
+                    else:
+                        messages.append("No existing AMM processes found")
+
+                elif "kill_orphans" in form_data:
+                    success, msg = kill_existing_amm_processes(swap_client)
+                    if success:
+                        messages.append(msg)
+                    else:
+                        err_messages.append(msg)
+
                 if "autostart" in form_data:
                     swap_client.settings["amm_autostart"] = True
                     swap_client.log.info("AMM autostart enabled")
