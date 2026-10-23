@@ -186,6 +186,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
             stdout=stdout_dest,
             stderr=stderr_dest,
             cwd=datadir_path,
+            pass_fds=extra_config.get("pass_fds", ()),
         ),
         opened_files,
         os.path.basename(daemon_bin),

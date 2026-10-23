@@ -979,7 +979,11 @@ def initialise_wallets(
                 )
                 coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
 
-                extra_config = {"stdout_to_file": True, "coin_name": coin_name}
+                extra_config = {
+                    "stdout_to_file": True,
+                    "coin_name": coin_name,
+                    "pass_fds": module.getWalletInitDaemonPassFds(),
+                }
 
                 if module.provides_master_key and "particl_daemon" in extra_opts:
                     daemons.append(extra_opts["particl_daemon"])
