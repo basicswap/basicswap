@@ -426,6 +426,11 @@ class BaseApp(DBMethods):
         self.log.warning(f"Setting mocktime to {new_offset}")
         self.mock_time_offset = new_offset
 
+    @staticmethod
+    def checkDue(now: int, last_checked: int, interval: int) -> bool:
+        # A clock moved back, real or mocked, must not stall the check
+        return not 0 <= now - last_checked < interval
+
     def get_clamped_int_from(
         self,
         settings: dict,

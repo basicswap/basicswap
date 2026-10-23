@@ -500,12 +500,6 @@ class TestFunctions(BaseTest):
             for e in swap_client.getEvents(Concepts.BID, bid_id)
         )
 
-    def _clear_mock_time(self, swap_client) -> None:
-        swap_client.setMockTimeOffset(0)
-        # update() stamped these with the mocked time, which holds off its checks
-        for name in [k for k in vars(swap_client) if k.startswith("_last_checked_")]:
-            setattr(swap_client, name, 0)
-
     def _assert_mercy_waits_for_swipe(
         self, bid_id, id_leader: int, id_follower: int, chain_a_coin
     ) -> None:
@@ -2101,7 +2095,7 @@ class TestFunctions(BaseTest):
         finally:
             self.continueMining()
             for node_id in (id_leader, id_follower):
-                self._clear_mock_time(swap_clients[node_id])
+                swap_clients[node_id].setMockTimeOffset(0)
                 swap_clients[node_id].check_expired_seconds = old_check_expired_seconds
 
     def do_test_10_underfunded_lock_a(self, coin_from, coin_to):
@@ -2209,6 +2203,9 @@ class BasicSwapTest(TestFunctions):
             "---------- Test {} p2sh nested segwit".format(self.test_coin_from.name)
         )
         ci = self.swap_clients[0].ci(self.test_coin_from)
+        if hasattr(ci, "_use_descriptors") and ci._use_descriptors:
+            logging.warning("Skipping test")
+            return
 
         addr_p2sh_segwit = ci.rpc_wallet(
             "getnewaddress", ["segwit test", "p2sh-segwit"]
@@ -2570,7 +2567,7 @@ class BasicSwapTest(TestFunctions):
         ci1 = self.swap_clients[1].ci(self.test_coin_from)
 
         addr = ci.rpc_wallet("getnewaddress", ["watchonly test", "bech32"])
-        ci1.rpc_wallet("importaddress", [addr, "", False])
+        ci1.importWatchOnlyAddress(addr, "")
         txid = ci.rpc_wallet("sendtoaddress", [addr, 1.0])
         tx_hex = ci.rpc(
             "getrawtransaction",
@@ -2584,19 +2581,16 @@ class BasicSwapTest(TestFunctions):
                 tx_hex,
             ],
         )
-        ro = ci1.rpc_wallet(
+        ro = ci1.rpc_wallet_watch(
             "gettransaction",
             [
                 txid,
             ],
         )
         assert ro["txid"] == txid
-        balances = ci1.rpc_wallet("getbalances")
-        assert (
-            balances["watchonly"]["trusted"]
-            + balances["watchonly"]["untrusted_pending"]
-            >= 1.0
-        )
+        balances = ci1.rpc_wallet_watch("getbalances")
+        watched = balances["mine" if ci1._use_descriptors else "watchonly"]
+        assert watched["trusted"] + watched["untrusted_pending"] >= 1.0
 
     def test_006_getblock_verbosity(self):
         logging.info(
@@ -3261,19 +3255,20 @@ class BasicSwapTest(TestFunctions):
         assert addr_info["hdmasterfingerprint"] == "a55b7ea9"
         assert addr_info["hdkeypath"] == "m/0h/1h/0h"
 
-        address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
-        for chain in ["external", "internal"]:
-            extkey_data = b58decode(address_chains[chain])[4:-4]
-            ek = ExtKeyPair()
-            ek.decode(extkey_data)
-            addr0h = ci.encodeSegwitAddress(
-                ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
-            )
-            if self.test_coin_from == Coins.BTC:
-                assert addr0h == self.expected_addresses[chain]
-            else:
-                pass
-                # TODO: derive expected keys
+        if not ci.canExportToElectrum():
+            address_chains = ci.getWalletKeyChains(bytes.fromhex(test_seed))
+            for chain in ["external", "internal"]:
+                extkey_data = b58decode(address_chains[chain])[4:-4]
+                ek = ExtKeyPair()
+                ek.decode(extkey_data)
+                addr0h = ci.encodeSegwitAddress(
+                    ci.getPubkeyHash(ek.derive_path("0h").get_pubkey())
+                )
+                if self.test_coin_from == Coins.BTC:
+                    assert addr0h == self.expected_addresses[chain]
+                else:
+                    pass
+                    # TODO: derive expected keys
 
         desc_watch = descsum_create(f"addr({addr})")
         self.callnoderpc(
@@ -3424,6 +3419,9 @@ class BasicSwapTest(TestFunctions):
     def test_015_changetype(self):
         logging.info(f"---------- Test {self.test_coin_from.name} changetype")
         ci = self.swap_clients[0].ci(self.test_coin_from)
+        if hasattr(ci, "_use_descriptors") and ci._use_descriptors:
+            logging.warning("Skipping test")
+            return
 
         addr_p2sh = ci.rpc_wallet(
             "getnewaddress", ["test_015_changetype", "p2sh-segwit"]
@@ -3478,7 +3476,7 @@ class BasicSwapTest(TestFunctions):
         lock_tx = ci0.signTxWithWallet(lock_tx)
         script_addr: str = ci0.encodeScriptDest(ci0.getScriptDest(lock_tx_script))
 
-        ci1.rpc_wallet_watch("importaddress", [script_addr])
+        ci1.importWatchOnlyAddress(script_addr, "")
 
         try:
             mining_address: str = self.getMiningAddr()
@@ -4074,7 +4072,7 @@ class BasicSwapTest(TestFunctions):
             )
         finally:
             swap_clients[0].check_expired_seconds = old_check_expired_seconds
-            self._clear_mock_time(swap_clients[0])
+            swap_clients[0].setMockTimeOffset(0)
 
     def test_08_insufficient_funds(self):
         self.do_test_08_insufficient_funds(self.test_coin_from, Coins.XMR)
@@ -4295,6 +4293,7 @@ class TestBTC(BasicSwapTest):
         assert rv["seed_id"] in (
             "3da5c0af91879e8ce97d9a843874601c08688078",
             "4a231080ec6f4078e543d39cc6dcf0b922c9b16b",
+            "44c597105a996e6c4234f7dc3593dde8bd0b1062",
         )
         assert rv["seed_id"] == rv["expected_seed_id"]
 

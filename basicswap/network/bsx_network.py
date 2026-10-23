@@ -1459,7 +1459,7 @@ class BSXNetwork:
         now: int = self.getTime()
 
         if self._poll_smsg:
-            if now - self._last_checked_smsg >= self.check_smsg_seconds:
+            if self.checkDue(now, self._last_checked_smsg, self.check_smsg_seconds):
                 self._last_checked_smsg = now
                 options = {
                     "encoding": "hex",
@@ -1479,7 +1479,9 @@ class BSXNetwork:
         try:
             if self._bridge_networks:
                 if len(self.active_networks) > 1:
-                    if now - self._last_checked_bridges >= self.check_bridges_seconds:
+                    if self.checkDue(
+                        now, self._last_checked_bridges, self.check_bridges_seconds
+                    ):
                         self.updateNetworkBridges(now)
             for network in self.active_networks:
                 if network["type"] == "simplex":
