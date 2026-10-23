@@ -1066,6 +1066,12 @@ def js_sentbids(self, url_split, post_string, is_json) -> bytes:
     return formatBids(swap_client, bids, filters)
 
 
+def js_network(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    swap_client.checkSystemStatus()
+    return bytes(json.dumps(swap_client.get_network_info()), "UTF-8")
+
+
 def js_networks(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     swap_client.checkSystemStatus()
@@ -2363,6 +2369,7 @@ endpoints = {
     "sentoffers": js_sentoffers,
     "bids": js_bids,
     "sentbids": js_sentbids,
+    "network": js_network,
     "networks": js_networks,
     "revokeoffer": js_revokeoffer,
     "smsgaddresses": js_smsgaddresses,

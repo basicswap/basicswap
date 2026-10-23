@@ -205,6 +205,7 @@ from .network.simplex.simplex import encryptMsg
 from .network.bsx_network import BSXNetwork, networkTypeToID
 from .network.util import getMsgPubkey
 import basicswap.config as cfg
+import basicswap.network.network as bsn
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 
@@ -843,6 +844,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(f"Disconnected electrum backend for {coin_type}")
                 except Exception as e:
                     self.log.debug(f"Error disconnecting electrum backend: {e}")
+
+        if self._network:
+            self._network.stopNetwork()
+            self._network = None
 
         self.log.info("Stopping threads.")
         for t in self.threads:
@@ -1531,6 +1536,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 self.threads.append(t)
                 t.start()
+
+        if "p2p_host" in self.settings:
+            network_key = self.getNetworkKey(1)
+            self._network = bsn.Network(
+                self.settings["p2p_host"], self.settings["p2p_port"], network_key, self
+            )
+            self._network.startNetwork()
 
         self.log.debug(
             f"network_key {self.network_key}\nnetwork_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"
@@ -4966,6 +4978,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
         return self.grindForEd25519Key(coin_to, evkey, key_path_base)
+
+    def getNetworkKey(self, key_num):
+        evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
+            "evkey"
+        ]
+
+        key_path = "44445556h/1h/{}".format(int(key_num))
+
+        extkey = self.callcoinrpc(Coins.PART, "extkey", ["info", evkey, key_path])[
+            "key_info"
+        ]["result"]
+        return decodeWif(
+            self.callcoinrpc(Coins.PART, "extkey", ["info", extkey])["key_info"][
+                "privkey"
+            ]
+        )
 
     def getContractPubkey(self, date, contract_count):
 
