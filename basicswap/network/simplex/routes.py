@@ -95,7 +95,7 @@ def processSimplexConnectRequest(self, net_i, req_data, offer, cursor) -> None:
     self.log.debug(
         f"Opening direct message route from {offer.addr_from} to {bidder_addr}"
     )
-    message_route = self.getMessageRoute(2, bidder_addr, offer.addr_from, cursor=cursor)
+    message_route = self.getMessageRoute(2, offer.addr_from, bidder_addr, cursor=cursor)
     if message_route:
         raise ValueError("Direct message route already exists")
 
@@ -107,7 +107,7 @@ def processSimplexConnectRequest(self, net_i, req_data, offer, cursor) -> None:
         "Invalid characters in connection request",
     )
 
-    self.checkConnectRequestRateLimit(int(MessageNetworks.SIMPLEX))
+    self.checkConnectRequestRateLimit(int(MessageNetworks.SIMPLEX), bidder_addr)
 
     cmd_id = net_i.send_command(f"/connect {connReqInvitation}")
     response = net_i.wait_for_command_response(cmd_id)
@@ -149,34 +149,11 @@ def sendSimplexRouteMsg(
     deterministic,
 ) -> bytes:
     network = self.getActiveNetwork(MessageNetworks.SIMPLEX)
-    net_i = network["ws_thread"]
 
-    remote_name = None
     route_data = json.loads(message_route.route_data.decode("UTF-8"))
-    if "localDisplayName" in route_data:
-        remote_name = route_data["localDisplayName"]
-    else:
-        pccConnId = route_data["pccConnId"]
-        self.log.debug(f"Finding name for Simplex chat, ID: {pccConnId}")
-        cmd_id = net_i.send_command("/chats")
-        response = net_i.wait_for_command_response(cmd_id)
-        for chat in getResponseData(response, "chats"):
-            if (
-                "chatInfo" not in chat
-                or "type" not in chat["chatInfo"]
-                or chat["chatInfo"]["type"] != "direct"
-            ):
-                continue
-            try:
-                if chat["chatInfo"]["contact"]["activeConn"]["connId"] == pccConnId:
-                    remote_name = chat["chatInfo"]["contact"]["localDisplayName"]
-                    break
-            except Exception as e:
-                self.log.debug(f"Error parsing chat: {e}")
-
-    if remote_name is None:
+    if "contactId" not in route_data:
         raise RuntimeError(
-            f"Unable to find remote name for simplex direct chat, pccConnId: {pccConnId}"
+            f"Simplex direct chat not connected, pccConnId: {route_data['pccConnId']}"
         )
 
     message_id = sendSimplexMsg(
@@ -189,6 +166,6 @@ def sendSimplexRouteMsg(
         cursor,
         timestamp,
         deterministic,
-        to_user_name=remote_name,
+        to_contact_id=route_data["contactId"],
     )
     return message_id

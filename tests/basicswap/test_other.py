@@ -2423,6 +2423,149 @@ class Test(unittest.TestCase):
         finally:
             db_test.closeDB(cursor)
 
+    def test_connect_request_limits(self):
+        from types import SimpleNamespace
+        from basicswap.network.bsx_network import BSXNetwork
+
+        now: int = 1800000000
+        sc = SimpleNamespace(
+            getTime=lambda: now,
+            _connect_request_times={},
+            _sender_connect_request_times={},
+            _max_connect_requests_per_hour=3,
+            _max_connect_requests_per_sender_per_hour=2,
+        )
+
+        def check(addr_from: str, new_route: bool = True) -> None:
+            BSXNetwork.checkConnectRequestRateLimit(sc, 1, addr_from, new_route)
+
+        check("addr_a")
+        check("addr_a")
+        with self.assertRaisesRegex(ValueError, "exceeded for sender"):
+            check("addr_a")
+        check("addr_b")
+        with self.assertRaisesRegex(ValueError, "rate limit exceeded$"):
+            check("addr_c")
+        check("addr_c", new_route=False)
+
+        now += 3600
+        check("addr_a")
+        assert list(sc._sender_connect_request_times) == [(1, "addr_a")]
+
+    def test_simplex_connect_request_finds_existing_route(self):
+        from types import SimpleNamespace
+        from unittest import mock
+        from basicswap.db import DirectMessageRoute
+        from basicswap.network.bsx_network import BSXNetwork
+        from basicswap.network.simplex.routes import processSimplexConnectRequest
+
+        sc = DBMethods()
+        sc.sqlite_file = ":memory:"
+        sc.mxDB = threading.RLock()
+        sc.log = BSXLogger("test")
+        sc.getMessageRoute = lambda *args, **kwargs: BSXNetwork.getMessageRoute(
+            sc, *args, **kwargs
+        )
+        net_i = mock.MagicMock()
+        offer = SimpleNamespace(
+            offer_id=secrets.token_bytes(28), addr_from="offer_addr"
+        )
+        cursor = sc.openDB()
+        try:
+            create_db_(sc._db_con, logger)
+            sc.add(
+                DirectMessageRoute(
+                    active_ind=1,
+                    network_id=2,
+                    smsg_addr_local="offer_addr",
+                    smsg_addr_remote="bid_addr",
+                    created_at=0,
+                ),
+                cursor,
+            )
+            req_data = {"bsx_address": "bid_addr", "connection_req": "simplex:/x"}
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                processSimplexConnectRequest(sc, net_i, req_data, offer, cursor)
+            net_i.send_command.assert_not_called()
+        finally:
+            sc.closeDB(cursor)
+
+    def test_simplex_receive_queue_bounded(self):
+        from unittest import mock
+        from basicswap.network.simplex import simplex
+
+        with mock.patch.object(simplex, "MAX_RECV_QUEUE_SIZE", 2):
+            ws_thread = simplex.WebSocketThread("ws://127.0.0.1:1", logger=logger)
+        for i in range(3):
+            ws_thread.on_message(None, '{"resp": {}}')
+        ws_thread.on_message(None, '{"corrId": "1"}')
+        assert ws_thread.recv_queue.qsize() == 2
+        assert ws_thread.cmd_recv_queue.qsize() == 1
+        assert ws_thread.num_messages_dropped == 1
+
+    def test_simplex_frame_limits_installed(self):
+        from types import SimpleNamespace
+        import websocket
+        from basicswap.network.nostr.client import BoundedFrameBuffer
+        from basicswap.network.simplex import simplex
+
+        ws_thread = simplex.WebSocketThread("ws://127.0.0.1:1", logger=logger)
+        ws_sock = websocket.WebSocket()
+        ws_thread.on_open(SimpleNamespace(sock=ws_sock))
+        assert isinstance(ws_sock.frame_buffer, BoundedFrameBuffer)
+        assert ws_sock.frame_buffer.max_frame_len == simplex.MAX_EVENT_LEN
+
+    def test_portal_smsg_difficulty_bound(self):
+        from basicswap.basicswap_util import MessageNetworks
+        from basicswap.messages_npb import MessagePortalOffer
+        from basicswap.network.bsx_network import BSXNetwork
+
+        sc = DBMethods()
+        sc.sqlite_file = ":memory:"
+        sc.mxDB = threading.RLock()
+        sc.log = BSXLogger("test")
+        now: int = 1800000000
+        sc.getTime = lambda: now
+        sc.getSmsgMsgBytes = lambda msg: msg["payload"]
+        sc.getActiveNetwork = lambda network_id: {"bridged": [{"type": "simplex"}]}
+        sc.own_portals = {}
+        sc.known_portals = {}
+        sc._portal_time_valid = 30 * 60
+        sc._max_known_portals = 20
+        sc._have_smsg_rpc = False
+
+        cursor = sc.openDB()
+        try:
+            create_db_(sc._db_con, logger)
+
+            def offer_portal(addr_portal: str, smsg_difficulty: int) -> int:
+                msg_data = MessagePortalOffer(
+                    network_type_from=MessageNetworks.SMSG,
+                    network_type_to=MessageNetworks.SIMPLEX,
+                    portal_address_to=b"network_addr",
+                    time_valid=30 * 60,
+                    smsg_difficulty=smsg_difficulty,
+                )
+                msg = {
+                    "msgid": secrets.token_bytes(28).hex(),
+                    "msg_net": "smsg",
+                    "sent": now,
+                    "from": addr_portal,
+                    "pubkey_from": "02" + "11" * 32,
+                    "payload": msg_data.to_bytes(),
+                }
+                BSXNetwork.processPortalOffer(sc, msg)
+                return cursor.execute(
+                    "SELECT COUNT(*) FROM network_portals"
+                ).fetchone()[0]
+
+            assert offer_portal("portal_1", 0x1EFFFFFF) == 1
+            assert offer_portal("portal_2", 0x1E0FFFFF) == 1
+            assert offer_portal("portal_3", 0x1E3FFFFF) == 2
+            assert offer_portal("portal_4", 0) == 2
+        finally:
+            sc.closeDB(cursor)
+
     def test_db_savepoint(self):
         db_test = DBMethods()
         db_test.sqlite_file = ":memory:"

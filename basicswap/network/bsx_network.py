@@ -53,6 +53,9 @@ from basicswap.util.address import (
 )
 from basicswap.util.logging import LogCategories as LC
 from basicswap.util.smsg import smsgGetID
+from basicswap.contrib.test_framework.messages import uint256_from_compact
+
+MAX_PORTAL_SMSG_DIFFICULTY: int = 0x1E3FFFFF  # Compact target
 
 
 def networkTypeToID(type: str) -> int:
@@ -97,8 +100,12 @@ class BSXNetwork:
             )
         )  # Seconds
         self._connect_request_times = {}
+        self._sender_connect_request_times = {}
         self._max_connect_requests_per_hour = self.settings.get(
-            "max_connect_requests_per_hour", 30
+            "max_connect_requests_per_hour", 100
+        )
+        self._max_connect_requests_per_sender_per_hour = self.settings.get(
+            "max_connect_requests_per_sender_per_hour", 5
         )
         self.check_smsg_seconds = self.get_int_setting(
             "check_smsg_seconds", 10, 1, 10 * 60
@@ -141,10 +148,6 @@ class BSXNetwork:
         super().__init__(data_dir=data_dir, settings=settings, **kwargs)
 
     def finalise(self):
-        if self._network:
-            self._network.stopNetwork()
-            self._network = None
-
         if self.zmqContext:
             self.zmqContext.destroy()
 
@@ -286,15 +289,6 @@ class BSXNetwork:
 
         finally:
             self.closeDB(cursor)
-
-    def add_connection(self, host, port, peer_pubkey):
-        self.log.info(f"add_connection {host} {port} {peer_pubkey.hex()}.")
-        self._network.add_connection(host, port, peer_pubkey)
-
-    def get_network_info(self):
-        if not self._network:
-            return {"Error": "Not Initialised"}
-        return self._network.get_info()
 
     def getNetworksInfo(self) -> list:
         network_config_list = self.settings.get("networks", [])
@@ -910,19 +904,37 @@ class BSXNetwork:
     def getSmsgMsgPayloadVersion(self, msg) -> int:
         return msg.get("payloadversion", self._smsg_payload_version)
 
-    def checkConnectRequestRateLimit(self, network_id: int) -> None:
+    def checkConnectRequestRateLimit(
+        self, network_id: int, addr_from: str, new_route: bool = True
+    ) -> None:
         now_rl: int = self.getTime()
-        request_times = [
+        for key, times in list(self._sender_connect_request_times.items()):
+            if now_rl - times[-1] >= 3600:
+                del self._sender_connect_request_times[key]
+        sender_key = (network_id, addr_from)
+        sender_times = [
             t
-            for t in self._connect_request_times.get(network_id, [])
+            for t in self._sender_connect_request_times.get(sender_key, [])
             if now_rl - t < 3600
         ]
         ensure(
-            len(request_times) < self._max_connect_requests_per_hour,
-            "Connection request rate limit exceeded",
+            len(sender_times) < self._max_connect_requests_per_sender_per_hour,
+            "Connection request rate limit exceeded for sender",
         )
-        request_times.append(now_rl)
-        self._connect_request_times[network_id] = request_times
+        if new_route:
+            request_times = [
+                t
+                for t in self._connect_request_times.get(network_id, [])
+                if now_rl - t < 3600
+            ]
+            ensure(
+                len(request_times) < self._max_connect_requests_per_hour,
+                "Connection request rate limit exceeded",
+            )
+            request_times.append(now_rl)
+            self._connect_request_times[network_id] = request_times
+        sender_times.append(now_rl)
+        self._sender_connect_request_times[sender_key] = sender_times
 
     def expireMessageRoutes(self) -> None:
         if self._is_locked is True:
@@ -1283,6 +1295,23 @@ class BSXNetwork:
         portal_data.from_bytes(msg_bytes)
         if portal_data.network_type_from != network_received_on:
             raise RuntimeError("Network from must match network received on.")
+        smsg_difficulty: int = portal_data.smsg_difficulty
+        min_target: int = uint256_from_compact(MAX_PORTAL_SMSG_DIFFICULTY)
+        if self._have_smsg_rpc:
+            # Stakers can raise the smsg difficulty past the fixed cap
+            min_target = min(
+                min_target,
+                uint256_from_compact(self.callrpc("smsggetdifficulty", [-1, True])),
+            )
+        # uint256_from_compact can't decode exponents below 3, all far too hard
+        if (
+            smsg_difficulty >> 24 < 3
+            or uint256_from_compact(smsg_difficulty) < min_target
+        ):
+            self.log.debug(
+                f"Ignoring portal, smsg difficulty {smsg_difficulty:x} is too high."
+            )
+            return
 
         network_from = self.getActiveNetwork(portal_data.network_type_from)
 

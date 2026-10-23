@@ -692,6 +692,8 @@ class NostrClient:
                 raise TemporaryError("Too many Nostr publications queued.")
             self._pending_publishes[event["id"]] = PendingPublish(event)
             self._seen_event_ids[event["id"]] = True
+            while len(self._seen_event_ids) > MAX_SEEN_EVENT_IDS:
+                self._seen_event_ids.popitem(last=False)
         self._publish_wake.set()
 
     def runPublisher(self) -> None:

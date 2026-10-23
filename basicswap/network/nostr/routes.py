@@ -189,7 +189,9 @@ def processNostrConnectRequest(self, net_i, msg, req_data, offer, cursor) -> Non
                 msg["sent"] > route_data.get("req_sent", 0),
                 "Direct message route already exists",
             )
-        self.checkConnectRequestRateLimit(int(MessageNetworks.NOSTR))
+        self.checkConnectRequestRateLimit(
+            int(MessageNetworks.NOSTR), bidder_addr, new_route=replace_key
+        )
         if replace_key:
             self.log.info(f"Replacing remote key of route {message_route.record_id}")
             route_data["remote_pubkey"] = remote_pubkey
@@ -231,7 +233,7 @@ def processNostrConnectRequest(self, net_i, msg, req_data, offer, cursor) -> Non
         return
     route_privkey_hex, route_pubkey = newNostrRouteKey()
 
-    self.checkConnectRequestRateLimit(int(MessageNetworks.NOSTR))
+    self.checkConnectRequestRateLimit(int(MessageNetworks.NOSTR), bidder_addr)
 
     now: int = self.getTime()
     # No connection to establish, the route is usable immediately.

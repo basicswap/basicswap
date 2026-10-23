@@ -350,6 +350,21 @@ class TestNostrInboundGates(unittest.TestCase):
         with self.assertRaisesRegex(TemporaryError, "Too many"):
             client.publishEvent(client.buildEvent("ZnVsbA=="))
 
+    def test_published_ids_stay_within_seen_limit(self):
+        from unittest import mock
+
+        client = self.makeClient()
+        expire_at = int(time.time()) + 600
+        events = [
+            client.buildEvent("ZnVsbA==", expiration=expire_at + i) for i in range(5)
+        ]
+        with mock.patch("basicswap.network.nostr.client.MAX_SEEN_EVENT_IDS", 3):
+            for event in events:
+                client.publishEvent(event)
+        assert len(client._seen_event_ids) == 3
+        assert events[0]["id"] not in client._seen_event_ids
+        assert events[-1]["id"] in client._seen_event_ids
+
     def test_frame_limits_reject_before_payload(self):
         import struct
         from websocket import WebSocketPayloadException
@@ -2296,6 +2311,7 @@ class TestNostrHandshake(BasicSwapFixture):
             "resp": {
                 "Right": {
                     "contact": {
+                        "contactId": 7,
                         "activeConn": {"connId": "conn-77"},
                         "localDisplayName": "peer",
                     }

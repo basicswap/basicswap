@@ -537,9 +537,9 @@ class TestSimplexSend(unittest.TestCase):
     def test_send_counts(self):
         ws = FakeSendWs()
         submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg")
-        submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg", to_user_name="bob")
+        submitSimplexMsg(self.app, {"ws_thread": ws}, b"msg", to_contact_id=7)
         assert ws.commands[0].startswith("#bsx ")
-        assert ws.commands[1].startswith("@bob ")
+        assert ws.commands[1].startswith("/_send @7 text ")
         assert self.app.num_group_simplex_messages_sent == 1
         assert self.app.num_direct_simplex_messages_sent == 1
 

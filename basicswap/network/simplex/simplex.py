@@ -13,7 +13,7 @@ import traceback
 import websocket
 
 
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
 
 from basicswap.util.smsg import (
     smsgEncrypt,
@@ -28,6 +28,10 @@ from basicswap.util.address import (
     decodeWif,
 )
 from basicswap.basicswap_util import AddressTypes, MessageNetworks
+from basicswap.network.nostr.client import installFrameLimits
+
+MAX_RECV_QUEUE_SIZE: int = 5000
+MAX_EVENT_LEN: int = 256 * 1024
 
 
 def encode_base64(data: bytes) -> str:
@@ -55,13 +59,14 @@ class WebSocketThread(threading.Thread):
         self.connection_id: int = 0  # Incremented on each (re)connect
         self.delay_event = threading.Event()
 
-        self.recv_queue = Queue()
-        self.cmd_recv_queue = Queue()
-        self.delayed_events_queue = Queue()
+        self.recv_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
+        self.cmd_recv_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
+        self.delayed_events_queue = Queue(maxsize=MAX_RECV_QUEUE_SIZE)
 
         self.ignore_events: bool = False
 
         self.num_messages_received: int = 0
+        self.num_messages_dropped: int = 0
         self.last_error_str: str = ""
         self._stopping: bool = False
 
@@ -79,7 +84,18 @@ class WebSocketThread(threading.Thread):
                 message = self.delayed_events_queue.get(block=False)
             except Empty:
                 break
-            self.recv_queue.put(message)
+            self.queue_put(self.recv_queue, message)
+
+    def queue_put(self, q, message) -> None:
+        try:
+            q.put(message, block=False)
+        except Full:
+            self.num_messages_dropped += 1
+            if self.num_messages_dropped == 1:
+                if self.logger:
+                    self.logger.warning("Simplex receive queue full, dropping events")
+                else:
+                    print(f"{self.tag} - Receive queue full, dropping events")
 
     def on_message(self, ws, message):
         if self.logger:
@@ -88,10 +104,10 @@ class WebSocketThread(threading.Thread):
             print(f"{self.tag} - Received msg")
 
         if message.startswith('{"corrId"'):
-            self.cmd_recv_queue.put(message)
+            self.queue_put(self.cmd_recv_queue, message)
         else:
             self.num_messages_received += 1
-            self.recv_queue.put(message)
+            self.queue_put(self.recv_queue, message)
 
     def queue_get(self):
         try:
@@ -136,6 +152,14 @@ class WebSocketThread(threading.Thread):
         self.connection_id += 1
         self.connected = True
         self.last_error_str = ""
+        try:
+            if getattr(ws, "sock", None) is not None:
+                installFrameLimits(ws.sock, MAX_EVENT_LEN)
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"Simplex ws - Could not install frame limits: {e}")
+            else:
+                print(f"{self.tag}: Could not install frame limits: {e}")
 
     def send_command(self, cmd_str: str):
         with self.mutex:
@@ -263,7 +287,7 @@ def sendSimplexMsg(
     cursor,
     timestamp: int = None,
     deterministic: bool = False,
-    to_user_name: str = None,
+    to_contact_id: int = None,
     return_msg: bool = False,
     difficulty_target=0x1EFFFFFF,
 ) -> bytes:
@@ -282,19 +306,19 @@ def sendSimplexMsg(
     )
     smsg_id = smsgGetID(smsg_msg)
 
-    submitSimplexMsg(self, network, smsg_msg, to_user_name)
+    submitSimplexMsg(self, network, smsg_msg, to_contact_id)
 
     if return_msg:
         return smsg_id, smsg_msg
     return smsg_id
 
 
-def submitSimplexMsg(self, network, smsg_msg, to_user_name: str = None) -> None:
+def submitSimplexMsg(self, network, smsg_msg, to_contact_id: int = None) -> None:
     # Raises TemporaryError while the simplex-chat client is unreachable so
     # queued actions retry instead of erroring the bid.
     ws_thread = network["ws_thread"]
-    if to_user_name is not None:
-        to = "@" + to_user_name + " "
+    if to_contact_id is not None:
+        to = f"/_send @{to_contact_id} text "
     else:
         to = "#bsx "
     if not ws_thread.connected:
@@ -311,14 +335,14 @@ def submitSimplexMsg(self, network, smsg_msg, to_user_name: str = None) -> None:
         json_str = json.dumps(response, indent=4)
         self.log.debug(f"Response {json_str}")
         raise ValueError("Send failed")
-    if to_user_name is not None:
+    if to_contact_id is not None:
         self.num_direct_simplex_messages_sent += 1
     else:
         self.num_group_simplex_messages_sent += 1
 
 
-def forwardSimplexMsg(self, network, smsg_msg, to_user_name: str = None):
-    submitSimplexMsg(self, network, smsg_msg, to_user_name)
+def forwardSimplexMsg(self, network, smsg_msg):
+    submitSimplexMsg(self, network, smsg_msg)
     return smsgGetID(smsg_msg)
 
 
@@ -438,9 +462,9 @@ def parseSimplexMsg(self, chat_item):
 def processSimplexContactConnected(self, event_data) -> None:
     contact_data = getResponseData(event_data, "contact")
     connId = contact_data["activeConn"]["connId"]
-    localDisplayName = contact_data["localDisplayName"]
+    contact_id: int = contact_data["contactId"]
     self.log.debug(
-        f"Processing Contact Connected event, ID: {connId}, contact name: {localDisplayName}."
+        f"Processing Contact Connected event, ID: {connId}, contact id: {contact_id}."
     )
 
     try:
@@ -463,8 +487,15 @@ def processSimplexContactConnected(self, event_data) -> None:
                 self.log.debug(
                     f"Direct message route established local: {smsg_addr_local}, remote: {smsg_addr_remote}."
                 )
-                query = "UPDATE direct_message_routes SET active_ind = 1 WHERE record_id = :record_id "
-                cursor.execute(query, {"record_id": record_id})
+                route_data["contactId"] = contact_id
+                query = "UPDATE direct_message_routes SET active_ind = 1, route_data = :route_data WHERE record_id = :record_id "
+                cursor.execute(
+                    query,
+                    {
+                        "record_id": record_id,
+                        "route_data": json.dumps(route_data).encode("UTF-8"),
+                    },
+                )
                 found_direct_message_route = record_id
                 break
 
@@ -480,9 +511,10 @@ def processSimplexContactConnected(self, event_data) -> None:
 
 def processSimplexContactDisconnected(self, event_data) -> None:
     net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
-    connId = getResponseData(event_data, "contact")["activeConn"]["connId"]
+    contact_data = getResponseData(event_data, "contact")
+    connId = contact_data["activeConn"]["connId"]
     self.log.info(f"Direct message route disconnected, connId: {connId}")
-    closeSimplexChat(self, net_i, connId)
+    closeSimplexChat(self, net_i, contact_data["contactId"])
 
     query_str = (
         "SELECT record_id, network_id, smsg_addr_local, smsg_addr_remote, route_data FROM direct_message_routes "
@@ -513,17 +545,18 @@ def processSimplexContactDisconnected(self, event_data) -> None:
 def closeSimplexRoute(self, route_data) -> None:
     net_i = self.getActiveNetworkInterface(MessageNetworks.SIMPLEX)
 
-    connId = route_data["pccConnId"]
-
-    self.log.info(f"Closing Simplex chat, id: {connId}")
-    closeSimplexChat(self, net_i, connId)
+    if "contactId" not in route_data:
+        self.log.debug(f"Simplex route never connected, id: {route_data['pccConnId']}")
+        return
+    self.log.info(f"Closing Simplex chat, contact id: {route_data['contactId']}")
+    closeSimplexChat(self, net_i, route_data["contactId"])
 
 
 def processEvent(self, ws_thread, msg_type: str, data) -> bool:
     if ws_thread.ignore_events:
         if msg_type not in ("contactConnected", "contactDeletedByContact"):
             return False
-        ws_thread.delayed_events_queue.put(json.dumps(data))
+        ws_thread.queue_put(ws_thread.delayed_events_queue, json.dumps(data))
         return True
 
     if msg_type == "contactConnected":
@@ -566,8 +599,6 @@ def readSimplexMsgs(self, network):
             self.log.debug(f"readSimplexMsgs error: {e}")
             if self.debug:
                 self.log.error(traceback.format_exc())
-
-        self.delay_event.wait(0.05)
 
 
 def getResponseData(data, tag=None):
@@ -752,42 +783,19 @@ def initialiseSimplexNetwork(self, network_config) -> None:
     self.active_networks.append(add_network)
 
 
-def closeSimplexChat(self, net_i, connId) -> bool:
+def closeSimplexChat(self, net_i, contact_id: int) -> bool:
     try:
-        cmd_id = net_i.send_command("/chats")
-        response = net_i.wait_for_command_response(cmd_id, num_tries=500)
-        remote_name = None
-        for chat in getResponseData(response, "chats"):
-            if (
-                "chatInfo" not in chat
-                or "type" not in chat["chatInfo"]
-                or chat["chatInfo"]["type"] != "direct"
-            ):
-                continue
-            try:
-                if chat["chatInfo"]["contact"]["activeConn"]["connId"] == connId:
-                    remote_name = chat["chatInfo"]["contact"]["localDisplayName"]
-                    break
-            except Exception as e:
-                self.log.debug(f"Error parsing chat: {e}")
-
-        if remote_name is None:
-            self.log.warning(
-                f"Unable to find remote name for simplex direct chat, ID: {connId}"
-            )
-            return False
-
-        self.log.debug(f"Deleting simplex chat @{remote_name}, connID {connId}")
-        cmd_id = net_i.send_command(f"/delete @{remote_name}")
+        self.log.debug(f"Deleting simplex chat, contact id: {contact_id}")
+        cmd_id = net_i.send_command(f"/_delete @{contact_id}")
         cmd_response = net_i.wait_for_command_response(cmd_id)
 
         if getResponseData(cmd_response, "type") != "contactDeleted":
-            self.log.warning(f"Failed to delete simplex chat, ID: {connId}")
+            self.log.warning(f"Failed to delete simplex chat, contact id: {contact_id}")
             self.log.debug(
                 "cmd_response: {}".format(json.dumps(cmd_response, indent=4))
             )
             return False
     except Exception as e:
-        self.log.warning(f"Error deleting simplex chat, ID: {connId} - {e}")
+        self.log.warning(f"Error deleting simplex chat, contact id: {contact_id} - {e}")
         return False
     return True
