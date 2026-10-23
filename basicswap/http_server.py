@@ -1056,6 +1056,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         if self.server.allow_cors:
             self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Content-Type", content_type)
+        self.send_header("X-Content-Type-Options", "nosniff")
         if content_type.startswith("text/html"):
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
