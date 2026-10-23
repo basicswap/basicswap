@@ -101,6 +101,9 @@ class CoinInterface:
     def est_tx_input_vsize() -> int:
         return 0
 
+    def getSplitTxFees(self) -> (int, int, int):
+        return 0, 0, 0
+
     def setDefaults(self):
         self._unknown_wallet_seed = True
         self._restore_height = None

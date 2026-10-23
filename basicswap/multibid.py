@@ -11,7 +11,8 @@ import json
 import os
 
 from dataclasses import dataclass, replace
-from typing import List, Optional
+from math import ceil
+from typing import Callable, List, Optional
 
 from .basicswap_util import BidStates, SwapTypes
 from .bidplanner import (
@@ -47,10 +48,6 @@ MIN_LEG_TIMEOUT_SECONDS: int = 5 * 60
 PEER_CONFIRM_ALLOWANCE_SECONDS: int = 30 * 60
 # Skip an offer worth less than this many times its own redeem fee.
 DUST_FEE_MULTIPLE: int = 20
-# Leave this fraction of the balance unspent to cover the coin B lock fee.
-# Mirrors FEE_RESERVE_FRACTION in the Smart Buy page's Max button.
-FEE_RESERVE_FRACTION: float = 0.001
-
 
 # A leg is ready to send its coin B lock once its coin A lock has confirmed.
 READY_STATE = BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED
@@ -239,6 +236,121 @@ def redeem_fee(fee_rate: int, redeem_vsize: int) -> int:
     return fee_rate * redeem_vsize // 1000
 
 
+@dataclass(frozen=True)
+class FeeReserve:
+    """Fees a plan holds back from the coin it pays with: each offer's lock,
+    the tx splitting the wallet when the legs fund from their own outputs, and
+    the inputs past the first that covering the spend takes, counting the
+    wallet's outputs largest first. Monero-based coins have their wallet size
+    the locks instead (locks_fee(amount, num_locks)) and say how much they can
+    spend (max_locks(num_locks))."""
+
+    lock: dict
+    split_fixed: int = 0
+    split_per_output: int = 0
+    outputs: tuple = ()
+    input_fee: int = 0
+    locks_fee: Optional[Callable[[int, int], int]] = None
+    max_locks: Optional[Callable[[int], int]] = None
+
+    def split(self, num_legs: int) -> int:
+        # A lone leg can combine outputs, so it never needs a split.
+        if num_legs < 2:
+            return 0
+        return self.split_fixed + num_legs * self.split_per_output
+
+    def extra_inputs(self, amount: int, fees: int) -> int:
+        covered, extra = 0, 0
+        for n, value in enumerate(self.outputs):
+            if covered >= amount + fees + extra:
+                break
+            covered += value
+            extra = n * self.input_fee
+        return extra
+
+    def spendable(self, num_legs: int, balance: int) -> int:
+        """Spend left from balance after the worst-case fees of num_legs legs."""
+        if self.max_locks:
+            return self.max_locks(num_legs)
+        max_lock_fee: int = max(self.lock.values(), default=0)
+        fees: int = self.split(num_legs) + num_legs * max_lock_fee
+        return balance - fees - self.extra_inputs(balance, fees)
+
+    def for_offers(self, offer_ids, amount: int) -> int:
+        if self.locks_fee:
+            return self.locks_fee(amount, len(offer_ids))
+        fees: int = self.split(len(offer_ids)) + sum(self.lock[o] for o in offer_ids)
+        return fees + self.extra_inputs(amount, fees)
+
+    def fits(self, offer_ids, spend: int, balance: int) -> bool:
+        if self.max_locks:
+            return spend <= self.max_locks(len(offer_ids))
+        return spend + self.for_offers(offer_ids, spend) <= balance
+
+
+def plan_fee_reserve(swap_client, ci, offer_ids, splits: bool) -> FeeReserve:
+    """Adaptor-sig locks pay the offer's to-rate and secret-hash locks the live
+    rate. Only legs given their own inputs (splits) can need a split. Extra
+    inputs are priced at the highest of those rates."""
+    if ci.coin_type() in swap_client.xmr_based_coins:
+        return FeeReserve({}, locks_fee=ci.estLockTxsFee, max_locks=ci.estMaxLockAmount)
+    input_vsize: int = ci.est_tx_input_vsize()
+    lock_vsize: int = ci.est_lock_tx_vsize() + input_vsize
+    live_rate = None
+    rates = {}
+    lock = {}
+    for offer_id in offer_ids:
+        _, xmr_offer = swap_client.getXmrOffer(offer_id)
+        if xmr_offer:
+            rate = xmr_offer.b_fee_rate
+        else:
+            if live_rate is None:
+                live_rate = ci.make_int(ci.get_fee_rate()[0])
+            rate = live_rate
+        rates[offer_id] = rate
+        lock[offer_id] = ceil(rate * lock_vsize / 1000)
+    outputs = tuple(
+        sorted((o["value"] for o in ci.getSpendableOutputs() or ()), reverse=True)
+    )
+    input_fee: int = ceil(max(rates.values(), default=0) * input_vsize / 1000)
+    if not splits:
+        return FeeReserve(lock, outputs=outputs, input_fee=input_fee)
+    split_fixed, split_per_output, split_per_input = ci.getSplitTxFees()
+    return FeeReserve(
+        lock,
+        split_fixed,
+        split_per_output,
+        outputs,
+        max(input_fee, split_per_input),
+    )
+
+
+def plan_spend_max(fill, balance: int, reserve: FeeReserve, max_bids: int):
+    """Largest spend plan whose spend, plus the fee reserve for the legs it
+    uses, fits the balance. Returns (plan, target), or (None, None) when the
+    balance can't cover the fees of a single leg.
+
+    fill(target) plans one spend. Reserving the worst-case fees of k legs leaves
+    the rest to spend. Fewer reserved legs means a larger spend, so search for
+    the smallest k whose plan fits with its own legs' fees."""
+    best = (None, None)
+    lo, hi = 1, max_bids
+    while lo <= hi:
+        k: int = (lo + hi) // 2
+        target: int = reserve.spendable(k, balance)
+        if target <= 0:
+            hi = k - 1
+            continue
+        trial = fill(target)
+        legs = [leg.offer_id for leg in trial.legs]
+        if reserve.fits(legs, trial.total_spend, balance):
+            best = (trial, target)
+            hi = k - 1
+        else:
+            lo = k + 1
+    return best
+
+
 def live_redeem_fee(ci) -> int:
     """Redeem fee for a swap that redeems at the live fee rate (secret-hash).
 
@@ -362,24 +474,31 @@ def planMultiBid(
     coin_from,
     coin_to,
     mode: str,
-    target: int,
+    target: Optional[int],
     anchor: str = ANCHOR_MARKET,
     slip_percent: float = DEFAULT_SLIP_PERCENT,
     max_bids: int = DEFAULT_MAX_BIDS,
     allow_known_only: bool = False,
     allow_self_bids: bool = False,
     manual_offers: Optional[List[bytes]] = None,
+    spend_max: bool = False,
 ):
     """Split `target` across the offers to buy coin_from paying coin_to.
 
     manual_offers overrides the rate limit: the picked offers are the only ones
     bid on, whatever they cost. The rest are still listed, so a caller showing
     the plan can offer them to be picked instead.
+
+    spend_max replaces `target` with the whole coin_to balance, less the fee
+    reserve for the legs the plan actually uses.
     """
 
     ensure(mode in (FILL_RECEIVE, FILL_SPEND), "Unknown fill mode")
     ensure(anchor in (ANCHOR_MARKET, ANCHOR_BEST), "Unknown anchor")
-    ensure(target > 0, "Amount must be greater than zero")
+    if spend_max:
+        ensure(mode == FILL_SPEND, "spend_max requires spend mode")
+    else:
+        ensure(target > 0, "Amount must be greater than zero")
     ensure(int(coin_from) != int(coin_to), "coin_from and coin_to must differ")
 
     ci_from = swap_client.ci(coin_from)
@@ -449,14 +568,35 @@ def planMultiBid(
                 floored.append(c)
         candidates = floored
 
-    plan = plan_fill(
-        candidates,
-        target,
-        mode,
-        max_bids=max_bids,
-        scale=ci_from.COIN(),
-        fees=fee_by_offer,
-    )
+    def fill(fill_target: int) -> Plan:
+        return plan_fill(
+            candidates,
+            fill_target,
+            mode,
+            max_bids=max_bids,
+            scale=ci_from.COIN(),
+            fees=fee_by_offer,
+        )
+
+    if spend_max:
+        ci_to = swap_client.ci(coin_to)
+        plan, target = plan_spend_max(
+            fill,
+            ci_to.getSpendableBalance(),
+            plan_fee_reserve(
+                swap_client,
+                ci_to,
+                [c.offer_id for c in candidates],
+                swap_client.is_reverse_ads_bid(coin_from, coin_to),
+            ),
+            max_bids,
+        )
+        ensure(
+            plan is not None,
+            f"{ci_to.coin_name()} balance is too low to cover the fees of a bid",
+        )
+    else:
+        plan = fill(target)
 
     bid_on = {leg.offer_id for leg in plan.legs}
     excluded += [
@@ -529,26 +669,25 @@ def placeMultiBid(
             ci_to.coin_name(), batch_cap
         ),
     )
-    # Every leg can be accepted, so the whole spend must be covered up front.
-    # The bidder funds coin_to in both directions, so hold back a fraction of it
-    # for the lock fee rather than letting a plan spend 100%.
+    # Every leg can be accepted, so the whole spend and its fees must be covered
+    # up front. The bidder funds coin_to in both directions.
     balance = ci_to.getSpendableBalance()
-    spendable = int(balance * (1 - FEE_RESERVE_FRACTION))
+    reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
+    reserve = plan_fee_reserve(swap_client, ci_to, offers, reverse_bid)
+    total_need = total_spend + reserve.for_offers(offers, total_spend)
     ensure(
-        spendable >= total_spend,
-        "Insufficient {} balance for the full plan: have {}, need {} plus fee reserve".format(
+        balance >= total_need,
+        "Insufficient {} balance for the full plan: have {}, need {} including fees".format(
             ci_to.coin_name(),
             ci_to.format_amount(balance),
-            ci_to.format_amount(total_spend),
+            ci_to.format_amount(total_need),
         ),
     )
 
     # Every leg is funded before any is broadcast, so an unbroadcast leg's
     # change cannot fund the next. Each leg gets its own inputs instead.
     assigned = (
-        leg_prevouts(swap_client, ci_from, ci_to, offers, legs)
-        if swap_client.is_reverse_ads_bid(coin_from, coin_to)
-        else None
+        leg_prevouts(swap_client, ci_from, ci_to, offers, legs) if reverse_bid else None
     )
 
     placed: List[dict] = []

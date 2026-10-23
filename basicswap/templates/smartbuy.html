@@ -24,7 +24,7 @@
  <div class="flex gap-2 mt-3">
   {% for pct in [25, 50, 75, 100] %}
   <button type="button" data-pct="{{ pct }}" class="pct-btn flex-1 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-400 rounded-lg p-2 text-sm text-gray-700 dark:text-white hover:bg-blue-500 hover:text-white hover:border-blue-500 transition-colors focus:outline-none"
-   {% if pct == 100 %}title="Your balance minus a small reserve for the lock fee"{% endif %}>
+   {% if pct == 100 %}title="Your balance minus the fees for the bids it takes"{% endif %}>
    {% if pct == 100 %}Max{% else %}{{ pct }}%{% endif %}
   </button>
   {% endfor %}
