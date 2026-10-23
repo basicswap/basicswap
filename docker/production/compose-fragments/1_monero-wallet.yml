@@ -1,5 +1,6 @@
     monero_wallet:
         image: i_monero_wallet
+        stop_grace_period: 10m
         build:
             context: monero_wallet
             dockerfile: Dockerfile

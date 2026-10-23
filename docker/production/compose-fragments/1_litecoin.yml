@@ -1,5 +1,6 @@
     litecoin_core:
         image: i_litecoin
+        stop_grace_period: 10m
         build:
             context: litecoin
             dockerfile: Dockerfile

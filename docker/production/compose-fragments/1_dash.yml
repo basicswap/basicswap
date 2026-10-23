@@ -1,5 +1,6 @@
     dash_core:
         image: i_dash
+        stop_grace_period: 10m
         build:
             context: dash
             dockerfile: Dockerfile

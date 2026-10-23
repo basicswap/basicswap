@@ -1,5 +1,6 @@
     wownero_daemon:
         image: i_wownero_daemon
+        stop_grace_period: 10m
         build:
             context: wownero_daemon
             dockerfile: Dockerfile

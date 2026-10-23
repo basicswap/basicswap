@@ -1,5 +1,6 @@
     firo_core:
         image: i_firo
+        stop_grace_period: 10m
         build:
             context: firo
             dockerfile: Dockerfile

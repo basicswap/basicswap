@@ -1,5 +1,6 @@
     bitcoin_core:
         image: i_bitcoin
+        stop_grace_period: 10m
         build:
             context: bitcoin
             dockerfile: Dockerfile

@@ -1,5 +1,6 @@
     bitcoincash_core:
         image: i_bitcoincash
+        stop_grace_period: 10m
         build:
             context: bitcoincash
             dockerfile: Dockerfile
