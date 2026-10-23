@@ -332,10 +332,9 @@
         </ul>
       </div>
 
-      <form method="post" autocomplete="off">
-
         <div id="configTabContent">
           <div class="block" id="json-content" role="tabpanel" aria-labelledby="json-tab">
+            <form method="post" id="amm-config-form" autocomplete="off">
             <div id="amm-dirty-banner" class="hidden mb-4 p-3 rounded-md border border-yellow-300 bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-200 text-sm">
               You have unsaved configuration changes while the AMM is running. Save the config for changes to take effect.
             </div>
@@ -359,6 +358,7 @@
                 </div>
               </div>
             </div>
+            </form>
           </div>
 
           <div class="hidden" id="settings-content" role="tabpanel" aria-labelledby="settings-tab">
@@ -789,7 +789,6 @@
         </div>
 
        <!-- AMM Configuration Tabs handled by external JS -->
-      </form>
      </div>
 
      {% if state_exists and debug_ui_mode %}
