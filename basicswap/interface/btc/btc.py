@@ -18,8 +18,6 @@ import threading
 import time
 import traceback
 
-from io import BytesIO
-
 from basicswap.basicswap_util import (
     getVoutByAddress,
     getVoutByScriptPubKey,
@@ -76,6 +74,7 @@ from basicswap.contrib.test_framework.messages import (
     CTxIn,
     CTxInWitness,
     CTxOut,
+    StrictBytesIO,
 )
 from basicswap.contrib.test_framework.script import (
     CScript,
@@ -1496,7 +1495,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # Load tx from bytes to internal representation
         # Transactions with no inputs require allow_witness set to false to decode correctly
         tx = CTransaction()
-        tx.deserialize(BytesIO(tx_bytes), allow_witness)
+        tx.deserialize(StrictBytesIO(tx_bytes), allow_witness)
         return tx
 
     def createSCLockTx(

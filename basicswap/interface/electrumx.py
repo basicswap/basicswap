@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import queue
+import re
 import select
 import socket
 import ssl
@@ -17,6 +18,11 @@ import time
 from basicswap.util import TemporaryError
 
 CERT_PINS_FILENAME = "electrum_cert_pins.json"
+MAX_RESPONSE_LEN: int = 10 * 1024 * 1024
+TXID_LIST_METHODS = (
+    "blockchain.scripthash.get_history",
+    "blockchain.scripthash.listunspent",
+)
 
 
 def _is_private_address(host: str) -> bool:
@@ -27,6 +33,30 @@ def _is_private_address(host: str) -> bool:
         return addr.is_private or addr.is_loopback or addr.is_link_local
     except ValueError:
         return host == "localhost"
+
+
+def _has_valid_txids(method: str, result) -> bool:
+    if method not in TXID_LIST_METHODS or not isinstance(result, list):
+        return True
+    for entry in result:
+        txid = entry.get("tx_hash") if isinstance(entry, dict) else None
+        if not isinstance(txid, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", txid):
+            return False
+    return True
+
+
+def _is_public_host(host: str) -> bool:
+    import ipaddress
+
+    if not host:
+        return False
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return host != "localhost" and not host.endswith((".localhost", ".local"))
+    if addr.version == 6 and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped
+    return addr.is_global and not addr.is_multicast
 
 
 def _is_authenticated_transport(host: str) -> bool:
@@ -131,6 +161,7 @@ class ElectrumConnection:
         proxy_port=None,
         cert_pins=None,
         coin_name="",
+        public_only=False,
     ):
         self._host = host
         self._port = port
@@ -138,6 +169,8 @@ class ElectrumConnection:
         self._timeout = timeout
         self._coin_name = coin_name
         self._cert_pins = cert_pins if cert_pins is not None else CertPinStore()
+        self._public_only = public_only
+        self._misbehaving_callback = None
         self._socket = None
         self._request_id = 0
         self._lock = threading.Lock()
@@ -153,6 +186,8 @@ class ElectrumConnection:
         self._proxy_port = proxy_port
 
     def _open_socket(self):
+        if self._public_only and not _is_public_host(self._host):
+            raise ValueError(f"{self._host} is not a public address")
         use_proxy = (
             self._proxy_host
             and self._proxy_port
@@ -170,12 +205,35 @@ class ElectrumConnection:
                     f"Electrum connecting via proxy {self._proxy_host}:{self._proxy_port} to {self._host}:{self._port}"
                 )
             return sock
-        sock = socket.create_connection((self._host, self._port), timeout=self._timeout)
+        if self._public_only:
+            sock = self._connect_public()
+        else:
+            sock = socket.create_connection(
+                (self._host, self._port), timeout=self._timeout
+            )
         if self._log and self._proxy_host and self._proxy_port:
             self._log.debug(
                 f"Electrum connecting directly to LAN server {self._host}:{self._port} (bypassing proxy)"
             )
         return sock
+
+    def _connect_public(self):
+        addrs = [
+            sockaddr[:2]
+            for *_, sockaddr in socket.getaddrinfo(
+                self._host, self._port, type=socket.SOCK_STREAM
+            )
+            if _is_public_host(sockaddr[0])
+        ]
+        if len(addrs) < 1:
+            raise ValueError(f"{self._host} has no public address")
+        last_error = None
+        for addr in addrs:
+            try:
+                return socket.create_connection(addr, timeout=self._timeout)
+            except OSError as e:
+                last_error = e
+        raise last_error
 
     def server_key(self) -> str:
         return f"{self._host}:{self._port}"
@@ -318,6 +376,7 @@ class ElectrumConnection:
                     except json.JSONDecodeError:
                         if self._log:
                             self._log.debug(f"Invalid JSON from electrum: {line[:100]}")
+                self._check_buffer_len(buffer)
             except Exception as e:
                 if self._listener_running and self._log:
                     self._log.debug(f"Electrum listener error: {e}")
@@ -365,6 +424,20 @@ class ElectrumConnection:
         """Register callback for header height updates. Callback receives height as argument."""
         self._header_callback = callback
 
+    def register_misbehaving_callback(self, callback):
+        self._misbehaving_callback = callback
+
+    def _drop_misbehaving(self, reason: str) -> None:
+        _close_socket_safe(self._socket)
+        self._connected = False
+        if self._misbehaving_callback:
+            self._misbehaving_callback(reason)
+        raise ConnectionError(reason)
+
+    def _check_buffer_len(self, buffer: bytes) -> None:
+        if len(buffer) > MAX_RESPONSE_LEN:
+            self._drop_misbehaving(f"response exceeds {MAX_RESPONSE_LEN} bytes")
+
     def _send_request(self, method, params=None):
         if params is None:
             params = []
@@ -385,8 +458,12 @@ class ElectrumConnection:
 
     def _receive_response_sync(self, expected_id, timeout=30):
         buffer = b""
-        self._socket.settimeout(timeout)
+        deadline = time.time() + timeout
         while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise TemporaryError("Request timed out")
+            self._socket.settimeout(remaining)
             try:
                 with self._io_lock:
                     data = self._socket.recv(4096)
@@ -402,6 +479,7 @@ class ElectrumConnection:
                         return response.get("result")
                     elif "method" in response:
                         self._handle_notification(response)
+                self._check_buffer_len(buffer)
             except socket.timeout:
                 raise TemporaryError("Request timed out")
 
@@ -428,11 +506,17 @@ class ElectrumConnection:
 
     def _receive_batch_responses_sync(self, expected_ids, timeout=30):
         buffer = b""
-        self._socket.settimeout(timeout)
+        deadline = time.time() + timeout
         results = {}
         pending_ids = set(expected_ids)
 
         while pending_ids:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise TemporaryError(
+                    f"Batch request timed out, {len(pending_ids)} responses pending"
+                )
+            self._socket.settimeout(remaining)
             try:
                 with self._io_lock:
                     data = self._socket.recv(4096)
@@ -451,6 +535,7 @@ class ElectrumConnection:
                         pending_ids.discard(resp_id)
                     elif "method" in response:
                         self._handle_notification(response)
+                self._check_buffer_len(buffer)
             except socket.timeout:
                 raise TemporaryError(
                     f"Batch request timed out, {len(pending_ids)} responses pending"
@@ -503,16 +588,17 @@ class ElectrumConnection:
                     with self._io_lock:
                         self._socket.sendall((json.dumps(request) + "\n").encode())
                 result = self._receive_response_async(request_id, timeout=timeout)
-                return result
             else:
                 request_id = self._send_request(method, params)
                 result = self._receive_response_sync(request_id, timeout=timeout)
-                return result
+            if not _has_valid_txids(method, result):
+                self._drop_misbehaving(f"{method} returned an invalid txid")
         except (ssl.SSLError, OSError, ConnectionError) as e:
             _close_socket_safe(self._socket)
             self._connected = False
             self._socket = None
             raise TemporaryError(f"Connection error: {e}")
+        return result
 
     def call_batch(self, requests):
         if not self.is_connected():
@@ -542,8 +628,10 @@ class ElectrumConnection:
             responses = self._receive_batch_responses(request_ids)
 
             results = []
-            for req_id in request_ids:
+            for (method, _), req_id in zip(requests, request_ids):
                 resp = responses.get(req_id, {})
+                if not _has_valid_txids(method, resp.get("result")):
+                    self._drop_misbehaving(f"{method} returned an invalid txid")
                 if "error" in resp:
                     results.append(None)
                 else:
@@ -780,6 +868,9 @@ class ElectrumServer:
                 proxy_port=self._proxy_port,
                 cert_pins=self._cert_pins,
                 coin_name=self._coin_name,
+            )
+            conn.register_misbehaving_callback(
+                lambda reason: self._blacklist_server(server, reason)
             )
             conn.connect()
             connect_time = (time.time() - start_time) * 1000
@@ -1345,6 +1436,8 @@ class ElectrumServer:
                 features = peer[2] if len(peer) > 2 else []
 
                 host = hostname if hostname else ip_addr
+                if not _is_public_host(host):
+                    continue
                 is_onion = host.endswith(".onion")
 
                 ssl_port = None
@@ -1414,8 +1507,10 @@ class ElectrumServer:
                 log=self._log,
                 proxy_host=self._proxy_host,
                 proxy_port=self._proxy_port,
-                cert_pins=self._cert_pins,
+                # Pins only come from servers the operator connects to
+                cert_pins=CertPinStore(),
                 coin_name=self._coin_name,
+                public_only=True,
             )
             test_conn.connect()
             latency = test_conn.ping()

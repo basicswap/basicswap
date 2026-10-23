@@ -2073,6 +2073,360 @@ class Test(unittest.TestCase):
             == "252cd6e85b99e0fd554c44d5fe638923f7ef563048362406a665cf3400feb1bd"
         )
 
+    def test_tx_parser_rejects_short_data(self):
+        from basicswap.contrib.test_framework.messages import ser_compact_size
+
+        ci = self.ci_btc()
+        many_inputs = (2).to_bytes(4, "little") + ser_compact_size(200000)
+        with self.assertRaises(ValueError):
+            ci.loadTx(many_inputs)
+        with self.assertRaises(ValueError):
+            ci.getTxid(many_inputs)
+
+        tx = CTransaction()
+        tx.nVersion = 2
+        tx.vin.append(CTxIn(COutPoint(1, 0), b"\x51"))
+        tx.vout.append(CTxOut(1000, b"\x51"))
+        tx_bytes = tx.serialize()
+        assert ci.loadTx(tx_bytes).serialize() == tx_bytes
+        for cut in (1, 4, 20):
+            with self.assertRaises(ValueError):
+                ci.loadTx(tx_bytes[:-cut])
+
+    def test_nav_pivx_tx_parser_rejects_short_data(self):
+        from basicswap.interface.nav.contrib.mininode import (
+            COutPoint as NAVOutPoint,
+            CTxIn as NAVTxIn,
+            CTxOut as NAVTxOut,
+        )
+        from basicswap.interface.pivx.contrib.messages import (
+            COutPoint as PIVXOutPoint,
+            CTransaction as PIVXTransaction,
+            CTxIn as PIVXTxIn,
+            CTxOut as PIVXTxOut,
+            SaplingTxData,
+        )
+
+        nav_tx = NAVTransaction()
+        nav_tx.nVersion = 2
+        nav_tx.nTime = 1
+        nav_tx.vin.append(NAVTxIn(NAVOutPoint(1, 0), b"\x51"))
+        nav_tx.vout.append(NAVTxOut(1000, b"\x51"))
+        nav_tx.strDZeel = b"hello"
+
+        sap_data = SaplingTxData()
+        sap_data.pre = b"\x01"
+        sap_data.valueBalance = 0
+        sap_data.vShieldedSpend = []
+        sap_data.vShieldedOutput = []
+        sap_data.bindingSig = b"\x00" * 64
+        pivx_tx = PIVXTransaction()
+        pivx_tx.nVersion = 3
+        pivx_tx.nType = 1
+        pivx_tx.vin.append(PIVXTxIn(PIVXOutPoint(1, 0), b"\x51"))
+        pivx_tx.vout.append(PIVXTxOut(1000, b"\x51"))
+        pivx_tx.sapData = sap_data
+        pivx_tx.extraData = b"hello"
+
+        for cls, tx in ((NAVInterface, nav_tx), (PIVXInterface, pivx_tx)):
+            settings = {"rpcport": 0, "rpcauth": "none"}
+            settings.update(REQUIRED_SETTINGS)
+            ci = cls(settings, "regtest")
+            tx_bytes = tx.serialize()
+            assert ci.loadTx(tx_bytes).serialize() == tx_bytes
+            for cut in (1, 3):
+                with self.assertRaises(ValueError):
+                    ci.loadTx(tx_bytes[:-cut])
+
+    def test_part_tx_parser_witness_optional(self):
+        from basicswap.contrib.test_framework.messages import (
+            CTxInWitness,
+            CTxOutPart,
+            PARTICL_TX_VERSION,
+        )
+
+        ci = self.ci_btc()
+        tx = CTransaction()
+        tx.nVersion = PARTICL_TX_VERSION
+        tx.vin.append(CTxIn(COutPoint(1, 0)))
+        tx.vout.append(CTxOutPart(1000, b"\x51"))
+        witness = CTxInWitness()
+        witness.scriptWitness.stack = [b"\x01" * 72]
+        tx.wit.vtxinwit = [witness]
+
+        no_witness = ci.loadTx(tx.serialize_without_witness())
+        assert no_witness.serialize_without_witness() == tx.serialize_without_witness()
+        assert no_witness.wit.vtxinwit[0].scriptWitness.stack == []
+        with_witness = ci.loadTx(tx.serialize())
+        assert with_witness.serialize() == tx.serialize()
+        with self.assertRaises(ValueError):
+            ci.loadTx(tx.serialize()[:-1])
+
+    def test_dcr_tx_parser_bounds_witness(self):
+        from basicswap.interface.dcr.messages import (
+            COutPoint as DCRCOutPoint,
+            CTransaction as DCRTransaction,
+            CTxIn as DCRTxIn,
+            CTxOut as DCRTxOut,
+            TxSerializeType,
+        )
+        from basicswap.util.integer import encode_compactsize
+
+        version = 1 | (TxSerializeType.OnlyWitness << 16)
+        many_witnesses = version.to_bytes(4, "little") + encode_compactsize(200000)
+        with self.assertRaisesRegex(ValueError, "Witness count"):
+            DCRTransaction().deserialize(many_witnesses)
+
+        tx = DCRTransaction()
+        txi = DCRTxIn(DCRCOutPoint(1, 0, 0))
+        txi.signature_script = b"\x01" * 72
+        tx.vin.append(txi)
+        tx.vout.append(DCRTxOut(1000, b"\x51"))
+        for ser_type in (
+            TxSerializeType.Full,
+            TxSerializeType.NoWitness,
+            TxSerializeType.OnlyWitness,
+        ):
+            tx_bytes = tx.serialize(ser_type)
+            loaded = DCRTransaction()
+            loaded.deserialize(tx_bytes)
+            assert loaded.serialize(ser_type) == tx_bytes
+            with self.assertRaisesRegex(ValueError, "Truncated"):
+                DCRTransaction().deserialize(tx_bytes[:-1])
+
+    def test_electrum_response_len_capped(self):
+        import socket
+        from unittest import mock
+        from basicswap.interface import electrumx
+        from basicswap.interface.electrumx import ElectrumConnection, ElectrumServer
+
+        def stub_connection():
+            conn = ElectrumConnection("127.0.0.1", 0, use_ssl=False)
+            conn._socket, peer = socket.socketpair()
+            conn._connected = True
+            oversized = []
+            conn.register_misbehaving_callback(lambda reason: oversized.append(True))
+
+            def send():
+                try:
+                    peer.sendall(b"x" * 70000)
+                except OSError:
+                    pass
+
+            threading.Thread(target=send, daemon=True).start()
+            return conn, peer, oversized
+
+        with mock.patch.object(electrumx, "MAX_RESPONSE_LEN", 65536):
+            for receive in (
+                lambda c: c._receive_response_sync(1, timeout=2),
+                lambda c: c._receive_batch_responses_sync([1, 2], timeout=2),
+            ):
+                conn, peer, oversized = stub_connection()
+                try:
+                    with self.assertRaises(ConnectionError):
+                        receive(conn)
+                finally:
+                    peer.close()
+                assert not conn.is_connected()
+                assert oversized == [True]
+
+            conn, peer, oversized = stub_connection()
+            conn._start_listener()
+            listener = conn._listener_thread
+            listener.join(timeout=5)
+            conn._listener_running = False
+            peer.close()
+            assert not listener.is_alive()
+            assert not conn.is_connected()
+            assert oversized == [True]
+
+        server = ElectrumServer(
+            "bitcoin",
+            clearnet_servers=[
+                "electrum1.example.com:50002",
+                "electrum2.example.com:50002",
+            ],
+        )
+        with (
+            mock.patch.object(ElectrumConnection, "connect"),
+            mock.patch.object(
+                ElectrumConnection, "get_server_version", return_value=["test"]
+            ),
+            mock.patch.object(ElectrumServer, "_start_keepalive"),
+            mock.patch.object(ElectrumServer, "_subscribe_headers"),
+        ):
+            assert server._try_connect_server(server._servers[0])
+        server._connection._misbehaving_callback("test")
+        assert [s["host"] for s in server.get_sorted_servers()] == [
+            "electrum2.example.com"
+        ]
+
+    def test_electrum_sync_receive_deadline(self):
+        import socket
+        import time
+        from basicswap.interface.electrumx import ElectrumConnection
+        from basicswap.util import TemporaryError
+
+        for receive in (
+            lambda c: c._receive_response_sync(1, timeout=1),
+            lambda c: c._receive_batch_responses_sync([1, 2], timeout=1),
+        ):
+            conn = ElectrumConnection("127.0.0.1", 0, use_ssl=False)
+            conn._socket, peer = socket.socketpair()
+            conn._connected = True
+            stop = threading.Event()
+
+            def drip():
+                for _ in range(30):
+                    if stop.wait(0.1):
+                        return
+                    try:
+                        peer.sendall(b"x")
+                    except OSError:
+                        return
+
+            threading.Thread(target=drip, daemon=True).start()
+            start = time.time()
+            try:
+                with self.assertRaisesRegex(TemporaryError, "timed out"):
+                    receive(conn)
+                assert time.time() - start < 2
+            finally:
+                stop.set()
+                peer.close()
+                conn._socket.close()
+
+    def test_electrum_discovery_skips_non_public_peers(self):
+        from unittest import mock
+        from basicswap.interface.electrumx import ElectrumServer
+
+        server = ElectrumServer(
+            "bitcoin", clearnet_servers=["electrum.example.com:50002"]
+        )
+        peers = [
+            ["127.0.0.1", "", ["s50002"]],
+            ["10.0.0.2", "", ["s50002"]],
+            ["100.64.0.3", "", ["t50001"]],
+            ["169.254.0.4", "", ["s50002"]],
+            ["::1", "", ["s50002"]],
+            ["fd00::5", "", ["s50002"]],
+            ["::ffff:192.168.1.6", "", ["s50002"]],
+            ["8.8.8.8", "localhost", ["s50002"]],
+            ["8.8.8.8", "printer.local", ["s50002"]],
+            ["8.8.8.8", "electrum.example.org", ["s50002"]],
+            ["2606:4700::1111", "", ["s50002"]],
+            ["", "abcdefghijklmnop.onion", ["t50001"]],
+        ]
+        with mock.patch.object(server, "call", return_value=peers):
+            hosts = [p["host"] for p in server.discover_peers()]
+        assert hosts == [
+            "electrum.example.org",
+            "2606:4700::1111",
+            "abcdefghijklmnop.onion",
+        ]
+
+    def test_electrum_ping_refuses_non_public_destinations(self):
+        import socket
+        from unittest import mock
+        from basicswap.interface.electrumx import ElectrumServer
+
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(4)
+        listener.settimeout(0.5)
+        port = listener.getsockname()[1]
+        server = ElectrumServer(
+            "bitcoin", clearnet_servers=["electrum.example.com:50002"]
+        )
+        real_getaddrinfo = socket.getaddrinfo
+
+        def rebind(host, *args, **kwargs):
+            if host == "rebind.example.com":
+                host = "127.0.0.1"
+            return real_getaddrinfo(host, *args, **kwargs)
+
+        try:
+            assert server.ping_server("127.0.0.1", port, ssl=False) is None
+            with self.assertRaises(socket.timeout):
+                listener.accept()
+
+            with mock.patch("socket.getaddrinfo", side_effect=rebind):
+                assert server.ping_server("rebind.example.com", port, ssl=False) is None
+            with self.assertRaises(socket.timeout):
+                listener.accept()
+        finally:
+            listener.close()
+
+    def test_electrum_ping_writes_no_pins(self):
+        from unittest import mock
+        from basicswap.interface.electrumx import (
+            CertPinStore,
+            ElectrumConnection,
+            ElectrumServer,
+        )
+
+        pins = CertPinStore()
+        server = ElectrumServer(
+            "bitcoin", clearnet_servers=["electrum.example.com:50002"], cert_pins=pins
+        )
+
+        def first_use_pin(conn):
+            conn._cert_pins.set(conn._coin_name, conn.server_key(), "00" * 32)
+
+        with (
+            mock.patch.object(ElectrumConnection, "connect", first_use_pin),
+            mock.patch.object(ElectrumConnection, "ping", return_value=1.0),
+        ):
+            assert server.ping_server("electrum.example.org", 50002) == 1.0
+        assert pins.get("bitcoin", "electrum.example.org:50002") is None
+
+    def test_electrum_txids_checked(self):
+        import json
+        import socket
+        from basicswap.interface.electrumx import ElectrumConnection
+        from basicswap.util import TemporaryError
+
+        valid = [{"tx_hash": "ab" * 32, "height": 1}]
+        invalid = (
+            [{"tx_hash": "<img src=x onerror=alert(1)>", "height": 1}],
+            [{"tx_hash": "ab" * 31, "height": 1}],
+            [{"height": 1}],
+        )
+
+        dropped = []
+
+        def stub_connection(results):
+            conn = ElectrumConnection("127.0.0.1", 0, use_ssl=False)
+            conn._socket, peer = socket.socketpair()
+            conn._connected = True
+            conn.register_misbehaving_callback(dropped.append)
+            for request_id, result in enumerate(results, 1):
+                response = {"jsonrpc": "2.0", "id": request_id, "result": result}
+                peer.sendall((json.dumps(response) + "\n").encode())
+            return conn, peer
+
+        for method in (
+            "blockchain.scripthash.get_history",
+            "blockchain.scripthash.listunspent",
+        ):
+            conn, peer = stub_connection([valid])
+            assert conn.call(method, ["00" * 32]) == valid
+            peer.close()
+            for result in invalid:
+                conn, peer = stub_connection([result])
+                with self.assertRaisesRegex(TemporaryError, "invalid txid"):
+                    conn.call(method, ["00" * 32])
+                assert not conn.is_connected()
+                peer.close()
+
+                conn, peer = stub_connection([valid, result])
+                requests = [(method, ["00" * 32]), (method, ["11" * 32])]
+                with self.assertRaisesRegex(TemporaryError, "invalid txid"):
+                    conn.call_batch(requests)
+                assert not conn.is_connected()
+                peer.close()
+        assert len(dropped) == 2 * 2 * len(invalid)
+
     def test_validateSwapType(self):
         logging.info("---------- Test validateSwapType")
         basicswap_dir = "/tmp/bsx_test_other"
