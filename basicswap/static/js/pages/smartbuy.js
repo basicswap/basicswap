@@ -5,8 +5,6 @@
   const NOT_PLACED = 'Not placed';
   const SETTINGS_KEY = 'smartbuy.settings';
   const TAB_KEY = 'smartbuy.tab';
-  // Keep in sync with FEE_RESERVE_FRACTION in multibid.py.
-  const FEE_RESERVE_FRACTION = 0.001;
   // Mirrors the minimum bid amount; a shortfall smaller than this cannot be re-bid.
   const MIN_BID_AMOUNT = 0.001;
   // Keep in sync with DEFAULT_MAX_BIDS in multibid.py.
@@ -38,6 +36,7 @@
   const REFRESH_DEBOUNCE = 1500;
 
   let activeSide = 'receive';
+  let spendMax = false;
   let currentPlan = null;
   let retryPlanId = null;
   const historyPlans = new Map();
@@ -468,9 +467,10 @@
     el('planExhaustive').classList.toggle('hidden', plan.exhaustive);
 
     if (plan.num_bids > 0) {
-      if (plan.mode === 'receive') {
+      if (plan.mode === 'receive' || spendMax) {
         el('pay_amount').value = plan.total_spend;
-      } else {
+      }
+      if (plan.mode === 'spend') {
         el('receive_amount').value = plan.total_receive;
       }
     }
@@ -488,7 +488,7 @@
   const preview = async () => {
     const spending = activeSide === 'pay';
     const amount = el(spending ? 'pay_amount' : 'receive_amount').value.trim();
-    if (!amount) {
+    if (!amount && !(spending && spendMax)) {
       showError('Enter an amount to pay, or an amount to receive.');
       return;
     }
@@ -501,7 +501,11 @@
       max_bids: el('max_bids').value,
       allow_self_bids: checked('allow_self_bids')
     };
-    body[spending ? 'spend_amount' : 'receive_amount'] = amount;
+    if (spending && spendMax) {
+      body.spend_max = true;
+    } else {
+      body[spending ? 'spend_amount' : 'receive_amount'] = amount;
+    }
 
     if (checked('manual_offers') && picks.size) {
       body.manual_offers = [...picks];
@@ -549,7 +553,7 @@
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       const amount = el(activeSide === 'pay' ? 'pay_amount' : 'receive_amount').value.trim();
-      if (amount && beforePlacing()) {
+      if ((amount || spendMax) && beforePlacing()) {
         preview();
       }
     }, REFRESH_DEBOUNCE);
@@ -713,6 +717,7 @@
     receiveCoin.value = wasPaying;
 
     retryPlanId = null;
+    spendMax = false;
     el('pay_amount').value = '';
     el('receive_amount').value = '';
     syncCoins();
@@ -758,16 +763,19 @@
     ['coin_to', 'coin_from'].forEach((id) => {
       el(id).addEventListener('change', () => {
         retryPlanId = null;
+        spendMax = false;
       });
     });
 
     el('pay_amount').addEventListener('input', (e) => {
       activeSide = 'pay';
+      spendMax = false;
       e.target.value = e.target.value.replace(/(\.\d{8})\d+/, '$1');
       el('receive_amount').value = '';
     });
     el('receive_amount').addEventListener('input', (e) => {
       activeSide = 'receive';
+      spendMax = false;
       e.target.value = e.target.value.replace(/(\.\d{8})\d+/, '$1');
       el('pay_amount').value = '';
     });
@@ -785,12 +793,15 @@
     document.querySelectorAll('.pct-btn').forEach((button) => {
       button.addEventListener('click', () => {
         const pct = parseInt(button.dataset.pct, 10);
-        // Max leaves the lock-fee reserve, or the plan is rejected for spending 100%.
-        const frac = pct >= 100 ? 1 - FEE_RESERVE_FRACTION : pct / 100;
-        const amount = Math.trunc(balanceOf(el('coin_to')) * frac * 1e8) / 1e8;
-        el('pay_amount').value = amount > 0 ? amount : '';
+        spendMax = pct >= 100;
+        const amount = Math.trunc(balanceOf(el('coin_to')) * pct / 100 * 1e8) / 1e8;
+        el('pay_amount').value = !spendMax && amount > 0 ? amount : '';
         el('receive_amount').value = '';
         activeSide = 'pay';
+        if (spendMax) {
+          picks.clear();
+          preview();
+        }
       });
     });
 
