@@ -296,8 +296,8 @@ def prepare_balance(
     wait_for_amount: float = amount
     if not test_balance:
         wait_for_amount += current_balance
-    delay_iterations = 100 if coin == Coins.NAV else 30
-    delay_time = 5 if coin == Coins.NAV else 3
+    delay_iterations = 30
+    delay_time = 3
 
     if wait_until_spendable is False:
         return

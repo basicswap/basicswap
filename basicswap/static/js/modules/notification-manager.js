@@ -281,7 +281,6 @@ function ensureToastContainer() {
       11: 'PIVX',
       12: 'DASH',
       13: 'FIRO',
-      14: 'NAV',
       15: 'LTC (MWEB)',
       17: 'BCH',
       18: 'DOGE'
@@ -303,7 +302,6 @@ function ensureToastContainer() {
       11: 100000000,    // PIVX - 8 decimals
       12: 100000000,    // DASH - 8 decimals
       13: 100000000,    // FIRO - 8 decimals
-      14: 100000000,    // NAV - 8 decimals
       15: 100000000,    // LTC (MWEB) - 8 decimals
       17: 100000000,    // BCH - 8 decimals
       18: 100000000     // DOGE - 8 decimals

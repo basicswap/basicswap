@@ -6,7 +6,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-from io import BytesIO
 import hashlib
 import logging
 import os
@@ -59,8 +58,6 @@ from basicswap.interface.dash.dash import DASHInterface
 from basicswap.interface.doge.doge import DOGEInterface
 from basicswap.interface.firo.firo import FIROInterface
 from basicswap.interface.ltc.ltc import LTCInterface
-from basicswap.interface.nav.contrib.mininode import CTransaction as NAVTransaction
-from basicswap.interface.nav.nav import NAVInterface
 from basicswap.interface.part.part import PARTInterface
 from basicswap.interface.pivx.pivx import PIVXInterface
 from basicswap.protocols.atomic_swap_1 import buildContractScript
@@ -918,7 +915,6 @@ class Test(unittest.TestCase):
             LTCInterface,
             NMCInterface,
             PARTInterface,
-            NAVInterface,
             DOGEInterface,
             DASHInterface,
             FIROInterface,
@@ -956,12 +952,7 @@ class Test(unittest.TestCase):
                     ci, Kal, Kaf, **lock_args
                 )
                 lock_bytes = ci.createSCLockTx(200000, script_lock)
-                if cls is NAVInterface:
-                    # NAV's loadTx drops allow_witness, which an input-less tx needs
-                    tx_lock = NAVTransaction()
-                    tx_lock.deserialize(BytesIO(lock_bytes), allow_witness=False)
-                else:
-                    tx_lock = ci.loadTx(lock_bytes, allow_witness=False)
+                tx_lock = ci.loadTx(lock_bytes, allow_witness=False)
                 tx_lock.vin.append(CTxIn(COutPoint(1, 0)))
                 tx_lock_bytes = tx_lock.serialize()
                 spend_tx = ci.createSCLockSpendTx(tx_lock_bytes, script_lock, dest, fee)
@@ -2093,12 +2084,7 @@ class Test(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ci.loadTx(tx_bytes[:-cut])
 
-    def test_nav_pivx_tx_parser_rejects_short_data(self):
-        from basicswap.interface.nav.contrib.mininode import (
-            COutPoint as NAVOutPoint,
-            CTxIn as NAVTxIn,
-            CTxOut as NAVTxOut,
-        )
+    def test_pivx_tx_parser_rejects_short_data(self):
         from basicswap.interface.pivx.contrib.messages import (
             COutPoint as PIVXOutPoint,
             CTransaction as PIVXTransaction,
@@ -2106,13 +2092,6 @@ class Test(unittest.TestCase):
             CTxOut as PIVXTxOut,
             SaplingTxData,
         )
-
-        nav_tx = NAVTransaction()
-        nav_tx.nVersion = 2
-        nav_tx.nTime = 1
-        nav_tx.vin.append(NAVTxIn(NAVOutPoint(1, 0), b"\x51"))
-        nav_tx.vout.append(NAVTxOut(1000, b"\x51"))
-        nav_tx.strDZeel = b"hello"
 
         sap_data = SaplingTxData()
         sap_data.pre = b"\x01"
@@ -2128,15 +2107,14 @@ class Test(unittest.TestCase):
         pivx_tx.sapData = sap_data
         pivx_tx.extraData = b"hello"
 
-        for cls, tx in ((NAVInterface, nav_tx), (PIVXInterface, pivx_tx)):
-            settings = {"rpcport": 0, "rpcauth": "none"}
-            settings.update(REQUIRED_SETTINGS)
-            ci = cls(settings, "regtest")
-            tx_bytes = tx.serialize()
-            assert ci.loadTx(tx_bytes).serialize() == tx_bytes
-            for cut in (1, 3):
-                with self.assertRaises(ValueError):
-                    ci.loadTx(tx_bytes[:-cut])
+        settings = {"rpcport": 0, "rpcauth": "none"}
+        settings.update(REQUIRED_SETTINGS)
+        ci = PIVXInterface(settings, "regtest")
+        tx_bytes = pivx_tx.serialize()
+        assert ci.loadTx(tx_bytes).serialize() == tx_bytes
+        for cut in (1, 3):
+            with self.assertRaises(ValueError):
+                ci.loadTx(tx_bytes[:-cut])
 
     def test_part_tx_parser_witness_optional(self):
         from basicswap.contrib.test_framework.messages import (

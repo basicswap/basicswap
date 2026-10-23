@@ -18,7 +18,6 @@ from basicswap.interface.wow.chainparams import params as wow_params
 from basicswap.interface.pivx.chainparams import params as pivx_params
 from basicswap.interface.dash.chainparams import params as dash_params
 from basicswap.interface.firo.chainparams import params as firo_params
-from basicswap.interface.nav.chainparams import params as nav_params
 from basicswap.interface.bch.chainparams import params as bch_params
 
 
@@ -36,7 +35,7 @@ class Coins(IntEnum):
     PIVX = 11
     DASH = 12
     FIRO = 13
-    NAV = 14
+    # NAV = 14
     LTC_MWEB = 15
     # ZANO = 16
     BCH = 17
@@ -70,7 +69,6 @@ chainparams = {
     Coins.PIVX: pivx_params,
     Coins.DASH: dash_params,
     Coins.FIRO: firo_params,
-    Coins.NAV: nav_params,
     Coins.BCH: bch_params,
     Coins.DOGE: doge_params,
 }

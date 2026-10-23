@@ -1293,10 +1293,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.firo.firo import FIROInterface
 
             return FIROInterface(self.coin_clients[coin], self.chain, self)
-        elif coin == Coins.NAV:
-            from .interface.nav.nav import NAVInterface
-
-            return NAVInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError("Unknown coin type")
 
@@ -8157,7 +8153,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if ci.using_segwit():
             options["force_segwit"] = True
 
-        if coin_type in (Coins.NAV, Coins.DCR):
+        if coin_type == Coins.DCR:
             privkey_wif = self.ci(coin_type).encodeKey(privkey)
             redeem_sig = ci.getTxSignature(redeem_txn, prevout, privkey_wif)
         else:
@@ -8193,7 +8189,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             redeem_txn = ci.setTxScriptSig(bytes.fromhex(redeem_txn), 0, script).hex()
 
-        if coin_type in (Coins.NAV, Coins.DCR):
+        if coin_type == Coins.DCR:
             # Only checks signature
             ro = ci.verifyRawTransaction(redeem_txn, [prevout])
         else:
@@ -8249,7 +8245,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return None
 
         ci = self.ci(coin_type)
-        if coin_type in (Coins.NAV, Coins.DCR):
+        if coin_type == Coins.DCR:
             prevout = ci.find_prevout_info(txn, txn_script)
         else:
             # TODO: Sign in bsx for all coins
@@ -8313,7 +8309,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         options = {}
         if self.coin_clients[coin_type]["use_segwit"]:
             options["force_segwit"] = True
-        if coin_type in (Coins.NAV, Coins.DCR):
+        if coin_type == Coins.DCR:
             privkey_wif = ci.encodeKey(privkey)
             refund_sig = ci.getTxSignature(refund_txn, prevout, privkey_wif)
         else:
@@ -8344,7 +8340,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             refund_txn = ci.setTxScriptSig(bytes.fromhex(refund_txn), 0, script).hex()
 
-        if coin_type in (Coins.NAV, Coins.DCR):
+        if coin_type == Coins.DCR:
             # Only checks signature
             ro = ci.verifyRawTransaction(refund_txn, [prevout])
         else:
@@ -16910,8 +16906,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["staked"] = walletinfo.get("staked_balance", 0)
             elif coin in self.xmr_based_coins:
                 rv["main_address"] = self.getCachedMainWalletAddress(ci)
-            elif coin == Coins.NAV:
-                rv["immature"] = walletinfo["immature_balance"]
             elif coin == Coins.LTC:
                 if self.coin_clients[coin].get("connection_type") != "electrum":
                     try:

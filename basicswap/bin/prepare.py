@@ -69,7 +69,6 @@ from basicswap.interface.wow.core import (
 from basicswap.interface.pivx.core import prepare_module as pivx_prepare
 from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
-from basicswap.interface.nav.core import prepare_module as nav_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
 from basicswap.network.nostr.prepare import prepare_module as nostr_prepare
 from basicswap.network.simplex.prepare import prepare_module as simplex_prepare
@@ -82,7 +81,6 @@ coin_prepare_modules = {
     "dash": dash_prepare,
     "decred": dcr_prepare,
     "dogecoin": doge_prepare,
-    "navcoin": nav_prepare,
     "namecoin": nmc_prepare,
     "monero": xmr_prepare,
     "wownero": wow_prepare,
@@ -141,11 +139,6 @@ known_coins = {
         firo_prepare.version_tag,
         firo_prepare.signers.keys(),
     ),
-    "navcoin": (
-        nav_prepare.version,
-        nav_prepare.version_tag,
-        nav_prepare.signers.keys(),
-    ),
     "bitcoincash": (
         bch_prepare.version,
         bch_prepare.version_tag,
@@ -158,9 +151,7 @@ known_coins = {
     ),
 }
 
-disabled_coins = [
-    "navcoin",
-]
+disabled_coins = []
 
 known_networks = ["smsg", "simplex", "nostr"]
 disabled_networks = []
@@ -1686,7 +1677,6 @@ def main():
         "pivx": pivx_prepare.getConfigSegment(prepare_ctx),
         "dash": dash_prepare.getConfigSegment(prepare_ctx),
         "firo": firo_prepare.getConfigSegment(prepare_ctx),
-        "navcoin": nav_prepare.getConfigSegment(prepare_ctx),
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
         "dogecoin": doge_prepare.getConfigSegment(prepare_ctx),
     }
@@ -1726,9 +1716,7 @@ def main():
         else:
             default_name: str = "wallet.dat"
             use_name: str = (
-                "wallet.dat"
-                if coin_id in (Coins.NAV, Coins.FIRO, Coins.DCR)
-                else "bsx_wallet"
+                "wallet.dat" if coin_id in (Coins.FIRO, Coins.DCR) else "bsx_wallet"
             )
 
         if coin_name == "litecoin":
