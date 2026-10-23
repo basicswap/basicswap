@@ -53,6 +53,10 @@ def aes_decrypt(enc, pass_data: bytes, iv: bytes):
 
 
 SMSG_MIN_TTL = 60 * 60
+SMSG_VERSION_LEGACY = bytes((2, 1))
+# 2.2: the signature also covers the version, timestamp and recipient, and the mac
+# every header field but the pow hash and nonce, which are set after it.
+SMSG_VERSION_BOUND = bytes((2, 2))
 SMSG_BUCKET_LEN = 60 * 60
 SMSG_HDR_LEN = (
     108  # Length of unencrypted header, 4 + 4 + 2 + 1 + 8 + 4 + 16 + 33 + 32 + 4
@@ -68,6 +72,17 @@ def smsgGetTimestamp(smsg_message: bytes) -> int:
 def smsgGetTTL(smsg_message: bytes) -> int:
     ensure(len(smsg_message) > SMSG_HDR_LEN, "smsg_message shorter than header")
     return int.from_bytes(smsg_message[19 : 19 + 4], byteorder="little")
+
+
+def boundHash(smsg_timestamp: int, pubkey_to: bytes, payload: bytes) -> bytes:
+    return sha256(
+        sha256(
+            SMSG_VERSION_BOUND
+            + smsg_timestamp.to_bytes(8, byteorder="little")
+            + pubkey_to
+            + payload
+        )
+    )
 
 
 def smsgGetPOWHash(smsg_message: bytes) -> bytes:
@@ -96,6 +111,7 @@ def smsgEncrypt(
     payload_format: int = 2,
     smsg_ttl: int = SMSG_MIN_TTL,
     difficulty_target=0x1EFFFFFF,
+    smsg_version: bytes = SMSG_VERSION_LEGACY,
 ) -> bytes:
     # assert len(payload) < 128  # Requires lz4 if payload > 128 bytes
     # TODO: Add lz4 to match core smsg
@@ -119,7 +135,12 @@ def smsgEncrypt(
     key_e: bytes = H[:32]
     key_m: bytes = H[32:]
 
-    payload_hash: bytes = sha256(sha256(payload))
+    if smsg_version == SMSG_VERSION_BOUND:
+        payload_hash: bytes = boundHash(
+            smsg_timestamp, PublicKey(pubkey_to).format(), payload
+        )
+    else:
+        payload_hash: bytes = sha256(sha256(payload))
     signature: bytes = PrivateKey(privkey_from).sign_recoverable(
         payload_hash, hasher=None
     )
@@ -148,16 +169,26 @@ def smsgEncrypt(
 
     ciphertext: bytes = aes_encrypt(plaintext_data, key_e, smsg_iv)
 
-    m = hmac.new(key_m, digestmod="SHA256")
-    m.update(smsg_timestamp.to_bytes(8, byteorder="little"))
-    m.update(smsg_iv)
-    m.update(ciphertext)
-    mac: bytes = m.digest()
-
     smsg_hash = bytes((0,)) * 4
     smsg_nonce = bytes((0,)) * 4
-    smsg_version = bytes((2, 1))
     smsg_flags = bytes((0,))
+
+    m = hmac.new(key_m, digestmod="SHA256")
+    if smsg_version == SMSG_VERSION_BOUND:
+        m.update(
+            smsg_version
+            + smsg_flags
+            + smsg_timestamp.to_bytes(8, byteorder="little")
+            + smsg_ttl.to_bytes(4, byteorder="little")
+            + smsg_iv
+            + R
+            + len(ciphertext).to_bytes(4, byteorder="little")
+        )
+    else:
+        m.update(smsg_timestamp.to_bytes(8, byteorder="little"))
+        m.update(smsg_iv)
+    m.update(ciphertext)
+    mac: bytes = m.digest()
 
     ensure(len(R) == 33, "Invalid R length")
     ensure(len(mac) == 32, "Invalid MAC length")
@@ -215,10 +246,15 @@ def smsgDecrypt(
     key_e: bytes = H[:32]
     key_m: bytes = H[32:]
 
+    smsg_version: bytes = bytes(encrypted_message[8:10])
     m = hmac.new(key_m, digestmod="SHA256")
-    m.update(smsg_timestamp.to_bytes(8, byteorder="little"))
-    m.update(smsg_iv)
-    m.update(ciphertext)
+    if smsg_version == SMSG_VERSION_BOUND:
+        m.update(encrypted_message[8:72])
+        m.update(encrypted_message[104:])
+    else:
+        m.update(smsg_timestamp.to_bytes(8, byteorder="little"))
+        m.update(smsg_iv)
+        m.update(ciphertext)
     mac_calculated: bytes = m.digest()
 
     ensure(mac == mac_calculated, "Mismatched MAC")
@@ -239,7 +275,12 @@ def smsgDecrypt(
     ofs += 65
     ofs += 4
     payload = plaintext[ofs:]
-    payload_hash: bytes = sha256(sha256(payload))
+    if smsg_version == SMSG_VERSION_BOUND:
+        payload_hash: bytes = boundHash(
+            smsg_timestamp, PublicKey.from_secret(privkey_to).format(), payload
+        )
+    else:
+        payload_hash: bytes = sha256(sha256(payload))
 
     # Convert format from BTC
     recid = (signature[0] - 27) & 3
@@ -255,7 +296,10 @@ def smsgDecrypt(
     if output_dict:
         return {
             "msgid": smsgGetID(encrypted_message).hex(),
+            "mac": mac.hex(),
             "sent": smsg_timestamp,
+            "ttl": smsgGetTTL(encrypted_message),
+            "smsg_version": smsg_version,
             "hex": payload.hex(),
             "pubkey_from": pubkey_signer.hex(),
         }

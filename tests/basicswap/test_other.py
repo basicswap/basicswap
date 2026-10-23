@@ -6,6 +6,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import base64
+import collections
 import hashlib
 import logging
 import os
@@ -87,6 +89,7 @@ from basicswap.util import (
 from basicswap.rpc import Jsonrpc, escape_rpcauth
 from basicswap.messages_npb import (
     BidMessage,
+    OfferRevokeMessage,
 )
 from basicswap.contrib.test_framework import segwit_addr
 from basicswap.contrib.test_framework.script import (
@@ -3313,6 +3316,51 @@ class Test(unittest.TestCase):
                 assert os.umask(0o022) == 0o077, main.__module__
         finally:
             os.umask(orig_umask)
+
+    def test_early_offer_revokes_keep_every_sender(self):
+        settings = {"rpcport": 0, "rpcauth": "none"}
+        settings.update(REQUIRED_SETTINGS)
+        ci_part = PARTInterface(settings, "regtest")
+        sc = _FakeSwapClient()
+        sc._possibly_revoked_offers = collections.deque([], maxlen=1000)
+        sc._expired_offer_revokes = set()
+        sc.network_addr = "network_addr"
+        sc.mock_time_offset = 0
+        sc.ci = lambda coin: ci_part
+        sc.getTime = lambda: BaseApp.getTime(sc)
+        sc.openDB = lambda: None
+        sc.closeDB = lambda cursor: None
+        sc.getOffer = lambda offer_id, cursor: None
+        sc.getSmsgMsgBytes = lambda msg: msg["payload"]
+        sc.storeOfferRevoke = lambda *args: BasicSwap.storeOfferRevoke(sc, *args)
+
+        offer_id = sc.getTime().to_bytes(8, "big") + secrets.token_bytes(20)
+        maker, other = PrivateKey(), PrivateKey()
+        maker_addr = ci_part.pubkey_to_address(maker.public_key.format())
+        other_addr = ci_part.pubkey_to_address(other.public_key.format())
+
+        def revoke(key: PrivateKey, addr_from: str) -> None:
+            sig = ci_part._signMessageWithKeyLocal(
+                ci_part.encodeKey(key.secret), offer_id.hex() + "_revoke"
+            )
+            msg_data = OfferRevokeMessage(
+                offer_msg_id=offer_id, signature=base64.b64decode(sig)
+            )
+            msg = {
+                "to": sc.network_addr,
+                "from": addr_from,
+                "payload": msg_data.to_bytes(),
+            }
+            BasicSwap.processOfferRevoke(sc, msg)
+
+        revoke(other, maker_addr)
+        assert len(sc._possibly_revoked_offers) == 0
+        revoke(other, other_addr)
+        assert BasicSwap.isOfferRevoked(sc, offer_id, maker_addr) is False
+        revoke(maker, maker_addr)
+        revoke(maker, maker_addr)
+        assert len(sc._possibly_revoked_offers) == 2
+        assert BasicSwap.isOfferRevoked(sc, offer_id, maker_addr) is True
 
 
 if __name__ == "__main__":
