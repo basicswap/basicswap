@@ -19,6 +19,7 @@ from util import (
     get_driver,
 )
 from tests.basicswap.util.common import read_json_api
+from basicswap.basicswap_util import DebugTypes
 
 base_url = "http://localhost"
 
@@ -53,22 +54,26 @@ def recover_chain_b_lock_tx(driver, offer_data, offerer_port, bidder_port):
         time.sleep(2)
     assert bid_state == "Received"
 
-    # Set BID_STOP_AFTER_COIN_B_LOCK (13) debugind
-    rv = read_json_api(offerer_port, f"bids/{bid0_id}", {"debugind": 13})
+    rv = read_json_api(
+        offerer_port,
+        f"bids/{bid0_id}",
+        {"debugind": int(DebugTypes.BID_STOP_AFTER_COIN_B_LOCK)},
+    )
     assert "error" not in rv
 
     # Accept bid
     rv = read_json_api(offerer_port, f"bids/{bid0_id}", {"accept": 1})
     assert "error" not in rv
 
+    bidder_states = ("Scriptless coin locked", "Script coin lock released")
     for i in range(100):
         rv = read_json_api(bidder_port, f"bids/{bid0_id}")
         bid_state = rv["bid_state"]
-        if bid_state == "Scriptless coin locked":
+        if bid_state in bidder_states:
             break
         print("Bidder: Waiting for state")
         time.sleep(5)
-    assert bid_state == "Scriptless coin locked"
+    assert bid_state in bidder_states
 
     for i in range(100):
         rv = read_json_api(offerer_port, f"bids/{bid0_id}")

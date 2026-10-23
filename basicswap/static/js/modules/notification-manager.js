@@ -116,14 +116,14 @@ const NotificationManager = (function() {
       const typeColor = getToastColor(item.type, item);
       const typeIconHtml = `<div class="inline-flex flex-shrink-0 justify-center items-center w-8 h-8 ${typeColor} rounded-lg text-white mr-3">${typeIcon}</div>`;
 
-      let enhancedTitle = item.title;
+      let enhancedTitle = window.config.utils.escapeHtml(String(item.title ?? ''));
       if ((item.type === 'new_offer' || item.type === 'new_bid') && item.coinFrom && item.coinTo) {
         const coinFromIcon = getCoinIcon(getCoinDisplayName(item.coinFrom));
         const coinToIcon = getCoinIcon(getCoinDisplayName(item.coinTo));
         const coinFromName = getCoinDisplayName(item.coinFrom);
         const coinToName = getCoinDisplayName(item.coinTo);
 
-        enhancedTitle = item.title
+        enhancedTitle = enhancedTitle
           .replace(new RegExp(`(\\d+\\.\\d+)\\s+${coinFromName}`, 'g'), `<img src="/static/images/coins/${coinFromIcon}" class="w-4 h-4 inline mr-1" alt="${coinFromName}" onerror="this.style.display='none'">$1 ${coinFromName}`)
           .replace(new RegExp(`(\\d+\\.\\d+)\\s+${coinToName}`, 'g'), `<img src="/static/images/coins/${coinToIcon}" class="w-4 h-4 inline mr-1" alt="${coinToName}" onerror="this.style.display='none'">$1 ${coinToName}`);
       }
@@ -627,7 +627,7 @@ function ensureToastContainer() {
             <div class="flex items-center ml-3 text-sm font-medium text-gray-900 dark:text-white">
               ${coinIconHtml}
               <div class="flex flex-col">
-                <span class="font-semibold">${title}</span>
+                <span class="font-semibold">${window.config.utils.escapeHtml(String(title ?? ''))}</span>
                 ${options.subtitle ? `<span class="text-xs text-gray-500 dark:text-gray-400">${options.subtitle}</span>` : ''}
               </div>
             </div>

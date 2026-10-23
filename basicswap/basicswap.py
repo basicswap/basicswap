@@ -85,6 +85,7 @@ from .offer_tracking import (
     validate_offer_budget,
 )
 from .oracles import (
+    filterValidRates,
     getExchangeName,
     oracle_fetchers,
     rate_source_names,
@@ -1905,7 +1906,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 return
 
             latest_tag = tags_data[0].get("name", "").lstrip("v")
-            if not latest_tag:
+            if not all(p.isascii() and p.isdigit() for p in latest_tag.split(".")):
                 self.log.warning("Could not determine latest version from GitHub tags")
                 return
 
@@ -18119,7 +18120,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         fetcher = oracle_fetchers.get(rate_source)
         if fetcher is None:
             raise ValueError(f"Unknown rate source {rate_source}")
-        rates = fetcher(self, coins_list, currency_to, oldest_valid_update)
+        rates = filterValidRates(
+            fetcher(self, coins_list, currency_to, oldest_valid_update)
+        )
 
         with self._price_cache_lock:
             for coin_id, (rate, volume_24h, price_change_24h) in rates.items():

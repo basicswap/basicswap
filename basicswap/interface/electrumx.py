@@ -735,6 +735,19 @@ def _parse_server_string(server_str):
     return {"host": host, "port": port, "ssl": use_ssl}
 
 
+PEER_HOST_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:"
+)
+
+
+def is_valid_peer_host(host) -> bool:
+    return (
+        isinstance(host, str)
+        and 0 < len(host) <= 253
+        and all(c in PEER_HOST_CHARS for c in host)
+    )
+
+
 class ElectrumServer:
     def __init__(
         self,

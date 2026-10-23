@@ -318,13 +318,13 @@ const RateManager = {
         Ajax.post('/json/rates', params,
             (response) => {
                 if (ratesDisplay) {
-                    ratesDisplay.innerHTML = typeof response === 'string' ?
-                        response : '<pre><code>' + JSON.stringify(response, null, '  ') + '</code></pre>';
+                    ratesDisplay.innerHTML = '<pre><code>' + window.config.utils.escapeHtml(
+                        typeof response === 'string' ? response : JSON.stringify(response, null, '  ')) + '</code></pre>';
                 }
             },
             (error) => {
                 if (ratesDisplay) {
-                    ratesDisplay.innerHTML = '<p>Error loading rates: ' + error + '</p>';
+                    ratesDisplay.innerHTML = '<p>Error loading rates: ' + window.config.utils.escapeHtml(String(error)) + '</p>';
                 }
             }
         );

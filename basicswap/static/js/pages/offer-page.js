@@ -20,7 +20,7 @@
       this.xhr_rates.onload = () => {
         if (this.xhr_rates.status == 200) {
           const obj = JSON.parse(this.xhr_rates.response);
-          const inner_html = '<h4 class="bold">Rates</h4><pre><code>' + JSON.stringify(obj, null, '  ') + '</code></pre>';
+          const inner_html = '<h4 class="bold">Rates</h4><pre><code>' + window.config.utils.escapeHtml(JSON.stringify(obj, null, '  ')) + '</code></pre>';
           const ratesDisplay = document.getElementById('rates_display');
           if (ratesDisplay) {
             ratesDisplay.innerHTML = inner_html;

@@ -237,6 +237,7 @@ const ConfigManager = (function() {
             return fullName;
         }
     };
+    publicAPI.utils = utils;
     return publicAPI;
 })();
 

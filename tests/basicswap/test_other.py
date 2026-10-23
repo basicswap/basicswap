@@ -2124,6 +2124,122 @@ class Test(unittest.TestCase):
             assert len(b) == expect_length
             assert decode_varint(b) == (i, expect_length)
 
+    def test_electrum_discover_drops_invalid_peer_hosts(self):
+        import json
+        from basicswap.interface.electrumx import is_valid_peer_host
+        from basicswap.js_server import js_electrum_discover
+
+        onion = "x" * 56 + ".onion"
+        for host, valid in (
+            ("electrum.example.com", True),
+            ("1.2.3.4", True),
+            ("2001:db8::1", True),
+            (onion, True),
+            ("", False),
+            (None, False),
+            ("a b", False),
+            ('"><img src=x onerror=alert(1)>', False),
+            ("a" * 254, False),
+        ):
+            assert is_valid_peer_host(host) is valid, host
+
+        peers = [
+            {"host": "electrum.example.com", "port": 50002, "is_onion": False},
+            {"host": "<img src=x onerror=alert(1)>", "port": 50002, "is_onion": False},
+            {"host": onion, "port": 50002, "is_onion": True},
+        ]
+
+        class Server:
+            def get_current_server_info(self):
+                return {"host": "electrum.example.org", "port": 50002}
+
+            def discover_peers(self):
+                return [dict(peer) for peer in peers]
+
+        class Backend:
+            _server = Server()
+
+        class CI:
+            _connection_type = "electrum"
+
+            def getBackend(self):
+                return Backend()
+
+        class SwapClient:
+            def ci(self, coin_type):
+                return CI()
+
+        class Srv:
+            swap_client = SwapClient()
+
+        class Handler:
+            server = Srv()
+
+        rv = json.loads(
+            js_electrum_discover(Handler(), None, b'{"coin": "bitcoin"}', True)
+        )
+        assert [s["host"] for s in rv["clearnet_servers"]] == ["electrum.example.com"]
+        assert [s["host"] for s in rv["onion_servers"]] == [onion]
+
+    def test_oracle_rates_validated(self):
+        from unittest import mock
+        from basicswap.basicswap import BasicSwap
+        from basicswap.oracles import filterValidRates, oracle_fetchers
+
+        rates = {
+            1: (100.5, 1000, -2.5),
+            2: (float("nan"), 1, 1),
+            3: ("inf", 1, 1),
+            4: ("abc", 1, 1),
+            5: (0, 1, 1),
+            6: (-1, 1, 1),
+            7: (True, 1, 1),
+            8: ("12.5", "nan", "x"),
+            9: (None, 1, 1),
+        }
+        assert filterValidRates(rates) == {
+            1: (100.5, 1000.0, -2.5),
+            8: (12.5, None, None),
+        }
+
+        class Cursor:
+            rowcount = 1
+
+            def __init__(self):
+                self.rates = []
+
+            def execute(self, query, params=None):
+                if params and "rate" in params:
+                    self.rates.append(params["currency_from"])
+
+        class Stub:
+            _price_cache_lock = threading.Lock()
+
+            def __init__(self):
+                self._price_cache = {}
+                self._volume_cache = {}
+                self.cursor = Cursor()
+
+            def openDB(self):
+                return self.cursor
+
+            def commitDB(self):
+                pass
+
+            def closeDB(self, cursor, commit=True):
+                pass
+
+        stub = Stub()
+        with mock.patch.dict(
+            oracle_fetchers, {"test_oracle": lambda *args: dict(rates)}
+        ):
+            fetched = BasicSwap._fetchPricesAndVolumeForSource(
+                stub, list(rates), "test_oracle", 1
+            )
+        assert fetched == {1, 8}
+        assert sorted(key[0] for key in stub._price_cache) == [1, 8]
+        assert stub.cursor.rates == [1, 8]
+
     def test_base58(self):
         k = bytes.fromhex(
             "0b4c6e34c21b910f92c7985a8093de526f5f8677a112a8c672d1098139b70e0f"
