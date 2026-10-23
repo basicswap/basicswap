@@ -1,5 +1,6 @@
     monero_daemon:
         image: i_monero_daemon
+        stop_grace_period: 10m
         build:
             context: monero_daemon
             dockerfile: Dockerfile

@@ -1,5 +1,6 @@
     dogecoin_core:
         image: i_dogecoin
+        stop_grace_period: 10m
         build:
             context: dogecoin
             dockerfile: Dockerfile

@@ -596,6 +596,18 @@ def prepareDataDir(coin, settings, chain, particl_mnemonic, extra_opts={}):
     if prepare_module is None:
         raise ValueError("Unknown coin")
 
+    core_settings = settings["chainclients"][coin]
+    for user_key, password_key in (
+        ("rpcuser", "rpcpassword"),
+        ("walletrpcuser", "walletrpcpassword"),
+    ):
+        if core_settings.get(user_key, "") != "" and not core_settings.get(
+            password_key, ""
+        ):
+            exitWithError(
+                f"The {coin} {user_key} is set but its {password_key} is empty"
+            )
+
     prepare_module.prepareDataDir(
         extra_opts["prepare_ctx"], settings, chain, extra_opts
     )
@@ -1304,6 +1316,7 @@ def ensure_network_valid(network_name: str, test_disabled: bool = True) -> None:
 
 def main():
     global use_tor_proxy, with_coins_changed
+    os.umask(0o077)
     setTorrcVars()
     data_dir = None
     bin_dir = None

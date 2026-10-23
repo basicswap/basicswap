@@ -1,5 +1,6 @@
     wownero_wallet:
         image: i_wownero_wallet
+        stop_grace_period: 10m
         build:
             context: wownero_wallet
             dockerfile: Dockerfile

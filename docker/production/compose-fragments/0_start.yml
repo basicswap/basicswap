@@ -5,6 +5,7 @@ networks:
 services:
     particl_core:
         image: i_particl
+        stop_grace_period: 10m
         build:
             context: particl
             dockerfile: Dockerfile

@@ -1,5 +1,6 @@
     pivx_core:
         image: i_pivx
+        stop_grace_period: 10m
         build:
             context: pivx
             dockerfile: Dockerfile

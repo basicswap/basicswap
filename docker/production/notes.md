@@ -20,7 +20,7 @@ Copy and edit .env config:
     cp example.env .env
 
 
-Optionally set random RPC passwords:
+Set random RPC passwords, example.env leaves them empty and basicswap-prepare refuses an empty one:
 
     for KEY in $(grep -o '^.*_RPC_PWD' .env)
     do
@@ -221,5 +221,6 @@ Prepare wallet:
 
 # Notes
 
-Switch Basicswap repo:
-    docker-compose build swapclient --build-arg BASICSWAP_URL=https://github.com/basicswap/basicswap/archive/refs/heads/dev.zip --build-arg BASICSWAP_DIR=basicswap-dev
+Switch Basicswap repo or commit, the full commit id is required:
+    docker-compose build swapclient --build-arg BASICSWAP_COMMIT=$(git ls-remote https://github.com/basicswap/basicswap refs/heads/dev | cut -f1)
+    docker-compose build swapclient --build-arg BASICSWAP_REPO=https://github.com/<user>/basicswap.git --build-arg BASICSWAP_COMMIT=<commit>

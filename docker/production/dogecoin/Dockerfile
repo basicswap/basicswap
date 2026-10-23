@@ -1,14 +1,15 @@
-FROM i_swapclient as install_stage
+FROM i_swapclient AS install_stage
 
 RUN basicswap-prepare --preparebinonly --bindir=/coin_bin --withcoin=dogecoin --withoutcoin=particl && \
-    find /coin_bin -name *.tar.gz -delete
+    find /coin_bin -name *.tar.gz -delete && \
+    chmod -R a+rX /coin_bin
 
 FROM debian:trixie-slim
 COPY --from=install_stage /coin_bin .
 
-ENV DOGECOIN_DATA /data
+ENV DOGECOIN_DATA=/data
 
-RUN groupadd -r dogecoin && useradd -r -m -g dogecoin dogecoin \
+RUN groupadd -g 1000 dogecoin && useradd -u 1000 -m -g dogecoin dogecoin \
     && apt-get update \
     && apt-get install -qq --no-install-recommends gosu \
     && rm -rf /var/lib/apt/lists/* \

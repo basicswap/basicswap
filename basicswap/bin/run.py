@@ -679,6 +679,7 @@ def printHelp():
 
 
 def main():
+    os.umask(0o077)
     data_dir = None
     chain = "mainnet"
     start_only_coins = set()

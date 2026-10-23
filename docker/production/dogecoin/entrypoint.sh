@@ -1,8 +1,9 @@
 #!/bin/bash
 set -e
 
-if [[ "$1" == "dogecoin-cli" || "$1" == "dogecoin-tx" || "$1" == "dogecoind" || "$1" == "test_dogecoin" ]]; then
+if [[ "${1##*/}" == "dogecoin-cli" || "${1##*/}" == "dogecoin-tx" || "${1##*/}" == "dogecoind" || "${1##*/}" == "test_dogecoin" ]]; then
 	mkdir -p "$DOGECOIN_DATA"
+	find "$DOGECOIN_DATA" ! -user dogecoin -exec chown -h dogecoin:dogecoin {} +
 
 	chown -h dogecoin:dogecoin /home/dogecoin/.dogecoin
 	exec gosu dogecoin "$@"
