@@ -107,9 +107,6 @@ class WalletManager:
 
         self._log.debug(f"WalletManager: {Coins(coin_type).name} initialized")
 
-    def getDepositAddress(self, coin_type: Coins) -> str | None:
-        return self.getAddress(coin_type, index=0, internal=False)
-
     def isInitialized(self, coin_type: Coins) -> bool:
         return coin_type in self._initialized
 

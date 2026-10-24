@@ -5340,11 +5340,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         ci = self.ci(coin_type)
 
-        if hasattr(ci, "useBackend") and ci.useBackend() and self._wallet_manager:
-            addr = self._wallet_manager.getDepositAddress(coin_type)
-            if addr:
-                return addr
-
         key_str = "receive_addr_" + ci.coin_name().lower()
         use_cursor = self.openDB(cursor)
         try:
