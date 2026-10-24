@@ -2102,6 +2102,8 @@ class Test(unittest.TestCase):
 
         class Srv:
             session_tokens = {"csrf": "the-server-token"}
+            used_form_ids = {}
+            form_id_lock = threading.Lock()
 
         class Stub:
             server = Srv()
@@ -2109,10 +2111,14 @@ class Test(unittest.TestCase):
         check = HttpHandler.checkForm
         msgs = []
         # Correct token -> returns parsed form data.
-        fd = check(Stub(), b"formid=the-server-token&x=1", "rpc", msgs)
+        fd = check(Stub(), b"formid=the-server-token.n1&x=1", "rpc", msgs)
         assert fd is not None and b"x" in fd
+        assert check(Stub(), b"formid=the-server-token.n1&x=1", "rpc", msgs) is None
+        assert "Prevented double submit for form rpc." in msgs
+        assert check(Stub(), b"formid=the-server-token.n2&x=1", "rpc", msgs)
         # Wrong / missing / empty -> rejected (None).
         assert check(Stub(), b"formid=wrong&x=1", "rpc", msgs) is None
+        assert check(Stub(), b"formid=the-server-token&x=1", "rpc", msgs) is None
         assert check(Stub(), b"x=1", "rpc", msgs) is None
         assert check(Stub(), "", "rpc", msgs) is None
 
@@ -2204,7 +2210,7 @@ class Test(unittest.TestCase):
             ):
                 page, rendered = render_404(handler)
             shutdown_token = handler.server.session_tokens["shutdown"]
-            assert rendered["form_id"] == "csrf-token"
+            assert rendered["form_id"].startswith("csrf-token.")
             assert shutdown_token != "old-token"
             assert f"/shutdown/{shutdown_token}" in page
 

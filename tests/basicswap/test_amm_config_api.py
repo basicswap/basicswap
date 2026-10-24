@@ -7,6 +7,7 @@
 import io
 import logging
 import tempfile
+import threading
 import types
 import unittest
 from unittest import mock
@@ -430,6 +431,8 @@ class AmmControlTest(unittest.TestCase):
     def test_control_form_needs_token(self):
         class Srv:
             session_tokens = {"csrf": "csrf-token"}
+            used_form_ids = {}
+            form_id_lock = threading.Lock()
             env = mock.MagicMock()
 
         class Stub(HttpHandler):
@@ -445,7 +448,7 @@ class AmmControlTest(unittest.TestCase):
             for post_string, allowed in (
                 (b"start=1&host=127.0.0.1&port=12700", False),
                 (b"start=1&formid=wrong", False),
-                (b"start=1&formid=csrf-token", True),
+                (b"start=1&formid=csrf-token.n1", True),
             ):
                 swap_client = mock.MagicMock()
                 swap_client.data_dir = data_dir

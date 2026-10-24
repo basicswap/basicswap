@@ -19,6 +19,7 @@ import http.client
 import base64
 import socket
 
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from jinja2 import Environment, PackageLoader, select_autoescape
 from socket import error as SocketError
@@ -497,6 +498,9 @@ class HttpHandler(BaseHTTPRequestHandler):
         # TODO: Add debug flag to re-enable.
         pass
 
+    def generate_form_id(self):
+        return self.server.session_tokens["csrf"] + "." + secrets.token_hex(8)
+
     def checkForm(self, post_string, name, messages):
         if post_string == "":
             return None
@@ -506,12 +510,19 @@ class HttpHandler(BaseHTTPRequestHandler):
         except (KeyError, IndexError):
             messages.append("Missing form token.")
             return None
-        # Real CSRF check: the form must carry the server-issued token. Replaces
-        # the former per-form-name double-submit latch, which was not a security
-        # control (any fresh value passed).
-        if not hmac.compare_digest(form_id, self.server.session_tokens.get("csrf", "")):
+        token, _, nonce = form_id.rpartition(".")
+        if not nonce or not hmac.compare_digest(
+            token, self.server.session_tokens.get("csrf", "")
+        ):
             messages.append("Invalid form token.")
             return None
+        # One nonce per render, shared by its forms: a page must reload between posts.
+        with self.server.form_id_lock:
+            used = self.server.used_form_ids.setdefault(name, deque(maxlen=100))
+            if nonce in used:
+                messages.append("Prevented double submit for form {}.".format(name))
+                return None
+            used.append(nonce)
         return form_data
 
     def render_template(
@@ -638,7 +649,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             template.render(
                 title=self.server.title,
                 h2=self.server.title,
-                form_id=self.server.session_tokens["csrf"] if issue_tokens else "",
+                form_id=self.generate_form_id() if issue_tokens else "",
                 **args_dict,
             ),
             "UTF-8",
@@ -1524,11 +1535,13 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
         self.title = "BasicSwap - " + __version__
         self.session_tokens = dict()
         self.session_tokens["csrf"] = secrets.token_urlsafe(32)
+        self.used_form_ids = dict()
         self.active_sessions = {}
         self.env = env
         self.msg_id_counter = 0
 
         self.session_lock = threading.Lock()
+        self.form_id_lock = threading.Lock()
         self.msg_id_lock = threading.Lock()
         self._handler_slots = threading.BoundedSemaphore(MAX_HTTP_HANDLERS)
 
