@@ -1111,15 +1111,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             )
 
             if addresses:
-                try:
-                    detailed_balances = self._backend.getDetailedBalance(addresses)
-                    for addr, bal_info in detailed_balances.items():
-                        confirmed = bal_info.get("confirmed", 0)
-                        unconfirmed = bal_info.get("unconfirmed", 0)
-                        total_confirmed_sats += confirmed
-                        total_unconfirmed_sats += unconfirmed
-                except Exception as e:
-                    self._log.warning(f"_queryElectrumWalletInfo error: {e}")
+                detailed_balances = self._backend.getDetailedBalance(addresses)
+                for bal_info in detailed_balances.values():
+                    total_confirmed_sats += bal_info["confirmed"]
+                    total_unconfirmed_sats += bal_info["unconfirmed"]
 
         balance_btc = total_confirmed_sats / self.COIN()
         unconfirmed_btc = total_unconfirmed_sats / self.COIN()

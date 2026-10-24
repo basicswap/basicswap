@@ -2805,7 +2805,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     confirmed_balance += bal.get("confirmed", 0)
                     unconfirmed_balance += bal.get("unconfirmed", 0)
             except Exception as e:
-                self.log.debug(f"Error getting detailed balance: {e}")
+                self.log.warning(
+                    f"Skipping transfer: {getCoinName(coin_type)} balance unavailable: {e}"
+                )
+                self._pending_sweeps[coin_type] = self.getTime()
+                return {"skipped": True, "reason": "balance_unavailable"}
 
             if unconfirmed_balance != 0:
                 self.log.warning(
