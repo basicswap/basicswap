@@ -1068,6 +1068,58 @@ class TestPlaceMultiBid(unittest.TestCase):
         self.assertEqual(len(placed), 2)
         self.assertEqual(failed, [])
 
+    def test_a_spend_max_plan_places(self):
+        swap_client = FakeSwapClient(
+            self.book(), market_rate=ltc(0.43), balance=ltc(4.30), fee_rate=0.0001
+        )
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.XMR, Coins.LTC, FILL_SPEND, None, spend_max=True
+        )
+
+        placed, failed, _ = placeMultiBid(
+            swap_client,
+            [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs],
+        )
+
+        self.assertEqual(plan.unfilled, 0)
+        self.assertEqual(len(placed), 2)
+        self.assertEqual(failed, [])
+
+    def test_a_spend_max_plan_paying_xmr_places(self):
+        book = [
+            FakeOffer(
+                b"X",
+                0.004,
+                160,
+                coin_from=Coins.BTC,
+                coin_to=Coins.XMR,
+                min_bid_amount=0.0001,
+            ),
+            FakeOffer(
+                b"Y",
+                0.01,
+                161,
+                coin_from=Coins.BTC,
+                coin_to=Coins.XMR,
+                min_bid_amount=0.0001,
+            ),
+        ]
+        swap_client = FakeSwapClient(
+            book, market_rate=xmr(160), balance=xmr(1), fee_rate=0.0001
+        )
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.BTC, Coins.XMR, FILL_SPEND, None, spend_max=True
+        )
+
+        placed, failed, _ = placeMultiBid(
+            swap_client,
+            [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs],
+        )
+
+        self.assertEqual(plan.unfilled, 0)
+        self.assertEqual(len(placed), 2)
+        self.assertEqual(failed, [])
+
     def test_a_failed_leg_does_not_stop_the_others(self):
         swap_client = FakeSwapClient(self.book())
         swap_client.fail_offers.add(b"A")
