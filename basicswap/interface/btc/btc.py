@@ -1447,8 +1447,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def isSegwitAddress(self, address: str) -> bool:
         bech32_prefix: str = self.chainparams_network().get("hrp", "")
-        return len(bech32_prefix) > 0 and address.lower().startswith(
-            bech32_prefix + "1"
+        return (
+            len(bech32_prefix) > 0
+            and address.lower().startswith(bech32_prefix + "1")
+            and address in (address.lower(), address.upper())
         )
 
     def supportsTaproot(self) -> bool:

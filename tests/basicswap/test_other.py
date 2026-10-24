@@ -743,6 +743,15 @@ class Test(unittest.TestCase):
         address = segwit_addr.encode_segwit_address(hrp, 1, bytes(range(32)))
         assert ci.getDestForAddress(address.upper()) == ci.getDestForAddress(address)
 
+    def test_base58_address_starting_like_bech32(self):
+        settings = {"rpcport": 0, "rpcauth": "none"}
+        settings.update(REQUIRED_SETTINGS)
+        ci = PARTInterface(settings, "mainnet", swap_client=_FakeSwapClient())
+        pkh = bytes.fromhex("fd18") + bytes(18)
+        address = ci.pkh_to_address(pkh)
+        assert address.startswith("Pw1")
+        assert ci.decodeAddress(address) == pkh
+
     def test_scripthash_from_address_keeps_the_witness_version(self):
         ci = self.ci_btc()
         network_params = ci.chainparams_network()
