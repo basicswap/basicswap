@@ -38,6 +38,21 @@ def is_loopback_address(addr: str) -> bool:
         return False
 
 
+NAT64_WELL_KNOWN_PREFIX = ipaddress.ip_network("64:ff9b::/96")
+
+
+def is_public_ip_address(addr: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    elif ip.version == 6 and ip in NAT64_WELL_KNOWN_PREFIX:
+        ip = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    return ip.is_global and not ip.is_multicast
+
+
 def is_url_scheme_allowed(url: str) -> bool:
     # Only http(s) may be fetched; blocks file://, ftp://, gopher:// etc.
     return urllib.parse.urlparse(url).scheme in ("http", "https")
@@ -46,8 +61,7 @@ def is_url_scheme_allowed(url: str) -> bool:
 def is_public_url(url: str) -> bool:
     # True only when url is http(s) and its host resolves exclusively to public
     # addresses. Used to keep the /json/readurl proxy from reaching internal
-    # services (loopback, LAN, cloud-metadata). is_private covers 127.0.0.0/8
-    # and 169.254.0.0/16.
+    # services (loopback, LAN, cloud-metadata).
     parsed = urllib.parse.urlparse(url)
     if not is_url_scheme_allowed(url):
         return False
@@ -60,7 +74,7 @@ def is_public_url(url: str) -> bool:
     except Exception:
         return False
     for *_, sockaddr in addrinfo:
-        if is_private_ip_address(sockaddr[0]):
+        if not is_public_ip_address(sockaddr[0]):
             return False
     return True
 
