@@ -914,7 +914,10 @@ class TestNostrClientRelay(unittest.TestCase):
                     time.sleep(0.05)
                 assert client.numReceiving() == 0
                 for i in range(200):
-                    if client.numReceiving() == 1:
+                    if (
+                        relay.num_subscriptions_closed == 4
+                        and client.numReceiving() == 1
+                    ):
                         break
                     time.sleep(0.05)
                 assert client.numReceiving() == 1
