@@ -383,7 +383,12 @@ def plan_fill(
     else:
         unfilled = target - total_spend
         # Less than the price of one unit can't be spent, it isn't a shortfall
-        if unfilled < max((-(-leg.rate // scale) for leg in legs), default=0):
+        unit_prices = [
+            -(-c.rate // scale)
+            for c, amount in zip(best["members"], best["amounts"])
+            if amount < c.max_amount
+        ]
+        if unit_prices and unfilled < min(unit_prices):
             unfilled = 0
 
     return Plan(
