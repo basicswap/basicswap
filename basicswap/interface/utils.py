@@ -146,6 +146,16 @@ class FeeValidator:
     def feeForVSize(fee_rate: int, vsize: int) -> int:
         return ceil(fee_rate * vsize / 1000)
 
+    def getSplitTxFees(self) -> (int, int, int):
+        """(fixed, per_output, per_input) fees to split the wallet into outputs."""
+        fee_rate: int = self.make_int(self.get_fee_rate(self._conf_target)[0])
+        base_vsize: int = self.est_split_tx_vsize(0)
+        return (
+            self.feeForVSize(fee_rate, base_vsize),
+            self.feeForVSize(fee_rate, self.est_split_tx_vsize(1) - base_vsize),
+            self.feeForVSize(fee_rate, self.est_tx_input_vsize()),
+        )
+
     def validateFeeRate(
         self, feerate: int, concept_type: int, force_bypass: bool = False
     ) -> None:
