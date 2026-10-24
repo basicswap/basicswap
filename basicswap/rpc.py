@@ -23,6 +23,14 @@ _use_rpc_pooling = False
 _rpc_pool_settings = {}
 
 
+def redact_url(url: str) -> str:
+    # The userinfo isn't escaped, so it can hold "/", "?" or "#".
+    scheme, sep, rest = url.partition("://")
+    if "@" not in rest:
+        return url
+    return scheme + sep + rest.rpartition("@")[2]
+
+
 def enable_rpc_pooling(settings):
     global _use_rpc_pooling, _rpc_pool_settings
     _use_rpc_pooling = settings.get("enabled", False)
@@ -93,7 +101,7 @@ class Jsonrpc:
             self.__host = parsed.netloc
 
         if not self.__host:
-            raise ValueError(f"Invalid or empty hostname in URI: {uri}")
+            raise ValueError(f"Invalid or empty hostname in URI: {redact_url(uri)}")
         self.__handler = parsed.path
         if not self.__handler:
             self.__handler = "/RPC2"

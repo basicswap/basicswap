@@ -18,6 +18,7 @@ import shutil
 import signal
 import socket
 import socks
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -255,6 +256,16 @@ monero_wallet_rpc_proxy_config = [
 default_socket = socket.socket
 default_socket_timeout = socket.getdefaulttimeout()
 default_socket_getaddrinfo = socket.getaddrinfo
+
+
+def readSecret(prompt: str, confirm: bool = False) -> str:
+    # getpass reads the terminal even when stdin is redirected
+    if not sys.stdin.isatty():
+        return sys.stdin.readline().rstrip("\r\n")
+    value = getpass.getpass(prompt)
+    if confirm and getpass.getpass("Repeat " + prompt[0].lower() + prompt[1:]) != value:
+        exitWithError("The entries do not match")
+    return value
 
 
 def shouldManageDaemon(prefix: str) -> bool:
@@ -771,6 +782,9 @@ def printHelp():
         + '                         "auto" to create a wallet automatically - No mnemonic.'
         + '                         "none" to disable wallet initialisation.'
     )
+    print(
+        "--particl_mnemonic       Prompt for the recovery phrase, or read it from stdin when that isn't a terminal."
+    )
     print("--withcoin=              Prepare system to run daemon for coin.")
     print("--withoutcoin=           Do not prepare system to run daemon for coin.")
     print("--addcoin=               Add coin to existing setup.")
@@ -849,6 +863,9 @@ def printHelp():
         "--dashv20compatible      Generate the same DASH wallet seed as for DASH v20 - Use only when importing an existing seed."
     )
     print("--client-auth-password=  Set or update the password to protect the web UI.")
+    print(
+        "--client-auth-password   Prompt for the web UI password, or read it from stdin when that isn't a terminal (after the mnemonic)."
+    )
     print("--disable-client-auth    Remove password protection from the web UI.")
     print(
         "--light                  Use light wallet mode (Electrum) for all supported coins."
@@ -873,6 +890,10 @@ def finalise_daemon(d):
         for fp in [d.handle.stdout, d.handle.stderr, d.handle.stdin] + d.files:
             if fp:
                 fp.close()
+    except subprocess.TimeoutExpired as e:
+        logging.info(
+            f"Error stopping {d.name}, process {d.handle.pid}: timed out after {e.timeout} seconds"
+        )
     except Exception as e:
         logging.info(f"Error stopping {d.name}, process {d.handle.pid}: {e}")
 
@@ -1314,6 +1335,7 @@ def main():
     port_offset = None
     chain = "mainnet"
     particl_wallet_mnemonic = None
+    prompt_particl_mnemonic = False
     with_coins = {
         "particl",
     }
@@ -1333,6 +1355,7 @@ def main():
     migratewallets = False
     tor_control_password = None
     client_auth_pwd_value = None
+    prompt_client_auth_pwd = False
     disable_client_auth_flag = False
     light_mode = False
     coin_modes = {}
@@ -1433,6 +1456,10 @@ def main():
                 continue
             if name == "particl_mnemonic":
                 particl_wallet_mnemonic = s[1].strip('"')
+                if particl_wallet_mnemonic not in ("auto", "none"):
+                    logger.warning(
+                        "The mnemonic is visible in the process list, pass --particl_mnemonic alone to be prompted for it."
+                    )
                 continue
             if name in ("withcoin", "withcoins"):
                 for coin in [s.strip().lower() for s in s[1].split(",")]:
@@ -1499,6 +1526,9 @@ def main():
                 continue
             if name == "client-auth-password":
                 client_auth_pwd_value = s[1].strip('"')
+                logger.warning(
+                    "The password is visible in the process list, pass --client-auth-password alone to be prompted for it."
+                )
                 continue
 
         if name == "disable-client-auth":
@@ -1506,6 +1536,12 @@ def main():
             continue
         if name == "light":
             light_mode = True
+            continue
+        if name == "particl_mnemonic":
+            prompt_particl_mnemonic = True
+            continue
+        if name == "client-auth-password":
+            prompt_client_auth_pwd = True
             continue
         if name.endswith("-mode") and len(s) == 2:
             coin_prefix = name[:-5]
@@ -1536,6 +1572,15 @@ def main():
     if print_versions:
         printVersion(with_coins)
         return 0
+
+    if prompt_particl_mnemonic:
+        particl_wallet_mnemonic = readSecret("Particl mnemonic: ").strip()
+        if particl_wallet_mnemonic == "":
+            exitWithError("No mnemonic entered")
+    if prompt_client_auth_pwd:
+        client_auth_pwd_value = readSecret("Client auth password: ", confirm=True)
+        if client_auth_pwd_value == "":
+            exitWithError("No password entered")
 
     if data_dir is None:
         data_dir = os.path.join(os.path.expanduser(cfg.BASICSWAP_DATADIR))

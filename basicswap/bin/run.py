@@ -94,6 +94,27 @@ def checkPARTZmqConfigBeforeStart(part_settings, swap_settings):
         logger.debug(f"Error checking PART ZMQ config: {e}")
 
 
+SECRET_ARG_NAMES = ("hdseed", "pass", "daemon-login")
+
+
+def redactArgs(args) -> str:
+    redacted = []
+    hide_next = False
+    for arg in args:
+        if hide_next:
+            redacted.append("***")
+            hide_next = False
+            continue
+        name, sep, _ = arg.partition("=")
+        if name.lstrip("-") in SECRET_ARG_NAMES:
+            if sep:
+                arg = name + "=***"
+            else:
+                hide_next = True
+        redacted.append(arg)
+    return " ".join(redacted)
+
+
 def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
     daemon_bin = os.path.expanduser(os.path.join(bin_dir, daemon_bin))
     datadir_path = os.path.expanduser(node_dir)
@@ -158,7 +179,7 @@ def startDaemon(node_dir, bin_dir, daemon_bin, opts=[], extra_config={}):
         args.append("-datadir=" + datadir_path)
     args += opts
     logger.info(f"Starting node {daemon_bin}")
-    logger.debug("Arguments {}".format(" ".join(args)))
+    logger.debug("Arguments {}".format(redactArgs(args)))
 
     opened_files = []
     if extra_config.get("stdout_to_file", False):
@@ -205,7 +226,7 @@ def startXmrDaemon(node_dir, bin_dir, daemon_bin, opts=[]):
         "--config-file=" + os.path.join(datadir_path, config_filename),
     ] + opts
     logger.info(f"Starting node {daemon_bin}")
-    logger.debug("Arguments {}".format(" ".join(args)))
+    logger.debug("Arguments {}".format(redactArgs(args)))
 
     # return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     file_stdout = open(os.path.join(datadir_path, "core_stdout.log"), "w")
@@ -269,7 +290,7 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
                     fp_to.write(line)
 
     logger.info(f"Starting wallet daemon {wallet_bin}")
-    logger.debug("Arguments {}".format(" ".join(args)))
+    logger.debug("Arguments {}".format(redactArgs(args)))
 
     # TODO: return subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=data_dir)
     wallet_stdout = open(os.path.join(data_dir, "wallet_stdout.log"), "w")
@@ -619,6 +640,10 @@ def runClient(
                 if fp:
                     fp.close()
             closed_pids.append(d.handle.pid)
+        except subprocess.TimeoutExpired as e:
+            swap_client.log.error(
+                f"Waiting for {d.name} {d.handle.pid} to shutdown: timed out after {e.timeout} seconds"
+            )
         except Exception as e:
             swap_client.log.error(
                 f"Waiting for {d.name} {d.handle.pid} to shutdown: {e}"

@@ -210,7 +210,8 @@ Prepare wallet:
 
     docker-compose -f docker-compose-prepare.yml up -d --scale swapprepare=0
 
-    docker-compose -f docker-compose-prepare.yml run -e WALLET_ENCRYPTION_PWD=walletpass \
+    read -rs WALLET_ENCRYPTION_PWD && export WALLET_ENCRYPTION_PWD
+    docker-compose -f docker-compose-prepare.yml run -e WALLET_ENCRYPTION_PWD \
         --rm swapprepare \
         basicswap-prepare --initwalletsonly --withoutcoin=particl --withcoin=${ADD_COIN}
 

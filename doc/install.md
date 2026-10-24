@@ -68,7 +68,7 @@ Append `--usebtcfastsync` to the below command to optionally initialise the Bitc
 
 ##### Client Authentication
 
-Append `--client-auth-password=<YOUR_PASSWORD>` to the below command to optionally enable client authentication to protect your web UI from unauthorized access.<br>
+Append `--client-auth-password` to the below command to be prompted for a password that protects your web UI from unauthorized access.<br>
 
 
 Setup with a local Monero daemon (recommended):
@@ -89,11 +89,11 @@ And the output of `echo $CURRENT_XMR_HEIGHT` for use if you need to later restor
 
 ##### Restore
 
-To restore an existing install use --particl_mnemonic to input the existing mnemonic:
+To restore an existing install use --particl_mnemonic, which prompts for the existing mnemonic:
 
     docker-compose run --rm swapclient basicswap-prepare --datadir=/coindata --htmlhost="0.0.0.0" --wshost="0.0.0.0" \
                        --withcoins=monero --xmrrestoreheight=$ORIGINAL_XMR_HEIGHT \
-                       --particl_mnemonic="existing mnemonic here"
+                       --particl_mnemonic
 
 
 #### Set the timezone (optional)
@@ -121,7 +121,8 @@ Remove any existing wallets after copying over a pruned chain or the Bitcoin dae
 
 With Encryption
 
-    docker-compose run --rm -e WALLET_ENCRYPTION_PWD=passwordhere swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
+    read -rs WALLET_ENCRYPTION_PWD && export WALLET_ENCRYPTION_PWD
+    docker-compose run --rm -e WALLET_ENCRYPTION_PWD swapclient basicswap-prepare --datadir=/coindata --addcoin=bitcoin --usebtcfastsync
 
 
 ## Windows
@@ -206,7 +207,7 @@ Prepare the datadir:
     OR using a remote/public XMR daemon (not recommended):
     XMR_RPC_HOST="node.xmr.to" XMR_RPC_PORT=18081 basicswap-prepare --datadir=$SWAP_DATADIR --withcoins=monero --xmrrestoreheight=$CURRENT_XMR_HEIGHT
 
-Append `--client-auth-password=<YOUR_PASSWORD>` to the above command to optionally enable client authentication to protect your web UI from unauthorized access.<br>
+Append `--client-auth-password` to the above command to be prompted for a password that protects your web UI from unauthorized access.<br>
 Record the mnemonic from the output of the above command.
 
 Start Basicswap:
