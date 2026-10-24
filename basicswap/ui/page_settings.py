@@ -345,6 +345,23 @@ def page_settings(self, url_split, post_string):
                                 form_data, "electrum_onion_" + name, ""
                             ).strip()
                             data["electrum_onion_servers"] = onion_servers
+                            max_servers_str = get_data_entry_or(
+                                form_data, "max_electrum_servers_" + name, ""
+                            ).strip()
+                            if max_servers_str == "":
+                                data["max_electrum_servers"] = None
+                            elif (
+                                max_servers_str.isdecimal()
+                                and int(max_servers_str) >= 1
+                            ):
+                                data["max_electrum_servers"] = int(max_servers_str)
+                            else:
+                                display_name = getCoinName(
+                                    swap_client.getCoinIdFromName(name)
+                                )
+                                err_messages.append(
+                                    f"Servers kept connected for {display_name} must be a whole number, at least 1."
+                                )
                             auto_transfer_now = have_data_entry(
                                 form_data, "auto_transfer_now_" + name
                             )
@@ -424,6 +441,7 @@ def page_settings(self, url_split, post_string):
     sorted_names = sorted(swap_client.settings["chainclients"].keys())
     from basicswap.interface.electrumx import (
         DEFAULT_ELECTRUM_SERVERS,
+        DEFAULT_MAX_ELECTRUM_SERVERS,
         DEFAULT_ONION_SERVERS,
     )
 
@@ -464,6 +482,10 @@ def page_settings(self, url_split, post_string):
                 "clearnet_servers_text": clearnet_text,
                 "onion_servers_text": onion_text,
                 "address_gap_limit": c.get("address_gap_limit", 50),
+                "max_electrum_servers": c.get("max_electrum_servers", ""),
+                "max_electrum_servers_default": swap_client.settings.get(
+                    "max_electrum_servers", DEFAULT_MAX_ELECTRUM_SERVERS
+                ),
             }
         )
         if name in ("monero", "wownero"):

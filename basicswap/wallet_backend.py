@@ -162,6 +162,7 @@ class ElectrumBackend(WalletBackend):
         proxy_host=None,
         proxy_port=None,
         cert_pins=None,
+        max_servers: int = 1,
     ):
         from basicswap.interface.electrumx import ElectrumServer
         from basicswap.chainparams import Coins, chainparams
@@ -191,6 +192,7 @@ class ElectrumBackend(WalletBackend):
             proxy_host=proxy_host,
             proxy_port=proxy_port,
             cert_pins=cert_pins,
+            max_servers=max_servers,
         )
 
         self._realtime_callback = None
@@ -209,9 +211,27 @@ class ElectrumBackend(WalletBackend):
 
         self._max_batch_size = 5
         self._background_mode = False
+        self._txid_fn = None
 
     def setBackgroundMode(self, enabled: bool):
         self._background_mode = enabled
+
+    def setTxidFunction(self, txid_fn) -> None:
+        self._txid_fn = txid_fn
+
+    def _txMatches(self, txid: str, tx) -> bool:
+        if self._txid_fn is None:
+            return True
+        tx_hex = tx.get("hex") if isinstance(tx, dict) else tx
+        try:
+            if isinstance(tx_hex, str) and self._txid_fn(tx_hex) == txid.lower():
+                return True
+        except Exception:
+            pass
+        self._log.warning(
+            f"Electrum server returned a transaction that does not match {txid[:16]}..."
+        )
+        return False
 
     def _call(self, method: str, params: list = None, timeout: int = 10):
         if self._background_mode and hasattr(self._server, "call_background"):
@@ -522,17 +542,22 @@ class ElectrumBackend(WalletBackend):
 
     def getTransaction(self, txid: str) -> dict | None:
         try:
-            return self._call("blockchain.transaction.get", [txid, True])
+            tx_info = self._call("blockchain.transaction.get", [txid, True])
         except Exception:
             return None
+        if tx_info and not self._txMatches(txid, tx_info):
+            return None
+        return tx_info
 
     def getTransactionRaw(self, txid: str) -> str | None:
         try:
             tx_hex = self._call("blockchain.transaction.get", [txid, False])
-            return tx_hex
         except Exception as e:
             self._log.warning(f"getTransactionRaw failed for {txid[:16]}...: {e}")
             return None
+        if tx_hex and not self._txMatches(txid, tx_hex):
+            return None
+        return tx_hex
 
     def _cacheConfirmedTx(self, txid: str, tx_info: dict) -> None:
         if not tx_info or not tx_info.get("blockhash"):
@@ -571,6 +596,8 @@ class ElectrumBackend(WalletBackend):
                 calls = [("blockchain.transaction.get", [txid, True]) for txid in chunk]
                 responses = self._call_batch(calls)
                 for txid, tx_info in zip(chunk, responses):
+                    if tx_info and not self._txMatches(txid, tx_info):
+                        tx_info = None
                     result[txid] = tx_info if tx_info else None
                     self._cacheConfirmedTx(txid, tx_info)
             except Exception as e:
@@ -593,6 +620,8 @@ class ElectrumBackend(WalletBackend):
             calls = [("blockchain.transaction.get", [txid, False]) for txid in txids]
             responses = self._call_batch(calls)
             for txid, tx_hex in zip(txids, responses):
+                if tx_hex and not self._txMatches(txid, tx_hex):
+                    tx_hex = None
                 result[txid] = tx_hex if tx_hex else None
         except Exception as e:
             self._log.debug(f"getTransactionBatchRaw error: {e}")

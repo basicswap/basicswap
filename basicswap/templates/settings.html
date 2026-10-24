@@ -239,6 +239,13 @@
           </div>
          </div>
 
+         <div class="mb-4 pt-2">
+          <h5 class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">Kept Connected</h5>
+          <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+           <input type="number" name="max_electrum_servers_{{ c.name }}" id="max_electrum_servers_{{ c.name }}" value="{{ c.max_electrum_servers }}" min="1" step="1" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-24 p-2.5 focus:ring-1 focus:outline-none" placeholder="{{ c.max_electrum_servers_default }}">
+          </div>
+         </div>
+
          <!-- Discover Servers Button -->
          <div class="mb-4 flex justify-end">
           <button type="button" class="discover-servers-btn inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors focus:outline-none focus:ring-0" data-coin="{{ c.name }}">

@@ -985,6 +985,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "electrum_port",
             "electrum_ssl",
             "electrum_poll_interval",
+            "max_electrum_servers",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -1206,6 +1207,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return self._electrum_cert_pins
 
     def _initElectrumBackend(self, coin, interface) -> bool:
+        from .interface.electrumx import DEFAULT_MAX_ELECTRUM_SERVERS
         from .wallet_backend import ElectrumBackend
 
         try:
@@ -1216,6 +1218,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "electrum_clearnet_servers", None
             )
             onion_servers = self.coin_clients[coin].get("electrum_onion_servers", None)
+            max_servers = self.coin_clients[coin].get(
+                "max_electrum_servers",
+                self.settings.get("max_electrum_servers", DEFAULT_MAX_ELECTRUM_SERVERS),
+            )
 
             backend = ElectrumBackend(
                 coin,
@@ -1226,6 +1232,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 proxy_host=proxy_host,
                 proxy_port=proxy_port,
                 cert_pins=self.getElectrumCertPins(),
+                max_servers=max_servers,
             )
             interface.setBackend(backend)
             ticker = interface.ticker() if hasattr(interface, "ticker") else str(coin)
@@ -11106,10 +11113,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 continue
 
             if c.get("connection_type") == "electrum":
-                if (
-                    k not in self._electrum_spend_check_futures
-                    or self._electrum_spend_check_futures[k].done()
-                ):
+                if k not in self._electrum_spend_check_futures:
                     self._electrum_spend_check_futures[k] = self.thread_pool.submit(
                         self._fetchSpendsElectrum,
                         k,
@@ -11398,6 +11402,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 found = ci.checkWatchedScript(s.script)
                 if found:
+                    if found.get("height", 0) <= 0:
+                        self.log.debug(
+                            f"Waiting for watched script tx to confirm for bid {self.log.id(s.bid_id)}: {self.logIDT(bytes.fromhex(found['txid']))}"
+                        )
+                        continue
                     results["scripts"].append((s, found))
             except Exception as e:
                 self.log.debug(f"_fetchSpendsElectrum checkWatchedScript error: {e}")
@@ -16752,6 +16761,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     for coin, cc in self.coin_clients.items():
                         if cc["name"] == coin_name:
                             cc["electrum_onion_servers"] = new_onion
+                            break
+
+            if "max_electrum_servers" in data:
+                new_max_servers = data["max_electrum_servers"]
+                if new_max_servers != settings_cc.get("max_electrum_servers", None):
+                    settings_changed = True
+                    suggest_reboot = True
+                    if new_max_servers is None:
+                        settings_cc.pop("max_electrum_servers")
+                    else:
+                        settings_cc["max_electrum_servers"] = new_max_servers
+                    for coin, cc in self.coin_clients.items():
+                        if cc["name"] == coin_name:
+                            if new_max_servers is None:
+                                cc.pop("max_electrum_servers", None)
+                            else:
+                                cc["max_electrum_servers"] = new_max_servers
                             break
 
             if settings_changed:

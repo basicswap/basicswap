@@ -5,10 +5,21 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import os
+
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.electrum_blockchain import (
+    HeaderNet,
+    hash_encode,
+    serialize_header,
+)
 from basicswap.rpc import make_rpc_func
 from basicswap.chainparams import Coins, chainparams
-from basicswap.interface.ltc.util import check_header_pow_scrypt
+from basicswap.interface.ltc.util import scrypt_hash
+
+
+def pow_hash_header(header: dict) -> str:
+    return hash_encode(scrypt_hash(serialize_header(header)))
 
 
 class LTCInterface(BTCInterface):
@@ -34,9 +45,20 @@ class LTCInterface(BTCInterface):
             wallet=self._rpc_wallet_mweb,
         )
 
-    @staticmethod
-    def _checkHeaderPoW(header_bytes: bytes) -> bool:
-        return check_header_pow_scrypt(header_bytes)
+    def _electrumCheckpointsDir(self) -> str:
+        return os.path.join(os.path.dirname(__file__), "checkpoints")
+
+    def _electrumHeaderNet(self) -> HeaderNet:
+        return HeaderNet(
+            genesis=self.chainparams_network()["genesis_hash"],
+            checkpoints=self._electrumCheckpoints(),
+            testnet=self._network != "mainnet",
+            max_target=0x00000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,
+            first_target=0x00000FFFF0000000000000000000000000000000000000000000000000000000,
+            target_timespan=84 * 60 * 60,
+            pow_hash_header=pow_hash_header,
+            timestamp_before_chunk=True,
+        )
 
     def getNewMwebAddress(self, use_segwit=False, label="swap_receive") -> str:
         if self.useBackend():
