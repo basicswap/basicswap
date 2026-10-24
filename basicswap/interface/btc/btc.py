@@ -4451,8 +4451,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def getBalances(self) -> tuple[int, int]:
         """(spendable, total) wallet balance."""
         if self.useBackend():
-            balance = self.getSpendableBalance()
-            return balance, balance
+            wi = self.getWalletInfo()
+            balance = self.make_int(wi["balance"])
+            return balance, balance + self.make_int(wi["unconfirmed_balance"])
 
         mine = self.rpc_wallet("getbalances")["mine"]
         trusted = self.make_int(mine["trusted"])
