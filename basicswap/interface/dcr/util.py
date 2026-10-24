@@ -10,7 +10,7 @@ import select
 import subprocess
 
 
-def createDCRWallet(args, hex_seed, logging, delay_event):
+def createDCRWallet(args, hex_seed, password, logging, delay_event):
     logging.info("Creating DCR wallet")
 
     pipe_r, pipe_w = os.pipe()  # subprocess.PIPE is buffered, blocks when read
@@ -28,8 +28,11 @@ def createDCRWallet(args, hex_seed, logging, delay_event):
         response = None
         if "Opened wallet" in buf:
             pass
-        elif "Use the existing configured private passphrase" in buf:
-            response = b"y\n"
+        elif (
+            "Enter the private passphrase for your new wallet" in buf
+            or "Confirm passphrase" in buf
+        ):
+            response = (password + "\n").encode("utf-8")
         elif "Do you want to add an additional layer of encryption" in buf:
             response = b"n\n"
         elif "Do you have an existing wallet seed" in buf:
@@ -70,9 +73,12 @@ def createDCRWallet(args, hex_seed, logging, delay_event):
                 delay_event.wait(0.1)
     except Exception as e:
         logging.error(f"dcrwallet --create failed: {e}")
+        raise
     finally:
         if p.poll() is None:
             p.terminate()
         os.close(pipe_r)
         os.close(pipe_w)
         p.stdin.close()
+    if p.returncode != 0:
+        raise ValueError(f"dcrwallet --create exited with code {p.returncode}")

@@ -7,6 +7,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import copy
+import getpass
 import json
 import logging
 import os
@@ -532,8 +533,14 @@ def runClient(
                     if wallet_pwd == "":
                         # Only set when in startonlycoin mode
                         wallet_pwd = os.getenv("WALLET_ENCRYPTION_PWD", "")
+                    if (
+                        wallet_pwd == ""
+                        and "decred" in start_only_coins
+                        and sys.stdin.isatty()
+                    ):
+                        wallet_pwd = getpass.getpass("Wallet encryption password: ")
                     if wallet_pwd != "":
-                        wallet_opts.append(f'--pass="{wallet_pwd}"')
+                        wallet_opts.append("--promptpass")
                     extra_config = {
                         "add_datadir": False,
                         "stdout_to_file": True,
@@ -550,6 +557,11 @@ def runClient(
                             extra_config=extra_config,
                         )
                     )
+                    if wallet_pwd != "":
+                        daemons[-1].handle.stdin.write(
+                            (wallet_pwd + "\n").encode("utf-8")
+                        )
+                        daemons[-1].handle.stdin.flush()
                     pid = daemons[-1].handle.pid
                     swap_client.log.info(f"Started {filename} {pid}")
                 continue  # /decred

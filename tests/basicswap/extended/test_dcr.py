@@ -819,12 +819,12 @@ class Test(BaseTest):
             max_tries=12,
         )
 
-        extra_opts.append("--pass=test_pass")
         args = [os.path.join(DCR_BINDIR, DCR_WALLET), "--create"] + extra_opts
-        createDCRWallet(args, cls.hex_seeds[i], logging, test_delay_event)
+        createDCRWallet(args, cls.hex_seeds[i], "test_pass", logging, test_delay_event)
 
         test_delay_event.wait(1.0)
 
+        extra_opts.append("--pass=test_pass")
         cls.dcr_daemons.append(
             startDaemon(
                 appdata,
