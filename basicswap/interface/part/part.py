@@ -375,8 +375,8 @@ class PARTInterfaceBlind(PARTInterface):
                 "vout": u["vout"],
                 "value": self.make_int(u["amount"], r=1),
             }
-            for u in self.rpc_wallet("listunspentblind", [1])
-            if u.get("spendable", False)
+            for u in self.rpc_wallet("listunspentblind", [0])
+            if u.get("spendable", False) and u.get("safe", True)
         ]
 
     def splitOutputs(self, values):
@@ -1837,3 +1837,6 @@ class PARTInterfaceAnon(PARTInterface):
 
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_wallet("getbalances")["mine"]["anon_trusted"])
+
+    def getSpendableOutputs(self):
+        return None

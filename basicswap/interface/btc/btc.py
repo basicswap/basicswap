@@ -2708,9 +2708,15 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 raise ValueError("Electrum backend or WalletManager not available")
             rv = []
             addr_to_sh = wm.getSignableAddresses(self.coin_type())
-            for sh_utxos in backend.getBatchUnspent(list(addr_to_sh.values())).values():
+            internal_shs = {
+                addr_to_sh[a]
+                for a in wm.getInternalAddresses(self.coin_type())
+                if a in addr_to_sh
+            }
+            batch_utxos = backend.getBatchUnspent(list(addr_to_sh.values()))
+            for sh, sh_utxos in batch_utxos.items():
                 for utxo in sh_utxos:
-                    if utxo.get("confirmations", 0) < 1:
+                    if utxo.get("confirmations", 0) < 1 and sh not in internal_shs:
                         continue
                     if wm.isUTXOLocked(
                         self.coin_type(), utxo.get("txid", ""), utxo.get("vout", 0)
@@ -2731,7 +2737,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 "vout": u["vout"],
                 "value": self.make_int(u["amount"]),
             }
-            for u in self.rpc_wallet("listunspent", [1])
+            for u in self.rpc_wallet("listunspent", [0])
             if u.get("spendable", False) and u.get("safe", True)
         ]
 
