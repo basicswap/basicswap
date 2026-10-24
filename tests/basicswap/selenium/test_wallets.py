@@ -18,6 +18,21 @@ from basicswap.util import dumpje
 from util import click_option, get_driver
 
 
+def rpc_apply(driver, cmd):
+    page = driver.find_element(By.TAG_NAME, "html")
+    driver.find_element(By.NAME, "cmd").send_keys(cmd)
+    driver.find_element(By.NAME, "apply").click()
+    WebDriverWait(driver, 30).until(EC.staleness_of(page))
+    WebDriverWait(driver, 30).until(
+        lambda d: d.find_elements(By.NAME, "result")
+        or d.find_elements(By.CLASS_NAME, "error_msg")
+    )
+    results = driver.find_elements(By.NAME, "result")
+    errors = [e.text for e in driver.find_elements(By.CLASS_NAME, "error_msg")]
+    assert results, errors
+    return results[0].text
+
+
 def test_wallets(driver):
     base_url = "http://localhost:12701"
     node2_url = "http://localhost:12702"
@@ -126,18 +141,19 @@ def test_wallets(driver):
         if option.text == "Particl":
             option.click()
             break
-    driver.find_element(By.NAME, "cmd").send_keys("listunspent")
-    driver.find_element(By.NAME, "apply").click()
-    time.sleep(1)
+    locked = False
+    for i in range(5):
+        text_value = rpc_apply(driver, "listunspent")
+        utxos = json.loads(text_value.split("\n", 1)[1])
 
-    text_value = driver.find_element(By.NAME, "result").text
-    utxos = json.loads(text_value.split("\n", 1)[1])
-
-    lock_utxos = [{"txid": utxos[0]["txid"], "vout": utxos[0]["vout"]}]
-    driver.find_element(By.NAME, "cmd").send_keys(
-        'lockunspent false "{}"'.format(dumpje(lock_utxos))
-    )
-    driver.find_element(By.NAME, "apply").click()
+        lock_utxos = [{"txid": utxos[0]["txid"], "vout": utxos[0]["vout"]}]
+        text_value = rpc_apply(
+            driver, 'lockunspent false "{}"'.format(dumpje(lock_utxos))
+        )
+        if text_value.strip().endswith("true"):
+            locked = True
+            break
+    assert locked
 
     print("Check for locked UTXO count")
     driver.get(base_url + "/wallet/PART")
