@@ -803,6 +803,9 @@ class ElectrumServer:
         self._keepalive_thread = None
         self._keepalive_running = False
         self._keepalive_interval = 15
+        self._reconnect_event = threading.Event()
+        self._extras_thread = None
+        self._connect_attempted = False
         self._last_activity = 0
         self._last_reconnect_time = 0
 
@@ -921,6 +924,11 @@ class ElectrumServer:
                         f"Switched to Electrum server: {server['host']}:{server['port']} "
                         f"({connect_time:.0f}ms)"
                     )
+                else:
+                    self._log.info(
+                        f"{self._coin_name} reconnected to Electrum server: "
+                        f"{server['host']}:{server['port']} ({connect_time:.0f}ms)"
+                    )
             if self._stopping:
                 conn.disconnect()
                 self._connection = None
@@ -932,6 +940,11 @@ class ElectrumServer:
             self._subscribe_headers()
             return True
         except Exception as e:
+            if self._log:
+                self._log.debug(
+                    f"{self._coin_name} Electrum server {server['host']}:{server['port']} "
+                    f"connect failed: {e}"
+                )
             self._connection_failures += 1
             self._last_connection_error = str(e)
             self._update_server_score(server, success=False)
@@ -950,19 +963,22 @@ class ElectrumServer:
             f"Failed to connect to any Electrum server for {self._coin_name}"
         )
 
-    def _reconnect(self, prefer_current: bool = True) -> bool:
+    def _reconnect(self) -> bool:
         if self._stopping:
             return False
         old = self._connection
-        self._connection = None
         if old:
             try:
                 old.disconnect()
             except Exception:
                 pass
+        with self._lock:
+            if self._connection is not old:
+                return True
+            self._connection = None
         time.sleep(0.3)
         servers = self.get_sorted_servers()
-        if prefer_current and self._current_server_host:
+        if self._current_server_host:
             servers.sort(
                 key=lambda s: (
                     s["host"] != self._current_server_host
@@ -1110,7 +1126,11 @@ class ElectrumServer:
         for server in self.get_sorted_servers():
             if len(have) >= self._max_servers - 1:
                 break
-            if self._stopping or not self._keepalive_running:
+            if (
+                self._stopping
+                or not self._keepalive_running
+                or self._reconnect_event.is_set()
+            ):
                 break
             key = self._get_server_key(server)
             if key == primary_key or key in have:
@@ -1191,6 +1211,8 @@ class ElectrumServer:
             return self._switch_primary_locked(key, keep_old=True)
 
     def _switch_primary_locked(self, key: str, keep_old: bool) -> bool:
+        if self._connection is None:
+            return False
         with self._extras_lock:
             conn = self._extra_connections.pop(key, None)
         if conn is None or not conn.is_connected():
@@ -1239,7 +1261,15 @@ class ElectrumServer:
                 if self._switch_primary_locked(key, keep_old=False):
                     return True
             self._server_tips.pop(self._primary_key(), None)
-            return self._reconnect(prefer_current=False)
+            old = self._connection
+            self._connection = None
+            self._request_reconnect()
+        if old is not None:
+            try:
+                old.disconnect()
+            except Exception:
+                pass
+        return False
 
     def _is_rate_limit_error(self, error_msg: str) -> bool:
         rate_limit_patterns = [
@@ -1318,18 +1348,29 @@ class ElectrumServer:
 
     def _stop_keepalive(self):
         self._keepalive_running = False
+        self._reconnect_event.set()
         if self._keepalive_thread:
             self._keepalive_thread.join(timeout=2)
             self._keepalive_thread = None
+        self._reconnect_event.clear()
+
+    def _keepalive_owner(self) -> bool:
+        return (
+            self._keepalive_running
+            and self._keepalive_thread is threading.current_thread()
+        )
 
     def _keepalive_loop(self):
-        while self._keepalive_running:
+        while self._keepalive_owner():
             try:
-                self._maintain_extras()
-                for _ in range(self._keepalive_interval):
-                    if not self._keepalive_running:
-                        return
-                    time.sleep(1)
+                if self._reconnect_event.is_set():
+                    if not self._reconnect():
+                        self._sleep_keepalive_interval()
+                        continue
+                    self._reconnect_event.clear()
+                self._start_extras_pass()
+                if self._reconnect_event.wait(self._keepalive_interval):
+                    continue
 
                 now = time.time()
                 if now - self._last_activity >= self._keepalive_interval:
@@ -1339,11 +1380,29 @@ class ElectrumServer:
                                 self._connection.call("server.ping")
                                 self._last_activity = time.time()
                             except Exception:
-                                pass
+                                self._reconnect_event.set()
                             finally:
                                 self._lock.release()
             except Exception:
                 pass
+
+    def _start_extras_pass(self):
+        if self._extras_thread is not None and self._extras_thread.is_alive():
+            return
+        self._extras_thread = threading.Thread(
+            target=self._maintain_extras, daemon=True
+        )
+        self._extras_thread.start()
+
+    def _sleep_keepalive_interval(self):
+        for _ in range(self._keepalive_interval):
+            if not self._keepalive_owner():
+                return
+            time.sleep(1)
+
+    def _request_reconnect(self):
+        self._reconnect_event.set()
+        self._start_keepalive()
 
     def _throttle_request(self):
         now = time.time()
@@ -1359,94 +1418,53 @@ class ElectrumServer:
             return True
         return self._connection is None or not self._connection.is_connected()
 
-    def _check_connection_health(self, timeout=5) -> bool:
-        if self._connection is None or not self._connection.is_connected():
-            return False
+    def _call_connected(self, label: str, send, timeout: int, throttle: bool = True):
+        # Only the first connect runs here, the keepalive thread owns reconnects
+        if self._stopping:
+            raise TemporaryError("Electrum server is shutting down")
+        if throttle:
+            self._throttle_request()
+        if not self._lock.acquire(timeout=timeout + 5):
+            raise TemporaryError(f"Electrum call timed out waiting for lock: {label}")
         try:
-            self._connection.call("server.ping", [], timeout=timeout)
-            return True
-        except Exception as e:
-            if self._log:
-                self._log.debug(f"Connection health check failed: {e}")
-            return False
+            if self._connection is None and not self._connect_attempted:
+                self._connect_attempted = True
+                try:
+                    self.connect()
+                except TemporaryError:
+                    self._request_reconnect()
+                    raise
+            conn = self._connection
+            if conn is None or not conn.is_connected():
+                self._request_reconnect()
+                raise TemporaryError(f"Electrum not connected: {label}")
+            try:
+                result = send(conn)
+            except Exception as e:
+                if self._stopping:
+                    raise TemporaryError("Electrum server is shutting down")
+                if self._is_rate_limit_error(str(e)):
+                    server = self._get_server(self._current_server_idx)
+                    self._blacklist_server(server, str(e))
+                elif self._is_timeout_error(e):
+                    self._record_timeout()
+                if self._should_reconnect_after(e):
+                    self._request_reconnect()
+                raise
+            self._last_activity = time.time()
+            return result
+        finally:
+            self._lock.release()
 
     def call(self, method, params=None, timeout=10):
-        if self._stopping:
-            raise TemporaryError("Electrum server is shutting down")
-        self._throttle_request()
-        lock_acquired = self._lock.acquire(timeout=timeout + 5)
-        if not lock_acquired:
-            raise TemporaryError(f"Electrum call timed out waiting for lock: {method}")
-        try:
-            for attempt in range(2):
-                if self._stopping:
-                    raise TemporaryError("Electrum server is shutting down")
-                if self._connection is None or not self._connection.is_connected():
-                    self.connect()
-                    if self._connection is None:
-                        raise TemporaryError("Failed to establish Electrum connection")
-                elif (time.time() - self._last_activity) > 60:
-                    if not self._check_connection_health():
-                        self._reconnect(prefer_current=True)
-                        if self._connection is None:
-                            raise TemporaryError(
-                                "Failed to re-establish Electrum connection"
-                            )
-                try:
-                    result = self._connection.call(method, params, timeout=timeout)
-                    self._last_activity = time.time()
-                    return result
-                except Exception as e:
-                    if self._is_rate_limit_error(str(e)):
-                        server = self._get_server(self._current_server_idx)
-                        self._blacklist_server(server, str(e))
-                    elif self._is_timeout_error(e):
-                        self._record_timeout()
-                    if attempt == 0 and self._should_reconnect_after(e):
-                        self._reconnect(prefer_current=True)
-                    else:
-                        raise
-        finally:
-            self._lock.release()
+        return self._call_connected(
+            method, lambda conn: conn.call(method, params, timeout=timeout), timeout
+        )
 
     def call_batch(self, requests, timeout=15):
-        if self._stopping:
-            raise TemporaryError("Electrum server is shutting down")
-        self._throttle_request()
-        lock_acquired = self._lock.acquire(timeout=timeout + 5)
-        if not lock_acquired:
-            raise TemporaryError("Electrum batch call timed out waiting for lock")
-        try:
-            for attempt in range(2):
-                if self._stopping:
-                    raise TemporaryError("Electrum server is shutting down")
-                if self._connection is None or not self._connection.is_connected():
-                    self.connect()
-                    if self._connection is None:
-                        raise TemporaryError("Failed to establish Electrum connection")
-                elif (time.time() - self._last_activity) > 60:
-                    if not self._check_connection_health():
-                        self._reconnect(prefer_current=True)
-                        if self._connection is None:
-                            raise TemporaryError(
-                                "Failed to re-establish Electrum connection"
-                            )
-                try:
-                    result = self._connection.call_batch(requests)
-                    self._last_activity = time.time()
-                    return result
-                except Exception as e:
-                    if self._is_rate_limit_error(str(e)):
-                        server = self._get_server(self._current_server_idx)
-                        self._blacklist_server(server, str(e))
-                    elif self._is_timeout_error(e):
-                        self._record_timeout()
-                    if attempt == 0 and self._should_reconnect_after(e):
-                        self._reconnect(prefer_current=True)
-                    else:
-                        raise
-        finally:
-            self._lock.release()
+        return self._call_connected(
+            "batch", lambda conn: conn.call_batch(requests), timeout
+        )
 
     @staticmethod
     def _is_timeout_error(e) -> bool:
@@ -1470,86 +1488,17 @@ class ElectrumServer:
             self._last_timeout_time = 0
 
     def call_background(self, method, params=None, timeout=20):
-        if self._stopping:
-            raise TemporaryError("Electrum server is shutting down")
-        lock_acquired = self._lock.acquire(timeout=timeout + 5)
-        if not lock_acquired:
-            raise TemporaryError(
-                f"Electrum background call timed out waiting for lock: {method}"
-            )
-        try:
-            for attempt in range(2):
-                if self._stopping:
-                    raise TemporaryError("Electrum server is shutting down")
-                if self._connection is None or not self._connection.is_connected():
-                    self.connect()
-                    if self._connection is None:
-                        raise TemporaryError("Electrum call failed: no connection")
-                try:
-                    result = self._connection.call(method, params, timeout=timeout)
-                    self._last_activity = time.time()
-                    return result
-                except TemporaryError as e:
-                    if self._stopping:
-                        raise TemporaryError("Electrum server is shutting down")
-                    if self._is_timeout_error(e):
-                        self._record_timeout()
-                    if attempt == 0:
-                        self._reconnect(prefer_current=True)
-                    else:
-                        raise
-                except Exception as e:
-                    if self._is_rate_limit_error(str(e)):
-                        server = self._get_server(self._current_server_idx)
-                        self._blacklist_server(server, str(e))
-                    if attempt == 0 and self._should_reconnect_after(e):
-                        self._reconnect(prefer_current=True)
-                    else:
-                        raise
-        finally:
-            self._lock.release()
+        return self._call_connected(
+            method,
+            lambda conn: conn.call(method, params, timeout=timeout),
+            timeout,
+            throttle=False,
+        )
 
     def call_batch_background(self, requests, timeout=30):
-        if self._stopping:
-            raise TemporaryError("Electrum server is shutting down")
-        lock_acquired = self._lock.acquire(timeout=timeout + 5)
-        if not lock_acquired:
-            raise TemporaryError(
-                "Electrum background batch call timed out waiting for lock"
-            )
-        try:
-            for attempt in range(2):
-                if self._stopping:
-                    raise TemporaryError("Electrum server is shutting down")
-                if self._connection is None or not self._connection.is_connected():
-                    self.connect()
-                    if self._connection is None:
-                        raise TemporaryError(
-                            "Electrum batch call failed: no connection"
-                        )
-                try:
-                    result = self._connection.call_batch(requests)
-                    self._last_activity = time.time()
-                    return result
-                except TemporaryError as e:
-                    if self._stopping:
-                        raise TemporaryError("Electrum server is shutting down")
-                    if self._is_timeout_error(e):
-                        self._record_timeout()
-                    if attempt == 0:
-                        self._reconnect(prefer_current=True)
-                    else:
-                        raise
-                except Exception as e:
-                    if self._is_rate_limit_error(str(e)):
-                        server = self._get_server(self._current_server_idx)
-                        self._blacklist_server(server, str(e))
-                    if attempt == 0 and self._should_reconnect_after(e):
-                        self._reconnect(prefer_current=True)
-                    else:
-                        raise
-        finally:
-            self._lock.release()
+        return self._call_connected(
+            "batch", lambda conn: conn.call_batch(requests), timeout, throttle=False
+        )
 
     def disconnect(self):
         self._stop_keepalive()

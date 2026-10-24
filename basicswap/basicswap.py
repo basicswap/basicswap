@@ -462,16 +462,6 @@ def threadPollElectrumChainState(swap_client, coin_type):
             )
 
             if consecutive_errors >= 3:
-                try:
-                    backend = ci.getBackend()
-                    if backend and hasattr(backend, "disconnect"):
-                        backend.disconnect()
-                        swap_client.log.debug(
-                            f"threadPollElectrumChainState {ci.ticker()}: disconnected to trigger server rotation"
-                        )
-                except Exception:
-                    pass
-
                 jitter = random.randint(0, 10)
                 wait_time = min(backoff_seconds + jitter, max_backoff_seconds)
                 swap_client.log.warning(
