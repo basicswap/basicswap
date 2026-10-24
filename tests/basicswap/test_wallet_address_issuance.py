@@ -194,6 +194,22 @@ class TestAddressIssuanceDensity(unittest.TestCase):
             self.wm.getNewAddress(Coins.BTC, internal=True)
         self.assertEqual(self.state.last_internal_index, self.POOL_SIZE)
 
+    def test_pool_extends_past_addresses_with_history(self):
+        self.assertEqual(self.wm.extendAddressPool(Coins.BTC), [])
+
+        self.wm.markAddressesUsed(Coins.BTC, ["addr_1_15"])
+        added = self.wm.extendAddressPool(Coins.BTC)
+        self.assertEqual(
+            [address for address, _ in added],
+            [f"addr_1_{i}" for i in range(self.POOL_SIZE, 15 + self.POOL_SIZE + 1)],
+        )
+        self.assertEqual(self.state.last_internal_index, 15 + self.POOL_SIZE)
+        self.assertEqual(self.wm.extendAddressPool(Coins.BTC), [])
+
+    def test_used_history_is_not_handed_out(self):
+        self.wm.markAddressesUsed(Coins.BTC, ["addr_0_0", "addr_0_1"])
+        self.assertEqual(self.wm.getNewAddress(Coins.BTC), "addr_0_2")
+
 
 if __name__ == "__main__":
     unittest.main()

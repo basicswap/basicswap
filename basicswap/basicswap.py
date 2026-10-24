@@ -2140,19 +2140,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _subscribeElectrumAddresses(self, coin_type, backend) -> None:
         try:
+            wm = self._wallet_manager
+            num_subscribed: int = 0
             addresses = [
                 (addr, scripthash)
-                for addr, scripthash in self._wallet_manager.getAddressesForSubscription(
-                    coin_type
-                )
+                for addr, scripthash in wm.getAddressesForSubscription(coin_type)
                 if not backend.isSubscribed(scripthash)
             ]
-            for addr, _scripthash in addresses:
-                backend.subscribeAddressWithCallback(addr)
+            while addresses:
+                # A subscribe status is null only for an address with no history.
+                used = [
+                    addr
+                    for addr, _scripthash in addresses
+                    if backend.subscribeAddressWithCallback(addr)
+                ]
+                num_subscribed += len(addresses)
+                wm.markAddressesUsed(coin_type, used)
+                addresses = wm.extendAddressPool(coin_type)
 
-            if addresses:
+            if num_subscribed:
                 self.log.info(
-                    f"Subscribed to {len(addresses)} {Coins(coin_type).name} "
+                    f"Subscribed to {num_subscribed} {Coins(coin_type).name} "
                     "addresses for real-time updates"
                 )
         except Exception as e:
@@ -2254,7 +2262,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             added = self._wallet_manager.runMigration(
                 coin_type,
                 full_node_addresses=rpc_addresses if rpc_addresses else None,
-                num_addresses=20,
             )
 
             total_addresses = len(self._wallet_manager.getAllAddresses(coin_type))
