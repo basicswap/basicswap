@@ -10,6 +10,7 @@ from io import BytesIO
 import base64
 import collections
 import hashlib
+import itertools
 import logging
 import os
 import random
@@ -1002,6 +1003,47 @@ class Test(unittest.TestCase):
         key = ci.getNewRandomKey()
         proof = ci.proveDLEAG(key)
         assert ci.verifyDLEAG(proof)
+
+    def test_xmr_lock_fee_covers_any_inputs_the_wallet_picks(self):
+        ci = self.ci_xmr()
+
+        def fee_for(n_inputs: int) -> int:
+            return 1000 + 700 * n_inputs
+
+        def wallet_funds(values, amount: int) -> bool:
+            # transfer takes one output that covers it, else outputs in any order
+            if any(v >= amount + fee_for(2) for v in values):
+                return True
+            for order in itertools.permutations(values):
+                covered = 0
+                for n_inputs, value in enumerate(order, start=1):
+                    covered += value
+                    if covered >= amount + fee_for(max(n_inputs, 2)):
+                        break
+                else:
+                    return False
+            return True
+
+        for values in ([5, 300, 2000, 9000, 9000], [5, 5, 20000]):
+            ci._lockTxFeeModel = lambda values=values: (sorted(values), fee_for)
+
+            amount = ci.estMaxLockAmount(1)
+            assert amount > 0
+            assert wallet_funds(values, amount)
+            assert amount + ci.estLockTxsFee(amount, 1) <= sum(values)
+
+            amount = ci.estMaxLockAmount(2)
+            assert amount + ci.estLockTxsFee(amount, 2) <= sum(values)
+
+    def test_xmr_lock_fee_refuses_more_inputs_than_a_tx_takes(self):
+        ci = self.ci_xmr()
+        ci._lockTxFeeModel = lambda: ([800] * 150, lambda n: 1000 + 700 * n)
+
+        amount = ci.estMaxLockAmount(1)
+        ci.estLockTxsFee(amount, 1)
+        with self.assertRaises(ValueError) as e:
+            ci.estLockTxsFee(amount + 100, 1)
+        assert "Consolidate" in str(e.exception)
 
     def test_rate(self):
         scale_from = 8
