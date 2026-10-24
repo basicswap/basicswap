@@ -201,14 +201,17 @@ def _allocate(members: Sequence[Candidate], target: int, mode: str, scale: int, 
         for i, c in enumerate(members):
             if budget <= 0:
                 break
-            slack = c.max_amount - c.min_amount
-            if slack <= 0:
+            cost_now = (amounts[i] * c.rate) // scale
+            # Smallest amount costing the whole budget, or one unit less if that
+            # amount overshoots it.
+            amount = -(-(cost_now + budget) * scale // c.rate)
+            if (amount * c.rate) // scale > cost_now + budget:
+                amount -= 1
+            amount = min(c.max_amount, amount)
+            if amount <= amounts[i]:
                 continue
-            take = min(slack, (budget * scale) // c.rate)
-            if take <= 0:
-                continue
-            amounts[i] += take
-            budget -= (take * c.rate) // scale
+            budget -= (amount * c.rate) // scale - cost_now
+            amounts[i] = amount
 
     filled = sum(amounts) - fee_total
     cost = sum((a * c.rate) // scale for a, c in zip(amounts, members))
@@ -323,7 +326,10 @@ def plan_fill(
                 if bound >= best["cost"]:
                     return
         else:
-            affordable = min_amount + ((target - min_cost) * scale) // next_cheap
+            # Leg costs round down, so each leg can buy up to one atomic unit more
+            affordable = (
+                min_amount + ((target - min_cost + max_bids) * scale) // next_cheap
+            )
             reachable = min(max_amount + suffix_max[i], affordable)
             if reachable < best["filled"]:
                 return
@@ -372,13 +378,24 @@ def plan_fill(
     fees_total = sum(fees.get(leg.offer_id, 0) for leg in legs)
     net_receive = total_receive - fees_total
 
+    if mode == FILL_RECEIVE:
+        unfilled = max(0, target - net_receive)
+    else:
+        unfilled = target - total_spend
+        # Less than the price of one unit can't be spent, it isn't a shortfall
+        unit_prices = [
+            -(-c.rate // scale)
+            for c, amount in zip(best["members"], best["amounts"])
+            if amount < c.max_amount
+        ]
+        if unit_prices and unfilled < min(unit_prices):
+            unfilled = 0
+
     return Plan(
         legs=legs,
         total_receive=total_receive,
         total_spend=total_spend,
-        unfilled=max(
-            0, target - (net_receive if mode == FILL_RECEIVE else total_spend)
-        ),
+        unfilled=unfilled,
         scale=scale,
         exhaustive=state["exhaustive"],
         fees=fees_total,

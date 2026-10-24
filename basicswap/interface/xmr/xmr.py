@@ -101,6 +101,9 @@ class XMRInterface(CoinInterface):
                 "failed to get earliest fork height",
                 "failed to get output distribution",
                 "not enough money",
+                "not enough unlocked money",
+                "tx not possible",  # v0.18
+                "transaction not possible",  # v0.19+
                 "request-sent",
                 "idle",
                 "busy",
@@ -434,7 +437,11 @@ class XMRInterface(CoinInterface):
             )
             rv["encrypted"] = False if self._wallet_password is None else True
             rv["locked"] = False
-            return rv
+        try:
+            rv["max_lock_amount"] = self.format_amount(self.estMaxLockAmount(1))
+        except Exception as e:
+            self._log.debug(f"{self.coin_name()} max lock amount unavailable: {e}")
+        return rv
 
     def getMainWalletAddress(self) -> str:
         with self._mx_wallet:
@@ -478,11 +485,17 @@ class XMRInterface(CoinInterface):
 
         return float(self.format_amount(fee_per_k_bytes)), "get_fee_estimate"
 
-    def getRedeemFeeRate(self) -> int:
-        # A sweep ignores the offer's rate. Priority 0 is resolved by the
-        # wallet against the backlog, so assume the higher tier it can land on.
+    def getSendFeeEstimate(self) -> tuple[int, int]:
+        """(fee per byte of weight, quantization mask) a send pays."""
+        # Priority 0 is resolved by the wallet against the backlog, so assume
+        # the higher tier it can land on.
         priority: int = self._fee_priority if self._fee_priority > 0 else 2
-        return self.rpc("get_fee_estimate")["fees"][priority - 1] * 1000
+        fee_est = self.rpc("get_fee_estimate")
+        return fee_est["fees"][priority - 1], fee_est["quantization_mask"]
+
+    def getRedeemFeeRate(self) -> int:
+        # A sweep ignores the offer's rate.
+        return self.getSendFeeEstimate()[0] * 1000
 
     def getNewRandomKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
@@ -588,6 +601,77 @@ class XMRInterface(CoinInterface):
     def max_batched_lock_outputs(self) -> int:
         # Monero caps a tx at 16 outputs (BULLETPROOF_MAX_OUTPUTS); one is change.
         return 15
+
+    @staticmethod
+    def max_tx_inputs() -> int:
+        # TODO: change to 128 at fcmp hard fork
+        return 100
+
+    def _lockTxFeeModel(self):
+        """Unlocked output amounts, smallest first, and the fee of a tx paying
+        one coin B lock from n of them."""
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            if not self.isChainSynced():
+                raise TemporaryError(f"{self.coin_name()} wallet is syncing")
+            transfers = self.rpc_wallet(
+                "incoming_transfers", {"transfer_type": "available"}
+            ).get("transfers", [])
+            weight_1, weight_2 = (
+                self.rpc_wallet(
+                    "estimate_tx_size_and_weight", {"n_inputs": n, "n_outputs": 2}
+                )["weight"]
+                for n in (1, 2)
+            )
+        fee_per_byte, mask = self.getSendFeeEstimate()
+        input_weight: int = weight_2 - weight_1
+
+        def fee(n_inputs: int) -> int:
+            return (weight_1 + (n_inputs - 1) * input_weight) * fee_per_byte + mask
+
+        values = sorted(t["amount"] for t in transfers if t["unlocked"])
+        return values, fee
+
+    def estLockTxsFee(self, amount: int, num_locks: int) -> int:
+        """Fee for num_locks coin B locks of amount between them, whichever
+        unlocked outputs the wallet spends. It takes one output that covers the
+        amount if it has one, else picks at random, so the smallest first is
+        the worst case. A tx may take a second, small input. Locks that don't
+        batch go in their own txs, each spending the change of the one before.
+        Raises when the worst case is more inputs than one tx can take."""
+        values, fee_for = self._lockTxFeeModel()
+        ensure(
+            len(values) > 0,
+            "The {} wallet has no unlocked outputs to spend".format(self.coin_name()),
+        )
+        extra: int = (num_locks - 1) * fee_for(1)
+        if values[-1] >= amount + fee_for(2) + extra:
+            return fee_for(2) + extra
+        covered: int = 0
+        for n_inputs, value in enumerate(values, start=1):
+            covered += value
+            fee: int = fee_for(max(n_inputs, 2)) + extra
+            if covered >= amount + fee:
+                ensure(
+                    n_inputs <= self.max_tx_inputs(),
+                    "The {} wallet could spend {} outputs, more than the {} one transaction can take. Consolidate it first by sending the balance to yourself.".format(
+                        self.coin_name(), n_inputs, self.max_tx_inputs()
+                    ),
+                )
+                return fee
+        return fee
+
+    def estMaxLockAmount(self, num_locks: int) -> int:
+        """Largest total of num_locks coin B locks estLockTxsFee covers."""
+        values, fee_for = self._lockTxFeeModel()
+        if len(values) < 1:
+            return 0
+        best: int = values[-1] - fee_for(2)
+        covered: int = 0
+        for n_inputs, value in enumerate(values[: self.max_tx_inputs()], start=1):
+            covered += value
+            best = max(best, covered - fee_for(max(n_inputs, 2)))
+        return max(0, best - (num_locks - 1) * fee_for(1))
 
     def publishBLockTxs(self, locks, feerate: int = 0, unlock_time: int = 0):
         """Lock for several swaps at once, so their change is not chained.

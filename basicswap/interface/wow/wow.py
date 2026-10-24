@@ -30,3 +30,8 @@ class WOWInterface(XMRInterface):
     @staticmethod
     def depth_spendable() -> int:
         return 4
+
+    @staticmethod
+    def max_tx_inputs() -> int:
+        # TODO: change to 128 at fcmp hard fork
+        return 100

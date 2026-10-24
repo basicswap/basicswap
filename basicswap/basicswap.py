@@ -232,7 +232,13 @@ def validOfferStateToReceiveBid(offer_state):
 
 
 def checkAndNotifyBalanceChange(
-    swap_client, coin_type, ci, cc, new_height, trigger_source="block"
+    swap_client,
+    coin_type,
+    ci,
+    cc,
+    new_height,
+    trigger_source="block",
+    blockchain_info=None,
 ):
     if not swap_client.ws_server:
         return
@@ -241,7 +247,8 @@ def checkAndNotifyBalanceChange(
         return
 
     try:
-        blockchain_info = ci.getBlockchainInfo()
+        if blockchain_info is None:
+            blockchain_info = ci.getBlockchainInfo()
         verification_progress = blockchain_info.get("verificationprogress", 1.0)
         if verification_progress < 0.99:
             return
@@ -359,6 +366,7 @@ def threadPollChainState(swap_client, coin_type):
                 cc,
                 new_height,
                 "block" if block_changed else "poll",
+                chain_state,
             )
 
         except Exception as e:
@@ -4271,6 +4279,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def ensureWalletCanSend(
         self, ci, swap_type, ensure_balance: int, estimated_fee: int, for_offer=True
     ) -> None:
+        if ci.coin_type() in self.xmr_based_coins:
+            estimated_fee = ci.estLockTxsFee(ensure_balance, 1)
         balance_msg: str = (
             f"{ci.format_amount(ensure_balance)} {ci.coin_name()} with estimated fee {ci.format_amount(estimated_fee)}"
         )
@@ -7206,12 +7216,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # MSG2F
             pi = self.pi(SwapTypes.XMR_SWAP)
 
+            pkh_refund_to = ci_from.decodeAddress(
+                self.getReceiveAddressFromPool(
+                    coin_from,
+                    bid_id,
+                    TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND,
+                    cursor=use_cursor,
+                )
+            )
             refundExtraArgs = dict()
             lockExtraArgs = dict()
             if self.isBchXmrSwap(offer):
-                pkh_refund_to = ci_from.decodeAddress(
-                    self.getCachedAddressForCoin(coin_from, use_cursor)
-                )
                 pkh_dest = xmr_swap.dest_af
                 # refund script
                 refundExtraArgs["mining_fee"] = a_fee_rate
@@ -7320,9 +7335,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 prevout_amount,
             )
             ensure(v, "Invalid coin A lock refund tx leader sig")
-            pkh_refund_to = ci_from.decodeAddress(
-                self.getCachedAddressForCoin(coin_from, use_cursor)
-            )
             xmr_swap.a_lock_refund_spend_tx = ci_from.createSCLockRefundSpendTx(
                 xmr_swap.a_lock_refund_tx,
                 xmr_swap.a_lock_refund_tx_script,
