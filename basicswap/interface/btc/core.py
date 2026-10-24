@@ -67,6 +67,33 @@ def getBasePath():
     return base_path
 
 
+def checkTarMembers(ft: tarfile.TarFile, dest_dir: str):
+    dest_dir = os.path.realpath(dest_dir)
+
+    def isInside(path: str) -> bool:
+        return os.path.commonpath((dest_dir, os.path.realpath(path))) == dest_dir
+
+    for member in ft:
+        member_path = os.path.join(dest_dir, member.name)
+        if member.issym():
+            target_path = os.path.join(os.path.dirname(member_path), member.linkname)
+        elif member.islnk():
+            target_path = os.path.join(dest_dir, member.linkname)
+        elif member.isfile() or member.isdir():
+            target_path = member_path
+        else:
+            raise ValueError(f"Unexpected tar member type: {member.name}")
+        if not isInside(member_path) or not isInside(target_path):
+            raise ValueError(f"Tar member outside {dest_dir}: {member.name}")
+        mode = member.mode & 0o755
+        if member.isfile() or member.islnk():
+            if not mode & 0o100:
+                mode &= ~0o111
+            mode |= 0o600
+        member.mode = mode
+        yield member
+
+
 class BTCPrepare(CoinPrepareModule):
     def getConfigSegment(self, ctx: PrepareContext) -> dict:
         config = {
@@ -252,7 +279,7 @@ class BTCPrepare(CoinPrepareModule):
                     ft.extractall(path=data_dir, filter="data")
                 else:
                     # TODO: Remove when minimum python version is >= 3.12
-                    ft.extractall(path=data_dir)
+                    ft.extractall(path=data_dir, members=checkTarMembers(ft, data_dir))
 
     def checkFastsyncData(self, ctx: PrepareContext, sync_filename: str):
         ctx.logger.info(f"Validating signature for: {sync_filename}")

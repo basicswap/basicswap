@@ -5,13 +5,43 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import ipaddress
 import os
+import re
 import select
 import sqlite3
 import subprocess
 import time
 
 from basicswap.util.daemon import Daemon
+
+# simplexmq's serverStrP, with domain hosts limited to hostname labels
+SMP_LABEL = r"[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?"
+SMP_HOST = (
+    rf"(?:{SMP_LABEL}(?:\.{SMP_LABEL})*|\[[0-9A-Fa-f:.]+\]|[0-9A-Fa-f]*:[0-9A-Fa-f:]*)"
+)
+SMP_SERVER_ADDRESS_RE = re.compile(
+    rf"smp://[A-Za-z0-9_-]+=*(?::[^\x00-\x20\x7f@:/]+)?@(?P<hosts>{SMP_HOST}(?:,{SMP_HOST})*)(?::(?P<port>[0-9]{{1,5}}))?"
+)
+
+
+def isValidSmpHost(host: str) -> bool:
+    if not (host.startswith("[") or ":" in host):
+        return True
+    try:
+        ipaddress.IPv6Address(host.strip("[]"))
+    except ValueError:
+        return False
+    return True
+
+
+def isValidSmpServerAddress(server_address: str) -> bool:
+    m = SMP_SERVER_ADDRESS_RE.fullmatch(server_address)
+    if m is None:
+        return False
+    if m["port"] is not None and not 0 < int(m["port"]) < 65536:
+        return False
+    return all(isValidSmpHost(host) for host in m["hosts"].split(","))
 
 
 def serverExistsInDatabase(simplex_db_path: str, server_address: str, logger) -> bool:
@@ -55,13 +85,7 @@ def initSimplexClient(args, logger, delay_event):
 
     pipe_r, pipe_w = os.pipe()  # subprocess.PIPE is buffered, blocks when read
 
-    if os.name == "nt":
-        str_args = " ".join(args)
-        p = subprocess.Popen(
-            str_args, shell=True, stdin=subprocess.PIPE, stdout=pipe_w, stderr=pipe_w
-        )
-    else:
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=pipe_w, stderr=pipe_w)
+    p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=pipe_w, stderr=pipe_w)
 
     def readOutput():
         buf = os.read(pipe_r, 1024).decode("utf-8")

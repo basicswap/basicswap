@@ -416,11 +416,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             "walletpassphrasechange", [old_password, new_password], timeout=120
         )
 
-        # Lock wallet to match other coins
-        self.rpc_wallet("walletlock")
-
         # Clear initial password
         self._sc.editSettings(self.coin_name().lower(), {"wallet_pwd": ""})
+
+        # Lock wallet to match other coins
+        self.rpc_wallet("walletlock")
 
     def unlockWallet(
         self,

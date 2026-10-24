@@ -201,6 +201,11 @@ class DCRPrepare(CoinPrepareModule):
     ) -> None:
         if core_settings["manage_wallet_daemon"] is False:
             return
+        net_dir = {"regtest": "simnet", "testnet": "testnet3"}.get(
+            swap_client.chain, swap_client.chain
+        )
+        if os.path.exists(os.path.join(core_settings["datadir"], net_dir, "wallet.db")):
+            return
         self.createWallet(ctx, swap_client, coin_id, core_settings)
 
     def createWallet(
@@ -220,7 +225,6 @@ class DCRPrepare(CoinPrepareModule):
         )
         extra_args = [
             '--appdata="{}"'.format(core_settings["datadir"]),
-            "--pass={}".format(dcr_password),
         ]
 
         filename: str = getWalletBinName(coin_id, core_settings, "dcrwallet")
@@ -229,7 +233,7 @@ class DCRPrepare(CoinPrepareModule):
             "--create",
         ] + extra_args
         hex_seed = swap_client.getWalletKey(coin_id, 1).hex()
-        createDCRWallet(args, hex_seed, ctx.logger, threading.Event())
+        createDCRWallet(args, hex_seed, dcr_password, ctx.logger, threading.Event())
 
 
 prepare_module = DCRPrepare(

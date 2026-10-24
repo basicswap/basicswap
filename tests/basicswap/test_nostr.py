@@ -1444,6 +1444,50 @@ class TestNetworkSettings(BasicSwapFixture):
         )
         assert simplex["group_link"] == link
 
+    def test_simplex_server_address_checked(self):
+        address = "smp://u2dS9sG8nMNURyZwqASV4yROM28Er0luVTx5X1CsMrU=@smp4.simplex.im"
+        self.sc.settings["networks"].append(
+            {"type": "simplex", "server_address": address, "enabled": False}
+        )
+        for value in (
+            "smp://server",
+            "smp://hash@smp4.simplex.im & calc.exe",
+            "smp://hash@smp4.simplex.im|calc",
+            "smp://hash@smp4.simplex.im:5223 -e /quit",
+            "smp://hash@smp4.simplex.im:0",
+            "smp://hash@smp4.simplex.im:65536",
+            "smp://hash@.",
+            "smp://hash@..",
+            "smp://hash@-x",
+            "smp://hash@a..b",
+            "smp://hash@:",
+            "smp://hash@:5223",
+            "smp://hash@[1.2.3.4]",
+            "smp://hash@" + "a" * 64,
+        ):
+            with self.assertRaisesRegex(ValueError, "Invalid server address"):
+                self.sc.editNetworkSettings("simplex", {"server_address": value})
+        simplex = next(
+            n for n in self.sc.settings["networks"] if n["type"] == "simplex"
+        )
+        assert simplex["server_address"] == address
+
+        for value in (
+            "smp://Q8SNxc2SRcKyXlhJM8KFUgPNW4KXPGRm4eSLtT_oh-I=:password@127.0.0.1:5223",
+            "smp://hash@smp8.simplex.im,smp8.onion:5223",
+            "smp://hash@[2001:db8::1]:5223",
+            "smp://hash@2001:db8::1",
+            "smp://hash@smp4.simplex.im:65535",
+        ):
+            changed, reboot = self.sc.editNetworkSettings(
+                "simplex", {"server_address": value}
+            )
+            assert changed and reboot
+            simplex = next(
+                n for n in self.sc.settings["networks"] if n["type"] == "simplex"
+            )
+            assert simplex["server_address"] == value
+
     def test_cannot_disable_last_network(self):
         changed, _ = self.sc.editNetworkSettings("smsg", {"enabled": False})
         assert changed
