@@ -101,6 +101,7 @@ class XMRInterface(CoinInterface):
                 "failed to get earliest fork height",
                 "failed to get output distribution",
                 "not enough money",
+                "not enough unlocked money",
                 "tx not possible",  # v0.18
                 "transaction not possible",  # v0.19+
                 "request-sent",
