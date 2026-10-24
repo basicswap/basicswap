@@ -7208,12 +7208,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # MSG2F
             pi = self.pi(SwapTypes.XMR_SWAP)
 
+            pkh_refund_to = ci_from.decodeAddress(
+                self.getReceiveAddressFromPool(
+                    coin_from,
+                    bid_id,
+                    TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND,
+                    cursor=use_cursor,
+                )
+            )
             refundExtraArgs = dict()
             lockExtraArgs = dict()
             if self.isBchXmrSwap(offer):
-                pkh_refund_to = ci_from.decodeAddress(
-                    self.getCachedAddressForCoin(coin_from, use_cursor)
-                )
                 pkh_dest = xmr_swap.dest_af
                 # refund script
                 refundExtraArgs["mining_fee"] = a_fee_rate
@@ -7322,9 +7327,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 prevout_amount,
             )
             ensure(v, "Invalid coin A lock refund tx leader sig")
-            pkh_refund_to = ci_from.decodeAddress(
-                self.getCachedAddressForCoin(coin_from, use_cursor)
-            )
             xmr_swap.a_lock_refund_spend_tx = ci_from.createSCLockRefundSpendTx(
                 xmr_swap.a_lock_refund_tx,
                 xmr_swap.a_lock_refund_tx_script,
