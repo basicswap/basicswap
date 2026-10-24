@@ -403,7 +403,7 @@ def threadPollElectrumChainState(swap_client, coin_type):
 
     try:
         ci._electrum_scan_counter = 1
-        if hasattr(ci, "_queryElectrumWalletInfo"):
+        if ci.getWalletManager() is not None:
             ci._queryElectrumWalletInfo(funded_only=True)
             swap_client.log.debug(
                 f"Primed {ci.ticker()} wallet cache with funded addresses"

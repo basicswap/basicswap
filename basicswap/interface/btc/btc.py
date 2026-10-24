@@ -1113,22 +1113,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         rv["locked_utxos"] = len(self.rpc_wallet("listlockunspent"))
         return rv
 
-    def _queryElectrumWalletInfo(self, funded_only: bool = False):
+    def _queryElectrumWalletInfo(self, funded_only: bool = False) -> None:
+        wm = self.getWalletManager()
+        if wm is None:
+            return
         total_confirmed_sats = 0
         total_unconfirmed_sats = 0
-        wm = self.getWalletManager()
-        if wm:
-            addresses = wm.getAllAddresses(
-                self.coin_type(),
-                funded_only=funded_only,
-                watch_only_require_key=True,
-            )
-
-            if addresses:
-                detailed_balances = self._backend.getDetailedBalance(addresses)
-                for bal_info in detailed_balances.values():
-                    total_confirmed_sats += bal_info["confirmed"]
-                    total_unconfirmed_sats += bal_info["unconfirmed"]
+        addresses = wm.getAllAddresses(
+            self.coin_type(),
+            funded_only=funded_only,
+            watch_only_require_key=True,
+        )
+        if addresses:
+            detailed_balances = self._backend.getDetailedBalance(addresses)
+            for bal_info in detailed_balances.values():
+                total_confirmed_sats += bal_info["confirmed"]
+                total_unconfirmed_sats += bal_info["unconfirmed"]
 
         balance_btc = total_confirmed_sats / self.COIN()
         unconfirmed_btc = total_unconfirmed_sats / self.COIN()
@@ -1136,14 +1136,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         pending_outgoing = 0
         pending_incoming = 0
         pending_count = 0
-        if wm:
-            pending_txs = wm.getPendingTxs(self.coin_type())
-            for ptx in pending_txs:
-                pending_count += 1
-                if ptx.get("tx_type") == "outgoing":
-                    pending_outgoing += ptx.get("amount", 0)
-                elif ptx.get("tx_type") == "incoming":
-                    pending_incoming += ptx.get("amount", 0)
+        for ptx in wm.getPendingTxs(self.coin_type()):
+            pending_count += 1
+            if ptx.get("tx_type") == "outgoing":
+                pending_outgoing += ptx.get("amount", 0)
+            elif ptx.get("tx_type") == "incoming":
+                pending_incoming += ptx.get("amount", 0)
 
         result = {
             "balance": balance_btc,
@@ -1158,7 +1156,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         }
 
         self._cached_wallet_info = result
-        return result
 
     def refreshElectrumWalletInfo(self, full_scan: bool = False):
         if not self.useBackend():
