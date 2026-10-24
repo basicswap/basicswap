@@ -232,7 +232,13 @@ def validOfferStateToReceiveBid(offer_state):
 
 
 def checkAndNotifyBalanceChange(
-    swap_client, coin_type, ci, cc, new_height, trigger_source="block"
+    swap_client,
+    coin_type,
+    ci,
+    cc,
+    new_height,
+    trigger_source="block",
+    blockchain_info=None,
 ):
     if not swap_client.ws_server:
         return
@@ -241,7 +247,8 @@ def checkAndNotifyBalanceChange(
         return
 
     try:
-        blockchain_info = ci.getBlockchainInfo()
+        if blockchain_info is None:
+            blockchain_info = ci.getBlockchainInfo()
         verification_progress = blockchain_info.get("verificationprogress", 1.0)
         if verification_progress < 0.99:
             return
@@ -359,6 +366,7 @@ def threadPollChainState(swap_client, coin_type):
                 cc,
                 new_height,
                 "block" if block_changed else "poll",
+                chain_state,
             )
 
         except Exception as e:
