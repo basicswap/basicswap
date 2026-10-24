@@ -148,6 +148,8 @@ DEFAULT_ONION_SERVERS = {
     "litecoin": [],
 }
 
+DEFAULT_MAX_ELECTRUM_SERVERS = 2
+
 
 class ElectrumConnection:
     def __init__(

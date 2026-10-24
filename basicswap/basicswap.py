@@ -1207,6 +1207,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return self._electrum_cert_pins
 
     def _initElectrumBackend(self, coin, interface) -> bool:
+        from .interface.electrumx import DEFAULT_MAX_ELECTRUM_SERVERS
         from .wallet_backend import ElectrumBackend
 
         try:
@@ -1218,7 +1219,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             onion_servers = self.coin_clients[coin].get("electrum_onion_servers", None)
             max_servers = self.coin_clients[coin].get(
-                "max_electrum_servers", self.settings.get("max_electrum_servers", 2)
+                "max_electrum_servers",
+                self.settings.get("max_electrum_servers", DEFAULT_MAX_ELECTRUM_SERVERS),
             )
 
             backend = ElectrumBackend(
@@ -16759,6 +16761,23 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     for coin, cc in self.coin_clients.items():
                         if cc["name"] == coin_name:
                             cc["electrum_onion_servers"] = new_onion
+                            break
+
+            if "max_electrum_servers" in data:
+                new_max_servers = data["max_electrum_servers"]
+                if new_max_servers != settings_cc.get("max_electrum_servers", None):
+                    settings_changed = True
+                    suggest_reboot = True
+                    if new_max_servers is None:
+                        settings_cc.pop("max_electrum_servers")
+                    else:
+                        settings_cc["max_electrum_servers"] = new_max_servers
+                    for coin, cc in self.coin_clients.items():
+                        if cc["name"] == coin_name:
+                            if new_max_servers is None:
+                                cc.pop("max_electrum_servers", None)
+                            else:
+                                cc["max_electrum_servers"] = new_max_servers
                             break
 
             if settings_changed:
