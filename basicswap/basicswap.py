@@ -11595,7 +11595,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def checkQueuedActions(self) -> None:
         if self.isSystemUnlocked() is False:
-            self.log.info("Not checking queued actions.  System is locked.")
+            self.log.debug("Not checking queued actions.  System is locked.")
             return
         now: int = self.getTime()
         reload_in_progress: bool = False
