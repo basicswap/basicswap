@@ -412,6 +412,7 @@ def make_interface(bc_mgr):
     ci._header_bc_mgr = bc_mgr
     ci._header_syncs = {}
     ci._header_sync_lock = threading.Lock()
+    ci._headers_synced = False
     return ci
 
 
@@ -427,7 +428,7 @@ class TestFollowedServers(unittest.TestCase):
         servers = FollowedServers(
             {"a": ChainServer(primary_headers), "b": ChainServer(other_headers)}, "a"
         )
-        self.ci._headerSyncElectrum(StubBackend(servers))
+        self.ci._syncHeadersElectrum(StubBackend(servers))
         return servers
 
     def test_conflicting_server_dropped(self):
@@ -442,7 +443,7 @@ class TestFollowedServers(unittest.TestCase):
         servers = FollowedServers(
             {"a": ChainServer(self.main), "b": TimingOutServer(self.main)}, "a"
         )
-        self.ci._headerSyncElectrum(StubBackend(servers))
+        self.ci._syncHeadersElectrum(StubBackend(servers))
         self.assertEqual(servers.dropped, ["b"])
         self.assertNotIn("b", self.ci._header_syncs)
         self.assertEqual(self.bc_mgr.get_best_chain().height(), CHUNK_SIZE + 5)
@@ -451,7 +452,7 @@ class TestFollowedServers(unittest.TestCase):
         servers = FollowedServers(
             {"a": TimingOutServer(self.main), "b": ChainServer(self.main)}, "a"
         )
-        self.ci._headerSyncElectrum(StubBackend(servers))
+        self.ci._syncHeadersElectrum(StubBackend(servers))
         self.assertEqual(servers.dropped, [])
         self.assertEqual(self.bc_mgr.get_best_chain().height(), CHUNK_SIZE + 5)
 
@@ -483,6 +484,7 @@ class TestFollowedServers(unittest.TestCase):
         for header in Chunk0.headers[:3]:
             chain.save_header(header)
         ci = make_interface(bc_mgr)
+        ci._headers_synced = True
         servers = FollowedServers({"a": ChainServer(Chunk0.headers[:3])}, "a")
         self.assertIs(
             ci._verifyTxMerkleElectrum(StubBackend(servers), "aa" * 32, 2), False

@@ -367,6 +367,24 @@ def threadPollChainState(swap_client, coin_type):
         swap_client.chainstate_delay_event.wait(random.randrange(*poll_delay_range))
 
 
+def threadSyncElectrumHeaders(swap_client, coin_type):
+    ci = swap_client.ci(coin_type)
+    cc = swap_client.coin_clients[coin_type]
+    poll_interval = cc.get("electrum_poll_interval", 10)
+    header_event = cc.setdefault("electrum_header_event", threading.Event())
+    ci.getBackend()._server.register_height_callback(lambda height: header_event.set())
+
+    while not swap_client.chainstate_delay_event.is_set():
+        header_event.clear()
+        try:
+            ci.syncElectrumHeaders()
+        except Exception as e:
+            swap_client.log.warning(
+                f"threadSyncElectrumHeaders {ci.ticker()}, error: {e}"
+            )
+        header_event.wait(timeout=poll_interval)
+
+
 def threadPollElectrumChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
@@ -856,9 +874,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.chainstate_delay_event.set()
 
         for cc in self.coin_clients.values():
-            refresh_event = cc.get("electrum_refresh_event")
-            if refresh_event is not None:
-                refresh_event.set()
+            for event_name in ("electrum_refresh_event", "electrum_header_event"):
+                event = cc.get(event_name)
+                if event is not None:
+                    event.set()
 
         for coin_type, cc in self.coin_clients.items():
             interface = cc.get("interface")
@@ -1564,13 +1583,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.coin_clients[c]["connection_type"] == "electrum":
                 ci = self.ci(c)
                 self.log.info(f"Starting electrum polling thread for {ci.coin_name()}")
-                t = threading.Thread(
-                    target=threadPollElectrumChainState,
-                    args=(self, c),
-                    name=f"electrum_poll_{ci.ticker()}",
-                )
-                self.threads.append(t)
-                t.start()
+                for target, name in (
+                    (threadSyncElectrumHeaders, "electrum_headers"),
+                    (threadPollElectrumChainState, "electrum_poll"),
+                ):
+                    t = threading.Thread(
+                        target=target, args=(self, c), name=f"{name}_{ci.ticker()}"
+                    )
+                    self.threads.append(t)
+                    t.start()
 
         self.log.debug(
             f"network_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"

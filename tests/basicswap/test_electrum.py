@@ -1304,6 +1304,7 @@ def init_header_sync(ci) -> None:
     ci._header_bc_mgr = None
     ci._header_syncs = {}
     ci._header_sync_lock = threading.Lock()
+    ci._headers_synced = False
 
 
 def hold_headers(ci, height: int, headers: list) -> None:
@@ -1326,6 +1327,7 @@ def hold_headers(ci, height: int, headers: list) -> None:
         fp.write(b"".join(headers))
     chain.update_size()
     ci._header_bc_mgr = bc_mgr
+    ci._headers_synced = True
 
 
 def make_merkle_interface(held_height: int = 1):
@@ -1687,7 +1689,7 @@ class TestElectrumMedianTime(unittest.TestCase):
         hold_headers(ci, 90, headers)
         self.assertEqual(ci.getChainMedianTime(), 1005)
         self.assertEqual(ci.getChainMedianTime(), 1005)
-        self.assertEqual(server.call_count, 1)
+        self.assertEqual(server.call_count, 0)
 
     def test_empty_headers_fails_soft(self):
         backend = StubBackend(HeadersStubServer(headers=[]), height=100)

@@ -27,6 +27,7 @@ from basicswap.basicswap_util import (
 from basicswap.interface.base import Secp256k1Interface
 from basicswap.interface.utils import FeeValidator
 from basicswap.util import (
+    TemporaryError,
     b2i,
     ensure,
     i2b,
@@ -363,6 +364,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._header_bc_mgr = None
         self._header_syncs: dict[str, HeaderSync] = {}
         self._header_sync_lock = threading.Lock()
+        self._headers_synced: bool = False
         self._median_time_cache: int | None = None
 
     def setBackend(self, backend) -> None:
@@ -556,7 +558,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def getChainHeight(self) -> int:
         if self.useBackend():
-            sync = self._headerSyncElectrum(self._backend)
+            sync = self._headerChainElectrum(self._backend)
             return sync.bc_mgr.get_best_chain().height()
         return self.rpc("getblockcount")
 
@@ -598,7 +600,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return self._medianTimePastElectrum(backend, height)
 
     def _medianTimePastElectrum(self, backend, height: int | None) -> int | None:
-        sync = self._headerSyncElectrum(backend)
+        sync = self._headerChainElectrum(backend)
         if height is None:
             height = sync.bc_mgr.get_best_chain().height()
         if height < 0:
@@ -687,7 +689,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if not backend:
             raise ValueError("No electrum backend available")
 
-        header = self._readHeaderElectrum(self._headerSyncElectrum(backend), height)
+        header = self._readHeaderElectrum(self._headerChainElectrum(backend), height)
         if header is None:
             raise ValueError(f"No verified header at height {height}")
         return {
@@ -706,7 +708,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if block_height <= 0:
             return None
         header = self._readHeaderElectrum(
-            self._headerSyncElectrum(backend), block_height
+            self._headerChainElectrum(backend), block_height
         )
         if header is None:
             return None
@@ -774,7 +776,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def _isValidTxBytes(self, data: bytes) -> bool:
         return is_valid_tx(data)
 
-    def _headerSyncElectrum(self, backend) -> HeaderSync:
+    def syncElectrumHeaders(self) -> None:
+        if self.useBackend() and self._backend:
+            self._syncHeadersElectrum(self._backend)
+
+    def _syncHeadersElectrum(self, backend) -> None:
         server = backend._server
         with self._header_sync_lock:
             if self._header_bc_mgr is None:
@@ -804,12 +810,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     sync = HeaderSync(bc_mgr, server.server_caller(key), self._log)
                     self._header_syncs[key] = sync
                 if sync.tip == tip and bc_mgr.check_header(sync.tip_header):
+                    self._headers_synced = True
                     continue
                 try:
                     header = sync.get_block_header(
                         tip, mode=ChainResolutionMode.CATCHUP
                     )
                     sync.process_header_at_tip(tip, header)
+                    self._headers_synced = True
                 except ChainConflict as e:
                     self._log.warning(
                         f"{self.coin_name()} electrum server {key} chain refused: {e}"
@@ -828,11 +836,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     if key not in tips:
                         self._header_syncs.pop(key)
                 self._switchLaggingServerElectrum(server)
-            primary_key = server.primary_key()
-            sync = self._header_syncs.get(primary_key)
-            if sync is None:
-                sync = HeaderSync(bc_mgr, server.server_caller(primary_key), self._log)
-            return sync
+
+    def _headerChainElectrum(self, backend) -> HeaderSync:
+        if not self._headers_synced:
+            raise TemporaryError(f"{self.coin_name()} headers not synced yet")
+        server = backend._server
+        primary_key = server.primary_key()
+        sync = self._header_syncs.get(primary_key)
+        if sync is None:
+            sync = HeaderSync(
+                self._header_bc_mgr, server.server_caller(primary_key), self._log
+            )
+        return sync
 
     def _switchLaggingServerElectrum(self, server) -> None:
         best = self._header_bc_mgr.get_best_chain()
@@ -864,8 +879,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         header = chain.read_header(height)
         if header is None and height <= chain.net.max_checkpoint():
             try:
-                with sync.bc_mgr.bhi_lock:
-                    sync.request_chunk_below_max_checkpoint(height=height)
+                sync.request_chunk_below_max_checkpoint(height=height)
             except Exception as e:
                 self._log.debug(f"Headers at {height} unavailable: {e}")
                 return None
@@ -5274,7 +5288,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         try:
             tx_info = backend.getTransaction(txid_hex)
             chain_height = (
-                self._headerSyncElectrum(backend).bc_mgr.get_best_chain().height()
+                self._headerChainElectrum(backend).bc_mgr.get_best_chain().height()
             )
             block_height = 0
             confirmations = 0
@@ -5631,7 +5645,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             ):
                 return None
             header = self._readHeaderElectrum(
-                self._headerSyncElectrum(backend), block_height
+                self._headerChainElectrum(backend), block_height
             )
             if header is None:
                 return None
