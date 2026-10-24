@@ -142,16 +142,12 @@ def test_wallets(driver):
     print("Check for locked UTXO count")
     driver.get(base_url + "/wallet/PART")
     found = False
-    for i in range(5):
-        try:
-            el = driver.find_element(By.ID, "locked_utxos")
+    for i in range(20):
+        if driver.find_elements(By.ID, "locked_utxos"):
             found = True
             break
-        except Exception:
-            continue
-        driver.refresh()
         time.sleep(2)
-        found = True
+        driver.refresh()
     assert found
     driver.refresh()
 

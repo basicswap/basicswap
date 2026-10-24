@@ -656,6 +656,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         self._wallet_update_timeout = self.settings.get("wallet_update_timeout", 30)
+        self._wallet_info_refresh_seconds = 10 if self.chain == "regtest" else 30
 
         self._restrict_unknown_seed_wallets = self.settings.get(
             "restrict_unknown_seed_wallets", True
@@ -17131,7 +17132,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         wait_for_complete: bool = False,
     ) -> None:
         now: int = self.getTime()
-        if not force_update and now - self._last_updated_wallets_info < 30:
+        if (
+            not force_update
+            and now - self._last_updated_wallets_info
+            < self._wallet_info_refresh_seconds
+        ):
             return
 
         futures = []
@@ -17144,7 +17149,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if cc["connection_type"] in ("rpc", "electrum"):
                 if (
                     not force_update
-                    and now - cc.get("last_updated_wallet_info", 0) < 30
+                    and now - cc.get("last_updated_wallet_info", 0)
+                    < self._wallet_info_refresh_seconds
                 ):
                     continue
                 cc["last_updated_wallet_info"] = self.getTime()
