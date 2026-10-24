@@ -230,6 +230,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def est_tx_input_vsize() -> int:
         return 166
 
+    @classmethod
+    def est_split_tx_vsize(cls, num_outputs: int) -> int:
+        # One input, plus change.
+        return 15 + cls.est_tx_input_vsize() + (num_outputs + 1) * 36
+
     @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 327

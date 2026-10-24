@@ -705,17 +705,20 @@ def parseMultiBidRequest(swap_client, post_data):
 
     have_receive: bool = have_data_entry(post_data, "receive_amount")
     have_spend: bool = have_data_entry(post_data, "spend_amount")
+    spend_max: bool = toBool(get_data_entry_or(post_data, "spend_max", "false"))
     ensure(
-        have_receive != have_spend,
-        "Requires one of receive_amount or spend_amount",
+        have_receive + have_spend + spend_max == 1,
+        "Requires one of receive_amount, spend_amount or spend_max",
     )
 
+    target = None
     if have_receive:
         mode = FILL_RECEIVE
         target = inputAmount(get_data_entry(post_data, "receive_amount"), ci_from)
     else:
         mode = FILL_SPEND
-        target = inputAmount(get_data_entry(post_data, "spend_amount"), ci_to)
+        if have_spend:
+            target = inputAmount(get_data_entry(post_data, "spend_amount"), ci_to)
 
     max_bids = int(get_data_entry_or(post_data, "max_bids", DEFAULT_MAX_BIDS))
     ensure(max_bids >= 1, "max_bids must be at least 1")
@@ -728,6 +731,7 @@ def parseMultiBidRequest(swap_client, post_data):
         "coin_to": coin_to,
         "mode": mode,
         "target": target,
+        "spend_max": spend_max,
         "anchor": get_data_entry_or(post_data, "anchor", ANCHOR_MARKET),
         "slip_percent": float(
             get_data_entry_or(post_data, "slip_percent", DEFAULT_SLIP_PERCENT)
