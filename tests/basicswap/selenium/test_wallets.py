@@ -67,6 +67,10 @@ def test_wallets(driver):
 
     print("Withdrawing from node 1")
     driver.get(base_url + "/wallet/PART")
+    used_form_id = driver.execute_script(
+        "return arguments[0].form.elements.namedItem('formid').value;",
+        driver.find_element(By.NAME, f"withdraw_{part_id}"),
+    )
     driver.find_element(By.NAME, f"to_{part_id}").send_keys(node2_deposit_address)
     driver.find_element(By.NAME, f"amt_{part_id}").send_keys("10")
     for name in (f"withdraw_type_from_{part_id}", f"withdraw_type_to_{part_id}"):
@@ -84,6 +88,36 @@ def test_wallets(driver):
     assert len(elements) == 1, errors
     e = elements[0]
     assert "Withdrew 10 rtPART (plain to plain) to address" in e.text
+
+    print("Resubmitting the same withdrawal form")
+    driver.execute_script(
+        "arguments[0].form.elements.namedItem('formid').value = arguments[1];",
+        driver.find_element(By.NAME, f"withdraw_{part_id}"),
+        used_form_id,
+    )
+    for name, value in (
+        (f"to_{part_id}", node2_deposit_address),
+        (f"amt_{part_id}", "10"),
+    ):
+        el = driver.find_element(By.NAME, name)
+        el.clear()
+        el.send_keys(value)
+    for name in (f"withdraw_type_from_{part_id}", f"withdraw_type_to_{part_id}"):
+        click_option(driver.find_element(By.NAME, name), "Plain")
+    result_page = driver.find_element(By.TAG_NAME, "html")
+    driver.find_element(By.NAME, f"withdraw_{part_id}").click()
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.ID, "confirmYes"))
+    ).click()
+    WebDriverWait(driver, 30).until(EC.staleness_of(result_page))
+    WebDriverWait(driver, 30).until(
+        lambda d: d.find_elements(By.CLASS_NAME, "infomsg")
+        or d.find_elements(By.CLASS_NAME, "error_msg")
+    )
+    infos = [e.text for e in driver.find_elements(By.CLASS_NAME, "infomsg")]
+    errors = [e.text for e in driver.find_elements(By.CLASS_NAME, "error_msg")]
+    assert not any("Withdrew" in m for m in infos), infos
+    assert any("Prevented double submit" in m for m in errors), errors
 
     print("Locking UTXO")
     driver.get(base_url + "/rpc")
@@ -108,16 +142,12 @@ def test_wallets(driver):
     print("Check for locked UTXO count")
     driver.get(base_url + "/wallet/PART")
     found = False
-    for i in range(5):
-        try:
-            el = driver.find_element(By.ID, "locked_utxos")
+    for i in range(20):
+        if driver.find_elements(By.ID, "locked_utxos"):
             found = True
             break
-        except Exception:
-            continue
-        driver.refresh()
         time.sleep(2)
-        found = True
+        driver.refresh()
     assert found
     driver.refresh()
 

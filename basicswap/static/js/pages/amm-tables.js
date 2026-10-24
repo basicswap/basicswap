@@ -950,7 +950,7 @@ const AmmTablesManager = (function() {
     }
 
     function setupConfigFormListener() {
-        const configForm = document.querySelector('form[method="post"]');
+        const configForm = document.getElementById('amm-config-form');
         if (configForm) {
             configForm.addEventListener('submit', function() {
                 localStorage.setItem('amm_update_tables', 'true');

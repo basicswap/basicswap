@@ -2102,6 +2102,8 @@ class Test(unittest.TestCase):
 
         class Srv:
             session_tokens = {"csrf": "the-server-token"}
+            used_form_ids = {}
+            form_id_lock = threading.Lock()
 
         class Stub:
             server = Srv()
@@ -2109,12 +2111,133 @@ class Test(unittest.TestCase):
         check = HttpHandler.checkForm
         msgs = []
         # Correct token -> returns parsed form data.
-        fd = check(Stub(), b"formid=the-server-token&x=1", "rpc", msgs)
+        fd = check(Stub(), b"formid=the-server-token.n1&x=1", "rpc", msgs)
         assert fd is not None and b"x" in fd
+        assert check(Stub(), b"formid=the-server-token.n1&x=1", "rpc", msgs) is None
+        assert "Prevented double submit for form rpc." in msgs
+        assert check(Stub(), b"formid=the-server-token.n2&x=1", "rpc", msgs)
         # Wrong / missing / empty -> rejected (None).
         assert check(Stub(), b"formid=wrong&x=1", "rpc", msgs) is None
+        assert check(Stub(), b"formid=the-server-token&x=1", "rpc", msgs) is None
         assert check(Stub(), b"x=1", "rpc", msgs) is None
         assert check(Stub(), "", "rpc", msgs) is None
+
+    def test_json_smsgaddresses_requires_post(self):
+        from basicswap.http_server import json_requires_post
+
+        assert not json_requires_post(["", "json", "smsgaddresses"])
+        assert not json_requires_post(["", "json", "smsgaddresses", ""])
+        for mode in ("new", "add", "edit", "disableall"):
+            assert json_requires_post(["", "json", "smsgaddresses", mode]), mode
+
+    def test_tokens_not_rendered_before_login(self):
+        from unittest import mock
+        from basicswap.http_server import HttpHandler
+
+        class SwapClient:
+            ws_server = None
+            debug = False
+            debug_ui = False
+            use_tor_proxy = False
+            _show_notifications = False
+
+            def __init__(self, settings):
+                self.settings = settings
+
+            def getSummary(self):
+                from collections import defaultdict
+
+                return defaultdict(int)
+
+            def getLockedState(self):
+                return True, False
+
+        class Srv:
+            title = "BasicSwap"
+
+            def __init__(self, settings):
+                self.swap_client = SwapClient(settings)
+                self.session_lock = threading.Lock()
+                self.msg_id_lock = threading.Lock()
+                self.msg_id_counter = 0
+                self.session_tokens = {"csrf": "csrf-token", "shutdown": "old-token"}
+
+        class Stub(HttpHandler):
+            def __init__(self, settings, basic_auth_ok=False):
+                self.headers = {}
+                self.path = "/static/missing"
+                self.server = Srv(settings)
+                self._basic_auth_ok = basic_auth_ok
+
+            def putHeaders(self, status_code, content_type, extra_headers=None):
+                pass
+
+        def render_404(handler):
+            rendered = {}
+            get_template = env.get_template
+
+            class Capture:
+                def __init__(self, template):
+                    self.template = template
+
+                def render(self, **kwargs):
+                    rendered.update(kwargs)
+                    return self.template.render(**kwargs)
+
+            def capture_404(name, *args, **kwargs):
+                template = get_template(name, *args, **kwargs)
+                return Capture(template) if name == "404.html" else template
+
+            with mock.patch.object(env, "get_template", side_effect=capture_404):
+                page = handler.page_404(["", "static", "missing"]).decode()
+            return page, rendered
+
+        from basicswap.http_server import env
+
+        password = {"client_auth_hash": rfc2440_hash_password("password")}
+        handler = Stub(password)
+        page, rendered = render_404(handler)
+        assert rendered["form_id"] == ""
+        assert "old-token" not in page
+        assert handler.server.session_tokens["shutdown"] == "old-token"
+
+        authenticated = Stub(password)
+        for handler in (Stub(password, basic_auth_ok=True), Stub({}), authenticated):
+            with mock.patch.object(
+                HttpHandler,
+                "is_authenticated",
+                return_value=handler is authenticated,
+            ):
+                page, rendered = render_404(handler)
+            shutdown_token = handler.server.session_tokens["shutdown"]
+            assert rendered["form_id"].startswith("csrf-token.")
+            assert shutdown_token != "old-token"
+            assert f"/shutdown/{shutdown_token}" in page
+
+    def test_html_responses_deny_framing(self):
+        from basicswap.http_server import HttpHandler
+
+        class Srv:
+            allow_cors = False
+
+        class Stub(HttpHandler):
+            def __init__(self):
+                self.server = Srv()
+                self.sent = []
+
+            def send_response(self, code, message=None):
+                pass
+
+            def send_header(self, keyword, value):
+                self.sent.append((keyword, value))
+
+            def end_headers(self):
+                pass
+
+        handler = Stub()
+        handler.putHeaders(200, "text/html")
+        assert ("X-Frame-Options", "DENY") in handler.sent
+        assert ("Content-Security-Policy", "frame-ancestors 'none'") in handler.sent
 
     def test_varint(self):
         test_vectors = [

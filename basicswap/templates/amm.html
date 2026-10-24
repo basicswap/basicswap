@@ -179,6 +179,7 @@
      <div class="p-6 bg-white dark:bg-gray-500 rounded-xl shadow-md">
       <h3 class="mb-4 text-xl font-bold text-coolGray-900 dark:text-white">Control</h3>
       <form method="post" autocomplete="off">
+       <input type="hidden" name="formid" value="{{ form_id }}">
        <div class="mb-4">
         <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Status</label>
         <div class="flex items-center">
@@ -331,10 +332,9 @@
         </ul>
       </div>
 
-      <form method="post" autocomplete="off">
-
         <div id="configTabContent">
           <div class="block" id="json-content" role="tabpanel" aria-labelledby="json-tab">
+            <form method="post" id="amm-config-form" autocomplete="off">
             <div id="amm-dirty-banner" class="hidden mb-4 p-3 rounded-md border border-yellow-300 bg-yellow-50 text-yellow-800 dark:bg-yellow-900 dark:border-yellow-700 dark:text-yellow-200 text-sm">
               You have unsaved configuration changes while the AMM is running. Save the config for changes to take effect.
             </div>
@@ -358,6 +358,7 @@
                 </div>
               </div>
             </div>
+            </form>
           </div>
 
           <div class="hidden" id="settings-content" role="tabpanel" aria-labelledby="settings-tab">
@@ -788,7 +789,6 @@
         </div>
 
        <!-- AMM Configuration Tabs handled by external JS -->
-      </form>
      </div>
 
      {% if state_exists and debug_ui_mode %}

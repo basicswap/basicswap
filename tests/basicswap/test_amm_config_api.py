@@ -4,13 +4,23 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import io
+import logging
+import tempfile
+import threading
+import types
 import unittest
+from unittest import mock
 
+from basicswap.http_server import HttpHandler
+from basicswap.ui import page_amm as page_amm_module
 from basicswap.ui.page_amm import (
+    amm_form_allowed,
     validate_amm_config,
     get_amm_template_runtime,
     get_amm_bid_runtime,
     classify_offer_ids,
+    log_capture_thread,
 )
 
 
@@ -415,6 +425,73 @@ class ClassifyOfferIdsTest(unittest.TestCase):
         self.assertEqual(runtime["std"]["active_offer_count"], 1)
         self.assertEqual(runtime["std"]["offer_ids"], ["0a"])
         self.assertEqual(runtime["std"]["stale_offer_ids"], ["0b"])
+
+
+class AmmControlTest(unittest.TestCase):
+    def test_control_form_needs_token(self):
+        class Srv:
+            session_tokens = {"csrf": "csrf-token"}
+            used_form_ids = {}
+            form_id_lock = threading.Lock()
+            env = mock.MagicMock()
+
+        class Stub(HttpHandler):
+            def __init__(self, swap_client):
+                self.server = Srv()
+                self.server.swap_client = swap_client
+                self.command = "POST"
+
+            def render_template(self, template, args_dict, *args, **kwargs):
+                return b""
+
+        with tempfile.TemporaryDirectory() as data_dir:
+            for post_string, allowed in (
+                (b"start=1&host=127.0.0.1&port=12700", False),
+                (b"start=1&formid=wrong", False),
+                (b"start=1&formid=csrf-token.n1", True),
+            ):
+                swap_client = mock.MagicMock()
+                swap_client.data_dir = data_dir
+                swap_client.debug = False
+                swap_client.settings = {"amm_autostart": True}
+                with (
+                    mock.patch.object(
+                        page_amm_module,
+                        "start_amm_process",
+                        return_value=(True, "started"),
+                    ) as start,
+                    mock.patch.object(
+                        page_amm_module, "check_existing_amm_processes", return_value=[]
+                    ),
+                ):
+                    page_amm_module.page_amm(Stub(swap_client), None, post_string)
+                self.assertIs(start.called, allowed)
+                if not allowed:
+                    self.assertIn("amm_autostart", swap_client.settings)
+
+        err_messages = []
+        self.assertTrue(
+            amm_form_allowed(
+                Stub(None), b"save_config=true&config_content=%7B%7D", err_messages
+            )
+        )
+        self.assertEqual(err_messages, [])
+
+    def test_token_cleared_when_process_exits(self):
+        class Process:
+            def __init__(self):
+                self.stdout = io.StringIO("")
+
+            def poll(self):
+                return 0
+
+        swap_client = types.SimpleNamespace(log=logging, _amm_api_token="token")
+        log_capture_thread(Process(), swap_client, "token")
+        self.assertIsNone(swap_client._amm_api_token)
+
+        swap_client._amm_api_token = "restarted"
+        log_capture_thread(Process(), swap_client, "token")
+        self.assertEqual(swap_client._amm_api_token, "restarted")
 
 
 if __name__ == "__main__":

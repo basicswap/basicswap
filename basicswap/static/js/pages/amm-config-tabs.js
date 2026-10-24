@@ -104,7 +104,6 @@
         if (maxSecondsBetweenBidsEl) maxSecondsBetweenBidsEl.value = config.max_seconds_between_bids || 60;
         if (pruneStateDelayEl) pruneStateDelayEl.value = config.prune_state_delay || 120;
         if (pruneStateAfterSecondsEl) pruneStateAfterSecondsEl.value = config.prune_state_after_seconds || 604800;
-        document.getElementById('auth').value = config.auth || '';
       } catch (error) {
         console.error('Error loading settings from JSON:', error);
       }
@@ -135,7 +134,6 @@
         if (maxSecondsBetweenBidsEl) config.max_seconds_between_bids = parseInt(maxSecondsBetweenBidsEl.value) || 60;
         if (pruneStateDelayEl) config.prune_state_delay = parseInt(pruneStateDelayEl.value) || 120;
         if (pruneStateAfterSecondsEl) config.prune_state_after_seconds = parseInt(pruneStateAfterSecondsEl.value) || 604800;
-        config.auth = document.getElementById('auth').value || '';
 
         configTextarea.value = JSON.stringify(config, null, 2);
 
@@ -205,7 +203,7 @@
     },
 
     setupConfigForm: function() {
-      const configForm = document.querySelector('form[method="post"]');
+      const configForm = document.getElementById('amm-config-form');
       const saveConfigBtn = document.getElementById('save_config_btn');
 
       if (configForm && saveConfigBtn) {
@@ -228,7 +226,7 @@
 
     setupCreateDefaultButton: function() {
       const createDefaultBtn = document.getElementById('create_default_btn');
-      const configForm = document.querySelector('form[method="post"]');
+      const configForm = document.getElementById('amm-config-form');
 
       if (createDefaultBtn && configForm) {
         createDefaultBtn.addEventListener('click', (e) => {

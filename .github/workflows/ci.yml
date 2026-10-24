@@ -265,6 +265,8 @@ jobs:
               python tests/basicswap/selenium/test_settings.py
               echo "Running test_swap_direction.py"
               python tests/basicswap/selenium/test_swap_direction.py
+              echo "Running test_wallets.py"
+              python tests/basicswap/selenium/test_wallets.py
               kill $TEST_NETWORK_PID
             failure_logs: |
               echo "=== SELENIUM BACKGROUND LOG ==="

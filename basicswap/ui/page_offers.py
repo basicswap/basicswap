@@ -488,7 +488,7 @@ def offer_to_post_string(self, swap_client, offer_id):
     if amount_to is None:
         amount_to = (offer.amount_from * offer.rate) // ci_from.COIN()
     offer_data = {
-        "formid": self.server.session_tokens["csrf"],
+        "formid": self.generate_form_id(),
         "addr_to": offer.addr_to,
         "addr_from": offer.addr_from,
         "coin_from": offer.coin_from,
@@ -982,7 +982,6 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
         "active_ind": offer.active_ind,
         "swap_type": strSwapDesc(offer.swap_type),
         "reverse": reverse_bid,
-        "form_id": get_data_entry_or(form_data, "formid", "") if form_data else "",
         "auto_accept_type": (
             offer.auto_accept_type if hasattr(offer, "auto_accept_type") else 0
         ),

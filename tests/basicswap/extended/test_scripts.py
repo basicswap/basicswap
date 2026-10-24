@@ -388,7 +388,9 @@ class Test(unittest.TestCase):
         offers = read_json_api(UI_PORT, "offers")
         assert len(offers) == 2
 
-        addr_bid_from = read_json_api(UI_PORT + 1, "smsgaddresses/new")["new_address"]
+        addr_bid_from = read_json_api(UI_PORT + 1, "smsgaddresses/new", {})[
+            "new_address"
+        ]
         node1_test1_config = {
             "bids": [
                 {
@@ -689,7 +691,7 @@ class Test(unittest.TestCase):
 
         addrs = []
         for i in range(2):
-            addrs.append(read_json_api(UI_PORT, "smsgaddresses/new")["new_address"])
+            addrs.append(read_json_api(UI_PORT, "smsgaddresses/new", {})["new_address"])
 
         node0_test2_config = {
             "offers": [
@@ -759,7 +761,9 @@ class Test(unittest.TestCase):
         for addr in addrs:
             assert found_addrs[addr] == 1
 
-        addr_bid_from = read_json_api(UI_PORT + 1, "smsgaddresses/new")["new_address"]
+        addr_bid_from = read_json_api(UI_PORT + 1, "smsgaddresses/new", {})[
+            "new_address"
+        ]
         node1_test1_config = {
             "bids": [
                 {
