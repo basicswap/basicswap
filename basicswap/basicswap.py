@@ -17016,6 +17016,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def updateWalletInfo(self, coin) -> None:
         # Store wallet info to db so it's available after startup
+        updated: bool = False
         try:
             ci = self.ci(coin)
             is_electrum = hasattr(ci, "useBackend") and ci.useBackend()
@@ -17027,13 +17028,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             wi = self.getWalletInfo(coin)
             if wi:
                 self.addWalletInfoRecord(coin, 1, wi)
+                updated = True
 
             if not is_electrum and coin in WalletManager.SUPPORTED_COINS:
                 self._syncAddressesFromFullNode(coin)
         except Exception as e:
             self.log.error(f"updateWalletInfo {e}.")
         finally:
+            self.coin_clients[coin]["last_updated_wallet_info"] = self.getTime()
             self._updating_wallets_info[int(coin)] = False
+
+        if updated and self.ws_server:
+            self.ws_server.send_message_to_all(
+                json.dumps(
+                    {
+                        "event": "wallet_info_updated",
+                        "coin": chainparams[coin]["ticker"],
+                    }
+                )
+            )
 
     def _syncAddressesFromFullNode(self, coin_type: Coins) -> int:
         if coin_type in self._synced_addresses_from_full_node:
