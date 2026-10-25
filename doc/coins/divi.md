@@ -50,19 +50,24 @@ silently appearing to succeed.
 
 ## RPC credentials
 
-divid 3.0.0 writes no `.cookie` file and has no `-rpcauth` option, so BasicSwap cannot use cookie
-auth the way it does for other cores. `prepare.py` therefore always writes `rpcuser=` and
+Divi Core has no cookie auth and no `-rpcauth` option, so `prepare.py` always writes `rpcuser=` and
 `rpcpassword=` into `divi.conf` and the same pair into `basicswap.json`. They come from
 `DIVI_RPC_USER` / `DIVI_RPC_PWD` when set, and are generated at random otherwise.
 
-## Release verification
+## Node and release verification
 
-Divi publishes no detached signature and no hashes file. Release hashes are pinned in
-`interface/divi/core.py` and checked in `verifyCoreHash`; `verifyCoreSignature` logs a warning
-and does nothing. This is a weaker guarantee than every other coin here. Update the table
-deliberately, from the published release.
+`basicswap-prepare` installs [IronDivi](https://github.com/DiviDomains/IronDivi), a maintained
+implementation of the Divi protocol, as the Divi node. Divi Core has had no commits since
+2023-07-06 and no release since v3.0.0 (2023-07-14); IronDivi speaks the same P2P protocol and
+the RPC calls listed below.
 
-Divi Core has had no commits since 2023-07-06 and no release since v3.0.0 (2023-07-14).
+Each IronDivi release carries per-target archives (`irondivi-<target>.tar.gz`), a `SHA256SUMS`
+file and `SHA256SUMS.asc`, a detached signature over it. `prepare.py` checks the signature
+against `pgp/keys/irondivi_builder.pgp` (signer `irondivi_builder` in `interface/divi/core.py`)
+and the archive's hash against `SHA256SUMS`, as it does for other coins. `irondivid` and
+`irondivi-cli` are installed as `divid` and `divi-cli`. Releases exist for Linux (x86_64,
+aarch64, armv7, i686, ppc64le, riscv64, s390x) and macOS (x86_64, arm64); there is no Windows
+release.
 
 ## RPC quirks (differ from PIVX)
 

@@ -5,6 +5,7 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+import platform
 import secrets
 
 from basicswap.contrib.mnemonic import Mnemonic
@@ -12,15 +13,11 @@ from basicswap.interface.divi.chainparams import params
 from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
-    getFileHash,
+    getOSDirNames,
 )
 
-DIVI_VERSION = os.getenv("DIVI_VERSION", "3.0.0")
+DIVI_VERSION = os.getenv("DIVI_VERSION", "0.2.7")
 DIVI_VERSION_TAG = os.getenv("DIVI_VERSION_TAG", "")
-
-# Divi release archives carry the short commit of the build in the filename,
-# but the directory inside the archive does not.
-DIVI_VERSION_COMMIT = os.getenv("DIVI_VERSION_COMMIT", "9e2f76c")
 
 DIVI_RPC_HOST = os.getenv("DIVI_RPC_HOST", "127.0.0.1")
 # Not divid's own defaults (51473/51475): Divi forked PIVX without changing
@@ -30,23 +27,28 @@ DIVI_ONION_PORT = int(os.getenv("DIVI_ONION_PORT", 51872))
 DIVI_RPC_USER = os.getenv("DIVI_RPC_USER", "")
 DIVI_RPC_PWD = os.getenv("DIVI_RPC_PWD", "")
 
-# Divi publishes no detached signature and no hashes file for its releases --
-# the GitHub release is four bare archives.  Every other coin here is verified
-# against a signed hash document; for Divi that is not possible, so the
-# release hashes are pinned below instead and checked in verifyCoreHash.
-#
-# This is a weaker guarantee: the binary is trusted because its hash is in
-# reviewed source, not because a named maintainer signed it.  Update this
-# table deliberately, never automatically, and re-derive the values from the
-# published release rather than from a local build.
-#
-# Computed from the v3.0.0 GitHub release assets, 2026-10-13.
-DIVI_RELEASE_HASHES = {
-    "divi-3.0.0-osx64-9e2f76c.tar.gz": "0f5e93f1550e116d5becf7818a08f62e0500bbd3be4ea05ec9d49f183f52b32b",
-    "divi-3.0.0-RPi2-9e2f76c.tar.gz": "e584348f20d8dbb4942ec13e98769ce6d97511060584686322a3d6af4865156f",
-    "divi-3.0.0-win64-9e2f76c.zip": "77feefbdc14a9321fb19e47c057bfe2e634809704cbc270b302a0d9c8463d386",
-    "divi-3.0.0-x86_64-linux-gnu-9e2f76c.tar.gz": "d09933ab413335b7472b29c4c255d7affea73630b73a0d5c52aec40a63fbd276",
+# The node is IronDivi (https://github.com/DiviDomains/IronDivi), a maintained
+# implementation of the Divi protocol; Divi Core itself has had no release
+# since v3.0.0 (2023).  Each IronDivi release carries a SHA256SUMS file and a
+# detached signature over it, SHA256SUMS.asc, checked against the key below.
+# TODO: fill in the release key's fingerprint once it is published; until then
+# the signature check fails closed.
+divi_signers = {"irondivi_builder": ()}
+
+# IronDivi archives are named for the Rust target they were built for.
+IRONDIVI_LINUX_ARCHS = {
+    "x86_64-linux-gnu": "x86_64-linux-gnu",
+    "aarch64-linux-gnu": "aarch64-linux-gnu",
+    "arm-linux-gnueabihf": "armv7-linux-gnueabihf",
+    "i686-linux-gnu": "i686-linux-gnu",
+    "ppc64le-linux-gnu": "powerpc64le-linux-gnu",
+    "riscv64-linux-gnu": "riscv64-linux-gnu",
+    "s390x-linux-gnu": "s390x-linux-gnu",
 }
+
+# IronDivi ships irondivid and irondivi-cli; they are installed under the
+# names basicswap starts the Divi node by.  There is no divi-tx.
+IRONDIVI_BINS = {"divid": "irondivid", "divi-cli": "irondivi-cli"}
 
 
 class DIVIPrepare(CoinPrepareModule):
@@ -69,10 +71,9 @@ class DIVIPrepare(CoinPrepareModule):
             "core_version_group": 17,
         }
 
-        # divid 3.0.0 writes no .cookie file and has no -rpcauth option, so
-        # basicswap cannot fall back to cookie auth as it does for other
-        # cores.  Credentials must be set in both divi.conf and the json
-        # settings; generate them when none are given.
+        # Divi Core has no cookie auth and no -rpcauth option, so credentials
+        # are set in both divi.conf and the json settings, for any Divi node;
+        # generate them when none are given.
         if self.rpc_user != "":
             config["rpcuser"] = self.rpc_user
             config["rpcpassword"] = self.rpc_password
@@ -83,28 +84,32 @@ class DIVIPrepare(CoinPrepareModule):
         return config
 
     def getArchName(self, ctx: PrepareContext, os_name: str, use_guix: bool) -> str:
-        # Divi predates guix builds; the macOS archive is osx64, not
-        # x86_64-apple-darwin.
         if os_name == "osx":
-            return "osx64"
-        return ctx.bin_arch
+            # prepare.py reports every Mac as osx64.
+            if platform.machine() == "arm64":
+                return "aarch64-macos"
+            return "x86_64-macos"
+        if os_name == "win":
+            raise ValueError("IronDivi publishes no Windows release.")
+        arch_name = IRONDIVI_LINUX_ARCHS.get(ctx.bin_arch)
+        if arch_name is None:
+            raise ValueError(f"IronDivi publishes no release for {ctx.bin_arch}.")
+        return arch_name
 
     def getReleaseFilename(self, ctx: PrepareContext, arch_name: str) -> str:
-        # Divi puts the build's short commit in the release filename.
-        return (
-            f"{self.name}-{self.version}-{arch_name}-"
-            f"{DIVI_VERSION_COMMIT}.{ctx.file_ext}"
-        )
+        return f"irondivi-{arch_name}.tar.gz"
 
     def getReleaseUrl(self, ctx: PrepareContext, release_filename: str) -> str:
         return (
-            "https://github.com/DiviProject/Divi/releases/download/"
+            "https://github.com/DiviDomains/IronDivi/releases/download/"
             f"v{self.version}{self.version_tag}/{release_filename}"
         )
 
+    def getPubkeyFilename(self, signing_key_name: str) -> str:
+        return "irondivi_builder.pgp"
+
     def getExtractBins(self) -> list:
-        # No divi-wallet binary is shipped.
-        return [self.name + "d", self.name + "-cli", self.name + "-tx"]
+        return list(IRONDIVI_BINS)
 
     def getExtractPath(
         self,
@@ -113,11 +118,8 @@ class DIVIPrepare(CoinPrepareModule):
         release_path: str,
         extra_opts: dict,
     ) -> str:
-        # The directory inside the archive has no commit suffix.
-        return f"{self.name}-{self.version}/bin/{bin_name}"
-
-    def hasDetachedSig(self) -> bool:
-        return False
+        archive_dir = os.path.basename(release_path)[: -len(".tar.gz")]
+        return f"{archive_dir}/{IRONDIVI_BINS[bin_name]}"
 
     def downloadCore(
         self,
@@ -126,12 +128,7 @@ class DIVIPrepare(CoinPrepareModule):
         signing_key_name: str,
         extra_opts: dict,
     ) -> tuple:
-        """Download the release only.
-
-        There is no assert file and no signature to fetch, so both are None
-        and verifyCoreHash falls back to the pinned table.
-        """
-        os_name, _ = self.getOSDirNamesFor(ctx)
+        os_name, _ = getOSDirNames(ctx.bin_arch)
         arch_name = self.getArchName(ctx, os_name, False)
 
         release_filename = self.getReleaseFilename(ctx, arch_name)
@@ -139,51 +136,20 @@ class DIVIPrepare(CoinPrepareModule):
         release_url = self.getReleaseUrl(ctx, release_filename)
         ctx.download_release(release_url, release_path, extra_opts)
 
-        return release_path, None, None
-
-    def getOSDirNamesFor(self, ctx: PrepareContext) -> tuple:
-        from basicswap.interface.prepare_util import getOSDirNames
-
-        return getOSDirNames(ctx.bin_arch)
-
-    def verifyCoreHash(
-        self, ctx: PrepareContext, release_path: str, assert_path: str
-    ) -> str:
-        release_filename = os.path.basename(release_path)
-        expect_hash = DIVI_RELEASE_HASHES.get(release_filename)
-        if expect_hash is None:
-            raise ValueError(
-                f"No pinned hash for {release_filename}. Divi publishes no signed "
-                "hashes file, so an unlisted release cannot be verified. Add the "
-                "hash to DIVI_RELEASE_HASHES in interface/divi/core.py after "
-                "checking it by hand."
-            )
-
-        release_hash: str = getFileHash(release_path)
-        ctx.logger.info(f"{release_filename} hash: {release_hash}")
-        if release_hash != expect_hash:
-            raise ValueError(
-                f"Hash mismatch for {release_filename}: got {release_hash}, "
-                f"expected {expect_hash}."
-            )
-        ctx.logger.info("Release hash matches the pinned value.")
-        return release_hash
-
-    def verifyCoreSignature(
-        self,
-        ctx: PrepareContext,
-        gpg,
-        release_path: str,
-        assert_path: str,
-        assert_sig_path: str,
-        signing_key_name: str,
-        extra_opts: dict,
-    ) -> None:
-        ctx.logger.warning(
-            "Divi publishes no signed release hashes. This binary was verified "
-            "against a hash pinned in interface/divi/core.py, which is a weaker "
-            "guarantee than the signature check used for every other coin."
+        # One SHA256SUMS covers every archive of a release; keep it per
+        # version so an upgrade does not check against the old list.
+        assert_url = self.getReleaseUrl(ctx, "SHA256SUMS")
+        assert_path = os.path.join(
+            bin_dir, f"irondivi-{self.version}{self.version_tag}-SHA256SUMS"
         )
+        if not os.path.exists(assert_path):
+            ctx.download_file(assert_url, assert_path)
+
+        assert_sig_path = assert_path + ".asc"
+        if not os.path.exists(assert_sig_path):
+            ctx.download_file(assert_url + ".asc", assert_sig_path)
+
+        return release_path, assert_path, assert_sig_path
 
     def writeCoinConfig(
         self,
@@ -288,20 +254,12 @@ class DIVIPrepare(CoinPrepareModule):
         return None
 
 
-# Divi has no release signers.  prepareRelease() in bin/prepare.py iterates
-# over signers and fails if the loop body never runs, so one sentinel entry is
-# needed; it is named so the reason shows up plainly in the prepare log:
-#   "Prepare core: divi v3.0.0 - Signer: unsigned-release-pinned-hash"
-# It is never used as a key name -- verifyCoreSignature is a no-op.
-DIVI_NO_SIGNER = "unsigned-release-pinned-hash"
-
-
 prepare_module = DIVIPrepare(
     name=params["name"],
     ticker=params["ticker"],
     version=DIVI_VERSION,
     version_tag=DIVI_VERSION_TAG,
-    signers={DIVI_NO_SIGNER: ()},
+    signers=divi_signers,
     rpc_user=DIVI_RPC_USER,
     rpc_password=DIVI_RPC_PWD,
     onion_port=DIVI_ONION_PORT,

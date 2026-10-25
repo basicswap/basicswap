@@ -76,7 +76,6 @@ DIVI_BINDIR = os.path.expanduser(
 )
 DIVID = os.getenv("DIVID", "divid" + cfg.bin_suffix)
 DIVI_CLI = os.getenv("DIVI_CLI", "divi-cli" + cfg.bin_suffix)
-DIVI_TX = os.getenv("DIVI_TX", "divi-tx" + cfg.bin_suffix)
 
 DIVI_BASE_PORT = 34852
 DIVI_BASE_RPC_PORT = 35852

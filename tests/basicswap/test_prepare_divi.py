@@ -6,15 +6,19 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-Tests for the Divi prepare module: rpc credentials and wallet seeding.
+Tests for the Divi prepare module: the IronDivi release, rpc credentials and
+wallet seeding.
 
 export PYTHONPATH=$(pwd)
 pytest -v tests/basicswap/test_prepare_divi.py
 """
 
+import hashlib
+import io
 import logging
 import os
 import shutil
+import tarfile
 import tempfile
 import unittest
 import unittest.mock
@@ -46,13 +50,14 @@ class TestDiviPrepare(unittest.TestCase):
             port_offset=0,
             should_manage_daemon=lambda ticker: True,
             logger=logging.getLogger(__name__),
+            bin_arch="x86_64-linux-gnu",
         )
         self.module = divi_core.DIVIPrepare(
             name="divi",
             ticker="DIVI",
-            version="3.0.0",
+            version="0.2.7",
             version_tag="",
-            signers={divi_core.DIVI_NO_SIGNER: ()},
+            signers=divi_core.divi_signers,
             reseed_note=True,
             creates_wallet=True,
         )
@@ -67,6 +72,79 @@ class TestDiviPrepare(unittest.TestCase):
         with open(conf_path, "w") as fp:
             self.module.writeCoinConfig(self.ctx, fp, "regtest", "salt", settings, {})
         return conf_path
+
+    def test_release_arch_names(self):
+        for bin_arch, arch_name in (
+            ("x86_64-linux-gnu", "x86_64-linux-gnu"),
+            ("aarch64-linux-gnu", "aarch64-linux-gnu"),
+            ("arm-linux-gnueabihf", "armv7-linux-gnueabihf"),
+            ("ppc64le-linux-gnu", "powerpc64le-linux-gnu"),
+        ):
+            self.ctx.bin_arch = bin_arch
+            assert self.module.getArchName(self.ctx, "linux", False) == arch_name
+        for machine, arch_name in (
+            ("arm64", "aarch64-macos"),
+            ("x86_64", "x86_64-macos"),
+        ):
+            with unittest.mock.patch.object(
+                divi_core.platform, "machine", return_value=machine
+            ):
+                assert self.module.getArchName(self.ctx, "osx", False) == arch_name
+        with self.assertRaises(ValueError):
+            self.module.getArchName(self.ctx, "win", False)
+        self.ctx.bin_arch = "mips-linux-gnu"
+        with self.assertRaises(ValueError):
+            self.module.getArchName(self.ctx, "linux", False)
+
+    def test_release_url(self):
+        filename = self.module.getReleaseFilename(self.ctx, "x86_64-linux-gnu")
+        assert filename == "irondivi-x86_64-linux-gnu.tar.gz"
+        assert self.module.getReleaseUrl(self.ctx, filename) == (
+            "https://github.com/DiviDomains/IronDivi/releases/download/"
+            "v0.2.7/irondivi-x86_64-linux-gnu.tar.gz"
+        )
+
+    def writeRelease(self) -> str:
+        # Laid out as an IronDivi release archive.
+        release_path = os.path.join(self.tmp_dir, "irondivi-x86_64-linux-gnu.tar.gz")
+        with tarfile.open(release_path, "w:gz") as ft:
+            for name in ("irondivid", "irondivi-cli", "LICENSE"):
+                data = name.encode()
+                info = tarfile.TarInfo("irondivi-x86_64-linux-gnu/" + name)
+                info.size = len(data)
+                ft.addfile(info, io.BytesIO(data))
+        return release_path
+
+    def test_extract_renames_binaries(self):
+        bin_dir = os.path.join(self.tmp_dir, "bin")
+        os.makedirs(bin_dir)
+        self.module.extractCore(self.ctx, bin_dir, self.writeRelease(), {})
+        assert sorted(os.listdir(bin_dir)) == ["divi-cli", "divid"]
+        with open(os.path.join(bin_dir, "divid"), "rb") as fp:
+            assert fp.read() == b"irondivid"
+
+    def test_release_hash_in_sums(self):
+        release_path = self.writeRelease()
+        with open(release_path, "rb") as fp:
+            release_hash = hashlib.sha256(fp.read()).hexdigest()
+        sums_path = os.path.join(self.tmp_dir, "SHA256SUMS")
+        with open(sums_path, "w") as fp:
+            fp.write(f"{release_hash}  irondivi-x86_64-linux-gnu.tar.gz\n")
+        assert (
+            self.module.verifyCoreHash(self.ctx, release_path, sums_path)
+            == release_hash
+        )
+        with open(sums_path, "w") as fp:
+            fp.write("00" * 32 + "  irondivi-x86_64-linux-gnu.tar.gz\n")
+        with self.assertRaises(ValueError):
+            self.module.verifyCoreHash(self.ctx, release_path, sums_path)
+
+    def test_signature_by_unlisted_key_refused(self):
+        result = unittest.mock.Mock(valid=True, fingerprint="AB" * 20, key_id="AB" * 8)
+        with self.assertRaises(ValueError):
+            self.module.ensureValidSignatureBy(
+                self.ctx, result, "irondivi_builder", filepath="SHA256SUMS"
+            )
 
     def test_generated_rpc_credentials(self):
         # divid has no cookie auth and no rpcauth, so credentials must exist
