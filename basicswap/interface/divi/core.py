@@ -31,9 +31,7 @@ DIVI_RPC_PWD = os.getenv("DIVI_RPC_PWD", "")
 # implementation of the Divi protocol; Divi Core itself has had no release
 # since v3.0.0 (2023).  Each IronDivi release carries a SHA256SUMS file and a
 # detached signature over it, SHA256SUMS.asc, checked against the key below.
-# TODO: fill in the release key's fingerprint once it is published; until then
-# the signature check fails closed.
-divi_signers = {"irondivi_builder": ()}
+divi_signers = {"irondivi_builder": ("15F858B57C68A858DD2D131D9A25155BFBB01184",)}
 
 # IronDivi archives are named for the Rust target they were built for.
 IRONDIVI_LINUX_ARCHS = {
