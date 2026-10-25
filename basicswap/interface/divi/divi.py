@@ -519,8 +519,9 @@ class DIVIInterface(BTCInterface):
 
     def getUTXOBalance(self, address: str) -> int:
         # verifyProofOfFunds uses scantxoutset, which divid does not have.
-        # The address index holds the same confirmed outputs.
-        utxos = self.rpc("getaddressutxos", [{"addresses": [address]}])
+        # The address index holds the same confirmed outputs.  IronDivi scans
+        # the UTXO set for it, so allow the same 60 s as getLockTxHeight.
+        utxos = self.rpc("getaddressutxos", [{"addresses": [address]}], timeout=60)
         return sum(int(utxo["satoshis"]) for utxo in utxos)
 
     def isAddressMine(self, address: str, or_watch_only: bool = False) -> bool:
