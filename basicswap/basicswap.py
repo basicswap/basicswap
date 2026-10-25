@@ -3772,6 +3772,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # The prefunded itx should already be unlocked above (a_lock_tx), repeat to catch edge cases
                 self.unlockPrefundedTxInputs(bid.bid_id, offer.coin_to, use_cursor)
                 self.unlockPlanReservedOutputs(bid.bid_id, offer.coin_to, use_cursor)
+                self.returnUnpaidXmrSwapAddresses(
+                    bid.bid_id, bid.state == BidStates.SWAP_COMPLETED, use_cursor
+                )
             elif SwapTypes.SELLER_FIRST:
                 pass  # No prevouts are locked
 
@@ -5063,29 +5066,47 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.closeDB(use_cursor, commit=False)
         return addr
 
-    def returnAddressToPool(self, bid_id: bytes, tx_type):
+    def returnAddressToPool(self, bid_id: bytes, tx_type, cursor=None):
         self.log.debug(
             f"Return address to pool bid_id {self.log.id(bid_id)}, type {tx_type}"
         )
         try:
-            cursor = self.openDB()
+            use_cursor = self.openDB(cursor)
             try:
                 record = self.queryOne(
                     PooledAddress,
-                    cursor,
+                    use_cursor,
                     {"tx_type": int(tx_type), "bid_id": bid_id},
                 )
                 self.log.debug(f"Returning address to pool addr {record.addr}")
 
                 # unset PooledAddress.bid_id
                 query = "UPDATE addresspool SET bid_id = NULL WHERE bid_id = :bid_id AND tx_type = :tx_type"
-                cursor.execute(query, {"bid_id": bid_id, "tx_type": tx_type})
+                use_cursor.execute(query, {"bid_id": bid_id, "tx_type": tx_type})
 
-                self.commitDB()
+                if cursor is None:
+                    self.commitDB()
             except Exception as e:  # noqa: F841
                 pass
         finally:
-            self.closeDB(cursor, commit=False)
+            if cursor is None:
+                self.closeDB(use_cursor, commit=False)
+
+    def returnUnpaidXmrSwapAddresses(
+        self, bid_id: bytes, completed: bool, cursor
+    ) -> None:
+        # Only addresses no swap tx can still pay go back. They stay marked
+        # used, so only another swap can be handed them.
+        a_lock = self.queryOne(
+            SwapTx, cursor, {"bid_id": bid_id, "tx_type": int(TxTypes.XMR_SWAP_A_LOCK)}
+        )
+        a_lock_unsent: bool = a_lock is None or a_lock.state in (None, TxStates.TX_NONE)
+        if a_lock_unsent:
+            self.returnAddressToPool(bid_id, TxTypes.XMR_SWAP_A_LOCK, cursor)
+        if a_lock_unsent or completed:
+            self.returnAddressToPool(
+                bid_id, TxTypes.XMR_SWAP_A_LOCK_REFUND_SPEND, cursor
+            )
 
     def getReceiveAddressForCoin(self, coin_type):
         new_addr = self.ci(coin_type).getNewAddress(
@@ -7056,6 +7077,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.add(message_route_link, cursor)
             bid.bid_id = bid_id
             xmr_swap.bid_id = bid.bid_id
+            if "dest_af" not in extra_options:
+                cursor.execute(
+                    "UPDATE addresspool SET bid_id = :bid_id"
+                    " WHERE addr = :addr AND tx_type = :tx_type",
+                    {
+                        "bid_id": bid_id,
+                        "addr": address_out,
+                        "tx_type": int(TxTypes.XMR_SWAP_A_LOCK),
+                    },
+                )
 
             bid.chain_a_height_start = ci_from.getChainHeight()
             bid.chain_b_height_start = ci_to.getChainHeight()
@@ -7577,7 +7608,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
             address_out = self.getReceiveAddressFromPool(
-                coin_from, bid.offer_id, TxTypes.XMR_SWAP_A_LOCK, cursor=use_cursor
+                coin_from, bid_id, TxTypes.XMR_SWAP_A_LOCK, cursor=use_cursor
             )
             if coin_from == Coins.PART_BLIND:
                 addrinfo = ci_from.rpc("getaddressinfo", [address_out])
@@ -15706,6 +15737,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.unlockPlanReservedOutputs(
                             bid_id, Coins(coin_rows[0][0]), cursor
                         )
+                        self.returnUnpaidXmrSwapAddresses(bid_id, False, cursor)
             for offer_id in offers_to_expire:
                 query = "SELECT states FROM offers WHERE offer_id = :offer_id AND active_ind = 1 AND state IN (:offer_received, :offer_sent)"
                 rows = cursor.execute(
