@@ -2568,7 +2568,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         if rough_change > dust_limit:
             try:
-                change_addr = wm.getNewAddress(self.coin_type(), internal=True)
+                change_addr = wm.getNewAddress(
+                    self.coin_type(), internal=True, mark_used=lock_unspents
+                )
             except Exception as e:
                 self._log.warning(f"Failed to generate new internal address: {e}")
                 change_addr = wm.getExistingInternalAddress(self.coin_type())
@@ -2795,6 +2797,23 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 self._log.debug("UTXO already locked")
             else:
                 self._log.warning(f"Error locking UTXOs: {e}")
+
+    def _txOutputAddresses(self, tx) -> list[str]:
+        addresses = [
+            self.getAddressFromScriptPubKey(txo.scriptPubKey) for txo in tx.vout
+        ]
+        return [a for a in addresses if a]
+
+    def claimChangeAddresses(self, tx, cursor) -> None:
+        if not self.getWalletManager().claimAddresses(
+            self.coin_type(), self._txOutputAddresses(tx), cursor
+        ):
+            raise ValueError("Change address already taken, retry funding")
+
+    def releaseChangeAddresses(self, tx, cursor) -> None:
+        self.getWalletManager().releaseAddresses(
+            self.coin_type(), self._txOutputAddresses(tx), cursor
+        )
 
     def splitOutputs(self, values):
         """Pay each value to a new address of this wallet in one transaction and

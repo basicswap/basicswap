@@ -3669,7 +3669,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if prefunded_tx is None:
                 continue
             try:
-                self.ci(coin_to).unlockInputs(prefunded_tx, cursor=cursor)
+                ci = self.ci(coin_to)
+                ci.unlockInputs(prefunded_tx, cursor=cursor)
+                if ci.useBackend():
+                    ci.releaseChangeAddresses(ci.loadTx(prefunded_tx), cursor)
             except Exception as e:
                 self.log.warning(f"Prefunded {type_str} unlockInputs failed {e}")
 
@@ -4464,6 +4467,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
                 )
                 self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
+            elif ci_from.useBackend():
+                ci_from.claimChangeAddresses(
+                    ci_from.loadTx(extra_options["prefunded_itx"]), cursor
+                )
 
             # TODO: Send proof of funds with offer
             # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
@@ -6778,6 +6785,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ci_to.validateFeeRate(
                     prefunded_tx_fee_rate, Concepts.BID, bypass_fee_validation
                 )
+                if ci_to.useBackend():
+                    ci_to.claimChangeAddresses(ci_to.loadTx(prefunded_tx_data), cursor)
             else:
                 amount, amount_to, bid_rate = self.setBidAmounts(
                     amount, offer, extra_options, ci_from

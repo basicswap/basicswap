@@ -237,6 +237,37 @@ class WalletManager:
         finally:
             self._swap_client.closeDB(cursor, commit=False)
 
+    def claimAddresses(self, coin_type: Coins, addresses: list[str], cursor) -> bool:
+        """Mark this wallet's addresses among `addresses` used. False, with
+        nothing marked, if one already was."""
+        if not addresses:
+            return True
+        in_list = ",".join("?" * len(addresses))
+        params = (int(coin_type), *addresses)
+        cursor.execute(
+            "SELECT COUNT(*) FROM wallet_addresses WHERE coin_type = ?"
+            f" AND address IN ({in_list}) AND ever_used = 1",
+            params,
+        )
+        if cursor.fetchone()[0] > 0:
+            return False
+        cursor.execute(
+            "UPDATE wallet_addresses SET ever_used = 1"
+            f" WHERE coin_type = ? AND address IN ({in_list})",
+            params,
+        )
+        return True
+
+    def releaseAddresses(self, coin_type: Coins, addresses: list[str], cursor) -> None:
+        if not addresses:
+            return
+        cursor.execute(
+            "UPDATE wallet_addresses SET ever_used = 0 WHERE coin_type = ?"
+            f" AND address IN ({','.join('?' * len(addresses))})"
+            " AND COALESCE(cached_balance, 0) = 0",
+            (int(coin_type), *addresses),
+        )
+
     def extendAddressPool(self, coin_type: Coins) -> list[tuple[str, str]]:
         """Derive until POOL_SIZE unused addresses follow the last used one on
         each chain, as a restoring wallet's gap scan does. Returns the new
@@ -274,7 +305,12 @@ class WalletManager:
         return added
 
     def getNewAddress(
-        self, coin_type: Coins, internal: bool = False, label: str = "", cursor=None
+        self,
+        coin_type: Coins,
+        internal: bool = False,
+        label: str = "",
+        cursor=None,
+        mark_used: bool = True,
     ) -> str:
         if not self.isInitialized(coin_type):
             raise ValueError(f"Wallet not initialized for {Coins(coin_type).name}")
@@ -308,19 +344,20 @@ class WalletManager:
                 coin_type, internal, use_cursor
             )
             if reuse_addr is not None:
-                use_cursor.execute(
-                    "UPDATE wallet_addresses SET ever_used = 1"
-                    " WHERE coin_type = ? AND derivation_index = ?"
-                    " AND is_internal = ?",
-                    (int(coin_type), reuse_index, internal),
-                )
+                if mark_used:
+                    use_cursor.execute(
+                        "UPDATE wallet_addresses SET ever_used = 1"
+                        " WHERE coin_type = ? AND derivation_index = ?"
+                        " AND is_internal = ?",
+                        (int(coin_type), reuse_index, internal),
+                    )
                 self._setHighWaterIndex(state, internal, reuse_index, use_cursor)
                 self._swap_client.commitDB()
                 return reuse_addr
 
             next_index = self._nextUnusedIndex(coin_type, internal, use_cursor)
             address, _ = self._addDerivedAddress(
-                coin_type, next_index, internal, True, use_cursor
+                coin_type, next_index, internal, mark_used, use_cursor
             )
             self._setHighWaterIndex(state, internal, next_index, use_cursor)
 
