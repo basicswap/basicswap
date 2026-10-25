@@ -135,9 +135,10 @@ is confirmed with `gettxout`, and any input lost in the window is reselected.
 
 ## Tests
 
-- `tests/basicswap/test_prepare_divi.py`: prepare-time behaviour (RPC credentials, seed pipe).
-- `tests/basicswap/extended/test_divi.py`: regtest swaps against divid 3.0.0, with PART, BTC and
-  LTC as the other coin. Secret-hash and adaptor-signature swaps in both directions, refunds,
+- `tests/basicswap/test_prepare_divi.py`: prepare-time behaviour (RPC credentials, seed pipe, and the
+  IronDivi download, hash and signature checks).
+- `tests/basicswap/extended/test_divi.py`: regtest swaps against IronDivi, with PART, BTC and LTC as
+  the other coin. Secret-hash and adaptor-signature swaps in both directions, refunds,
   coin B lock recovery, a private offer, a node stopped mid-swap, wallet withdraw, and the web UI.
 
 There is no public Divi testnet faucet and testnet difficulty makes CPU mining impractical, so
