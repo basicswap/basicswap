@@ -851,6 +851,9 @@ class ElectrumBackend(WalletBackend):
         except Exception as e:
             self._log.debug(f"Error in realtime callback: {e}")
 
+    def isSubscribed(self, scripthash: str) -> bool:
+        return scripthash in self._subscribed_scripthashes
+
     def subscribeAddressWithCallback(self, address: str) -> str:
         if self._isUnsupportedAddress(address):
             return None

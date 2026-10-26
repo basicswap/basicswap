@@ -373,6 +373,10 @@ def threadPollElectrumChainState(swap_client, coin_type):
 
     poll_interval = cc.get("electrum_poll_interval", 10)
     poll_delay_range = (poll_interval, poll_interval + 5)
+    reconcile_interval = cc.get("electrum_reconcile_interval", 300)
+    refresh_event = cc.setdefault("electrum_refresh_event", threading.Event())
+    last_reconcile = time.time()
+    subscribed = False
     consecutive_errors = 0
     backoff_seconds = 30
     max_backoff_seconds = 300
@@ -391,6 +395,9 @@ def threadPollElectrumChainState(swap_client, coin_type):
 
     while not swap_client.chainstate_delay_event.is_set():
         try:
+            pushed = refresh_event.is_set()
+            refresh_event.clear()
+
             chain_state = ci.getBlockchainInfo()
             new_height: int = chain_state["blocks"]
 
@@ -417,21 +424,36 @@ def threadPollElectrumChainState(swap_client, coin_type):
                         with swap_client.mxDB:
                             cc["chain_median_time"] = mtp
 
-            try:
-                ci.refreshElectrumWalletInfo()
-                checkAndNotifyBalanceChange(
-                    swap_client,
-                    coin_type,
-                    ci,
-                    cc,
-                    new_height,
-                    "electrum_poll",
-                    chain_state,
-                )
-            except Exception as refresh_err:
-                swap_client.log.debug(
-                    f"threadPollElectrumChainState {ci.ticker()} refresh error: {refresh_err}"
-                )
+            do_reconcile = (time.time() - last_reconcile) >= reconcile_interval
+            # A call per address: kept off startup and unlock, and rerun to pick
+            # up addresses handed out since.
+            if (do_reconcile or not subscribed) and ci.getWalletManager() is not None:
+                backend = ci.getBackend()
+                if not subscribed:
+                    backend.enableRealtimeNotifications(
+                        swap_client._handleElectrumNotification
+                    )
+                    subscribed = True
+                swap_client._subscribeElectrumAddresses(coin_type, backend)
+
+            if pushed or block_changed or do_reconcile:
+                try:
+                    ci.refreshElectrumWalletInfo(full_scan=pushed or do_reconcile)
+                    checkAndNotifyBalanceChange(
+                        swap_client,
+                        coin_type,
+                        ci,
+                        cc,
+                        new_height,
+                        "electrum_poll",
+                        chain_state,
+                    )
+                    if do_reconcile:
+                        last_reconcile = time.time()
+                except Exception as refresh_err:
+                    swap_client.log.debug(
+                        f"threadPollElectrumChainState {ci.ticker()} refresh error: {refresh_err}"
+                    )
 
         except Exception as e:
             consecutive_errors += 1
@@ -460,7 +482,9 @@ def threadPollElectrumChainState(swap_client, coin_type):
                 backoff_seconds = min(backoff_seconds * 2, max_backoff_seconds)
                 continue
 
-        swap_client.chainstate_delay_event.wait(random.randrange(*poll_delay_range))
+        if swap_client.chainstate_delay_event.is_set():
+            break
+        refresh_event.wait(timeout=random.randrange(*poll_delay_range))
 
     swap_client.log.info(f"Electrum polling thread exiting for {ci.ticker()}")
 
@@ -840,6 +864,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.delay_event.set()
         self.chainstate_delay_event.set()
+
+        for cc in self.coin_clients.values():
+            refresh_event = cc.get("electrum_refresh_event")
+            if refresh_event is not None:
+                refresh_event.set()
 
         for coin_type, cc in self.coin_clients.items():
             interface = cc.get("interface")
@@ -2109,100 +2138,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if cc and cc.get("connection_type") == "electrum":
                     self.initializeWalletManager(c)
 
-    def _enableElectrumRealtimeNotifications(self) -> None:
-        for c in self.activeCoins():
-            cc = self.coin_clients.get(c)
-            if not cc or cc.get("connection_type") != "electrum":
-                continue
-
-            try:
-                ci = self.ci(c)
-                if not hasattr(ci, "_backend") or ci._backend is None:
-                    continue
-
-                backend = ci._backend
-
-                def make_callback(coin_type, coin_interface):
-                    def on_address_change(ct, address, scripthash, event_type):
-                        self._handleElectrumNotification(
-                            ct, address, scripthash, event_type
-                        )
-
-                    return on_address_change
-
-                callback = make_callback(c, ci)
-                backend.enableRealtimeNotifications(callback)
-
-                self._subscribeElectrumAddresses(c, ci, backend)
-
-                self.log.info(f"Real-time notifications enabled for {ci.coin_name()}")
-
-            except Exception as e:
-                self.log.debug(
-                    f"Could not enable realtime notifications for {Coins(c).name}: {e}"
-                )
-
-    def _subscribeElectrumAddresses(self, coin_type, ci, backend) -> None:
+    def _subscribeElectrumAddresses(self, coin_type, backend) -> None:
         try:
-            wm = self._wallet_manager
-            if wm and wm.isInitialized(coin_type):
-                for i in range(20):
-                    try:
-                        addr = wm.getAddressAtIndex(coin_type, i, internal=False)
-                        if addr:
-                            backend.subscribeAddressWithCallback(addr)
-                    except Exception:
-                        break
+            addresses = [
+                (addr, scripthash)
+                for addr, scripthash in self._wallet_manager.getAddressesForSubscription(
+                    coin_type
+                )
+                if not backend.isSubscribed(scripthash)
+            ]
+            for addr, _scripthash in addresses:
+                backend.subscribeAddressWithCallback(addr)
 
-                for i in range(10):
-                    try:
-                        addr = wm.getAddressAtIndex(coin_type, i, internal=True)
-                        if addr:
-                            backend.subscribeAddressWithCallback(addr)
-                    except Exception:
-                        break
-
+            if addresses:
+                self.log.info(
+                    f"Subscribed to {len(addresses)} {Coins(coin_type).name} "
+                    "addresses for real-time updates"
+                )
         except Exception as e:
             self.log.debug(f"Error subscribing electrum addresses: {e}")
 
     def _handleElectrumNotification(
         self, coin_type, address, scripthash, event_type
     ) -> None:
-        if not self.ws_server:
-            return
-
+        # Runs on the socket listener thread, so it must not make Electrum
+        # calls (that would deadlock waiting on the same thread to read the
+        # reply). Just wake the poll worker, which refreshes and notifies.
         try:
-            ci = self.ci(coin_type)
             cc = self.coin_clients[coin_type]
-
-            balances = ci.getBalances()
-            if balances != cc.get("cached_balances"):
-                cc["cached_balances"] = balances
-
-                suppress = False
-                if hasattr(ci, "getBackend") and ci.useBackend():
-                    backend = ci.getBackend()
-                    if backend and hasattr(backend, "recentlyReconnected"):
-                        if backend.recentlyReconnected(grace_seconds=30):
-                            suppress = True
-
-                if suppress:
-                    self.log.debug(
-                        f"Electrum notification: {ci.ticker()} balance cache updated silently (recent reconnection)"
-                    )
-                else:
-                    balance_event = {
-                        "event": "coin_balance_updated",
-                        "coin": ci.ticker(),
-                        "height": cc.get("chain_height", 0),
-                        "trigger": "electrum_notification",
-                        "address": address[:20] + "..." if address else None,
-                    }
-                    self.ws_server.send_message_to_all(json.dumps(balance_event))
-                    self.log.debug(
-                        f"Electrum notification: {ci.ticker()} balance updated"
-                    )
-
+            cc.setdefault("electrum_refresh_event", threading.Event()).set()
         except Exception as e:
             self.log.debug(f"Error handling electrum notification: {e}")
 
