@@ -478,11 +478,17 @@ class XMRInterface(CoinInterface):
 
         return float(self.format_amount(fee_per_k_bytes)), "get_fee_estimate"
 
-    def getRedeemFeeRate(self) -> int:
-        # A sweep ignores the offer's rate. Priority 0 is resolved by the
-        # wallet against the backlog, so assume the higher tier it can land on.
+    def getSendFeeEstimate(self) -> (int, int):
+        """(fee per byte of weight, quantization mask) a send pays."""
+        # Priority 0 is resolved by the wallet against the backlog, so assume
+        # the higher tier it can land on.
         priority: int = self._fee_priority if self._fee_priority > 0 else 2
-        return self.rpc("get_fee_estimate")["fees"][priority - 1] * 1000
+        fee_est = self.rpc("get_fee_estimate")
+        return fee_est["fees"][priority - 1], fee_est["quantization_mask"]
+
+    def getRedeemFeeRate(self) -> int:
+        # A sweep ignores the offer's rate.
+        return self.getSendFeeEstimate()[0] * 1000
 
     def getNewRandomKey(self) -> bytes:
         # Note: Returned bytes are in big endian order
@@ -588,6 +594,69 @@ class XMRInterface(CoinInterface):
     def max_batched_lock_outputs(self) -> int:
         # Monero caps a tx at 16 outputs (BULLETPROOF_MAX_OUTPUTS); one is change.
         return 15
+
+    @staticmethod
+    def max_tx_inputs() -> int:
+        # TODO: change to 128 at fcmp hard fork
+        return 100
+
+    def _lockTxFeeModel(self, num_locks: int):
+        """Unlocked output amounts, largest first, and the fee of one tx
+        paying num_locks coin B locks from n of them."""
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            transfers = self.rpc_wallet(
+                "incoming_transfers", {"transfer_type": "available"}
+            ).get("transfers", [])
+            weight_1, weight_2 = (
+                self.rpc_wallet(
+                    "estimate_tx_size_and_weight",
+                    {"n_inputs": n, "n_outputs": num_locks + 1},
+                )["weight"]
+                for n in (1, 2)
+            )
+        fee_per_byte, mask = self.getSendFeeEstimate()
+        input_weight: int = weight_2 - weight_1
+
+        def fee(n_inputs: int) -> int:
+            return (weight_1 + (n_inputs - 1) * input_weight) * fee_per_byte + mask
+
+        values = sorted((t["amount"] for t in transfers if t["unlocked"]), reverse=True)
+        return values, fee
+
+    def estLockTxsFee(self, amount: int, num_locks: int) -> int:
+        """Fee for one tx paying num_locks coin B locks of amount between them.
+        Spends the largest unlocked outputs first, and raises when the tx
+        cannot take that many."""
+        values, fee_for = self._lockTxFeeModel(num_locks)
+        n_inputs, covered, fee = 0, 0, 0
+        for value in values:
+            if covered >= amount + fee:
+                break
+            n_inputs += 1
+            covered += value
+            fee = fee_for(n_inputs)
+        ensure(
+            n_inputs > 0 or amount <= 0,
+            "The {} wallet has no unlocked outputs to spend".format(self.coin_name()),
+        )
+        ensure(
+            n_inputs <= self.max_tx_inputs(),
+            "The {} wallet would spend {} outputs, more than the {} one transaction can take. Consolidate it first by sending the balance to yourself.".format(
+                self.coin_name(), n_inputs, self.max_tx_inputs()
+            ),
+        )
+        return fee
+
+    def estMaxLockAmount(self, num_locks: int) -> int:
+        """Largest total of num_locks coin B locks one tx can fund from the
+        unlocked outputs."""
+        values, fee_for = self._lockTxFeeModel(num_locks)
+        best, covered = 0, 0
+        for n_inputs, value in enumerate(values[: self.max_tx_inputs()], start=1):
+            covered += value
+            best = max(best, covered - fee_for(n_inputs))
+        return best
 
     def publishBLockTxs(self, locks, feerate: int = 0, unlock_time: int = 0):
         """Lock for several swaps at once, so their change is not chained.
