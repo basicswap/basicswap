@@ -322,12 +322,6 @@ function ensureToastContainer() {
       this.initializeBalanceTracking();
       this.checkForPendingUpdateNotification();
 
-      if (window.CleanupManager) {
-        window.CleanupManager.registerResource('notificationManager', this, (mgr) => {
-          mgr.dispose();
-        });
-      }
-
       return this;
     },
 
@@ -748,7 +742,7 @@ function ensureToastContainer() {
 
         case 'coin_balance_updated':
           if (data.coin && config.showBalanceChanges) {
-            this.handleBalanceUpdate(data);
+            this.fetchAndShowBalanceChange(data.coin);
           }
           return;
       }
@@ -756,25 +750,6 @@ function ensureToastContainer() {
       if (toastTitle && shouldShowToast) {
         this.createToast(toastTitle, toastType, toastOptions);
       }
-    },
-
-    handleBalanceUpdate: function(data) {
-      if (!data.coin) return;
-
-      this.fetchAndShowBalanceChange(data.coin);
-      const balanceKey = `balance_${data.coin}`;
-
-      if (this.balanceTimeouts && this.balanceTimeouts[balanceKey]) {
-        clearTimeout(this.balanceTimeouts[balanceKey]);
-      }
-
-      if (!this.balanceTimeouts) {
-        this.balanceTimeouts = {};
-      }
-
-      this.balanceTimeouts[balanceKey] = CleanupManager.setTimeout(() => {
-        this.fetchAndShowBalanceChange(data.coin);
-      }, 2000);
     },
 
     fetchAndShowBalanceChange: function(coinSymbol) {
@@ -954,15 +929,6 @@ function ensureToastContainer() {
     manualResetBalanceTracking: function() {
       this.resetBalanceTracking();
       this.initializeBalanceTracking();
-    },
-
-    dispose: function() {
-      if (this.balanceTimeouts) {
-        Object.values(this.balanceTimeouts).forEach(timeout => {
-          clearTimeout(timeout);
-        });
-        this.balanceTimeouts = {};
-      }
     }
   };
 

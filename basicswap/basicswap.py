@@ -274,6 +274,8 @@ def checkAndNotifyBalanceChange(
                 swap_client.log.debug(
                     f"{ci.ticker()} balance updated (trigger: {trigger_source})"
                 )
+                swap_client._updating_wallets_info[int(coin_type)] = True
+                swap_client.updateWalletInfo(coin_type)
                 balance_event = {
                     "event": "coin_balance_updated",
                     "coin": ci.ticker(),
@@ -525,7 +527,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._expiring_bids = []  # List of bids expiring soon
         self._expiring_offers = []  # List of offers expiring soon
         self._updating_wallets_info = {}
-        self._last_updated_wallets_info = 0
         self._synced_addresses_from_full_node = set()
         self._cached_electrum_legacy_funds = {}
 
@@ -17129,13 +17130,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         wait_for_complete: bool = False,
     ) -> None:
         now: int = self.getTime()
-        if (
-            not force_update
-            and now - self._last_updated_wallets_info
-            < self._wallet_info_refresh_seconds
-        ):
-            return
-
         futures = []
         for c in Coins:
             if only_coin is not None and c != only_coin:
