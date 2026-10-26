@@ -251,6 +251,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         # est_lock_tx_vsize covers one input, each further input adds this.
         return 41 + 108 // cls.witnessScaleFactor()
 
+    @classmethod
+    def est_split_tx_vsize(cls, num_outputs: int) -> int:
+        # One input, plus change.
+        return 10 + cls.est_tx_input_vsize() + (num_outputs + 1) * 34
+
     @staticmethod
     def supports_add_inputs() -> bool:
         return True

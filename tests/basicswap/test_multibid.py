@@ -9,6 +9,7 @@ import json
 import logging
 import unittest
 
+from math import ceil
 from types import SimpleNamespace
 
 from basicswap.basicswap_util import SwapTypes
@@ -89,6 +90,16 @@ class FakeCI:
     def est_tx_input_vsize(self) -> int:
         return 68
 
+    def getSplitTxFees(self):
+        if self._coin_type == Coins.XMR:
+            return 0, 0, 0
+        fee_rate: int = self.make_int(self._fee_rate)
+        return (
+            ceil(fee_rate * 100 / 1000),
+            ceil(fee_rate * 34 / 1000),
+            ceil(fee_rate * self.est_tx_input_vsize() / 1000),
+        )
+
     def lockOutput(self, txid_hex: str, vout: int, bid_id=None, cursor=None) -> None:
         self.locked.append((txid_hex, vout))
 
@@ -134,8 +145,21 @@ class FakeCI:
     def coin_name(self) -> str:
         return self._name
 
+    def coin_type(self):
+        return self._coin_type
+
     def getSpendableBalance(self) -> int:
         return self._balance
+
+
+class FakeXMRCI(FakeCI):
+    def estLockTxsFee(self, amount: int, num_locks: int) -> int:
+        return num_locks * ceil(
+            self.make_int(self._fee_rate) * self.est_lock_tx_vsize() / 1000
+        )
+
+    def estMaxLockAmount(self, num_locks: int) -> int:
+        return self._balance - self.estLockTxsFee(self._balance, num_locks)
 
 
 class FakeOffer:
@@ -189,8 +213,9 @@ class FakeSwapClient:
         self.bid_plans = {}
         self.kv = {}
         self.fail_offers = set()
+        self.xmr_based_coins = (Coins.XMR,)
         self._cis = {
-            Coins.XMR: FakeCI(
+            Coins.XMR: FakeXMRCI(
                 Coins.XMR,
                 "Monero",
                 balance=balance,
@@ -1027,16 +1052,16 @@ class TestPlaceMultiBid(unittest.TestCase):
 
     def test_rejects_a_plan_that_spends_the_whole_balance(self):
         # 4.29 LTC needed; a balance of exactly that leaves nothing for the lock fee.
-        swap_client = FakeSwapClient(self.book(), balance=ltc(4.29))
+        swap_client = FakeSwapClient(self.book(), balance=ltc(4.29), fee_rate=0.0001)
 
         with self.assertRaises(ValueError) as e:
             placeMultiBid(swap_client, self.legs(swap_client))
 
-        self.assertIn("fee reserve", str(e.exception))
+        self.assertIn("including fees", str(e.exception))
         self.assertEqual(swap_client.posted, [])
 
     def test_places_when_the_balance_covers_the_spend_and_the_reserve(self):
-        swap_client = FakeSwapClient(self.book(), balance=ltc(4.30))
+        swap_client = FakeSwapClient(self.book(), balance=ltc(4.30), fee_rate=0.0001)
 
         placed, failed, _ = placeMultiBid(swap_client, self.legs(swap_client))
 

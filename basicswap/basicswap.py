@@ -13814,8 +13814,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ):
                 continue
             if (
-                self.getPreFundedTx(
-                    Concepts.BID, leg.bid_id, TxTypes.PTX_PRE_FUNDED, cursor=cursor
+                self.queryOne(
+                    PrefundedTx,
+                    cursor,
+                    {
+                        "linked_type": Concepts.BID,
+                        "linked_id": leg.bid_id,
+                        "tx_type": TxTypes.PTX_PRE_FUNDED,
+                        "used_by": None,
+                    },
                 )
                 is not None
             ):

@@ -288,6 +288,13 @@ class PARTInterfaceBlind(PARTInterface):
     def est_lock_tx_vsize() -> int:
         return 980
 
+    @classmethod
+    def est_split_tx_vsize(cls, num_outputs: int) -> int:
+        # One input, plus change. A blind output is 95 bytes and a 677 byte
+        # rangeproof witness.
+        output_vsize: int = 95 + -(-677 // cls.witnessScaleFactor())
+        return 14 + cls.est_tx_input_vsize() + (num_outputs + 1) * output_vsize
+
     @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 1032
