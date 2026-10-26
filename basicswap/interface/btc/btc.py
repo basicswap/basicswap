@@ -2821,6 +2821,31 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             self.coin_type(), self._txOutputAddresses(tx), cursor
         )
 
+    def hasBuriedHistoryElectrum(self, address: str, req_conf: int = 3) -> bool:
+        # History is in blockchain order, so an address's first confirmed tx funds it
+        backend = self.getBackend()
+        try:
+            tip = self.getChainHeight()
+            script = self.getDestForAddress(address)
+            for entry in backend.getAddressHistory(address):
+                height = entry["height"]
+                if height <= 0 or tip - height + 1 < req_conf:
+                    continue
+                tx_hex = backend.getTransactionRaw(entry["txid"])
+                return (
+                    tx_hex is not None
+                    and script
+                    in [
+                        txo.scriptPubKey
+                        for txo in self.loadTx(bytes.fromhex(tx_hex)).vout
+                    ]
+                    and self._verifyTxMerkleElectrum(backend, entry["txid"], height)
+                    is True
+                )
+        except Exception as e:
+            self._log.debug(f"{self.coin_name()} history of {address} unproven: {e}")
+        return False
+
     def splitOutputs(self, values):
         """Pay each value to a new address of this wallet in one transaction and
         broadcast it. Returns the outputs it created, which are spendable as

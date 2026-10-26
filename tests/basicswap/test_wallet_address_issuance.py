@@ -9,9 +9,20 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
+from basicswap.contrib.test_framework.messages import (
+    COutPoint,
+    CTransaction,
+    CTxIn,
+    CTxOut,
+)
+from basicswap.interface.btc.btc import BTCInterface
 from basicswap.wallet_manager import WalletManager
+from tests.basicswap.util.common import REQUIRED_SETTINGS
 
 
 def _make_db() -> str:
@@ -195,20 +206,182 @@ class TestAddressIssuanceDensity(unittest.TestCase):
         self.assertEqual(self.state.last_internal_index, self.POOL_SIZE)
 
     def test_pool_extends_past_addresses_with_history(self):
-        self.assertEqual(self.wm.extendAddressPool(Coins.BTC), [])
+        self.assertEqual(self.wm.extendAddressPool(Coins.BTC, []), [])
 
         self.wm.markAddressesUsed(Coins.BTC, ["addr_1_15"])
-        added = self.wm.extendAddressPool(Coins.BTC)
+        added = self.wm.extendAddressPool(Coins.BTC, ["addr_1_15"])
         self.assertEqual(
             [address for address, _ in added],
             [f"addr_1_{i}" for i in range(self.POOL_SIZE, 15 + self.POOL_SIZE + 1)],
         )
         self.assertEqual(self.state.last_internal_index, 15 + self.POOL_SIZE)
-        self.assertEqual(self.wm.extendAddressPool(Coins.BTC), [])
+        self.assertEqual(self.wm.extendAddressPool(Coins.BTC, ["addr_1_15"]), [])
+
+    def test_used_addresses_at_pool_head(self):
+        self.wm.markAddressesUsed(Coins.BTC, ["addr_1_2", "addr_0_3", "addr_1_7"])
+        self.assertEqual(
+            self.wm.usedAddressesAtPoolHead(Coins.BTC),
+            [["addr_0_3"], ["addr_1_7", "addr_1_2"]],
+        )
+
+        self.wm.extendAddressPool(Coins.BTC, ["addr_1_7"])
+        self.assertEqual(self.wm.usedAddressesAtPoolHead(Coins.BTC), [["addr_0_3"], []])
+
+    def test_pool_grows_only_past_history_proven_on_chain(self):
+        self.wm.getAddressesForSubscription = lambda coin_type: [
+            (f"addr_{internal}_{i}", f"sh_{internal}_{i}")
+            for internal in (0, 1)
+            for i in range(self.POOL_SIZE)
+        ]
+        subscribed = []
+
+        class LyingBackend:
+            def isSubscribed(self, scripthash):
+                return False
+
+            def subscribeAddresses(self, addresses):
+                subscribed.append(list(addresses))
+                if len(subscribed) > 5:
+                    raise RuntimeError("the pool kept growing")
+                return {address: "status" for address in addresses}
+
+        ci = SimpleNamespace(
+            hasBuriedHistoryElectrum=lambda address: address == "addr_1_15"
+        )
+        swap_client = SimpleNamespace(
+            _wallet_manager=self.wm,
+            log=logging.getLogger("issuance"),
+            ci=lambda coin_type: ci,
+        )
+        BasicSwap._subscribeElectrumAddresses(swap_client, Coins.BTC, LyingBackend())
+
+        self.assertEqual(len(subscribed), 2)
+        self.assertEqual(
+            subscribed[1],
+            [f"addr_1_{i}" for i in range(self.POOL_SIZE, 15 + self.POOL_SIZE + 1)],
+        )
+
+    def test_an_unproven_extension_is_retried_on_reconcile(self):
+        initial = [
+            (f"addr_{internal}_{i}", f"sh_{internal}_{i}")
+            for internal in (0, 1)
+            for i in range(self.POOL_SIZE)
+        ]
+        self.wm.getAddressesForSubscription = lambda coin_type: initial
+        subscribed_scripthashes = set()
+        subscribed = []
+
+        class Backend:
+            def isSubscribed(self, scripthash):
+                return scripthash in subscribed_scripthashes
+
+            def subscribeAddresses(self, addresses):
+                subscribed.append(list(addresses))
+                subscribed_scripthashes.update(
+                    address.replace("addr_", "sh_") for address in addresses
+                )
+                return {
+                    address: "status" if address == "addr_1_15" else None
+                    for address in addresses
+                }
+
+        proven = set()
+        ci = SimpleNamespace(hasBuriedHistoryElectrum=lambda address: address in proven)
+        swap_client = SimpleNamespace(
+            _wallet_manager=self.wm,
+            log=logging.getLogger("issuance"),
+            ci=lambda coin_type: ci,
+        )
+        backend = Backend()
+        BasicSwap._subscribeElectrumAddresses(swap_client, Coins.BTC, backend)
+        self.assertEqual(len(subscribed), 1)
+
+        proven.add("addr_1_15")
+        BasicSwap._subscribeElectrumAddresses(swap_client, Coins.BTC, backend)
+        self.assertEqual(len(subscribed), 2)
+        self.assertEqual(
+            subscribed[1],
+            [f"addr_1_{i}" for i in range(self.POOL_SIZE, 15 + self.POOL_SIZE + 1)],
+        )
 
     def test_used_history_is_not_handed_out(self):
         self.wm.markAddressesUsed(Coins.BTC, ["addr_0_0", "addr_0_1"])
         self.assertEqual(self.wm.getNewAddress(Coins.BTC), "addr_0_2")
+
+
+class TestBuriedHistory(unittest.TestCase):
+    TIP = 110
+
+    def setUp(self):
+        settings = dict(REQUIRED_SETTINGS)
+        settings.update(
+            {"rpcport": 0, "rpcauth": "none", "connection_type": "electrum"}
+        )
+        self.ci = BTCInterface(settings, "regtest")
+        self.ci._log = MagicMock()
+        self.address = self.ci.encodeSegwitAddress(b"\x11" * 20)
+        self.history = []
+        self.txs = {}
+        self.proof = True
+        self.proofs_checked = []
+
+        test = self
+
+        class Backend:
+            def getAddressHistory(self, address):
+                return test.history
+
+            def getTransactionRaw(self, txid):
+                return test.txs.get(txid)
+
+        def verify(backend, txid, height):
+            self.proofs_checked.append((txid, height))
+            return self.proof
+
+        self.ci._backend = Backend()
+        self.ci.getChainHeight = lambda: self.TIP
+        self.ci._verifyTxMerkleElectrum = verify
+
+    def addTx(self, pkh: bytes, height: int) -> str:
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(1, 0)))
+        tx.vout.append(CTxOut(10000, bytes([0x00, 0x14]) + pkh))
+        txid = self.ci.getTxid(tx).hex()
+        self.txs[txid] = tx.serialize().hex()
+        self.history.append({"txid": txid, "height": height})
+        return txid
+
+    def test_a_buried_proven_payment_counts(self):
+        txid = self.addTx(b"\x11" * 20, self.TIP - 2)
+        self.assertTrue(self.ci.hasBuriedHistoryElectrum(self.address))
+        self.assertEqual(self.proofs_checked, [(txid, self.TIP - 2)])
+
+    def test_a_later_spend_does_not_hide_the_payment(self):
+        receive = self.addTx(b"\x11" * 20, self.TIP - 5)
+        self.addTx(b"\x22" * 20, self.TIP - 3)
+        self.assertTrue(self.ci.hasBuriedHistoryElectrum(self.address))
+        self.assertEqual(self.proofs_checked, [(receive, self.TIP - 5)])
+
+    def test_a_shallow_or_unmined_payment_does_not_count(self):
+        self.addTx(b"\x11" * 20, self.TIP - 1)
+        self.addTx(b"\x11" * 20, 0)
+        self.assertFalse(self.ci.hasBuriedHistoryElectrum(self.address))
+        self.assertEqual(self.proofs_checked, [])
+
+    def test_a_mined_tx_not_paying_the_address_does_not_count(self):
+        self.addTx(b"\x22" * 20, self.TIP - 10)
+        self.assertFalse(self.ci.hasBuriedHistoryElectrum(self.address))
+
+    def test_an_unproven_payment_does_not_count(self):
+        self.addTx(b"\x11" * 20, self.TIP - 10)
+        for proof in (None, False):
+            self.proof = proof
+            self.assertFalse(self.ci.hasBuriedHistoryElectrum(self.address))
+
+    def test_a_tx_the_server_does_not_return_does_not_count(self):
+        txid = self.addTx(b"\x11" * 20, self.TIP - 10)
+        del self.txs[txid]
+        self.assertFalse(self.ci.hasBuriedHistoryElectrum(self.address))
 
 
 if __name__ == "__main__":

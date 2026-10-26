@@ -268,11 +268,41 @@ class WalletManager:
             (int(coin_type), *addresses),
         )
 
-    def extendAddressPool(self, coin_type: Coins) -> list[tuple[str, str]]:
-        """Derive until POOL_SIZE unused addresses follow the last used one on
-        each chain, as a restoring wallet's gap scan does. Returns the new
-        (address, scripthash) pairs."""
+    def usedAddressesAtPoolHead(self, coin_type: Coins) -> list[list[str]]:
+        """The used addresses among the last POOL_SIZE derived on each chain,
+        highest index first: only these can extend the pool."""
+        cursor = self._swap_client.openDB()
+        try:
+            chains = []
+            for internal in (False, True):
+                cursor.execute(
+                    "SELECT address FROM wallet_addresses"
+                    " WHERE coin_type = ? AND is_internal = ? AND ever_used = 1"
+                    " AND derivation_index > (SELECT MAX(derivation_index)"
+                    " FROM wallet_addresses WHERE coin_type = ? AND is_internal = ?) - ?"
+                    " ORDER BY derivation_index DESC",
+                    (
+                        int(coin_type),
+                        internal,
+                        int(coin_type),
+                        internal,
+                        self.POOL_SIZE,
+                    ),
+                )
+                chains.append([row[0] for row in cursor.fetchall()])
+            return chains
+        finally:
+            self._swap_client.closeDB(cursor, commit=False)
+
+    def extendAddressPool(
+        self, coin_type: Coins, addresses: list[str]
+    ) -> list[tuple[str, str]]:
+        """Derive until POOL_SIZE unused addresses follow the highest of
+        `addresses` on each chain, as a restoring wallet's gap scan does.
+        Returns the new (address, scripthash) pairs."""
         added = []
+        if not addresses:
+            return added
         cursor = self._swap_client.openDB()
         try:
             state = self._swap_client.queryOne(
@@ -281,8 +311,9 @@ class WalletManager:
             for internal in (False, True):
                 cursor.execute(
                     "SELECT MAX(derivation_index) FROM wallet_addresses"
-                    " WHERE coin_type = ? AND is_internal = ? AND ever_used = 1",
-                    (int(coin_type), internal),
+                    " WHERE coin_type = ? AND is_internal = ?"
+                    f" AND address IN ({','.join('?' * len(addresses))})",
+                    (int(coin_type), internal, *addresses),
                 )
                 last_used = cursor.fetchone()[0]
                 if last_used is None:

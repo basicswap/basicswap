@@ -2159,6 +2159,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def _subscribeElectrumAddresses(self, coin_type, backend) -> None:
         try:
+            ci = self.ci(coin_type)
             wm = self._wallet_manager
             num_subscribed: int = 0
             addresses = [
@@ -2166,14 +2167,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 for addr, scripthash in wm.getAddressesForSubscription(coin_type)
                 if not backend.isSubscribed(scripthash)
             ]
-            while addresses:
-                statuses = backend.subscribeAddresses(addresses)
-                # A subscribe status is null only for an address with no history.
-                wm.markAddressesUsed(
-                    coin_type, [addr for addr, status in statuses.items() if status]
-                )
-                num_subscribed += len(statuses)
-                addresses = [addr for addr, _ in wm.extendAddressPool(coin_type)]
+            while True:
+                if addresses:
+                    statuses = backend.subscribeAddresses(addresses)
+                    # A subscribe status is null only for an address with no history.
+                    wm.markAddressesUsed(
+                        coin_type, [addr for addr, status in statuses.items() if status]
+                    )
+                    num_subscribed += len(statuses)
+                highest_proven = [
+                    next((a for a in chain if ci.hasBuriedHistoryElectrum(a)), None)
+                    for chain in wm.usedAddressesAtPoolHead(coin_type)
+                ]
+                addresses = [
+                    addr
+                    for addr, _ in wm.extendAddressPool(
+                        coin_type, [a for a in highest_proven if a is not None]
+                    )
+                ]
+                if not addresses:
+                    break
 
             if num_subscribed:
                 self.log.info(
