@@ -463,6 +463,7 @@ class ElectrumBackend(WalletBackend):
                         "bad-txns",
                         "txn-mempool-conflict",
                         "already in block chain",
+                        "already in utxo set",
                         "transaction already exists",
                         "insufficient fee",
                         "dust",
