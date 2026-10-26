@@ -19,6 +19,8 @@ from basicswap.util import TemporaryError
 
 CERT_PINS_FILENAME = "electrum_cert_pins.json"
 MAX_RESPONSE_LEN: int = 10 * 1024 * 1024
+# Electrum keeps up to 100 requests in flight per server
+MAX_PIPELINED_SUBSCRIBES: int = 100
 TXID_LIST_METHODS = (
     "blockchain.scripthash.get_history",
     "blockchain.scripthash.listunspent",
@@ -603,6 +605,13 @@ class ElectrumConnection:
         return result
 
     def call_batch(self, requests):
+        return [
+            None if "error" in resp else resp.get("result")
+            for resp in self.call_batch_responses(requests)
+        ]
+
+    def call_batch_responses(self, requests) -> list[dict]:
+        """The reply to each request, {} for one that got none."""
         if not self.is_connected():
             self.connect()
         try:
@@ -634,10 +643,7 @@ class ElectrumConnection:
                 resp = responses.get(req_id, {})
                 if not _has_valid_txids(method, resp.get("result")):
                     self._drop_misbehaving(f"{method} returned an invalid txid")
-                if "error" in resp:
-                    results.append(None)
-                else:
-                    results.append(resp.get("result"))
+                results.append(resp)
             return results
         except (ssl.SSLError, OSError, ConnectionError) as e:
             _close_socket_safe(self._socket)
@@ -1567,28 +1573,52 @@ class ElectrumServer:
             self._connection._start_listener()
             self._resubscribe_all()
 
+    @staticmethod
+    def _subscribe_chunks(scripthashes: list) -> list[list]:
+        return [
+            scripthashes[i : i + MAX_PIPELINED_SUBSCRIBES]
+            for i in range(0, len(scripthashes), MAX_PIPELINED_SUBSCRIBES)
+        ]
+
+    @staticmethod
+    def _subscribe_requests(chunk: list) -> list:
+        return [("blockchain.scripthash.subscribe", [sh]) for sh in chunk]
+
     def _resubscribe_all(self):
         conn = self._connection
         if not conn:
             return
-        for scripthash in list(self._subscribed_scripthashes):
+        for chunk in self._subscribe_chunks(list(self._subscribed_scripthashes)):
             try:
-                conn.call("blockchain.scripthash.subscribe", [scripthash])
+                responses = conn.call_batch_responses(self._subscribe_requests(chunk))
             except Exception as e:
                 if self._log:
-                    self._log.debug(
-                        f"Failed to resubscribe to {scripthash[:16]}...: {e}"
-                    )
+                    self._log.debug(f"Failed to resubscribe: {e}")
+                return
+            failed = sum(1 for resp in responses if "result" not in resp)
+            if failed and self._log:
+                self._log.debug(f"Failed to resubscribe {failed} scripthashes")
 
-    def subscribe_with_callback(self, scripthash, callback):
-        self._notification_callbacks[scripthash] = callback
-        self._subscribed_scripthashes.add(scripthash)
+    def subscribe_many(self, callbacks: dict) -> dict:
+        """Subscribe each scripthash in callbacks, returning the status of each
+        one the server answered."""
+        for scripthash, callback in callbacks.items():
+            self._notification_callbacks[scripthash] = callback
+            self._subscribed_scripthashes.add(scripthash)
+            if self._connection:
+                self._connection.register_notification_callback(scripthash, callback)
 
-        if self._connection:
-            self._connection.register_notification_callback(scripthash, callback)
-
-        status = self.call("blockchain.scripthash.subscribe", [scripthash])
-        return status
+        statuses = {}
+        for chunk in self._subscribe_chunks(list(callbacks)):
+            responses = self._call_connected(
+                "subscribe",
+                lambda conn: conn.call_batch_responses(self._subscribe_requests(chunk)),
+                timeout=30,
+            )
+            for scripthash, resp in zip(chunk, responses):
+                if "result" in resp:
+                    statuses[scripthash] = resp["result"]
+        return statuses
 
     def discover_peers(self):
         try:

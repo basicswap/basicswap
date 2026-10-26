@@ -788,26 +788,21 @@ class ElectrumBackend(WalletBackend):
     def isSubscribed(self, scripthash: str) -> bool:
         return scripthash in self._subscribed_scripthashes
 
-    def subscribeAddressWithCallback(self, address: str) -> str:
-        if self._isUnsupportedAddress(address):
-            return None
-
-        try:
+    def subscribeAddresses(self, addresses: list[str]) -> dict[str, str | None]:
+        """The subscribe status of each address the server answered."""
+        address_for = {}
+        for address in addresses:
+            if self._isUnsupportedAddress(address):
+                continue
             scripthash = self._addressToScripthash(address)
             self._address_to_scripthash[address] = scripthash
+            address_for[scripthash] = address
 
-            if self._realtime_callback:
-                status = self._server.subscribe_with_callback(
-                    scripthash, self._create_scripthash_callback(scripthash)
-                )
-            else:
-                status = self._call("blockchain.scripthash.subscribe", [scripthash])
-
-            self._subscribed_scripthashes.add(scripthash)
-            return status
-        except Exception as e:
-            self._log.debug(f"Failed to subscribe to {address}: {e}")
-            return None
+        statuses = self._server.subscribe_many(
+            {sh: self._create_scripthash_callback(sh) for sh in address_for}
+        )
+        self._subscribed_scripthashes.update(statuses)
+        return {address_for[sh]: status for sh, status in statuses.items()}
 
     def getSyncStatus(self) -> dict:
         import time

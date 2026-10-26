@@ -2154,20 +2154,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             wm = self._wallet_manager
             num_subscribed: int = 0
             addresses = [
-                (addr, scripthash)
+                addr
                 for addr, scripthash in wm.getAddressesForSubscription(coin_type)
                 if not backend.isSubscribed(scripthash)
             ]
             while addresses:
+                statuses = backend.subscribeAddresses(addresses)
                 # A subscribe status is null only for an address with no history.
-                used = [
-                    addr
-                    for addr, _scripthash in addresses
-                    if backend.subscribeAddressWithCallback(addr)
-                ]
-                num_subscribed += len(addresses)
-                wm.markAddressesUsed(coin_type, used)
-                addresses = wm.extendAddressPool(coin_type)
+                wm.markAddressesUsed(
+                    coin_type, [addr for addr, status in statuses.items() if status]
+                )
+                num_subscribed += len(statuses)
+                addresses = [addr for addr, _ in wm.extendAddressPool(coin_type)]
 
             if num_subscribed:
                 self.log.info(
