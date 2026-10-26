@@ -475,6 +475,11 @@ class BCHInterface(BTCInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_wallet("getbalance", ["*", 1, False]))
 
+    def getBalances(self) -> tuple[int, int]:
+        wi = self.rpc_wallet("getwalletinfo")
+        balance = self.make_int(wi["balance"])
+        return balance, balance + self.make_int(wi["unconfirmed_balance"])
+
     def getScriptDest(self, script):
         return self.scriptToP2SH32LockingBytecode(script)
 

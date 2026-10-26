@@ -4527,6 +4527,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         return self.make_int(self.rpc_wallet("getbalances")["mine"]["trusted"])
 
+    def getBalances(self) -> tuple[int, int]:
+        """(spendable, total) wallet balance."""
+        if self.useBackend():
+            balance = self.getSpendableBalance()
+            return balance, balance
+
+        mine = self.rpc_wallet("getbalances")["mine"]
+        trusted = self.make_int(mine["trusted"])
+        return trusted, trusted + self.make_int(mine["untrusted_pending"])
+
     def createUTXO(self, value_sats: int):
         # Create a new address and send value_sats to it
 

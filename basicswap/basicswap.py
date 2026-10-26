@@ -252,28 +252,13 @@ def checkAndNotifyBalanceChange(
         return
 
     try:
-        current_balance = ci.getSpendableBalance()
-        current_total_balance = swap_client.getTotalBalance(coin_type)
-        cached_balance = cc.get("cached_balance", None)
-        cached_total_balance = cc.get("cached_total_balance", None)
-
-        current_unconfirmed = current_total_balance - current_balance
-        cached_unconfirmed = cc.get("cached_unconfirmed", None)
-
-        if (
-            cached_balance is None
-            or current_balance != cached_balance
-            or cached_total_balance is None
-            or current_total_balance != cached_total_balance
-            or cached_unconfirmed is None
-            or current_unconfirmed != cached_unconfirmed
-        ):
-            cc["cached_balance"] = current_balance
-            cc["cached_total_balance"] = current_total_balance
-            cc["cached_unconfirmed"] = current_unconfirmed
+        balances = ci.getBalances()
+        cached_balances = cc.get("cached_balances")
+        if balances != cached_balances:
+            cc["cached_balances"] = balances
 
             suppress = False
-            if cached_balance is None or cached_total_balance is None:
+            if cached_balances is None:
                 suppress = True
             elif hasattr(ci, "getBackend") and ci.useBackend():
                 backend = ci.getBackend()
@@ -2169,15 +2154,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci = self.ci(coin_type)
             cc = self.coin_clients[coin_type]
 
-            current_balance = ci.getSpendableBalance()
-            current_total = self.getTotalBalance(coin_type)
-            cached_balance = cc.get("cached_balance")
-            cached_total = cc.get("cached_total_balance")
-
-            if current_balance != cached_balance or current_total != cached_total:
-                cc["cached_balance"] = current_balance
-                cc["cached_total_balance"] = current_total
-                cc["cached_unconfirmed"] = current_total - current_balance
+            balances = ci.getBalances()
+            if balances != cc.get("cached_balances"):
+                cc["cached_balances"] = balances
 
                 suppress = False
                 if hasattr(ci, "getBackend") and ci.useBackend():
@@ -8628,41 +8607,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ):
                 all_confirmed = False
         return all_confirmed
-
-    def getTotalBalance(self, coin_type) -> int:
-        try:
-            ci = self.ci(coin_type)
-            if self.coin_clients[coin_type].get("connection_type") == "electrum":
-                return ci.getSpendableBalance()
-            if hasattr(ci, "rpc_wallet"):
-                if coin_type in self.xmr_based_coins:
-                    balance_info = ci.rpc_wallet("get_balance")
-                    return balance_info["balance"]
-                elif coin_type == Coins.PART:
-                    balances = ci.rpc_wallet("getbalances")
-                    return ci.make_int(
-                        balances["mine"]["trusted"]
-                        + balances["mine"]["untrusted_pending"]
-                    )
-                else:
-                    try:
-                        balances = ci.rpc_wallet("getbalances")
-                        return ci.make_int(
-                            balances["mine"]["trusted"]
-                            + balances["mine"]["untrusted_pending"]
-                        )
-                    except Exception:
-                        wallet_info = ci.rpc_wallet("getwalletinfo")
-                        total = wallet_info.get("balance", 0)
-                        if "unconfirmed_balance" in wallet_info:
-                            total += wallet_info["unconfirmed_balance"]
-                        if "immature_balance" in wallet_info:
-                            total += wallet_info["immature_balance"]
-                        return ci.make_int(total)
-            else:
-                return ci.getSpendableBalance()
-        except Exception:
-            return ci.getSpendableBalance()
 
     def getAddressBalance(self, coin_type, address: str) -> int:
         if self.coin_clients[coin_type]["chain_lookups"] == "explorer":
