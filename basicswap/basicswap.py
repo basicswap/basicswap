@@ -293,16 +293,22 @@ def threadPollXMRChainState(swap_client, coin_type):
     while not swap_client.chainstate_delay_event.is_set():
         try:
             new_height = ci.getChainHeight()
-            if new_height != cc["chain_height"]:
+            block_changed = new_height != cc["chain_height"]
+            if block_changed:
                 swap_client.log.debug(
                     f"New {ci.ticker()} block at height: {new_height}"
                 )
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
 
-                checkAndNotifyBalanceChange(
-                    swap_client, coin_type, ci, cc, new_height, "block"
-                )
+            checkAndNotifyBalanceChange(
+                swap_client,
+                coin_type,
+                ci,
+                cc,
+                new_height,
+                "block" if block_changed else "poll",
+            )
 
         except Exception as e:
             swap_client.log.warning(
