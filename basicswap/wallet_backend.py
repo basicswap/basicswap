@@ -759,7 +759,6 @@ class ElectrumBackend(WalletBackend):
     def enableRealtimeNotifications(self, callback) -> None:
         self._realtime_callback = callback
         self._server.enable_realtime_notifications()
-        self._log.info(f"Real-time notifications enabled for {self._coin_type}")
 
     def _create_scripthash_callback(self, scripthash):
 

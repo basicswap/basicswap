@@ -412,8 +412,6 @@ class ElectrumConnection:
         elif method == "blockchain.headers.subscribe" and len(params) >= 1:
             header = params[0]
             height = header.get("height", 0)
-            if self._log:
-                self._log.debug(f"New block header notification: height={height}")
             if self._header_callback and height > 0:
                 try:
                     self._header_callback(height)
@@ -1295,8 +1293,6 @@ class ElectrumServer:
         if height > self._subscribed_height:
             self._subscribed_height = height
             self._subscribed_height_time = time.time()
-            if self._log:
-                self._log.debug(f"Header subscription updated height to {height}")
             if self._height_callback:
                 try:
                     self._height_callback(height)

@@ -395,6 +395,7 @@ def threadPollElectrumChainState(swap_client, coin_type):
     refresh_event = cc.setdefault("electrum_refresh_event", threading.Event())
     last_reconcile = time.time()
     subscribed = False
+    polled = False
     consecutive_errors = 0
     backoff_seconds = 30
     max_backoff_seconds = 300
@@ -419,10 +420,11 @@ def threadPollElectrumChainState(swap_client, coin_type):
             chain_state = ci.getBlockchainInfo()
             new_height: int = chain_state["blocks"]
 
-            if consecutive_errors > 0:
+            if consecutive_errors > 0 and polled:
                 swap_client.log.info(
                     f"threadPollElectrumChainState {ci.ticker()}: connection recovered"
                 )
+            polled = True
             consecutive_errors = 0
             backoff_seconds = 30
 
@@ -475,7 +477,13 @@ def threadPollElectrumChainState(swap_client, coin_type):
 
         except Exception as e:
             consecutive_errors += 1
-            swap_client.log.warning(
+            # The first header sync can finish after the first poll
+            log_error = (
+                swap_client.log.debug
+                if not polled and isinstance(e, TemporaryError)
+                else swap_client.log.warning
+            )
+            log_error(
                 f"threadPollElectrumChainState {ci.ticker()}, error ({consecutive_errors}): {e}"
             )
 
