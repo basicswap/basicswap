@@ -123,6 +123,11 @@ class PIVXInterface(BTCInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc("getwalletinfo")["balance"])
 
+    def getBalances(self) -> tuple[int, int]:
+        wi = self.rpc("getwalletinfo")
+        balance = self.make_int(wi["balance"])
+        return balance, balance + self.make_int(wi["unconfirmed_balance"])
+
     def loadTx(self, tx_bytes: bytes, allow_witness: bool = True) -> CTransaction:
         # Load tx from bytes to internal representation
         tx = CTransaction()

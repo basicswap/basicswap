@@ -500,6 +500,12 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         default_account_bal = balances["balances"][0]  # 0 always default?
         return self.make_int(default_account_bal["spendable"])
 
+    def getBalances(self) -> tuple[int, int]:
+        default_account_bal = self.rpc_wallet("getbalance")["balances"][0]
+        return self.make_int(default_account_bal["spendable"]), self.make_int(
+            default_account_bal["total"]
+        )
+
     def getSeedHash(self, seed: bytes, coin_type_id=None) -> bytes:
         # m / purpose' / coin_type' / account' / change / address_index
         # m/44'/coin_type'/0'/0/0

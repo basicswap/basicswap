@@ -91,6 +91,11 @@ class DASHInterface(BTCInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_wallet("getwalletinfo")["balance"])
 
+    def getBalances(self) -> tuple[int, int]:
+        wi = self.rpc_wallet("getwalletinfo")
+        balance = self.make_int(wi["balance"])
+        return balance, balance + self.make_int(wi["unconfirmed_balance"])
+
     def getScriptForPubkeyHash(self, pkh: bytes) -> bytearray:
         # Return P2PKH
         return CScript([OP_DUP, OP_HASH160, pkh, OP_EQUALVERIFY, OP_CHECKSIG])

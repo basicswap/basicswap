@@ -432,6 +432,11 @@ class FIROInterface(BTCInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc("getwalletinfo")["balance"])
 
+    def getBalances(self) -> tuple[int, int]:
+        wi = self.rpc("getwalletinfo")
+        balance = self.make_int(wi["balance"])
+        return balance, balance + self.make_int(wi["unconfirmed_balance"])
+
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes

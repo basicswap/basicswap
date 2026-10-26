@@ -259,28 +259,13 @@ def checkAndNotifyBalanceChange(
         return
 
     try:
-        current_balance = ci.getSpendableBalance()
-        current_total_balance = swap_client.getTotalBalance(coin_type)
-        cached_balance = cc.get("cached_balance", None)
-        cached_total_balance = cc.get("cached_total_balance", None)
-
-        current_unconfirmed = current_total_balance - current_balance
-        cached_unconfirmed = cc.get("cached_unconfirmed", None)
-
-        if (
-            cached_balance is None
-            or current_balance != cached_balance
-            or cached_total_balance is None
-            or current_total_balance != cached_total_balance
-            or cached_unconfirmed is None
-            or current_unconfirmed != cached_unconfirmed
-        ):
-            cc["cached_balance"] = current_balance
-            cc["cached_total_balance"] = current_total_balance
-            cc["cached_unconfirmed"] = current_unconfirmed
+        balances = ci.getBalances()
+        cached_balances = cc.get("cached_balances")
+        if balances != cached_balances:
+            cc["cached_balances"] = balances
 
             suppress = False
-            if cached_balance is None or cached_total_balance is None:
+            if cached_balances is None:
                 suppress = True
             elif hasattr(ci, "getBackend") and ci.useBackend():
                 backend = ci.getBackend()
@@ -296,6 +281,8 @@ def checkAndNotifyBalanceChange(
                 swap_client.log.debug(
                     f"{ci.ticker()} balance updated (trigger: {trigger_source})"
                 )
+                swap_client._updating_wallets_info[int(coin_type)] = True
+                swap_client.updateWalletInfo(coin_type)
                 balance_event = {
                     "event": "coin_balance_updated",
                     "coin": ci.ticker(),
@@ -315,16 +302,22 @@ def threadPollXMRChainState(swap_client, coin_type):
     while not swap_client.chainstate_delay_event.is_set():
         try:
             new_height = ci.getChainHeight()
-            if new_height != cc["chain_height"]:
+            block_changed = new_height != cc["chain_height"]
+            if block_changed:
                 swap_client.log.debug(
                     f"New {ci.ticker()} block at height: {new_height}"
                 )
                 with swap_client.mxDB:
                     cc["chain_height"] = new_height
 
-                checkAndNotifyBalanceChange(
-                    swap_client, coin_type, ci, cc, new_height, "block"
-                )
+            checkAndNotifyBalanceChange(
+                swap_client,
+                coin_type,
+                ci,
+                cc,
+                new_height,
+                "block" if block_changed else "poll",
+            )
 
         except Exception as e:
             swap_client.log.warning(
@@ -548,7 +541,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._expiring_bids = []  # List of bids expiring soon
         self._expiring_offers = []  # List of offers expiring soon
         self._updating_wallets_info = {}
-        self._last_updated_wallets_info = 0
         self._synced_addresses_from_full_node = set()
         self._cached_electrum_legacy_funds = {}
 
@@ -2183,15 +2175,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ci = self.ci(coin_type)
             cc = self.coin_clients[coin_type]
 
-            current_balance = ci.getSpendableBalance()
-            current_total = self.getTotalBalance(coin_type)
-            cached_balance = cc.get("cached_balance")
-            cached_total = cc.get("cached_total_balance")
-
-            if current_balance != cached_balance or current_total != cached_total:
-                cc["cached_balance"] = current_balance
-                cc["cached_total_balance"] = current_total
-                cc["cached_unconfirmed"] = current_total - current_balance
+            balances = ci.getBalances()
+            if balances != cc.get("cached_balances"):
+                cc["cached_balances"] = balances
 
                 suppress = False
                 if hasattr(ci, "getBackend") and ci.useBackend():
@@ -8677,41 +8663,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ):
                 all_confirmed = False
         return all_confirmed
-
-    def getTotalBalance(self, coin_type) -> int:
-        try:
-            ci = self.ci(coin_type)
-            if self.coin_clients[coin_type].get("connection_type") == "electrum":
-                return ci.getSpendableBalance()
-            if hasattr(ci, "rpc_wallet"):
-                if coin_type in self.xmr_based_coins:
-                    balance_info = ci.rpc_wallet("get_balance")
-                    return balance_info["balance"]
-                elif coin_type == Coins.PART:
-                    balances = ci.rpc_wallet("getbalances")
-                    return ci.make_int(
-                        balances["mine"]["trusted"]
-                        + balances["mine"]["untrusted_pending"]
-                    )
-                else:
-                    try:
-                        balances = ci.rpc_wallet("getbalances")
-                        return ci.make_int(
-                            balances["mine"]["trusted"]
-                            + balances["mine"]["untrusted_pending"]
-                        )
-                    except Exception:
-                        wallet_info = ci.rpc_wallet("getwalletinfo")
-                        total = wallet_info.get("balance", 0)
-                        if "unconfirmed_balance" in wallet_info:
-                            total += wallet_info["unconfirmed_balance"]
-                        if "immature_balance" in wallet_info:
-                            total += wallet_info["immature_balance"]
-                        return ci.make_int(total)
-            else:
-                return ci.getSpendableBalance()
-        except Exception:
-            return ci.getSpendableBalance()
 
     def getAddressBalance(self, coin_type, address: str) -> int:
         if self.coin_clients[coin_type]["chain_lookups"] == "explorer":
@@ -17123,6 +17074,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def updateWalletInfo(self, coin) -> None:
         # Store wallet info to db so it's available after startup
+        updated: bool = False
         try:
             ci = self.ci(coin)
             is_electrum = hasattr(ci, "useBackend") and ci.useBackend()
@@ -17134,13 +17086,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             wi = self.getWalletInfo(coin)
             if wi:
                 self.addWalletInfoRecord(coin, 1, wi)
+                updated = True
 
             if not is_electrum and coin in WalletManager.SUPPORTED_COINS:
                 self._syncAddressesFromFullNode(coin)
         except Exception as e:
             self.log.error(f"updateWalletInfo {e}.")
         finally:
+            self.coin_clients[coin]["last_updated_wallet_info"] = self.getTime()
             self._updating_wallets_info[int(coin)] = False
+
+        if updated and self.ws_server:
+            self.ws_server.send_message_to_all(
+                json.dumps(
+                    {
+                        "event": "wallet_info_updated",
+                        "coin": chainparams[coin]["ticker"],
+                    }
+                )
+            )
 
     def _syncAddressesFromFullNode(self, coin_type: Coins) -> int:
         if coin_type in self._synced_addresses_from_full_node:
@@ -17223,13 +17187,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         wait_for_complete: bool = False,
     ) -> None:
         now: int = self.getTime()
-        if (
-            not force_update
-            and now - self._last_updated_wallets_info
-            < self._wallet_info_refresh_seconds
-        ):
-            return
-
         futures = []
         for c in Coins:
             if only_coin is not None and c != only_coin:

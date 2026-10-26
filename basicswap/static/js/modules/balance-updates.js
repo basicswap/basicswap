@@ -124,7 +124,7 @@ const BalanceUpdatesManager = (function() {
   function setupWebSocketHandler(contextKey, balanceUpdateCallback, swapEventCallback, errorContext) {
     const handlerId = window.WebSocketManager.addMessageHandler('message', (data) => {
       if (data && data.event) {
-        if (data.event === 'coin_balance_updated') {
+        if (data.event === 'wallet_info_updated') {
           handleBalanceUpdate(contextKey, balanceUpdateCallback, errorContext);
         }
 

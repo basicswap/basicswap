@@ -1042,13 +1042,16 @@ class XMRInterface(CoinInterface):
                 return {"error": str(e)}
 
     def getSpendableBalance(self) -> int:
+        return self.getBalances()[0]
+
+    def getBalances(self) -> tuple[int, int]:
         with self._mx_wallet:
             self.openWallet(self._wallet_filename)
             if not self.isChainSynced():
                 raise TemporaryError(f"{self.coin_name()} wallet is syncing")
 
             balance_info = self.rpc_wallet("get_balance")
-            return balance_info["unlocked_balance"]
+            return balance_info["unlocked_balance"], balance_info["balance"]
 
     def changeWalletPassword(
         self, old_password, new_password, check_seed_if_encrypt: bool = True
