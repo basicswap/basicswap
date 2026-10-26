@@ -146,7 +146,7 @@ class FeeValidator:
     def feeForVSize(fee_rate: int, vsize: int) -> int:
         return ceil(fee_rate * vsize / 1000)
 
-    def getSplitTxFees(self) -> (int, int, int):
+    def getSplitTxFees(self) -> tuple[int, int, int]:
         """(fixed, per_output, per_input) fees to split the wallet into outputs."""
         fee_rate: int = self.make_int(self.get_fee_rate(self._conf_target)[0])
         base_vsize: int = self.est_split_tx_vsize(0)
