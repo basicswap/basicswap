@@ -328,6 +328,9 @@ class TestBuriedHistory(unittest.TestCase):
         test = self
 
         class Backend:
+            def hasHistory(self, address):
+                return bool(test.history)
+
             def getAddressHistory(self, address):
                 return test.history
 

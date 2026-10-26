@@ -169,7 +169,7 @@ class ElectrumBackend(WalletBackend):
 
         self._coin_type = coin_type
         self._log = log
-        self._subscribed_scripthashes = set()
+        self._statuses: dict[str, str | None] = {}
 
         coin_params = chainparams.get(coin_type, chainparams.get(Coins.BTC))
         self._network_params = coin_params.get(chain, coin_params.get("mainnet", {}))
@@ -768,6 +768,9 @@ class ElectrumBackend(WalletBackend):
         return callback
 
     def _handle_scripthash_notification(self, scripthash, new_status):
+        if scripthash in self._statuses and self._statuses[scripthash] == new_status:
+            return
+        self._statuses[scripthash] = new_status
         if not self._realtime_callback:
             return
 
@@ -785,7 +788,10 @@ class ElectrumBackend(WalletBackend):
             self._log.debug(f"Error in realtime callback: {e}")
 
     def isSubscribed(self, scripthash: str) -> bool:
-        return scripthash in self._subscribed_scripthashes
+        return scripthash in self._statuses
+
+    def hasHistory(self, address: str) -> bool:
+        return self._statuses.get(self._address_to_scripthash.get(address)) is not None
 
     def subscribeAddresses(self, addresses: list[str]) -> dict[str, str | None]:
         """The subscribe status of each address the server answered."""
@@ -800,7 +806,7 @@ class ElectrumBackend(WalletBackend):
         statuses = self._server.subscribe_many(
             {sh: self._create_scripthash_callback(sh) for sh in address_for}
         )
-        self._subscribed_scripthashes.update(statuses)
+        self._statuses.update(statuses)
         return {address_for[sh]: status for sh, status in statuses.items()}
 
     def getSyncStatus(self) -> dict:

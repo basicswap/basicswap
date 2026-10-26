@@ -365,6 +365,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._header_syncs: dict[str, HeaderSync] = {}
         self._header_sync_lock = threading.Lock()
         self._headers_synced: bool = False
+        self._buried_history: set[str] = set()
         self._median_time_cache: int | None = None
 
     def setBackend(self, backend) -> None:
@@ -2822,17 +2823,21 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         )
 
     def hasBuriedHistoryElectrum(self, address: str, req_conf: int = 3) -> bool:
-        # History is in blockchain order, so an address's first confirmed tx funds it
+        if address in self._buried_history:
+            return True
         backend = self.getBackend()
+        if not backend.hasHistory(address):
+            return False
         try:
             tip = self.getChainHeight()
             script = self.getDestForAddress(address)
+            # History is in blockchain order, so an address's first confirmed tx funds it
             for entry in backend.getAddressHistory(address):
                 height = entry["height"]
                 if height <= 0 or tip - height + 1 < req_conf:
                     continue
                 tx_hex = backend.getTransactionRaw(entry["txid"])
-                return (
+                proven = (
                     tx_hex is not None
                     and script
                     in [
@@ -2842,6 +2847,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     and self._verifyTxMerkleElectrum(backend, entry["txid"], height)
                     is True
                 )
+                if proven:
+                    self._buried_history.add(address)
+                return proven
         except Exception as e:
             self._log.debug(f"{self.coin_name()} history of {address} unproven: {e}")
         return False

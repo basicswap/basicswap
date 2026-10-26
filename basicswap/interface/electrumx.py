@@ -1591,7 +1591,15 @@ class ElectrumServer:
                 if self._log:
                     self._log.debug(f"Failed to resubscribe: {e}")
                 return
-            failed = sum(1 for resp in responses if "result" not in resp)
+            failed = 0
+            for scripthash, resp in zip(chunk, responses):
+                if "result" not in resp:
+                    failed += 1
+                    continue
+                # Delivers any change missed while disconnected
+                callback = self._notification_callbacks.get(scripthash)
+                if callback:
+                    callback(scripthash, resp["result"])
             if failed and self._log:
                 self._log.debug(f"Failed to resubscribe {failed} scripthashes")
 
