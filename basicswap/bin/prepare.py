@@ -699,9 +699,8 @@ def modify_tor_config(
                     for opt_line in monero_wallet_rpc_proxy_config:
                         fp.write(opt_line + "\n")
 
-            coin_settings["trusted_daemon"] = extra_opts.get(
-                "trust_remote_node", "auto"
-            )
+            if "trust_remote_node" in extra_opts:
+                coin_settings["trusted_daemon"] = extra_opts["trust_remote_node"]
         return
 
     core_conf_name: str = coin_settings.get(
@@ -828,7 +827,7 @@ def printHelp():
         )
     )
     print(
-        "--trustremotenode        Set trusted-daemon for XMR and WOW, default:true, =false for untrusted. --enabletor and --disabletor default to auto: true when daemon rpchost value is a private ip address else false"
+        '--trustremotenode        Set trusted-daemon for XMR and WOW, default:true, =false for untrusted. "trusted_daemon": "auto" in basicswap.json: true when daemon rpchost value is a private ip address else false'
     )
     print(
         "--noextractover          Prevent extracting cores if files exist.  Speeds up tests"
