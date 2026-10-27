@@ -1711,6 +1711,20 @@ def js_lock(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps({"success": True}), "UTF-8")
 
 
+def js_logging(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    if post_string:
+        post_data = getFormData(post_string, is_json)
+        names = []
+        for key in ("include", "exclude"):
+            value = get_data_entry_or(post_data, key, [])
+            if isinstance(value, str):
+                value = [name for name in value.split(",") if name != ""]
+            names.append(value)
+        swap_client.setLogCategories(*names)
+    return bytes(json.dumps(swap_client.logCategories()), "UTF-8")
+
+
 def js_404(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps({"Error": "path unknown"}), "UTF-8")
 
@@ -2383,6 +2397,7 @@ endpoints = {
     "unlock": js_unlock,
     "lock": js_lock,
     "help": js_help,
+    "logging": js_logging,
     "readurl": js_readurl,
     "active": js_active,
     "coinprices": js_coinprices,
