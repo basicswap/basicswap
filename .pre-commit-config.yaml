@@ -14,21 +14,21 @@ repos:
 
   # Black - Python formatter
   - repo: https://github.com/psf/black
-    rev: 26.5.1
+    rev: 26.10.1
     hooks:
     - id: black
       exclude: (basicswap/contrib|basicswap/interface/contrib)/
 
   # Flake8 - Lint Python
   - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0
+    rev: 7.4.1
     hooks:
     - id: flake8
       exclude: ^(basicswap/contrib/|basicswap/interface/[^/]+/contrib/|bin/install_certifi\.py$)
 
   # ESLint - Lint Javascript and fix issues where possible
   - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v10.7.0
+    rev: v10.13.0
     hooks:
     - id: eslint
       #args: ["--fix"]
