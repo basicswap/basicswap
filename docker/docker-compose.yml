@@ -1,6 +1,6 @@
 services:
     swapclient:
-        image: i_swapclient
+        image: i_swapclient_dev
         stop_grace_period: 5m
         build:
             context: ../
