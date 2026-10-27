@@ -68,6 +68,7 @@ from basicswap.interface.wow.core import (
     prepare_module as wow_prepare,
 )
 from basicswap.interface.pivx.core import prepare_module as pivx_prepare
+from basicswap.interface.divi.core import prepare_module as divi_prepare
 from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
@@ -87,6 +88,7 @@ coin_prepare_modules = {
     "wownero": wow_prepare,
     "pivx": pivx_prepare,
     "firo": firo_prepare,
+    "divi": divi_prepare,
 }
 
 known_coins = {
@@ -129,6 +131,11 @@ known_coins = {
         pivx_prepare.version,
         pivx_prepare.version_tag,
         pivx_prepare.signers.keys(),
+    ),
+    "divi": (
+        divi_prepare.version,
+        divi_prepare.version_tag,
+        divi_prepare.signers.keys(),
     ),
     "dash": (
         dash_prepare.version,
@@ -1003,7 +1010,11 @@ def initialise_wallets(
                 )
                 coin_args += getCoreBinArgs(c, coin_settings, prepare=True)
 
-                extra_config = {"stdout_to_file": True, "coin_name": coin_name}
+                extra_config = {
+                    "stdout_to_file": True,
+                    "coin_name": coin_name,
+                    "pass_fds": module.getWalletInitDaemonPassFds(),
+                }
 
                 if module.provides_master_key and "particl_daemon" in extra_opts:
                     daemons.append(extra_opts["particl_daemon"])
@@ -1730,6 +1741,7 @@ def main():
         "monero": xmr_prepare.getConfigSegment(prepare_ctx),
         "wownero": wow_prepare.getConfigSegment(prepare_ctx),
         "pivx": pivx_prepare.getConfigSegment(prepare_ctx),
+        "divi": divi_prepare.getConfigSegment(prepare_ctx),
         "dash": dash_prepare.getConfigSegment(prepare_ctx),
         "firo": firo_prepare.getConfigSegment(prepare_ctx),
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
