@@ -17306,7 +17306,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             for row in q:
                 coin_id = row[0]
 
-                if self.isCoinActive(coin_id) is False:
+                if (
+                    coin_id not in self.coin_clients
+                    or self.isCoinActive(coin_id) is False
+                ):
                     # Skip cached info if coin was disabled
                     continue
 
