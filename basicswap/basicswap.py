@@ -367,12 +367,35 @@ def threadPollChainState(swap_client, coin_type):
         swap_client.chainstate_delay_event.wait(random.randrange(*poll_delay_range))
 
 
+def threadSyncElectrumHeaders(swap_client, coin_type):
+    ci = swap_client.ci(coin_type)
+    cc = swap_client.coin_clients[coin_type]
+    poll_interval = cc.get("electrum_poll_interval", 10)
+    header_event = cc.setdefault("electrum_header_event", threading.Event())
+    ci.getBackend()._server.register_height_callback(lambda height: header_event.set())
+
+    while not swap_client.chainstate_delay_event.is_set():
+        header_event.clear()
+        try:
+            ci.syncElectrumHeaders()
+        except Exception as e:
+            swap_client.log.warning(
+                f"threadSyncElectrumHeaders {ci.ticker()}, error: {e}"
+            )
+        header_event.wait(timeout=poll_interval)
+
+
 def threadPollElectrumChainState(swap_client, coin_type):
     ci = swap_client.ci(coin_type)
     cc = swap_client.coin_clients[coin_type]
 
     poll_interval = cc.get("electrum_poll_interval", 10)
     poll_delay_range = (poll_interval, poll_interval + 5)
+    reconcile_interval = cc.get("electrum_reconcile_interval", 300)
+    refresh_event = cc.setdefault("electrum_refresh_event", threading.Event())
+    last_reconcile = time.time()
+    subscribed = False
+    polled = False
     consecutive_errors = 0
     backoff_seconds = 30
     max_backoff_seconds = 300
@@ -381,7 +404,7 @@ def threadPollElectrumChainState(swap_client, coin_type):
 
     try:
         ci._electrum_scan_counter = 1
-        if hasattr(ci, "_queryElectrumWalletInfo"):
+        if ci.getWalletManager() is not None:
             ci._queryElectrumWalletInfo(funded_only=True)
             swap_client.log.debug(
                 f"Primed {ci.ticker()} wallet cache with funded addresses"
@@ -391,13 +414,17 @@ def threadPollElectrumChainState(swap_client, coin_type):
 
     while not swap_client.chainstate_delay_event.is_set():
         try:
+            pushed = refresh_event.is_set()
+            refresh_event.clear()
+
             chain_state = ci.getBlockchainInfo()
             new_height: int = chain_state["blocks"]
 
-            if consecutive_errors > 0:
+            if consecutive_errors > 0 and polled:
                 swap_client.log.info(
                     f"threadPollElectrumChainState {ci.ticker()}: connection recovered"
                 )
+            polled = True
             consecutive_errors = 0
             backoff_seconds = 30
 
@@ -417,39 +444,50 @@ def threadPollElectrumChainState(swap_client, coin_type):
                         with swap_client.mxDB:
                             cc["chain_median_time"] = mtp
 
-            try:
-                ci.refreshElectrumWalletInfo()
-                checkAndNotifyBalanceChange(
-                    swap_client,
-                    coin_type,
-                    ci,
-                    cc,
-                    new_height,
-                    "electrum_poll",
-                    chain_state,
-                )
-            except Exception as refresh_err:
-                swap_client.log.debug(
-                    f"threadPollElectrumChainState {ci.ticker()} refresh error: {refresh_err}"
-                )
+            do_reconcile = (time.time() - last_reconcile) >= reconcile_interval
+            # A call per address: kept off startup and unlock, and rerun to pick
+            # up addresses handed out since.
+            if (do_reconcile or not subscribed) and ci.getWalletManager() is not None:
+                backend = ci.getBackend()
+                if not subscribed:
+                    backend.enableRealtimeNotifications(
+                        swap_client._handleElectrumNotification
+                    )
+                    subscribed = True
+                swap_client._subscribeElectrumAddresses(coin_type, backend)
+
+            if pushed or block_changed or do_reconcile:
+                try:
+                    ci.refreshElectrumWalletInfo(full_scan=pushed or do_reconcile)
+                    checkAndNotifyBalanceChange(
+                        swap_client,
+                        coin_type,
+                        ci,
+                        cc,
+                        new_height,
+                        "electrum_poll",
+                        chain_state,
+                    )
+                    if do_reconcile:
+                        last_reconcile = time.time()
+                except Exception as refresh_err:
+                    swap_client.log.debug(
+                        f"threadPollElectrumChainState {ci.ticker()} refresh error: {refresh_err}"
+                    )
 
         except Exception as e:
             consecutive_errors += 1
-            swap_client.log.warning(
+            # The first header sync can finish after the first poll
+            log_error = (
+                swap_client.log.debug
+                if not polled and isinstance(e, TemporaryError)
+                else swap_client.log.warning
+            )
+            log_error(
                 f"threadPollElectrumChainState {ci.ticker()}, error ({consecutive_errors}): {e}"
             )
 
             if consecutive_errors >= 3:
-                try:
-                    backend = ci.getBackend()
-                    if backend and hasattr(backend, "disconnect"):
-                        backend.disconnect()
-                        swap_client.log.debug(
-                            f"threadPollElectrumChainState {ci.ticker()}: disconnected to trigger server rotation"
-                        )
-                except Exception:
-                    pass
-
                 jitter = random.randint(0, 10)
                 wait_time = min(backoff_seconds + jitter, max_backoff_seconds)
                 swap_client.log.warning(
@@ -460,7 +498,9 @@ def threadPollElectrumChainState(swap_client, coin_type):
                 backoff_seconds = min(backoff_seconds * 2, max_backoff_seconds)
                 continue
 
-        swap_client.chainstate_delay_event.wait(random.randrange(*poll_delay_range))
+        if swap_client.chainstate_delay_event.is_set():
+            break
+        refresh_event.wait(timeout=random.randrange(*poll_delay_range))
 
     swap_client.log.info(f"Electrum polling thread exiting for {ci.ticker()}")
 
@@ -840,6 +880,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.delay_event.set()
         self.chainstate_delay_event.set()
+
+        for cc in self.coin_clients.values():
+            for event_name in ("electrum_refresh_event", "electrum_header_event"):
+                event = cc.get(event_name)
+                if event is not None:
+                    event.set()
 
         for coin_type, cc in self.coin_clients.items():
             interface = cc.get("interface")
@@ -1545,13 +1591,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.coin_clients[c]["connection_type"] == "electrum":
                 ci = self.ci(c)
                 self.log.info(f"Starting electrum polling thread for {ci.coin_name()}")
-                t = threading.Thread(
-                    target=threadPollElectrumChainState,
-                    args=(self, c),
-                    name=f"electrum_poll_{ci.ticker()}",
-                )
-                self.threads.append(t)
-                t.start()
+                for target, name in (
+                    (threadSyncElectrumHeaders, "electrum_headers"),
+                    (threadPollElectrumChainState, "electrum_poll"),
+                ):
+                    t = threading.Thread(
+                        target=target, args=(self, c), name=f"{name}_{ci.ticker()}"
+                    )
+                    self.threads.append(t)
+                    t.start()
 
         self.log.debug(
             f"network_pubkey {self.network_pubkey}\nnetwork_addr {self.network_addr}"
@@ -2109,100 +2157,54 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if cc and cc.get("connection_type") == "electrum":
                     self.initializeWalletManager(c)
 
-    def _enableElectrumRealtimeNotifications(self) -> None:
-        for c in self.activeCoins():
-            cc = self.coin_clients.get(c)
-            if not cc or cc.get("connection_type") != "electrum":
-                continue
-
-            try:
-                ci = self.ci(c)
-                if not hasattr(ci, "_backend") or ci._backend is None:
-                    continue
-
-                backend = ci._backend
-
-                def make_callback(coin_type, coin_interface):
-                    def on_address_change(ct, address, scripthash, event_type):
-                        self._handleElectrumNotification(
-                            ct, address, scripthash, event_type
-                        )
-
-                    return on_address_change
-
-                callback = make_callback(c, ci)
-                backend.enableRealtimeNotifications(callback)
-
-                self._subscribeElectrumAddresses(c, ci, backend)
-
-                self.log.info(f"Real-time notifications enabled for {ci.coin_name()}")
-
-            except Exception as e:
-                self.log.debug(
-                    f"Could not enable realtime notifications for {Coins(c).name}: {e}"
-                )
-
-    def _subscribeElectrumAddresses(self, coin_type, ci, backend) -> None:
+    def _subscribeElectrumAddresses(self, coin_type, backend) -> None:
         try:
+            ci = self.ci(coin_type)
             wm = self._wallet_manager
-            if wm and wm.isInitialized(coin_type):
-                for i in range(20):
-                    try:
-                        addr = wm.getAddressAtIndex(coin_type, i, internal=False)
-                        if addr:
-                            backend.subscribeAddressWithCallback(addr)
-                    except Exception:
-                        break
+            num_subscribed: int = 0
+            addresses = [
+                addr
+                for addr, scripthash in wm.getAddressesForSubscription(coin_type)
+                if not backend.isSubscribed(scripthash)
+            ]
+            while True:
+                if addresses:
+                    statuses = backend.subscribeAddresses(addresses)
+                    # A subscribe status is null only for an address with no history.
+                    wm.markAddressesUsed(
+                        coin_type, [addr for addr, status in statuses.items() if status]
+                    )
+                    num_subscribed += len(statuses)
+                highest_proven = [
+                    next((a for a in chain if ci.hasBuriedHistoryElectrum(a)), None)
+                    for chain in wm.usedAddressesAtPoolHead(coin_type)
+                ]
+                addresses = [
+                    addr
+                    for addr, _ in wm.extendAddressPool(
+                        coin_type, [a for a in highest_proven if a is not None]
+                    )
+                ]
+                if not addresses:
+                    break
 
-                for i in range(10):
-                    try:
-                        addr = wm.getAddressAtIndex(coin_type, i, internal=True)
-                        if addr:
-                            backend.subscribeAddressWithCallback(addr)
-                    except Exception:
-                        break
-
+            if num_subscribed:
+                self.log.info(
+                    f"Subscribed to {num_subscribed} {Coins(coin_type).name} "
+                    "addresses for real-time updates"
+                )
         except Exception as e:
             self.log.debug(f"Error subscribing electrum addresses: {e}")
 
     def _handleElectrumNotification(
         self, coin_type, address, scripthash, event_type
     ) -> None:
-        if not self.ws_server:
-            return
-
+        # Runs on the socket listener thread, so it must not make Electrum
+        # calls (that would deadlock waiting on the same thread to read the
+        # reply). Just wake the poll worker, which refreshes and notifies.
         try:
-            ci = self.ci(coin_type)
             cc = self.coin_clients[coin_type]
-
-            balances = ci.getBalances()
-            if balances != cc.get("cached_balances"):
-                cc["cached_balances"] = balances
-
-                suppress = False
-                if hasattr(ci, "getBackend") and ci.useBackend():
-                    backend = ci.getBackend()
-                    if backend and hasattr(backend, "recentlyReconnected"):
-                        if backend.recentlyReconnected(grace_seconds=30):
-                            suppress = True
-
-                if suppress:
-                    self.log.debug(
-                        f"Electrum notification: {ci.ticker()} balance cache updated silently (recent reconnection)"
-                    )
-                else:
-                    balance_event = {
-                        "event": "coin_balance_updated",
-                        "coin": ci.ticker(),
-                        "height": cc.get("chain_height", 0),
-                        "trigger": "electrum_notification",
-                        "address": address[:20] + "..." if address else None,
-                    }
-                    self.ws_server.send_message_to_all(json.dumps(balance_event))
-                    self.log.debug(
-                        f"Electrum notification: {ci.ticker()} balance updated"
-                    )
-
+            cc.setdefault("electrum_refresh_event", threading.Event()).set()
         except Exception as e:
             self.log.debug(f"Error handling electrum notification: {e}")
 
@@ -2290,7 +2292,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             added = self._wallet_manager.runMigration(
                 coin_type,
                 full_node_addresses=rpc_addresses if rpc_addresses else None,
-                num_addresses=20,
             )
 
             total_addresses = len(self._wallet_manager.getAllAddresses(coin_type))
@@ -2834,7 +2835,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     confirmed_balance += bal.get("confirmed", 0)
                     unconfirmed_balance += bal.get("unconfirmed", 0)
             except Exception as e:
-                self.log.debug(f"Error getting detailed balance: {e}")
+                self.log.warning(
+                    f"Skipping transfer: {getCoinName(coin_type)} balance unavailable: {e}"
+                )
+                self._pending_sweeps[coin_type] = self.getTime()
+                return {"skipped": True, "reason": "balance_unavailable"}
 
             if unconfirmed_balance != 0:
                 self.log.warning(
@@ -3698,7 +3703,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if prefunded_tx is None:
                 continue
             try:
-                self.ci(coin_to).unlockInputs(prefunded_tx, cursor=cursor)
+                ci = self.ci(coin_to)
+                ci.unlockInputs(prefunded_tx, cursor=cursor)
+                if ci.useBackend():
+                    ci.releaseChangeAddresses(ci.loadTx(prefunded_tx), cursor)
             except Exception as e:
                 self.log.warning(f"Prefunded {type_str} unlockInputs failed {e}")
 
@@ -4493,6 +4501,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
                 )
                 self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
+            elif ci_from.useBackend():
+                ci_from.claimChangeAddresses(
+                    ci_from.loadTx(extra_options["prefunded_itx"]), cursor
+                )
 
             # TODO: Send proof of funds with offer
             # proof_of_funds_hash = getOfferProofOfFundsHash(msg_buf, offer_addr)
@@ -5368,11 +5380,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # TODO: auto refresh after used
 
         ci = self.ci(coin_type)
-
-        if hasattr(ci, "useBackend") and ci.useBackend() and self._wallet_manager:
-            addr = self._wallet_manager.getDepositAddress(coin_type)
-            if addr:
-                return addr
 
         key_str = "receive_addr_" + ci.coin_name().lower()
         use_cursor = self.openDB(cursor)
@@ -6812,6 +6819,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 ci_to.validateFeeRate(
                     prefunded_tx_fee_rate, Concepts.BID, bypass_fee_validation
                 )
+                if ci_to.useBackend():
+                    ci_to.claimChangeAddresses(ci_to.loadTx(prefunded_tx_data), cursor)
             else:
                 amount, amount_to, bid_rate = self.setBidAmounts(
                     amount, offer, extra_options, ci_from
@@ -11607,7 +11616,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def checkQueuedActions(self) -> None:
         if self.isSystemUnlocked() is False:
-            self.log.info("Not checking queued actions.  System is locked.")
+            self.log.debug("Not checking queued actions.  System is locked.")
             return
         now: int = self.getTime()
         reload_in_progress: bool = False

@@ -807,7 +807,8 @@ class HeaderSync:
             raise Exception(f"{repr(height)} is not a block height")
         if raw_header := self._headers_cache.get(height):
             return deserialize_header(raw_header, height)
-        self.log.debug(f"requesting block header {height} in mode={mode}")
+        if mode != ChainResolutionMode.CATCHUP:
+            self.log.debug(f"requesting block header {height} in mode={mode}")
         res = self.server.call("blockchain.block.header", [height])
         return deserialize_header(bytes.fromhex(res), height)
 

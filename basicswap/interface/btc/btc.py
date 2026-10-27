@@ -27,6 +27,7 @@ from basicswap.basicswap_util import (
 from basicswap.interface.base import Secp256k1Interface
 from basicswap.interface.utils import FeeValidator
 from basicswap.util import (
+    TemporaryError,
     b2i,
     ensure,
     i2b,
@@ -363,6 +364,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         self._header_bc_mgr = None
         self._header_syncs: dict[str, HeaderSync] = {}
         self._header_sync_lock = threading.Lock()
+        self._headers_synced: bool = False
+        self._buried_history: set[str] = set()
         self._median_time_cache: int | None = None
 
     def setBackend(self, backend) -> None:
@@ -556,7 +559,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
     def getChainHeight(self) -> int:
         if self.useBackend():
-            sync = self._headerSyncElectrum(self._backend)
+            sync = self._headerChainElectrum(self._backend)
             return sync.bc_mgr.get_best_chain().height()
         return self.rpc("getblockcount")
 
@@ -598,7 +601,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return self._medianTimePastElectrum(backend, height)
 
     def _medianTimePastElectrum(self, backend, height: int | None) -> int | None:
-        sync = self._headerSyncElectrum(backend)
+        sync = self._headerChainElectrum(backend)
         if height is None:
             height = sync.bc_mgr.get_best_chain().height()
         if height < 0:
@@ -687,7 +690,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if not backend:
             raise ValueError("No electrum backend available")
 
-        header = self._readHeaderElectrum(self._headerSyncElectrum(backend), height)
+        header = self._readHeaderElectrum(self._headerChainElectrum(backend), height)
         if header is None:
             raise ValueError(f"No verified header at height {height}")
         return {
@@ -706,7 +709,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if block_height <= 0:
             return None
         header = self._readHeaderElectrum(
-            self._headerSyncElectrum(backend), block_height
+            self._headerChainElectrum(backend), block_height
         )
         if header is None:
             return None
@@ -774,7 +777,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def _isValidTxBytes(self, data: bytes) -> bool:
         return is_valid_tx(data)
 
-    def _headerSyncElectrum(self, backend) -> HeaderSync:
+    def syncElectrumHeaders(self) -> None:
+        if self.useBackend() and self._backend:
+            self._syncHeadersElectrum(self._backend)
+
+    def _syncHeadersElectrum(self, backend) -> None:
         server = backend._server
         with self._header_sync_lock:
             if self._header_bc_mgr is None:
@@ -804,12 +811,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     sync = HeaderSync(bc_mgr, server.server_caller(key), self._log)
                     self._header_syncs[key] = sync
                 if sync.tip == tip and bc_mgr.check_header(sync.tip_header):
+                    self._headers_synced = True
                     continue
                 try:
                     header = sync.get_block_header(
                         tip, mode=ChainResolutionMode.CATCHUP
                     )
                     sync.process_header_at_tip(tip, header)
+                    self._headers_synced = True
                 except ChainConflict as e:
                     self._log.warning(
                         f"{self.coin_name()} electrum server {key} chain refused: {e}"
@@ -828,11 +837,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     if key not in tips:
                         self._header_syncs.pop(key)
                 self._switchLaggingServerElectrum(server)
-            primary_key = server.primary_key()
-            sync = self._header_syncs.get(primary_key)
-            if sync is None:
-                sync = HeaderSync(bc_mgr, server.server_caller(primary_key), self._log)
-            return sync
+
+    def _headerChainElectrum(self, backend) -> HeaderSync:
+        if not self._headers_synced:
+            raise TemporaryError(f"{self.coin_name()} headers not synced yet")
+        server = backend._server
+        primary_key = server.primary_key()
+        sync = self._header_syncs.get(primary_key)
+        if sync is None:
+            sync = HeaderSync(
+                self._header_bc_mgr, server.server_caller(primary_key), self._log
+            )
+        return sync
 
     def _switchLaggingServerElectrum(self, server) -> None:
         best = self._header_bc_mgr.get_best_chain()
@@ -864,8 +880,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         header = chain.read_header(height)
         if header is None and height <= chain.net.max_checkpoint():
             try:
-                with sync.bc_mgr.bhi_lock:
-                    sync.request_chunk_below_max_checkpoint(height=height)
+                sync.request_chunk_below_max_checkpoint(height=height)
             except Exception as e:
                 self._log.debug(f"Headers at {height} unavailable: {e}")
                 return None
@@ -1099,27 +1114,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         rv["locked_utxos"] = len(self.rpc_wallet("listlockunspent"))
         return rv
 
-    def _queryElectrumWalletInfo(self, funded_only: bool = False):
+    def _queryElectrumWalletInfo(self, funded_only: bool = False) -> None:
+        wm = self.getWalletManager()
+        if wm is None:
+            return
         total_confirmed_sats = 0
         total_unconfirmed_sats = 0
-        wm = self.getWalletManager()
-        if wm:
-            addresses = wm.getAllAddresses(
-                self.coin_type(),
-                funded_only=funded_only,
-                watch_only_require_key=True,
-            )
-
-            if addresses:
-                try:
-                    detailed_balances = self._backend.getDetailedBalance(addresses)
-                    for addr, bal_info in detailed_balances.items():
-                        confirmed = bal_info.get("confirmed", 0)
-                        unconfirmed = bal_info.get("unconfirmed", 0)
-                        total_confirmed_sats += confirmed
-                        total_unconfirmed_sats += unconfirmed
-                except Exception as e:
-                    self._log.warning(f"_queryElectrumWalletInfo error: {e}")
+        addresses = wm.getAllAddresses(
+            self.coin_type(),
+            funded_only=funded_only,
+            watch_only_require_key=True,
+        )
+        if addresses:
+            detailed_balances = self._backend.getDetailedBalance(addresses)
+            for bal_info in detailed_balances.values():
+                total_confirmed_sats += bal_info["confirmed"]
+                total_unconfirmed_sats += bal_info["unconfirmed"]
 
         balance_btc = total_confirmed_sats / self.COIN()
         unconfirmed_btc = total_unconfirmed_sats / self.COIN()
@@ -1127,14 +1137,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         pending_outgoing = 0
         pending_incoming = 0
         pending_count = 0
-        if wm:
-            pending_txs = wm.getPendingTxs(self.coin_type())
-            for ptx in pending_txs:
-                pending_count += 1
-                if ptx.get("tx_type") == "outgoing":
-                    pending_outgoing += ptx.get("amount", 0)
-                elif ptx.get("tx_type") == "incoming":
-                    pending_incoming += ptx.get("amount", 0)
+        for ptx in wm.getPendingTxs(self.coin_type()):
+            pending_count += 1
+            if ptx.get("tx_type") == "outgoing":
+                pending_outgoing += ptx.get("amount", 0)
+            elif ptx.get("tx_type") == "incoming":
+                pending_incoming += ptx.get("amount", 0)
 
         result = {
             "balance": balance_btc,
@@ -1149,7 +1157,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         }
 
         self._cached_wallet_info = result
-        return result
 
     def refreshElectrumWalletInfo(self, full_scan: bool = False):
         if not self.useBackend():
@@ -2567,8 +2574,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         dust_limit = self.getdustlimit()
 
         if rough_change > dust_limit:
-            change_addr = wm.getNewInternalAddress(self.coin_type())
-            if not change_addr:
+            try:
+                change_addr = wm.getNewAddress(
+                    self.coin_type(), internal=True, mark_used=lock_unspents
+                )
+            except Exception as e:
+                self._log.warning(f"Failed to generate new internal address: {e}")
                 change_addr = wm.getExistingInternalAddress(self.coin_type())
             if not change_addr:
                 change_addr = selected_utxos[0].get("address")
@@ -2793,6 +2804,55 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 self._log.debug("UTXO already locked")
             else:
                 self._log.warning(f"Error locking UTXOs: {e}")
+
+    def _txOutputAddresses(self, tx) -> list[str]:
+        addresses = [
+            self.getAddressFromScriptPubKey(txo.scriptPubKey) for txo in tx.vout
+        ]
+        return [a for a in addresses if a]
+
+    def claimChangeAddresses(self, tx, cursor) -> None:
+        if not self.getWalletManager().claimAddresses(
+            self.coin_type(), self._txOutputAddresses(tx), cursor
+        ):
+            raise ValueError("Change address already taken, retry funding")
+
+    def releaseChangeAddresses(self, tx, cursor) -> None:
+        self.getWalletManager().releaseAddresses(
+            self.coin_type(), self._txOutputAddresses(tx), cursor
+        )
+
+    def hasBuriedHistoryElectrum(self, address: str, req_conf: int = 3) -> bool:
+        if address in self._buried_history:
+            return True
+        backend = self.getBackend()
+        if not backend.hasHistory(address):
+            return False
+        try:
+            tip = self.getChainHeight()
+            script = self.getDestForAddress(address)
+            # History is in blockchain order, so an address's first confirmed tx funds it
+            for entry in backend.getAddressHistory(address):
+                height = entry["height"]
+                if height <= 0 or tip - height + 1 < req_conf:
+                    continue
+                tx_hex = backend.getTransactionRaw(entry["txid"])
+                proven = (
+                    tx_hex is not None
+                    and script
+                    in [
+                        txo.scriptPubKey
+                        for txo in self.loadTx(bytes.fromhex(tx_hex)).vout
+                    ]
+                    and self._verifyTxMerkleElectrum(backend, entry["txid"], height)
+                    is True
+                )
+                if proven:
+                    self._buried_history.add(address)
+                return proven
+        except Exception as e:
+            self._log.debug(f"{self.coin_name()} history of {address} unproven: {e}")
+        return False
 
     def splitOutputs(self, values):
         """Pay each value to a new address of this wallet in one transaction and
@@ -4430,8 +4490,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def getBalances(self) -> tuple[int, int]:
         """(spendable, total) wallet balance."""
         if self.useBackend():
-            balance = self.getSpendableBalance()
-            return balance, balance
+            wi = self.getWalletInfo()
+            balance = self.make_int(wi["balance"])
+            return balance, balance + self.make_int(wi["unconfirmed_balance"])
 
         mine = self.rpc_wallet("getbalances")["mine"]
         trusted = self.make_int(mine["trusted"])
@@ -5257,7 +5318,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         try:
             tx_info = backend.getTransaction(txid_hex)
             chain_height = (
-                self._headerSyncElectrum(backend).bc_mgr.get_best_chain().height()
+                self._headerChainElectrum(backend).bc_mgr.get_best_chain().height()
             )
             block_height = 0
             confirmations = 0
@@ -5614,7 +5675,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             ):
                 return None
             header = self._readHeaderElectrum(
-                self._headerSyncElectrum(backend), block_height
+                self._headerChainElectrum(backend), block_height
             )
             if header is None:
                 return None
