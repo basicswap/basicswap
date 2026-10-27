@@ -23,6 +23,7 @@ from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import chainparams, Coins, isKnownCoinName
 from basicswap.network.simplex.client import startSimplexNetworkClient
 from basicswap.ui.util import getCoinName
+from basicswap.util import path_exists
 from basicswap.util.daemon import Daemon
 
 initial_logger = logging.getLogger()
@@ -66,7 +67,7 @@ def checkPARTZmqConfigBeforeStart(part_settings, swap_settings):
             return
 
         config_path = os.path.join(datadir, "particl.conf")
-        if not os.path.exists(config_path):
+        if not path_exists(config_path):
             return
 
         with open(config_path, "r") as f:
@@ -265,7 +266,7 @@ def startXmrWalletDaemon(node_dir, bin_dir, wallet_bin, opts=[]):
         else "monero_wallet.conf"
     )
     config_path = os.path.join(data_dir, wallet_config_filename)
-    if os.path.exists(config_path):
+    if path_exists(config_path):
         args += ["--config-file=" + config_path]
         with open(config_path) as fp:
             for line in fp:
@@ -391,11 +392,11 @@ def runClient(
                 "Please unset the WALLET_ENCRYPTION_PWD environment variable."
             )
 
-    if not os.path.exists(settings_path):
+    try:
+        with open(settings_path) as fs:
+            settings = json.load(fs)
+    except FileNotFoundError:
         raise ValueError("Settings file not found: " + str(settings_path))
-
-    with open(settings_path) as fs:
-        settings = json.load(fs)
 
     swap_client = BasicSwap(
         data_dir, settings, chain, log_name=log_prefix, extra_opts=extra_opts

@@ -33,7 +33,7 @@ from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins, chainparams, getCoinIdFromName
 from basicswap.contrib.rpcauth import generate_salt
 from basicswap.ui.util import getCoinName
-from basicswap.util import ensure, toBool
+from basicswap.util import ensure, path_exists, toBool
 from basicswap.util.network import urlretrieve, make_reporthook
 from basicswap.util.rfc2440 import rfc2440_hash_password
 from basicswap.bin.run import (
@@ -708,7 +708,7 @@ def modify_tor_config(
     )
     config_path = os.path.join(data_dir, core_conf_name)
 
-    if not os.path.exists(config_path):
+    if not path_exists(config_path):
         exitWithError("{} does not exist".format(config_path))
 
     if "onionport" not in coin_settings:
@@ -1252,7 +1252,7 @@ def migrate_wallets(
 
 
 def load_config(config_path):
-    if not os.path.exists(config_path):
+    if not path_exists(config_path):
         exitWithError("{} does not exist".format(config_path))
     with open(config_path) as fs:
         settings = json.load(fs)
@@ -1618,7 +1618,7 @@ def main():
         os.makedirs(gpg_homedir)
     config_path = os.path.join(data_dir, cfg.CONFIG_FILENAME)
 
-    config_exists = os.path.exists(config_path)
+    config_exists = path_exists(config_path)
     if config_exists and (
         client_auth_pwd_value is not None or disable_client_auth_flag
     ):
@@ -1659,7 +1659,7 @@ def main():
             or extra_opts.get("disablenetwork")
         )
         and not use_tor_proxy
-        and os.path.exists(config_path)
+        and path_exists(config_path)
     ):
         settings = load_config(config_path)
         settings_use_tor = settings.get("use_tor", False)
@@ -2059,7 +2059,7 @@ def main():
         + (", ".join(with_coins))
         + ("" if with_coins_changed else " (default)")
     )
-    if os.path.exists(config_path):
+    if path_exists(config_path):
         if prepare_bin_only:
             settings = load_config(config_path)
 

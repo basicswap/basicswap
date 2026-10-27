@@ -7,6 +7,7 @@
 
 
 import json
+import os
 import time
 import decimal
 
@@ -60,6 +61,15 @@ class RevokedOffer(Exception):
 def ensure(v, err_string):
     if not v:
         raise ValueError(err_string)
+
+
+def path_exists(path: str) -> bool:
+    """os.path.exists, but a path that can't be checked raises instead of reading as missing."""
+    try:
+        os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    return True
 
 
 def toBool(s) -> bool:
