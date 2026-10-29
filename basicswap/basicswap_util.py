@@ -730,7 +730,6 @@ def isActiveBidState(state):
         BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
         BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
-        BidStates.XMR_SWAP_FAILED,
         BidStates.XMR_SWAP_FAILED_SWIPED_SENDING_MERCY,
         BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY,
         BidStates.BID_REQUEST_ACCEPTED,
