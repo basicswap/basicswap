@@ -12352,9 +12352,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         )
 
             num_not_completed = 0
+            amount_not_completed: int = 0
             for active_bid in active_bids:
                 if active_bid[2] != BidStates.SWAP_COMPLETED:
                     num_not_completed += 1
+                    amount_not_completed += active_bid[1]
             max_concurrent_bids = opts.get("max_concurrent_bids", 1)
             self.log.debug(
                 f"active_bids {num_not_completed}, max_concurrent_bids {max_concurrent_bids}."
@@ -12370,11 +12372,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.evaluateKnownIdentityForAutoAccept(strategy, identity_stats)
 
             # Ensure the coin from wallet has sufficient balance for multiple bids
-            bids_active_if_accepted: int = num_not_completed + 1
-
             ci_from = self.ci(offer.coin_from)
             try:
-                ci_from.ensureFunds(bids_active_if_accepted * bid_amount)
+                ci_from.ensureFunds(amount_not_completed + bid_amount)
             except Exception as e:  # noqa: F841
                 raise AutomationConstraintTemporary("Balance too low")
 
