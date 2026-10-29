@@ -1076,6 +1076,17 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.send_header(header_tuple[0], header_tuple[1])
         self.end_headers()
 
+    def putJson(self, status_code, content: bytes) -> bytes:
+        # Not for HTML: those pages carry the CSRF token beside reflected input,
+        # which compressed lengths can leak (BREACH).
+        extra_headers = [("Vary", "Accept-Encoding")]
+        if "gzip" in self.headers.get("Accept-Encoding", ""):
+            content = gzip.compress(content)
+            extra_headers.append(("Content-Encoding", "gzip"))
+        extra_headers.append(("Content-Length", str(len(content))))
+        self.putHeaders(status_code, "application/json", extra_headers=extra_headers)
+        return content
+
     def handle_http(self, status_code, path, post_string="", is_json=False):
         swap_client = self.server.swap_client
         parsed = parse.urlparse(self.path)
@@ -1165,21 +1176,22 @@ class HttpHandler(BaseHTTPRequestHandler):
                 self.putHeaders(405, "application/json")
                 return json.dumps({"error": "POST required"}).encode("utf-8")
             try:
-                self.putHeaders(status_code, "application/json")
                 func = js_url_to_function(url_split)
-                return func(self, url_split, post_string, is_json)
+                response = func(self, url_split, post_string, is_json)
             except Exception as ex:
                 if isinstance(ex, LockedCoinError):
                     clean_msg = f"Wallet locked: {getCoinName(ex.coinid)} wallet must be unlocked"
                     swap_client.log.warning(clean_msg)
-                    return js_error(self, clean_msg)
-                elif isinstance(ex, BalanceError):
-                    # Suppress traceback
-                    method: str = url_split[2] if len(url_split) > 2 else "unknown"
-                    swap_client.log.error(f"js method: {method} failed - {ex}")
-                elif swap_client.debug is True:
-                    swap_client.log.error(traceback.format_exc())
-                return js_error(self, str(ex))
+                    response = js_error(self, clean_msg)
+                else:
+                    if isinstance(ex, BalanceError):
+                        # Suppress traceback
+                        method: str = url_split[2] if len(url_split) > 2 else "unknown"
+                        swap_client.log.error(f"js method: {method} failed - {ex}")
+                    elif swap_client.debug is True:
+                        swap_client.log.error(traceback.format_exc())
+                    response = js_error(self, str(ex))
+            return self.putJson(status_code, response)
 
         if page == "static":
             try:
@@ -1377,8 +1389,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                         status_data = amm_status_api(
                             swap_client, self.path, query_params
                         )
-                        self.putHeaders(200, "application/json")
-                        return json.dumps(status_data).encode("utf-8")
+                        return self.putJson(
+                            200, json.dumps(status_data).encode("utf-8")
+                        )
                     elif len(url_split) > 2 and url_split[2] == "autostart":
                         query_params = {}
                         if parsed.query:
@@ -1388,8 +1401,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                         autostart_data = amm_autostart_api(
                             swap_client, post_string, query_params
                         )
-                        self.putHeaders(200, "application/json")
-                        return json.dumps(autostart_data).encode("utf-8")
+                        return self.putJson(
+                            200, json.dumps(autostart_data).encode("utf-8")
+                        )
                     elif len(url_split) > 2 and url_split[2] == "debug":
                         query_params = {}
                         if parsed.query:
@@ -1399,8 +1413,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                         debug_data = amm_debug_api(
                             swap_client, post_string, query_params
                         )
-                        self.putHeaders(200, "application/json")
-                        return json.dumps(debug_data).encode("utf-8")
+                        return self.putJson(200, json.dumps(debug_data).encode("utf-8"))
                     elif len(url_split) > 2 and url_split[2] == "config":
                         query_params = {}
                         if parsed.query:
@@ -1410,8 +1423,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                         config_result = amm_config_api(
                             swap_client, post_string, query_params
                         )
-                        self.putHeaders(200, "application/json")
-                        return json.dumps(config_result).encode("utf-8")
+                        return self.putJson(
+                            200, json.dumps(config_result).encode("utf-8")
+                        )
                     elif len(url_split) > 2 and url_split[2] == "state":
                         query_params = {}
                         if parsed.query:
@@ -1421,8 +1435,9 @@ class HttpHandler(BaseHTTPRequestHandler):
                         state_result = amm_state_api(
                             swap_client, post_string, query_params
                         )
-                        self.putHeaders(200, "application/json")
-                        return json.dumps(state_result).encode("utf-8")
+                        return self.putJson(
+                            200, json.dumps(state_result).encode("utf-8")
+                        )
                     return page_amm(self, url_split, post_string)
                 if page == "shutdown":
                     return self.page_shutdown(url_split, post_string)
