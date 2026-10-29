@@ -483,7 +483,7 @@ def getLockName(lock_type):
 
 def describeEventEntry(event_type, event_msg):
     if event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH:
-        return "Failed to publish lock tx B"
+        return "Failed to publish lock tx B: " + event_msg
     if event_type == EventLogTypes.LOCK_TX_A_PUBLISHED:
         return "Lock tx A published"
     if event_type == EventLogTypes.LOCK_TX_B_PUBLISHED:
