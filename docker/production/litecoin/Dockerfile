@@ -23,4 +23,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 8332 8333 18332 18333 18443 18444
-CMD ["/litecoin/litecoind", "--datadir=/data"]
+CMD ["/litecoin/litecoind", "--datadir=/data", "-printtoconsole", "-nodebuglogfile"]

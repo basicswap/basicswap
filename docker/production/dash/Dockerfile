@@ -25,4 +25,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 9999 9998
-CMD ["/dash/dashd", "--datadir=/data"]
+CMD ["/dash/dashd", "--datadir=/data", "-printtoconsole", "-nodebuglogfile"]

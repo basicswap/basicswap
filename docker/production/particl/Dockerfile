@@ -23,4 +23,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 51735 20792 51738
-CMD ["/particl/particld", "--datadir=/data"]
+CMD ["/particl/particld", "--datadir=/data", "-printtoconsole", "-nodebuglogfile"]
