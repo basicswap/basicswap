@@ -7013,7 +7013,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.pkbsf = ci_to.getPubkey(kbsf)
             if "pkaf" in extra_options:
                 xmr_swap.pkaf = extra_options["pkaf"]
-                ensure(ci_to.verifyPubkey(xmr_swap.pkaf), "Invalid pkaf supplied")
+                ensure(ci_from.verifyPubkey(xmr_swap.pkaf), "Invalid pkaf supplied")
             else:
                 kaf = self.getPathKey(
                     coin_from,
