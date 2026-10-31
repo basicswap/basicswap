@@ -542,6 +542,10 @@ class CoinPrepareModule(ReleasePrepareModule):
         # Extra daemon arguments for the wallet initialisation run
         return []
 
+    def getWalletInitDaemonPassFds(self) -> tuple:
+        # File descriptors the wallet initialisation daemon must inherit
+        return ()
+
     def needsPostInitPasswordChange(self) -> bool:
         # True where the wallet must be encrypted after initialiseWallet
         return not self.creates_wallet

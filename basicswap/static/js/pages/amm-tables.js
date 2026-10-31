@@ -580,6 +580,7 @@ const AmmTablesManager = (function() {
             'wow': 'WOW',
             'dash': 'DASH',
             'pivx': 'PIVX',
+            'divi': 'DIVI',
             'firo': 'FIRO',
             'xzc': 'FIRO',
             'zcoin': 'FIRO',
@@ -594,7 +595,8 @@ const AmmTablesManager = (function() {
             'WOW': 'WOW',
             'FIRO': 'FIRO',
             'DASH': 'DASH',
-            'PIVX': 'PIVX'
+            'PIVX': 'PIVX',
+            'DIVI': 'DIVI'
         };
 
         if (coinToTicker[lowerCoin]) {
@@ -655,7 +657,7 @@ const AmmTablesManager = (function() {
 
     async function fetchLatestPrices() {
         try {
-            const coins = 'BTC,BCH,DCR,DOGE,LTC,NMC,XMR,PART,WOW,FIRO,DASH,PIVX';
+            const coins = 'BTC,BCH,DCR,DOGE,LTC,NMC,XMR,PART,WOW,FIRO,DASH,PIVX,DIVI';
 
             const response = await fetch('/json/coinprices', {
                 method: 'POST',
@@ -2657,7 +2659,7 @@ const AmmTablesManager = (function() {
         }
     }
 
-    const coins_without_segwit = ['11', 'PIVX', '12', 'Dash'];
+    const coins_without_segwit = ['11', 'PIVX', '12', 'Dash', '19', 'DIVI'];
 
     function updateSwapTypeOptions(coinFromValue, coinToValue, swapTypeSelect) {
         if (!swapTypeSelect) return;

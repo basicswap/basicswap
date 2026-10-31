@@ -507,12 +507,12 @@ def describeBid(
             data["txns"] = txns
 
             data["xmr_b_shared_address"] = (
-                ci_to.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs)
+                ci_follower.encodeSharedAddress(xmr_swap.pkbv, xmr_swap.pkbs)
                 if xmr_swap.pkbs
                 else None
             )
             data["xmr_b_shared_viewkey"] = (
-                ci_to.encodeKey(xmr_swap.vkbv) if xmr_swap.vkbv else None
+                ci_follower.encodeKey(xmr_swap.vkbv) if xmr_swap.vkbv else None
             )
 
             if swap_client.debug_ui:

@@ -95,6 +95,12 @@ BasicSwap is compatible with the following digital assets.
    </td>
   </tr>
   <tr>
+   <td>Divi
+   </td>
+   <td>DIVI
+   </td>
+  </tr>
+  <tr>
    <td>Decred
    </td>
    <td>DCR
