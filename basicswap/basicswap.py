@@ -13101,37 +13101,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         replace_unlinked: bool = False
         if bid.state == BidStates.BID_RECEIVING_ACC:
-            current_id: bytes = xmr_swap.split_parent_msg_id
-            if current_id is None:
-                self.log.info(
-                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}, the one being received was stored without its message id."
-                )
+            replace_unlinked = self.laterAcceptReplaces(bid, offer, xmr_swap, msg)
+            if replace_unlinked is None:
                 return
-            current_sent: int = int.from_bytes(current_id[:8], byteorder="big")
-            if current_id == bytes.fromhex(msg["msgid"]):
-                self.log.info(
-                    f"Ignoring a repeat adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}."
-                )
-                return
-            if msg["sent"] < current_sent:
-                self.log.info(
-                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent before the one being received."
-                )
-                return
-            linked: bool = (
-                min(offer.protocol_version, bid.protocol_version)
-                >= PROTOCOL_VERSION_SPLIT_PARENT
-            )
-            # Unlinked parts are told apart by send time alone
-            if not linked and msg["sent"] == current_sent:
-                self.log.info(
-                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent in the same second as the one being received."
-                )
-                return
-            replace_unlinked = not linked
-            self.log.info(
-                f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
-            )
 
         ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
@@ -15030,6 +15002,40 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             or row.parent_msg_id == xmr_swap.split_parent_msg_id
         )
 
+    def laterAcceptReplaces(self, bid, offer, xmr_swap, msg) -> bool | None:
+        """None to ignore the accept, else whether the replaced parts carry no parent."""
+        current_id: bytes = xmr_swap.split_parent_msg_id
+        if current_id is None:
+            self.log.info(
+                f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}, the one being received was stored without its message id."
+            )
+            return None
+        current_sent: int = int.from_bytes(current_id[:8], byteorder="big")
+        if current_id == bytes.fromhex(msg["msgid"]):
+            self.log.info(
+                f"Ignoring a repeat adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}."
+            )
+            return None
+        if msg["sent"] < current_sent:
+            self.log.info(
+                f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent before the one being received."
+            )
+            return None
+        linked: bool = (
+            min(offer.protocol_version, bid.protocol_version)
+            >= PROTOCOL_VERSION_SPLIT_PARENT
+        )
+        # Unlinked parts are told apart by send time alone
+        if not linked and msg["sent"] == current_sent:
+            self.log.info(
+                f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent in the same second as the one being received."
+            )
+            return None
+        self.log.info(
+            f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
+        )
+        return not linked
+
     def getSplitChunkRefusal(
         self, cursor, msg, msg_type: int, bid_id: bytes, now: int
     ) -> str | None:
@@ -15420,6 +15426,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         allowed_states = [
             BidStates.BID_REQUEST_SENT,
+            BidStates.BID_RECEIVING,
         ]
         if bid.was_sent and offer.was_sent:
             allowed_states.append(BidStates.BID_REQUEST_ACCEPTED)
@@ -15427,6 +15434,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.state in allowed_states,
             f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
+
+        replacing: bool = bid.state == BidStates.BID_RECEIVING
+        replace_unlinked: bool = False
+        if replacing:
+            replace_unlinked = self.laterAcceptReplaces(bid, offer, xmr_swap, msg)
+            if replace_unlinked is None:
+                return
+
         ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         ci_from = self.ci(offer.coin_to)
@@ -15465,11 +15480,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info(
             f"Receiving reverse adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid.offer_id)}."
         )
-        self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
         try:
             cursor = self.openDB()
-            self.notify(NT.BID_ACCEPTED, {"bid_id": bid_id.hex()}, cursor)
+            if replace_unlinked:
+                cursor.execute(
+                    "DELETE FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND addr_from = :addr_from AND parent_msg_id IS NULL AND created_at < :sent",
+                    {
+                        "bid_id": bid_id,
+                        "msg_type": int(XmrSplitMsgTypes.BID),
+                        "addr_from": offer.addr_from,
+                        "sent": msg["sent"],
+                    },
+                )
+            self.saveBid(bid_id, bid, xmr_swap=xmr_swap, cursor=cursor)
+            if not replacing:
+                self.notify(NT.BID_ACCEPTED, {"bid_id": bid_id.hex()}, cursor)
             if ci_to.curve_type() != Curves.ed25519:
                 self.receiveXmrBid(bid, cursor)
         finally:
