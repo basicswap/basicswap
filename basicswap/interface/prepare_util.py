@@ -433,8 +433,9 @@ class CoinPrepareModule(ReleasePrepareModule):
             ctx.logger.info("Skipping extract, files exist.")
             return
 
-        with tarfile.open(release_path) as ft:
-            for member in ft.getmembers():
+        # Stream mode, a bz2 archive decompresses from its start on each seek back
+        with tarfile.open(release_path, "r|*") as ft:
+            for member in ft:
                 if member.isdir():
                     continue
                 bin_name = os.path.basename(member.name)
