@@ -51,7 +51,7 @@ BITCOIN_FASTSYNC_SIG_URL = os.getenv(
 
 
 BTC_RPC_HOST = os.getenv("BTC_RPC_HOST", "127.0.0.1")
-BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 19996))
+BTC_RPC_PORT = int(os.getenv("BTC_RPC_PORT", 8332))
 BTC_PORT = int(os.getenv("BTC_PORT", 8333))
 BTC_ONION_PORT = int(os.getenv("BTC_ONION_PORT", 8334))
 BTC_RPC_USER = os.getenv("BTC_RPC_USER", "")
