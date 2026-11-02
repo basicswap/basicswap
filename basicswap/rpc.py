@@ -8,8 +8,6 @@
 import base64
 import http.client
 import json
-import logging
-import socket
 import traceback
 import urllib
 from xmlrpc.client import (
@@ -18,9 +16,6 @@ from xmlrpc.client import (
     SafeTransport,
 )
 from .util import jsonDecimal
-
-_use_rpc_pooling = False
-_rpc_pool_settings = {}
 
 
 class RPCError(ValueError):
@@ -37,12 +32,6 @@ def redact_url(url: str) -> str:
     if "@" not in rest:
         return url
     return scheme + sep + rest.rpartition("@")[2]
-
-
-def enable_rpc_pooling(settings):
-    global _use_rpc_pooling, _rpc_pool_settings
-    _use_rpc_pooling = settings.get("enabled", False)
-    _rpc_pool_settings = settings
 
 
 class TimeoutTransport(Transport):
@@ -182,9 +171,6 @@ class Jsonrpc:
 def callrpc(
     rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1", timeout=None
 ):
-    if _use_rpc_pooling:
-        return callrpc_pooled(rpc_port, auth, method, params, wallet, host, timeout)
-
     try:
         url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
         x = Jsonrpc(url, timeout=timeout if timeout else 10)
@@ -199,74 +185,6 @@ def callrpc(
         raise RPCError(r["error"])
 
     return r["result"]
-
-
-def callrpc_pooled(
-    rpc_port, auth, method, params=[], wallet=None, host="127.0.0.1", timeout=None
-):
-    from .rpc_pool import get_rpc_pool
-
-    url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
-
-    if timeout:
-        try:
-            conn = Jsonrpc(url, timeout=timeout)
-            v = conn.json_request(method, params)
-            r = json.loads(v.decode("utf-8"))
-            conn.close()
-            if "error" in r and r["error"] is not None:
-                raise RPCError(r["error"])
-            return r["result"]
-        except ValueError:
-            raise
-        except Exception as ex:
-            raise ValueError(f"RPC server error: {ex}, method: {method}")
-
-    max_connections = _rpc_pool_settings.get("max_connections_per_daemon", 5)
-    pool = get_rpc_pool(url, max_connections)
-
-    max_retries = 2
-
-    for attempt in range(max_retries):
-        conn = pool.get_connection()
-
-        try:
-            v = conn.json_request(method, params)
-            r = json.loads(v.decode("utf-8"))
-
-            if "error" in r and r["error"] is not None:
-                pool.discard_connection(conn)
-                raise RPCError(r["error"])
-
-            pool.return_connection(conn)
-            return r["result"]
-
-        except (
-            http.client.RemoteDisconnected,
-            http.client.IncompleteRead,
-            http.client.BadStatusLine,
-            ConnectionError,
-            ConnectionResetError,
-            ConnectionAbortedError,
-            BrokenPipeError,
-            TimeoutError,
-            socket.timeout,
-            socket.error,
-            OSError,
-        ) as ex:
-            pool.discard_connection(conn)
-            if attempt < max_retries - 1:
-                continue
-            logging.warning(
-                f"RPC server error after {max_retries} attempts: {ex}, method: {method}"
-            )
-            raise ValueError(f"RPC server error: {ex}, method: {method}")
-        except ValueError:
-            raise
-        except Exception as ex:
-            pool.discard_connection(conn)
-            logging.error(f"Unexpected RPC error: {ex}, method: {method}")
-            raise ValueError(f"RPC server error: {ex}, method: {method}")
 
 
 def openrpc(rpc_port, auth, wallet=None, host="127.0.0.1", timeout=10):
