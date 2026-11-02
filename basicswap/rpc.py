@@ -8,6 +8,8 @@
 import base64
 import http.client
 import json
+import threading
+import time
 import traceback
 import urllib
 from xmlrpc.client import (
@@ -40,8 +42,11 @@ class TimeoutTransport(Transport):
         super().__init__(*args, **kwargs)
 
     def make_connection(self, host):
-        conn = http.client.HTTPConnection(host, timeout=self.timeout)
-        return conn
+        if self._connection[1] is None or self._connection[0] != host:
+            self._connection = host, http.client.HTTPConnection(
+                host, timeout=self.timeout
+            )
+        return self._connection[1]
 
 
 class TimeoutSafeTransport(SafeTransport):
@@ -50,8 +55,11 @@ class TimeoutSafeTransport(SafeTransport):
         super().__init__(*args, **kwargs)
 
     def make_connection(self, host):
-        conn = http.client.HTTPSConnection(host, timeout=self.timeout)
-        return conn
+        if self._connection[1] is None or self._connection[0] != host:
+            self._connection = host, http.client.HTTPSConnection(
+                host, timeout=self.timeout
+            )
+        return self._connection[1]
 
 
 class Jsonrpc:
@@ -126,10 +134,13 @@ class Jsonrpc:
         if self.__transport is not None:
             self.__transport.close()
 
-    def json_request(self, method, params):
-        connection = None
+    def json_request(self, method, params, timeout=None):
         try:
             connection = self.__transport.make_connection(self.__host)
+            if timeout is not None:
+                connection.timeout = timeout
+                if connection.sock is not None:
+                    connection.sock.settimeout(timeout)
             headers = self.__transport._extra_headers[:]
 
             request_body = {"method": method, "params": params, "id": self.__request_id}
@@ -148,24 +159,34 @@ class Jsonrpc:
             )
             self.__request_id += 1
 
-            resp = connection.getresponse()
-            result = resp.read()
-
-            connection.close()
-
-            return result
+            return connection.getresponse().read()
 
         except Fault:
             raise
         except Exception:
             self.__transport.close()
             raise
-        finally:
-            if connection is not None:
-                try:
-                    connection.close()
-                except Exception:
-                    pass
+
+
+# Below bitcoind's rpcservertimeout (30s), so a kept connection is never one
+# the node has already closed.
+RPC_KEEPALIVE_SECONDS = 15
+_thread_rpc_conns = threading.local()
+
+
+def _thread_rpc_connection(url: str) -> Jsonrpc:
+    conns = getattr(_thread_rpc_conns, "conns", None)
+    if conns is None:
+        conns = _thread_rpc_conns.conns = {}
+    entry = conns.get(url)
+    if entry is not None:
+        conn, last_used = entry
+        if time.monotonic() - last_used < RPC_KEEPALIVE_SECONDS:
+            return conn
+        conn.close()
+    conn = Jsonrpc(url)
+    conns[url] = (conn, 0.0)
+    return conn
 
 
 def callrpc(
@@ -173,10 +194,9 @@ def callrpc(
 ):
     try:
         url = Jsonrpc.constructUrl(auth, host, rpc_port, wallet)
-        x = Jsonrpc(url, timeout=timeout if timeout else 10)
-
-        v = x.json_request(method, params)
-        x.close()
+        x = _thread_rpc_connection(url)
+        v = x.json_request(method, params, timeout=timeout if timeout else 10)
+        _thread_rpc_conns.conns[url] = (x, time.monotonic())
         r = json.loads(v.decode("utf-8"))
     except Exception as ex:
         raise ValueError(f"RPC server error: {ex}, method: {method}")
