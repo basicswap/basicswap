@@ -20,6 +20,7 @@ class FeeValidator:
         return COIN // 10
 
     def __init__(self, **kwargs):
+        self._relay_fee = None
         self.updateFeeValidationSettings(kwargs.get("network"))
         super().__init__(**kwargs)
 
@@ -129,12 +130,15 @@ class FeeValidator:
             return chain_client_settings["min_relay_fee"], "min_relay_fee_setting"
 
         if self._connection_type == "rpc":
-            networkinfo = self.rpc("getnetworkinfo")
-            if "relayfee" in networkinfo:
-                return networkinfo["relayfee"], "relayfee_rpc"
+            return self.getRelayFee(), "relayfee_rpc"
         elif self._connection_type == "electrum":
             return 0.00001, "relayfee_electrum_default"
         return None, None
+
+    def getRelayFee(self) -> float:
+        if self._relay_fee is None:
+            self._relay_fee = self.rpc("getnetworkinfo")["relayfee"]
+        return self._relay_fee
 
     @staticmethod
     def compareFeeRates(actual: int, expected: int) -> bool:
