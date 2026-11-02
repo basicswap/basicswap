@@ -11969,10 +11969,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(len(offer_data.proof_signature) == 0, "Unexpected data")
             ensure(len(offer_data.pkhash_seller) == 0, "Unexpected data")
             ensure(len(offer_data.secret_hash) == 0, "Unexpected data")
-
-            ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
-            ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
-
         else:
             raise ValueError(f"Unknown swap type {offer_data.swap_type}.")
 
@@ -11997,6 +11993,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # Check for sent
             existing_offer = self.getOffer(offer_id, cursor=cursor)
+            if existing_offer is not None and existing_offer.active_ind != 1:
+                raise RevokedOffer(
+                    f"Ignoring inactive offer {offer_id.hex()}, active_ind: {existing_offer.active_ind}."
+                )
+
+            if offer_data.swap_type == SwapTypes.XMR_SWAP:
+                ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
+                ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
+
             if existing_offer is None:
 
                 bid_reversed: bool = (
@@ -12072,10 +12077,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     cursor,
                 )
             else:
-                if existing_offer.active_ind != 1:
-                    raise RevokedOffer(
-                        f"Ignoring inactive offer {offer_id.hex()}, active_ind: {existing_offer.active_ind}."
-                    )
                 if existing_offer.state != OfferStates.OFFER_RECEIVED:
                     existing_offer.setState(OfferStates.OFFER_RECEIVED)
                     existing_offer.pk_from = pk_from
