@@ -23,6 +23,14 @@ _use_rpc_pooling = False
 _rpc_pool_settings = {}
 
 
+class RPCError(ValueError):
+    def __init__(self, error):
+        super().__init__("RPC error " + str(error))
+        self.message: str = (
+            error.get("message", str(error)) if isinstance(error, dict) else str(error)
+        )
+
+
 def redact_url(url: str) -> str:
     # The userinfo isn't escaped, so it can hold "/", "?" or "#".
     scheme, sep, rest = url.partition("://")
@@ -188,7 +196,7 @@ def callrpc(
         raise ValueError(f"RPC server error: {ex}, method: {method}")
 
     if "error" in r and r["error"] is not None:
-        raise ValueError("RPC error " + str(r["error"]))
+        raise RPCError(r["error"])
 
     return r["result"]
 
@@ -207,7 +215,7 @@ def callrpc_pooled(
             r = json.loads(v.decode("utf-8"))
             conn.close()
             if "error" in r and r["error"] is not None:
-                raise ValueError("RPC error " + str(r["error"]))
+                raise RPCError(r["error"])
             return r["result"]
         except ValueError:
             raise
@@ -228,7 +236,7 @@ def callrpc_pooled(
 
             if "error" in r and r["error"] is not None:
                 pool.discard_connection(conn)
-                raise ValueError("RPC error " + str(r["error"]))
+                raise RPCError(r["error"])
 
             pool.return_connection(conn)
             return r["result"]

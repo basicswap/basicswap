@@ -93,7 +93,7 @@ from .oracles import (
 )
 from .db_util import remove_expired_data
 from .http_server import HttpThread
-from .rpc import escape_rpcauth
+from .rpc import RPCError, escape_rpcauth
 from .rpc_xmr import make_xmr_rpc2_func
 from .types import WatchedTransaction, WatchedScript, WatchedOutput
 from .ui.app import UIApp
@@ -1826,7 +1826,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 waited: int = int(now - started_at)
                 if waited >= time_limit:
                     break
-                err: str = str(ex)
+                err: str = ex.message if isinstance(ex, RPCError) else str(ex)
                 is_loading: bool = any(
                     log in err
                     for log in [
@@ -1838,13 +1838,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         "Reaccepting",
                     ]
                 )
-                if now - last_logged_at >= 30 or (
-                    not is_loading and err != last_logged_err
-                ):
+                if err != last_logged_err or now - last_logged_at >= 30:
                     last_logged_err, last_logged_at = err, now
                     if is_loading:
                         self.log.info(
-                            f"Waiting for {Coins(coin_type).name} RPC, {waited}/{time_limit}s."
+                            f"Waiting for {Coins(coin_type).name} RPC: {err}, {waited}/{time_limit}s."
                         )
                     else:
                         self.log.warning(
