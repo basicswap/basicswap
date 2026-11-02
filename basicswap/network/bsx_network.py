@@ -1092,7 +1092,7 @@ class BSXNetwork:
             return  # TODO: Switch to paid?
 
         msg_id = message[2:]
-        options = {"encoding": "hex", "updatestatus": True}
+        options = {"encoding": "hex", "setread": True}
         if self._can_use_smsg_payload2:
             options["pubkey_from"] = True
         num_tries = 5
