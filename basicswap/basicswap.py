@@ -1811,32 +1811,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     # systemd will try to restart the process if fail_code != 0
                     self.stopRunning(1)
 
-        chain_client_settings = self.getChainClientSettings(coin_type)
-        # Total seconds waited for will be ((startup_tries(1 + startup_tries) / 2) * startup_delay
-        startup_tries: int = self.get_clamped_int_from(
-            chain_client_settings,
-            "startup_tries",
-            self.get_int_setting("startup_tries", 15, 1, 100),
-            1,
-            100,
-        )
-        startup_delay: int = self.get_clamped_int_from(
-            chain_client_settings,
-            "startup_delay",
-            self.get_int_setting("startup_delay", 5, 1, 100),
-            1,
-            100,
-        )
-        for i in range(startup_tries):
+        time_limit: int = self.getStartupTimeout(coin_type)
+        started_at: float = time.time()
+        last_logged_err: str = ""
+        last_logged_at: float = 0.0
+        while True:
             if self.delay_event.is_set():
                 return
             try:
                 self.coin_clients[coin_type]["interface"].testDaemonRPC(with_wallet)
                 return
             except Exception as ex:
-                wait_for: int = startup_delay * (1 + i)
-                if any(
-                    log in str(ex)
+                now: float = time.time()
+                waited: int = int(now - started_at)
+                if waited >= time_limit:
+                    break
+                err: str = str(ex)
+                is_loading: bool = any(
+                    log in err
                     for log in [
                         "Verifying",
                         "Loading",
@@ -1845,17 +1837,46 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         "Upgrading",
                         "Reaccepting",
                     ]
+                )
+                if now - last_logged_at >= 30 or (
+                    not is_loading and err != last_logged_err
                 ):
-                    self.log.info(
-                        f"Waiting for {Coins(coin_type).name} RPC. Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
-                    )
-                else:
-                    self.log.warning(
-                        f"Can't connect to {Coins(coin_type).name} RPC: {ex}.  Trying again in {wait_for} seconds, {1 + i}/{startup_tries}."
-                    )
-                self.delay_event.wait(wait_for)
+                    last_logged_err, last_logged_at = err, now
+                    if is_loading:
+                        self.log.info(
+                            f"Waiting for {Coins(coin_type).name} RPC, {waited}/{time_limit}s."
+                        )
+                    else:
+                        self.log.warning(
+                            f"Can't connect to {Coins(coin_type).name} RPC: {err}, {waited}/{time_limit}s."
+                        )
+                self.delay_event.wait(1)
         self.log.error(f"Can't connect to {Coins(coin_type).name} RPC, exiting.")
         self.stopRunning(1)  # systemd will try to restart the process if fail_code != 0
+
+    def getStartupTimeout(self, coin_type) -> int:
+        chain_client_settings = self.getChainClientSettings(coin_type)
+        for settings in (chain_client_settings, self.settings):
+            if "startup_timeout" in settings:
+                return self.get_clamped_int_from(settings, "startup_timeout", 600, 1)
+            # Deprecated, replaced by startup_timeout.
+            if "startup_tries" in settings or "startup_delay" in settings:
+                startup_tries: int = self.get_clamped_int_from(
+                    chain_client_settings,
+                    "startup_tries",
+                    self.get_int_setting("startup_tries", 15, 1, 100),
+                    1,
+                    100,
+                )
+                startup_delay: int = self.get_clamped_int_from(
+                    chain_client_settings,
+                    "startup_delay",
+                    self.get_int_setting("startup_delay", 5, 1, 100),
+                    1,
+                    100,
+                )
+                return startup_delay * startup_tries * (startup_tries + 1) // 2
+        return 600
 
     def checkCoinsReady(self, coin_from, coin_to) -> None:
         check_coins = (coin_from, coin_to)
