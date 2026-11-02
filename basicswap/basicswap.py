@@ -16071,6 +16071,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def editGeneralSettings(self, data):
         self.log.info("Updating general settings.")
         settings_changed = False
+        rate_sources_changed = False
         suggest_reboot = False
         settings_copy = copy.deepcopy(self.settings)
         with self.mxDB:
@@ -16190,6 +16191,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if settings_copy.get("rate_sources", {}) != new_value:
                     settings_copy["rate_sources"] = new_value
                     settings_changed = True
+                    rate_sources_changed = True
 
             if "notifications_new_offers" in data:
                 new_value = data["notifications_new_offers"]
@@ -16331,6 +16333,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     json.dump(settings_copy, fp, indent=4)
                 shutil.move(settings_path_new, settings_path)
                 self.settings = settings_copy
+                if rate_sources_changed:
+                    self._last_price_fetch = 0
         return settings_changed, suggest_reboot
 
     def editNetworkSettings(self, network_type: str, data):
