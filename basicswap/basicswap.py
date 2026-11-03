@@ -16998,6 +16998,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["staked"] = walletinfo.get("staked_balance", 0)
             elif coin in self.xmr_based_coins:
                 rv["main_address"] = self.getCachedMainWalletAddress(ci)
+                if "max_lock_amount" in walletinfo:
+                    rv["max_lock_amount"] = walletinfo["max_lock_amount"]
             elif coin == Coins.LTC:
                 if self.coin_clients[coin].get("connection_type") != "electrum":
                     try:
