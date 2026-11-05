@@ -2514,11 +2514,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         input_vsize = 68
         est_vsize = 10 + len(parsed_tx.vout) * 34 + input_vsize
-        if isinstance(feerate, int):
-            fee_per_vbyte = max(1, feerate // 1000)
-        else:
-            fee_per_vbyte = max(1, int(feerate * 100000))
-        est_fee = est_vsize * fee_per_vbyte
+        feerate_satkb = (
+            feerate if isinstance(feerate, int) else int(feerate * 100000000)
+        )
+        est_fee = max(est_vsize, self.feeForVSize(feerate_satkb, est_vsize))
 
         selected_utxos = []
         total_input = 0
@@ -2530,7 +2529,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             est_vsize = (
                 10 + len(parsed_tx.vout) * 34 + len(selected_utxos) * input_vsize + 34
             )
-            est_fee = est_vsize * fee_per_vbyte
+            est_fee = max(est_vsize, self.feeForVSize(feerate_satkb, est_vsize))
             target = total_output if subfee else total_output + est_fee
             if total_input >= target:
                 break
@@ -2559,13 +2558,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             dummy_witness_stack
         )
 
-        feerate_satkb = (
-            feerate if isinstance(feerate, int) else int(feerate * 100000000)
-        )
         min_relay_fee = 250
 
         rough_vsize = 10 + (len(funded_tx.vout) + 1) * 34 + len(selected_utxos) * 68
-        rough_fee = max(round(feerate_satkb * rough_vsize / 1000), min_relay_fee)
+        rough_fee = max(self.feeForVSize(feerate_satkb, rough_vsize), min_relay_fee)
         rough_change = (
             (total_input - total_output)
             if subfee
@@ -2590,7 +2586,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             final_vsize = self.getTxVSize(
                 funded_tx, add_witness_bytes=witness_bytes_len_est
             )
-            final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
+            final_fee = max(self.feeForVSize(feerate_satkb, final_vsize), min_relay_fee)
             change = (
                 (total_input - total_output)
                 if subfee
@@ -2605,14 +2601,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     funded_tx, add_witness_bytes=witness_bytes_len_est
                 )
                 final_fee = max(
-                    round(feerate_satkb * final_vsize / 1000), min_relay_fee
+                    self.feeForVSize(feerate_satkb, final_vsize), min_relay_fee
                 )
                 change = 0
         else:
             final_vsize = self.getTxVSize(
                 funded_tx, add_witness_bytes=witness_bytes_len_est
             )
-            final_fee = max(round(feerate_satkb * final_vsize / 1000), min_relay_fee)
+            final_fee = max(self.feeForVSize(feerate_satkb, final_vsize), min_relay_fee)
             change = 0
 
         if subfee:
@@ -3636,7 +3632,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         witness_bytes = 109
         vsize = self.getTxVSize(tx, add_witness_bytes=witness_bytes)
-        pay_fee = round(fee_rate * vsize / 1000)
+        pay_fee = self.feeForVSize(fee_rate, vsize)
         self._log.info_s(
             f"BLockSpendTx fee_rate, vsize, fee: {fee_rate}, {vsize}, {pay_fee}."
         )

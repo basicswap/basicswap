@@ -9,6 +9,7 @@ import socks
 import threading
 
 from enum import IntEnum
+from math import ceil
 
 from basicswap.basicswap_util import (
     TxLockTypes,
@@ -100,6 +101,10 @@ class CoinInterface:
     @staticmethod
     def est_tx_input_vsize() -> int:
         return 0
+
+    @staticmethod
+    def feeForVSize(fee_rate: int, vsize: int) -> int:
+        return ceil(fee_rate * vsize / 1000)
 
     def getSplitTxFees(self) -> tuple[int, int, int]:
         return 0, 0, 0

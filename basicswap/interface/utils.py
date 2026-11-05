@@ -6,8 +6,6 @@
 
 import time
 
-from math import ceil
-
 from basicswap.contrib.test_framework.messages import COIN
 from basicswap.db import (
     Concepts,
@@ -151,10 +149,6 @@ class FeeValidator:
         if actual < expected:
             return False
         return actual - expected < 10
-
-    @staticmethod
-    def feeForVSize(fee_rate: int, vsize: int) -> int:
-        return ceil(fee_rate * vsize / 1000)
 
     def getSplitTxFees(self) -> tuple[int, int, int]:
         """(fixed, per_output, per_input) fees to split the wallet into outputs."""

@@ -1202,13 +1202,13 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 0, self.getPubkeyHashDest(self.decodeAddress(change_addr))
             )
             tx_obj.vout.append(change_txo)
-            fee: int = self.estimateSignedTxSize(tx_obj) * feerate // 1000
+            fee: int = self.feeForVSize(feerate, self.estimateSignedTxSize(tx_obj))
             if excess - fee > DUST_THRESHOLD:
                 change_txo.value = excess - fee
             else:
                 # Any dust change not returned to the wallet is left to the fee.
                 tx_obj.vout.pop()
-                fee = self.estimateSignedTxSize(tx_obj) * feerate // 1000
+                fee = self.feeForVSize(feerate, self.estimateSignedTxSize(tx_obj))
                 ensure(excess >= fee, "Insufficient funds")
 
             tx_bytes = tx_obj.serialize()
@@ -1250,7 +1250,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 change_script = self.getPubkeyHashDest(self.decodeAddress(change_addr))
                 tx_obj.vout.append(self.txoType()(change, change_script))
 
-            fee: int = self.estimateSignedTxSize(tx_obj) * feerate // 1000
+            fee: int = self.feeForVSize(feerate, self.estimateSignedTxSize(tx_obj))
             ensure(
                 tx_obj.vout[0].value - fee > DUST_THRESHOLD, "Amount too low after fee"
             )
@@ -2227,7 +2227,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         witness_bytes = 115
         size = len(tx.serialize()) + witness_bytes
-        pay_fee = round(fee_rate * size / 1000)
+        pay_fee = self.feeForVSize(fee_rate, size)
         self._log.info_s(
             f"BLockSpendTx fee_rate, vsize, fee: {fee_rate}, {size}, {pay_fee}."
         )

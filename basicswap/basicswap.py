@@ -3107,11 +3107,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             est_vsize = len(legacy_utxos) * 150 + 40
             fee_rate, _ = ci.get_fee_rate(ci._conf_target)
-            if isinstance(fee_rate, int):
-                fee_per_vbyte = max(1, fee_rate // 1000)
-            else:
-                fee_per_vbyte = max(1, int(fee_rate * 100000))
-            estimated_fee_sats = est_vsize * fee_per_vbyte
+            if not isinstance(fee_rate, int):
+                fee_rate = ci.make_int(fee_rate, r=1)
+            estimated_fee_sats = max(est_vsize, ci.feeForVSize(fee_rate, est_vsize))
 
             if total_legacy_sats <= estimated_fee_sats * 2:
                 return {
@@ -4491,8 +4489,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
             if "prefunded_itx" not in extra_options:
                 # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
-                estimated_fee: int = (
-                    msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
+                estimated_fee: int = ci_from.feeForVSize(
+                    msg_buf.fee_rate_from, ci_from.est_lock_tx_vsize()
                 )
                 self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
             elif ci_from.useBackend():
@@ -5146,9 +5144,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if coin_type in self.xmr_based_coins:
             # Fee estimate must be manually initiated
             return None
-        tx_vsize = self.ci(coin_type).getHTLCSpendTxVSize()
-        est_fee = (fee_rate * tx_vsize) / 1000
-        return est_fee
+        ci = self.ci(coin_type)
+        return ci.feeForVSize(ci.make_int(fee_rate, r=1), ci.getHTLCSpendTxVSize())
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
@@ -6828,7 +6825,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # TODO: Better tx size estimate
             fee_rate_to = xmr_offer.b_fee_rate
-            estimated_fee: int = fee_rate_to * ci_to.est_lock_tx_vsize() // 1000
+            estimated_fee: int = ci_to.feeForVSize(
+                fee_rate_to, ci_to.est_lock_tx_vsize()
+            )
 
             # A plan leg's reserved outputs were sized to fund its lock.
             if (
@@ -7588,7 +7587,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # TODO: Better tx size estimate
             fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
             fee_rate_from = ci_to.make_int(fee_rate)
-            estimated_fee: int = fee_rate_from * ci_to.est_lock_tx_vsize() // 1000
+            estimated_fee: int = ci_to.feeForVSize(
+                fee_rate_from, ci_to.est_lock_tx_vsize()
+            )
             self.ensureWalletCanSend(
                 ci_to,
                 offer.swap_type,
@@ -8159,13 +8160,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = ci.getHTLCSpendTxVSize()
-        tx_fee = (fee_rate * tx_vsize) / 1000
+        tx_fee = ci.feeForVSize(ci.make_int(fee_rate, r=1), tx_vsize)
 
-        self.log.debug(
-            f"Redeem tx fee {ci.format_amount(tx_fee, conv_int=True, r=1)}, rate {fee_rate}"
-        )
+        self.log.debug(f"Redeem tx fee {ci.format_amount(tx_fee)}, rate {fee_rate}")
 
-        amount_out = prev_amount - ci.make_int(tx_fee, r=1)
+        amount_out = prev_amount - tx_fee
         ensure(amount_out > 0, "Amount out <= 0")
 
         if addr_redeem_out is None:
@@ -8315,13 +8314,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = ci.getHTLCSpendTxVSize(False)
-        tx_fee = (fee_rate * tx_vsize) / 1000
+        tx_fee = ci.feeForVSize(ci.make_int(fee_rate, r=1), tx_vsize)
 
-        self.log.debug(
-            f"Refund tx fee {ci.format_amount(tx_fee, conv_int=True, r=1)}, rate {fee_rate}"
-        )
+        self.log.debug(f"Refund tx fee {ci.format_amount(tx_fee)}, rate {fee_rate}")
 
-        amount_out = ci.make_int(prevout["amount"], r=1) - ci.make_int(tx_fee, r=1)
+        amount_out = ci.make_int(prevout["amount"], r=1) - tx_fee
         if amount_out <= 0:
             raise ValueError("Refund amount out <= 0")
 
