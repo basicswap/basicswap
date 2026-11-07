@@ -7,7 +7,7 @@
 import time
 from abc import ABC, abstractmethod
 
-from .util import FEE_RATE_CACHE_SECONDS, TemporaryError
+from .util import TemporaryError
 
 
 class WalletBackend(ABC):
@@ -204,6 +204,7 @@ class ElectrumBackend(WalletBackend):
 
         self._cached_fee = {}
         self._cached_fee_time = {}
+        self._fee_cache_ttl = 300
 
         self._tx_detail_cache = {}
         self._tx_detail_cache_max = 10000
@@ -605,7 +606,7 @@ class ElectrumBackend(WalletBackend):
         now = time.time()
         cache_key = blocks
         if cache_key in self._cached_fee:
-            if (now - self._cached_fee_time.get(cache_key, 0)) < FEE_RATE_CACHE_SECONDS:
+            if (now - self._cached_fee_time.get(cache_key, 0)) < self._fee_cache_ttl:
                 return self._cached_fee[cache_key]
 
         try:

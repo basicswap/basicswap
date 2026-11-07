@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import time
+
 from math import ceil
 
 from basicswap.contrib.test_framework.messages import COIN
@@ -11,7 +13,7 @@ from basicswap.db import (
     Concepts,
     strConcepts,
 )
-from basicswap.util import toBool as make_boolean
+from basicswap.util import FEE_RATE_CACHE_SECONDS, toBool as make_boolean
 
 
 class FeeValidator:
@@ -136,9 +138,13 @@ class FeeValidator:
         return None, None
 
     def getRelayFee(self) -> float:
-        if self._relay_fee is None:
-            self._relay_fee = self.rpc("getnetworkinfo")["relayfee"]
-        return self._relay_fee
+        now: float = time.time()
+        cached = self._relay_fee
+        if cached is not None and now - cached[0] < FEE_RATE_CACHE_SECONDS:
+            return cached[1]
+        relay_fee: float = self.rpc("getnetworkinfo")["relayfee"]
+        self._relay_fee = (now, relay_fee)
+        return relay_fee
 
     @staticmethod
     def compareFeeRates(actual: int, expected: int) -> bool:

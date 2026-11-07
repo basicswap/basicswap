@@ -1439,7 +1439,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             if cached is not None and now - cached[0] < FEE_RATE_CACHE_SECONDS:
                 return cached[1]
             fee_rate_and_src = self._estimateFeeRateRPC(conf_target)
-            self._rpc_fee_rate_cache[conf_target] = (now, fee_rate_and_src)
+            if fee_rate_and_src[1] == "estimatesmartfee":
+                self._rpc_fee_rate_cache[conf_target] = (now, fee_rate_and_src)
             return fee_rate_and_src
 
         fee_rate, rate_src = try_get_fee_rate(self, conf_target)
