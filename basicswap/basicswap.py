@@ -17393,7 +17393,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     query_suffix += " AND expire_at <= :now"
                 elif active_state == "revoked":
                     query_suffix += " AND active_ind != 1"
-            else:
+            elif filters.get("offer_id", None) is None:
                 query_suffix += " AND (expire_at > :now AND active_ind = 1)"
 
             filter_offer_id = filters.get("offer_id", None)
