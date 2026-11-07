@@ -12,12 +12,12 @@ from basicswap.interface.wow.chainparams import params
 from basicswap.interface.xmr.core import XMRPrepare
 from basicswap.interface.prepare_util import PrepareContext, getOSDirNames
 
-WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.3.0")
+WOWNERO_VERSION = os.getenv("WOWNERO_VERSION", "0.11.6.0")
 WOWNERO_VERSION_TAG = os.getenv("WOWNERO_VERSION_TAG", "")
-WOW_SITE_COMMIT = (
-    "5400b3fa3e76eab2788d8e93edbb70846a62e57a"  # Lock hashes.txt to wownero version
-)
-wownero_signers = {"wowario": ("AB3A2F725818FCFF2794841C793504B449C69220",)}
+wownero_signers = {
+    "jwinterm": ("480BA7FFEC261AA0956487B92FA22C51D5E39B7A",),
+    "wowario": ("AB3A2F725818FCFF2794841C793504B449C69220",),
+}
 
 WOW_RPC_HOST = os.getenv("WOW_RPC_HOST", "127.0.0.1")
 WOW_RPC_PORT = int(os.getenv("WOW_RPC_PORT", 34598))
@@ -84,14 +84,16 @@ class WOWPrepare(XMRPrepare):
                 machine = "x86_64"
             architecture = machine + "-w64-mingw32"
 
+        release_base_url = (
+            f"https://github.com/wownero/wownero/releases/download/v{self.version}"
+        )
         release_filename = f"wownero-{architecture}-v{self.version}.{use_file_ext}"
-        release_url = f"https://codeberg.org/wownero/wownero/releases/download/v{self.version}/{release_filename}"
+        release_url = f"{release_base_url}/{release_filename}"
         release_path = os.path.join(bin_dir, release_filename)
         ctx.download_release(release_url, release_path, extra_opts)
 
-        assert_filename = f"wownero-{self.version}-hashes.txt"
-        # Get the hashes file as of WOW_SITE_COMMIT
-        assert_url = f"https://codeberg.org/wownero/wownero.org-website/raw/commit/{WOW_SITE_COMMIT}/hashes.txt"
+        assert_filename = f"wownero-{self.version}-SHA256SUMS.txt.asc"
+        assert_url = f"{release_base_url}/SHA256SUMS.txt.asc"
         assert_path = os.path.join(bin_dir, assert_filename)
         if not os.path.exists(assert_path):
             ctx.download_file(assert_url, assert_path)
@@ -100,7 +102,7 @@ class WOWPrepare(XMRPrepare):
 
     def getPubkeyUrls(self, ctx: PrepareContext) -> list:
         return [
-            "https://codeberg.org/wownero/wownero/raw/branch/master/utils/gpg_keys/wowario.asc"
+            "https://raw.githubusercontent.com/wownero/wownero/master/utils/gpg_keys/wowario.asc"
         ]
 
     def getWalletConfFilename(self) -> str:
