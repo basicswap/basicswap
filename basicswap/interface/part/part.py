@@ -198,6 +198,30 @@ class PARTInterface(BTCInterface):
 
         return encodeStealthAddress(prefix_byte, scan_pubkey, spend_pubkey)
 
+    def lockWatchOnlyOutput(self, txid_hex: str, vout: int) -> None:
+        # Particl's blinded coin selection doesn't skip watch-only outputs
+        try:
+            self.rpc_wallet(
+                "lockunspent", [False, [{"txid": txid_hex, "vout": vout}], True]
+            )
+        except Exception as e:
+            if "expected unspent output" not in str(e):
+                self._log.warning(
+                    f"Locking watch-only output {self._log.id(txid_hex)}:{vout} failed: {e}"
+                )
+
+    def unlockTxOutputs(self, txid_hex: str) -> None:
+        try:
+            locked = [
+                o for o in self.rpc_wallet("listlockunspent") if o["txid"] == txid_hex
+            ]
+            if len(locked) > 0:
+                self.rpc_wallet("lockunspent", [True, locked])
+        except Exception as e:
+            self._log.warning(
+                f"Unlocking outputs of {self._log.id(txid_hex)} failed: {e}"
+            )
+
     def getWitnessStackSerialisedLength(self, witness_stack) -> int:
         length: int = 0
         if len(witness_stack) > 0 and isinstance(witness_stack[0], list):
@@ -1381,6 +1405,8 @@ class PARTInterfaceBlind(PARTInterface):
                 )
                 continue
             ensure(output["type"] == "blind", "Output is not blind")
+            if not bid_sender:
+                self.lockWatchOnlyOutput(txid_hex, output["vout"])
             tx_amount = self.make_int(output["amount"])
             if bid_sender:
                 tx_amount *= -1
@@ -1433,6 +1459,7 @@ class PARTInterfaceBlind(PARTInterface):
             )
             self.rpc_wallet("rescanblockchain", [restore_height])
 
+        self.unlockTxOutputs(chain_b_lock_txid.hex())
         butxos = self.rpc_wallet("listunspentblind", [1, 9999999, [sx_addr]])
         utxo = None
         for blind_utxo in butxos:
