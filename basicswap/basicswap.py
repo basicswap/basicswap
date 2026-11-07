@@ -3530,6 +3530,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 BidStates.XMR_SWAP_FAILED_REFUNDED,
                 BidStates.XMR_SWAP_FAILED_SWIPED,
                 BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
                 BidStates.SWAP_TIMEDOUT,
             ):
                 if is_offer_creator:
@@ -3798,6 +3799,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 BidStates.XMR_SWAP_FAILED_REFUNDED,
                 BidStates.XMR_SWAP_FAILED_SWIPED,
                 BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
                 BidStates.SWAP_COMPLETED,
                 BidStates.SWAP_TIMEDOUT,
             ):
@@ -9250,6 +9252,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                 if bid.xmr_b_lock_tx is None:
                     # Nothing was locked on chain B, there is nothing to recover.
+                    bid.setState(BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER)
+                    self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+                    self.commitDB()
                     rv = True  # Remove from swaps_in_progress
                 elif was_sent:
                     if (

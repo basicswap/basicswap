@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from enum import IntEnum, auto
 
 CURRENT_DB_VERSION = 42
-CURRENT_DB_DATA_VERSION = 10
+CURRENT_DB_DATA_VERSION = 11
 
 
 class Concepts(IntEnum):

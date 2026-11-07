@@ -177,7 +177,8 @@ const BidPage = {
     31: { phase: 'failed', order: 99, label: 'Expired' },         // BID_EXPIRED
     32: { phase: 'negotiation', order: 3.5, label: 'Negotiation' }, // BID_AACCEPT_DELAY
     33: { phase: 'failed', order: 89, label: 'Failed' },          // BID_AACCEPT_FAIL
-    34: { phase: 'negotiation', order: 0.4, label: 'Negotiation' }  // CONNECT_REQ_SENT
+    34: { phase: 'negotiation', order: 0.4, label: 'Negotiation' }, // CONNECT_REQ_SENT
+    41: { phase: 'failed', order: 94.5, label: 'Failed' }         // XMR_SWAP_FAILED_NOTHING_TO_RECOVER
   },
 
   init: function(bidId, bidStateInd, createdAtTimestamp, stateTimeTimestamp, options) {

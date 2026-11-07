@@ -174,6 +174,9 @@ def upgradeDatabaseData(self, data_version):
             ):
                 addBidState(self, state, now, cursor)
 
+        if data_version > 0 and data_version < 11:
+            addBidState(self, BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER, now, cursor)
+
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
         self.commitDB()
