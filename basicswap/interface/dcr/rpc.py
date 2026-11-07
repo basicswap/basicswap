@@ -7,7 +7,7 @@
 
 import json
 import traceback
-from basicswap.rpc import Jsonrpc
+from basicswap.rpc import Jsonrpc, RPCError
 
 
 def callrpc(rpc_port, auth, method, params=[], host="127.0.0.1", timeout=None):
@@ -23,7 +23,7 @@ def callrpc(rpc_port, auth, method, params=[], host="127.0.0.1", timeout=None):
         raise ValueError("RPC server error " + str(ex) + ", method: " + method)
 
     if "error" in r and r["error"] is not None:
-        raise ValueError("RPC error " + str(r["error"]))
+        raise RPCError(r["error"])
 
     return r["result"]
 

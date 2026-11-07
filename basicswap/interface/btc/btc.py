@@ -113,7 +113,7 @@ from basicswap.basicswap_util import (
 )
 
 from basicswap.chainparams import Coins
-from basicswap.rpc import make_rpc_func, openrpc
+from basicswap.rpc import RPCError, make_rpc_func, openrpc
 
 SEQUENCE_LOCKTIME_GRANULARITY = 9  # 512 seconds
 SEQUENCE_LOCKTIME_TYPE_FLAG = 1 << 22
@@ -424,7 +424,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             traceback.print_exc()
             raise ValueError("RPC Server Error " + str(ex))
         if "error" in r and r["error"] is not None:
-            raise ValueError("RPC error " + str(r["error"]))
+            raise RPCError(r["error"])
         return r["result"]
 
     def close_rpc(self, rpc_conn):
