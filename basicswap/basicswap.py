@@ -11977,6 +11977,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if self.isOfferRevoked(offer_id, msg["from"]):
             raise RevokedOffer(f"Offer has been revoked {offer_id.hex()}.")
 
+        # validateFeeRate can call the daemon or an Electrum server, keep it outside the DB session
+        existing_offer = self.getOffer(offer_id)
+        if offer_data.swap_type == SwapTypes.XMR_SWAP and (
+            existing_offer is None or existing_offer.active_ind == 1
+        ):
+            ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
+            ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
+
         pk_from: bytes = getMsgPubkey(self, msg)
         try:
             cursor = self.openDB()
@@ -11997,10 +12005,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise RevokedOffer(
                     f"Ignoring inactive offer {offer_id.hex()}, active_ind: {existing_offer.active_ind}."
                 )
-
-            if offer_data.swap_type == SwapTypes.XMR_SWAP:
-                ci_from.validateFeeRate(offer_data.fee_rate_from, Concepts.OFFER)
-                ci_to.validateFeeRate(offer_data.fee_rate_to, Concepts.OFFER)
 
             if existing_offer is None:
 
