@@ -44,6 +44,15 @@ class DASHInterface(BTCInterface):
     def decodeAddress(self, address: str) -> bytes:
         return decodeAddress(address)[1:]
 
+    def createWallet(self, wallet_name: str, password: str = "") -> None:
+        if self._connection_type == "electrum":
+            return
+        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
+        self.rpc(
+            "createwallet",
+            [wallet_name, False, True, password, False, self._use_descriptors, True],
+        )
+
     def getWalletSeedID(self) -> str:
         hdseed: str = self.rpc_wallet("dumphdinfo")["hdseed"]
         return self.getSeedHash(bytes.fromhex(hdseed)).hex()

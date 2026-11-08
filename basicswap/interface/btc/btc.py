@@ -468,18 +468,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                         )
                         try:
-                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-                            self.rpc(
-                                "createwallet",
-                                [
-                                    self._rpc_wallet,
-                                    False,
-                                    True,
-                                    "",
-                                    False,
-                                    self._use_descriptors,
-                                ],
-                            )
+                            self.createWallet(self._rpc_wallet)
                             wallets = self.rpc("listwallets")
                             if self.getWalletSeedID() == "Not found":
                                 self._log.info(
@@ -5210,18 +5199,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                             self._log.info(
                                 f'Creating wallet "{self._rpc_wallet}" for {self.coin_name()}.'
                             )
-                            # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
-                            self.rpc(
-                                "createwallet",
-                                [
-                                    self._rpc_wallet,
-                                    False,
-                                    True,
-                                    password,
-                                    False,
-                                    self._use_descriptors,
-                                ],
-                            )
+                            self.createWallet(self._rpc_wallet, password)
                     else:
                         raise
 
