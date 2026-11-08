@@ -176,6 +176,24 @@ def upgradeDatabaseData(self, data_version):
 
         if data_version > 0 and data_version < 11:
             addBidState(self, BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER, now, cursor)
+            # Deactivating these again after the re-check would count them twice
+            for addr_from, bid_addr in cursor.execute(
+                "SELECT o.addr_from, b.bid_addr FROM bids b"
+                " JOIN offers o ON o.offer_id = b.offer_id"
+                " WHERE b.state = :state AND b.active_ind = 1"
+                " AND COALESCE(b.in_progress, 0) = 0",
+                {"state": int(BidStates.XMR_SWAP_FAILED)},
+            ).fetchall():
+                cursor.execute(
+                    "UPDATE knownidentities SET num_recv_bids_failed = num_recv_bids_failed - 1"
+                    " WHERE address = :address AND num_recv_bids_failed > 0",
+                    {"address": addr_from},
+                )
+                cursor.execute(
+                    "UPDATE knownidentities SET num_sent_bids_failed = num_sent_bids_failed - 1"
+                    " WHERE address = :address AND num_sent_bids_failed > 0",
+                    {"address": bid_addr},
+                )
             # loadFromDB reloads these and the XMR_SWAP_FAILED branch re-checks chain B
             cursor.execute(
                 "UPDATE bids SET in_progress = 1 WHERE state = :state AND active_ind = 1",
