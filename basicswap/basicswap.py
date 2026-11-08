@@ -807,25 +807,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self._wallet_manager = WalletManager(self, self.log)
 
-        self._prepare_rpc_pooling()
-
-    def _prepare_rpc_pooling(self):
-        if "rpc_connection_pool" not in self.settings:
-            self.settings["rpc_connection_pool"] = {
-                "enabled": True,
-                "max_connections_per_daemon": 5,
-            }
-            self._save_settings()
-
-    def _enable_rpc_pooling(self):
-        rpc_pool_settings = self.settings.get("rpc_connection_pool", {})
-        if rpc_pool_settings.get("enabled", False):
-            from basicswap import rpc
-            from basicswap import rpc_pool
-
-            rpc.enable_rpc_pooling(rpc_pool_settings)
-            rpc_pool.set_pool_logger(self.log)
-
     def _save_settings(self):
         import shutil
         from basicswap import config as cfg
@@ -856,13 +837,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if self._price_fetch_thread and self._price_fetch_thread.is_alive():
             self._price_fetch_thread.join(timeout=5)
             self.log.info("Background price fetching stopped")
-
-        try:
-            from basicswap.rpc_pool import close_all_pools
-
-            close_all_pools()
-        except Exception as e:
-            self.log.debug(f"Error closing RPC pools: {e}")
 
         try:
             from basicswap.ui.page_amm import stop_amm_process, get_amm_status
@@ -1585,7 +1559,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Could not get electrum server version for {c}: {e}"
                     )
-        self._enable_rpc_pooling()
 
         for c in self.activeCoins():
             if self.coin_clients[c]["connection_type"] == "electrum":

@@ -15,8 +15,6 @@ DEFAULT_SECURE_COOKIES = False
 # Send the mercy keyshare after swiping a peer, letting them recover chain B.
 # Costs a tx fee.
 DEFAULT_ALTRUISTIC = True
-DEFAULT_RPC_POOL_ENABLED = True
-DEFAULT_RPC_POOL_MAX_CONNECTIONS = 5
 TEST_DATADIRS = os.path.expanduser(os.getenv("DATADIRS", "/tmp/basicswap"))
 DEFAULT_TEST_BINDIR = os.path.expanduser(
     os.getenv("DEFAULT_TEST_BINDIR", os.path.join("~", ".basicswap", "bin"))
