@@ -13306,6 +13306,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def watchXmrSwap(self, bid, offer, xmr_swap, cursor=None) -> None:
         self.log.debug(f"Adaptor-sig swap in progress, bid {self.log.id(bid.bid_id)}.")
         self.swaps_in_progress[bid.bid_id] = (bid, offer)
+        bid.in_progress = 1
+        if bid.state == BidStates.XMR_SWAP_FAILED:
+            return
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -13331,7 +13334,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 TxTypes.XMR_SWAP_A_LOCK_REFUND,
                 SwapTypes.XMR_SWAP,
             )
-        bid.in_progress = 1
 
         # Watch outputs for chain A lock tx if txid is unknown (BCH)
         if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.txid is None:
