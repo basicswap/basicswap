@@ -1901,14 +1901,6 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             if "expected unspent output" not in str(e):
                 raise
 
-    def swipePaysKey(
-        self, swipe_tx_bytes: bytes, swipe_txid_hex: str, key: bytes
-    ) -> bool:
-        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
-        swipe_tx = self.loadTx(swipe_tx_bytes)
-        dest: bytes = self.getPubkeyHashDest(self.pkh(self.getPubkey(key)))
-        return bytes(swipe_tx.vout[0].script_pubkey) == bytes(dest)
-
     def createMercyTx(
         self,
         refund_swipe_tx_bytes: bytes,
@@ -1935,9 +1927,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             push_script_data(mercy_script, b"XBSW")
             push_script_data(mercy_script, keyshare)
             tx.vout.append(self.txoType()(0, bytes(mercy_script)))
-        # Back to the same script by default, which is the wallet's own.  A swipe
-        # paid to a key derived for the swap has to name a destination instead,
-        # or the coin stays on a key the wallet knows nothing about.
+        # Back to the swipe's script without a destination, which leaves the coin
+        # on a key derived for the swap that the wallet knows nothing about.
         dest_script: bytes = (
             prevout_script
             if addr_to is None
@@ -1963,14 +1954,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
                 ),
             )
         )
-        if key is None:
-            # The swipe paid a pooled address the wallet holds.
-            # Full serialisation, NoWitness leaves signrawtransaction nowhere to
-            # write the signature script
-            return self.signTxWithWallet(tx.serialize())
-
-        # A key derived for this swap instead, which the wallet does not hold, so
-        # nothing else can spend the output and it is signed here.
+        # The wallet does not hold the swap derived key, so nothing else can spend the output
         sig = self.signTx(key, tx.serialize(), 0, prevout_script, prevout_value)
         return self.setTxSignature(tx.serialize(), [sig, self.getPubkey(key)])
 

@@ -244,12 +244,9 @@ class CoinInterface:
         # swipe, that publishes it while the swipe can still be replaced.
         return False
 
-    def swipePaysKey(
-        self, swipe_tx_bytes: bytes, swipe_txid_hex: str, key: bytes
-    ) -> bool:
-        # TODO: Remove.  Bids whose swipe was built before the payout moved to a
-        # swap derived key pay a pooled address, and their mercy tx has to be
-        # signed by the wallet as it was then.
+    def swipePaysKey(self) -> bool:
+        # Whether the swipe pays the swap's KA_SWIPE key.  Where it pays a wallet
+        # address instead, the wallet signs the mercy tx.
         return True
 
     def mercySpendImportsKey(self) -> bool:

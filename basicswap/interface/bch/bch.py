@@ -1223,6 +1223,10 @@ class BCHInterface(BTCInterface):
     def lockNonSegwitPrevouts(self) -> None:
         pass
 
+    def swipePaysKey(self) -> bool:
+        # The covenant pays the swipe to dest_af, fixed when the swap is set up
+        return False
+
     def prepareMercySpend(self, key: bytes, rescan_from: int) -> None:
         # The swipe paid a key derived for the swap.  Imported here rather than
         # when the swipe was built, so the wallet cannot select the output until

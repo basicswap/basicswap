@@ -5439,14 +5439,6 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
     def canSendMercyTx(self) -> bool:
         return True
 
-    def swipePaysKey(
-        self, swipe_tx_bytes: bytes, swipe_txid_hex: str, key: bytes
-    ) -> bool:
-        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
-        swipe_tx = self.loadTx(swipe_tx_bytes)
-        dest: bytes = self.getScriptForPubkeyHash(self.pkh(self.getPubkey(key)))
-        return bytes(swipe_tx.vout[0].scriptPubKey) == bytes(dest)
-
     def createMercyTx(
         self,
         refund_swipe_tx_bytes: bytes,
@@ -5470,9 +5462,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         tx.vin.append(CTxIn(COutPoint(b2i(refund_swipe_tx_id), 0)))
         if keyshare is not None:
             tx.vout.append(self.txoType()(0, CScript([OP_RETURN, b"XBSW", keyshare])))
-        # Back to the same script by default, which is the wallet's own.  A swipe
-        # paid to a key derived for the swap has to name a destination instead,
-        # or the coin stays on a key the wallet knows nothing about.
+        # Back to the swipe's script without a destination, which leaves the coin
+        # on a key derived for the swap that the wallet knows nothing about.
         dest_script: bytes = (
             prevout_script if addr_to is None else self.getDestForAddress(addr_to)
         )
@@ -5501,12 +5492,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 ),
             )
         )
-        if key is None:
-            # The swipe paid a pooled address the wallet holds
-            return self.signTxWithWallet(tx.serialize())
-
-        # A key derived for this swap instead, which the wallet does not hold, so
-        # nothing else can spend the output and it is signed here.
+        # The wallet does not hold the swap derived key, so nothing else can spend the output
         script_code = CScript(
             [
                 OP_DUP,
