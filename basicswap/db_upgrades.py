@@ -176,6 +176,11 @@ def upgradeDatabaseData(self, data_version):
 
         if data_version > 0 and data_version < 11:
             addBidState(self, BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER, now, cursor)
+            # loadFromDB reloads these and the XMR_SWAP_FAILED branch re-checks chain B
+            cursor.execute(
+                "UPDATE bids SET in_progress = 1 WHERE state = :state AND active_ind = 1",
+                {"state": int(BidStates.XMR_SWAP_FAILED)},
+            )
 
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
