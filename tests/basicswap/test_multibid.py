@@ -12,7 +12,7 @@ import unittest
 
 from types import SimpleNamespace
 
-from basicswap.basicswap_util import SwapTypes
+from basicswap.basicswap_util import ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER, SwapTypes
 from basicswap.bidplanner import (
     AUTO_ACCEPT_ANY,
     AUTO_ACCEPT_NONE,
@@ -695,9 +695,11 @@ class TestRateScale(unittest.TestCase):
 
         self.assertEqual(market_rate, xmr(3.0))
         self.assertEqual(limit_rate, xmr(3.15))
+        # The receive grosses up by the lock spend fee, the buffer at a zero rate
+        total_receive: int = ltc(2) + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
         self.assertEqual(plan.num_bids, 1)
-        self.assertEqual(plan.total_receive, ltc(2))
-        self.assertEqual(plan.total_spend, xmr(6))
+        self.assertEqual(plan.total_receive, total_receive)
+        self.assertEqual(plan.total_spend, total_receive * 3 * 10**4)
         self.assertEqual(plan.unfilled, 0)
 
     def test_reports_the_rate_against_market_at_par(self):
@@ -720,8 +722,8 @@ class TestRateScale(unittest.TestCase):
         self.assertEqual(described["pct_vs_market"], 0.0)
         self.assertEqual(described["avg_rate"], "3.000000000000")
         self.assertEqual(described["market_rate"], "3.000000000000")
-        self.assertEqual(described["total_receive"], "2.00000000")
-        self.assertEqual(described["total_spend"], "6.000000000000")
+        self.assertEqual(described["total_receive"], "2.00000012")
+        self.assertEqual(described["total_spend"], "6.000000360000")
 
 
 def outs(*values):

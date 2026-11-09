@@ -81,6 +81,10 @@ class PARTInterface(BTCInterface):
         return 200
 
     @staticmethod
+    def xmr_swap_a_lock_refund_tx_vsize() -> int:
+        return 204
+
+    @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         return 138
 
@@ -322,6 +326,10 @@ class PARTInterfaceBlind(PARTInterface):
     @staticmethod
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 1032
+
+    def estLockSpendFee(self, fee_rate: int) -> int:
+        # The daemon sets the fee from the rate
+        return self.feeForVSize(fee_rate, self.xmr_swap_a_lock_spend_tx_vsize())
 
     @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
@@ -1613,10 +1621,6 @@ class PARTInterfaceAnon(PARTInterface):
     @staticmethod
     def est_lock_tx_vsize() -> int:
         return 1153
-
-    @staticmethod
-    def xmr_swap_a_lock_spend_tx_vsize() -> int:
-        raise ValueError("Not possible")
 
     @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:

@@ -368,12 +368,14 @@ def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -
 
     A coin that sets its own redeem fee overrides that with the rate it will
     actually pay."""
-    reverse_bid = swap_client.is_reverse_ads_bid(coin_from, coin_to)
-    redeem_vsize = (
-        ci_from.xmr_swap_b_lock_spend_tx_vsize()
-        if reverse_bid
-        else ci_from.xmr_swap_a_lock_spend_tx_vsize()
-    )
+    if swap_client.is_reverse_ads_bid(coin_from, coin_to):
+        b_lock_spend_vsize: int = ci_from.xmr_swap_b_lock_spend_tx_vsize()
+
+        def lock_spend_fee(rate: int) -> int:
+            return ci_from.feeForVSize(rate, b_lock_spend_vsize)
+
+    else:
+        lock_spend_fee = ci_from.estLockSpendFee
     wallet_rate = ci_from.getRedeemFeeRate() if candidates else None
     live_fee = None
     fees = {}
@@ -381,7 +383,7 @@ def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -
         _, xmr_offer = swap_client.getXmrOffer(c.offer_id)
         if xmr_offer:
             rate = wallet_rate if wallet_rate is not None else xmr_offer.a_fee_rate
-            fees[c.offer_id] = ci_from.feeForVSize(rate or 0, redeem_vsize)
+            fees[c.offer_id] = lock_spend_fee(rate or 0)
         else:
             if live_fee is None:
                 live_fee = live_redeem_fee(ci_from)

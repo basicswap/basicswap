@@ -1222,12 +1222,11 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
             coin_from, conf_target
         )
         fee_rate_int = ci_from.make_int(from_fee_override, r=1)
-        lock_spend_tx_vsize = (
-            ci_from.xmr_swap_b_lock_spend_tx_vsize()
+        lock_spend_tx_fee: int = (
+            ci_from.feeForVSize(fee_rate_int, ci_from.xmr_swap_b_lock_spend_tx_vsize())
             if reverse_bid
-            else ci_from.xmr_swap_a_lock_spend_tx_vsize()
+            else ci_from.estLockSpendFee(fee_rate_int)
         )
-        lock_spend_tx_fee = ci_from.feeForVSize(fee_rate_int, lock_spend_tx_vsize)
         rv["fee"] = ci_from.format_amount(lock_spend_tx_fee)
         rv["fee_rate"] = ci_from.format_amount(fee_rate_int)
         rv["fee_src"] = fee_src

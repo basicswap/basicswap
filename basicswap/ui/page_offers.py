@@ -324,13 +324,13 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 )
                 parsed_data["from_fee_override"] = page_data["from_fee_override"]
 
-                lock_spend_tx_vsize = (
-                    ci_from.xmr_swap_b_lock_spend_tx_vsize()
+                from_fee_rate: int = ci_from.make_int(from_fee_override, r=1)
+                lock_spend_tx_fee: int = (
+                    ci_from.feeForVSize(
+                        from_fee_rate, ci_from.xmr_swap_b_lock_spend_tx_vsize()
+                    )
                     if reverse_bid
-                    else ci_from.xmr_swap_a_lock_spend_tx_vsize()
-                )
-                lock_spend_tx_fee = ci_from.feeForVSize(
-                    ci_from.make_int(from_fee_override, r=1), lock_spend_tx_vsize
+                    else ci_from.estLockSpendFee(from_fee_rate)
                 )
                 page_data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(
                     lock_spend_tx_fee
@@ -1026,18 +1026,19 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
         elif chain_a_fee_rate > a_fee_rate_now * warning_threshold:
             data["a_fee_warn"] = "high"
 
-        lock_spend_tx_vsize = (
-            ci_from.xmr_swap_b_lock_spend_tx_vsize()
-            if reverse_bid
-            else ci_from.xmr_swap_a_lock_spend_tx_vsize()
-        )
         # Paid in coin_from, so sized by the offer's from rate, which is
         # a_fee_rate whichever chain coin_from is on, unless coin_from sets its
         # own redeem fee.
         redeem_fee_rate = ci_from.getRedeemFeeRate()
         if redeem_fee_rate is None:
             redeem_fee_rate = xmr_offer.a_fee_rate
-        lock_spend_tx_fee = ci_from.feeForVSize(redeem_fee_rate, lock_spend_tx_vsize)
+        lock_spend_tx_fee: int = (
+            ci_from.feeForVSize(
+                redeem_fee_rate, ci_from.xmr_swap_b_lock_spend_tx_vsize()
+            )
+            if reverse_bid
+            else ci_from.estLockSpendFee(redeem_fee_rate)
+        )
         data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(lock_spend_tx_fee)
 
     if offer.was_sent:

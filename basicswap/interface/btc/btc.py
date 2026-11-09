@@ -267,6 +267,10 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return 147
 
     @staticmethod
+    def xmr_swap_a_lock_refund_tx_vsize() -> int:
+        return 150
+
+    @staticmethod
     def xmr_swap_b_lock_spend_tx_vsize() -> int:
         return 110
 
