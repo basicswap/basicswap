@@ -18326,6 +18326,49 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             rv["num_core_disabled"] = num_core_disabled
         return rv
 
+    def reconcileSMSGAddresses(self, local_keys) -> None:
+        # particld only saves receive flags on a clean shutdown
+        receiving = {
+            k["address"]
+            for k in local_keys["wallet_keys"] + local_keys["smsg_keys"]
+            if k["receive"] == "1"
+        }
+        cursor = self.openDB()
+        try:
+            live = {
+                row[0]
+                for row in cursor.execute(
+                    self.liveMessageAddressesQuery(), {"now": self.getTime()}
+                )
+            }
+            not_receiving = live - receiving
+            for addr in not_receiving:
+                self.editSMSGAddress(addr, 1, cursor=cursor)
+
+            num_queued: int = 0
+            num_disabled: int = 0
+            for addr, use_type in cursor.execute(
+                "SELECT addr, use_type FROM smsgaddresses WHERE active_ind = 0"
+            ).fetchall():
+                if addr not in receiving:
+                    continue
+                if use_type in (AddressTypes.OFFER, AddressTypes.BID):
+                    cursor.execute(
+                        "UPDATE smsgaddresses SET active_ind = 1 WHERE addr = :addr",
+                        {"addr": addr},
+                    )
+                    num_queued += 1
+                else:
+                    self.callrpc("smsglocalkeys", ["recv", "-", addr])
+                    num_disabled += 1
+
+            if len(not_receiving) > 0 or num_queued > 0 or num_disabled > 0:
+                self.log.info(
+                    f"Reconciled SMSG addresses with particld: {len(not_receiving)} in use enabled, {num_queued} queued for retirement, {num_disabled} disabled"
+                )
+        finally:
+            self.closeDB(cursor)
+
     def retireUnusedSMSGAddresses(self, max_addresses: int = 500) -> None:
         if self._is_locked is True:
             return

@@ -229,9 +229,9 @@ class BSXNetwork:
                     self.settings["zmqhost"] + ":" + str(self.settings["zmqport"])
                 )
 
-            ro = self.callrpc("smsglocalkeys")
+            local_keys = self.callrpc("smsglocalkeys")
             found = False
-            for k in ro["smsg_keys"]:
+            for k in local_keys["smsg_keys"]:
                 if k["address"] == self.network_addr:
                     found = True
                     break
@@ -242,6 +242,7 @@ class BSXNetwork:
                 )
                 ro = self.callrpc("smsglocalkeys", ["anon", "-", self.network_addr])
                 ensure(ro["result"] == "Success.", "smsglocalkeys failed")
+            self.reconcileSMSGAddresses(local_keys)
         else:
             now = self.getTime()
             try:
