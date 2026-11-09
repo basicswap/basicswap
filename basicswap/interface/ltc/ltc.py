@@ -176,6 +176,20 @@ class LTCInterface(BTCInterface):
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
 
+    def getSpendableOutputs(self):
+        if self.useBackend():
+            return super().getSpendableOutputs()
+
+        return [
+            {
+                "txid": u["txid"],
+                "vout": u["vout"],
+                "value": self.make_int(u["amount"]),
+            }
+            for u in self.rpc_wallet("listunspent", [0])
+            if "vout" in u and u.get("spendable", False) and u.get("safe", True)
+        ]
+
     def getMWEBBalance(self) -> int:
         if self.useBackend():
             raise ValueError("MWEB not supported in electrum mode")
