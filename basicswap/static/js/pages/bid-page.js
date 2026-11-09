@@ -18,7 +18,7 @@ const BidPage = {
   coinTo: null,
   previousStateInd: null,
 
-  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31, 36, 38], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
+  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31, 36, 38, 41], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
 
   DELAYING_STATE: 20,
 
