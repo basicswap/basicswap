@@ -97,6 +97,9 @@ class LTCInterface(BTCInterface):
     def getWalletInfo(self):
         rv = super(LTCInterface, self).getWalletInfo()
         if not self.useBackend():
+            rv["balance"] = (
+                self.make_int(rv["balance"]) - self.getMWEBBalance()
+            ) / self.COIN()
             try:
                 mweb_info = self.rpc_wallet_mweb("getwalletinfo")
                 rv["mweb_balance"] = mweb_info["balance"]
@@ -175,6 +178,18 @@ class LTCInterface(BTCInterface):
                 utxo_address, 0
             ) + self.make_int(u["amount"], r=1)
         return unspent_addr
+
+    def getSpendableBalance(self) -> int:
+        if self.useBackend():
+            return super().getSpendableBalance()
+        return super().getSpendableBalance() - self.getMWEBBalance()
+
+    def getBalances(self) -> tuple[int, int]:
+        spendable, total = super().getBalances()
+        if self.useBackend():
+            return spendable, total
+        mweb_in_plain: int = self.getMWEBBalance()
+        return spendable - mweb_in_plain, total - mweb_in_plain
 
     def getSpendableOutputs(self):
         if self.useBackend():
