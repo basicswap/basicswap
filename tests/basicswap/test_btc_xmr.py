@@ -370,7 +370,11 @@ class TestFunctions(BaseTest):
             swap_clients[id_leader],
             BidStates.XMR_SWAP_FAILED_REFUNDED,
             swap_clients[id_follower],
-            [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
+            [
+                BidStates.BID_STALLED_FOR_TEST,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
+            ],
             wait_for=(self.extra_wait_time + 180),
         )
 
@@ -490,7 +494,11 @@ class TestFunctions(BaseTest):
             swap_clients[id_leader],
             BidStates.XMR_SWAP_FAILED_REFUNDED,
             swap_clients[id_follower],
-            [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
+            [
+                BidStates.BID_STALLED_FOR_TEST,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
+            ],
             wait_for=(self.extra_wait_time + 180),
         )
 

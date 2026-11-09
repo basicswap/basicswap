@@ -1739,6 +1739,7 @@ class Test(BaseTest):
                 BidStates.BID_ERROR,
                 BidStates.BID_ABANDONED,
                 BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
                 BidStates.XMR_SWAP_FAILED_REFUNDED,
             )
             for i in range(900):

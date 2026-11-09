@@ -33,6 +33,7 @@ window.PlanRows = (function () {
                 return 'bg-gray-200 text-black dark:bg-gray-400 dark:text-red-500';
             case 'Error':
             case 'Failed':
+            case 'Failed, nothing to recover':
             case 'Rejected':
                 return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
             default:
@@ -73,6 +74,7 @@ window.PlanRows = (function () {
         'Failed',
         'Failed, refunded',
         'Failed, swiped',
+        'Failed, nothing to recover',
         'Rejected',
         'Timed-out',
         'Auto accept failed'
@@ -86,6 +88,7 @@ window.PlanRows = (function () {
         'Failed',
         'Failed, refunded',
         'Failed, swiped',
+        'Failed, nothing to recover',
         'Rejected',
         'Timed-out',
         'Auto accept failed'

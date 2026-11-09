@@ -442,7 +442,11 @@ class TestFunctions(BaseTestWithPrepare):
             port_leader,
             BidStates.XMR_SWAP_FAILED_REFUNDED,
             port_follower,
-            [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
+            [
+                BidStates.BID_STALLED_FOR_TEST,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
+            ],
             240,
         )
 

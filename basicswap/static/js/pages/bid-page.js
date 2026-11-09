@@ -18,7 +18,7 @@ const BidPage = {
   coinTo: null,
   previousStateInd: null,
 
-  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31, 36, 38], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
+  INACTIVE_STATES: [8, 17, 18, 19, 21, 22, 23, 25, 31, 36, 38, 41], // Completed, Failed variants, Timed-out, Abandoned, Error, Rejected, Expired
 
   DELAYING_STATE: 20,
 
@@ -46,6 +46,7 @@ const BidPage = {
     'Bid Failed, swiped, recovered': 'Swap failed, but the other party sent a keyshare and your coin was recovered',
     'Bid Failed, swiped, mercy unused': 'Swap failed. A keyshare was sent but could not be used. Check the event log for details',
     'Bid Failed': 'Swap failed. Check events for details',
+    'Bid Failed, nothing to recover': 'Swap failed, nothing was locked to recover',
     'Bid Delaying': 'Brief delay between swap steps to ensure network propagation',
     'Bid Timed-out': 'Swap timed out waiting for the other party',
     'Bid Abandoned': 'Swap was manually abandoned. Locked coins will be refunded after timelock',
@@ -177,7 +178,8 @@ const BidPage = {
     31: { phase: 'failed', order: 99, label: 'Expired' },         // BID_EXPIRED
     32: { phase: 'negotiation', order: 3.5, label: 'Negotiation' }, // BID_AACCEPT_DELAY
     33: { phase: 'failed', order: 89, label: 'Failed' },          // BID_AACCEPT_FAIL
-    34: { phase: 'negotiation', order: 0.4, label: 'Negotiation' }  // CONNECT_REQ_SENT
+    34: { phase: 'negotiation', order: 0.4, label: 'Negotiation' }, // CONNECT_REQ_SENT
+    41: { phase: 'failed', order: 94.5, label: 'Failed' }         // XMR_SWAP_FAILED_NOTHING_TO_RECOVER
   },
 
   init: function(bidId, bidStateInd, createdAtTimestamp, stateTimeTimestamp, options) {
@@ -241,6 +243,7 @@ const BidPage = {
       'Scriptless coin locked': 11, 'Script coin lock released': 12,
       'Script tx redeemed': 13, 'Script pre-refund tx in chain': 14,
       'Scriptless tx redeemed': 15, 'Scriptless tx recovered': 16,
+      'Failed, nothing to recover': 41,
       'Failed, refunded': 17, 'Failed, swiped': 18, 'Failed': 19,
       'Delaying': 20, 'Timed-out': 21, 'Abandoned': 22, 'Error': 23,
       'Rejected': 25, 'Exchanged script lock tx sigs msg': 27,

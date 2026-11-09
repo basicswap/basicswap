@@ -22,6 +22,7 @@
     'Failed',
     'Failed, refunded',
     'Failed, swiped',
+    'Failed, nothing to recover',
     'Rejected',
     'Timed-out',
     'Auto accept failed'

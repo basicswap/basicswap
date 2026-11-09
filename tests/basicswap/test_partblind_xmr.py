@@ -341,7 +341,11 @@ class Test(BaseTest):
             test_delay_event,
             swap_clients[1],
             bid_id,
-            [BidStates.BID_STALLED_FOR_TEST, BidStates.XMR_SWAP_FAILED],
+            [
+                BidStates.BID_STALLED_FOR_TEST,
+                BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
+            ],
             sent=True,
         )
 

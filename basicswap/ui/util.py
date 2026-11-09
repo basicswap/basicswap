@@ -316,6 +316,8 @@ def describeBid(
             state_description = "Swap failed, the other party claimed the refund"
         elif bid.state == BidStates.XMR_SWAP_FAILED:
             state_description = "Swap failed"
+        elif bid.state == BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER:
+            state_description = "Swap failed, nothing was locked to recover"
 
     if state_description == "":
         if bid.state == BidStates.SWAP_TIMEDOUT:

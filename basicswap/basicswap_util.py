@@ -139,6 +139,7 @@ class BidStates(IntEnum):
     XMR_SWAP_FAILED_SWIPED_USING_MERCY = 37
     XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED = 38
     XMR_SWAP_FAILED_SWIPED_SENDING_MERCY = 39
+    XMR_SWAP_FAILED_NOTHING_TO_RECOVER = 41
 
 
 class TxStates(IntEnum):
@@ -396,6 +397,8 @@ def strBidState(state):
         return "Failed, swiped, mercy unused"
     if state == BidStates.XMR_SWAP_FAILED:
         return "Failed"
+    if state == BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER:
+        return "Failed, nothing to recover"
     if state == BidStates.SWAP_DELAYING:
         return "Delaying"
     if state == BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS:
@@ -684,6 +687,7 @@ inactive_states = [
     BidStates.BID_EXPIRED,
     BidStates.XMR_SWAP_FAILED_SWIPED_USED_MERCY,
     BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
+    BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
 ]
 
 
@@ -758,6 +762,7 @@ def isFailingBidState(state):
         BidStates.XMR_SWAP_FAILED_SWIPED_USING_MERCY,
         BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED,
         BidStates.XMR_SWAP_FAILED,
+        BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
     )
 
 

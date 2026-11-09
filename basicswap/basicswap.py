@@ -3530,6 +3530,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 BidStates.XMR_SWAP_FAILED_REFUNDED,
                 BidStates.XMR_SWAP_FAILED_SWIPED,
                 BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
                 BidStates.SWAP_TIMEDOUT,
             ):
                 if is_offer_creator:
@@ -3798,6 +3799,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 BidStates.XMR_SWAP_FAILED_REFUNDED,
                 BidStates.XMR_SWAP_FAILED_SWIPED,
                 BidStates.XMR_SWAP_FAILED,
+                BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
                 BidStates.SWAP_COMPLETED,
                 BidStates.SWAP_TIMEDOUT,
             ):
@@ -9240,6 +9242,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED:
                 rv = True  # Remove from swaps_in_progress
+            elif state == BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER:
+                rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
                 # A lock publish that errored may still have reached the chain
                 if (
@@ -9250,6 +9254,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
                 if bid.xmr_b_lock_tx is None:
                     # Nothing was locked on chain B, there is nothing to recover.
+                    bid.setState(BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER)
+                    self.saveBidInSession(bid_id, bid, cursor, xmr_swap)
+                    self.commitDB()
                     rv = True  # Remove from swaps_in_progress
                 elif was_sent:
                     if (
@@ -13301,6 +13308,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def watchXmrSwap(self, bid, offer, xmr_swap, cursor=None) -> None:
         self.log.debug(f"Adaptor-sig swap in progress, bid {self.log.id(bid.bid_id)}.")
         self.swaps_in_progress[bid.bid_id] = (bid, offer)
+        bid.in_progress = 1
+        if bid.state == BidStates.XMR_SWAP_FAILED:
+            return
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         coin_from = Coins(offer.coin_to if reverse_bid else offer.coin_from)
@@ -13326,7 +13336,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 TxTypes.XMR_SWAP_A_LOCK_REFUND,
                 SwapTypes.XMR_SWAP,
             )
-        bid.in_progress = 1
 
         # Watch outputs for chain A lock tx if txid is unknown (BCH)
         if bid.xmr_a_lock_tx and bid.xmr_a_lock_tx.txid is None:
