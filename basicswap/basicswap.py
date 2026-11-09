@@ -9242,6 +9242,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED_SWIPED_MERCY_UNUSED:
                 rv = True  # Remove from swaps_in_progress
+            elif state == BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER:
+                rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
                 # A lock publish that errored may still have reached the chain
                 if (

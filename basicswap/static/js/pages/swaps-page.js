@@ -37,6 +37,7 @@ const getStatusClass = (status, tx_a, tx_b) => {
         case 'Error':
         case 'Failed, swiped, mercy unused':
         case 'Failed':
+        case 'Failed, nothing to recover':
             return 'bg-red-300 text-black dark:bg-red-600 dark:text-white';
         case 'Failed, swiped':
         case 'Failed, swiped, recovered':

@@ -64,6 +64,7 @@ const STATE_MAP = {
     36: ['Failed, swiped, recovered'],
     38: ['Failed, swiped, mercy unused'],
     19: ['Failed'],
+    41: ['Failed, nothing to recover'],
     20: ['Delaying'],
     21: ['Timed-out', 'Expired'],
     22: ['Abandoned'],
