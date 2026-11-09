@@ -13,6 +13,7 @@ from collections import OrderedDict
 
 from basicswap.basicswap_util import (
     AddressTypes,
+    BidStates,
     MessageNetworkLinkTypes,
     MessageNetworks,
     MessageTypes,
@@ -361,6 +362,31 @@ class BSXNetwork:
             )
             rv.append(info)
         return rv
+
+    def liveMessageAddressesQuery(self) -> str:
+        # An errored bid can still be moved on by a lock release message
+        bid_error: int = int(BidStates.BID_ERROR)
+        return f"""SELECT DISTINCT address FROM (
+        SELECT b.bid_addr AS address FROM bids b
+               JOIN bidstates s ON b.state = s.state_id
+               WHERE b.active_ind = 1 AND b.was_sent = 1
+                     AND (b.in_progress OR s.in_progress OR b.state = {bid_error} OR (s.swap_ended = 0 AND b.expire_at > :now))
+        UNION
+        SELECT o.addr_from AS address FROM bids b
+               JOIN bidstates s ON b.state = s.state_id
+               JOIN offers o ON o.offer_id = b.offer_id
+               WHERE b.active_ind = 1 AND b.was_received = 1
+                     AND (b.in_progress OR s.in_progress OR b.state = {bid_error} OR (s.swap_ended = 0 AND b.expire_at > :now))
+        UNION
+        SELECT addr_from AS address FROM offers
+               WHERE active_ind = 1 AND was_sent = 1 AND expire_at > :now
+        UNION
+        SELECT smsg_addr_local AS address FROM direct_message_routes
+               WHERE active_ind = 2
+        UNION
+        SELECT addr AS address FROM smsgaddresses
+               WHERE active_ind = 1 AND use_type IN ({int(AddressTypes.PORTAL_LOCAL)}, {int(AddressTypes.RECV_OFFER)})
+        ) WHERE address IS NOT NULL"""
 
     def getPrivkeyForAddress(self, cursor, addr: str) -> bytes:
         cached = self._privkey_cache.get(addr)

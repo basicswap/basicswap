@@ -267,7 +267,7 @@ def make_activation_client():
     sc.ci = lambda coin_type: ci
     sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
     sc.isSystemUnlocked = lambda: True
-    sc.openDB = lambda cursor=None: "cursor"
+    sc.openDB = lambda cursor=None: FakeCursor([])
     sc.getNewDBCursor = lambda: "bid_cursor"
     sc.closeDB = lambda cursor, commit=True: None
     sc.closeDBCursor = lambda cursor: None

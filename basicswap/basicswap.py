@@ -3587,6 +3587,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if not offer:
             raise ValueError("Offer not found")
 
+        recv_addr: str = bid.bid_addr if bid.was_sent else offer.addr_from
+        if cursor.execute(
+            "SELECT 1 FROM smsgaddresses WHERE addr = :addr AND active_ind = 0",
+            {"addr": recv_addr},
+        ).fetchone():
+            self.editSMSGAddress(recv_addr, 1, cursor=cursor)
         self.loadBidTxns(bid, cursor)
 
         coin_from = Coins(offer.coin_from)
@@ -16258,6 +16264,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ):
                 self.expireMessages()
                 self.expireMessageRoutes()
+                self.retireUnusedSMSGAddresses()
                 self.expireDBRecords()
                 self.checkAcceptedBids()
                 self.checkStandingOfferWalletFloors()
@@ -18318,6 +18325,34 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if num_core_disabled > 0:
             rv["num_core_disabled"] = num_core_disabled
         return rv
+
+    def retireUnusedSMSGAddresses(self, max_addresses: int = 500) -> None:
+        if self._is_locked is True:
+            return
+        cursor = self.openDB()
+        try:
+            rows = cursor.execute(
+                f"""SELECT addr FROM smsgaddresses
+                    WHERE active_ind = 1 AND use_type IN (:offer_type, :bid_type)
+                    AND COALESCE(note, '') = '' AND addr != :network_addr
+                    AND addr NOT IN ({self.liveMessageAddressesQuery()})
+                    LIMIT :limit""",
+                {
+                    "offer_type": int(AddressTypes.OFFER),
+                    "bid_type": int(AddressTypes.BID),
+                    "network_addr": self.network_addr,
+                    "now": self.getTime(),
+                    "limit": max_addresses,
+                },
+            ).fetchall()
+            for row in rows:
+                self.editSMSGAddress(row[0], 0, cursor=cursor)
+            if len(rows) > 0:
+                self.log.debug(f"Retired {len(rows)} unused SMSG addresses")
+        except Exception as e:
+            self.logException(f"retireUnusedSMSGAddresses {e}")
+        finally:
+            self.closeDB(cursor)
 
     def prepareSMSGAddress(self, addr_send_from, use_type, cursor):
         if addr_send_from is None:
