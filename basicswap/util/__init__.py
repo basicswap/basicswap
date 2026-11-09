@@ -12,6 +12,7 @@ import time
 import decimal
 
 COIN = 100000000
+FEE_RATE_CACHE_SECONDS = 60
 
 
 decimal_ctx = decimal.Context()

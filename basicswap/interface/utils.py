@@ -4,6 +4,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
+import time
+
 from math import ceil
 
 from basicswap.contrib.test_framework.messages import COIN
@@ -11,7 +13,7 @@ from basicswap.db import (
     Concepts,
     strConcepts,
 )
-from basicswap.util import toBool as make_boolean
+from basicswap.util import FEE_RATE_CACHE_SECONDS, toBool as make_boolean
 
 
 class FeeValidator:
@@ -20,6 +22,7 @@ class FeeValidator:
         return COIN // 10
 
     def __init__(self, **kwargs):
+        self._relay_fee = None
         self.updateFeeValidationSettings(kwargs.get("network"))
         super().__init__(**kwargs)
 
@@ -129,12 +132,19 @@ class FeeValidator:
             return chain_client_settings["min_relay_fee"], "min_relay_fee_setting"
 
         if self._connection_type == "rpc":
-            networkinfo = self.rpc("getnetworkinfo")
-            if "relayfee" in networkinfo:
-                return networkinfo["relayfee"], "relayfee_rpc"
+            return self.getRelayFee(), "relayfee_rpc"
         elif self._connection_type == "electrum":
             return 0.00001, "relayfee_electrum_default"
         return None, None
+
+    def getRelayFee(self) -> float:
+        now: float = time.time()
+        cached = self._relay_fee
+        if cached is not None and now - cached[0] < FEE_RATE_CACHE_SECONDS:
+            return cached[1]
+        relay_fee: float = self.rpc("getnetworkinfo")["relayfee"]
+        self._relay_fee = (now, relay_fee)
+        return relay_fee
 
     @staticmethod
     def compareFeeRates(actual: int, expected: int) -> bool:

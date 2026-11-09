@@ -27,6 +27,7 @@ from basicswap.basicswap_util import (
 from basicswap.interface.base import Secp256k1Interface
 from basicswap.interface.utils import FeeValidator
 from basicswap.util import (
+    FEE_RATE_CACHE_SECONDS,
     TemporaryError,
     b2i,
     ensure,
@@ -325,6 +326,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             swap_client=swap_client,
             **kwargs,
         )
+        self._rpc_fee_rate_cache = {}
         self._rpc_host = coin_settings.get("rpchost", "127.0.0.1")
         self._rpcport = coin_settings["rpcport"]
         self._rpcauth = coin_settings["rpcauth"]
@@ -1372,6 +1374,21 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 addr_info["hdseedid"] == self._expect_seedid_hex, "unexpected seedid"
             )
 
+    def _estimateFeeRateRPC(self, conf_target: int) -> (float, str):
+        try:
+            fee_rate: float = self.rpc_wallet("estimatesmartfee", [conf_target])[
+                "feerate"
+            ]
+            ensure(fee_rate > 0.0, "Negative feerate")
+            return fee_rate, "estimatesmartfee"
+        except Exception:
+            try:
+                fee_rate: float = self.rpc_wallet("getwalletinfo")["paytxfee"]
+                ensure(fee_rate > 0.0, "Non positive feerate")
+                return fee_rate, "paytxfee"
+            except Exception:
+                return self.getRelayFee(), "relayfee"
+
     def get_fee_rate(self, conf_target: int = 2) -> (float, str):
         chain_client_settings = self._sc.getChainClientSettings(
             self.coin_type()
@@ -1406,20 +1423,14 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     self._log.debug(f"Electrum estimateFee failed: {e}")
                 return 0.00001, "electrum_default"
 
-            try:
-                fee_rate: float = self.rpc_wallet("estimatesmartfee", [conf_target])[
-                    "feerate"
-                ]
-                ensure(fee_rate > 0.0, "Negative feerate")
-                return fee_rate, "estimatesmartfee"
-            except Exception:
-                try:
-                    fee_rate: float = self.rpc_wallet("getwalletinfo")["paytxfee"]
-                    ensure(fee_rate > 0.0, "Non positive feerate")
-                    return fee_rate, "paytxfee"
-                except Exception:
-                    fee_rate: float = self.rpc("getnetworkinfo")["relayfee"]
-                    return fee_rate, "relayfee"
+            now: float = time.time()
+            cached = self._rpc_fee_rate_cache.get(conf_target)
+            if cached is not None and now - cached[0] < FEE_RATE_CACHE_SECONDS:
+                return cached[1]
+            fee_rate_and_src = self._estimateFeeRateRPC(conf_target)
+            if fee_rate_and_src[1] == "estimatesmartfee":
+                self._rpc_fee_rate_cache[conf_target] = (now, fee_rate_and_src)
+            return fee_rate_and_src
 
         fee_rate, rate_src = try_get_fee_rate(self, conf_target)
         if min_relay_fee and min_relay_fee > fee_rate:
