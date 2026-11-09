@@ -3712,7 +3712,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if cursor is None:
             self.saveBid(bid.bid_id, bid)
 
-        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         self._unlockMercyPrevout(ci_from, bid, cursor)
@@ -9072,25 +9071,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 # the swap: the BCH covenant forces the output to a
                                 # wallet address the wallet can select from.  Lock
                                 # such outputs until the mercy tx has spent them.
-                                if not ci_from.swipePaysKey(
-                                    xmr_swap.a_lock_refund_swipe_tx,
-                                    txid,
-                                    self.getPathKey(
-                                        Coins(
-                                            offer.coin_to
-                                            if reverse_bid
-                                            else offer.coin_from
-                                        ),
-                                        Coins(
-                                            offer.coin_from
-                                            if reverse_bid
-                                            else offer.coin_to
-                                        ),
-                                        bid.created_at,
-                                        xmr_swap.contract_count,
-                                        KeyTypes.KA_SWIPE,
-                                    ),
-                                ):
+                                if not ci_from.swipePaysKey():
                                     self._lockMercyPrevout(ci_from, bid, cursor)
                                 delay = self.get_delay_event_seconds()
                                 self.log.info(
@@ -9752,9 +9733,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
         return True
 
-    # TODO: Remove with the rest of the pre KA_SWIPE compatibility.  Only bids
-    # whose swipe pays a pooled address still need the payout kept out of coin
-    # selection until the mercy tx has spent it.
+    # A swipe paying a wallet address has its payout kept out of coin selection
+    # until the mercy tx has spent it.
     def _lockMercyPrevout(self, ci_from, bid, cursor) -> None:
         # Locks are held in memory by the daemon and expire on the electrum
         # backend, so this is re-asserted for as long as the mercy tx is owed
@@ -9789,19 +9769,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, None)
         ensure(swipe_tx, f"Swipe tx not found for bid {self.log.id(bid.bid_id)}.")
 
-        reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
-        ka_swipe = self.getPathKey(
-            Coins(offer.coin_to if reverse_bid else offer.coin_from),
-            Coins(offer.coin_from if reverse_bid else offer.coin_to),
-            bid.created_at,
-            xmr_swap.contract_count,
-            KeyTypes.KA_SWIPE,
-        )
-        # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
-        if not ci_from.swipePaysKey(
-            xmr_swap.a_lock_refund_swipe_tx, swipe_tx.txid.hex(), ka_swipe
-        ):
-            ka_swipe = None
+        ka_swipe = None
+        if ci_from.swipePaysKey():
+            reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+            ka_swipe = self.getPathKey(
+                Coins(offer.coin_to if reverse_bid else offer.coin_from),
+                Coins(offer.coin_from if reverse_bid else offer.coin_to),
+                bid.created_at,
+                xmr_swap.contract_count,
+                KeyTypes.KA_SWIPE,
+            )
 
         # Not getMercyPrevout, that only finds an output the wallet owns.
         swipe_n: int = ci_from.getMercyWatchVouts(swipe_tx.txid.hex())[0]
@@ -9923,7 +9900,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.logBidEvent(
                 bid.bid_id, EventLogTypes.MERCY_TX_NOT_SENT, give_up_reason, cursor
             )
-            # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
             self._unlockMercyPrevout(ci_from, bid, cursor)
             self.removeQueuedActions(cursor, bid.bid_id, ActionTypes.SEND_MERCY_TX)
             self._recoverSwipePayout(ci_from, bid, offer, xmr_swap, cursor)
@@ -14651,7 +14627,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.logBidEvent(
                 bid_id, EventLogTypes.MERCY_TX_NOT_SENT, skip_reason, cursor
             )
-            # TODO: Remove with the rest of the pre KA_SWIPE compatibility.
             self._unlockMercyPrevout(ci_from, bid, cursor)
             self._recoverSwipePayout(ci_from, bid, offer, xmr_swap, cursor)
             bid.setState(BidStates.XMR_SWAP_FAILED_SWIPED)
@@ -14690,9 +14665,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(f"Bid {self.log.id(bid_id)}: Sending an invalid keyshare.")
             kbsf = ci_to.getNewRandomKey()
 
-        # TODO: Remove.  A swipe built before the payout moved to a swap derived
-        # key pays a pooled address, so the wallet signs the mercy tx and holds
-        # the prevout lock, as it did then.
         if ka_swipe is None:
             self.log.debug(
                 f"Bid {self.log.id(bid_id)}: swipe pays the wallet, signing the mercy tx with it."

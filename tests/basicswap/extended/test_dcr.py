@@ -750,6 +750,16 @@ class Test(BaseTest):
                 ],
             )
 
+        for sc in cls.swap_clients:
+            for i in range(60):
+                try:
+                    sc.checkCoinsReady(cls.test_coin, cls.test_coin)
+                    break
+                except ValueError:
+                    if i == 59:
+                        raise
+                    test_delay_event.wait(1)
+
     @classmethod
     def tearDownClass(cls):
         logging.info("Finalising Decred Test")
