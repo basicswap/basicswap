@@ -23,4 +23,4 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 51472 51473
-CMD ["/pivx/pivxd", "--datadir=/data"]
+CMD ["/pivx/pivxd", "--datadir=/data", "-printtoconsole", "-nodebuglogfile"]

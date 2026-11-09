@@ -440,7 +440,7 @@ class FIROInterface(BTCInterface):
     def getBLockSpendTxFee(self, tx, fee_rate: int) -> int:
         add_bytes = 107
         size = len(tx.serialize_with_witness()) + add_bytes
-        pay_fee = round(fee_rate * size / 1000)
+        pay_fee = self.feeForVSize(fee_rate, size)
         self._log.info(
             f"BLockSpendTx fee_rate, size, fee: {fee_rate}, {size}, {pay_fee}."
         )
@@ -597,8 +597,11 @@ class FIROInterface(BTCInterface):
         current_height: int = chain_blocks
         block_hash = self.rpc("getblockhash", [current_height])
 
-        script_hash: bytes = self.decodeAddress(addr_find)
-        find_scriptPubKey = self.getDestForScriptHash(script_hash)
+        addr_data: bytes = decodeAddress(addr_find)
+        if addr_data[0] == self.chainparams_network()["pubkey_address"]:
+            find_scriptPubKey = self.getScriptForPubkeyHash(addr_data[1:])
+        else:
+            find_scriptPubKey = self.getDestForScriptHash(addr_data[1:])
 
         while current_height > height_start:
             block_hash = self.rpc("getblockhash", [current_height])

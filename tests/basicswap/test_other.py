@@ -268,6 +268,54 @@ class Test(unittest.TestCase):
         assert wallet_info["immature_balance"] == 0.25
         assert calls.count("getbalances") == 1
 
+    def test_ltc_hogex(self):
+        from basicswap.interface.ltc.ltc import LTCInterface
+
+        ci = LTCInterface(
+            {"rpcport": 0, "rpcauth": "none", **REQUIRED_SETTINGS}, "regtest"
+        )
+        # Mainnet integrating txs: one pays a peg-out, one also spends two peg-ins
+        peg_out = bytes.fromhex(
+            "0200000000080195aac628271f342507c9d371a0ecca59ccc139cf803709057f4067d985991b650000000000ffffffff"
+            "02c8ec9d7b952400002258208ea56d108427a9ff7ebaa88dbe6b9433f9c8d8d9649d99e0611f02f904ccda15484d991a"
+            "02000000160014b566d28576e5e7bd6aa33d4e2f802cf5ea8657e20000000000"
+        )
+        peg_ins = bytes.fromhex(
+            "02000000000803dd3ce9eff8a90bb12f81ffba8725b5b817d7aaaefed4c051d43d682977ff028b0000000000ffffffff"
+            "fc55e2fca68168a2a09de875bb6cb248c2aaf2e9b9a83e0e47bb08b5d133837b0000000000fffffffffe0bddd19cfb97"
+            "94780f5ff2f53d3be4ab143b5e7d164be5c0bdabaf91d16ae70000000000ffffffff02de433796972400002258200a2c"
+            "71e5a942007a5407b628ddc6dad8210500d5faab2f981cdfda274dc9e5774e41000000000000160014846da40316c201"
+            "669d680959313128246563df730000000000"
+        )
+        for tx_bytes, txid, num_vin in (
+            (
+                peg_out,
+                "cc53a5f1ce55d19b698fc119dbc7acd5fb94825eda152a3b755bba4f4f0e87a7",
+                1,
+            ),
+            (
+                peg_ins,
+                "651b9985d967407f05093780cf39c1cc59caeca071d3c90725341f2728c6aa95",
+                3,
+            ),
+        ):
+            tx = ci.loadTx(tx_bytes)
+            tx.rehash()
+            assert tx.hash == txid
+            assert len(tx.vin) == num_vin
+            assert len(tx.vout) == 2
+
+        with_body = bytearray(peg_out)
+        with_body[-5] = 0x01
+        unknown_flag = bytearray(peg_out)
+        unknown_flag[5] = 0x0A
+        with_locktime = bytearray(peg_out)
+        with_locktime[-4] = 0x01
+        for refused in (with_body, unknown_flag, peg_out[:-2]):
+            with self.assertRaises(ValueError):
+                ci.loadTx(bytes(refused))
+        assert ci.loadTx(bytes(with_locktime)).nLockTime == 1
+
     def test_serialise_num(self):
         def test_case(v, nb=None):
             b = SerialiseNum(v)
@@ -1790,6 +1838,79 @@ class Test(unittest.TestCase):
         ]
         for headers, settings, expected in cases:
             assert check(Stub(settings), headers) is expected, (headers, settings)
+
+    def queuedWsHandler(self, queue_bytes: int, small_buffer: bool = False):
+        import socket
+        import threading
+        from types import SimpleNamespace
+        from basicswap.contrib.websocket_server.websocket_server import (
+            WebSocketHandler,
+        )
+
+        ours, peer = socket.socketpair()
+        if small_buffer:
+            ours.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+        handler = WebSocketHandler.__new__(WebSocketHandler)
+        handler.server = SimpleNamespace(
+            send_queue_bytes=queue_bytes, _client_left_=lambda h: None
+        )
+        handler.request = ours
+        handler.client_address = ("127.0.0.1", 1)
+        handler.timeout = 2
+        handler._send_lock = threading.Lock()
+        handler.setup()
+        self.addCleanup(peer.close)
+        self.addCleanup(ours.close)
+        return handler, peer
+
+    def readWs(self, peer, size: int) -> bytes:
+        data = b""
+        peer.settimeout(5)
+        while len(data) < size:
+            chunk = peer.recv(65536)
+            if not chunk:
+                break
+            data += chunk
+        return data
+
+    def test_ws_send_queue_does_not_block_and_drops_a_stalled_reader(self):
+        handler, peer = self.queuedWsHandler(1024 * 1024, small_buffer=True)
+        frame = bytes(range(256)) * 256
+        for _ in range(12):
+            handler.send_bytes(frame)
+        with self.assertRaises(ConnectionError):
+            for _ in range(8):
+                handler.send_bytes(frame)
+        self.assertFalse(handler.keep_alive)
+        with self.assertRaises(ConnectionError):
+            handler.send_bytes(b"late")
+
+    def test_ws_send_queue_keeps_order_and_flushes_on_finish(self):
+        import socket
+        import threading
+        import time
+
+        handler, peer = self.queuedWsHandler(1024 * 1024, small_buffer=True)
+        received = []
+
+        def read():
+            time.sleep(0.1)
+            received.append(self.readWs(peer, 50 * 8 + 8))
+
+        reader = threading.Thread(target=read)
+        reader.start()
+        for n in range(50):
+            handler.send_bytes(b"msg %02d" % n)
+        handler.send_close(reason=b"prov")
+        handler.finish()
+        handler.request.shutdown(socket.SHUT_WR)
+        reader.join(10)
+        data = received[0]
+        self.assertEqual(
+            [data[i + 2 : i + 8] for i in range(0, 50 * 8, 8)],
+            [b"msg %02d" % n for n in range(50)],
+        )
+        self.assertEqual(data[50 * 8 + 4 :], b"prov")
 
     def test_ws_handshake_bad_request(self):
         # Anything that is not a websocket handshake (port scans, a client that

@@ -6,7 +6,15 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 import os
+from io import BytesIO
 
+from basicswap.contrib.test_framework.messages import (
+    CTransaction,
+    CTxIn,
+    CTxInWitness,
+    CTxOut,
+    deser_vector,
+)
 from basicswap.interface.btc.btc import BTCInterface
 from basicswap.interface.electrum_blockchain import (
     HeaderNet,
@@ -22,6 +30,9 @@ def pow_hash_header(header: dict) -> str:
     return hash_encode(scrypt_hash(serialize_header(header)))
 
 
+MWEB_FLAG = 0x08
+
+
 class LTCInterface(BTCInterface):
     @staticmethod
     def coin_type():
@@ -29,6 +40,35 @@ class LTCInterface(BTCInterface):
 
     def max_money(self) -> int:
         return 84000000 * self.COIN()
+
+    def loadTx(self, tx_bytes: bytes, allow_witness: bool = True) -> CTransaction:
+        if not (
+            allow_witness
+            and len(tx_bytes) > 5
+            and tx_bytes[4] == 0
+            and tx_bytes[5] & MWEB_FLAG
+        ):
+            return super().loadTx(tx_bytes, allow_witness)
+        # The integrating (HogEx) tx that pays MWEB peg-outs: its MWEB body is
+        # empty, and a tx with a body is refused rather than misread
+        flags: int = tx_bytes[5]
+        if flags & ~(MWEB_FLAG | 1):
+            raise ValueError("Unknown transaction optional data")
+        f = BytesIO(tx_bytes[6:])
+        tx = CTransaction()
+        tx.nVersion = int.from_bytes(tx_bytes[:4], "little")
+        tx.vin = deser_vector(f, CTxIn)
+        tx.vout = deser_vector(f, CTxOut)
+        if flags & 1:
+            tx.wit.vtxinwit = [CTxInWitness() for _ in range(len(tx.vin))]
+            tx.wit.deserialize(f)
+        if f.read(1) != b"\x00":
+            raise ValueError("MWEB transaction body not supported")
+        locktime = f.read(4)
+        if len(locktime) != 4:
+            raise ValueError("Transaction too short")
+        tx.nLockTime = int.from_bytes(locktime, "little")
+        return tx
 
     def __init__(self, coin_settings, network, swap_client=None, **kwargs):
         super().__init__(

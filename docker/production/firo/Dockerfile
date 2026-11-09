@@ -23,4 +23,5 @@ COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 8168 8888
-CMD ["/firo/firod", "--datadir=/data"]
+# Firo 0.14 writes no debug.log while it prints to the console
+CMD ["/firo/firod", "--datadir=/data", "-printtoconsole"]

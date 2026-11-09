@@ -715,7 +715,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "restrict_unknown_seed_wallets", True
         )
         self._max_check_loop_blocks = self.settings.get("max_check_loop_blocks", 100000)
-        self._force_db_upgrade = self.settings.get("force_db_upgrade", False)
+        self._force_db_upgrade = self.settings.get(
+            "force_db_upgrade", extra_opts.get("force_db_upgrade", False)
+        )
         self._bid_expired_leeway = 5
         self._bid_accept_leeway = 30
         self._plan_leg_timeout = self.get_int_setting(
@@ -3105,11 +3107,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             est_vsize = len(legacy_utxos) * 150 + 40
             fee_rate, _ = ci.get_fee_rate(ci._conf_target)
-            if isinstance(fee_rate, int):
-                fee_per_vbyte = max(1, fee_rate // 1000)
-            else:
-                fee_per_vbyte = max(1, int(fee_rate * 100000))
-            estimated_fee_sats = est_vsize * fee_per_vbyte
+            if not isinstance(fee_rate, int):
+                fee_rate = ci.make_int(fee_rate, r=1)
+            estimated_fee_sats = max(est_vsize, ci.feeForVSize(fee_rate, est_vsize))
 
             if total_legacy_sats <= estimated_fee_sats * 2:
                 return {
@@ -4489,8 +4489,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
             if "prefunded_itx" not in extra_options:
                 # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
-                estimated_fee: int = (
-                    msg_buf.fee_rate_from * ci_from.est_lock_tx_vsize() // 1000
+                estimated_fee: int = ci_from.feeForVSize(
+                    msg_buf.fee_rate_from, ci_from.est_lock_tx_vsize()
                 )
                 self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
             elif ci_from.useBackend():
@@ -5144,9 +5144,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if coin_type in self.xmr_based_coins:
             # Fee estimate must be manually initiated
             return None
-        tx_vsize = self.ci(coin_type).getHTLCSpendTxVSize()
-        est_fee = (fee_rate * tx_vsize) / 1000
-        return est_fee
+        ci = self.ci(coin_type)
+        return ci.feeForVSize(ci.make_int(fee_rate, r=1), ci.getHTLCSpendTxVSize())
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
         ci = self.ci(coin_type)
@@ -6826,7 +6825,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # TODO: Better tx size estimate
             fee_rate_to = xmr_offer.b_fee_rate
-            estimated_fee: int = fee_rate_to * ci_to.est_lock_tx_vsize() // 1000
+            estimated_fee: int = ci_to.feeForVSize(
+                fee_rate_to, ci_to.est_lock_tx_vsize()
+            )
 
             # A plan leg's reserved outputs were sized to fund its lock.
             if (
@@ -7012,7 +7013,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 xmr_swap.pkbsf = ci_to.getPubkey(kbsf)
             if "pkaf" in extra_options:
                 xmr_swap.pkaf = extra_options["pkaf"]
-                ensure(ci_to.verifyPubkey(xmr_swap.pkaf), "Invalid pkaf supplied")
+                ensure(ci_from.verifyPubkey(xmr_swap.pkaf), "Invalid pkaf supplied")
             else:
                 kaf = self.getPathKey(
                     coin_from,
@@ -7586,7 +7587,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # TODO: Better tx size estimate
             fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target=2)
             fee_rate_from = ci_to.make_int(fee_rate)
-            estimated_fee: int = fee_rate_from * ci_to.est_lock_tx_vsize() // 1000
+            estimated_fee: int = ci_to.feeForVSize(
+                fee_rate_from, ci_to.est_lock_tx_vsize()
+            )
             self.ensureWalletCanSend(
                 ci_to,
                 offer.swap_type,
@@ -8157,13 +8160,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = ci.getHTLCSpendTxVSize()
-        tx_fee = (fee_rate * tx_vsize) / 1000
+        tx_fee = ci.feeForVSize(ci.make_int(fee_rate, r=1), tx_vsize)
 
-        self.log.debug(
-            f"Redeem tx fee {ci.format_amount(tx_fee, conv_int=True, r=1)}, rate {fee_rate}"
-        )
+        self.log.debug(f"Redeem tx fee {ci.format_amount(tx_fee)}, rate {fee_rate}")
 
-        amount_out = prev_amount - ci.make_int(tx_fee, r=1)
+        amount_out = prev_amount - tx_fee
         ensure(amount_out > 0, "Amount out <= 0")
 
         if addr_redeem_out is None:
@@ -8313,13 +8314,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         fee_rate, fee_src = self.getFeeRateForCoin(coin_type)
 
         tx_vsize = ci.getHTLCSpendTxVSize(False)
-        tx_fee = (fee_rate * tx_vsize) / 1000
+        tx_fee = ci.feeForVSize(ci.make_int(fee_rate, r=1), tx_vsize)
 
-        self.log.debug(
-            f"Refund tx fee {ci.format_amount(tx_fee, conv_int=True, r=1)}, rate {fee_rate}"
-        )
+        self.log.debug(f"Refund tx fee {ci.format_amount(tx_fee)}, rate {fee_rate}")
 
-        amount_out = ci.make_int(prevout["amount"], r=1) - ci.make_int(tx_fee, r=1)
+        amount_out = ci.make_int(prevout["amount"], r=1) - tx_fee
         if amount_out <= 0:
             raise ValueError("Refund amount out <= 0")
 
@@ -11141,13 +11140,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return self.checkForSpendsElectrum(coin_type, c)
 
         # TODO: Check for spends on watchonly txns where possible
+        ci = self.ci(coin_type)
         if self.coin_clients[coin_type].get("have_spent_index", False):
             # TODO: batch getspentinfo
             for o in c["watched_outputs"]:
                 found_spend = None
                 try:
-                    found_spend = self.callcoinrpc(
-                        Coins.PART,
+                    found_spend = ci.rpc(
                         "getspentinfo",
                         [{"txid": o.txid_hex, "index": o.vout}],
                     )
@@ -11165,15 +11164,29 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Found spend in spentindex {self.logIDT(o.txid_hex)} {o.vout} in {self.logIDT(spend_txid)} {spend_n}"
                     )
-                    spend_txn = self.callcoinrpc(
-                        Coins.PART, "getrawtransaction", [spend_txid, True]
-                    )
+                    spend_txn = ci.rpc("getrawtransaction", [spend_txid, True])
                     self.processSpentOutput(
                         coin_type, o, spend_txid, spend_n, spend_txn
                     )
+            for t in c["watched_transactions"]:
+                if t.block_hash is not None:
+                    continue
+                try:
+                    tx = ci.rpc("getrawtransaction", [t.txid_hex, True])
+                except Exception as ex:
+                    if "No such mempool or blockchain transaction" not in str(ex):
+                        self.log.warning(f"getrawtransaction {ex}")
+                    continue
+                block_hash = tx.get("blockhash", None)
+                if block_hash is None:
+                    continue
+                block_height: int = ci.getBlockHeader(block_hash)["height"]
+                self.processFoundTransaction(
+                    t, block_hash, block_height, ci.getChainHeight()
+                )
+            # watched_scripts are not searched here, so they are missed on a coin with a spent index
             return
 
-        ci = self.ci(coin_type)
         chain_blocks = ci.getChainHeight()
         last_height_checked: int = c["last_height_checked"]
         block_check_min_time: int = c["block_check_min_time"]
@@ -13088,37 +13101,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         replace_unlinked: bool = False
         if bid.state == BidStates.BID_RECEIVING_ACC:
-            current_id: bytes = xmr_swap.split_parent_msg_id
-            if current_id is None:
-                self.log.info(
-                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}, the one being received was stored without its message id."
-                )
+            replace_unlinked = self.laterAcceptReplaces(bid, offer, xmr_swap, msg)
+            if replace_unlinked is None:
                 return
-            current_sent: int = int.from_bytes(current_id[:8], byteorder="big")
-            if current_id == bytes.fromhex(msg["msgid"]):
-                self.log.info(
-                    f"Ignoring a repeat adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}."
-                )
-                return
-            if msg["sent"] < current_sent:
-                self.log.info(
-                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent before the one being received."
-                )
-                return
-            linked: bool = (
-                min(offer.protocol_version, bid.protocol_version)
-                >= PROTOCOL_VERSION_SPLIT_PARENT
-            )
-            # Unlinked parts are told apart by send time alone
-            if not linked and msg["sent"] == current_sent:
-                self.log.info(
-                    f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent in the same second as the one being received."
-                )
-                return
-            replace_unlinked = not linked
-            self.log.info(
-                f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
-            )
 
         ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
@@ -15017,6 +15002,40 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             or row.parent_msg_id == xmr_swap.split_parent_msg_id
         )
 
+    def laterAcceptReplaces(self, bid, offer, xmr_swap, msg) -> bool | None:
+        """None to ignore the accept, else whether the replaced parts carry no parent."""
+        current_id: bytes = xmr_swap.split_parent_msg_id
+        if current_id is None:
+            self.log.info(
+                f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}, the one being received was stored without its message id."
+            )
+            return None
+        current_sent: int = int.from_bytes(current_id[:8], byteorder="big")
+        if current_id == bytes.fromhex(msg["msgid"]):
+            self.log.info(
+                f"Ignoring a repeat adaptor-sig bid accept for bid {self.log.id(bid.bid_id)}."
+            )
+            return None
+        if msg["sent"] < current_sent:
+            self.log.info(
+                f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent before the one being received."
+            )
+            return None
+        linked: bool = (
+            min(offer.protocol_version, bid.protocol_version)
+            >= PROTOCOL_VERSION_SPLIT_PARENT
+        )
+        # Unlinked parts are told apart by send time alone
+        if not linked and msg["sent"] == current_sent:
+            self.log.info(
+                f"Ignoring an adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} sent in the same second as the one being received."
+            )
+            return None
+        self.log.info(
+            f"Replacing the adaptor-sig bid accept for bid {self.log.id(bid.bid_id)} with a later one."
+        )
+        return not linked
+
     def getSplitChunkRefusal(
         self, cursor, msg, msg_type: int, bid_id: bytes, now: int
     ) -> str | None:
@@ -15407,6 +15426,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         allowed_states = [
             BidStates.BID_REQUEST_SENT,
+            BidStates.BID_RECEIVING,
         ]
         if bid.was_sent and offer.was_sent:
             allowed_states.append(BidStates.BID_REQUEST_ACCEPTED)
@@ -15414,6 +15434,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.state in allowed_states,
             f"Invalid state for bid {bid.state}, {strBidState(bid.state)}",
         )
+
+        replacing: bool = bid.state == BidStates.BID_RECEIVING
+        replace_unlinked: bool = False
+        if replacing:
+            replace_unlinked = self.laterAcceptReplaces(bid, offer, xmr_swap, msg)
+            if replace_unlinked is None:
+                return
+
         ensure(bid.expire_at > self.getTime() + self._bid_expired_leeway, "Bid expired")
 
         ci_from = self.ci(offer.coin_to)
@@ -15452,11 +15480,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.log.info(
             f"Receiving reverse adaptor-sig bid {self.log.id(bid_id)} for offer {self.log.id(bid.offer_id)}."
         )
-        self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
 
         try:
             cursor = self.openDB()
-            self.notify(NT.BID_ACCEPTED, {"bid_id": bid_id.hex()}, cursor)
+            if replace_unlinked:
+                cursor.execute(
+                    "DELETE FROM xmr_split_data WHERE bid_id = :bid_id AND msg_type = :msg_type AND addr_from = :addr_from AND parent_msg_id IS NULL AND created_at < :sent",
+                    {
+                        "bid_id": bid_id,
+                        "msg_type": int(XmrSplitMsgTypes.BID),
+                        "addr_from": offer.addr_from,
+                        "sent": msg["sent"],
+                    },
+                )
+            self.saveBid(bid_id, bid, xmr_swap=xmr_swap, cursor=cursor)
+            if not replacing:
+                self.notify(NT.BID_ACCEPTED, {"bid_id": bid_id.hex()}, cursor)
             if ci_to.curve_type() != Curves.ed25519:
                 self.receiveXmrBid(bid, cursor)
         finally:

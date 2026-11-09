@@ -219,8 +219,8 @@ class BaseApp(DBMethods):
         self._enabled_log_categories = set()
         for category in self.settings.get("enabled_log_categories", []):
             category = category.lower()
-            if category == "net":
-                self._enabled_log_categories.add(LC.NET)
+            if category.upper() in LC.__members__:
+                self._enabled_log_categories.add(LC[category.upper()])
             else:
                 self.log.warning(
                     f'Unknown entry "{category}" in "enabled_log_categories"'
@@ -544,6 +544,23 @@ class BaseApp(DBMethods):
         if log_category not in self._enabled_log_categories:
             return
         self.log.debug("(" + LC(log_category).name + ") " + message)
+
+    def logCategories(self) -> dict:
+        return {c.name.lower(): c in self._enabled_log_categories for c in LC}
+
+    def setLogCategories(self, include: list[str], exclude: list[str]) -> None:
+        for name in list(include) + list(exclude):
+            if name.upper() not in LC.__members__:
+                raise ValueError(f'Unknown log category "{name}"')
+        enabled = set(self._enabled_log_categories)
+        enabled.update(LC[name.upper()] for name in include)
+        enabled.difference_update(LC[name.upper()] for name in exclude)
+        self._enabled_log_categories = enabled
+        self.log.info(
+            "Enabled logging categories: {}".format(
+                ",".join(sorted([c.name for c in enabled])) or "none"
+            )
+        )
 
     def torControl(self, query):
         try:

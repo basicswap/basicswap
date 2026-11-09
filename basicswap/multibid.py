@@ -11,7 +11,6 @@ import json
 import os
 
 from dataclasses import dataclass, replace
-from math import ceil
 from typing import Callable, List, Optional
 
 from .basicswap_util import BidStates, SwapTypes
@@ -231,11 +230,6 @@ def plan_htlc_batch(
     return BatchPlan(wait=False, batch=batch, drop=[])
 
 
-def redeem_fee(fee_rate: int, redeem_vsize: int) -> int:
-    """Fee to redeem one received swap output."""
-    return fee_rate * redeem_vsize // 1000
-
-
 @dataclass(frozen=True)
 class FeeReserve:
     """Fees a plan holds back from the coin it pays with: each offer's lock,
@@ -308,11 +302,11 @@ def plan_fee_reserve(swap_client, ci, offer_ids, splits: bool) -> FeeReserve:
                 live_rate = ci.make_int(ci.get_fee_rate()[0])
             rate = live_rate
         rates[offer_id] = rate
-        lock[offer_id] = ceil(rate * lock_vsize / 1000)
+        lock[offer_id] = ci.feeForVSize(rate, lock_vsize)
     outputs = tuple(
         sorted((o["value"] for o in ci.getSpendableOutputs() or ()), reverse=True)
     )
-    input_fee: int = ceil(max(rates.values(), default=0) * input_vsize / 1000)
+    input_fee: int = ci.feeForVSize(max(rates.values(), default=0), input_vsize)
     if not splits:
         return FeeReserve(lock, outputs=outputs, input_fee=input_fee)
     split_fixed, split_per_output, split_per_input = ci.getSplitTxFees()
@@ -361,7 +355,7 @@ def live_redeem_fee(ci) -> int:
         raise ValueError(
             f"Could not get the {ci.coin_name()} fee rate to size the redeem fee: {e}"
         )
-    return redeem_fee(fee_rate, ci.getHTLCSpendTxVSize())
+    return ci.feeForVSize(fee_rate, ci.getHTLCSpendTxVSize())
 
 
 def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -> dict:
@@ -387,7 +381,7 @@ def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -
         _, xmr_offer = swap_client.getXmrOffer(c.offer_id)
         if xmr_offer:
             rate = wallet_rate if wallet_rate is not None else xmr_offer.a_fee_rate
-            fees[c.offer_id] = redeem_fee(rate or 0, redeem_vsize)
+            fees[c.offer_id] = ci_from.feeForVSize(rate or 0, redeem_vsize)
         else:
             if live_fee is None:
                 live_fee = live_redeem_fee(ci_from)
@@ -433,10 +427,12 @@ def leg_prevouts(swap_client, ci_from, ci_to, offers, legs):
         # Chain A is coin_to on a reverse bid, so it is the offer's to-rate.
         fee_rate: int = xmr_offer.b_fee_rate if xmr_offer else 0
         cost: int = (int(leg["amount"]) * offer.rate) // ci_from.COIN()
-        extra: int = fee_rate * ci_to.est_tx_input_vsize() // 1000
+        extra: int = ci_to.feeForVSize(fee_rate, ci_to.est_tx_input_vsize())
         # est_lock_tx_vsize is rough and leaves out change, a spare input's
         # worth covers both.
-        needs.append(cost + fee_rate * ci_to.est_lock_tx_vsize() // 1000 + extra)
+        needs.append(
+            cost + ci_to.feeForVSize(fee_rate, ci_to.est_lock_tx_vsize()) + extra
+        )
         extras.append(extra)
 
     assigned = assign_prevouts(outputs, needs, extras)

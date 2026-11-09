@@ -19,6 +19,7 @@ import traceback
 import unittest
 
 from copy import deepcopy
+from unittest.mock import patch
 
 from coincurve.keys import PrivateKey
 
@@ -1621,6 +1622,52 @@ class Test(BaseTest):
         swap_clients[1].acceptADSReverseBid(bid_id)
 
         self.waitForBothCompleted(bid_id, id_offerer=1, id_bidder=0)
+
+    def test_01f_xmr_part_reverse_double_accept_first_parts_lost(self):
+        logging.info(
+            "---------- Test XMR to PART, the offerer accepts a reverse bid twice, only the later's parts are sent"
+        )
+        swap_clients = self.swap_clients
+        offer_id = swap_clients[1].postOffer(
+            Coins.XMR,
+            Coins.PART,
+            1 * XMR_COIN,
+            10 * COIN,
+            1 * XMR_COIN,
+            SwapTypes.XMR_SWAP,
+        )
+        wait_for_offer(test_delay_event, swap_clients[0], offer_id)
+        offer = swap_clients[0].getOffer(offer_id)
+        bid_id = swap_clients[0].postXmrBid(offer_id, offer.amount_from)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[1],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        with patch.object(swap_clients[1], "sendXmrSplitMessages") as send_parts:
+            swap_clients[1].acceptADSReverseBid(bid_id)
+        send_parts.assert_called_once()
+        for _ in range(60):
+            bidder_bid, bidder_swap = swap_clients[0].getXmrBid(bid_id)
+            if bidder_bid.state != BidStates.BID_REQUEST_SENT:
+                break
+            if test_delay_event.wait(1):
+                raise ValueError("Test stopped.")
+        assert bidder_bid.state == BidStates.BID_RECEIVING
+        first_accept = bidder_swap.split_parent_msg_id
+        assert first_accept is not None
+
+        bid, xmr_swap = swap_clients[1].getXmrBid(bid_id)
+        bid.setState(BidStates.BID_RECEIVED)
+        swap_clients[1].saveBid(bid_id, bid, xmr_swap=xmr_swap)
+        swap_clients[1].acceptADSReverseBid(bid_id)
+
+        self.waitForBothCompleted(bid_id, id_offerer=1, id_bidder=0)
+        _, bidder_swap = swap_clients[0].getXmrBid(bid_id)
+        assert bidder_swap.split_parent_msg_id != first_accept
 
     def test_02_leader_recover_a_lock_tx(self):
         logging.info("---------- Test PART to XMR leader recovers coin a lock tx")

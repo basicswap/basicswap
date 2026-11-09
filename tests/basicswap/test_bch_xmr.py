@@ -1075,6 +1075,12 @@ class TestBCH(BasicSwapTest):
             bid_id, DebugTypes.BID_DONT_SPEND_COIN_B_LOCK
         )
         swap_clients[id_leader].setBidDebugInd(
+            bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_PREREFUND, False
+        )
+        swap_clients[id_follower].setBidDebugInd(
+            bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_PREREFUND, False
+        )
+        swap_clients[id_leader].setBidDebugInd(
             bid_id, DebugTypes.WAIT_FOR_COIN_B_LOCK_BEFORE_REFUND, False
         )
         swap_clients[id_follower].setBidDebugInd(

@@ -1227,10 +1227,8 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
             if reverse_bid
             else ci_from.xmr_swap_a_lock_spend_tx_vsize()
         )
-        lock_spend_tx_fee = ci_from.make_int(
-            fee_rate_int * lock_spend_tx_vsize / 1000, r=1
-        )
-        rv["fee"] = ci_from.format_amount(lock_spend_tx_fee // ci_from.COIN())
+        lock_spend_tx_fee = ci_from.feeForVSize(fee_rate_int, lock_spend_tx_vsize)
+        rv["fee"] = ci_from.format_amount(lock_spend_tx_fee)
         rv["fee_rate"] = ci_from.format_amount(fee_rate_int)
         rv["fee_src"] = fee_src
     except Exception as e:
@@ -1713,6 +1711,20 @@ def js_lock(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps({"success": True}), "UTF-8")
 
 
+def js_logging(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    if post_string:
+        post_data = getFormData(post_string, is_json)
+        names = []
+        for key in ("include", "exclude"):
+            value = get_data_entry_or(post_data, key, [])
+            if isinstance(value, str):
+                value = [name for name in value.split(",") if name != ""]
+            names.append(value)
+        swap_client.setLogCategories(*names)
+    return bytes(json.dumps(swap_client.logCategories()), "UTF-8")
+
+
 def js_404(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps({"Error": "path unknown"}), "UTF-8")
 
@@ -2142,11 +2154,9 @@ def js_modeswitchinfo(self, url_split, post_string, is_json) -> bytes:
     try:
         fee_rate, rate_src = ci.get_fee_rate(ci._conf_target)
         est_vsize = 180
-        if isinstance(fee_rate, int):
-            fee_per_vbyte = max(1, fee_rate // 1000)
-        else:
-            fee_per_vbyte = max(1, int(fee_rate * 100000))
-        estimated_fee_sats = est_vsize * fee_per_vbyte
+        if not isinstance(fee_rate, int):
+            fee_rate = ci.make_int(fee_rate, r=1)
+        estimated_fee_sats = max(est_vsize, ci.feeForVSize(fee_rate, est_vsize))
     except Exception:
         estimated_fee_sats = 180
         rate_src = "default"
@@ -2387,6 +2397,7 @@ endpoints = {
     "unlock": js_unlock,
     "lock": js_lock,
     "help": js_help,
+    "logging": js_logging,
     "readurl": js_readurl,
     "active": js_active,
     "coinprices": js_coinprices,

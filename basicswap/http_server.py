@@ -185,6 +185,7 @@ JSON_GET_ALLOWED = frozenset(
         "automationstrategies",
         "validateamount",
         "help",
+        "logging",
         "readurl",
         "active",
         "coinprices",

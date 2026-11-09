@@ -329,14 +329,11 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                     if reverse_bid
                     else ci_from.xmr_swap_a_lock_spend_tx_vsize()
                 )
-                lock_spend_tx_fee = ci_from.make_int(
-                    ci_from.make_int(from_fee_override, r=1)
-                    * lock_spend_tx_vsize
-                    / 1000,
-                    r=1,
+                lock_spend_tx_fee = ci_from.feeForVSize(
+                    ci_from.make_int(from_fee_override, r=1), lock_spend_tx_vsize
                 )
                 page_data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(
-                    lock_spend_tx_fee // ci_from.COIN()
+                    lock_spend_tx_fee
                 )
                 page_data["tla_from"] = ci_from.ticker()
 
@@ -1040,12 +1037,8 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
         redeem_fee_rate = ci_from.getRedeemFeeRate()
         if redeem_fee_rate is None:
             redeem_fee_rate = xmr_offer.a_fee_rate
-        lock_spend_tx_fee = ci_from.make_int(
-            redeem_fee_rate * lock_spend_tx_vsize / 1000, r=1
-        )
-        data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(
-            lock_spend_tx_fee // ci_from.COIN()
-        )
+        lock_spend_tx_fee = ci_from.feeForVSize(redeem_fee_rate, lock_spend_tx_vsize)
+        data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(lock_spend_tx_fee)
 
     if offer.was_sent:
         try:

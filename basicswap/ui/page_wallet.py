@@ -520,7 +520,7 @@ def page_wallet(self, url_split, post_string):
         wallet_data["fee_rate"] = ci.format_amount(int(fee_rate * ci.COIN()))
         wallet_data["fee_rate_src"] = fee_src
         wallet_data["est_fee"] = (
-            "Unknown" if est_fee is None else ci.format_amount(int(est_fee * ci.COIN()))
+            "Unknown" if est_fee is None else ci.format_amount(est_fee)
         )
         wallet_data["deposit_address"] = w.get("deposit_address", "Refresh necessary")
 

@@ -253,6 +253,7 @@ class FakeBlind(FakePart):
     publishBLockTx = PARTInterfaceBlind.publishBLockTx
     publishBLockTxs = PARTInterfaceBlind.publishBLockTxs
     findTxB = PARTInterfaceBlind.findTxB
+    lockWatchOnlyOutput = PARTInterfaceBlind.lockWatchOnlyOutput
 
 
 def anon_output(seed: int, amount: str, vout: int, out_type: str = "anon") -> dict:
