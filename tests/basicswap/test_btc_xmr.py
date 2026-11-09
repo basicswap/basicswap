@@ -2860,6 +2860,22 @@ class BasicSwapTest(TestFunctions):
         assert expect_vsize >= vsize_actual
         assert expect_vsize - vsize_actual <= 10
 
+        seq = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_BLOCKS, 8)
+        refund_tx, _, _ = ci.createSCLockRefundTx(
+            lock_tx, lock_tx_script, A, B, seq, seq, self.test_fee_rate
+        )
+        refund_guarded_spend_tx = ci.createSCLockSpendTx(
+            lock_tx,
+            lock_tx_script,
+            pkh_out,
+            self.test_fee_rate,
+            tx_lock_refund_bytes=refund_tx,
+        )
+        spend_fee: int = amount - ci.getVoutValue(
+            ci.loadTx(refund_guarded_spend_tx).vout[0]
+        )
+        assert spend_fee == ci.estLockSpendFee(self.test_fee_rate)
+
         # Test chain b (no-script) lock tx size
         v = ci.getNewRandomKey()
         s = ci.getNewRandomKey()
