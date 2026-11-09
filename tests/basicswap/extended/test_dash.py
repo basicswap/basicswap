@@ -410,7 +410,9 @@ class Test(unittest.TestCase):
 
             waitForRPC(dashRpc, delay_event, rpc_command="getblockchaininfo")
             if len(dashRpc("listwallets")) < 1:
-                dashRpc("createwallet bsx_wallet")
+                dashRpc(
+                    "-named createwallet wallet_name=bsx_wallet descriptors=false load_on_startup=true"
+                )
 
             sc.start()
 
@@ -747,8 +749,8 @@ class Test(unittest.TestCase):
         ci = self.swap_clients[0].ci(Coins.DASH)
         test_wif: str = ci.encodeKey(bytes.fromhex(test_seed))
         new_wallet_name: str = random.randbytes(10).hex()
-        # wallet_name, wallet_name, blank, passphrase, avoid_reuse, descriptors
-        ci.rpc("createwallet", [new_wallet_name, False, True, "", False, False])
+        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
+        ci.rpc("createwallet", [new_wallet_name, False, True, "", False, False, True])
         ci.rpc("sethdseed", [True, test_wif], wallet_override=new_wallet_name)
 
         test_pwd: str = "test_pwd"
@@ -765,7 +767,9 @@ class Test(unittest.TestCase):
         assert addr == "yb8DSec26MLqtuj48iELnhnDCSBBbpWJ9p"
 
         new_wallet_name += "_encrypted"
-        ci.rpc("createwallet", [new_wallet_name, False, True, test_pwd, False, False])
+        ci.rpc(
+            "createwallet", [new_wallet_name, False, True, test_pwd, False, False, True]
+        )
         ci.rpc("walletpassphrase", [test_pwd, 1000], wallet_override=new_wallet_name)
         # sethdseed fails on encrypted wallets!
         try:

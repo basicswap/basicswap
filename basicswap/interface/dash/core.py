@@ -9,7 +9,7 @@ import os
 from basicswap.interface.dash.chainparams import params
 from basicswap.interface.prepare_util import CoinPrepareModule, PrepareContext
 
-DASH_VERSION = os.getenv("DASH_VERSION", "23.1.8")
+DASH_VERSION = os.getenv("DASH_VERSION", "24.0.0")
 DASH_VERSION_TAG = os.getenv("DASH_VERSION_TAG", "")
 dash_signers = {
     "pasta": (
@@ -123,7 +123,7 @@ class DASHPrepare(CoinPrepareModule):
                 "Workaround for Dash sethdseed error if wallet is encrypted."
             )  # Errors with "AddHDChainSingle failed"
         assert use_descriptors is False
-        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors
+        # wallet_name, disable_private_keys, blank, passphrase, avoid_reuse, descriptors, load_on_startup
         swap_client.callcoinrpc(
             coin_id,
             "createwallet",
@@ -134,6 +134,7 @@ class DASHPrepare(CoinPrepareModule):
                 "",
                 False,
                 use_descriptors,
+                True,
             ],
         )
 

@@ -127,14 +127,15 @@ class BCHInterface(BTCInterface):
         return unspent_addr
 
     def createWallet(self, wallet_name: str, password: str = ""):
-        self.rpc("createwallet", [wallet_name, False])
+        # wallet_name, disable_private_keys, blank
+        self.rpc("createwallet", [wallet_name, False, True])
         if password != "":
             self.rpc(
                 "encryptwallet",
                 [
                     password,
                 ],
-                override_wallet=wallet_name,
+                wallet_override=wallet_name,
             )
 
     def newKeypool(self) -> None:
