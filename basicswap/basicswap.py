@@ -18253,7 +18253,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             mode = "-" if active_ind == 0 else "+"
             rv = self.callrpc("smsglocalkeys", ["recv", mode, address])
-            if "not found" in rv["result"]:
+            if active_ind != 0 and "not found" in rv["result"]:
                 self.callrpc(
                     "smsgaddlocaladdress",
                     [
