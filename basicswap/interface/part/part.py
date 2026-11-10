@@ -776,6 +776,11 @@ class PARTInterfaceBlind(PARTInterface):
         ensure(B == Kaf, "Bad script pubkey")
         ensure(csv_val == csv_val_expect, "Bad script csv value")
         ensure(C == Kaf, "Bad script pubkey")
+        # A non-minimal push decodes to the same values but makes the lock 2 spend non-standard
+        ensure(
+            script_out == self.genScriptLockRefundTxScript(Kal, Kaf, csv_val_expect),
+            "Bad lock refund script",
+        )
 
         # Check rangeproofs and commitments sum
         lock_tx_obj = self.rpc("decoderawtransaction", [lock_tx_bytes.hex()])

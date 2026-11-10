@@ -2135,6 +2135,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         ensure(B == Kaf, "Bad script pubkey")
         ensure(csv_val == csv_val_expect, "Bad script csv value")
         ensure(C == Kaf, "Bad script pubkey")
+        # A non-minimal push decodes to the same values but makes the lock 2 spend non-standard
+        ensure(
+            script_out == self.genScriptLockRefundTxScript(Kal, Kaf, csv_val_expect),
+            "Bad lock refund script",
+        )
 
         fee_paid = swap_value - locked_coin
         ensure(fee_paid > 0, "negative fee_paid")

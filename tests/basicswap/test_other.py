@@ -549,6 +549,66 @@ class Test(unittest.TestCase):
             except Exception as e:
                 assert "Bad fee" in str(e)
 
+    def test_lock_refund_script_must_be_canonical(self):
+        ci = self.ci_btc()
+
+        Kal = ci.getPubkey(ci.getNewRandomKey())
+        Kaf = ci.getPubkey(ci.getNewRandomKey())
+        script_lock = CScript([2, Kal, Kaf, 2, OP_CHECKMULTISIG])
+
+        locked_coin: int = ci.make_int(0.1)
+        lock_tx = CTransaction()
+        lock_tx.nVersion = ci.txVersion()
+        lock_tx.vin.append(
+            CTxIn(COutPoint(uint256_from_str(secrets.token_bytes(32)), 0))
+        )
+        lock_tx.vout.append(CTxOut(locked_coin, ci.getScriptDest(script_lock)))
+        lock_tx.rehash()
+        lock_tx_bytes = lock_tx.serialize()
+
+        lock1_value = ci.getExpectedSequence(
+            TxLockTypes.SEQUENCE_LOCK_TIME, 2 * 60 * 60
+        )
+        csv_val = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, 4 * 60 * 60)
+        fee_rate: int = 1000
+        refund_tx, refund_script, _ = ci.createSCLockRefundTx(
+            lock_tx_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, fee_rate
+        )
+
+        def verify(tx_bytes, script):
+            ci.verifySCLockRefundTx(
+                tx_bytes,
+                lock_tx_bytes,
+                script,
+                ci.getTxid(lock_tx),
+                0,
+                lock1_value,
+                script_lock,
+                Kal,
+                Kaf,
+                csv_val,
+                locked_coin,
+                fee_rate,
+            )
+
+        verify(refund_tx, refund_script)
+
+        # The same lock 2 value, pushed with a padding byte
+        csv_push = bytes(CScript([csv_val]))
+        csv_at: int = 76
+        self.assertEqual(refund_script[csv_at : csv_at + len(csv_push)], csv_push)
+        padded_push = bytes([csv_push[0] + 1]) + csv_push[1:] + b"\x00"
+        padded_script = (
+            refund_script[:csv_at]
+            + padded_push
+            + refund_script[csv_at + len(csv_push) :]
+        )
+        tx = ci.loadTx(refund_tx)
+        tx.vout[0].scriptPubKey = ci.getScriptDest(padded_script)
+        self.assertRaisesRegex(
+            ValueError, "Bad lock refund script", verify, tx.serialize(), padded_script
+        )
+
     def test_compare_fee_rates(self):
         # compareFeeRates must accept every fee feeForVSize can produce
         ci = self.ci_btc()
