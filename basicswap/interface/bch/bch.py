@@ -81,6 +81,10 @@ class BCHInterface(BTCInterface):
     def xmr_swap_a_lock_spend_tx_vsize() -> int:
         return 302
 
+    def estLockSpendFee(self, fee_rate: int) -> int:
+        # The covenant's mining_fee is the offer's fee rate, paid flat
+        return fee_rate
+
     @staticmethod
     def supports_add_inputs() -> bool:
         # BCHN rejects add_inputs; other legs' preselected inputs stay locked.

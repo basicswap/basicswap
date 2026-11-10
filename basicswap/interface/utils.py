@@ -6,6 +6,7 @@
 
 import time
 
+from basicswap.basicswap_util import ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
 from basicswap.contrib.test_framework.messages import COIN
 from basicswap.db import (
     Concepts,
@@ -149,6 +150,13 @@ class FeeValidator:
         if actual < expected:
             return False
         return actual - expected < 10
+
+    def estLockSpendFee(self, fee_rate: int) -> int:
+        # The lock spend tx pays the lock refund tx's fee plus a buffer
+        return (
+            self.feeForVSize(fee_rate, self.xmr_swap_a_lock_refund_tx_vsize())
+            + ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER
+        )
 
     def getSplitTxFees(self) -> tuple[int, int, int]:
         """(fixed, per_output, per_input) fees to split the wallet into outputs."""

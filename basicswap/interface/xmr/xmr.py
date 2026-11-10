@@ -80,10 +80,6 @@ class XMRInterface(CoinInterface):
         return 10
 
     @staticmethod
-    def xmr_swap_a_lock_spend_tx_vsize() -> int:
-        raise ValueError("Not possible")
-
-    @staticmethod
     def est_lock_tx_vsize() -> int:
         # TODO: Estimate with ringsize
         return 1604
