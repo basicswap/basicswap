@@ -759,7 +759,7 @@
            </svg>
           </div>
          </div>
-         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enable detailed logging and debug information</p>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Enable debug-only options and behaviour</p>
         </div>
 
         <div>
@@ -776,6 +776,22 @@
           </div>
          </div>
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Show advanced UI elements and debug controls</p>
+        </div>
+
+        <div>
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Log Level</label>
+         <div class="relative">
+          <select name="loglevel" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+           <option {% if general_settings.log_level == "debug" %}selected{% endif %} value="debug">Debug</option>
+           <option {% if general_settings.log_level == "info" %}selected{% endif %} value="info">Info</option>
+          </select>
+          <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+           </svg>
+          </div>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Debug adds detailed logs and error tracebacks</p>
         </div>
 
         <div class="md:col-span-2">

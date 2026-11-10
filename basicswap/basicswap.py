@@ -16438,6 +16438,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     settings_copy["debug_ui"] = new_value
                     settings_changed = True
 
+            if "log_level" in data:
+                new_value = data["log_level"]
+                ensure(new_value in ("debug", "info"), "Unknown log_level value")
+                if settings_copy.get("log_level") != new_value:
+                    self.debug_logs = new_value == "debug"
+                    self.log.setLevel(
+                        logging.DEBUG if self.debug_logs else logging.INFO
+                    )
+                    settings_copy["log_level"] = new_value
+                    settings_changed = True
+
             if "expire_unused_offers" in data:
                 new_value = data["expire_unused_offers"]
                 ensure(
