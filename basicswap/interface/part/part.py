@@ -1288,6 +1288,21 @@ class PARTInterfaceBlind(PARTInterface):
     def getSpendableBalance(self) -> int:
         return self.make_int(self.rpc_wallet("getbalances")["mine"]["blind_trusted"])
 
+    def fundBLockTx(
+        self,
+        Kbs: bytes,
+        output_amount: int,
+        feerate: int,
+        bid_id: bytes = None,
+        cursor=None,
+    ) -> tuple[bytes, int] | None:
+        return None
+
+    def fundBLockTxs(
+        self, locks, feerate: int, bid_id: bytes = None, cursor=None
+    ) -> bytes | None:
+        return None
+
     def publishBLockTx(
         self,
         vkbv: bytes,
@@ -1638,6 +1653,21 @@ class PARTInterfaceAnon(PARTInterface):
 
     def ticker(self) -> str:
         return super().ticker() + " Anon"
+
+    def fundBLockTx(
+        self,
+        Kbs: bytes,
+        output_amount: int,
+        feerate: int,
+        bid_id: bytes = None,
+        cursor=None,
+    ) -> tuple[bytes, int] | None:
+        return None
+
+    def fundBLockTxs(
+        self, locks, feerate: int, bid_id: bytes = None, cursor=None
+    ) -> bytes | None:
+        return None
 
     def publishBLockTx(
         self,

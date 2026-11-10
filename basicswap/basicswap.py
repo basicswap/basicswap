@@ -3596,6 +3596,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
+            recorded = self.getStringKV(f"b_lock_tx:{bid.bid_id.hex()}", cursor)
+            if recorded is not None:
+                # The wallet's locks on its inputs don't outlast a daemon restart
+                try:
+                    ci_to.lockPrefundedTxInputs(
+                        bytes.fromhex(json.loads(recorded)["tx"]), bid.bid_id, cursor
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"Locking the inputs of the recorded coin B lock tx for bid {self.log.id(bid.bid_id)} failed: {e}"
+                    )
             if (
                 ci_to.watch_blocks_for_scripts()
                 and bid.xmr_a_lock_tx
@@ -13740,6 +13751,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid.xmr_b_lock_tx.setState(TxStates.TX_SENT)
         xmr_swap.b_lock_tx_id = b_lock_tx_id
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, "", cursor)
+        self.clearStringKV(f"b_lock_tx:{bid.bid_id.hex()}", cursor)
+
+    def recordSignedBLockTx(self, b_lock_tx: bytes, vout, bid_ids, cursor) -> None:
+        # A retry must publish these bytes again, new inputs would pay the locks twice
+        record = json.dumps(
+            {"tx": b_lock_tx.hex(), "vout": vout, "bids": [b.hex() for b in bid_ids]}
+        )
+        for bid_id in bid_ids:
+            self.setStringKV(f"b_lock_tx:{bid_id.hex()}", record, cursor)
+        self.commitDB()
+
+    def dropRecordedBLockTx(self, ci_to, bid_id: bytes, cursor) -> None:
+        recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        if recorded is None:
+            return
+        self.clearStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        try:
+            ci_to.unlockInputs(bytes.fromhex(json.loads(recorded)["tx"]), cursor)
+        except Exception as e:
+            self.log.warning(
+                f"Unlocking the inputs of the dropped coin B lock tx for bid {self.log.id(bid_id)} failed: {e}"
+            )
 
     def sendXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
         # Follower sending coin B lock tx
@@ -13766,9 +13799,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return
 
+        # Recorded before its first publish, which may have reached the daemon
+        recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        if recorded is not None:
+            recorded = json.loads(recorded)
         lock_margin: int = self.getBLockMinMargin(ci_to)
         lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
-        if lock_remaining is not None and lock_remaining < lock_margin:
+        too_late: bool = lock_remaining is not None and lock_remaining < lock_margin
+        if too_late and recorded is not None:
+            # Too late to publish it, it only counts if it reached the node in time
+            recorded_txid: bytes = ci_to.getTxid(bytes.fromhex(recorded["tx"]))
+            if ci_to.getWalletTransaction(recorded_txid) is None:
+                self.dropRecordedBLockTx(ci_to, bid_id, cursor)
+                recorded = None
+        if too_late and recorded is None:
             # The leader won't release, so the lock could only be recovered
             if (
                 self.countBidEvents(
@@ -13789,6 +13833,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         if self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent) is True:
+            self.clearStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
             return
 
@@ -13798,7 +13843,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return
 
-        if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
+        if recorded is None and bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug(
                 f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
             )
@@ -13813,7 +13858,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         unlock_time: int = 0
-        if bid.debug_ind in (
+        if recorded is None and bid.debug_ind in (
             DebugTypes.CREATE_INVALID_COIN_B_LOCK,
             DebugTypes.B_LOCK_TX_MISSED_SEND,
         ):
@@ -13839,15 +13884,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 cursor,
             )
 
-        prefunded_tx = self.getPreFundedTx(
-            Concepts.BID,
-            bid.bid_id,
-            TxTypes.PTX_PRE_FUNDED,
-            cursor=cursor,
+        prefunded_tx = (
+            None
+            if recorded is not None
+            else self.getPreFundedTx(
+                Concepts.BID,
+                bid.bid_id,
+                TxTypes.PTX_PRE_FUNDED,
+                cursor=cursor,
+            )
         )
 
         batch = []
-        if bid.plan_id and prefunded_tx is None and hasattr(ci_to, "publishBLockTxs"):
+        if (
+            recorded is None
+            and bid.plan_id
+            and prefunded_tx is None
+            and hasattr(ci_to, "publishBLockTxs")
+        ):
             ready_timeout = self._plan_leg_timeout
             stored_timeout = self.getStringKV(
                 f"plan_leg_timeout:{bid.plan_id.hex()}", cursor
@@ -13919,11 +13973,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 continue
             leg_swaps.append((leg, leg.xmr_swap, leg_offer))
+        if recorded is not None:
+            for recorded_id in recorded["bids"]:
+                if recorded_id == bid_id.hex():
+                    continue
+                leg, leg_swap = self.getXmrBidFromSession(
+                    cursor, bytes.fromhex(recorded_id)
+                )
+                if leg is None or leg.xmr_b_lock_tx:
+                    continue
+                leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
+                leg_swaps.append((leg, leg_swap, leg_offer))
 
         try:
             b_lock_vout = None
             covered = None
-            if prefunded_tx:
+            b_lock_tx = None
+            if recorded is not None:
+                b_lock_tx = bytes.fromhex(recorded["tx"])
+                b_lock_vout = recorded["vout"]
+            elif prefunded_tx:
                 self.log.info("Using pre-funded tx")
                 pi = self.pi(offer.swap_type)
                 b_lock_tx = pi.promoteMockPTx(
@@ -13933,17 +14002,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.pkbs,
                 )
                 b_lock_tx = ci_to.signTxWithWallet(b_lock_tx)
-                b_lock_tx_id = bytes.fromhex(ci_to.publishTx(b_lock_tx))
             elif leg_swaps:
-                b_lock_tx_id, covered = ci_to.publishBLockTxs(
-                    [(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to)]
-                    + [
-                        (leg_swap.vkbv, leg_swap.pkbs, leg.amount_to)
-                        for leg, leg_swap, _ in leg_swaps
-                    ],
-                    b_fee_rate,
-                    unlock_time=unlock_time,
+                locks = [(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to)] + [
+                    (leg_swap.vkbv, leg_swap.pkbs, leg.amount_to)
+                    for leg, leg_swap, _ in leg_swaps
+                ]
+                b_lock_tx = ci_to.fundBLockTxs(
+                    locks, b_fee_rate, bid_id=bid_id, cursor=cursor
                 )
+                if b_lock_tx is None:
+                    b_lock_tx_id, covered = ci_to.publishBLockTxs(
+                        locks, b_fee_rate, unlock_time=unlock_time
+                    )
+            elif (
+                funded := ci_to.fundBLockTx(
+                    xmr_swap.pkbs,
+                    bid.amount_to,
+                    b_fee_rate,
+                    bid_id=bid_id,
+                    cursor=cursor,
+                )
+            ) is not None:
+                b_lock_tx, b_lock_vout = funded
             else:
                 result = ci_to.publishBLockTx(
                     xmr_swap.vkbv,
@@ -13956,7 +14036,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     b_lock_tx_id, b_lock_vout = result
                 else:
                     b_lock_tx_id = result
-            if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
+            if b_lock_tx is not None:
+                if recorded is None:
+                    self.recordSignedBLockTx(
+                        b_lock_tx,
+                        b_lock_vout,
+                        [bid_id] + [leg.bid_id for leg, _, _ in leg_swaps],
+                        cursor,
+                    )
+                if too_late:
+                    b_lock_tx_id = ci_to.getTxid(b_lock_tx)
+                else:
+                    try:
+                        b_lock_tx_id = bytes.fromhex(ci_to.publishTx(b_lock_tx))
+                    except Exception as e:
+                        if not ci_to.isTxExistsError(str(e)):
+                            raise
+                        b_lock_tx_id = ci_to.getTxid(b_lock_tx)
+            if recorded is None and bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
                     f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing XMR lock tx {self.log.id(b_lock_tx_id)}."
                 )
@@ -13984,6 +14081,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
                 )
             else:
+                self.dropRecordedBLockTx(ci_to, bid_id, cursor)
                 self.setBidError(
                     bid,
                     "publishBLockTx failed: " + str(ex),

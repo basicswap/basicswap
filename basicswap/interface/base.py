@@ -94,6 +94,25 @@ class CoinInterface:
         # Max swap lock outputs payable in one publishBLockTxs tx; None means unbounded.
         return None
 
+    def fundBLockTx(
+        self,
+        Kbs: bytes,
+        output_amount: int,
+        feerate: int,
+        bid_id: bytes = None,
+        cursor=None,
+    ) -> tuple[bytes, int] | None:
+        """The signed, unpublished lock tx and its lock output, None when the
+        wallet builds and sends it in one call (publishBLockTx)."""
+        return None
+
+    def fundBLockTxs(
+        self, locks, feerate: int, bid_id: bytes = None, cursor=None
+    ) -> bytes | None:
+        """The signed, unpublished tx paying every lock, None when the wallet
+        builds and sends it in one call (publishBLockTxs)."""
+        return None
+
     def getSpendableOutputs(self):
         # Trusted, unlocked outputs, or None when the coin cannot preselect inputs.
         return None

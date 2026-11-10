@@ -306,3 +306,39 @@ class TestBidActivationRetry(unittest.TestCase):
         self.assertIn(BID_ID, sc.swaps_in_progress)
         self.assertEqual(sc.deactivated, [])
         self.assertNotIn(EventLogTypes.ERROR, sc.events)
+
+    def test_recorded_lock_tx_inputs_locked_again(self):
+        import json
+
+        from basicswap.contrib.test_framework.messages import (
+            COutPoint,
+            CTransaction,
+            CTxIn,
+            CTxOut,
+        )
+
+        sc, ci = make_activation_client()
+        ci._headers_synced = True
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(5, 1)))
+        tx.vin.append(CTxIn(COutPoint(6, 2)))
+        tx.vout.append(CTxOut(1000, b"\x51"))
+        sc.kv[f"b_lock_tx:{BID_ID.hex()}"] = json.dumps(
+            {"tx": tx.serialize().hex(), "vout": 0, "bids": [BID_ID.hex()]}
+        )
+        locked = []
+
+        def lock_utxo(coin_type, txid, vout, bid_id=None, expires_in=0, cursor=None):
+            locked.append((txid, vout, bid_id, expires_in))
+
+        ci.getWalletManager = lambda: SimpleNamespace(lockUTXO=lock_utxo)
+
+        sc.loadFromDB()
+        self.assertIn(BID_ID, sc.swaps_in_progress)
+        self.assertEqual(
+            locked,
+            [
+                (f"{5:064x}", 1, BID_ID, 86400),
+                (f"{6:064x}", 2, BID_ID, 86400),
+            ],
+        )
