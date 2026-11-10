@@ -728,6 +728,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         self.swaps_in_progress = dict()
+        self._activate_retry = set()
         self._redeem_published_at = dict()
 
         self.threads = []
@@ -1586,6 +1587,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         _, _ = self.getLockedState()
 
         # Re-load in-progress bids
+        self.waitForElectrumHeaders()
         self.loadFromDB()
 
         # Catch offer fills missed while the node was down
@@ -3816,6 +3818,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
         self.log.info("Loading data from db")
         self.swaps_in_progress.clear()
+        self._activate_retry.clear()
         bid_cursor = None
         try:
             cursor = self.openDB()
@@ -3826,30 +3829,68 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     and bid.state > BidStates.BID_RECEIVED
                     and bid.state < BidStates.SWAP_COMPLETED
                 ):
-                    try:
-                        self.activateBid(cursor, bid)
-                    except Exception as ex:
-                        self.logException(f"Failed to activate bid! Error: {ex}")
-                        self.logEvent(
-                            Concepts.BID,
-                            bid.bid_id,
-                            EventLogTypes.ERROR,
-                            "Failed to activate",
-                            cursor,
-                        )
-                        try:
-                            bid.setState(BidStates.BID_ERROR)
-
-                            offer = self.queryOne(
-                                Offer, cursor, {"offer_id": bid.offer_id}
-                            )
-                            self.deactivateBid(cursor, offer, bid)
-                        except Exception as ex:
-                            self.logException(f"Further error deactivating: {ex}")
+                    self.activateBidOrRetry(cursor, bid)
             self.buildNotificationsCache(cursor)
         finally:
             self.closeDBCursor(bid_cursor)
             self.closeDB(cursor)
+
+    def activateBidOrRetry(self, cursor, bid) -> None:
+        try:
+            self.activateBid(cursor, bid)
+            self._activate_retry.discard(bid.bid_id)
+        except Exception as ex:
+            if self.isBidTransientError(bid.bid_id, ex, cursor):
+                # The bid and its queued actions stay as they are until it activates
+                self.swaps_in_progress.pop(bid.bid_id, None)
+                self._activate_retry.add(bid.bid_id)
+                self.log.warning(
+                    f"Activating bid {self.log.id(bid.bid_id)} failed, will retry: {ex}"
+                )
+                return
+            self._activate_retry.discard(bid.bid_id)
+            self.logException(f"Failed to activate bid! Error: {ex}")
+            self.logEvent(
+                Concepts.BID,
+                bid.bid_id,
+                EventLogTypes.ERROR,
+                "Failed to activate",
+                cursor,
+            )
+            try:
+                bid.setState(BidStates.BID_ERROR)
+
+                offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
+                self.deactivateBid(cursor, offer, bid)
+            except Exception as ex:
+                self.logException(f"Further error deactivating: {ex}")
+
+    def retryBidActivation(self) -> None:
+        try:
+            cursor = self.openDB()
+            for bid_id in list(self._activate_retry):
+                bid = self.queryOne(Bid, cursor, {"bid_id": bid_id})
+                if bid is None:
+                    self._activate_retry.discard(bid_id)
+                    continue
+                self.activateBidOrRetry(cursor, bid)
+        finally:
+            self.closeDB(cursor)
+
+    def waitForElectrumHeaders(self, timeout: int = 60) -> None:
+        # Activating a bid reads verified headers, which exist after a coin's first sync
+        end = time.time() + timeout
+        for c in self.activeCoins():
+            if self.coin_clients[c]["connection_type"] != "electrum":
+                continue
+            ci = self.ci(c)
+            while not ci.electrumHeadersSynced():
+                if time.time() >= end or self.delay_event.is_set():
+                    self.log.warning(
+                        f"{ci.coin_name()} headers not synced yet, bids that need them activate once they are."
+                    )
+                    return
+                self.delay_event.wait(1)
 
     def getActiveBidMsgValidTime(self) -> int:
         return self.SMSG_SECONDS_IN_HOUR * 48
@@ -15906,6 +15947,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.checkDue(
                 now, self._last_checked_progress, self.check_progress_seconds
             ):
+                if self._activate_retry:
+                    self.retryBidActivation()
                 for bid_id, v in list(self.swaps_in_progress.items()):
                     bid, offer = v
                     try:

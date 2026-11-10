@@ -780,6 +780,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         if self.useBackend() and self._backend:
             self._syncHeadersElectrum(self._backend)
 
+    def electrumHeadersSynced(self) -> bool:
+        return self._headers_synced
+
     def _syncHeadersElectrum(self, backend) -> None:
         server = backend._server
         with self._header_sync_lock:
