@@ -9226,10 +9226,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif state == BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER:
                 rv = True  # Remove from swaps_in_progress
             elif state == BidStates.XMR_SWAP_FAILED:
-                # A lock publish that errored may still have reached the chain
+                # Lock tx B may have reached the chain although its publish errored
                 if (
-                    bid.xmr_b_lock_tx is None
-                    and was_sent
+                    was_sent
+                    and bid.xmr_b_lock_tx is None
+                    and ci_to.watch_blocks_for_scripts()
+                ):
+                    coin_b = ci_to.coin_type()
+                    cc_b = self.coin_clients[coin_b]
+                    if not any(
+                        ws.bid_id == bid_id and ws.tx_type == TxTypes.XMR_SWAP_B_LOCK
+                        for ws in cc_b["watched_scripts"]
+                    ):
+                        self.setLastHeightCheckedStart(
+                            coin_b, bid.chain_b_height_start, cursor
+                        )
+                        self.addWatchedScript(
+                            coin_b,
+                            bid_id,
+                            ci_to.getPkDest(xmr_swap.pkbs),
+                            TxTypes.XMR_SWAP_B_LOCK,
+                        )
+                        return rv
+                    if cc_b["last_height_checked"] < ci_to.getChainHeight():
+                        return rv
+                if (
+                    was_sent
+                    and (
+                        bid.xmr_b_lock_tx is None or not bid.xmr_b_lock_tx.chain_height
+                    )
                     and self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
                 ):
                     self.saveBidInSession(bid_id, bid, cursor, xmr_swap)

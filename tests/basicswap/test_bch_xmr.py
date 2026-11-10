@@ -19,9 +19,11 @@ from basicswap.basicswap import (
     SwapTypes,
 )
 from basicswap.basicswap_util import (
+    EventLogTypes,
     TxLockTypes,
     TxTypes,
 )
+from basicswap.db import Concepts
 from basicswap.bin.run import startDaemon
 from basicswap.util.crypto import sha256
 from tests.basicswap.test_btc_xmr import BasicSwapTest
@@ -1133,4 +1135,83 @@ class TestBCH(BasicSwapTest):
             swap_clients[id_follower],
             BidStates.XMR_SWAP_FAILED_SWIPED,
             wait_for=(self.extra_wait_time + 240),
+        )
+
+    def test_16_follower_recovers_unrecorded_b_lock_tx(self):
+        coin_from = Coins.PART
+        coin_to = Coins.BCH
+        logging.info(
+            f"---------- Test {coin_from.name} to {coin_to.name} follower recovers a lock tx b it failed to record"
+        )
+        self.prepare_balance(Coins.BCH, 100.0, 1801, 1800)
+        swap_clients = self.swap_clients
+        id_leader: int = self.node_a_id
+        id_follower: int = self.node_b_id
+        assert not swap_clients[0].is_reverse_ads_bid(coin_from, coin_to)
+
+        ci_from = swap_clients[id_leader].ci(coin_from)
+        ci_to = swap_clients[id_leader].ci(coin_to)
+        amt_swap = ci_from.make_int(random.uniform(0.1, 2.0), r=1)
+        rate_swap = ci_to.make_int(random.uniform(0.2, 2.0), r=1)
+        offer_id = swap_clients[id_leader].postOffer(
+            coin_from,
+            coin_to,
+            amt_swap,
+            rate_swap,
+            amt_swap,
+            SwapTypes.XMR_SWAP,
+            lock_type=TxLockTypes.SEQUENCE_LOCK_BLOCKS,
+            lock_value=32,
+        )
+        wait_for_offer(test_delay_event, swap_clients[id_follower], offer_id)
+        offer = swap_clients[id_follower].getOffer(offer_id)
+        bid_id = swap_clients[id_follower].postXmrBid(offer_id, offer.amount_from)
+        wait_for_bid(
+            test_delay_event,
+            swap_clients[id_leader],
+            bid_id,
+            BidStates.BID_RECEIVED,
+            wait_for=(self.extra_wait_time + 40),
+        )
+
+        follower_ci_to = swap_clients[id_follower].ci(coin_to)
+        # Patched at publishTx, the call every lock tx b publish ends in
+        publish_tx = follower_ci_to.publishTx
+        simulated = []
+
+        def publish_then_fail(tx):
+            txid = publish_tx(tx)
+            if simulated:
+                return txid
+            simulated.append(txid)
+            raise ValueError("Simulated failure after publishing lock tx b")
+
+        follower_ci_to.publishTx = publish_then_fail
+        try:
+            swap_clients[id_leader].setBidDebugInd(
+                bid_id, DebugTypes.DONT_RELEASE_COIN_A_LOCK
+            )
+            swap_clients[id_leader].acceptBid(bid_id)
+
+            wait_for_bid_states(
+                test_delay_event,
+                bid_id,
+                swap_clients[id_leader],
+                BidStates.XMR_SWAP_FAILED_REFUNDED,
+                swap_clients[id_follower],
+                BidStates.XMR_SWAP_FAILED_REFUNDED,
+                wait_for=(self.extra_wait_time + 300),
+                fail_fast_b=False,
+            )
+        finally:
+            del follower_ci_to.publishTx
+
+        follower_events = swap_clients[id_follower].getEvents(Concepts.BID, bid_id)
+        assert any(
+            e.event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH
+            for e in follower_events
+        )
+        assert any(
+            e.event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED
+            for e in follower_events
         )
