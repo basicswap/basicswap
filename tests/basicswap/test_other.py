@@ -3726,6 +3726,39 @@ class Test(unittest.TestCase):
 
         del sc
 
+    def test_extract_secret_by_hash(self):
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.coin_clients = {
+            Coins.PIVX: {"use_segwit": False},
+            Coins.LTC: {"use_segwit": True},
+        }
+        secret = secrets.token_bytes(32)
+        script = buildContractScript(
+            100, sha256(secret), secrets.token_bytes(20), secrets.token_bytes(20)
+        )
+        bid = Bid()
+        bid.initiate_tx = SwapTx(script=script)
+        sig = "30" + "44" * 70
+        pubkey = "02" + "11" * 32
+
+        def script_sig(*items) -> dict:
+            return {"scriptSig": {"asm": " ".join(items)}}
+
+        redeem = script_sig(sig + "[ALL]", pubkey, secret.hex(), "1", script.hex())
+        self.assertEqual(sc.extractSecret(Coins.PIVX, bid, redeem), secret)
+        # Valid in a block on chains where CLEANSTACK is only relay policy
+        extra_push = script_sig(
+            "deadbeef", sig + "[ALL]", pubkey, secret.hex(), "1", script.hex()
+        )
+        self.assertEqual(sc.extractSecret(Coins.PIVX, bid, extra_push), secret)
+        refund = script_sig(sig + "[ALL]", pubkey, "0", script.hex())
+        self.assertIsNone(sc.extractSecret(Coins.PIVX, bid, refund))
+        witness = {
+            "txinwitness": [sig + "01", pubkey, secret.hex(), "01", script.hex()]
+        }
+        self.assertEqual(sc.extractSecret(Coins.LTC, bid, witness), secret)
+
     def test_jsonrpc(self):
         logging.info("---------- Test Jsonrpc")
         host = "127.0.0.1"

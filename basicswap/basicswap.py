@@ -10305,22 +10305,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return False  # Bid is still active
 
     def extractSecret(self, coin_type, bid, spend_in):
+        secret_hash = atomic_swap_1.extractScriptSecretHash(bid.initiate_tx.script)
         try:
             if coin_type in (Coins.DCR,):
-                script_sig = spend_in["scriptSig"]["asm"].split(" ")
-                ensure(len(script_sig) == 5, "Bad witness size")
-                return bytes.fromhex(script_sig[2])
+                pushes = spend_in["scriptSig"]["asm"].split(" ")
             elif (
                 coin_type in (Coins.PART,) or self.coin_clients[coin_type]["use_segwit"]
             ):
-                ensure(len(spend_in["txinwitness"]) == 5, "Bad witness size")
-                return bytes.fromhex(spend_in["txinwitness"][2])
+                pushes = spend_in["txinwitness"]
             else:
-                script_sig = spend_in["scriptSig"]["asm"].split(" ")
-                ensure(len(script_sig) == 5, "Bad witness size")
-                return bytes.fromhex(script_sig[2])
+                pushes = spend_in["scriptSig"]["asm"].split(" ")
         except Exception:
             return None
+        # Block validity doesn't fix the item count, so find the secret by its hash
+        for push in pushes:
+            try:
+                data = bytes.fromhex(push)
+            except ValueError:
+                continue
+            if sha256(data) == secret_hash:
+                return data
+        return None
 
     def addWatchedTransaction(
         self, coin_type, bid_id, txid_hex, tx_type, swap_type=None
