@@ -1,3 +1,119 @@
+0.19.2
+==============
+
+**Adaptor-sig swaps**
+- Coin B key share proofs on secp256k1 coins and the leader's `kal_sig` sign a hash that
+  includes the key itself and the offer or bid.
+- A failed coin B lock publish is retried with the same signed tx, never with newly funded
+  inputs, so a publish that reached the node before failing can't pay the lock twice.  The
+  signed tx is recorded before its first publish, and its inputs are locked again after a
+  restart.
+- Past the coin B lock margin, a recorded lock is never published again: it is tracked if
+  the wallet already has it, otherwise it is dropped and its inputs unlocked.  A lock
+  shared by several bids counts as too late once any bid it pays is, or has left the
+  locked state.
+- A coin B lock publish with no answer, or a wallet lookup that fails, is retried instead
+  of erroring the bid.
+- The follower sends coin B only while the coin A lock is still `blocks_confirmed` deep,
+  and the leader releases coin A only while the coin B lock is still in the chain and that
+  deep.
+- When several outputs pay a lock address, the lock lookup takes the one with the agreed
+  amount, and a watched script adopts an output only with the agreed amount.
+- Lock and lock refund scripts must be byte for byte the ones this node builds,
+  and Decred swap outputs must use script version 0.
+- Bids activated at startup retry on a temporary error instead of erroring, and startup
+  waits for Electrum headers to sync first.
+- The lock spend fee is estimated from the lock refund tx's fee, and on Bitcoin Cash as
+  the covenant's flat mining fee.
+- On Bitcoin Cash and Decred, a lost coin B lock tx is found again by rescanning chain B.
+- A failed swap with nothing to recover ends in its own state, "Failed, nothing to
+  recover", and no longer counts as in progress.
+- A reverse bid follows the later of two accepts, and a bid's `pkaf` is checked as a chain
+  A key.
+- The bid page shows the error on a failed coin B lock publish.
+
+**Secret-hash swaps**
+- The buyer finds the secret in a redeem by its hash, not its position.
+- The initiate tx and its refund are saved before the initiate tx is published.  A retried
+  accept publishes the saved tx again and sends the accept, also when the offer has since
+  been disabled or the bid has expired, and an unanswered publish is retried.
+
+**Monero**
+- Settings page has a button to clean up old swap wallet caches.
+- `max_lock_amount` reaches the cached wallet info.
+
+**Litecoin**
+- MWEB outputs held in the plain wallet are left out of its spendable balance and coin
+  selection.
+- A tx that integrates MWEB funds is read correctly, and one with an MWEB body is refused.
+
+**Fees**
+- Every fee computed from a rate rounds up.
+- Fee estimates are cached for 60 seconds and the relay fee is cached.  Fee rates are no
+  longer checked for inactive offers.
+
+**Settings and logging**
+- New configs are written with `debug` off.
+- A new `log_level` setting, `debug` or `info`, sets the log level and whether tracebacks
+  are logged, and can be changed from the settings page.  Without it, the level follows
+  `debug` as before.  New configs log at `debug`.
+- Abandoning a bid no longer needs debug mode.  The button still shows only with the debug
+  UI on.
+- `safe_logs` refuses debug logs, not only debug mode.
+- Log categories can be switched at runtime through `/json/logging`, and new installs
+  leave `net` off.
+- Daemon startup is polled every second, up to `startup_timeout` (default 600 seconds).
+  `startup_tries` and `startup_delay` are still honoured.
+
+**Fixes**
+- Processed SMSG messages are marked read, so they are no longer processed again at every
+  start.
+- A balance check no longer uses up a wallet change address.
+- The auto-accept balance check adds up the amounts of the bids in flight.
+- Prices are fetched again when the rate sources change.
+- `/json/offers/<id>` finds an offer whatever its state.
+- Firo's rescan finds outputs paying P2PKH addresses.
+- Watched txs on a coin with a spent index are looked up on that coin's daemon, not
+  Particl's.
+- A watched Particl blind coin B lock tx stays out of the wallet's coin selection.
+- `--forcedbupgrade` works from the command line.
+- An idle websocket client is pinged instead of dropped.
+- Dash wallets are created to load when the node starts.
+
+**Performance**
+- Daemon RPC connections are kept alive per thread.  The connection pool is removed.
+- JSON responses are gzipped when the client accepts it.
+
+**Security / hardening**
+- `basicswap-prepare` matches a release hash only inside the signed text of an
+  inline-signed hash file (Firo, Bitcoin Cash, Monero, Wownero) and verifies only that
+  text.  The Bitcoin fastsync snapshot hash is checked the same way.
+- An Electrum header chunk below the last checkpoint must be complete.
+
+**Docker**
+- The production swapclient is built from a local `basicswap.zip` when one is beside the
+  Dockerfile, otherwise from the pinned commit.
+- The production cores log to stdout only, within the compose files' log limits.
+
+**Daemon updates**
+- Bitcoin Cash Node  v29.1.0 -> v29.2.0
+- Dash  v23.1.8 -> v24.0.0
+- Wownero  v0.11.3.0 -> v0.11.6.0, downloaded from GitHub, with jwinterm as a signer.
+
+**Upgrade notes**
+- The adaptor-sig protocol version is raised to 8, and the minimum accepted version with
+  it.  This release won't take adaptor-sig offers or bids from 0.19.1 and earlier, and an
+  offer posted before upgrading takes no bids.  Swaps already in progress finish on the old protocol.
+  Secret-hash swaps are unchanged.
+- Dash v24.0.0 is a hard fork, expected on November 28.  Update the cores before then with
+  `basicswap-prepare --upgradecores`, see [doc/upgrade.md](upgrade.md).
+- Debug mode is turned off once on the first start, as it accepts refund locks as short as
+  60 seconds instead of 2 hours.  The log level stays as it was, and abandoning a bid no
+  longer needs debug mode.  To turn it back on, set `"debug": true` in `basicswap.json`.
+- The data upgrade to version 11 runs on the first start, and re-checks bids an earlier
+  version left at "Failed".  The database stays at version 42.
+
+
 0.19.1
 ==============
 
