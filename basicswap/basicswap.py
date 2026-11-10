@@ -14141,11 +14141,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     b_lock_tx_id = ci_to.getTxid(b_lock_tx)
                 else:
                     try:
-                        b_lock_tx_id = bytes.fromhex(ci_to.publishTx(b_lock_tx))
+                        published = ci_to.publishTx(b_lock_tx)
                     except Exception as e:
                         if not ci_to.isTxExistsError(str(e)):
                             raise
-                        b_lock_tx_id = ci_to.getTxid(b_lock_tx)
+                        published = ci_to.getTxid(b_lock_tx).hex()
+                    if published is None:
+                        # No answer isn't a refusal, the tx may be out
+                        raise TemporaryError(
+                            f"No answer publishing the coin B lock tx for bid {self.log.id(bid_id)}."
+                        )
+                    b_lock_tx_id = bytes.fromhex(published)
             if recorded is None and bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
                     f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing XMR lock tx {self.log.id(b_lock_tx_id)}."
