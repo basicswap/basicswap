@@ -951,7 +951,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             f"Fee rate: {fee_rate}, source: {fee_src}, block target: {self._conf_target}"
         )
         return self.fundTx(
-            bytes.fromhex(txn), fee_rate, lock_unspents=lock_unspents, subfee=sub_fee
+            bytes.fromhex(txn),
+            fee_rate,
+            lock_unspents=lock_unspents,
+            subfee=sub_fee,
+            change_addr=change_addr,
         ).hex()
 
     def createRawSignedTransaction(self, addr_to, amount) -> str:
@@ -1180,6 +1184,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         bid_id: bytes = None,
         cursor=None,
         prevouts=None,
+        change_addr: str = None,
     ) -> bytes:
         if prevouts:
             # dcrwallet's fundrawtransaction rejects a tx that has inputs,
@@ -1263,6 +1268,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             options = {
                 "feeRate": feerate_str,
             }
+            if change_addr:
+                options["changeaddress"] = change_addr
             rv = self.rpc_wallet("fundrawtransaction", [tx.hex(), "default", options])
             tx_bytes = bytes.fromhex(rv["hex"])
             tx_obj = self.loadTx(tx_bytes)
