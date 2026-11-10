@@ -59,6 +59,13 @@ class RevokedOffer(Exception):
     pass
 
 
+class IncompatibleProtocol(ValueError):
+    def __init__(self, kind: str, version: int, minimum: int):
+        super().__init__(
+            f"Incompatible {kind} protocol version {version}, minimum {minimum}"
+        )
+
+
 def ensure(v, err_string):
     if not v:
         raise ValueError(err_string)

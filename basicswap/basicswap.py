@@ -105,6 +105,7 @@ from .util import (
     ChainNotSyncedError,
     DeserialiseNum,
     InactiveCoin,
+    IncompatibleProtocol,
     LockedCoinError,
     RevokedOffer,
     TemporaryError,
@@ -12106,10 +12107,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
 
         if offer_data.swap_type == SwapTypes.SELLER_FIRST:
-            ensure(
-                offer_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH,
-                "Invalid protocol version",
-            )
+            if offer_data.protocol_version < MINPROTO_VERSION_SECRET_HASH:
+                raise IncompatibleProtocol(
+                    "offer", offer_data.protocol_version, MINPROTO_VERSION_SECRET_HASH
+                )
             ensure(len(offer_data.proof_address) == 0, "Unexpected data")
             ensure(len(offer_data.proof_signature) == 0, "Unexpected data")
             ensure(len(offer_data.pkhash_seller) == 0, "Unexpected data")
@@ -12117,10 +12118,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         elif offer_data.swap_type == SwapTypes.BUYER_FIRST:
             raise ValueError("TODO")
         elif offer_data.swap_type == SwapTypes.XMR_SWAP:
-            ensure(
-                offer_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
-                "Invalid protocol version",
-            )
+            if offer_data.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+                raise IncompatibleProtocol(
+                    "offer", offer_data.protocol_version, MINPROTO_VERSION_ADAPTOR_SIG
+                )
             if reverse_bid:
                 ensure(
                     ci_to.has_segwit(),
@@ -12626,10 +12627,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_data.from_bytes(bid_bytes)
 
         # Validate bid data
-        ensure(
-            bid_data.protocol_version >= MINPROTO_VERSION_SECRET_HASH,
-            "Invalid protocol version",
-        )
+        if bid_data.protocol_version < MINPROTO_VERSION_SECRET_HASH:
+            raise IncompatibleProtocol(
+                "bid", bid_data.protocol_version, MINPROTO_VERSION_SECRET_HASH
+            )
         ensure(len(bid_data.offer_msg_id) == 28, "Bad offer_id length")
 
         offer_id = bid_data.offer_msg_id
@@ -13081,10 +13082,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_data.from_bytes(bid_bytes)
 
         # Validate data
-        ensure(
-            bid_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
-            "Invalid protocol version",
-        )
+        if bid_data.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+            raise IncompatibleProtocol(
+                "bid", bid_data.protocol_version, MINPROTO_VERSION_ADAPTOR_SIG
+            )
         ensure(len(bid_data.offer_msg_id) == 28, "Bad offer_id length")
 
         offer_id = bid_data.offer_msg_id
@@ -13092,10 +13093,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
-        ensure(
-            offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
-            "Incompatible offer protocol version",
-        )
+        if offer.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+            raise IncompatibleProtocol(
+                "offer", offer.protocol_version, MINPROTO_VERSION_ADAPTOR_SIG
+            )
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ensure(reverse_bid is False, f"Offer: {self.log.id(offer_id)} is reversed")
 
@@ -15605,10 +15606,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid_data.from_bytes(bid_bytes)
 
         # Validate data
-        ensure(
-            bid_data.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
-            "Invalid protocol version",
-        )
+        if bid_data.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+            raise IncompatibleProtocol(
+                "bid", bid_data.protocol_version, MINPROTO_VERSION_ADAPTOR_SIG
+            )
         ensure(len(bid_data.offer_msg_id) == 28, "Bad offer_id length")
 
         offer_id = bid_data.offer_msg_id
@@ -15616,10 +15617,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(offer and offer.was_sent, f"Offer not found: {self.log.id(offer_id)}")
         ensure(offer.swap_type == SwapTypes.XMR_SWAP, "Bid/offer swap type mismatch")
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(offer_id)}")
-        ensure(
-            offer.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
-            "Incompatible offer protocol version",
-        )
+        if offer.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+            raise IncompatibleProtocol(
+                "offer", offer.protocol_version, MINPROTO_VERSION_ADAPTOR_SIG
+            )
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
         ensure(reverse_bid is True, f"Offer: {self.log.id(offer_id)} not reversed")
 
@@ -15982,9 +15983,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except RevokedOffer as ex:
             self.log.debug(str(ex))
         except Exception as ex:
-            self.log.error(f"processMsg {ex}")
+            self.log.error(f"processMsg {self.log.short_id(msg['msgid'])}: {ex}")
             if self.debug_logs:
-                self.log.error(traceback.format_exc())
+                if not isinstance(ex, IncompatibleProtocol):
+                    self.log.error(traceback.format_exc())
                 self.logEvent(
                     Concepts.NETWORK_MESSAGE,
                     bytes.fromhex(msg["msgid"]),

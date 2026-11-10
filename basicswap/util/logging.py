@@ -48,6 +48,17 @@ class BSXLogger(logging.Logger):
             return prefix + concept_id[: max_chars // 2].hex()
         return prefix + concept_id.hex()
 
+    def short_id(self, concept_id: bytes, prefix: str = "") -> str:
+        if self.safe_logs or concept_id is None:
+            return self.id(concept_id, prefix)
+        if isinstance(concept_id, bytes):
+            concept_id = concept_id.hex()
+        # Every id opens with its 8-byte timestamp, whose top 4 bytes stay zero until 2106
+        hex_id = concept_id.removeprefix("00000000")
+        if len(hex_id) > 15:
+            hex_id = f"{hex_id[:12]}…{hex_id[-3:]}"
+        return prefix + hex_id
+
     def info_s(self, msg, *args, **kwargs):
         if self.safe_logs is False:
             self.info(msg, *args, **kwargs)
@@ -66,6 +77,9 @@ class BSXLogAdapter(logging.LoggerAdapter):
 
     def id(self, concept_id: bytes, prefix: str = "") -> str:
         return self.logger.id(concept_id, prefix)
+
+    def short_id(self, concept_id: bytes, prefix: str = "") -> str:
+        return self.logger.short_id(concept_id, prefix)
 
     def info_s(self, msg, *args, **kwargs):
         return self.logger.info_s(msg, *args, **kwargs)
