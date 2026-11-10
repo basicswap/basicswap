@@ -265,7 +265,9 @@ class BaseApp(DBMethods):
             self.delay_event.set()
 
     def openLogFile(self):
-        self.fp = open(os.path.join(self.data_dir, "basicswap.log"), "a")
+        self.fp = open(
+            os.path.join(self.data_dir, "basicswap.log"), "a", encoding="utf-8"
+        )
 
     def prepareLogging(self):
         logging.setLoggerClass(BSXLogger)
