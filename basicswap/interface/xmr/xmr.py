@@ -1053,6 +1053,46 @@ class XMRInterface(CoinInterface):
             balance_info = self.rpc_wallet("get_balance")
             return balance_info["unlocked_balance"], balance_info["balance"]
 
+    def findUnusedSwapWalletCaches(self, max_age_days: int) -> list[tuple[str, int]]:
+        wallets_dir = os.path.join(
+            self._sc.getChainClientSettings(self.coin_type())["datadir"], "wallets"
+        )
+        cutoff: float = time.time() - max_age_days * 86400
+        caches = []
+        for entry in os.scandir(wallets_dir):
+            address: str = entry.name.removesuffix("_spend")
+            if not entry.is_file():
+                continue
+            if not os.path.isfile(entry.path + ".keys"):
+                continue
+            try:
+                xmr_util.decode_address(address, self._addr_prefix)
+            except Exception:
+                continue
+            file_stat = entry.stat()
+            if file_stat.st_mtime > cutoff:
+                continue
+            caches.append((entry.path, file_stat.st_size))
+        return caches
+
+    def pruneSwapWalletCaches(self, max_age_days: int) -> tuple[int, int]:
+        num_removed: int = 0
+        bytes_removed: int = 0
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            for path, size in self.findUnusedSwapWalletCaches(max_age_days):
+                try:
+                    os.remove(path)
+                except OSError as e:
+                    self._log.warning(f"Could not remove {path}: {e}")
+                    continue
+                num_removed += 1
+                bytes_removed += size
+        self._log.info(
+            f"Removed {num_removed} {self.coin_name()} swap wallet caches ({bytes_removed} bytes)"
+        )
+        return num_removed, bytes_removed
+
     def changeWalletPassword(
         self, old_password, new_password, check_seed_if_encrypt: bool = True
     ):

@@ -810,6 +810,39 @@
          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Automatically clean up database records for expired offers and bids and all related data</p>
         </div>
 
+        <div class="md:col-span-2">
+         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Clean Up Monero/Wownero Swap Wallets (days unused)</label>
+         <div class="flex items-center gap-3">
+          <div class="relative max-w-xs">
+           <input type="number" form="prune-swap-wallets-form" name="prune_swap_wallets_days" autocomplete="off" min="14" value="{{ swap_wallets_prune.days if swap_wallets_prune else 90 }}" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+          </div>
+          <button form="prune-swap-wallets-form" name="preview_swap_wallets_prune" value="Preview" type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+           Preview
+          </button>
+         </div>
+         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Delete cached swap wallets not used in this many days. Key files are kept, a removed wallet is rescanned if it is needed again.</p>
+         {% if swap_wallets_prune %}
+         {% set prune_total = swap_wallets_prune.coins|sum(attribute='count') %}
+         <div id="swap-wallets-prune-preview" class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mt-3">
+          {% for c in swap_wallets_prune.coins %}
+          <p class="text-sm text-gray-700 dark:text-gray-300">{{ c.name }}: {{ c.count }} swap wallet caches ({{ '%.1f'|format(c.mb) }} MB) not used in {{ swap_wallets_prune.days }} days</p>
+          {% else %}
+          <p class="text-sm text-gray-700 dark:text-gray-300">No Monero or Wownero wallet managed by BasicSwap is active.</p>
+          {% endfor %}
+          <div class="flex items-center gap-3 mt-3">
+           {% if prune_total > 0 %}
+           <button form="prune-swap-wallets-confirm-form" name="prune_swap_wallets" value="Delete" type="submit" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+            Delete {{ prune_total }} Caches
+           </button>
+           {% endif %}
+           <button type="button" onclick="document.getElementById('swap-wallets-prune-preview').remove()" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-900 dark:text-white font-medium py-2 px-4 rounded-lg transition-colors focus:outline-none">
+            {{ 'Cancel' if prune_total > 0 else 'Close' }}
+           </button>
+          </div>
+         </div>
+         {% endif %}
+        </div>
+
        </div>
 
        <div class="flex justify-end pt-6  mt-6">
@@ -899,6 +932,15 @@
     </div>
     <input type="hidden" name="formid" value="{{ form_id }}">
    </form>
+   <form method="post" id="prune-swap-wallets-form">
+    <input type="hidden" name="formid" value="{{ form_id }}">
+   </form>
+   {% if swap_wallets_prune %}
+   <form method="post" id="prune-swap-wallets-confirm-form">
+    <input type="hidden" name="formid" value="{{ form_id }}">
+    <input type="hidden" name="prune_swap_wallets_days" value="{{ swap_wallets_prune.days }}">
+   </form>
+   {% endif %}
   </div>
 
   <div class="tab-content{% if current_tab != 'security' %} hidden{% endif %}" id="security" role="tabpanel" aria-labelledby="security-tab">

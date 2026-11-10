@@ -13,6 +13,7 @@ from .util import (
     get_data_entry_or,
 )
 from basicswap.util import (
+    ensure,
     toBool,
     InactiveCoin,
 )
@@ -34,6 +35,7 @@ def page_settings(self, url_split, post_string):
     err_messages = []
     extra_headers = []
     active_tab = "coins"
+    swap_wallets_prune = None
     form_data = self.checkForm(post_string, "settings", err_messages)
     if form_data:
         try:
@@ -50,6 +52,39 @@ def page_settings(self, url_split, post_string):
                     ),
                 }
                 swap_client.editGeneralSettings(data)
+            elif have_data_entry(
+                form_data, "preview_swap_wallets_prune"
+            ) or have_data_entry(form_data, "prune_swap_wallets"):
+                active_tab = "general"
+                max_age_days = int(
+                    get_data_entry_or(form_data, "prune_swap_wallets_days", "90")
+                )
+                ensure(max_age_days >= 14, "Age must be at least 14 days")
+                is_preview = have_data_entry(form_data, "preview_swap_wallets_prune")
+                if is_preview:
+                    swap_wallets_prune = {"days": max_age_days, "coins": []}
+                for coin in swap_client.activeCoins():
+                    if coin not in swap_client.xmr_based_coins:
+                        continue
+                    if not swap_client.getChainClientSettings(coin).get(
+                        "manage_wallet_daemon", False
+                    ):
+                        continue
+                    ci = swap_client.ci(coin)
+                    if is_preview:
+                        caches = ci.findUnusedSwapWalletCaches(max_age_days)
+                        swap_wallets_prune["coins"].append(
+                            {
+                                "name": getCoinName(coin),
+                                "count": len(caches),
+                                "mb": sum(size for _, size in caches) / 1048576,
+                            }
+                        )
+                        continue
+                    num_removed, bytes_removed = ci.pruneSwapWalletCaches(max_age_days)
+                    messages.append(
+                        f"{getCoinName(coin)}: removed {num_removed} swap wallet caches ({bytes_removed / 1048576:.1f} MB)."
+                    )
             elif have_data_entry(form_data, "apply_security"):
                 active_tab = "security"
                 data = {
@@ -647,6 +682,7 @@ def page_settings(self, url_split, post_string):
             "networks": networks_formatted,
             "networks_global": networks_global,
             "active_tab": active_tab,
+            "swap_wallets_prune": swap_wallets_prune,
         },
         extra_headers=extra_headers,
     )
