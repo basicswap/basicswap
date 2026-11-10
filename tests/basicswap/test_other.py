@@ -3798,6 +3798,47 @@ class Test(unittest.TestCase):
         }
         self.assertEqual(sc.extractSecret(Coins.LTC, bid, witness), secret)
 
+    def test_lock_tx_lookup_picks_the_output_with_the_amount(self):
+        ci = self.ci_btc()
+        script = buildContractScript(
+            100,
+            secrets.token_bytes(32),
+            secrets.token_bytes(20),
+            secrets.token_bytes(20),
+        )
+        dest = ci.getScriptDest(script)
+        addr = ci.encodeScriptDest(dest)
+        amount: int = 5000000
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(1, 0)))
+        tx.vout.append(CTxOut(1000, dest))
+        tx.vout.append(CTxOut(amount, dest))
+        tx_hex: str = tx.serialize().hex()
+        txid_hex: str = ci.getTxid(tx).hex()
+        wallet_rpc = {
+            "listunspent": [
+                {"address": addr, "amount": 0.00001, "txid": txid_hex},
+                {"address": addr, "amount": 0.05, "txid": txid_hex},
+            ],
+            "gettransaction": {
+                "hex": tx_hex,
+                "confirmations": 1,
+                "blockhash": "00" * 32,
+            },
+        }
+        node_rpc = {
+            "decoderawtransaction": ci._describeTxLocal(tx_hex),
+            "getblockheader": {"height": 100},
+        }
+        ci.isAddressMine = lambda address, or_watch_only=False: True
+        ci.rpc_wallet_watch = lambda method, params=None: wallet_rpc[method]
+        ci.rpc = lambda method, params=None: node_rpc[method]
+
+        found = ci.getLockTxHeight(None, addr, amount, 0, find_index=True)
+        self.assertEqual(found["txid"], txid_hex)
+        self.assertEqual(found["index"], 1)
+        self.assertEqual(found["value"], amount)
+
     def test_jsonrpc(self):
         logging.info("---------- Test Jsonrpc")
         host = "127.0.0.1"

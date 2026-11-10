@@ -324,7 +324,11 @@ class FIROInterface(BTCInterface):
             if isinstance(vout, int) and vout >= 0:
                 rv["index"] = vout
             else:
-                rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+                rv["index"] = find_vout_for_address_from_txobj(
+                    tx_obj,
+                    dest_address,
+                    lambda txo: self.make_int(txo["value"]) == bid_amount,
+                )
             if rv["index"] is not None and rv["index"] >= 0:
                 rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 

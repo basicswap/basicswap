@@ -133,19 +133,27 @@ def findOutput(tx, script_pk: bytes):
     return None
 
 
-def find_vout_for_address_from_txobj(tx_obj, addr: str) -> int:
+def find_vout_for_address_from_txobj(tx_obj, addr: str, prefer=None) -> int:
     """
     Locate the vout index of the given transaction sending to the
-    given address. Raises runtime error exception if not found.
+    given address, the first one prefer accepts if any.
+    Raises runtime error exception if not found.
     """
+    first = None
     for i in range(len(tx_obj["vout"])):
         scriptPubKey = tx_obj["vout"][i]["scriptPubKey"]
         if "addresses" in scriptPubKey:
-            if any([addr == a for a in scriptPubKey["addresses"]]):
-                return i
-        elif "address" in scriptPubKey:
-            if addr == scriptPubKey["address"]:
-                return i
+            pays_addr = any([addr == a for a in scriptPubKey["addresses"]])
+        else:
+            pays_addr = addr == scriptPubKey.get("address")
+        if not pays_addr:
+            continue
+        if prefer is None or prefer(tx_obj["vout"][i]):
+            return i
+        if first is None:
+            first = i
+    if first is not None:
+        return first
     raise RuntimeError(
         "Vout not found for address: txid={}, addr={}".format(tx_obj["txid"], addr)
     )
@@ -3940,7 +3948,11 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             if isinstance(vout, int) and vout >= 0:
                 rv["index"] = vout
             else:
-                rv["index"] = find_vout_for_address_from_txobj(tx_obj, dest_address)
+                rv["index"] = find_vout_for_address_from_txobj(
+                    tx_obj,
+                    dest_address,
+                    lambda txo: self.make_int(txo["value"]) == bid_amount,
+                )
             if rv["index"] is not None and rv["index"] >= 0:
                 rv["value"] = self.make_int(tx_obj["vout"][rv["index"]]["value"])
 
@@ -4003,11 +4015,22 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                         if tx_hex:
                             tx = self.loadTx(bytes.fromhex(tx_hex))
                             dest_script = self.getDestForAddress(dest_address)
-                            for idx, txout in enumerate(tx.vout):
-                                if txout.scriptPubKey == dest_script:
-                                    rv["index"] = idx
-                                    rv["value"] = txout.nValue
-                                    break
+                            paying = [
+                                idx
+                                for idx, txout in enumerate(tx.vout)
+                                if txout.scriptPubKey == dest_script
+                            ]
+                            if paying:
+                                idx = next(
+                                    (
+                                        i
+                                        for i in paying
+                                        if tx.vout[i].nValue == bid_amount
+                                    ),
+                                    paying[0],
+                                )
+                                rv["index"] = idx
+                                rv["value"] = tx.vout[idx].nValue
                     except Exception:
                         pass
                 if return_txid:
@@ -4092,11 +4115,18 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 if tx_hex:
                     tx = self.loadTx(bytes.fromhex(tx_hex))
                     dest_script = self.getDestForAddress(dest_address)
-                    for idx, txout in enumerate(tx.vout):
-                        if txout.scriptPubKey == dest_script:
-                            rv["index"] = idx
-                            rv["value"] = txout.nValue
-                            break
+                    paying = [
+                        idx
+                        for idx, txout in enumerate(tx.vout)
+                        if txout.scriptPubKey == dest_script
+                    ]
+                    if paying:
+                        idx = next(
+                            (i for i in paying if tx.vout[i].nValue == bid_amount),
+                            paying[0],
+                        )
+                        rv["index"] = idx
+                        rv["value"] = tx.vout[idx].nValue
             except Exception as e:
                 self._log.debug(
                     f"lookupUnspentByAddress electrum index lookup error: {e}"
