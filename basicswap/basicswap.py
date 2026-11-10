@@ -10925,8 +10925,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
     def processFoundScript(
-        self, coin_type, watched_script, txid: bytes, vout: int
-    ) -> None:
+        self, coin_type, watched_script, txid: bytes, vout: int, value: int
+    ) -> bool:
+        """False if the output was ignored and the script is still watched."""
         bid_in_progress = self.swaps_in_progress.get(watched_script.bid_id, None)
         if bid_in_progress is None:
             self.log.warning(
@@ -10935,8 +10936,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.removeWatchedScript(
                 coin_type, watched_script.bid_id, watched_script.script
             )
-            return
+            return True
         bid = bid_in_progress[0]
+
+        # Anyone can pay to the script, and later lookups only check the output adopted here
+        expect_value = {
+            TxTypes.PTX: bid.amount_to,
+            TxTypes.XMR_SWAP_A_LOCK: bid.amount,
+            TxTypes.XMR_SWAP_B_LOCK: bid.amount_to,
+        }.get(watched_script.tx_type)
+        if expect_value is not None and value != expect_value:
+            self.log.warning(
+                f"Ignoring {self.logIDT(txid)} {vout} paying the watched script for bid {self.log.id(watched_script.bid_id)}: value {value} != {expect_value}."
+            )
+            return False
 
         if watched_script.tx_type == TxTypes.PTX:
             bid.participate_tx.txid = txid
@@ -10987,6 +11000,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.removeWatchedScript(
             coin_type, watched_script.bid_id, watched_script.script
         )
+        return True
 
     def process_MERCY_tx(
         self, coin_type, bid_id: bytes, spend_txid_hex: str, spend_txn
@@ -11277,7 +11291,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 self.log.debug(
                                     f"Found script from search for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {i}."
                                 )
-                                self.processFoundScript(coin_type, s, txid_bytes, i)
+                                if self.processFoundScript(
+                                    coin_type,
+                                    s,
+                                    txid_bytes,
+                                    i,
+                                    ci.make_int(txo["value"]),
+                                ):
+                                    break
 
                 for o in list(c["watched_outputs"]):
                     for i, inp in enumerate(tx["vin"]):
@@ -11361,8 +11382,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         for s in list(c["watched_scripts"]):
             try:
-                found = ci.checkWatchedScript(s.script)
-                if found:
+                for found in ci.checkWatchedScript(s.script):
                     if found.get("height", 0) <= 0:
                         self.log.debug(
                             f"Waiting for watched script tx to confirm for bid {self.log.id(s.bid_id)}: {self.logIDT(bytes.fromhex(found['txid']))}"
@@ -11372,7 +11392,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
                     )
-                    self.processFoundScript(coin_type, s, txid_bytes, found["vout"])
+                    if self.processFoundScript(
+                        coin_type, s, txid_bytes, found["vout"], found["value"]
+                    ):
+                        break
             except Exception as e:
                 self.log.debug(f"checkWatchedScript error: {e}")
 
@@ -11436,14 +11459,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.delay_event.is_set():
                 return results
             try:
-                found = ci.checkWatchedScript(s.script)
-                if found:
+                confirmed = []
+                for found in ci.checkWatchedScript(s.script):
                     if found.get("height", 0) <= 0:
                         self.log.debug(
                             f"Waiting for watched script tx to confirm for bid {self.log.id(s.bid_id)}: {self.logIDT(bytes.fromhex(found['txid']))}"
                         )
                         continue
-                    results["scripts"].append((s, found))
+                    confirmed.append(found)
+                if confirmed:
+                    results["scripts"].append((s, confirmed))
             except Exception as e:
                 self.log.debug(f"_fetchSpendsElectrum checkWatchedScript error: {e}")
 
@@ -11463,13 +11488,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             except Exception as e:
                 self.log.debug(f"_processFetchedSpends output error: {e}")
 
-        for s, found in results["scripts"]:
+        for s, confirmed in results["scripts"]:
             try:
-                txid_bytes = bytes.fromhex(found["txid"])
-                self.log.debug(
-                    f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
-                )
-                self.processFoundScript(coin_type, s, txid_bytes, found["vout"])
+                for found in confirmed:
+                    txid_bytes = bytes.fromhex(found["txid"])
+                    self.log.debug(
+                        f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
+                    )
+                    if self.processFoundScript(
+                        coin_type, s, txid_bytes, found["vout"], found["value"]
+                    ):
+                        break
             except Exception as e:
                 self.log.debug(f"_processFetchedSpends script error: {e}")
 

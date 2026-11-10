@@ -4213,10 +4213,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 )
         return None
 
-    def checkWatchedScript(self, script: bytes):
+    def checkWatchedScript(self, script: bytes) -> list[dict]:
+        """Every output paying script, in the server's history order."""
+        found = []
         backend = self.getBackend()
         if not backend:
-            return None
+            return found
 
         try:
             scripthash = self.scriptToScripthash(script)
@@ -4232,28 +4234,35 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                 tx = self.loadTx(bytes.fromhex(tx_hex))
                 if self.getTxid(tx).hex() != tx_entry["tx_hash"]:
                     continue
-                for i, out in enumerate(tx.vout):
-                    if out.scriptPubKey == script:
-                        height = tx_entry.get("height", 0)
-                        if height > 0:
-                            verified = self._verifyTxMerkleElectrum(
-                                backend, tx_entry["tx_hash"], height
-                            )
-                            if verified is False:
-                                self._log.error(
-                                    f"Ignoring watched script tx {tx_entry['tx_hash']}, merkle proof failed"
-                                )
-                                return None
-                            if verified is None:
-                                height = 0
-                        return {
+                paying = [
+                    i for i, out in enumerate(tx.vout) if out.scriptPubKey == script
+                ]
+                if not paying:
+                    continue
+                height = tx_entry.get("height", 0)
+                if height > 0:
+                    verified = self._verifyTxMerkleElectrum(
+                        backend, tx_entry["tx_hash"], height
+                    )
+                    if verified is False:
+                        self._log.error(
+                            f"Ignoring watched script tx {tx_entry['tx_hash']}, merkle proof failed"
+                        )
+                        return found
+                    if verified is None:
+                        height = 0
+                for i in paying:
+                    found.append(
+                        {
                             "txid": tx_entry["tx_hash"],
                             "vout": i,
                             "height": height,
+                            "value": tx.vout[i].nValue,
                         }
+                    )
         except Exception as e:
             self._log.debug(f"_findOutputSpendingScript electrum error: {e}")
-        return None
+        return found
 
     def getOutput(self, txid, dest_script, expect_value, xmr_swap=None):
         if self._connection_type == "electrum":

@@ -3839,6 +3839,36 @@ class Test(unittest.TestCase):
         self.assertEqual(found["index"], 1)
         self.assertEqual(found["value"], amount)
 
+    def test_found_script_needs_the_agreed_amount(self):
+        from basicswap.basicswap_util import TxTypes
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.coin_clients = {Coins.BCH: {"watched_scripts": []}}
+        amount: int = 5000000
+        bid = Bid(bid_id=secrets.token_bytes(28), amount=amount)
+        bid.xmr_a_lock_tx = SwapTx(bid_id=bid.bid_id, tx_type=TxTypes.XMR_SWAP_A_LOCK)
+        sc.swaps_in_progress = {bid.bid_id: (bid, Offer())}
+        sc.saveBid = lambda bid_id, bid: None
+        sc.logBidEvent = lambda *args, **kwargs: None
+        sc.addWatchedScript(
+            Coins.BCH, bid.bid_id, secrets.token_bytes(23), TxTypes.XMR_SWAP_A_LOCK
+        )
+        watched_scripts = sc.coin_clients[Coins.BCH]["watched_scripts"]
+        watched = watched_scripts[0]
+        lock_txid = secrets.token_bytes(32)
+
+        self.assertFalse(
+            sc.processFoundScript(Coins.BCH, watched, secrets.token_bytes(32), 0, 546)
+        )
+        self.assertIsNone(bid.xmr_a_lock_tx.txid)
+        self.assertEqual(watched_scripts, [watched])
+        self.assertTrue(sc.processFoundScript(Coins.BCH, watched, lock_txid, 1, amount))
+        self.assertEqual(bid.xmr_a_lock_tx.txid, lock_txid)
+        self.assertEqual(bid.xmr_a_lock_tx.vout, 1)
+        self.assertEqual(watched_scripts, [])
+
     def test_jsonrpc(self):
         logging.info("---------- Test Jsonrpc")
         host = "127.0.0.1"

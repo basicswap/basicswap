@@ -108,7 +108,7 @@ class ElectrumWatcherMerkleTest(unittest.TestCase):
         ci = make_interface(self.txs, self.history[:1])
         calls = []
         set_verifier(ci, True, calls)
-        rv = ci.checkWatchedScript(WATCHED_SCRIPT)
+        (rv,) = ci.checkWatchedScript(WATCHED_SCRIPT)
         self.assertEqual(rv["txid"], self.watched_tx.hash)
         self.assertEqual(rv["height"], SPEND_HEIGHT)
         self.assertEqual(calls, [(self.watched_tx.hash, SPEND_HEIGHT)])
@@ -117,7 +117,7 @@ class ElectrumWatcherMerkleTest(unittest.TestCase):
         ci = make_interface(self.txs, self.history[:1])
         calls = []
         set_verifier(ci, None, calls)
-        rv = ci.checkWatchedScript(WATCHED_SCRIPT)
+        (rv,) = ci.checkWatchedScript(WATCHED_SCRIPT)
         self.assertEqual(rv["txid"], self.watched_tx.hash)
         self.assertEqual(rv["height"], 0)
 
@@ -126,7 +126,7 @@ class ElectrumWatcherMerkleTest(unittest.TestCase):
         calls = []
         set_verifier(ci, False, calls)
         rv = ci.checkWatchedScript(WATCHED_SCRIPT)
-        self.assertIsNone(rv)
+        self.assertEqual(rv, [])
 
     def test_output_spend_with_other_txid_ignored(self):
         other_spend = CTransaction()
@@ -155,7 +155,7 @@ class ElectrumWatcherMerkleTest(unittest.TestCase):
         ci = make_interface(self.txs, self.history[:1])
         calls = []
         set_verifier(ci, True, calls)
-        self.assertIsNone(ci.checkWatchedScript(WATCHED_SCRIPT))
+        self.assertEqual(ci.checkWatchedScript(WATCHED_SCRIPT), [])
         self.assertEqual(calls, [])
 
     def test_mempool_height_not_verified(self):
