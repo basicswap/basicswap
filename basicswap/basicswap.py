@@ -13816,13 +13816,33 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             and lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed
         )
 
+    def recordedBLockTxTooLate(
+        self, recorded, reverse_bid: bool, lock_margin: int, cursor
+    ) -> bool:
+        # The tx pays every bid it lists, so it is too late once one of them is
+        for recorded_id in recorded["bids"]:
+            leg, _ = self.getXmrBidFromSession(cursor, bytes.fromhex(recorded_id))
+            # A bid that left the state can no more use the lock than one past its margin
+            if leg is None or leg.state != BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+                return True
+            leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
+            leg_remaining = self.getLegLockRemaining(
+                leg, leg_offer, reverse_bid, cursor
+            )
+            if leg_remaining is not None and leg_remaining < lock_margin:
+                return True
+        return False
+
     def dropRecordedBLockTx(self, ci_to, bid_id: bytes, cursor) -> None:
         recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
         if recorded is None:
             return
-        self.clearStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        recorded = json.loads(recorded)
+        # Every bid the tx pays holds the record, none may publish it once its inputs are unlocked
+        for recorded_id in recorded["bids"]:
+            self.clearStringKV(f"b_lock_tx:{recorded_id}", cursor)
         try:
-            ci_to.unlockInputs(bytes.fromhex(json.loads(recorded)["tx"]), cursor)
+            ci_to.unlockInputs(bytes.fromhex(recorded["tx"]), cursor)
         except Exception as e:
             self.log.warning(
                 f"Unlocking the inputs of the dropped coin B lock tx for bid {self.log.id(bid_id)} failed: {e}"
@@ -13860,10 +13880,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         lock_margin: int = self.getBLockMinMargin(ci_to)
         lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
         too_late: bool = lock_remaining is not None and lock_remaining < lock_margin
-        if too_late and recorded is not None:
+        track_only: bool = False
+        if recorded is not None and self.recordedBLockTxTooLate(
+            recorded, reverse_bid, lock_margin, cursor
+        ):
             # Too late to publish it, it only counts if it reached the node in time
             recorded_txid: bytes = ci_to.getTxid(bytes.fromhex(recorded["tx"]))
-            if not ci_to.isWalletTransaction(recorded_txid):
+            if ci_to.isWalletTransaction(recorded_txid):
+                track_only = True
+            else:
                 self.dropRecordedBLockTx(ci_to, bid_id, cursor)
                 recorded = None
         if too_late and recorded is None:
@@ -13899,7 +13924,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Sending lock tx B can't be undone, and lock tx A may have left the chain since it was last checked
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
-        if not too_late and not self.coinALockConfirmed(bid, xmr_swap, ci_from):
+        if not track_only and not self.coinALockConfirmed(bid, xmr_swap, ci_from):
             raise TemporaryError(
                 f"Lock tx A for bid {self.log.id(bid_id)} is not confirmed deeply enough to send lock tx B."
             )
@@ -14044,7 +14069,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 if leg is None or leg.xmr_b_lock_tx:
                     continue
-                if not too_late and not self.coinALockConfirmed(leg, leg_swap, ci_from):
+                if not track_only and not self.coinALockConfirmed(
+                    leg, leg_swap, ci_from
+                ):
                     raise TemporaryError(
                         f"Lock tx A for bid {self.log.id(leg.bid_id)} is not confirmed deeply enough to send lock tx B."
                     )
@@ -14110,7 +14137,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         [bid_id] + [leg.bid_id for leg, _, _ in leg_swaps],
                         cursor,
                     )
-                if too_late:
+                if track_only:
                     b_lock_tx_id = ci_to.getTxid(b_lock_tx)
                 else:
                     try:
