@@ -1169,13 +1169,18 @@ class TestBCH(BasicSwapTest):
         )
 
         follower_ci_to = swap_clients[id_follower].ci(coin_to)
-        publish_b_lock_tx = follower_ci_to.publishBLockTx
+        # Patched at publishTx, the call every lock tx b publish ends in
+        publish_tx = follower_ci_to.publishTx
+        simulated = []
 
-        def publish_then_fail(*args, **kwargs):
-            publish_b_lock_tx(*args, **kwargs)
+        def publish_then_fail(tx):
+            txid = publish_tx(tx)
+            if simulated:
+                return txid
+            simulated.append(txid)
             raise ValueError("Simulated failure after publishing lock tx b")
 
-        follower_ci_to.publishBLockTx = publish_then_fail
+        follower_ci_to.publishTx = publish_then_fail
         try:
             swap_clients[id_leader].setBidDebugInd(
                 bid_id, DebugTypes.DONT_RELEASE_COIN_A_LOCK
@@ -1193,9 +1198,13 @@ class TestBCH(BasicSwapTest):
                 fail_fast_b=False,
             )
         finally:
-            del follower_ci_to.publishBLockTx
+            del follower_ci_to.publishTx
 
         follower_events = swap_clients[id_follower].getEvents(Concepts.BID, bid_id)
+        assert any(
+            e.event_type == EventLogTypes.FAILED_TX_B_LOCK_PUBLISH
+            for e in follower_events
+        )
         assert any(
             e.event_type == EventLogTypes.LOCK_TX_B_REFUND_TX_PUBLISHED
             for e in follower_events
