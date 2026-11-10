@@ -7852,12 +7852,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.closeDB(use_cursor)
 
     def abandonBid(self, bid_id: bytes) -> None:
-        if not self.debug:
-            self.log.error(
-                f"Can't abandon bid {self.log.id(bid_id)} when not in debug mode."
-            )
-            return
-
         self.log.info(f"Abandoning Bid {self.log.id(bid_id)}")
         self.deactivateBidForReason(bid_id, BidStates.BID_ABANDONED)
 
