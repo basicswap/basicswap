@@ -34,6 +34,7 @@ from basicswap.util import (
     b2i,
     i2b,
     i2h,
+    TemporaryError,
 )
 from basicswap.util.address import (
     b58decode,
@@ -705,6 +706,18 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         except Exception as e:  # noqa: F841
             # TODO: filter errors
             return None
+
+    def isWalletTransaction(self, txid: bytes) -> bool:
+        # A failed lookup raises, unlike getWalletTransaction it can't stand for a tx the wallet lacks
+        try:
+            self.rpc_wallet("gettransaction", [txid.hex()])
+        except Exception as e:
+            if "no information for transaction" in str(e):
+                return False
+            raise TemporaryError(
+                f"{self.coin_name()} wallet transaction lookup failed: {e}"
+            )
+        return True
 
     def listWalletTransactions(self, count=100, skip=0, include_watchonly=True):
         try:

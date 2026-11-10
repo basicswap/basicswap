@@ -868,6 +868,18 @@ class TestBLockTxRetry(unittest.TestCase):
             return ci.getTxid(tx_bytes).hex()
 
         wallet_txids = set()
+        wallet_errors = []
+
+        def rpc_wallet(method, params=[]):
+            assert method == "gettransaction"
+            if wallet_errors:
+                raise wallet_errors[0]
+            if bytes.fromhex(params[0]) not in wallet_txids:
+                raise ValueError(
+                    "RPC error {'code': -5, 'message': 'Invalid or non-wallet transaction id'}"
+                )
+            return {}
+
         unlocked = []
         a_lock = {"info": {"depth": 2, "height": 100}}
         ci.blocks_confirmed = 2
@@ -876,9 +888,7 @@ class TestBLockTxRetry(unittest.TestCase):
         ci.fundTx = fund_tx
         ci.signTxWithWallet = lambda tx_bytes: tx_bytes
         ci.publishTx = publish_tx
-        ci.getWalletTransaction = lambda txid: (
-            published[0] if txid in wallet_txids else None
-        )
+        ci.rpc_wallet = rpc_wallet
         ci.unlockInputs = lambda tx_data, cursor=None: unlocked.append(tx_data)
 
         sc = BasicSwap.__new__(BasicSwap)
@@ -944,6 +954,7 @@ class TestBLockTxRetry(unittest.TestCase):
             funded=funded,
             published=published,
             wallet_txids=wallet_txids,
+            wallet_errors=wallet_errors,
             unlocked=unlocked,
             a_lock=a_lock,
         )
@@ -1002,6 +1013,24 @@ class TestBLockTxRetry(unittest.TestCase):
         self.assertEqual(c.kv, {})
         self.assertEqual(c.unlocked, [c.published[0]])
         self.assertIn(EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, c.events)
+
+    def test_late_retry_waits_while_the_wallet_lookup_fails(self):
+        from basicswap.basicswap_util import EventLogTypes
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(publish_errors=[TemporaryError("timed out")])
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        c.lock.update(remaining=0, margin=3600)
+        c.wallet_errors.append(
+            ValueError("RPC server error: timed out, method: gettransaction")
+        )
+        self.assertRaises(TemporaryError, c.sc.sendXmrBidCoinBLockTx, c.bid_id, None)
+
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(len(c.kv), 1)
+        self.assertEqual(c.unlocked, [])
+        self.assertNotIn(EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, c.events)
 
     def test_failed_publish_drops_the_record(self):
         c = self.make_client(

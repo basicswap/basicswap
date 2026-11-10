@@ -6322,11 +6322,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
 
             # With the initiate txn in the wallet the funds are out, the checks on committing them no longer apply
-            funds_committed: bool = (
-                bid.initiate_tx is not None
-                and self.ci(offer.coin_from).getWalletTransaction(bid.initiate_tx.txid)
-                is not None
-            )
+            funds_committed: bool = False
+            if bid.initiate_tx is not None:
+                funds_committed = self.ci(offer.coin_from).isWalletTransaction(
+                    bid.initiate_tx.txid
+                )
             ensure(funds_committed or offer.active_ind == 1, "Offer not active")
 
             # Ensure bid is still valid
@@ -6397,12 +6397,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 # It was saved before its first publish, which may not have reached the node
                 if bid.initiate_tx.tx_data is not None:
                     try:
-                        if ci_from.publishTx(bid.initiate_tx.tx_data) is None:
-                            txid = None
+                        answered: bool = (
+                            ci_from.publishTx(bid.initiate_tx.tx_data) is not None
+                        )
                     except Exception as e:
                         if not ci_from.isTxExistsError(str(e)):
                             raise
-                    if txid is not None and bid.getITxState() is None:
+                        answered = True
+                    if not answered:
+                        raise TemporaryError(
+                            f"No answer publishing the initiate txn for bid {self.log.id(bid_id)}."
+                        )
+                    if bid.getITxState() is None:
                         bid.setITxState(TxStates.TX_SENT)
                         if not self.countBidEvents(
                             bid, EventLogTypes.ITX_PUBLISHED, use_cursor
@@ -6473,6 +6479,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.commitDB()
 
                 txid = ci_from.publishTx(bytes.fromhex(txn))
+                if txid is None:
+                    raise TemporaryError(
+                        f"No answer publishing the initiate txn for bid {self.log.id(bid_id)}."
+                    )
                 self.log.debug(
                     f"Submitted initiate txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
                 )
@@ -13853,7 +13863,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if too_late and recorded is not None:
             # Too late to publish it, it only counts if it reached the node in time
             recorded_txid: bytes = ci_to.getTxid(bytes.fromhex(recorded["tx"]))
-            if ci_to.getWalletTransaction(recorded_txid) is None:
+            if not ci_to.isWalletTransaction(recorded_txid):
                 self.dropRecordedBLockTx(ci_to, bid_id, cursor)
                 recorded = None
         if too_late and recorded is None:
