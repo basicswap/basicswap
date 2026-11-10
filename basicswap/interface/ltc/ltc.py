@@ -315,6 +315,14 @@ class LTCInterfaceMWEB(LTCInterface):
     def getNewAddress(self, use_segwit=False, label="swap_receive") -> str:
         return self.getNewMwebAddress()
 
+    def getMWEBBalance(self) -> int:
+        # Counts MWEB outputs held in the plain wallet, to leave them out of its balances
+        return 0
+
+    def getSpendableOutputs(self):
+        # MWEB outputs have no txid and vout to preselect
+        return None
+
     def has_mweb_wallet(self) -> bool:
         return "mweb" in self.rpc("listwallets")
 
