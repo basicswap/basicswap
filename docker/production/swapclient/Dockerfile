@@ -13,7 +13,7 @@ RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 ARG BASICSWAP_REPO=https://github.com/basicswap/basicswap.git
-ARG BASICSWAP_COMMIT=277b46b0278f1cc76199f7e847988647a1b36e38
+ARG BASICSWAP_COMMIT=b5f3b4eca8da5b6a8eec1d4c8bf0c82f330e5eb3
 ARG BASICSWAP_DIR=basicswap-master
 # The glob keeps COPY from failing when no local basicswap.zip is given
 COPY entrypoint.sh basicswap.zi[p] /tmp/src/
