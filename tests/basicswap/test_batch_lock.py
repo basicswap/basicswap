@@ -832,14 +832,14 @@ class TestBLockTxRetry(unittest.TestCase):
         from types import SimpleNamespace
 
         from basicswap.basicswap import BasicSwap
-        from basicswap.basicswap_util import SwapTypes
+        from basicswap.basicswap_util import SwapTypes, TxTypes
         from basicswap.chainparams import Coins
         from basicswap.contrib.test_framework.messages import (
             COutPoint,
             CTransaction,
             CTxIn,
         )
-        from basicswap.db import Bid, Offer, XmrOffer, XmrSwap
+        from basicswap.db import Bid, Offer, SwapTx, XmrOffer, XmrSwap
         from basicswap.interface.bch.bch import BCHInterface
         from basicswap.util.logging import BSXLogger
         from tests.basicswap.util.common import REQUIRED_SETTINGS
@@ -869,6 +869,10 @@ class TestBLockTxRetry(unittest.TestCase):
 
         wallet_txids = set()
         unlocked = []
+        a_lock = {"info": {"depth": 2, "height": 100}}
+        ci.blocks_confirmed = 2
+        ci.getLockTxHeight = lambda *args, **kwargs: a_lock["info"]
+        ci.isAddressMine = lambda address, or_watch_only=False: True
         ci.fundTx = fund_tx
         ci.signTxWithWallet = lambda tx_bytes: tx_bytes
         ci.publishTx = publish_tx
@@ -890,7 +894,12 @@ class TestBLockTxRetry(unittest.TestCase):
             was_sent=True,
         )
         bid.xmr_b_lock_tx = None
-        xmr_swap = XmrSwap(vkbv=key(1), pkbs=ci.getPubkey(key(2)))
+        bid.xmr_a_lock_tx = SwapTx(
+            bid_id=bid_id, tx_type=TxTypes.XMR_SWAP_A_LOCK, txid=bytes(32), vout=0
+        )
+        xmr_swap = XmrSwap(
+            vkbv=key(1), pkbs=ci.getPubkey(key(2)), a_lock_tx_script=bytes([0x51])
+        )
         offer = Offer(
             offer_id=bytes(28),
             coin_from=int(Coins.BTC),
@@ -936,6 +945,7 @@ class TestBLockTxRetry(unittest.TestCase):
             published=published,
             wallet_txids=wallet_txids,
             unlocked=unlocked,
+            a_lock=a_lock,
         )
 
     def test_retry_publishes_the_recorded_tx(self):
@@ -1028,6 +1038,35 @@ class TestBLockTxRetry(unittest.TestCase):
         self.assertEqual(len(c.published), 1)
         self.assertEqual(c.bid.xmr_b_lock_tx.txid, lock_txid)
         self.assertEqual(c.kv, {})
+
+    def test_lock_b_waits_for_a_lock_a_that_left_the_chain(self):
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client()
+        for a_lock_info in (None, {"depth": 1, "height": 101}):
+            c.a_lock["info"] = a_lock_info
+            self.assertRaises(
+                TemporaryError, c.sc.sendXmrBidCoinBLockTx, c.bid_id, None
+            )
+        self.assertEqual(c.funded, [])
+        self.assertEqual(c.published, [])
+
+        c.a_lock["info"] = {"depth": 2, "height": 101}
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+
+    def test_recorded_tx_is_not_published_again_without_lock_a(self):
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(publish_errors=[TemporaryError("timed out")])
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(len(c.published), 1)
+
+        c.a_lock["info"] = None
+        self.assertRaises(TemporaryError, c.sc.sendXmrBidCoinBLockTx, c.bid_id, None)
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(len(c.kv), 1)
 
     def test_tx_exists_error_texts(self):
         from basicswap.interface.btc.btc import BTCInterface

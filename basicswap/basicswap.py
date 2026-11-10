@@ -13799,6 +13799,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.setStringKV(f"b_lock_tx:{bid_id.hex()}", record, cursor)
         self.commitDB()
 
+    def coinALockConfirmed(self, bid, xmr_swap, ci_from) -> bool:
+        lock_tx_chain_info, _ = self.getCoinALockChainInfo(bid, xmr_swap, ci_from)
+        return (
+            lock_tx_chain_info is not None
+            and lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed
+        )
+
     def dropRecordedBLockTx(self, ci_to, bid_id: bytes, cursor) -> None:
         recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
         if recorded is None:
@@ -13880,6 +13887,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return
 
+        # Sending lock tx B can't be undone, and lock tx A may have left the chain since it was last checked
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        if not too_late and not self.coinALockConfirmed(bid, xmr_swap, ci_from):
+            raise TemporaryError(
+                f"Lock tx A for bid {self.log.id(bid_id)} is not confirmed deeply enough to send lock tx B."
+            )
+
         if recorded is None and bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug(
                 f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
@@ -13946,7 +13960,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if stored_timeout:
                 ready_timeout = int(stored_timeout)
 
-            ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
             plan = plan_batch_decision(
                 self.getPlanLegs(bid.plan_id, cursor),
                 bid_id,
@@ -14001,6 +14014,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 is not None
             ):
                 continue
+            if not self.coinALockConfirmed(leg, leg.xmr_swap, ci_from):
+                continue
             leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
             leg_sent: bool = leg.was_received if reverse_bid else leg.was_sent
             # A leg whose lock is already on chain must not be paid a second time.
@@ -14019,6 +14034,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 if leg is None or leg.xmr_b_lock_tx:
                     continue
+                if not too_late and not self.coinALockConfirmed(leg, leg_swap, ci_from):
+                    raise TemporaryError(
+                        f"Lock tx A for bid {self.log.id(leg.bid_id)} is not confirmed deeply enough to send lock tx B."
+                    )
                 leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
                 leg_swaps.append((leg, leg_swap, leg_offer))
 
