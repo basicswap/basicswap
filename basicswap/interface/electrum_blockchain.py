@@ -445,6 +445,11 @@ class Blockchain:
 
     def verify_chunk(self, index: int, data: bytes) -> None:
         num = len(data) // HEADER_SIZE
+        # Only a full chunk ends at the checkpoint hash that authenticates it
+        if index < len(self.checkpoints) and num != CHUNK_SIZE:
+            raise InvalidHeader(
+                f"chunk {index} below the max checkpoint has {num} headers, not {CHUNK_SIZE}"
+            )
         start_height = index * CHUNK_SIZE
         prev_hash = self.get_hash(start_height - 1)
         target = self.get_target(index - 1)

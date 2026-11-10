@@ -207,6 +207,20 @@ class TestCheckpoints(unittest.TestCase):
             sync.request_chunk_below_max_checkpoint(height=7)
         self.assertIsNone(bc_mgr.get_best_chain().read_header(7))
 
+    def test_short_chunk_below_checkpoint_refused(self):
+        bc_mgr = make_manager(make_net(Chunk0.genesis, [Chunk0.checkpoint]))
+        forged = mine(
+            hash_header(Chunk0.headers[0]),
+            1,
+            Chunk0.headers[1]["timestamp"],
+            EASY_BITS,
+            tag=9,
+        )
+        sync = HeaderSync(bc_mgr, ChainServer([Chunk0.headers[0], forged]), StubLog())
+        with self.assertRaises(Exception):
+            sync.request_chunk_below_max_checkpoint(height=1)
+        self.assertIsNone(bc_mgr.get_best_chain().read_header(1))
+
 
 class TestHeaderSync(unittest.TestCase):
     def setUp(self):
