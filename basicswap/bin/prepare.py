@@ -2184,6 +2184,7 @@ def main():
 
         settings = {
             "debug": False,
+            "log_level": "debug",
             "zmqhost": f"tcp://{PART_RPC_HOST}",
             "zmqport": PART_ZMQ_PORT + port_offset,
             "htmlhost": htmlhost,

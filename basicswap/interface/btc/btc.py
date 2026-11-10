@@ -5257,7 +5257,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         except Exception as e:
             self._log.error(f"{self.ticker()} recreating wallet failed: {e}.")
-            if self._sc.debug:
+            if self._sc.debug_logs:
                 self._log.error(traceback.format_exc())
 
     def changeWalletPassword(

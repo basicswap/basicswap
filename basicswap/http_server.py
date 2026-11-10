@@ -610,7 +610,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 args_dict["encrypted"] = False
                 args_dict["locked"] = False
-                if swap_client.debug:
+                if swap_client.debug_logs:
                     swap_client.log.warning(f"Could not get wallet locked state: {e}")
         else:
             args_dict["encrypted"] = args_dict.get("encrypted", False)
@@ -912,7 +912,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                         result = cmd + "\n" + swap_client.callcoincli(coin_type, cmd)
             except Exception as ex:
                 result = cmd + "\n" + str(ex)
-                if self.server.swap_client.debug is True:
+                if self.server.swap_client.debug_logs:
                     self.server.swap_client.log.error(traceback.format_exc())
 
         template = env.get_template("rpc.html")
@@ -1189,7 +1189,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                         # Suppress traceback
                         method: str = url_split[2] if len(url_split) > 2 else "unknown"
                         swap_client.log.error(f"js method: {method} failed - {ex}")
-                    elif swap_client.debug is True:
+                    elif swap_client.debug_logs:
                         swap_client.log.error(traceback.format_exc())
                     response = js_error(self, str(ex))
             return self.putJson(status_code, response)
@@ -1311,7 +1311,7 @@ class HttpHandler(BaseHTTPRequestHandler):
             except FileNotFoundError:
                 return self.page_404(url_split)
             except Exception as ex:
-                if swap_client.debug is True:
+                if swap_client.debug_logs:
                     swap_client.log.error(traceback.format_exc())
                 return self.page_error(str(ex))
 
@@ -1454,7 +1454,7 @@ class HttpHandler(BaseHTTPRequestHandler):
         except LockedCoinError:
             return page_unlock(self, url_split, post_string)
         except Exception as ex:
-            if swap_client.debug is True:
+            if swap_client.debug_logs:
                 swap_client.log.error(traceback.format_exc())
             return self.page_error(str(ex))
 
@@ -1564,7 +1564,7 @@ class HttpThread(threading.Thread, ThreadingHTTPServer):
         self.timeout = 60
         ThreadingHTTPServer.__init__(self, (self.host_name, self.port_no), HttpHandler)
 
-        if swap_client.debug:
+        if swap_client.debug_logs:
             swap_client.log.info("HTTP server initialized with threading support")
 
     def stop(self):

@@ -200,6 +200,12 @@ class BaseApp(DBMethods):
         self.coin_interfaces = {}
         self.mxDB = threading.RLock()
         self.debug = self.settings.get("debug", False)
+        log_level: str = self.settings.get(
+            "log_level", "debug" if self.debug else "info"
+        )
+        if log_level not in ("debug", "info"):
+            raise ValueError(f'Unknown "log_level" "{log_level}"')
+        self.debug_logs: bool = log_level == "debug"
         self.delay_event = threading.Event()
         self.chainstate_delay_event = threading.Event()
 
@@ -288,7 +294,7 @@ class BaseApp(DBMethods):
         stream_fp = logging.StreamHandler(self.fp)
         stream_fp.setFormatter(formatter)
 
-        self.log.setLevel(logging.DEBUG if self.debug else logging.INFO)
+        self.log.setLevel(logging.DEBUG if self.debug_logs else logging.INFO)
         self.log.addHandler(stream_fp)
         self.log.addHandler(stream_stdout)
 
@@ -537,7 +543,7 @@ class BaseApp(DBMethods):
 
     def logException(self, message: str) -> None:
         self.log.error(message)
-        if self.debug:
+        if self.debug_logs:
             self.log.error(traceback.format_exc())
 
     def logD(self, log_category: int, message: str) -> None:

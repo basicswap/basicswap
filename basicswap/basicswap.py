@@ -910,7 +910,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return self.log.id(concept_id, prefix="T_")
 
     def handleSessionErrors(self, e, cursor, tag):
-        if self.debug:
+        if self.debug_logs:
             self.log.error(traceback.format_exc())
 
         self.log.error(f"Error: {tag} - {e}")
@@ -1404,7 +1404,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             f"{daemon.name} exited during startup with code {daemon.handle.returncode}:\n{daemon.readOutput()}"
                         )
                         raise ValueError("Error, terminating")
-                    if self.debug:
+                    if self.debug_logs:
                         self.log.warning(f"Error, iteration {i}: {e}")
                     self.delay_event.wait(0.5)
             try:
@@ -3394,7 +3394,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.error(
                 f"Failed to initialize WalletManager for {Coins(coin_type).name}: {e}"
             )
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             return False
 
@@ -3484,7 +3484,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.error(f"initialiseWallet failed: {e}")
             if raise_errors:
                 raise
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             return
 
@@ -4355,7 +4355,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as e:
             type_str = "offer" if for_offer else "bid"
             err_msg = f"Insufficient funds for {type_str} of {balance_msg}."
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(f"ensureWalletCanSend failed {e}")
                 current_balance: int = ci.getSpendableBalance()
                 err_msg += (
@@ -11239,7 +11239,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 self.checkForSpends(k, c)
             except Exception as ex:
-                if self.debug:
+                if self.debug_logs:
                     self.log.error("checkForSpends %s", traceback.format_exc())
                 if self.is_transient_error(ex):
                     self.log.warning(f"checkForSpends {Coins(k).name} {ex}.")
@@ -11620,7 +11620,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         return True
                     return False
                 except Exception as e:  # noqa: F841
-                    if self.debug:
+                    if self.debug_logs:
                         self.log.error(traceback.format_exc())
                         self.log.error(f"Failed to process message {msg}")
 
@@ -11943,7 +11943,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.log.info(
                             f"Verify adaptor-sig {bid_type} {self.log.id(bid.bid_id)} failed: {ex}"
                         )
-                        if self.debug:
+                        if self.debug_logs:
                             self.log.error(traceback.format_exc())
                         bid.setState(BidStates.BID_ERROR)
                         self.updateDB(
@@ -12528,7 +12528,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return True
         except (AutomationConstraint, AutomationConstraintTemporary) as e:
             self.log.info(f"Not auto accepting bid {self.log.id(bid.bid_id)}, {e}.")
-            if self.debug:
+            if self.debug_logs:
                 self.logEvent(
                     Concepts.BID,
                     bid.bid_id,
@@ -13433,7 +13433,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 finally:
                     self.closeDB(cursor)
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(ex))
 
@@ -13622,7 +13622,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Nothing is persisted before the send, leave the queued action to retry
             raise
         except Exception as e:  # noqa: F841
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(e), cursor=cursor)
 
@@ -14157,7 +14157,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 raise TemporaryError("Fail for debug event")
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             error_msg = (
                 f"publishBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
@@ -15205,7 +15205,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(ex))
 
@@ -15287,7 +15287,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(ex))
 
@@ -15531,7 +15531,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(v, "verifyTxOtVES failed for chain a lock tx leader esig")
             xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             if bid_in_unexpected_state:
                 self.log.error(f"verifyTxOtVES error {ex}, bid in unexpected state")
@@ -15954,7 +15954,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(str(ex))
         except Exception as ex:
             self.log.error(f"processMsg {ex}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
                 self.logEvent(
                     Concepts.NETWORK_MESSAGE,
@@ -15973,7 +15973,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         except Exception as e:
             self.log.warning(f"Error processing PART wallet transaction: {e}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
 
     def _processZmqHashwtxAsync(self) -> None:
@@ -15986,7 +15986,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         except Exception as e:
             self.log.warning(f"Error processing PART wallet transaction: {e}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
 
     def expireBidsAndOffers(self, now) -> None:
@@ -16174,7 +16174,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         if self.checkBidState(bid_id, bid, offer) is True:
                             to_remove.append((bid_id, bid, offer))
                     except Exception as ex:
-                        if self.debug:
+                        if self.debug_logs:
                             self.log.error("checkBidState %s", traceback.format_exc())
                         if self.is_transient_error(ex):
                             self.log.warning(
@@ -18968,7 +18968,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["oracle"] = js
             except Exception as e:
                 rv["oracle_error"] = str(e)
-                if self.debug:
+                if self.debug_logs:
                     self.log.error(traceback.format_exc())
 
         if output_array:

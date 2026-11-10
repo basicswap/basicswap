@@ -220,7 +220,7 @@ def readNostrMsgs(self, network) -> None:
             self.processMsg(decrypted_msg)
         except Exception as e:
             self.log.debug(f"readNostrMsgs error: {e}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
 
         self.delay_event.wait(0.05)

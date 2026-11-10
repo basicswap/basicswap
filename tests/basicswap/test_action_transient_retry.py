@@ -73,6 +73,7 @@ def make_swap_client(action_rows):
     sc.fp = None
     sc.log = StubLog()
     sc.debug = False
+    sc.debug_logs = False
     sc.delay_event = SimpleNamespace(is_set=lambda: False)
     sc.errored_bids = []
     sc.events = []

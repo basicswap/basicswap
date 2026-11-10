@@ -50,6 +50,7 @@ def base_swap_client():
     sc.fp = None
     sc.log = StubLog()
     sc.debug = False
+    sc.debug_logs = False
     sc.is_reverse_ads_bid = lambda cf, ct: False
     sc.isBchXmrSwap = lambda offer: False
     sc.logIDT = lambda t: str(t)

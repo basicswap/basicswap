@@ -888,6 +888,7 @@ class TestBLockTxRetry(unittest.TestCase):
         sc = BasicSwap.__new__(BasicSwap)
         sc.fp = None
         sc.debug = False
+        sc.debug_logs = False
         sc.log = BSXLogger("test")
         bid_id = bytes(range(28))
         bid = Bid(

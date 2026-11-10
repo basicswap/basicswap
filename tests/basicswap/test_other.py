@@ -2543,6 +2543,7 @@ class Test(unittest.TestCase):
 
         class SwapClient:
             debug = False
+            debug_logs = False
 
         server = HttpThread("127.0.0.1", 0, False, SwapClient())
         try:
