@@ -6266,11 +6266,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, offer = self.getBidAndOffer(bid_id, use_cursor)
             ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
-            ensure(offer.active_ind == 1, "Offer not active")
+
+            # With the initiate txn in the wallet the funds are out, the checks on committing them no longer apply
+            funds_committed: bool = (
+                bid.initiate_tx is not None
+                and self.ci(offer.coin_from).getWalletTransaction(bid.initiate_tx.txid)
+                is not None
+            )
+            ensure(funds_committed or offer.active_ind == 1, "Offer not active")
 
             # Ensure bid is still valid
             now: int = self.getTime()
-            ensure(bid.expire_at > now + self._bid_accept_leeway, "Bid expired")
+            ensure(
+                funds_committed or bid.expire_at > now + self._bid_accept_leeway,
+                "Bid expired",
+            )
             ensure(
                 canAcceptBidState(bid.state),
                 "Wrong bid state: {}".format(BidStates(bid.state).name),
@@ -6295,14 +6305,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
             budget_amount: int = bid.amount_to if reverse_bid else bid.amount
-            validate_offer_budget(
-                self,
-                offer,
-                budget_amount,
-                use_cursor,
-                in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
-            )
-            self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
+            if not funds_committed:
+                validate_offer_budget(
+                    self,
+                    offer,
+                    budget_amount,
+                    use_cursor,
+                    in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
+                )
+                self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
 
             if bid.contract_count is None:
                 bid.contract_count = self.getNewContractId(use_cursor)
@@ -6324,11 +6335,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 op_hash = OpCodes.OP_SHA256
 
             if bid.initiate_tx is not None:
-                txid = bid.initiate_tx.txid
+                txid = bid.initiate_tx.txid.hex()
                 script = bid.initiate_tx.script
                 self.log.warning(
-                    f"Initiate txn {self.log.id(txid)} already exists for bid {self.log.id(bid_id)}"
+                    f"Initiate txn {self.log.id(bid.initiate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
                 )
+                # It was saved before its first publish, which may not have reached the node
+                if bid.initiate_tx.tx_data is not None:
+                    try:
+                        if ci_from.publishTx(bid.initiate_tx.tx_data) is None:
+                            txid = None
+                    except Exception as e:
+                        if not ci_from.isTxExistsError(str(e)):
+                            raise
+                    if txid is not None and bid.getITxState() is None:
+                        bid.setITxState(TxStates.TX_SENT)
+                        if not self.countBidEvents(
+                            bid, EventLogTypes.ITX_PUBLISHED, use_cursor
+                        ):
+                            self.logEvent(
+                                Concepts.BID,
+                                bid.bid_id,
+                                EventLogTypes.ITX_PUBLISHED,
+                                "",
+                                use_cursor,
+                            )
             else:
                 if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
                     sequence = ci_from.getExpectedSequence(
@@ -6375,18 +6406,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     coin_from, txn, offer, bid, script, cursor=use_cursor
                 )
                 bid.initiate_txn_refund = bytes.fromhex(refund_txn)
+                bid.initiate_tx = SwapTx(
+                    bid_id=bid_id,
+                    tx_type=TxTypes.ITX,
+                    txid=ci_from.getTxid(bytes.fromhex(txn)),
+                    vout=lock_tx_vout,
+                    tx_data=bytes.fromhex(txn),
+                    script=script,
+                )
+                # The refund txn must be on record before the initiate txn can be on chain
+                self.saveBidInSession(bid_id, bid, use_cursor, notify=False)
+                self.commitDB()
 
                 txid = ci_from.publishTx(bytes.fromhex(txn))
                 self.log.debug(
                     f"Submitted initiate txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
-                )
-                bid.initiate_tx = SwapTx(
-                    bid_id=bid_id,
-                    tx_type=TxTypes.ITX,
-                    txid=bytes.fromhex(txid),
-                    vout=lock_tx_vout,
-                    tx_data=bytes.fromhex(txn),
-                    script=script,
                 )
                 bid.setITxState(TxStates.TX_SENT)
                 self.logEvent(
