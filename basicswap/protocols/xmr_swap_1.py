@@ -251,6 +251,7 @@ class XmrSwapInterface(ProtocolInterface):
         sub_fee: bool,
         feerate: int = None,
         lock_unspents: bool = False,
+        preview: bool = False,
     ) -> bytes:
         if ci.coin_type() == Coins.BCH:
             # Workaround, BCH getScriptDest() uses OP_HASH256
@@ -258,8 +259,19 @@ class XmrSwapInterface(ProtocolInterface):
             addr_to: bytes = ci.getScriptDest(script)
         else:
             addr_to = self.getMockScriptAddr(ci)
+        # A preview's change goes to the mock output, keeping the wallet's change keys unused
+        change_addr = None
+        if preview:
+            change_addr = (
+                ci.encodeScriptDest(addr_to) if isinstance(addr_to, bytes) else addr_to
+            )
         funded_tx = ci.createRawFundedTransaction(
-            addr_to, amount, sub_fee, lock_unspents=lock_unspents, feerate=feerate
+            addr_to,
+            amount,
+            sub_fee,
+            lock_unspents=lock_unspents,
+            feerate=feerate,
+            change_addr=change_addr,
         )
         return bytes.fromhex(funded_tx)
 

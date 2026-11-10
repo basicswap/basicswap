@@ -4518,6 +4518,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         sub_fee: bool = False,
         lock_unspents: bool = True,
         feerate: int = None,
+        change_addr: str = None,
     ) -> str:
         if self.useBackend():
             return self._createRawFundedTransactionElectrum(
@@ -4541,6 +4542,8 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             "lockUnspents": lock_unspents,
             "feeRate": fee_rate,
         }
+        if change_addr:
+            options["changeAddress"] = change_addr
         if sub_fee:
             options["subtractFeeFromOutputs"] = [
                 0,
