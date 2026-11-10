@@ -1526,6 +1526,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script_pk = self.getScriptDest(script_out)
         locked_n = findOutput(tx, script_pk)
         ensure(locked_n is not None, "Lock output not found in tx")
+        # The script is only the one checked here under script version 0
+        ensure(tx.vout[locked_n].version == 0, "Bad output script version")
         locked_coin = tx.vout[locked_n].value
 
         # Check value
@@ -1627,6 +1629,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(len(tx.vout) == 1, "tx doesn't have one output")
         p2wpkh = self.getPubkeyHashDest(a_pkhash_f)
         ensure(tx.vout[0].script_pubkey == p2wpkh, "Bad output destination")
+        ensure(tx.vout[0].version == 0, "Bad output script version")
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         ensure(self.money_range(tx.vout[0].value), "Bad output value range")
@@ -1703,6 +1706,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script_pk = self.getScriptDest(script_out)
         locked_n = findOutput(tx, script_pk)
         ensure(locked_n is not None, "Output not found in tx")
+        ensure(tx.vout[locked_n].version == 0, "Bad output script version")
         locked_coin = tx.vout[locked_n].value
         ensure(self.money_range(locked_coin), "Bad output value range")
 
