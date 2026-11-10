@@ -707,10 +707,10 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             # TODO: filter errors
             return None
 
-    def isWalletTransaction(self, txid: bytes) -> bool:
+    def isWalletTransaction(self, tx: bytes) -> bool:
         # A failed lookup raises, unlike getWalletTransaction it can't stand for a tx the wallet lacks
         try:
-            self.rpc_wallet("gettransaction", [txid.hex()])
+            self.rpc_wallet("gettransaction", [self.getTxid(tx).hex()])
         except Exception as e:
             if "no information for transaction" in str(e):
                 return False

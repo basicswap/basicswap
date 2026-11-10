@@ -6323,9 +6323,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # With the initiate txn in the wallet the funds are out, the checks on committing them no longer apply
             funds_committed: bool = False
-            if bid.initiate_tx is not None:
+            if bid.initiate_tx is not None and bid.initiate_tx.tx_data is not None:
                 funds_committed = self.ci(offer.coin_from).isWalletTransaction(
-                    bid.initiate_tx.txid
+                    bid.initiate_tx.tx_data
                 )
             ensure(funds_committed or offer.active_ind == 1, "Offer not active")
 
@@ -13885,8 +13885,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             recorded, reverse_bid, lock_margin, cursor
         ):
             # Too late to publish it, it only counts if it reached the node in time
-            recorded_txid: bytes = ci_to.getTxid(bytes.fromhex(recorded["tx"]))
-            if ci_to.isWalletTransaction(recorded_txid):
+            if ci_to.isWalletTransaction(bytes.fromhex(recorded["tx"])):
                 track_only = True
             else:
                 self.dropRecordedBLockTx(ci_to, bid_id, cursor)

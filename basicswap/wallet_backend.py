@@ -711,6 +711,17 @@ class ElectrumBackend(WalletBackend):
 
         return result
 
+    def getScriptHistory(self, script: bytes) -> list[dict]:
+        # Raises when the server gives no answer, unlike getAddressHistory
+        from basicswap.interface.electrumx import scripthash_from_script
+
+        history = self._split_batch_call(
+            [scripthash_from_script(script)], "blockchain.scripthash.get_history"
+        )[0]
+        return [
+            {"txid": h.get("tx_hash"), "height": h.get("height", 0)} for h in history
+        ]
+
     def getAddressHistoryBackground(self, address: str) -> list[dict]:
         if self._isUnsupportedAddress(address):
             return []

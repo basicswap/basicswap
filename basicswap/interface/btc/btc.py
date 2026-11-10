@@ -3352,13 +3352,16 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             # TODO: filter errors
             return None
 
-    def isWalletTransaction(self, txid: bytes) -> bool:
+    def isWalletTransaction(self, tx: bytes) -> bool:
         # A failed lookup raises, unlike getWalletTransaction it can't stand for a tx the wallet lacks
-        if self._connection_type == "electrum":
-            # The backend reports a failed lookup and an unknown tx alike
-            return self._getTransactionElectrum(txid) is not None
+        txid: str = self.getTxid(tx).hex()
         try:
-            self.rpc_wallet("gettransaction", [txid.hex()])
+            if self._connection_type == "electrum":
+                # A server answers a script's history with a list, an unknown txid with an error like any other
+                script = bytes(self.loadTx(tx).vout[0].scriptPubKey)
+                history = self.getBackend().getScriptHistory(script)
+                return any(entry["txid"] == txid for entry in history)
+            self.rpc_wallet("gettransaction", [txid])
         except Exception as e:
             if "Invalid or non-wallet transaction id" in str(e):
                 return False
