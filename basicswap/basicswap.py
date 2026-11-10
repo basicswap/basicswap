@@ -4294,7 +4294,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pass
             else:
                 pi = self.pi(swap_type)
-                _ = pi.getFundedInitiateTxTemplate(ci, ensure_balance, False)
+                _ = pi.getFundedInitiateTxTemplate(
+                    ci, ensure_balance, False, preview=True
+                )
                 # TODO: Save the prefunded tx so the fee can't change, complicates multiple offers at the same time.
         except TemporaryError:
             raise

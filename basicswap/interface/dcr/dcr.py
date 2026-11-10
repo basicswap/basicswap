@@ -935,6 +935,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         sub_fee: bool = False,
         lock_unspents: bool = True,
         feerate: int = None,
+        change_addr: str = None,
     ) -> str:
 
         # amount can't be a string, else: Failed to parse request: parameter #2 'amounts' must be type float64 (got string)

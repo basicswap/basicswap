@@ -158,10 +158,17 @@ class AtomicSwapInterface(ProtocolInterface):
         sub_fee: bool,
         feerate: int = None,
         lock_unspents: bool = False,
+        preview: bool = False,
     ) -> bytes:
         addr_to = self.getMockScriptAddr(ci)
+        # A preview's change goes to the mock output, keeping the wallet's change keys unused
         funded_tx = ci.createRawFundedTransaction(
-            addr_to, amount, sub_fee, lock_unspents=lock_unspents, feerate=feerate
+            addr_to,
+            amount,
+            sub_fee,
+            lock_unspents=lock_unspents,
+            feerate=feerate,
+            change_addr=addr_to if preview else None,
         )
         return bytes.fromhex(funded_tx)
 

@@ -78,6 +78,7 @@ class PIVXInterface(BTCInterface):
         sub_fee: bool = False,
         lock_unspents: bool = True,
         feerate: int = None,
+        change_addr: str = None,
     ) -> str:
         txn = self.rpc(
             "createrawtransaction", [[], {addr_to: self.format_amount(amount)}]
@@ -94,6 +95,8 @@ class PIVXInterface(BTCInterface):
             "lockUnspents": lock_unspents,
             "feeRate": fee_rate,
         }
+        if change_addr:
+            options["changeAddress"] = change_addr
         if sub_fee:
             options["subtractFeeFromOutputs"] = [
                 0,

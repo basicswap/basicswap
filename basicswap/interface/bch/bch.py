@@ -196,6 +196,7 @@ class BCHInterface(BTCInterface):
         sub_fee: bool = False,
         lock_unspents: bool = True,
         feerate: int = None,
+        change_addr: str = None,
     ) -> str:
 
         if isinstance(addr_to, bytes):
@@ -221,6 +222,8 @@ class BCHInterface(BTCInterface):
             "lockUnspents": lock_unspents,
             "feeRate": fee_rate,
         }
+        if change_addr:
+            options["changeAddress"] = change_addr
         if sub_fee:
             options["subtractFeeFromOutputs"] = [
                 0,
