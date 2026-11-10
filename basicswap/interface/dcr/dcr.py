@@ -882,6 +882,24 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         pubkey = PublicKey.from_signature_and_message(sig, message_hash, hasher=None)
         return pubkey.format()
 
+    def signKeyProof(self, k: bytes, message: str, context: bytes) -> bytes:
+        """The key, then a signature over a hash that includes it. A signature
+        over the message alone doesn't show k is known, a key that cancels
+        another can be recovered from one built without it."""
+        K = self.getPubkey(k)
+        proof_hash = blake256(bytes(message, "utf-8") + K + context)
+        return K + PrivateKey(k).sign_recoverable(proof_hash, hasher=None)[:64]
+
+    def verifyKeyProof(self, proof: bytes, message: str, context: bytes) -> bytes:
+        ensure(len(proof) == 33 + 64, "Invalid key proof length")
+        K = proof[:33]
+        proof_hash = blake256(bytes(message, "utf-8") + K + context)
+        ensure(
+            PublicKey(K).verify_compact(proof[33:], proof_hash, hasher=None),
+            "Invalid key proof",
+        )
+        return K
+
     def verifyMessage(
         self, address: str, message: str, signature: str, message_magic: str = None
     ) -> bool:

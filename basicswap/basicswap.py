@@ -212,10 +212,12 @@ import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
-PROTOCOL_VERSION_ADAPTOR_SIG = 7
-MINPROTO_VERSION_ADAPTOR_SIG = 6
+PROTOCOL_VERSION_ADAPTOR_SIG = 8
+MINPROTO_VERSION_ADAPTOR_SIG = 8
 # Split messages to a peer at this version or later carry parent_msg_id
 PROTOCOL_VERSION_SPLIT_PARENT = 7
+# secp256k1 coin B key share proofs and kal_sig at this version or later sign a hash that includes the key
+PROTOCOL_VERSION_KEY_PROOFS = 8
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
@@ -6626,7 +6628,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def getXmrBidMessage(self, bid, xmr_swap, offer) -> XmrBidMessage:
         valid_for_seconds: int = bid.expire_at - bid.created_at
         msg_buf = XmrBidMessage()
-        msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
+        msg_buf.protocol_version = bid.protocol_version
         msg_buf.offer_msg_id = bid.offer_id
         msg_buf.time_valid = valid_for_seconds
         msg_buf.amount = bid.amount
@@ -7116,8 +7118,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
             elif ci_to.curve_type() == Curves.secp256k1:
-                xmr_swap.kbsf_dleag = ci_to.signRecoverable(
-                    kbsf, "proof kbsf owned for swap"
+                xmr_swap.kbsf_dleag = ci_to.signKeyProof(
+                    kbsf, "proof kbsf owned for swap", offer_id
                 )
             else:
                 raise ValueError("Unknown curve")
@@ -7128,9 +7130,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
             elif ci_to.curve_type() == Curves.secp256k1:
-                hash_msg = "proof kbsf owned for swap"
-                pk_recovered = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, hash_msg)
-                ensure(pk_recovered == xmr_swap.pkbsf, "kbsf recovered pubkey mismatch")
+                pk_proven = ci_to.verifyKeyProof(
+                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap", offer_id
+                )
+                ensure(pk_proven == xmr_swap.pkbsf, "kbsf proof pubkey mismatch")
                 xmr_swap.pkasf = xmr_swap.pkbsf
             else:
                 raise ValueError("Unknown curve")
@@ -7247,6 +7250,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(
                 canAcceptBidState(last_bid_state),
                 "Wrong bid state: {}".format(str(BidStates(last_bid_state))),
+            )
+            ensure(
+                bid.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+                "Incompatible bid protocol version",
             )
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=use_cursor)
@@ -7509,13 +7516,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
             elif ci_to.curve_type() == Curves.secp256k1:
-                xmr_swap.kbsl_dleag = ci_to.signRecoverable(
-                    kbsl, "proof kbsl owned for swap"
+                xmr_swap.kbsl_dleag = ci_to.signKeyProof(
+                    kbsl, "proof kbsl owned for swap", bid.bid_id
                 )
-                pk_recovered = ci_to.verifySigAndRecover(
-                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
+                pk_proven = ci_to.verifyKeyProof(
+                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap", bid.bid_id
                 )
-                ensure(pk_recovered == xmr_swap.pkbsl, "kbsl recovered pubkey mismatch")
+                ensure(pk_proven == xmr_swap.pkbsl, "kbsl proof pubkey mismatch")
             else:
                 raise ValueError("Unknown curve")
 
@@ -7640,6 +7647,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 canAcceptBidState(last_bid_state),
                 "Wrong bid state: {}".format(str(BidStates(last_bid_state))),
             )
+            ensure(
+                bid.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+                "Incompatible bid protocol version",
+            )
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=use_cursor)
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
@@ -7729,7 +7740,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
-            xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
+            xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf, bid.offer_id)
             ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
             xmr_swap.intent_accept_prepared_at = now
@@ -12887,9 +12898,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if not ci_to.verifyPubkey(xmr_swap.pkbsf):
                 raise ValueError("Invalid coin b pubkey.")
         elif ci_to.curve_type() == Curves.secp256k1:
-            xmr_swap.pkasf = ci_to.verifySigAndRecover(
-                xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
-            )
+            if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+                xmr_swap.pkasf = ci_to.verifyKeyProof(
+                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap", bid.offer_id
+                )
+            else:
+                xmr_swap.pkasf = ci_to.verifySigAndRecover(
+                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
+                )
             if not ci_from.verifyPubkey(xmr_swap.pkasf):
                 raise ValueError("Invalid coin a pubkey.")
             xmr_swap.pkbsf = xmr_swap.pkasf
@@ -12966,9 +12982,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.pkasl = xmr_swap.kbsl_dleag[0:33]
             xmr_swap.pkbsl = xmr_swap.kbsl_dleag[33 : 33 + 32]
         elif ci_to.curve_type() == Curves.secp256k1:
-            xmr_swap.pkasl = ci_to.verifySigAndRecover(
-                xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
-            )
+            if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+                xmr_swap.pkasl = ci_to.verifyKeyProof(
+                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap", bid.bid_id
+                )
+            else:
+                xmr_swap.pkasl = ci_to.verifySigAndRecover(
+                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
+                )
             xmr_swap.pkbsl = xmr_swap.pkasl
         else:
             raise ValueError("Unknown curve")
@@ -13621,7 +13642,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         # Prove leader can sign for kal, sent in MSG4F
-        xmr_swap.kal_sig = ci_from.signCompact(kal, "proof key owned for swap")
+        if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+            xmr_swap.kal_sig = ci_from.signKeyProof(
+                kal, "proof key owned for swap", bid_id
+            )
+        else:
+            xmr_swap.kal_sig = ci_from.signCompact(kal, "proof key owned for swap")
 
         # Create Script lock spend tx
         xmr_swap.a_lock_spend_tx = ci_from.createSCLockSpendTx(
@@ -15167,9 +15193,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 tx_lock_refund_bytes=xmr_swap.a_lock_refund_tx,
             )
 
-            ci_from.verifyCompactSig(
-                xmr_swap.pkal, "proof key owned for swap", xmr_swap.kal_sig
-            )
+            if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+                pk_proven = ci_from.verifyKeyProof(
+                    xmr_swap.kal_sig, "proof key owned for swap", bid_id
+                )
+                ensure(pk_proven == xmr_swap.pkal, "kal proof pubkey mismatch")
+            else:
+                ci_from.verifyCompactSig(
+                    xmr_swap.pkal, "proof key owned for swap", xmr_swap.kal_sig
+                )
 
             bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
@@ -15747,6 +15779,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         coin_to = Coins(offer.coin_to)
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
+            # Built before an upgrade, it would be a new bid on a refused protocol
+            if (
+                bid.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG
+                or offer.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG
+            ):
+                self.setBidError(
+                    bid, "Incompatible bid protocol version", cursor=cursor
+                )
+                return
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
 
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)

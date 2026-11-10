@@ -609,6 +609,104 @@ class Test(unittest.TestCase):
             ValueError, "Bad lock refund script", verify, tx.serialize(), padded_script
         )
 
+    def test_coin_b_key_proof_binds_the_key(self):
+        from coincurve.keys import PublicKey
+
+        ci = self.ci_btc()
+        n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        message = "proof kbsl owned for swap"
+        bid_id = secrets.token_bytes(28)
+        pkbsf = ci.getPubkey(ci.getNewRandomKey())
+
+        def scalar() -> int:
+            return int.from_bytes(secrets.token_bytes(32), "big") % (n - 1) + 1
+
+        def b32(v: int) -> bytes:
+            return v.to_bytes(32, "big")
+
+        # The old proof: a signature built from pkbsf alone recovers to a share that cancels it
+        z = int.from_bytes(sha256(message.encode("utf-8")), "big")
+        a, b = scalar(), scalar()
+        R = PublicKey.combine_keys(
+            [PrivateKey(b32(a)).public_key, PublicKey(pkbsf).multiply(b32(b))]
+        )
+        r = int.from_bytes(R.format(compressed=False)[1:33], "big") % n
+        s = (-r * pow(b, -1, n)) % n
+        X = (-a * pow(b, -1, n) - z * pow(r, -1, n)) % n
+        rogue = ci.sumPubkeys(
+            ci.getPubkey(b32(X)), PublicKey(pkbsf).multiply(b32(n - 1)).format()
+        )
+        s = min(s, n - s)
+        sig = None
+        for recid in range(4):
+            candidate = b32(r) + b32(s) + bytes([recid])
+            try:
+                if ci.verifySigAndRecover(candidate, message) == rogue:
+                    sig = candidate
+                    break
+            except Exception:
+                continue
+        self.assertIsNotNone(sig)
+        self.assertEqual(ci.sumPubkeys(rogue, pkbsf), ci.getPubkey(b32(X)))
+
+        # Once the signed hash includes the key, the same pair fails
+        self.assertRaises(
+            ValueError, ci.verifyKeyProof, rogue + sig[:64], message, bid_id
+        )
+
+        kbsl = ci.getNewRandomKey()
+        proof = ci.signKeyProof(kbsl, message, bid_id)
+        self.assertEqual(ci.verifyKeyProof(proof, message, bid_id), ci.getPubkey(kbsl))
+        self.assertRaises(
+            ValueError, ci.verifyKeyProof, proof, message, secrets.token_bytes(28)
+        )
+
+    def test_route_established_refuses_an_old_protocol_bid(self):
+        from basicswap.basicswap import MINPROTO_VERSION_ADAPTOR_SIG
+        from basicswap.basicswap_util import BidStates
+        from basicswap.db import XmrSwap
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.mock_time_offset = 0
+        offer = Offer(
+            offer_id=bytes(28),
+            coin_from=int(Coins.BTC),
+            coin_to=int(Coins.XMR),
+            swap_type=int(SwapTypes.XMR_SWAP),
+            protocol_version=MINPROTO_VERSION_ADAPTOR_SIG,
+        )
+        sent = []
+        sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
+        sc.queryOne = lambda cls, cursor, filters: XmrSwap(bid_id=filters["bid_id"])
+        sc.logEvent = lambda *args, **kwargs: None
+        sc.saveBid = lambda *args, **kwargs: None
+        sc.saveBidInSession = lambda *args, **kwargs: None
+        sc.sendXmrBidMessage = lambda bid, xmr_swap, offer, cursor: sent.append(
+            bid.bid_id
+        )
+
+        for protocol_version in (
+            MINPROTO_VERSION_ADAPTOR_SIG - 1,
+            MINPROTO_VERSION_ADAPTOR_SIG,
+        ):
+            bid = Bid(
+                bid_id=bytes([protocol_version]) * 28,
+                offer_id=bytes(28),
+                state=int(BidStates.CONNECT_REQ_SENT),
+                expire_at=sc.getTime() + 3600,
+                protocol_version=protocol_version,
+            )
+            sc.getBidAndOffer = lambda bid_id, cursor: (bid, offer)
+            sc.routeEstablishedForBid(bid.bid_id, None)
+            if protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+                self.assertEqual(bid.state, int(BidStates.BID_ERROR))
+                self.assertEqual(sent, [])
+            else:
+                self.assertEqual(bid.state, int(BidStates.BID_SENT))
+                self.assertEqual(sent, [bid.bid_id])
+
     def test_compare_fee_rates(self):
         # compareFeeRates must accept every fee feeForVSize can produce
         ci = self.ci_btc()
