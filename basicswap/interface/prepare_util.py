@@ -119,6 +119,32 @@ def ensureFileHashInFile(release_hash: str, assert_path: str, logger=None) -> No
             logger.info("Found release hash in assert file.")
 
 
+def readClearsigned(assert_path: str) -> tuple:
+    """Returns (message, signed_text) for the file's one cleartext-signed message."""
+    with open(assert_path, "rb") as fp:
+        lines = fp.read().splitlines(keepends=True)
+    marks = [line.rstrip() for line in lines]
+    begin = b"-----BEGIN PGP SIGNED MESSAGE-----"
+    if marks.count(begin) != 1:
+        raise ValueError(f"Expected one signed message in {assert_path}.")
+    start = marks.index(begin)
+    text_start = marks.index(b"", start) + 1
+    sig_start = marks.index(b"-----BEGIN PGP SIGNATURE-----", text_start)
+    end = marks.index(b"-----END PGP SIGNATURE-----", sig_start) + 1
+    return b"".join(lines[start:end]), b"".join(lines[text_start:sig_start])
+
+
+def ensureFileHashInSignedText(
+    release_hash: str, assert_path: str, logger=None
+) -> None:
+    if bytes(release_hash, "utf-8") not in readClearsigned(assert_path)[1]:
+        raise ValueError(
+            f"Error: Release hash {release_hash} not found in the signed text of the assert file."
+        )
+    if logger is not None:
+        logger.info("Found release hash in the signed text of the assert file.")
+
+
 def getFileHash(file_path: str, print_progress: bool = False, logger=None) -> str:
     h = hashlib.sha256()
     if print_progress:
@@ -160,6 +186,10 @@ class ReleasePrepareModule:
         """Returns (release_path, assert_path, assert_sig_path)."""
         raise NotImplementedError()
 
+    def hasDetachedSig(self) -> bool:
+        # False for coins whose hashes file is itself the signed document.
+        return True
+
     def getPubkeyFilename(self, signing_key_name: str) -> str:
         return f"{self.name}_{signing_key_name}.pgp"
 
@@ -191,7 +221,10 @@ class ReleasePrepareModule:
     ) -> str:
         release_hash: str = getFileHash(release_path)
         ctx.logger.info(f"{os.path.basename(release_path)} hash: {release_hash}")
-        ensureFileHashInFile(release_hash, assert_path, ctx.logger)
+        if self.hasDetachedSig():
+            ensureFileHashInFile(release_hash, assert_path, ctx.logger)
+        else:
+            ensureFileHashInSignedText(release_hash, assert_path, ctx.logger)
         return release_hash
 
     def verifyCoreSignature(
@@ -267,10 +300,6 @@ class CoinPrepareModule(ReleasePrepareModule):
         return (
             f"{self.name}-{self.version}{self.version_tag}-{arch_name}.{ctx.file_ext}"
         )
-
-    def hasDetachedSig(self) -> bool:
-        # False for coins whose hashes file is itself the signed document.
-        return True
 
     def getReleaseUrl(self, ctx: PrepareContext, release_filename: str):
         # Return one url string or a list of fallback urls

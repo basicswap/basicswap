@@ -1472,6 +1472,45 @@ class Test(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 readSecret("Password: ", confirm=True)
 
+    def test_release_hash_in_signed_text(self):
+        from types import SimpleNamespace
+        from basicswap.interface.prepare_util import getFileHash
+        from basicswap.interface.wow.core import prepare_module as wow_prepare
+        from basicswap.interface.xmr.core import prepare_module as xmr_prepare
+
+        ctx = SimpleNamespace(logger=logging.getLogger())
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            release_path = os.path.join(tmp_dir, "release.tar.bz2")
+            with open(release_path, "wb") as fp:
+                fp.write(b"release")
+            release_hash = getFileHash(release_path)
+            other_hash = sha256(b"other").hex()
+
+            def signed(text: str) -> str:
+                return (
+                    "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\n"
+                    f"{text}\n-----BEGIN PGP SIGNATURE-----\n\n"
+                    "iQ==\n-----END PGP SIGNATURE-----\n"
+                )
+
+            assert_path = os.path.join(tmp_dir, "hashes.txt")
+
+            def verify(contents: str) -> None:
+                with open(assert_path, "w") as fp:
+                    fp.write(contents)
+                for prepare_module in (xmr_prepare, wow_prepare):
+                    prepare_module.verifyCoreHash(ctx, release_path, assert_path)
+
+            verify(signed(f"release.tar.bz2, {release_hash}"))
+            # The signature covers only the text between the markers
+            for unsigned in (
+                signed(f"release.tar.bz2, {other_hash}") + f"{release_hash}\n",
+                f"{release_hash}\n" + signed(f"release.tar.bz2, {other_hash}"),
+                signed(f"release.tar.bz2, {other_hash}")
+                + signed(f"release.tar.bz2, {release_hash}"),
+            ):
+                self.assertRaises(ValueError, verify, unsigned)
+
     def test_is_public_url(self):
         # Non-http(s) schemes and internal hosts must be rejected; a public IP
         # literal (resolves to itself, no DNS needed) must be accepted.
