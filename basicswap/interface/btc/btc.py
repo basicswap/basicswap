@@ -4003,6 +4003,33 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
 
         return rv
 
+    def _setLockVoutElectrum(
+        self, backend, txid: bytes, dest_address: str, bid_amount: int, rv: dict
+    ) -> None:
+        try:
+            tx_info = backend.getTransaction(txid.hex())
+            tx_hex = tx_info.get("hex") if isinstance(tx_info, dict) else None
+            if not tx_hex:
+                tx_hex = backend.getTransactionRaw(txid.hex())
+            if not tx_hex:
+                return
+            tx = self.loadTx(bytes.fromhex(tx_hex))
+            dest_script = self.getDestForAddress(dest_address)
+            paying = [
+                i
+                for i, txout in enumerate(tx.vout)
+                if txout.scriptPubKey == dest_script
+            ]
+            if not paying:
+                return
+            idx = next(
+                (i for i in paying if tx.vout[i].nValue == bid_amount), paying[0]
+            )
+            rv["index"] = idx
+            rv["value"] = tx.vout[idx].nValue
+        except Exception as e:
+            self._log.debug(f"getLockTxHeight electrum index lookup error: {e}")
+
     def _getLockTxHeightElectrum(
         self,
         txid,
@@ -4047,34 +4074,9 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
                     confirmations = max(1, chain_height - block_height + 1)
                 rv = {"depth": confirmations, "height": block_height}
                 if find_index:
-                    try:
-                        tx_info = backend.getTransaction(txid.hex())
-                        tx_hex = None
-                        if tx_info and isinstance(tx_info, dict):
-                            tx_hex = tx_info.get("hex")
-                        if not tx_hex:
-                            tx_hex = backend.getTransactionRaw(txid.hex())
-                        if tx_hex:
-                            tx = self.loadTx(bytes.fromhex(tx_hex))
-                            dest_script = self.getDestForAddress(dest_address)
-                            paying = [
-                                idx
-                                for idx, txout in enumerate(tx.vout)
-                                if txout.scriptPubKey == dest_script
-                            ]
-                            if paying:
-                                idx = next(
-                                    (
-                                        i
-                                        for i in paying
-                                        if tx.vout[i].nValue == bid_amount
-                                    ),
-                                    paying[0],
-                                )
-                                rv["index"] = idx
-                                rv["value"] = tx.vout[idx].nValue
-                    except Exception:
-                        pass
+                    self._setLockVoutElectrum(
+                        backend, txid, dest_address, bid_amount, rv
+                    )
                 if return_txid:
                     rv["txid"] = txid.hex()
                 return rv
@@ -4147,32 +4149,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
             return None
 
         if find_index:
-            try:
-                tx_info = backend.getTransaction(txid.hex())
-                tx_hex = None
-                if tx_info and isinstance(tx_info, dict):
-                    tx_hex = tx_info.get("hex")
-                if not tx_hex:
-                    tx_hex = backend.getTransactionRaw(txid.hex())
-                if tx_hex:
-                    tx = self.loadTx(bytes.fromhex(tx_hex))
-                    dest_script = self.getDestForAddress(dest_address)
-                    paying = [
-                        idx
-                        for idx, txout in enumerate(tx.vout)
-                        if txout.scriptPubKey == dest_script
-                    ]
-                    if paying:
-                        idx = next(
-                            (i for i in paying if tx.vout[i].nValue == bid_amount),
-                            paying[0],
-                        )
-                        rv["index"] = idx
-                        rv["value"] = tx.vout[idx].nValue
-            except Exception as e:
-                self._log.debug(
-                    f"lookupUnspentByAddress electrum index lookup error: {e}"
-                )
+            self._setLockVoutElectrum(backend, txid, dest_address, bid_amount, rv)
 
         if return_txid:
             rv["txid"] = txid.hex()
