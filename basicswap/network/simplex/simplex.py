@@ -597,7 +597,7 @@ def readSimplexMsgs(self, network):
                 # self.log.debug(f"Message: {json.dumps(data, indent=4)}")
         except Exception as e:
             self.log.debug(f"readSimplexMsgs error: {e}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
 
 

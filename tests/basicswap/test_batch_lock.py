@@ -825,3 +825,388 @@ class TestPlanHTLCBatch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBLockTxRetry(unittest.TestCase):
+    def make_client(self, ci_cls=None, publish_errors=()):
+        from types import SimpleNamespace
+
+        from basicswap.basicswap import BasicSwap
+        from basicswap.basicswap_util import SwapTypes, TxTypes
+        from basicswap.chainparams import Coins
+        from basicswap.contrib.test_framework.messages import COutPoint, CTxIn
+        from basicswap.db import Bid, Offer, SwapTx, XmrOffer, XmrSwap
+        from basicswap.interface.bch.bch import BCHInterface
+        from basicswap.util.logging import BSXLogger
+        from tests.basicswap.util.common import REQUIRED_SETTINGS
+
+        coin_settings = {"rpcport": 0, "rpcauth": "none"}
+        coin_settings.update(REQUIRED_SETTINGS)
+        ci = (ci_cls or BCHInterface)(coin_settings, "regtest")
+        ci._log = BSXLogger("test")
+        funded = []
+
+        def fund_tx(tx_bytes, feerate, bid_id=None, cursor=None):
+            funded.append(bid_id)
+            tx = ci.loadTx(tx_bytes, allow_witness=False)
+            tx.vin.append(CTxIn(COutPoint(len(funded), 0)))
+            return tx.serialize()
+
+        published = []
+        publish_errors = list(publish_errors)
+
+        def publish_tx(tx_bytes):
+            published.append(tx_bytes)
+            if publish_errors:
+                raise publish_errors.pop(0)
+            return ci.getTxid(tx_bytes).hex()
+
+        wallet_txids = set()
+        wallet_errors = []
+
+        def rpc_wallet(method, params=[]):
+            assert method == "gettransaction"
+            if wallet_errors:
+                raise wallet_errors[0]
+            if bytes.fromhex(params[0]) not in wallet_txids:
+                raise ValueError(
+                    "RPC error {'code': -5, 'message': 'Invalid or non-wallet transaction id'}"
+                )
+            return {}
+
+        unlocked = []
+        a_lock = {"info": {"depth": 2, "height": 100}}
+        ci.blocks_confirmed = 2
+        ci.getLockTxHeight = lambda *args, **kwargs: a_lock["info"]
+        ci.isAddressMine = lambda address, or_watch_only=False: True
+        ci.fundTx = fund_tx
+        ci.signTxWithWallet = lambda tx_bytes: tx_bytes
+        ci.publishTx = publish_tx
+        ci.rpc_wallet = rpc_wallet
+        ci.unlockInputs = lambda tx_data, cursor=None: unlocked.append(tx_data)
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.debug = False
+        sc.debug_logs = False
+        sc.log = BSXLogger("test")
+        bid_id = bytes(range(28))
+        bid = Bid(
+            bid_id=bid_id,
+            offer_id=bytes(28),
+            state=int(BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED),
+            amount_to=make_int(1.5),
+            was_sent=True,
+        )
+        bid.xmr_b_lock_tx = None
+        bid.xmr_a_lock_tx = SwapTx(
+            bid_id=bid_id, tx_type=TxTypes.XMR_SWAP_A_LOCK, txid=bytes(32), vout=0
+        )
+        xmr_swap = XmrSwap(
+            vkbv=key(1), pkbs=ci.getPubkey(key(2)), a_lock_tx_script=bytes([0x51])
+        )
+        sibling_id = bytes(range(1, 29))
+        sibling = Bid(
+            bid_id=sibling_id,
+            offer_id=bytes(28),
+            state=int(BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED),
+            amount_to=make_int(0.5),
+            was_sent=True,
+        )
+        sibling.xmr_b_lock_tx = None
+        sibling.xmr_a_lock_tx = SwapTx(
+            bid_id=sibling_id, tx_type=TxTypes.XMR_SWAP_A_LOCK, txid=bytes(32), vout=0
+        )
+        sibling_swap = XmrSwap(
+            vkbv=key(3), pkbs=ci.getPubkey(key(4)), a_lock_tx_script=bytes([0x51])
+        )
+        bids = {bid_id: (bid, xmr_swap), sibling_id: (sibling, sibling_swap)}
+        offer = Offer(
+            offer_id=bytes(28),
+            coin_from=int(Coins.BTC),
+            coin_to=int(ci.coin_type()),
+            swap_type=int(SwapTypes.XMR_SWAP),
+        )
+        xmr_offer = XmrOffer(a_fee_rate=1000, b_fee_rate=1000)
+        kv = {}
+        actions = []
+        events = []
+        bid_errors = []
+        lock = {"remaining": None, "sibling_remaining": None, "margin": 0}
+        sc.getXmrBidFromSession = lambda cursor, bid_id: bids[bid_id]
+        sc.getXmrOfferFromSession = lambda cursor, offer_id: (offer, xmr_offer)
+        sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
+        sc.ci = lambda coin_type: ci
+        sc.getBLockMinMargin = lambda ci_to: lock["margin"]
+        sc.getLegLockRemaining = lambda leg, *args: lock[
+            "sibling_remaining" if leg is sibling else "remaining"
+        ]
+        sc.getPreFundedTx = lambda *args, **kwargs: None
+        sc.getStringKV = lambda key, cursor=None: kv.get(key)
+        sc.setStringKV = lambda key, value, cursor=None: kv.__setitem__(key, value)
+        sc.clearStringKV = lambda key, cursor=None: kv.pop(key, None)
+        sc.commitDB = lambda: None
+        sc.logBidEvent = lambda bid_id, event, msg, cursor: events.append(event)
+        sc.countBidEvents = lambda bid, event, cursor: events.count(event)
+        sc.setBidError = lambda bid, msg, **kwargs: bid_errors.append(msg)
+        sc.saveBidInSession = lambda *args, **kwargs: None
+        sc.get_delay_retry_seconds = lambda: 1
+        sc.createActionInSession = lambda delay, action_type, linked_id, cursor: (
+            actions.append(action_type)
+        )
+        return SimpleNamespace(
+            sc=sc,
+            ci=ci,
+            bid=bid,
+            bid_id=bid_id,
+            xmr_swap=xmr_swap,
+            sibling=sibling,
+            sibling_id=sibling_id,
+            sibling_swap=sibling_swap,
+            kv=kv,
+            actions=actions,
+            events=events,
+            bid_errors=bid_errors,
+            lock=lock,
+            funded=funded,
+            published=published,
+            wallet_txids=wallet_txids,
+            wallet_errors=wallet_errors,
+            unlocked=unlocked,
+            a_lock=a_lock,
+        )
+
+    def test_retry_publishes_the_recorded_tx(self):
+        from basicswap.basicswap_util import ActionTypes
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(
+            publish_errors=[
+                TemporaryError("timed out"),
+                TemporaryError("timed out"),
+                ValueError("transaction already in block chain"),
+            ]
+        )
+
+        for attempt in range(2):
+            c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+            self.assertIsNone(c.bid.xmr_b_lock_tx)
+        self.assertEqual(c.actions, [ActionTypes.SEND_XMR_SWAP_LOCK_TX_B] * 2)
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        self.assertEqual(c.funded, [c.bid_id])
+        self.assertEqual(len(c.published), 3)
+        self.assertEqual(c.published, [c.published[0]] * 3)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+        self.assertEqual(c.kv, {})
+
+    def test_late_retry_tracks_a_tx_the_node_has(self):
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(publish_errors=[TemporaryError("timed out")])
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertIsNone(c.bid.xmr_b_lock_tx)
+
+        c.lock.update(remaining=0, margin=3600)
+        c.wallet_txids.add(c.ci.getTxid(c.published[0]))
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+        self.assertEqual(c.kv, {})
+
+    def test_late_retry_drops_a_tx_the_node_never_got(self):
+        from basicswap.basicswap_util import EventLogTypes
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(publish_errors=[TemporaryError("timed out")])
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        c.lock.update(remaining=0, margin=3600)
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        self.assertEqual(len(c.published), 1)
+        self.assertIsNone(c.bid.xmr_b_lock_tx)
+        self.assertEqual(c.kv, {})
+        self.assertEqual(c.unlocked, [c.published[0]])
+        self.assertIn(EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, c.events)
+
+    def test_late_retry_waits_while_the_wallet_lookup_fails(self):
+        from basicswap.basicswap_util import EventLogTypes
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(publish_errors=[TemporaryError("timed out")])
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        c.lock.update(remaining=0, margin=3600)
+        c.wallet_errors.append(
+            ValueError("RPC server error: timed out, method: gettransaction")
+        )
+        self.assertRaises(TemporaryError, c.sc.sendXmrBidCoinBLockTx, c.bid_id, None)
+
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(len(c.kv), 1)
+        self.assertEqual(c.unlocked, [])
+        self.assertNotIn(EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, c.events)
+
+    def record_shared_tx(self, c) -> bytes:
+        locks = [
+            (swap.vkbv, swap.pkbs, leg.amount_to)
+            for leg, swap in ((c.bid, c.xmr_swap), (c.sibling, c.sibling_swap))
+        ]
+        shared_tx = c.ci.fundBLockTxs(locks, 1000, bid_id=c.bid_id, cursor=None)
+        c.sc.recordSignedBLockTx(shared_tx, None, [c.bid_id, c.sibling_id], None)
+        return shared_tx
+
+    def test_shared_tx_is_not_published_past_the_margin_of_a_bid_it_pays(self):
+        from basicswap.basicswap_util import EventLogTypes
+
+        c = self.make_client()
+        shared_tx = self.record_shared_tx(c)
+        c.lock.update(remaining=7200, sibling_remaining=0, margin=3600)
+
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(c.unlocked, [shared_tx])
+        self.assertEqual(len(c.published), 1)
+        self.assertNotEqual(c.published[0], shared_tx)
+        self.assertEqual(len(c.ci.loadTx(c.published[0]).vout), 1)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+        self.assertEqual(c.kv, {})
+
+        c.sc.sendXmrBidCoinBLockTx(c.sibling_id, None)
+        self.assertEqual(len(c.published), 1)
+        self.assertIsNone(c.sibling.xmr_b_lock_tx)
+        self.assertIn(EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE, c.events)
+
+    def test_dropped_shared_tx_is_dropped_for_every_bid_it_pays(self):
+        c = self.make_client()
+        shared_tx = self.record_shared_tx(c)
+        c.lock.update(remaining=0, sibling_remaining=7200, margin=3600)
+
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(c.kv, {})
+        self.assertEqual(c.unlocked, [shared_tx])
+        self.assertEqual(c.published, [])
+        self.assertIsNone(c.bid.xmr_b_lock_tx)
+
+        c.sc.sendXmrBidCoinBLockTx(c.sibling_id, None)
+        self.assertEqual(len(c.published), 1)
+        self.assertNotEqual(c.published[0], shared_tx)
+        self.assertEqual(c.sibling.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+        self.assertIsNone(c.bid.xmr_b_lock_tx)
+
+    def test_shared_tx_the_node_has_is_tracked_for_every_bid_it_pays(self):
+        c = self.make_client()
+        shared_tx = self.record_shared_tx(c)
+        c.lock.update(remaining=7200, sibling_remaining=0, margin=3600)
+        c.wallet_txids.add(c.ci.getTxid(shared_tx))
+
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(c.published, [])
+        self.assertEqual(c.unlocked, [])
+        for leg in (c.bid, c.sibling):
+            self.assertEqual(leg.xmr_b_lock_tx.txid, c.ci.getTxid(shared_tx))
+        self.assertEqual(c.kv, {})
+
+    def test_shared_tx_is_dropped_for_a_bid_that_left_the_locked_state(self):
+        c = self.make_client()
+        shared_tx = self.record_shared_tx(c)
+        c.sibling.state = int(BidStates.BID_ERROR)
+
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(c.unlocked, [shared_tx])
+        self.assertEqual(len(c.published), 1)
+        self.assertNotEqual(c.published[0], shared_tx)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+        self.assertIsNone(c.sibling.xmr_b_lock_tx)
+        self.assertEqual(c.kv, {})
+
+    def test_shared_tx_the_node_has_is_tracked_for_a_bid_that_left_the_locked_state(
+        self,
+    ):
+        c = self.make_client()
+        shared_tx = self.record_shared_tx(c)
+        c.sibling.state = int(BidStates.BID_ERROR)
+        c.wallet_txids.add(c.ci.getTxid(shared_tx))
+
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(c.published, [])
+        self.assertEqual(c.unlocked, [])
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(shared_tx))
+
+    def test_failed_publish_drops_the_record(self):
+        c = self.make_client(
+            publish_errors=[ValueError("bad-txns-inputs-missingorspent")]
+        )
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        self.assertEqual(len(c.bid_errors), 1)
+        self.assertIsNone(c.bid.xmr_b_lock_tx)
+        self.assertEqual(c.kv, {})
+        self.assertEqual(c.unlocked, [c.published[0]])
+
+    def test_lock_found_by_lookup_drops_the_record(self):
+        from basicswap.interface.base import TemporaryError
+        from basicswap.interface.btc.btc import BTCInterface
+
+        c = self.make_client(BTCInterface, [TemporaryError("timed out")])
+        found = []
+        c.ci.findTxB = lambda *args, **kwargs: found[0] if found else None
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(len(c.kv), 1)
+
+        lock_txid: bytes = c.ci.getTxid(c.published[0])
+        found.append(
+            {
+                "txid": lock_txid.hex(),
+                "height": 0,
+                "index": 0,
+                "value": c.bid.amount_to,
+            }
+        )
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, lock_txid)
+        self.assertEqual(c.kv, {})
+
+    def test_lock_b_waits_for_a_lock_a_that_left_the_chain(self):
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client()
+        for a_lock_info in (None, {"depth": 1, "height": 101}):
+            c.a_lock["info"] = a_lock_info
+            self.assertRaises(
+                TemporaryError, c.sc.sendXmrBidCoinBLockTx, c.bid_id, None
+            )
+        self.assertEqual(c.funded, [])
+        self.assertEqual(c.published, [])
+
+        c.a_lock["info"] = {"depth": 2, "height": 101}
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
+
+    def test_recorded_tx_is_not_published_again_without_lock_a(self):
+        from basicswap.interface.base import TemporaryError
+
+        c = self.make_client(publish_errors=[TemporaryError("timed out")])
+        c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+        self.assertEqual(len(c.published), 1)
+
+        c.a_lock["info"] = None
+        self.assertRaises(TemporaryError, c.sc.sendXmrBidCoinBLockTx, c.bid_id, None)
+        self.assertEqual(len(c.published), 1)
+        self.assertEqual(len(c.kv), 1)
+
+    def test_tx_exists_error_texts(self):
+        from basicswap.interface.btc.btc import BTCInterface
+
+        ci = self.make_client(BTCInterface).ci
+        for text in (
+            "Transaction already in block chain",
+            "transaction already in block chain",
+            "Transaction outputs already in utxo set",
+        ):
+            self.assertTrue(ci.isTxExistsError(text))
+        self.assertFalse(ci.isTxExistsError("bad-txns-inputs-missingorspent"))

@@ -189,16 +189,18 @@ def getChainBRemoteSplitKey(swap_client, bid, xmr_swap, offer):
     return None
 
 
-def setDLEAG(xmr_swap, ci_to, kbsf: bytes) -> None:
+def setDLEAG(xmr_swap, ci_to, kbsf: bytes, offer_id: bytes) -> None:
     if ci_to.curve_type() == Curves.ed25519:
         xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
         xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
     elif ci_to.curve_type() == Curves.secp256k1:
-        xmr_swap.kbsf_dleag = ci_to.signRecoverable(kbsf, "proof kbsf owned for swap")
-        pk_recovered: bytes = ci_to.verifySigAndRecover(
-            xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
+        xmr_swap.kbsf_dleag = ci_to.signKeyProof(
+            kbsf, "proof kbsf owned for swap", offer_id
         )
-        ensure(pk_recovered == xmr_swap.pkbsf, "kbsf recovered pubkey mismatch")
+        pk_proven: bytes = ci_to.verifyKeyProof(
+            xmr_swap.kbsf_dleag, "proof kbsf owned for swap", offer_id
+        )
+        ensure(pk_proven == xmr_swap.pkbsf, "kbsf proof pubkey mismatch")
         xmr_swap.pkasf = xmr_swap.pkbsf
     else:
         raise ValueError("Unknown curve")

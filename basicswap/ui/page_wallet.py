@@ -448,7 +448,7 @@ def page_wallet(self, url_split, post_string):
                     if not estimate_fee:
                         withdrawal_successful = True
                 except Exception as e:
-                    if swap_client.debug is True:
+                    if swap_client.debug_logs:
                         swap_client.log.error(traceback.format_exc())
                     err_messages.append(str(e))
             if not estimate_fee:
@@ -472,7 +472,7 @@ def page_wallet(self, url_split, post_string):
                 )
             except Exception as e:
                 err_messages.append(str(e))
-                if swap_client.debug is True:
+                if swap_client.debug_logs:
                     swap_client.log.error(traceback.format_exc())
 
     is_electrum_mode = (

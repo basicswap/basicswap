@@ -38,7 +38,9 @@ def page_debug(self, url_split, post_string):
                 messages.append("Done.")
             except Exception as e:
                 swap_client.log.error(
-                    traceback.format_exc() if swap_client.debug else f"reinit_xmr: {e}"
+                    traceback.format_exc()
+                    if swap_client.debug_logs
+                    else f"reinit_xmr: {e}"
                 )
                 err_messages.append(f"Failed: {e}.")
 
@@ -50,7 +52,7 @@ def page_debug(self, url_split, post_string):
             except Exception as e:
                 swap_client.log.error(
                     traceback.format_exc()
-                    if swap_client.debug
+                    if swap_client.debug_logs
                     else f"remove_expired_data: {e}"
                 )
                 err_messages.append("Failed.")
@@ -72,7 +74,7 @@ def page_debug(self, url_split, post_string):
             except Exception as e:
                 swap_client.log.error(
                     traceback.format_exc()
-                    if swap_client.debug
+                    if swap_client.debug_logs
                     else f"list_non_segwit_prevouts: {e}"
                 )
                 err_messages.append(f"Failed: {e}.")
@@ -84,7 +86,7 @@ def page_debug(self, url_split, post_string):
             except Exception as e:
                 swap_client.log.error(
                     traceback.format_exc()
-                    if swap_client.debug
+                    if swap_client.debug_logs
                     else f"combine_non_segwit_prevouts_btc: {e}"
                 )
                 err_messages.append(f"Failed: {e}.")
@@ -96,7 +98,7 @@ def page_debug(self, url_split, post_string):
             except Exception as e:
                 swap_client.log.error(
                     traceback.format_exc()
-                    if swap_client.debug
+                    if swap_client.debug_logs
                     else f"combine_non_segwit_prevouts_ltc: {e}"
                 )
                 err_messages.append(f"Failed: {e}.")
@@ -116,7 +118,7 @@ def page_debug(self, url_split, post_string):
             except Exception as e:
                 swap_client.log.error(
                     traceback.format_exc()
-                    if swap_client.debug
+                    if swap_client.debug_logs
                     else f"sweep_swipe_payout: {e}"
                 )
                 err_messages.append(f"Failed: {e}.")

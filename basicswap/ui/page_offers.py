@@ -359,7 +359,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                     parsed_data["to_fee_override"] = page_data["to_fee_override"]
     except Exception as e:
         # Error is expected if missing fields
-        if swap_client.debug is True:
+        if swap_client.debug_logs:
             swap_client.log.warning(f"parseOfferFormData failed to set fee: Error {e}")
 
     return parsed_data, errors
@@ -573,7 +573,7 @@ def _add_review_insights(swap_client, page_data, parsed_data) -> None:
                 delta = (user_rate - inferred_f) / inferred_f * 100.0
                 page_data["market_rate_delta_pct"] = round(delta, 1)
     except Exception as e:
-        if swap_client.debug:
+        if swap_client.debug_logs:
             swap_client.log.warning(f"Review market rate lookup failed: {e}")
 
     try:
@@ -619,7 +619,7 @@ def _add_review_insights(swap_client, page_data, parsed_data) -> None:
             page_data["competitor_coin_from"] = int(coin_from)
             page_data["competitor_coin_to"] = int(coin_to)
     except Exception as e:
-        if swap_client.debug:
+        if swap_client.debug_logs:
             swap_client.log.warning(f"Review competitor lookup failed: {e}")
 
     try:
@@ -629,7 +629,7 @@ def _add_review_insights(swap_client, page_data, parsed_data) -> None:
                 total, page_data.get("tla_from", "")
             ).strip()
     except Exception as e:
-        if swap_client.debug:
+        if swap_client.debug_logs:
             swap_client.log.warning(f"Review fee total failed: {e}")
 
 
@@ -721,7 +721,7 @@ def page_newoffer(self, url_split, post_string, get_string=""):
             for e in errors:
                 err_messages.append(str(e))
         except Exception as e:
-            if swap_client.debug is True:
+            if swap_client.debug_logs:
                 swap_client.log.error(traceback.format_exc())
             err_messages.append(str(e))
 
@@ -734,7 +734,7 @@ def page_newoffer(self, url_split, post_string, get_string=""):
             page_data["offer_id"] = offer_id.hex()
             wizard_step = "success"
         except Exception as e:
-            if swap_client.debug is True:
+            if swap_client.debug_logs:
                 swap_client.log.error(traceback.format_exc())
             page_data["publish_error"] = str(e)
 
@@ -752,13 +752,13 @@ def page_newoffer(self, url_split, post_string, get_string=""):
         try:
             _add_review_insights(swap_client, page_data, parsed_data)
         except Exception as e:
-            if swap_client.debug is True:
+            if swap_client.debug_logs:
                 swap_client.log.warning(f"Could not build review insights: {e}")
     if wizard_step in ("review", "success"):
         try:
             _add_tracking_review(swap_client, page_data, parsed_data)
         except Exception as e:
-            if swap_client.debug is True:
+            if swap_client.debug_logs:
                 swap_client.log.warning(f"Could not build tracking review: {e}")
 
     template_names = {
@@ -932,7 +932,7 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
                 return bytes()
 
             except Exception as ex:
-                if self.server.swap_client.debug is True:
+                if self.server.swap_client.debug_logs:
                     self.server.swap_client.log.error(traceback.format_exc())
                 err_messages.append("Send bid failed: " + str(ex))
                 show_bid_form = True
@@ -1070,7 +1070,7 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
     try:
         tracking = swap_client.getOfferTrackingSummary(offer)
     except Exception as e:
-        if swap_client.debug is True:
+        if swap_client.debug_logs:
             swap_client.log.warning(f"getOfferTrackingSummary failed: {e}")
         tracking = None
     if tracking is not None:

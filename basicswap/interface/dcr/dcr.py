@@ -34,6 +34,7 @@ from basicswap.util import (
     b2i,
     i2b,
     i2h,
+    TemporaryError,
 )
 from basicswap.util.address import (
     b58decode,
@@ -710,6 +711,18 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
             # TODO: filter errors
             return None
 
+    def isWalletTransaction(self, tx: bytes) -> bool:
+        # A failed lookup raises, unlike getWalletTransaction it can't stand for a tx the wallet lacks
+        try:
+            self.rpc_wallet("gettransaction", [self.getTxid(tx).hex()])
+        except Exception as e:
+            if "no information for transaction" in str(e):
+                return False
+            raise TemporaryError(
+                f"{self.coin_name()} wallet transaction lookup failed: {e}"
+            )
+        return True
+
     def listWalletTransactions(self, count=100, skip=0, include_watchonly=True):
         try:
             return self.rpc_wallet(
@@ -885,6 +898,24 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         message_hash = blake256(bytes(message, "utf-8"))
         pubkey = PublicKey.from_signature_and_message(sig, message_hash, hasher=None)
         return pubkey.format()
+
+    def signKeyProof(self, k: bytes, message: str, context: bytes) -> bytes:
+        """The key, then a signature over a hash that includes it. A signature
+        over the message alone doesn't show k is known, a key that cancels
+        another can be recovered from one built without it."""
+        K = self.getPubkey(k)
+        proof_hash = blake256(bytes(message, "utf-8") + K + context)
+        return K + PrivateKey(k).sign_recoverable(proof_hash, hasher=None)[:64]
+
+    def verifyKeyProof(self, proof: bytes, message: str, context: bytes) -> bytes:
+        ensure(len(proof) == 33 + 64, "Invalid key proof length")
+        K = proof[:33]
+        proof_hash = blake256(bytes(message, "utf-8") + K + context)
+        ensure(
+            PublicKey(K).verify_compact(proof[33:], proof_hash, hasher=None),
+            "Invalid key proof",
+        )
+        return K
 
     def verifyMessage(
         self, address: str, message: str, signature: str, message_magic: str = None
@@ -1520,6 +1551,8 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script_pk = self.getScriptDest(script_out)
         locked_n = findOutput(tx, script_pk)
         ensure(locked_n is not None, "Lock output not found in tx")
+        # The script is only the one checked here under script version 0
+        ensure(tx.vout[locked_n].version == 0, "Bad output script version")
         locked_coin = tx.vout[locked_n].value
 
         # Check value
@@ -1621,6 +1654,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(len(tx.vout) == 1, "tx doesn't have one output")
         p2wpkh = self.getPubkeyHashDest(a_pkhash_f)
         ensure(tx.vout[0].script_pubkey == p2wpkh, "Bad output destination")
+        ensure(tx.vout[0].version == 0, "Bad output script version")
 
         # The value of the lock tx output should already be verified, if the fee is as expected the difference will be the correct amount
         ensure(self.money_range(tx.vout[0].value), "Bad output value range")
@@ -1697,6 +1731,7 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         script_pk = self.getScriptDest(script_out)
         locked_n = findOutput(tx, script_pk)
         ensure(locked_n is not None, "Output not found in tx")
+        ensure(tx.vout[locked_n].version == 0, "Bad output script version")
         locked_coin = tx.vout[locked_n].value
         ensure(self.money_range(locked_coin), "Bad output value range")
 
@@ -1706,6 +1741,11 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         ensure(B == Kaf, "Bad script pubkey")
         ensure(csv_val == csv_val_expect, "Bad script csv value")
         ensure(C == Kaf, "Bad script pubkey")
+        # A non-minimal push decodes to the same values but makes the lock 2 spend invalid
+        ensure(
+            script_out == self.genScriptLockRefundTxScript(Kal, Kaf, csv_val_expect),
+            "Bad lock refund script",
+        )
 
         fee_paid = swap_value - locked_coin
         ensure(fee_paid > 0, "Non positive fee")
@@ -2187,31 +2227,48 @@ class DCRInterface(FeeValidator, Secp256k1Interface):
         tx.vout.append(self.txoType()(output_amount, script_pk))
         return tx.serialize()
 
+    def fundBLockTx(
+        self,
+        Kbs: bytes,
+        output_amount: int,
+        feerate: int,
+        bid_id: bytes = None,
+        cursor=None,
+    ) -> tuple[bytes, int] | None:
+        """Returned signed but unpublished, so the tx is recorded before it
+        can be on chain."""
+        b_lock_tx = self.fundTx(
+            self.createBLockTx(Kbs, output_amount),
+            feerate,
+            bid_id=bid_id,
+            cursor=cursor,
+        )
+        lock_vout = findOutput(self.loadTx(b_lock_tx), self.getPkDest(Kbs))
+        return self.signTxWithWallet(b_lock_tx), lock_vout
+
     def publishBLockTx(self, kbv, Kbs, output_amount, feerate, unlock_time: int = 0):
-        b_lock_tx = self.createBLockTx(Kbs, output_amount)
-
-        b_lock_tx = self.fundTx(b_lock_tx, feerate)
-
-        script_pk = self.getPkDest(Kbs)
-        funded_tx = self.loadTx(b_lock_tx)
-        lock_vout = findOutput(funded_tx, script_pk)
-
-        b_lock_tx = self.signTxWithWallet(b_lock_tx)
-
+        b_lock_tx, lock_vout = self.fundBLockTx(Kbs, output_amount, feerate)
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         return txid, lock_vout
 
-    def publishBLockTxs(self, locks, feerate: int, unlock_time: int = 0):
+    def fundBLockTxs(
+        self, locks, feerate: int, bid_id: bytes = None, cursor=None
+    ) -> bytes | None:
         """Lock several swaps in one transaction, so their change is not chained.
-
-        Returns the txid and the indexes of locks it pays.
-        """
+        Returned signed but unpublished, so the tx is recorded before it can be
+        on chain."""
         tx = CTransaction()
         tx.version = self.txVersion()
         for _kbv, Kbs, output_amount in locks:
             tx.vout.append(self.txoType()(output_amount, self.getPkDest(Kbs)))
 
-        b_lock_tx = self.signTxWithWallet(self.fundTx(tx.serialize(), feerate))
+        return self.signTxWithWallet(
+            self.fundTx(tx.serialize(), feerate, bid_id=bid_id, cursor=cursor)
+        )
+
+    def publishBLockTxs(self, locks, feerate: int, unlock_time: int = 0):
+        """Returns the txid and the indexes of locks it pays."""
+        b_lock_tx = self.fundBLockTxs(locks, feerate)
         txid = bytes.fromhex(self.publishTx(b_lock_tx))
         self._log.info(
             "publishBLockTxs {} to {} lock outputs".format(

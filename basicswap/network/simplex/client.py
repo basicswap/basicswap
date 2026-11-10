@@ -184,7 +184,7 @@ def startSimplexClient(
 
 def startSimplexNetworkClient(swap_client, network, data_dir: str, logger):
     simplex_dir = os.path.join(data_dir, "simplex")
-    log_level = "debug" if swap_client.debug else "info"
+    log_level = "debug" if swap_client.debug_logs else "info"
     socks_proxy = None
     if swap_client.use_tor_proxy:
         socks_proxy = f"{swap_client.tor_proxy_host}:{swap_client.tor_proxy_port}"

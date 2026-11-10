@@ -2183,7 +2183,8 @@ def main():
         extra_opts["zmqsecret"] = base64.b64encode(zmq_server_key).decode("utf-8")
 
         settings = {
-            "debug": True,
+            "debug": False,
+            "log_level": "debug",
             "zmqhost": f"tcp://{PART_RPC_HOST}",
             "zmqport": PART_ZMQ_PORT + port_offset,
             "htmlhost": htmlhost,

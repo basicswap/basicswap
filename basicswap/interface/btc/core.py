@@ -4,7 +4,6 @@
 # Distributed under the MIT software license, see the accompanying
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
-import mmap
 import os
 import shutil
 import tarfile
@@ -17,6 +16,7 @@ from basicswap.interface.prepare_util import (
     isValidSignature,
     havePubkey,
     getFileHash,
+    readClearsigned,
 )
 
 BITCOIN_VERSION = os.getenv("BITCOIN_VERSION", "31.1")
@@ -306,15 +306,13 @@ class BTCPrepare(CoinPrepareModule):
             sync_file_path, print_progress=True, logger=ctx.logger
         )
         ctx.logger.info(f"{sync_filename} hash: {utxo_snapshot_hash}")
-        with (
-            open(asc_file_path, "rb", 0) as fp,
-            mmap.mmap(fp.fileno(), 0, access=mmap.ACCESS_READ) as s,
-        ):
-            if s.find(bytes(utxo_snapshot_hash, "utf-8")) == -1:
-                raise ValueError(
-                    f"Error: Snapshot hash {utxo_snapshot_hash} not found in assert file."
-                )
-            ctx.logger.info("Found snapshot hash in assert file.")
+        # The signature covers only the signed text, not the rest of the file
+        signed_message, signed_text = readClearsigned(asc_file_path)
+        if bytes(utxo_snapshot_hash, "utf-8") not in signed_text:
+            raise ValueError(
+                f"Error: Snapshot hash {utxo_snapshot_hash} not found in assert file."
+            )
+        ctx.logger.info("Found snapshot hash in assert file.")
 
         pubkey_filename = "{}_{}.pgp".format("particl", "tecnovert")
         pubkeyurls = []
@@ -322,8 +320,7 @@ class BTCPrepare(CoinPrepareModule):
         gpg = createGPG(ctx.gnupg, ctx.gpg_homedir)
         if not havePubkey(gpg, fastsync_signers["tecnovert"][0]):
             ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
-        with open(asc_file_path, "rb") as fp:
-            verified = gpg.verify_file(fp)
+        verified = gpg.verify(signed_message)
         if (
             isValidSignature(verified)
             and verified.fingerprint in fastsync_signers["tecnovert"]
@@ -335,8 +332,7 @@ class BTCPrepare(CoinPrepareModule):
             pubkey_filename = "nicolasdorier.asc"
             if not havePubkey(gpg, fastsync_signers["nicolasdorier"][0]):
                 ctx.import_pubkey(gpg, pubkey_filename, pubkeyurls)
-            with open(asc_file_path, "rb") as fp:
-                verified = gpg.verify_file(fp)
+            verified = gpg.verify(signed_message)
             self.ensureValidSignatureBy(
                 ctx, verified, "nicolasdorier", fastsync_signers, filepath=asc_file_path
             )

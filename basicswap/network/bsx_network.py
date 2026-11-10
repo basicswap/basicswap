@@ -869,7 +869,7 @@ class BSXNetwork:
                 return bytes.fromhex(ro["msgid"]), bytes.fromhex(ro["msg"])
             return bytes.fromhex(ro["msgid"])
         except Exception as e:
-            if self.debug:
+            if self.debug_logs:
                 if ro is None:
                     self.log.error(f"smsgsend failed {e}")
                 else:
@@ -1017,7 +1017,7 @@ class BSXNetwork:
                     self.log.warning(
                         f"Bid {self.log.id(linked_id)} not sent on route {route_id}, will retry: {e}"
                     )
-                    if self.debug:
+                    if self.debug_logs:
                         self.log.error(traceback.format_exc())
                     continue
                 query = "UPDATE direct_message_route_links SET active_ind = 2 WHERE record_id = :record_id "
@@ -1076,7 +1076,7 @@ class BSXNetwork:
                     self.log.warning(
                         f"checkPendingMessageRoutes route {record_id}: {e}"
                     )
-                    if self.debug:
+                    if self.debug_logs:
                         self.log.error(traceback.format_exc())
         finally:
             self.closeDB(cursor)

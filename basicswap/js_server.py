@@ -1231,7 +1231,7 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
         rv["fee_rate"] = ci_from.format_amount(fee_rate_int)
         rv["fee_src"] = fee_src
     except Exception as e:
-        if swap_client.debug:
+        if swap_client.debug_logs:
             swap_client.log.warning(f"offer_fee_estimate failed: {e}")
         rv["error"] = "Fee estimate unavailable"
     return bytes(json.dumps(rv), "UTF-8")

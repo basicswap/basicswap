@@ -345,12 +345,10 @@ def describeBid(
         ]
     )[0]
 
-    can_abandon: bool = False
-    if swap_client.debug and bid.state not in (
+    can_abandon: bool = bid.state not in (
         BidStates.BID_ABANDONED,
         BidStates.SWAP_COMPLETED,
-    ):
-        can_abandon = True
+    )
 
     data = {
         "coin_from": ci_from.coin_name(),

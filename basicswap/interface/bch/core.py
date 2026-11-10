@@ -12,6 +12,7 @@ from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
     ensurePubkey,
+    readClearsigned,
     getOSDirNames,
 )
 
@@ -109,8 +110,7 @@ class BCHPrepare(CoinPrepareModule):
             gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
         )
 
-        with open(assert_path, "rb") as fp:
-            verified = gpg.verify_file(fp)
+        verified = gpg.verify(readClearsigned(assert_path)[0])
 
         self.ensureValidSignatureBy(
             ctx, verified, signing_key_name, filepath=assert_path

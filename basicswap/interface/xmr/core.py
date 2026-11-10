@@ -13,6 +13,7 @@ from basicswap.interface.prepare_util import (
     CoinPrepareModule,
     PrepareContext,
     ensurePubkey,
+    readClearsigned,
     exitWithError,
     getOSDirNames,
 )
@@ -105,6 +106,9 @@ class XMRPrepare(CoinPrepareModule):
 
         return release_path, assert_path, None
 
+    def hasDetachedSig(self) -> bool:
+        return False
+
     def getPubkeyUrls(self, ctx: PrepareContext) -> list:
         return [
             "https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc"
@@ -128,8 +132,7 @@ class XMRPrepare(CoinPrepareModule):
             gpg, ctx, signing_key_name, self.signers, pubkey_filename, pubkeyurls
         )
 
-        with open(assert_path, "rb") as fp:
-            verified = gpg.verify_file(fp)
+        verified = gpg.verify(readClearsigned(assert_path)[0])
 
         self.ensureValidSignatureBy(
             ctx, verified, signing_key_name, filepath=assert_path

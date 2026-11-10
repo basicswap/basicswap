@@ -84,7 +84,7 @@ def page_unlock(self, url_split, post_string):
             self.end_headers()
             return bytes()
         except Exception as e:
-            if swap_client.debug is True:
+            if swap_client.debug_logs:
                 swap_client.log.error(str(e))
             err_messages.append(str(e))
 

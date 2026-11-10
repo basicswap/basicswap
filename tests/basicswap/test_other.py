@@ -549,6 +549,288 @@ class Test(unittest.TestCase):
             except Exception as e:
                 assert "Bad fee" in str(e)
 
+    def test_lock_refund_script_must_be_canonical(self):
+        ci = self.ci_btc()
+
+        Kal = ci.getPubkey(ci.getNewRandomKey())
+        Kaf = ci.getPubkey(ci.getNewRandomKey())
+        script_lock = CScript([2, Kal, Kaf, 2, OP_CHECKMULTISIG])
+
+        locked_coin: int = ci.make_int(0.1)
+        lock_tx = CTransaction()
+        lock_tx.nVersion = ci.txVersion()
+        lock_tx.vin.append(
+            CTxIn(COutPoint(uint256_from_str(secrets.token_bytes(32)), 0))
+        )
+        lock_tx.vout.append(CTxOut(locked_coin, ci.getScriptDest(script_lock)))
+        lock_tx.rehash()
+        lock_tx_bytes = lock_tx.serialize()
+
+        lock1_value = ci.getExpectedSequence(
+            TxLockTypes.SEQUENCE_LOCK_TIME, 2 * 60 * 60
+        )
+        csv_val = ci.getExpectedSequence(TxLockTypes.SEQUENCE_LOCK_TIME, 4 * 60 * 60)
+        fee_rate: int = 1000
+        refund_tx, refund_script, _ = ci.createSCLockRefundTx(
+            lock_tx_bytes, script_lock, Kal, Kaf, lock1_value, csv_val, fee_rate
+        )
+
+        def verify(tx_bytes, script):
+            ci.verifySCLockRefundTx(
+                tx_bytes,
+                lock_tx_bytes,
+                script,
+                ci.getTxid(lock_tx),
+                0,
+                lock1_value,
+                script_lock,
+                Kal,
+                Kaf,
+                csv_val,
+                locked_coin,
+                fee_rate,
+            )
+
+        verify(refund_tx, refund_script)
+
+        # The same lock 2 value, pushed with a padding byte
+        csv_push = bytes(CScript([csv_val]))
+        csv_at: int = 76
+        self.assertEqual(refund_script[csv_at : csv_at + len(csv_push)], csv_push)
+        padded_push = bytes([csv_push[0] + 1]) + csv_push[1:] + b"\x00"
+        padded_script = (
+            refund_script[:csv_at]
+            + padded_push
+            + refund_script[csv_at + len(csv_push) :]
+        )
+        tx = ci.loadTx(refund_tx)
+        tx.vout[0].scriptPubKey = ci.getScriptDest(padded_script)
+        self.assertRaisesRegex(
+            ValueError, "Bad lock refund script", verify, tx.serialize(), padded_script
+        )
+
+    def test_coin_b_key_proof_binds_the_key(self):
+        from coincurve.keys import PublicKey
+
+        ci = self.ci_btc()
+        n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        message = "proof kbsl owned for swap"
+        bid_id = secrets.token_bytes(28)
+        pkbsf = ci.getPubkey(ci.getNewRandomKey())
+
+        def scalar() -> int:
+            return int.from_bytes(secrets.token_bytes(32), "big") % (n - 1) + 1
+
+        def b32(v: int) -> bytes:
+            return v.to_bytes(32, "big")
+
+        # The old proof: a signature built from pkbsf alone recovers to a share that cancels it
+        z = int.from_bytes(sha256(message.encode("utf-8")), "big")
+        a, b = scalar(), scalar()
+        R = PublicKey.combine_keys(
+            [PrivateKey(b32(a)).public_key, PublicKey(pkbsf).multiply(b32(b))]
+        )
+        r = int.from_bytes(R.format(compressed=False)[1:33], "big") % n
+        s = (-r * pow(b, -1, n)) % n
+        X = (-a * pow(b, -1, n) - z * pow(r, -1, n)) % n
+        rogue = ci.sumPubkeys(
+            ci.getPubkey(b32(X)), PublicKey(pkbsf).multiply(b32(n - 1)).format()
+        )
+        s = min(s, n - s)
+        sig = None
+        for recid in range(4):
+            candidate = b32(r) + b32(s) + bytes([recid])
+            try:
+                if ci.verifySigAndRecover(candidate, message) == rogue:
+                    sig = candidate
+                    break
+            except Exception:
+                continue
+        self.assertIsNotNone(sig)
+        self.assertEqual(ci.sumPubkeys(rogue, pkbsf), ci.getPubkey(b32(X)))
+
+        # Once the signed hash includes the key, the same pair fails
+        self.assertRaises(
+            ValueError, ci.verifyKeyProof, rogue + sig[:64], message, bid_id
+        )
+
+        kbsl = ci.getNewRandomKey()
+        proof = ci.signKeyProof(kbsl, message, bid_id)
+        self.assertEqual(ci.verifyKeyProof(proof, message, bid_id), ci.getPubkey(kbsl))
+        self.assertRaises(
+            ValueError, ci.verifyKeyProof, proof, message, secrets.token_bytes(28)
+        )
+
+    def test_route_established_refuses_an_old_protocol_bid(self):
+        from basicswap.basicswap import MINPROTO_VERSION_ADAPTOR_SIG
+        from basicswap.basicswap_util import BidStates
+        from basicswap.db import XmrSwap
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.mock_time_offset = 0
+        offer = Offer(
+            offer_id=bytes(28),
+            coin_from=int(Coins.BTC),
+            coin_to=int(Coins.XMR),
+            swap_type=int(SwapTypes.XMR_SWAP),
+            protocol_version=MINPROTO_VERSION_ADAPTOR_SIG,
+        )
+        sent = []
+        sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
+        sc.queryOne = lambda cls, cursor, filters: XmrSwap(bid_id=filters["bid_id"])
+        sc.logEvent = lambda *args, **kwargs: None
+        sc.saveBid = lambda *args, **kwargs: None
+        sc.saveBidInSession = lambda *args, **kwargs: None
+        sc.sendXmrBidMessage = lambda bid, xmr_swap, offer, cursor: sent.append(
+            bid.bid_id
+        )
+
+        for protocol_version in (
+            MINPROTO_VERSION_ADAPTOR_SIG - 1,
+            MINPROTO_VERSION_ADAPTOR_SIG,
+        ):
+            bid = Bid(
+                bid_id=bytes([protocol_version]) * 28,
+                offer_id=bytes(28),
+                state=int(BidStates.CONNECT_REQ_SENT),
+                expire_at=sc.getTime() + 3600,
+                protocol_version=protocol_version,
+            )
+            sc.getBidAndOffer = lambda bid_id, cursor: (bid, offer)
+            sc.routeEstablishedForBid(bid.bid_id, None)
+            if protocol_version < MINPROTO_VERSION_ADAPTOR_SIG:
+                self.assertEqual(bid.state, int(BidStates.BID_ERROR))
+                self.assertEqual(sent, [])
+            else:
+                self.assertEqual(bid.state, int(BidStates.BID_SENT))
+                self.assertEqual(sent, [bid.bid_id])
+
+    def test_lock_b_height_is_cleared_when_the_tx_leaves_the_chain(self):
+        from basicswap.db import XmrSwap
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.logBidEvent = lambda *args, **kwargs: None
+        sc.countBidEvents = lambda *args, **kwargs: 0
+        ci = self.ci_btc()
+        amount_to: int = 5000000
+        bid = Bid(
+            bid_id=secrets.token_bytes(28), amount_to=amount_to, chain_b_height_start=90
+        )
+        xmr_swap = XmrSwap(
+            bid_id=bid.bid_id,
+            vkbv=ci.getNewRandomKey(),
+            pkbs=ci.getPubkey(ci.getNewRandomKey()),
+        )
+        found = {
+            "txid": secrets.token_bytes(32).hex(),
+            "height": 100,
+            "index": 1,
+            "value": amount_to,
+        }
+        lookups = []
+        ci.findTxB = lambda *args, **kwargs: lookups.pop(0)
+
+        lookups.append(found)
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 100)
+
+        lookups.append(None)
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 0)
+        lookups.append(None)
+        self.assertFalse(sc.findTxB(ci, xmr_swap, bid, None, False))
+
+        lookups.append(dict(found, height=103))
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 103)
+
+        # Replaced by an output of another amount
+        lookups.append(dict(found, value=amount_to - 1))
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 0)
+
+    def test_lock_release_waits_for_a_lock_tx_b_that_left_the_chain(self):
+        from basicswap.basicswap_util import BidStates, TxTypes
+        from basicswap.db import XmrOffer, XmrSwap
+        from basicswap.util import TemporaryError
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.logBidEvent = lambda *args, **kwargs: None
+        sc.countBidEvents = lambda *args, **kwargs: 0
+        ci = self.ci_btc()
+        ci.blocks_confirmed = 2
+        chain = {"height": 110, "found": None}
+        ci.getChainHeight = lambda: chain["height"]
+        ci.findTxB = lambda *args, **kwargs: chain["found"]
+        sc.ci = lambda coin: ci
+        sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
+        sc.SMSG_SECONDS_IN_HOUR = 60 * 60
+
+        amount_to: int = 5000000
+        lock_txid: bytes = secrets.token_bytes(32)
+        offer = Offer(
+            offer_id=secrets.token_bytes(28),
+            coin_from=int(Coins.PART),
+            coin_to=int(Coins.BTC),
+            lock_type=int(TxLockTypes.SEQUENCE_LOCK_BLOCKS),
+            addr_from="offer_addr",
+        )
+        bid = Bid(
+            bid_id=secrets.token_bytes(28),
+            offer_id=offer.offer_id,
+            amount_to=amount_to,
+            chain_b_height_start=90,
+            was_received=True,
+            bid_addr="bid_addr",
+            state=int(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED),
+        )
+        # Ten blocks deep by the stored height
+        bid.xmr_b_lock_tx = SwapTx(
+            bid_id=bid.bid_id,
+            tx_type=TxTypes.XMR_SWAP_B_LOCK,
+            txid=lock_txid,
+            vout=1,
+            chain_height=100,
+        )
+        xmr_swap = XmrSwap(
+            bid_id=bid.bid_id,
+            vkbv=ci.getNewRandomKey(),
+            pkbs=ci.getPubkey(ci.getNewRandomKey()),
+            b_lock_tx_id=lock_txid,
+            al_lock_spend_tx_esig=secrets.token_bytes(64),
+        )
+        sent = []
+        sc.getXmrBidFromSession = lambda cursor, bid_id: (bid, xmr_swap)
+        sc.getXmrOfferFromSession = lambda cursor, offer_id: (offer, XmrOffer())
+        sc.sendMessage = lambda *args, **kwargs: sent.append(args[1]) or b"msg_id"
+        sc.addMessageLink = lambda *args, **kwargs: None
+        sc.saveBidInSession = lambda *args, **kwargs: None
+
+        self.assertRaises(TemporaryError, sc.sendXmrBidLockRelease, bid.bid_id, None)
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 0)
+
+        # Mined again, one confirmation short
+        chain["found"] = {
+            "txid": lock_txid.hex(),
+            "height": 109,
+            "index": 1,
+            "value": amount_to,
+        }
+        self.assertRaises(TemporaryError, sc.sendXmrBidLockRelease, bid.bid_id, None)
+        self.assertEqual(sent, [])
+        self.assertEqual(bid.state, int(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED))
+
+        chain["height"] = 111
+        sc.sendXmrBidLockRelease(bid.bid_id, None)
+        self.assertEqual(sent, ["bid_addr"])
+        self.assertEqual(bid.state, int(BidStates.XMR_SWAP_LOCK_RELEASED))
+
     def test_compare_fee_rates(self):
         # compareFeeRates must accept every fee feeForVSize can produce
         ci = self.ci_btc()
@@ -1472,6 +1754,45 @@ class Test(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 readSecret("Password: ", confirm=True)
 
+    def test_release_hash_in_signed_text(self):
+        from types import SimpleNamespace
+        from basicswap.interface.prepare_util import getFileHash
+        from basicswap.interface.wow.core import prepare_module as wow_prepare
+        from basicswap.interface.xmr.core import prepare_module as xmr_prepare
+
+        ctx = SimpleNamespace(logger=logging.getLogger())
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            release_path = os.path.join(tmp_dir, "release.tar.bz2")
+            with open(release_path, "wb") as fp:
+                fp.write(b"release")
+            release_hash = getFileHash(release_path)
+            other_hash = sha256(b"other").hex()
+
+            def signed(text: str) -> str:
+                return (
+                    "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\n"
+                    f"{text}\n-----BEGIN PGP SIGNATURE-----\n\n"
+                    "iQ==\n-----END PGP SIGNATURE-----\n"
+                )
+
+            assert_path = os.path.join(tmp_dir, "hashes.txt")
+
+            def verify(contents: str) -> None:
+                with open(assert_path, "w") as fp:
+                    fp.write(contents)
+                for prepare_module in (xmr_prepare, wow_prepare):
+                    prepare_module.verifyCoreHash(ctx, release_path, assert_path)
+
+            verify(signed(f"release.tar.bz2, {release_hash}"))
+            # The signature covers only the text between the markers
+            for unsigned in (
+                signed(f"release.tar.bz2, {other_hash}") + f"{release_hash}\n",
+                f"{release_hash}\n" + signed(f"release.tar.bz2, {other_hash}"),
+                signed(f"release.tar.bz2, {other_hash}")
+                + signed(f"release.tar.bz2, {release_hash}"),
+            ):
+                self.assertRaises(ValueError, verify, unsigned)
+
     def test_is_public_url(self):
         # Non-http(s) schemes and internal hosts must be rejected; a public IP
         # literal (resolves to itself, no DNS needed) must be accepted.
@@ -2222,6 +2543,7 @@ class Test(unittest.TestCase):
 
         class SwapClient:
             debug = False
+            debug_logs = False
 
         server = HttpThread("127.0.0.1", 0, False, SwapClient())
         try:
@@ -3725,6 +4047,110 @@ class Test(unittest.TestCase):
         )
 
         del sc
+
+    def test_extract_secret_by_hash(self):
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.coin_clients = {
+            Coins.PIVX: {"use_segwit": False},
+            Coins.LTC: {"use_segwit": True},
+        }
+        secret = secrets.token_bytes(32)
+        script = buildContractScript(
+            100, sha256(secret), secrets.token_bytes(20), secrets.token_bytes(20)
+        )
+        bid = Bid()
+        bid.initiate_tx = SwapTx(script=script)
+        sig = "30" + "44" * 70
+        pubkey = "02" + "11" * 32
+
+        def script_sig(*items) -> dict:
+            return {"scriptSig": {"asm": " ".join(items)}}
+
+        redeem = script_sig(sig + "[ALL]", pubkey, secret.hex(), "1", script.hex())
+        self.assertEqual(sc.extractSecret(Coins.PIVX, bid, redeem), secret)
+        # Valid in a block on chains where CLEANSTACK is only relay policy
+        extra_push = script_sig(
+            "deadbeef", sig + "[ALL]", pubkey, secret.hex(), "1", script.hex()
+        )
+        self.assertEqual(sc.extractSecret(Coins.PIVX, bid, extra_push), secret)
+        refund = script_sig(sig + "[ALL]", pubkey, "0", script.hex())
+        self.assertIsNone(sc.extractSecret(Coins.PIVX, bid, refund))
+        witness = {
+            "txinwitness": [sig + "01", pubkey, secret.hex(), "01", script.hex()]
+        }
+        self.assertEqual(sc.extractSecret(Coins.LTC, bid, witness), secret)
+
+    def test_lock_tx_lookup_picks_the_output_with_the_amount(self):
+        ci = self.ci_btc()
+        script = buildContractScript(
+            100,
+            secrets.token_bytes(32),
+            secrets.token_bytes(20),
+            secrets.token_bytes(20),
+        )
+        dest = ci.getScriptDest(script)
+        addr = ci.encodeScriptDest(dest)
+        amount: int = 5000000
+        tx = CTransaction()
+        tx.vin.append(CTxIn(COutPoint(1, 0)))
+        tx.vout.append(CTxOut(1000, dest))
+        tx.vout.append(CTxOut(amount, dest))
+        tx_hex: str = tx.serialize().hex()
+        txid_hex: str = ci.getTxid(tx).hex()
+        wallet_rpc = {
+            "listunspent": [
+                {"address": addr, "amount": 0.00001, "txid": txid_hex},
+                {"address": addr, "amount": 0.05, "txid": txid_hex},
+            ],
+            "gettransaction": {
+                "hex": tx_hex,
+                "confirmations": 1,
+                "blockhash": "00" * 32,
+            },
+        }
+        node_rpc = {
+            "decoderawtransaction": ci._describeTxLocal(tx_hex),
+            "getblockheader": {"height": 100},
+        }
+        ci.isAddressMine = lambda address, or_watch_only=False: True
+        ci.rpc_wallet_watch = lambda method, params=None: wallet_rpc[method]
+        ci.rpc = lambda method, params=None: node_rpc[method]
+
+        found = ci.getLockTxHeight(None, addr, amount, 0, find_index=True)
+        self.assertEqual(found["txid"], txid_hex)
+        self.assertEqual(found["index"], 1)
+        self.assertEqual(found["value"], amount)
+
+    def test_found_script_needs_the_agreed_amount(self):
+        from basicswap.basicswap_util import TxTypes
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.coin_clients = {Coins.BCH: {"watched_scripts": []}}
+        amount: int = 5000000
+        bid = Bid(bid_id=secrets.token_bytes(28), amount=amount)
+        bid.xmr_a_lock_tx = SwapTx(bid_id=bid.bid_id, tx_type=TxTypes.XMR_SWAP_A_LOCK)
+        sc.swaps_in_progress = {bid.bid_id: (bid, Offer())}
+        sc.saveBid = lambda bid_id, bid: None
+        sc.logBidEvent = lambda *args, **kwargs: None
+        sc.addWatchedScript(
+            Coins.BCH, bid.bid_id, secrets.token_bytes(23), TxTypes.XMR_SWAP_A_LOCK
+        )
+        watched_scripts = sc.coin_clients[Coins.BCH]["watched_scripts"]
+        watched = watched_scripts[0]
+        lock_txid = secrets.token_bytes(32)
+
+        self.assertFalse(
+            sc.processFoundScript(Coins.BCH, watched, secrets.token_bytes(32), 0, 546)
+        )
+        self.assertIsNone(bid.xmr_a_lock_tx.txid)
+        self.assertEqual(watched_scripts, [watched])
+        self.assertTrue(sc.processFoundScript(Coins.BCH, watched, lock_txid, 1, amount))
+        self.assertEqual(bid.xmr_a_lock_tx.txid, lock_txid)
+        self.assertEqual(bid.xmr_a_lock_tx.vout, 1)
+        self.assertEqual(watched_scripts, [])
 
     def test_jsonrpc(self):
         logging.info("---------- Test Jsonrpc")

@@ -1216,7 +1216,7 @@ def page_amm(self, _, post_string):
                     )
 
         except Exception as e:
-            if swap_client.debug:
+            if swap_client.debug_logs:
                 swap_client.log.error(traceback.format_exc())
             err_messages.append(str(e))
 

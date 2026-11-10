@@ -943,6 +943,11 @@ class BCHInterface(BTCInterface):
         ensure(out_2 == _out_2, "out_2 mismatch")
         ensure(public_key == _public_key, "public_key mismatch")
         ensure(timelock == _timelock, "timelock mismatch")
+        # A longer encoding decodes to the same values but fails when its branch is spent
+        ensure(
+            script_out == self.genScriptLockTxScript(self, Kal, Kaf, **kwargs),
+            "Bad lock script",
+        )
 
         return txid, locked_n
 
@@ -1012,6 +1017,11 @@ class BCHInterface(BTCInterface):
         ensure(public_key == _public_key, "public_key mismatch")
         ensure(timelock == _timelock, "timelock mismatch")
         ensure(_timelock == csv_val_expect, "timelock mismatch")
+        # A longer encoding decodes to the same values but fails when its branch is spent
+        ensure(
+            script_out == self.genScriptLockTxScript(self, Kal, Kaf, **kwargs),
+            "Bad lock refund script",
+        )
 
         lock_mining_fee, _, _, _, _ = self.extractScriptLockScriptValues(prevout_script)
         fee_paid = swap_value - locked_coin

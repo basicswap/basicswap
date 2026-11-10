@@ -212,10 +212,12 @@ import basicswap.protocols.xmr_swap_1 as xmr_swap_1
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
 
-PROTOCOL_VERSION_ADAPTOR_SIG = 7
-MINPROTO_VERSION_ADAPTOR_SIG = 6
+PROTOCOL_VERSION_ADAPTOR_SIG = 8
+MINPROTO_VERSION_ADAPTOR_SIG = 8
 # Split messages to a peer at this version or later carry parent_msg_id
 PROTOCOL_VERSION_SPLIT_PARENT = 7
+# secp256k1 coin B key share proofs and kal_sig at this version or later sign a hash that includes the key
+PROTOCOL_VERSION_KEY_PROOFS = 8
 
 MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
 MAXPROTO_VERSION = 10
@@ -661,8 +663,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Keep sensitive info out of the log file (WIP)
         self.log.safe_logs = self.settings.get("safe_logs", False)
-        if self.log.safe_logs and self.debug:
-            raise ValueError("Safe logs mode is incompatible with debug mode")
+        if self.log.safe_logs and self.debug_logs:
+            raise ValueError('Safe logs mode is incompatible with "log_level" "debug"')
 
         if self.log.safe_logs:
             self.log.warning("Safe log enabled.")
@@ -728,6 +730,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         self.swaps_in_progress = dict()
+        self._activate_retry = set()
         self._redeem_published_at = dict()
 
         self.threads = []
@@ -907,7 +910,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return self.log.id(concept_id, prefix="T_")
 
     def handleSessionErrors(self, e, cursor, tag):
-        if self.debug:
+        if self.debug_logs:
             self.log.error(traceback.format_exc())
 
         self.log.error(f"Error: {tag} - {e}")
@@ -1401,7 +1404,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             f"{daemon.name} exited during startup with code {daemon.handle.returncode}:\n{daemon.readOutput()}"
                         )
                         raise ValueError("Error, terminating")
-                    if self.debug:
+                    if self.debug_logs:
                         self.log.warning(f"Error, iteration {i}: {e}")
                     self.delay_event.wait(0.5)
             try:
@@ -1586,6 +1589,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         _, _ = self.getLockedState()
 
         # Re-load in-progress bids
+        self.waitForElectrumHeaders()
         self.loadFromDB()
 
         # Catch offer fills missed while the node was down
@@ -3390,7 +3394,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.error(
                 f"Failed to initialize WalletManager for {Coins(coin_type).name}: {e}"
             )
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             return False
 
@@ -3480,7 +3484,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.error(f"initialiseWallet failed: {e}")
             if raise_errors:
                 raise
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             return
 
@@ -3594,6 +3598,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
+            recorded = self.getStringKV(f"b_lock_tx:{bid.bid_id.hex()}", cursor)
+            if recorded is not None:
+                # The wallet's locks on its inputs don't outlast a daemon restart
+                try:
+                    ci_to.lockPrefundedTxInputs(
+                        bytes.fromhex(json.loads(recorded)["tx"]), bid.bid_id, cursor
+                    )
+                except Exception as e:
+                    self.log.warning(
+                        f"Locking the inputs of the recorded coin B lock tx for bid {self.log.id(bid.bid_id)} failed: {e}"
+                    )
             if (
                 ci_to.watch_blocks_for_scripts()
                 and bid.xmr_a_lock_tx
@@ -3816,6 +3831,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
         self.log.info("Loading data from db")
         self.swaps_in_progress.clear()
+        self._activate_retry.clear()
         bid_cursor = None
         try:
             cursor = self.openDB()
@@ -3826,30 +3842,68 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     and bid.state > BidStates.BID_RECEIVED
                     and bid.state < BidStates.SWAP_COMPLETED
                 ):
-                    try:
-                        self.activateBid(cursor, bid)
-                    except Exception as ex:
-                        self.logException(f"Failed to activate bid! Error: {ex}")
-                        self.logEvent(
-                            Concepts.BID,
-                            bid.bid_id,
-                            EventLogTypes.ERROR,
-                            "Failed to activate",
-                            cursor,
-                        )
-                        try:
-                            bid.setState(BidStates.BID_ERROR)
-
-                            offer = self.queryOne(
-                                Offer, cursor, {"offer_id": bid.offer_id}
-                            )
-                            self.deactivateBid(cursor, offer, bid)
-                        except Exception as ex:
-                            self.logException(f"Further error deactivating: {ex}")
+                    self.activateBidOrRetry(cursor, bid)
             self.buildNotificationsCache(cursor)
         finally:
             self.closeDBCursor(bid_cursor)
             self.closeDB(cursor)
+
+    def activateBidOrRetry(self, cursor, bid) -> None:
+        try:
+            self.activateBid(cursor, bid)
+            self._activate_retry.discard(bid.bid_id)
+        except Exception as ex:
+            if self.isBidTransientError(bid.bid_id, ex, cursor):
+                # The bid and its queued actions stay as they are until it activates
+                self.swaps_in_progress.pop(bid.bid_id, None)
+                self._activate_retry.add(bid.bid_id)
+                self.log.warning(
+                    f"Activating bid {self.log.id(bid.bid_id)} failed, will retry: {ex}"
+                )
+                return
+            self._activate_retry.discard(bid.bid_id)
+            self.logException(f"Failed to activate bid! Error: {ex}")
+            self.logEvent(
+                Concepts.BID,
+                bid.bid_id,
+                EventLogTypes.ERROR,
+                "Failed to activate",
+                cursor,
+            )
+            try:
+                bid.setState(BidStates.BID_ERROR)
+
+                offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
+                self.deactivateBid(cursor, offer, bid)
+            except Exception as ex:
+                self.logException(f"Further error deactivating: {ex}")
+
+    def retryBidActivation(self) -> None:
+        try:
+            cursor = self.openDB()
+            for bid_id in list(self._activate_retry):
+                bid = self.queryOne(Bid, cursor, {"bid_id": bid_id})
+                if bid is None:
+                    self._activate_retry.discard(bid_id)
+                    continue
+                self.activateBidOrRetry(cursor, bid)
+        finally:
+            self.closeDB(cursor)
+
+    def waitForElectrumHeaders(self, timeout: int = 60) -> None:
+        # Activating a bid reads verified headers, which exist after a coin's first sync
+        end = time.time() + timeout
+        for c in self.activeCoins():
+            if self.coin_clients[c]["connection_type"] != "electrum":
+                continue
+            ci = self.ci(c)
+            while not ci.electrumHeadersSynced():
+                if time.time() >= end or self.delay_event.is_set():
+                    self.log.warning(
+                        f"{ci.coin_name()} headers not synced yet, bids that need them activate once they are."
+                    )
+                    return
+                self.delay_event.wait(1)
 
     def getActiveBidMsgValidTime(self) -> int:
         return self.SMSG_SECONDS_IN_HOUR * 48
@@ -4303,7 +4357,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         except Exception as e:
             type_str = "offer" if for_offer else "bid"
             err_msg = f"Insufficient funds for {type_str} of {balance_msg}."
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(f"ensureWalletCanSend failed {e}")
                 current_balance: int = ci.getSpendableBalance()
                 err_msg += (
@@ -6268,11 +6322,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid, offer = self.getBidAndOffer(bid_id, use_cursor)
             ensure(bid, f"Bid not found: {self.log.id(bid_id)}.")
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
-            ensure(offer.active_ind == 1, "Offer not active")
+
+            # With the initiate txn in the wallet the funds are out, the checks on committing them no longer apply
+            funds_committed: bool = False
+            if bid.initiate_tx is not None and bid.initiate_tx.tx_data is not None:
+                funds_committed = self.ci(offer.coin_from).isWalletTransaction(
+                    bid.initiate_tx.tx_data
+                )
+            ensure(funds_committed or offer.active_ind == 1, "Offer not active")
 
             # Ensure bid is still valid
             now: int = self.getTime()
-            ensure(bid.expire_at > now + self._bid_accept_leeway, "Bid expired")
+            ensure(
+                funds_committed or bid.expire_at > now + self._bid_accept_leeway,
+                "Bid expired",
+            )
             ensure(
                 canAcceptBidState(bid.state),
                 "Wrong bid state: {}".format(BidStates(bid.state).name),
@@ -6297,14 +6361,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
             budget_amount: int = bid.amount_to if reverse_bid else bid.amount
-            validate_offer_budget(
-                self,
-                offer,
-                budget_amount,
-                use_cursor,
-                in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
-            )
-            self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
+            if not funds_committed:
+                validate_offer_budget(
+                    self,
+                    offer,
+                    budget_amount,
+                    use_cursor,
+                    in_flight=self.getOfferInFlightAmount(offer, use_cursor, bid_id),
+                )
+                self.validateOfferWalletFloor(offer, budget_amount, use_cursor, bid_id)
 
             if bid.contract_count is None:
                 bid.contract_count = self.getNewContractId(use_cursor)
@@ -6326,11 +6391,37 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 op_hash = OpCodes.OP_SHA256
 
             if bid.initiate_tx is not None:
-                txid = bid.initiate_tx.txid
+                txid = bid.initiate_tx.txid.hex()
                 script = bid.initiate_tx.script
                 self.log.warning(
-                    f"Initiate txn {self.log.id(txid)} already exists for bid {self.log.id(bid_id)}"
+                    f"Initiate txn {self.log.id(bid.initiate_tx.txid)} already exists for bid {self.log.id(bid_id)}"
                 )
+                # It was saved before its first publish, which may not have reached the node
+                if bid.initiate_tx.tx_data is not None:
+                    try:
+                        answered: bool = (
+                            ci_from.publishTx(bid.initiate_tx.tx_data) is not None
+                        )
+                    except Exception as e:
+                        if not ci_from.isTxExistsError(str(e)):
+                            raise
+                        answered = True
+                    if not answered:
+                        raise TemporaryError(
+                            f"No answer publishing the initiate txn for bid {self.log.id(bid_id)}."
+                        )
+                    if bid.getITxState() is None:
+                        bid.setITxState(TxStates.TX_SENT)
+                        if not self.countBidEvents(
+                            bid, EventLogTypes.ITX_PUBLISHED, use_cursor
+                        ):
+                            self.logEvent(
+                                Concepts.BID,
+                                bid.bid_id,
+                                EventLogTypes.ITX_PUBLISHED,
+                                "",
+                                use_cursor,
+                            )
             else:
                 if offer.lock_type < TxLockTypes.ABS_LOCK_BLOCKS:
                     sequence = ci_from.getExpectedSequence(
@@ -6377,18 +6468,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     coin_from, txn, offer, bid, script, cursor=use_cursor
                 )
                 bid.initiate_txn_refund = bytes.fromhex(refund_txn)
-
-                txid = ci_from.publishTx(bytes.fromhex(txn))
-                self.log.debug(
-                    f"Submitted initiate txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
-                )
                 bid.initiate_tx = SwapTx(
                     bid_id=bid_id,
                     tx_type=TxTypes.ITX,
-                    txid=bytes.fromhex(txid),
+                    txid=ci_from.getTxid(bytes.fromhex(txn)),
                     vout=lock_tx_vout,
                     tx_data=bytes.fromhex(txn),
                     script=script,
+                )
+                # The refund txn must be on record before the initiate txn can be on chain
+                self.saveBidInSession(bid_id, bid, use_cursor, notify=False)
+                self.commitDB()
+
+                txid = ci_from.publishTx(bytes.fromhex(txn))
+                if txid is None:
+                    raise TemporaryError(
+                        f"No answer publishing the initiate txn for bid {self.log.id(bid_id)}."
+                    )
+                self.log.debug(
+                    f"Submitted initiate txn {self.logIDT(txid)} to {ci_from.coin_name()} chain for bid {self.log.id(bid_id)}",
                 )
                 bid.setITxState(TxStates.TX_SENT)
                 self.logEvent(
@@ -6542,7 +6640,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def getXmrBidMessage(self, bid, xmr_swap, offer) -> XmrBidMessage:
         valid_for_seconds: int = bid.expire_at - bid.created_at
         msg_buf = XmrBidMessage()
-        msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
+        msg_buf.protocol_version = bid.protocol_version
         msg_buf.offer_msg_id = bid.offer_id
         msg_buf.time_valid = valid_for_seconds
         msg_buf.amount = bid.amount
@@ -7032,8 +7130,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsf_dleag = ci_to.proveDLEAG(kbsf)
             elif ci_to.curve_type() == Curves.secp256k1:
-                xmr_swap.kbsf_dleag = ci_to.signRecoverable(
-                    kbsf, "proof kbsf owned for swap"
+                xmr_swap.kbsf_dleag = ci_to.signKeyProof(
+                    kbsf, "proof kbsf owned for swap", offer_id
                 )
             else:
                 raise ValueError("Unknown curve")
@@ -7044,9 +7142,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 xmr_swap.pkasf = xmr_swap.kbsf_dleag[0:33]
             elif ci_to.curve_type() == Curves.secp256k1:
-                hash_msg = "proof kbsf owned for swap"
-                pk_recovered = ci_to.verifySigAndRecover(xmr_swap.kbsf_dleag, hash_msg)
-                ensure(pk_recovered == xmr_swap.pkbsf, "kbsf recovered pubkey mismatch")
+                pk_proven = ci_to.verifyKeyProof(
+                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap", offer_id
+                )
+                ensure(pk_proven == xmr_swap.pkbsf, "kbsf proof pubkey mismatch")
                 xmr_swap.pkasf = xmr_swap.pkbsf
             else:
                 raise ValueError("Unknown curve")
@@ -7163,6 +7262,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(
                 canAcceptBidState(last_bid_state),
                 "Wrong bid state: {}".format(str(BidStates(last_bid_state))),
+            )
+            ensure(
+                bid.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+                "Incompatible bid protocol version",
             )
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=use_cursor)
@@ -7425,13 +7528,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if ci_to.curve_type() == Curves.ed25519:
                 xmr_swap.kbsl_dleag = ci_to.proveDLEAG(kbsl)
             elif ci_to.curve_type() == Curves.secp256k1:
-                xmr_swap.kbsl_dleag = ci_to.signRecoverable(
-                    kbsl, "proof kbsl owned for swap"
+                xmr_swap.kbsl_dleag = ci_to.signKeyProof(
+                    kbsl, "proof kbsl owned for swap", bid.bid_id
                 )
-                pk_recovered = ci_to.verifySigAndRecover(
-                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
+                pk_proven = ci_to.verifyKeyProof(
+                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap", bid.bid_id
                 )
-                ensure(pk_recovered == xmr_swap.pkbsl, "kbsl recovered pubkey mismatch")
+                ensure(pk_proven == xmr_swap.pkbsl, "kbsl proof pubkey mismatch")
             else:
                 raise ValueError("Unknown curve")
 
@@ -7556,6 +7659,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 canAcceptBidState(last_bid_state),
                 "Wrong bid state: {}".format(str(BidStates(last_bid_state))),
             )
+            ensure(
+                bid.protocol_version >= MINPROTO_VERSION_ADAPTOR_SIG,
+                "Incompatible bid protocol version",
+            )
 
             offer, xmr_offer = self.getXmrOffer(bid.offer_id, cursor=use_cursor)
             ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
@@ -7645,7 +7752,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             xmr_swap.pkaf = ci_from.getPubkey(kaf)
 
-            xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf)
+            xmr_swap_1.setDLEAG(xmr_swap, ci_to, kbsf, bid.offer_id)
             ensure(xmr_swap.pkasf == ci_from.getPubkey(kbsf), "pkasf != kbsf")
 
             xmr_swap.intent_accept_prepared_at = now
@@ -7747,12 +7854,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.closeDB(use_cursor)
 
     def abandonBid(self, bid_id: bytes) -> None:
-        if not self.debug:
-            self.log.error(
-                f"Can't abandon bid {self.log.id(bid_id)} when not in debug mode."
-            )
-            return
-
         self.log.info(f"Abandoning Bid {self.log.id(bid_id)}")
         self.deactivateBidForReason(bid_id, BidStates.BID_ABANDONED)
 
@@ -8858,6 +8959,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid.xmr_b_lock_tx.txid = found_txid
 
             bid.xmr_b_lock_tx.chain_height = found_tx["height"]
+            bid_changed = True
+        if (
+            (invalid_tx_found or found_tx is None)
+            and bid.xmr_b_lock_tx is not None
+            and bid.xmr_b_lock_tx.chain_height
+        ):
+            # A lock tx that left the chain must not keep counting as confirmed
+            self.log.warning(
+                f"Lock tx B for bid {self.log.id(bid.bid_id)} is no longer found in the {ci_to.coin_name()} chain."
+            )
+            bid.xmr_b_lock_tx.chain_height = 0
             bid_changed = True
         return bid_changed
 
@@ -10332,22 +10444,27 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return False  # Bid is still active
 
     def extractSecret(self, coin_type, bid, spend_in):
+        secret_hash = atomic_swap_1.extractScriptSecretHash(bid.initiate_tx.script)
         try:
             if coin_type in (Coins.DCR,):
-                script_sig = spend_in["scriptSig"]["asm"].split(" ")
-                ensure(len(script_sig) == 5, "Bad witness size")
-                return bytes.fromhex(script_sig[2])
+                pushes = spend_in["scriptSig"]["asm"].split(" ")
             elif (
                 coin_type in (Coins.PART,) or self.coin_clients[coin_type]["use_segwit"]
             ):
-                ensure(len(spend_in["txinwitness"]) == 5, "Bad witness size")
-                return bytes.fromhex(spend_in["txinwitness"][2])
+                pushes = spend_in["txinwitness"]
             else:
-                script_sig = spend_in["scriptSig"]["asm"].split(" ")
-                ensure(len(script_sig) == 5, "Bad witness size")
-                return bytes.fromhex(script_sig[2])
+                pushes = spend_in["scriptSig"]["asm"].split(" ")
         except Exception:
             return None
+        # Block validity doesn't fix the item count, so find the secret by its hash
+        for push in pushes:
+            try:
+                data = bytes.fromhex(push)
+            except ValueError:
+                continue
+            if sha256(data) == secret_hash:
+                return data
+        return None
 
     def addWatchedTransaction(
         self, coin_type, bid_id, txid_hex, tx_type, swap_type=None
@@ -10913,8 +11030,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
 
     def processFoundScript(
-        self, coin_type, watched_script, txid: bytes, vout: int
-    ) -> None:
+        self, coin_type, watched_script, txid: bytes, vout: int, value: int
+    ) -> bool:
+        """False if the output was ignored and the script is still watched."""
         bid_in_progress = self.swaps_in_progress.get(watched_script.bid_id, None)
         if bid_in_progress is None:
             self.log.warning(
@@ -10923,8 +11041,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.removeWatchedScript(
                 coin_type, watched_script.bid_id, watched_script.script
             )
-            return
+            return True
         bid = bid_in_progress[0]
+
+        # Anyone can pay to the script, and later lookups only check the output adopted here
+        expect_value = {
+            TxTypes.PTX: bid.amount_to,
+            TxTypes.XMR_SWAP_A_LOCK: bid.amount,
+            TxTypes.XMR_SWAP_B_LOCK: bid.amount_to,
+        }.get(watched_script.tx_type)
+        if expect_value is not None and value != expect_value:
+            if (txid, vout) not in watched_script.ignored_outputs:
+                watched_script.ignored_outputs.add((txid, vout))
+                self.log.warning(
+                    f"Ignoring {self.logIDT(txid)} {vout} paying the watched script for bid {self.log.id(watched_script.bid_id)}: value {value} != {expect_value}."
+                )
+            return False
 
         if watched_script.tx_type == TxTypes.PTX:
             bid.participate_tx.txid = txid
@@ -10975,6 +11107,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self.removeWatchedScript(
             coin_type, watched_script.bid_id, watched_script.script
         )
+        return True
 
     def process_MERCY_tx(
         self, coin_type, bid_id: bytes, spend_txid_hex: str, spend_txn
@@ -11135,7 +11268,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             try:
                 self.checkForSpends(k, c)
             except Exception as ex:
-                if self.debug:
+                if self.debug_logs:
                     self.log.error("checkForSpends %s", traceback.format_exc())
                 if self.is_transient_error(ex):
                     self.log.warning(f"checkForSpends {Coins(k).name} {ex}.")
@@ -11265,7 +11398,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                                 self.log.debug(
                                     f"Found script from search for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {i}."
                                 )
-                                self.processFoundScript(coin_type, s, txid_bytes, i)
+                                if self.processFoundScript(
+                                    coin_type,
+                                    s,
+                                    txid_bytes,
+                                    i,
+                                    ci.make_int(txo["value"]),
+                                ):
+                                    break
 
                 for o in list(c["watched_outputs"]):
                     for i, inp in enumerate(tx["vin"]):
@@ -11349,8 +11489,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         for s in list(c["watched_scripts"]):
             try:
-                found = ci.checkWatchedScript(s.script)
-                if found:
+                for found in ci.checkWatchedScript(s.script):
                     if found.get("height", 0) <= 0:
                         self.log.debug(
                             f"Waiting for watched script tx to confirm for bid {self.log.id(s.bid_id)}: {self.logIDT(bytes.fromhex(found['txid']))}"
@@ -11360,7 +11499,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     self.log.debug(
                         f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
                     )
-                    self.processFoundScript(coin_type, s, txid_bytes, found["vout"])
+                    if self.processFoundScript(
+                        coin_type, s, txid_bytes, found["vout"], found["value"]
+                    ):
+                        break
             except Exception as e:
                 self.log.debug(f"checkWatchedScript error: {e}")
 
@@ -11424,14 +11566,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.delay_event.is_set():
                 return results
             try:
-                found = ci.checkWatchedScript(s.script)
-                if found:
+                confirmed = []
+                for found in ci.checkWatchedScript(s.script):
                     if found.get("height", 0) <= 0:
                         self.log.debug(
                             f"Waiting for watched script tx to confirm for bid {self.log.id(s.bid_id)}: {self.logIDT(bytes.fromhex(found['txid']))}"
                         )
                         continue
-                    results["scripts"].append((s, found))
+                    confirmed.append(found)
+                if confirmed:
+                    results["scripts"].append((s, confirmed))
             except Exception as e:
                 self.log.debug(f"_fetchSpendsElectrum checkWatchedScript error: {e}")
 
@@ -11451,13 +11595,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             except Exception as e:
                 self.log.debug(f"_processFetchedSpends output error: {e}")
 
-        for s, found in results["scripts"]:
+        for s, confirmed in results["scripts"]:
             try:
-                txid_bytes = bytes.fromhex(found["txid"])
-                self.log.debug(
-                    f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
-                )
-                self.processFoundScript(coin_type, s, txid_bytes, found["vout"])
+                for found in confirmed:
+                    txid_bytes = bytes.fromhex(found["txid"])
+                    self.log.debug(
+                        f"Found script via Electrum for bid {self.log.id(s.bid_id)}: {self.logIDT(txid_bytes)} {found['vout']}."
+                    )
+                    if self.processFoundScript(
+                        coin_type, s, txid_bytes, found["vout"], found["value"]
+                    ):
+                        break
             except Exception as e:
                 self.log.debug(f"_processFetchedSpends script error: {e}")
 
@@ -11501,7 +11649,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         return True
                     return False
                 except Exception as e:  # noqa: F841
-                    if self.debug:
+                    if self.debug_logs:
                         self.log.error(traceback.format_exc())
                         self.log.error(f"Failed to process message {msg}")
 
@@ -11824,7 +11972,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                         self.log.info(
                             f"Verify adaptor-sig {bid_type} {self.log.id(bid.bid_id)} failed: {ex}"
                         )
-                        if self.debug:
+                        if self.debug_logs:
                             self.log.error(traceback.format_exc())
                         bid.setState(BidStates.BID_ERROR)
                         self.updateDB(
@@ -12409,7 +12557,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return True
         except (AutomationConstraint, AutomationConstraintTemporary) as e:
             self.log.info(f"Not auto accepting bid {self.log.id(bid.bid_id)}, {e}.")
-            if self.debug:
+            if self.debug_logs:
                 self.logEvent(
                     Concepts.BID,
                     bid.bid_id,
@@ -12794,9 +12942,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if not ci_to.verifyPubkey(xmr_swap.pkbsf):
                 raise ValueError("Invalid coin b pubkey.")
         elif ci_to.curve_type() == Curves.secp256k1:
-            xmr_swap.pkasf = ci_to.verifySigAndRecover(
-                xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
-            )
+            if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+                xmr_swap.pkasf = ci_to.verifyKeyProof(
+                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap", bid.offer_id
+                )
+            else:
+                xmr_swap.pkasf = ci_to.verifySigAndRecover(
+                    xmr_swap.kbsf_dleag, "proof kbsf owned for swap"
+                )
             if not ci_from.verifyPubkey(xmr_swap.pkasf):
                 raise ValueError("Invalid coin a pubkey.")
             xmr_swap.pkbsf = xmr_swap.pkasf
@@ -12873,9 +13026,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             xmr_swap.pkasl = xmr_swap.kbsl_dleag[0:33]
             xmr_swap.pkbsl = xmr_swap.kbsl_dleag[33 : 33 + 32]
         elif ci_to.curve_type() == Curves.secp256k1:
-            xmr_swap.pkasl = ci_to.verifySigAndRecover(
-                xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
-            )
+            if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+                xmr_swap.pkasl = ci_to.verifyKeyProof(
+                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap", bid.bid_id
+                )
+            else:
+                xmr_swap.pkasl = ci_to.verifySigAndRecover(
+                    xmr_swap.kbsl_dleag, "proof kbsl owned for swap"
+                )
             xmr_swap.pkbsl = xmr_swap.pkasl
         else:
             raise ValueError("Unknown curve")
@@ -13304,7 +13462,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 finally:
                     self.closeDB(cursor)
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(ex))
 
@@ -13493,7 +13651,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Nothing is persisted before the send, leave the queued action to retry
             raise
         except Exception as e:  # noqa: F841
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(e), cursor=cursor)
 
@@ -13528,7 +13686,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
 
         # Prove leader can sign for kal, sent in MSG4F
-        xmr_swap.kal_sig = ci_from.signCompact(kal, "proof key owned for swap")
+        if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+            xmr_swap.kal_sig = ci_from.signKeyProof(
+                kal, "proof key owned for swap", bid_id
+            )
+        else:
+            xmr_swap.kal_sig = ci_from.signCompact(kal, "proof key owned for swap")
 
         # Create Script lock spend tx
         xmr_swap.a_lock_spend_tx = ci_from.createSCLockSpendTx(
@@ -13658,6 +13821,55 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         bid.xmr_b_lock_tx.setState(TxStates.TX_SENT)
         xmr_swap.b_lock_tx_id = b_lock_tx_id
         self.logBidEvent(bid.bid_id, EventLogTypes.LOCK_TX_B_PUBLISHED, "", cursor)
+        self.clearStringKV(f"b_lock_tx:{bid.bid_id.hex()}", cursor)
+
+    def recordSignedBLockTx(self, b_lock_tx: bytes, vout, bid_ids, cursor) -> None:
+        # A retry must publish these bytes again, new inputs would pay the locks twice
+        record = json.dumps(
+            {"tx": b_lock_tx.hex(), "vout": vout, "bids": [b.hex() for b in bid_ids]}
+        )
+        for bid_id in bid_ids:
+            self.setStringKV(f"b_lock_tx:{bid_id.hex()}", record, cursor)
+        self.commitDB()
+
+    def coinALockConfirmed(self, bid, xmr_swap, ci_from) -> bool:
+        lock_tx_chain_info, _ = self.getCoinALockChainInfo(bid, xmr_swap, ci_from)
+        return (
+            lock_tx_chain_info is not None
+            and lock_tx_chain_info["depth"] >= ci_from.blocks_confirmed
+        )
+
+    def recordedBLockTxTooLate(
+        self, recorded, reverse_bid: bool, lock_margin: int, cursor
+    ) -> bool:
+        # The tx pays every bid it lists, so it is too late once one of them is
+        for recorded_id in recorded["bids"]:
+            leg, _ = self.getXmrBidFromSession(cursor, bytes.fromhex(recorded_id))
+            # A bid that left the state can no more use the lock than one past its margin
+            if leg is None or leg.state != BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+                return True
+            leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
+            leg_remaining = self.getLegLockRemaining(
+                leg, leg_offer, reverse_bid, cursor
+            )
+            if leg_remaining is not None and leg_remaining < lock_margin:
+                return True
+        return False
+
+    def dropRecordedBLockTx(self, ci_to, bid_id: bytes, cursor) -> None:
+        recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        if recorded is None:
+            return
+        recorded = json.loads(recorded)
+        # Every bid the tx pays holds the record, none may publish it once its inputs are unlocked
+        for recorded_id in recorded["bids"]:
+            self.clearStringKV(f"b_lock_tx:{recorded_id}", cursor)
+        try:
+            ci_to.unlockInputs(bytes.fromhex(recorded["tx"]), cursor)
+        except Exception as e:
+            self.log.warning(
+                f"Unlocking the inputs of the dropped coin B lock tx for bid {self.log.id(bid_id)} failed: {e}"
+            )
 
     def sendXmrBidCoinBLockTx(self, bid_id: bytes, cursor) -> None:
         # Follower sending coin B lock tx
@@ -13684,9 +13896,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return
 
+        # Recorded before its first publish, which may have reached the daemon
+        recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
+        if recorded is not None:
+            recorded = json.loads(recorded)
         lock_margin: int = self.getBLockMinMargin(ci_to)
         lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
-        if lock_remaining is not None and lock_remaining < lock_margin:
+        too_late: bool = lock_remaining is not None and lock_remaining < lock_margin
+        track_only: bool = False
+        if recorded is not None and self.recordedBLockTxTooLate(
+            recorded, reverse_bid, lock_margin, cursor
+        ):
+            # Too late to publish it, it only counts if it reached the node in time
+            if ci_to.isWalletTransaction(bytes.fromhex(recorded["tx"])):
+                track_only = True
+            else:
+                self.dropRecordedBLockTx(ci_to, bid_id, cursor)
+                recorded = None
+        if too_late and recorded is None:
             # The leader won't release, so the lock could only be recovered
             if (
                 self.countBidEvents(
@@ -13707,6 +13934,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         if self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent) is True:
+            self.clearStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
             self.saveBidInSession(bid_id, bid, cursor, xmr_swap, save_in_progress=offer)
             return
 
@@ -13716,7 +13944,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             return
 
-        if bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
+        # Sending lock tx B can't be undone, and lock tx A may have left the chain since it was last checked
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
+        if not track_only and not self.coinALockConfirmed(bid, xmr_swap, ci_from):
+            raise TemporaryError(
+                f"Lock tx A for bid {self.log.id(bid_id)} is not confirmed deeply enough to send lock tx B."
+            )
+
+        if recorded is None and bid.debug_ind == DebugTypes.BID_STOP_AFTER_COIN_A_LOCK:
             self.log.debug(
                 f"Adaptor-sig bid {self.log.id(bid_id)}: Stalling bid for testing: {bid.debug_ind}."
             )
@@ -13731,7 +13966,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         unlock_time: int = 0
-        if bid.debug_ind in (
+        if recorded is None and bid.debug_ind in (
             DebugTypes.CREATE_INVALID_COIN_B_LOCK,
             DebugTypes.B_LOCK_TX_MISSED_SEND,
         ):
@@ -13757,15 +13992,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 cursor,
             )
 
-        prefunded_tx = self.getPreFundedTx(
-            Concepts.BID,
-            bid.bid_id,
-            TxTypes.PTX_PRE_FUNDED,
-            cursor=cursor,
+        prefunded_tx = (
+            None
+            if recorded is not None
+            else self.getPreFundedTx(
+                Concepts.BID,
+                bid.bid_id,
+                TxTypes.PTX_PRE_FUNDED,
+                cursor=cursor,
+            )
         )
 
         batch = []
-        if bid.plan_id and prefunded_tx is None and hasattr(ci_to, "publishBLockTxs"):
+        if (
+            recorded is None
+            and bid.plan_id
+            and prefunded_tx is None
+            and hasattr(ci_to, "publishBLockTxs")
+        ):
             ready_timeout = self._plan_leg_timeout
             stored_timeout = self.getStringKV(
                 f"plan_leg_timeout:{bid.plan_id.hex()}", cursor
@@ -13773,7 +14017,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if stored_timeout:
                 ready_timeout = int(stored_timeout)
 
-            ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
             plan = plan_batch_decision(
                 self.getPlanLegs(bid.plan_id, cursor),
                 bid_id,
@@ -13828,6 +14071,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 is not None
             ):
                 continue
+            if not self.coinALockConfirmed(leg, leg.xmr_swap, ci_from):
+                continue
             leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
             leg_sent: bool = leg.was_received if reverse_bid else leg.was_sent
             # A leg whose lock is already on chain must not be paid a second time.
@@ -13837,11 +14082,32 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 continue
             leg_swaps.append((leg, leg.xmr_swap, leg_offer))
+        if recorded is not None:
+            for recorded_id in recorded["bids"]:
+                if recorded_id == bid_id.hex():
+                    continue
+                leg, leg_swap = self.getXmrBidFromSession(
+                    cursor, bytes.fromhex(recorded_id)
+                )
+                if leg is None or leg.xmr_b_lock_tx:
+                    continue
+                if not track_only and not self.coinALockConfirmed(
+                    leg, leg_swap, ci_from
+                ):
+                    raise TemporaryError(
+                        f"Lock tx A for bid {self.log.id(leg.bid_id)} is not confirmed deeply enough to send lock tx B."
+                    )
+                leg_offer, _ = self.getXmrOfferFromSession(cursor, leg.offer_id)
+                leg_swaps.append((leg, leg_swap, leg_offer))
 
         try:
             b_lock_vout = None
             covered = None
-            if prefunded_tx:
+            b_lock_tx = None
+            if recorded is not None:
+                b_lock_tx = bytes.fromhex(recorded["tx"])
+                b_lock_vout = recorded["vout"]
+            elif prefunded_tx:
                 self.log.info("Using pre-funded tx")
                 pi = self.pi(offer.swap_type)
                 b_lock_tx = pi.promoteMockPTx(
@@ -13851,17 +14117,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_swap.pkbs,
                 )
                 b_lock_tx = ci_to.signTxWithWallet(b_lock_tx)
-                b_lock_tx_id = bytes.fromhex(ci_to.publishTx(b_lock_tx))
             elif leg_swaps:
-                b_lock_tx_id, covered = ci_to.publishBLockTxs(
-                    [(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to)]
-                    + [
-                        (leg_swap.vkbv, leg_swap.pkbs, leg.amount_to)
-                        for leg, leg_swap, _ in leg_swaps
-                    ],
-                    b_fee_rate,
-                    unlock_time=unlock_time,
+                locks = [(xmr_swap.vkbv, xmr_swap.pkbs, bid.amount_to)] + [
+                    (leg_swap.vkbv, leg_swap.pkbs, leg.amount_to)
+                    for leg, leg_swap, _ in leg_swaps
+                ]
+                b_lock_tx = ci_to.fundBLockTxs(
+                    locks, b_fee_rate, bid_id=bid_id, cursor=cursor
                 )
+                if b_lock_tx is None:
+                    b_lock_tx_id, covered = ci_to.publishBLockTxs(
+                        locks, b_fee_rate, unlock_time=unlock_time
+                    )
+            elif (
+                funded := ci_to.fundBLockTx(
+                    xmr_swap.pkbs,
+                    bid.amount_to,
+                    b_fee_rate,
+                    bid_id=bid_id,
+                    cursor=cursor,
+                )
+            ) is not None:
+                b_lock_tx, b_lock_vout = funded
             else:
                 result = ci_to.publishBLockTx(
                     xmr_swap.vkbv,
@@ -13874,7 +14151,30 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     b_lock_tx_id, b_lock_vout = result
                 else:
                     b_lock_tx_id = result
-            if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
+            if b_lock_tx is not None:
+                if recorded is None:
+                    self.recordSignedBLockTx(
+                        b_lock_tx,
+                        b_lock_vout,
+                        [bid_id] + [leg.bid_id for leg, _, _ in leg_swaps],
+                        cursor,
+                    )
+                if track_only:
+                    b_lock_tx_id = ci_to.getTxid(b_lock_tx)
+                else:
+                    try:
+                        published = ci_to.publishTx(b_lock_tx)
+                    except Exception as e:
+                        if not ci_to.isTxExistsError(str(e)):
+                            raise
+                        published = ci_to.getTxid(b_lock_tx).hex()
+                    if published is None:
+                        # No answer isn't a refusal, the tx may be out
+                        raise TemporaryError(
+                            f"No answer publishing the coin B lock tx for bid {self.log.id(bid_id)}."
+                        )
+                    b_lock_tx_id = bytes.fromhex(published)
+            if recorded is None and bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND:
                 self.log.debug(
                     f"Adaptor-sig bid {self.log.id(bid_id)}: Debug {bid.debug_ind} - Losing XMR lock tx {self.log.id(b_lock_tx_id)}."
                 )
@@ -13886,7 +14186,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
                 raise TemporaryError("Fail for debug event")
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             error_msg = (
                 f"publishBLockTx failed for bid {self.log.id(bid_id)} with error {ex}"
@@ -13902,6 +14202,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     delay, ActionTypes.SEND_XMR_SWAP_LOCK_TX_B, bid_id, cursor
                 )
             else:
+                self.dropRecordedBLockTx(ci_to, bid_id, cursor)
                 self.setBidError(
                     bid,
                     "publishBLockTx failed: " + str(ex),
@@ -14023,6 +14324,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     cursor,
                 )
                 return
+
+        # The release can't be undone, and lock tx B may have left the chain since it was last checked
+        ci_to = self.ci(Coins(offer.coin_from if reverse_bid else offer.coin_to))
+        was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+        self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
+        if (
+            bid.xmr_b_lock_tx is None
+            or not bid.xmr_b_lock_tx.chain_height
+            or ci_to.getChainHeight() - bid.xmr_b_lock_tx.chain_height
+            < ci_to.blocks_confirmed
+        ):
+            raise TemporaryError(
+                f"Lock tx B for bid {self.log.id(bid_id)} is not confirmed deeply enough to release the lock tx secret."
+            )
 
         msg_buf = XmrBidLockReleaseMessage(
             bid_msg_id=bid_id, al_lock_spend_tx_esig=xmr_swap.al_lock_spend_tx_esig
@@ -14919,7 +15234,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(ex))
 
@@ -14987,15 +15302,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 tx_lock_refund_bytes=xmr_swap.a_lock_refund_tx,
             )
 
-            ci_from.verifyCompactSig(
-                xmr_swap.pkal, "proof key owned for swap", xmr_swap.kal_sig
-            )
+            if bid.protocol_version >= PROTOCOL_VERSION_KEY_PROOFS:
+                pk_proven = ci_from.verifyKeyProof(
+                    xmr_swap.kal_sig, "proof key owned for swap", bid_id
+                )
+                ensure(pk_proven == xmr_swap.pkal, "kal proof pubkey mismatch")
+            else:
+                ci_from.verifyCompactSig(
+                    xmr_swap.pkal, "proof key owned for swap", xmr_swap.kal_sig
+                )
 
             bid.setState(BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX)
             bid.setState(BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX)
             self.saveBid(bid_id, bid, xmr_swap=xmr_swap)
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             self.setBidError(bid, str(ex))
 
@@ -15239,7 +15560,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(v, "verifyTxOtVES failed for chain a lock tx leader esig")
             xmr_swap.al_lock_spend_tx_esig = msg_data.al_lock_spend_tx_esig
         except Exception as ex:
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
             if bid_in_unexpected_state:
                 self.log.error(f"verifyTxOtVES error {ex}, bid in unexpected state")
@@ -15567,6 +15888,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         coin_to = Coins(offer.coin_to)
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
+            # Built before an upgrade, it would be a new bid on a refused protocol
+            if (
+                bid.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG
+                or offer.protocol_version < MINPROTO_VERSION_ADAPTOR_SIG
+            ):
+                self.setBidError(
+                    bid, "Incompatible bid protocol version", cursor=cursor
+                )
+                return
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
 
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
@@ -15653,7 +15983,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             self.log.debug(str(ex))
         except Exception as ex:
             self.log.error(f"processMsg {ex}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
                 self.logEvent(
                     Concepts.NETWORK_MESSAGE,
@@ -15672,7 +16002,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         except Exception as e:
             self.log.warning(f"Error processing PART wallet transaction: {e}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
 
     def _processZmqHashwtxAsync(self) -> None:
@@ -15685,7 +16015,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         except Exception as e:
             self.log.warning(f"Error processing PART wallet transaction: {e}")
-            if self.debug:
+            if self.debug_logs:
                 self.log.error(traceback.format_exc())
 
     def expireBidsAndOffers(self, now) -> None:
@@ -15865,13 +16195,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.checkDue(
                 now, self._last_checked_progress, self.check_progress_seconds
             ):
+                if self._activate_retry:
+                    self.retryBidActivation()
                 for bid_id, v in list(self.swaps_in_progress.items()):
                     bid, offer = v
                     try:
                         if self.checkBidState(bid_id, bid, offer) is True:
                             to_remove.append((bid_id, bid, offer))
                     except Exception as ex:
-                        if self.debug:
+                        if self.debug_logs:
                             self.log.error("checkBidState %s", traceback.format_exc())
                         if self.is_transient_error(ex):
                             self.log.warning(
@@ -16133,6 +16465,21 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if settings_copy.get("debug_ui", False) != new_value:
                     self.debug_ui = new_value
                     settings_copy["debug_ui"] = new_value
+                    settings_changed = True
+
+            if "log_level" in data:
+                new_value = data["log_level"]
+                ensure(new_value in ("debug", "info"), "Unknown log_level value")
+                ensure(
+                    not (new_value == "debug" and self.log.safe_logs),
+                    "Safe logs mode is incompatible with debug logs",
+                )
+                if settings_copy.get("log_level") != new_value:
+                    self.debug_logs = new_value == "debug"
+                    self.log.setLevel(
+                        logging.DEBUG if self.debug_logs else logging.INFO
+                    )
+                    settings_copy["log_level"] = new_value
                     settings_changed = True
 
             if "expire_unused_offers" in data:
@@ -18665,7 +19012,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["oracle"] = js
             except Exception as e:
                 rv["oracle_error"] = str(e)
-                if self.debug:
+                if self.debug_logs:
                     self.log.error(traceback.format_exc())
 
         if output_array:

@@ -569,6 +569,7 @@ def run_prepare(
             for opt in EXTRA_CONFIG_JSON.get(f"doge{node_id}", []):
                 fp.write(opt + "\n")
 
+    settings["debug"] = True
     settings["startup_timeout"] = 120
     settings["min_delay_event"] = 1
     settings["max_delay_event"] = 4
