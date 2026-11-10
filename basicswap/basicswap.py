@@ -11024,9 +11024,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             TxTypes.XMR_SWAP_B_LOCK: bid.amount_to,
         }.get(watched_script.tx_type)
         if expect_value is not None and value != expect_value:
-            self.log.warning(
-                f"Ignoring {self.logIDT(txid)} {vout} paying the watched script for bid {self.log.id(watched_script.bid_id)}: value {value} != {expect_value}."
-            )
+            if (txid, vout) not in watched_script.ignored_outputs:
+                watched_script.ignored_outputs.add((txid, vout))
+                self.log.warning(
+                    f"Ignoring {self.logIDT(txid)} {vout} paying the watched script for bid {self.log.id(watched_script.bid_id)}: value {value} != {expect_value}."
+                )
             return False
 
         if watched_script.tx_type == TxTypes.PTX:
