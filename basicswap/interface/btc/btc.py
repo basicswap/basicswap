@@ -5566,9 +5566,12 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         return None
 
     def isTxExistsError(self, err_str: str) -> bool:
-        if self._connection_type == "electrum":
-            return "Transaction outputs already in utxo set" in err_str
-        return "Transaction already in block chain" in err_str
+        # The text changed in Bitcoin Core 28, and its case differs between forks
+        err_lower: str = err_str.lower()
+        return (
+            "transaction already in block chain" in err_lower
+            or "transaction outputs already in utxo set" in err_lower
+        )
 
     def isTxNonFinalError(self, err_str: str) -> bool:
         err_lower = err_str.lower()
