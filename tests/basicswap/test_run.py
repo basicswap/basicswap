@@ -89,6 +89,7 @@ class Test(BaseTest):
             "getnewaddress",
             ["initial funds", "bech32"],
             base_rpc_port=BTC_BASE_RPC_PORT,
+            wallet="bsx_wallet",
         )
         ltc_addr1 = callnoderpc(
             1,
@@ -99,7 +100,11 @@ class Test(BaseTest):
         )
 
         callnoderpc(
-            0, "sendtoaddress", [btc_addr1, 1000], base_rpc_port=BTC_BASE_RPC_PORT
+            0,
+            "sendtoaddress",
+            [btc_addr1, 1000],
+            base_rpc_port=BTC_BASE_RPC_PORT,
+            wallet="bsx_wallet",
         )
         callnoderpc(
             0,
