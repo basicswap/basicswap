@@ -663,8 +663,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         # Keep sensitive info out of the log file (WIP)
         self.log.safe_logs = self.settings.get("safe_logs", False)
-        if self.log.safe_logs and self.debug:
-            raise ValueError("Safe logs mode is incompatible with debug mode")
+        if self.log.safe_logs and self.debug_logs:
+            raise ValueError('Safe logs mode is incompatible with "log_level" "debug"')
 
         if self.log.safe_logs:
             self.log.warning("Safe log enabled.")
@@ -16441,6 +16441,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if "log_level" in data:
                 new_value = data["log_level"]
                 ensure(new_value in ("debug", "info"), "Unknown log_level value")
+                ensure(
+                    not (new_value == "debug" and self.log.safe_logs),
+                    "Safe logs mode is incompatible with debug logs",
+                )
                 if settings_copy.get("log_level") != new_value:
                     self.debug_logs = new_value == "debug"
                     self.log.setLevel(
