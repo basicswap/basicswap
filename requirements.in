@@ -1,4 +1,4 @@
-pyzmq==27.2.0
+pyzmq==27.3.0
 python-gnupg==0.5.7
 Jinja2==3.1.6
 pycryptodome==4.2.0
