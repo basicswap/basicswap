@@ -200,6 +200,19 @@ def upgradeDatabaseData(self, data_version):
                 {"state": int(BidStates.XMR_SWAP_FAILED)},
             )
 
+        if data_version > 0 and data_version < 11 and self.settings.get("debug", False):
+            # Configs from before 0.19.2 have debug on by default, which accepts 60 second refund locks
+            self.settings["debug"] = False
+            self.settings.setdefault("log_level", "debug")
+            self.debug = False
+            self.min_sequence_lock_seconds = self.get_int_setting(
+                "min_sequence_lock_seconds", 2 * 60 * 60
+            )
+            self._save_settings()
+            self.log.warning(
+                'Debug mode turned off on upgrade, set "debug": true in basicswap.json to turn it back on.'
+            )
+
         self.db_data_version = CURRENT_DB_DATA_VERSION
         self.setIntKV("db_data_version", self.db_data_version, cursor)
         self.commitDB()
