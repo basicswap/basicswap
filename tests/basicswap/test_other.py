@@ -707,6 +707,130 @@ class Test(unittest.TestCase):
                 self.assertEqual(bid.state, int(BidStates.BID_SENT))
                 self.assertEqual(sent, [bid.bid_id])
 
+    def test_lock_b_height_is_cleared_when_the_tx_leaves_the_chain(self):
+        from basicswap.db import XmrSwap
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.logBidEvent = lambda *args, **kwargs: None
+        sc.countBidEvents = lambda *args, **kwargs: 0
+        ci = self.ci_btc()
+        amount_to: int = 5000000
+        bid = Bid(
+            bid_id=secrets.token_bytes(28), amount_to=amount_to, chain_b_height_start=90
+        )
+        xmr_swap = XmrSwap(
+            bid_id=bid.bid_id,
+            vkbv=ci.getNewRandomKey(),
+            pkbs=ci.getPubkey(ci.getNewRandomKey()),
+        )
+        found = {
+            "txid": secrets.token_bytes(32).hex(),
+            "height": 100,
+            "index": 1,
+            "value": amount_to,
+        }
+        lookups = []
+        ci.findTxB = lambda *args, **kwargs: lookups.pop(0)
+
+        lookups.append(found)
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 100)
+
+        lookups.append(None)
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 0)
+        lookups.append(None)
+        self.assertFalse(sc.findTxB(ci, xmr_swap, bid, None, False))
+
+        lookups.append(dict(found, height=103))
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 103)
+
+        # Replaced by an output of another amount
+        lookups.append(dict(found, value=amount_to - 1))
+        self.assertTrue(sc.findTxB(ci, xmr_swap, bid, None, False))
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 0)
+
+    def test_lock_release_waits_for_a_lock_tx_b_that_left_the_chain(self):
+        from basicswap.basicswap_util import BidStates, TxTypes
+        from basicswap.db import XmrOffer, XmrSwap
+        from basicswap.util import TemporaryError
+
+        sc = BasicSwap.__new__(BasicSwap)
+        sc.fp = None
+        sc.log = BSXLogger("test")
+        sc.logBidEvent = lambda *args, **kwargs: None
+        sc.countBidEvents = lambda *args, **kwargs: 0
+        ci = self.ci_btc()
+        ci.blocks_confirmed = 2
+        chain = {"height": 110, "found": None}
+        ci.getChainHeight = lambda: chain["height"]
+        ci.findTxB = lambda *args, **kwargs: chain["found"]
+        sc.ci = lambda coin: ci
+        sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
+        sc.SMSG_SECONDS_IN_HOUR = 60 * 60
+
+        amount_to: int = 5000000
+        lock_txid: bytes = secrets.token_bytes(32)
+        offer = Offer(
+            offer_id=secrets.token_bytes(28),
+            coin_from=int(Coins.PART),
+            coin_to=int(Coins.BTC),
+            lock_type=int(TxLockTypes.SEQUENCE_LOCK_BLOCKS),
+            addr_from="offer_addr",
+        )
+        bid = Bid(
+            bid_id=secrets.token_bytes(28),
+            offer_id=offer.offer_id,
+            amount_to=amount_to,
+            chain_b_height_start=90,
+            was_received=True,
+            bid_addr="bid_addr",
+            state=int(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED),
+        )
+        # Ten blocks deep by the stored height
+        bid.xmr_b_lock_tx = SwapTx(
+            bid_id=bid.bid_id,
+            tx_type=TxTypes.XMR_SWAP_B_LOCK,
+            txid=lock_txid,
+            vout=1,
+            chain_height=100,
+        )
+        xmr_swap = XmrSwap(
+            bid_id=bid.bid_id,
+            vkbv=ci.getNewRandomKey(),
+            pkbs=ci.getPubkey(ci.getNewRandomKey()),
+            b_lock_tx_id=lock_txid,
+            al_lock_spend_tx_esig=secrets.token_bytes(64),
+        )
+        sent = []
+        sc.getXmrBidFromSession = lambda cursor, bid_id: (bid, xmr_swap)
+        sc.getXmrOfferFromSession = lambda cursor, offer_id: (offer, XmrOffer())
+        sc.sendMessage = lambda *args, **kwargs: sent.append(args[1]) or b"msg_id"
+        sc.addMessageLink = lambda *args, **kwargs: None
+        sc.saveBidInSession = lambda *args, **kwargs: None
+
+        self.assertRaises(TemporaryError, sc.sendXmrBidLockRelease, bid.bid_id, None)
+        self.assertEqual(bid.xmr_b_lock_tx.chain_height, 0)
+
+        # Mined again, one confirmation short
+        chain["found"] = {
+            "txid": lock_txid.hex(),
+            "height": 109,
+            "index": 1,
+            "value": amount_to,
+        }
+        self.assertRaises(TemporaryError, sc.sendXmrBidLockRelease, bid.bid_id, None)
+        self.assertEqual(sent, [])
+        self.assertEqual(bid.state, int(BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED))
+
+        chain["height"] = 111
+        sc.sendXmrBidLockRelease(bid.bid_id, None)
+        self.assertEqual(sent, ["bid_addr"])
+        self.assertEqual(bid.state, int(BidStates.XMR_SWAP_LOCK_RELEASED))
+
     def test_compare_fee_rates(self):
         # compareFeeRates must accept every fee feeForVSize can produce
         ci = self.ci_btc()

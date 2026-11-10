@@ -8954,6 +8954,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             bid.xmr_b_lock_tx.chain_height = found_tx["height"]
             bid_changed = True
+        if (
+            (invalid_tx_found or found_tx is None)
+            and bid.xmr_b_lock_tx is not None
+            and bid.xmr_b_lock_tx.chain_height
+        ):
+            # A lock tx that left the chain must not keep counting as confirmed
+            self.log.warning(
+                f"Lock tx B for bid {self.log.id(bid.bid_id)} is no longer found in the {ci_to.coin_name()} chain."
+            )
+            bid.xmr_b_lock_tx.chain_height = 0
+            bid_changed = True
         return bid_changed
 
     def checkXmrBidState(self, bid_id: bytes, bid, offer):
@@ -14229,6 +14240,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     cursor,
                 )
                 return
+
+        # The release can't be undone, and lock tx B may have left the chain since it was last checked
+        ci_to = self.ci(Coins(offer.coin_from if reverse_bid else offer.coin_to))
+        was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
+        self.findTxB(ci_to, xmr_swap, bid, cursor, was_sent)
+        if (
+            bid.xmr_b_lock_tx is None
+            or not bid.xmr_b_lock_tx.chain_height
+            or ci_to.getChainHeight() - bid.xmr_b_lock_tx.chain_height
+            < ci_to.blocks_confirmed
+        ):
+            raise TemporaryError(
+                f"Lock tx B for bid {self.log.id(bid_id)} is not confirmed deeply enough to release the lock tx secret."
+            )
 
         msg_buf = XmrBidLockReleaseMessage(
             bid_msg_id=bid_id, al_lock_spend_tx_esig=xmr_swap.al_lock_spend_tx_esig
