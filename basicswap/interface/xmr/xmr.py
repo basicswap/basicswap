@@ -236,8 +236,9 @@ class XMRInterface(CoinInterface):
                     == self._cached_main_wallet_address
                 ):
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                if self.is_transient_error(e):
+                    raise
 
         self._openWallet(filename)
 
