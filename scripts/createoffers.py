@@ -918,11 +918,6 @@ def process_offers(args, config, script_state) -> None:
                     )
                     if revoke_offer(offer_id, args):
                         print("Offer revoked, will repost with accurate amount")
-                        for i, prev_offer in enumerate(prev_template_offers):
-                            if prev_offer.get("offer_id") == offer_id:
-                                del prev_template_offers[i]
-                                break
-                        write_state(args.statefile, script_state)
                         offers_found -= 1
                 elif template_fixed_remaining is not None and (
                     float(offer.get("tracking_filled_amount", 0))
@@ -977,11 +972,6 @@ def process_offers(args, config, script_state) -> None:
                     result = read_json_api(f"revokeoffer/{old_offer_id}", {})
                     if args.debug:
                         print(f"Revoke result: {result}")
-
-                    for i, prev_offer in enumerate(prev_template_offers):
-                        if prev_offer.get("offer_id") == old_offer_id:
-                            del prev_template_offers[i]
-                            break
                 except Exception as e:
                     print(f"Error revoking duplicate offer {old_offer_id}: {e}")
 
