@@ -32,7 +32,7 @@
     'Completed'
   ]);
 
-  const REFRESH_EVENTS = new Set(['new_offer', 'offer_created', 'offer_expired']);
+  const REFRESH_EVENTS = new Set(['new_offer', 'offer_created', 'offer_revoked', 'offer_expired']);
   const BID_EVENTS = new Set(['bid_changed', 'swap_completed']);
   const REFRESH_DEBOUNCE = 1500;
 
