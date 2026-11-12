@@ -978,11 +978,9 @@ def process_offers(args, config, script_state) -> None:
             offers_found = 1
 
             if newest_offer.get("offer_id") not in template_offer_ids:
-                if "offers" not in script_state:
-                    script_state["offers"] = {}
-                if offer_template["name"] not in script_state["offers"]:
-                    script_state["offers"][offer_template["name"]] = []
-                script_state["offers"][offer_template["name"]].append(
+                script_state.setdefault("offers", {}).setdefault(
+                    offer_template["id"], []
+                ).append(
                     {"offer_id": newest_offer["offer_id"], "time": int(time.time())}
                 )
                 write_state(args.statefile, script_state)
