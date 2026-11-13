@@ -570,12 +570,14 @@ class BaseApp(DBMethods):
             )
         )
 
-    def torControl(self, query):
+    def torControl(self, query, log_errors: bool = True):
         try:
             command = 'AUTHENTICATE "{}"\r\n{}\r\nQUIT\r\n'.format(
                 self.tor_control_password, query
             ).encode("utf-8")
-            c = socket.create_connection((self.tor_proxy_host, self.tor_control_port))
+            c = socket.create_connection(
+                (self.tor_proxy_host, self.tor_control_port), timeout=10
+            )
             c.send(command)
             response = bytearray()
             while True:
@@ -586,7 +588,8 @@ class BaseApp(DBMethods):
             c.close()
             return response
         except Exception as e:
-            self.log.error(f"torControl {e}")
+            if log_errors:
+                self.log.error(f"torControl {e}")
             return
 
     def getTime(self) -> int:
