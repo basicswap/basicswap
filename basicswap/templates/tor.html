@@ -1,4 +1,6 @@
 {% include 'header.html' %}
+<script src="/static/js/libs/qrcode.js"></script>
+<script src="/static/js/modules/qrcode-manager.js?v={{ static_v }}"></script>
 {% from 'style.html' import circular_arrows_svg %}
 {% from 'macros.html' import breadcrumb %}
 <div class="container mx-auto">
@@ -83,6 +85,113 @@
           </tr>
          </table>
         </div>
+       </div>
+      </div>
+      <div class="mt-5 pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+       <div class="px-6">
+        <h3 class="mb-6 text-lg font-semibold text-gray-900 dark:text-white">Onion address</h3>
+       {% if not use_tor_proxy %}
+        <p class="text-sm text-gray-700 dark:text-gray-300">An onion address needs Tor mode on.</p>
+       {% else %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         <div class="space-y-6">
+          <p class="text-sm text-gray-700 dark:text-gray-300">Reaches this node's web UI, API, and WebSocket ports over Tor from anywhere, with no port forwarding.</p>
+          <form method="post">
+           <input type="hidden" name="set_onion_require_auth" value="1">
+           <label class="inline-flex items-center cursor-pointer">
+            <input type="checkbox" name="onion_require_auth" value="1" class="sr-only peer" onchange="this.form.submit()"{% if data.require_auth %} checked{% endif %}>
+            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+            <span class="ml-3 text-sm font-medium text-gray-900 dark:text-white">Require a key for each client</span>
+           </label>
+           <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ 'Only clients holding a key can reach the address. Use a separate key per client.' if data.require_auth else 'Anyone with the address can reach it. The web UI and API still ask for the client password, but the WebSocket has none.' }}</p>
+           <input type="hidden" name="formid" value="{{ form_id }}">
+          </form>
+        {% if data.onion_uri %}
+         {% if data.require_auth %}
+          <div>
+           <label for="client_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Clients</label>
+          {% if data.clients %}
+           <ul class="space-y-2 mb-2">
+           {% for client in data.clients %}
+            <li class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2">
+             <span class="grow min-w-0 truncate text-sm text-gray-900 dark:text-white">{{ client.name }}</span>
+             <form method="post" class="shrink-0">
+              <button type="submit" name="remove_onion_client" value="{{ client.key }}" data-name="{{ client.name }}" onclick="return confirm('Remove ' + this.dataset.name + '? It will no longer reach this address.')" title="Remove client" aria-label="Remove client" class="inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+              <input type="hidden" name="formid" value="{{ form_id }}">
+             </form>
+            </li>
+           {% endfor %}
+           </ul>
+          {% else %}
+           <p class="text-xs text-gray-400 dark:text-gray-500 italic mb-2">No clients yet. None can reach the address until you add one.</p>
+          {% endif %}
+           <form method="post" class="flex gap-2">
+            <input type="text" id="client_name" name="client_name" placeholder="Name, such as Pixel" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none">
+            <button type="submit" name="add_onion_client" value="1" class="whitespace-nowrap px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Add</button>
+            <input type="hidden" name="formid" value="{{ form_id }}">
+           </form>
+          </div>
+         {% endif %}
+        {% elif not data.require_auth and not data.has_password %}
+          <p class="text-sm text-gray-700 dark:text-gray-300">Set a client password first: without a key, anyone with the address reaches this node.</p>
+        {% else %}
+          <form method="post">
+          {% if data.require_auth %}
+           <label for="client_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">First client</label>
+          {% endif %}
+           <div class="flex gap-2">
+          {% if data.require_auth %}
+            <input type="text" id="client_name" name="client_name" placeholder="Name, such as Pixel" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0">
+          {% endif %}
+            <button type="submit" name="add_onion" value="1" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg whitespace-nowrap transition-colors focus:outline-none">Create the address</button>
+           </div>
+           <input type="hidden" name="formid" value="{{ form_id }}">
+          </form>
+        {% endif %}
+         </div>
+         <div class="space-y-6">
+          <div class="bg-gray-50 dark:bg-gray-600 rounded-lg p-6">
+        {% if data.new_client %}
+           <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Code for {{ data.new_client.name }}</h3>
+           <div class="mb-4 flex justify-center">
+            <div class="p-3 bg-white rounded-md">
+             <div id="qrcode-onion-client" class="qrcode" data-qrcode data-address="{{ data.new_client.uri }}"></div>
+            </div>
+           </div>
+           <p class="mt-2 mb-4 text-xs font-mono break-all text-center text-gray-700 dark:text-gray-300">{{ data.onion_url }}</p>
+           <p class="mb-4 text-sm text-gray-700 dark:text-gray-300">Scan it now: the key is shown only here and is not kept on this node. If it is lost, add the client again.</p>
+           <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Key, for Tor Browser</span>
+           <p class="mb-4 text-xs font-mono break-all text-gray-700 dark:text-gray-300">{{ data.new_client.key }}</p>
+           <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Line for a Tor client's ClientOnionAuthDir, in a file ending .auth_private</span>
+           <p class="text-xs font-mono break-all text-gray-700 dark:text-gray-300">{{ data.new_client.auth_private }}</p>
+        {% elif data.onion_uri and not data.require_auth %}
+           <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Code for this address</h3>
+          {% if not data.has_password %}
+           <p class="mb-4 text-sm text-red-600 dark:text-red-400">Not published: set a client password, or require a key for each client.</p>
+          {% endif %}
+           <div class="flex justify-center">
+            <div class="p-3 bg-white rounded-md">
+             <div id="qrcode-onion" class="qrcode" data-qrcode data-address="{{ data.onion_uri }}"></div>
+            </div>
+           </div>
+           <p class="mt-2 text-xs font-mono break-all text-center text-gray-700 dark:text-gray-300">{{ data.onion_url }}</p>
+        {% else %}
+           <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Client code</h3>
+           <p class="text-sm text-gray-700 dark:text-gray-300">{{ 'Add a client to show its code here. Each code is shown once.' if data.onion_uri else 'Create the address to show a code here.' }}</p>
+           {% if data.onion_uri %}
+           <p class="mt-4 text-xs font-mono break-all text-center text-gray-700 dark:text-gray-300">{{ data.onion_url }}</p>
+           {% endif %}
+        {% endif %}
+        {% if data.onion_uri %}
+           <form method="post" class="mt-6 flex justify-center">
+            <button type="submit" name="remove_onion" value="1" class="bg-red-500 hover:bg-red-600 text-white font-medium py-2.5 px-6 rounded-lg transition-colors focus:outline-none">Forget this address</button>
+            <input type="hidden" name="formid" value="{{ form_id }}">
+           </form>
+        {% endif %}
+          </div>
+         </div>
+        </div>
+       {% endif %}
        </div>
       </div>
      </div>
