@@ -199,6 +199,7 @@ jobs:
               pytest tests/basicswap/test_other.py
               pytest tests/basicswap/test_amm_config_api.py
               pytest tests/basicswap/test_prepare_simplex.py
+              pytest tests/basicswap/test_prepare_divi.py
               pytest tests/basicswap/test_bidplanner.py
               pytest tests/basicswap/test_multibid.py
               pytest tests/basicswap/test_batch_lock.py
