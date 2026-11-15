@@ -406,6 +406,12 @@ class XMRInterface(CoinInterface):
         self._chain_synced_until = time.monotonic() + CHAIN_SYNCED_CACHE_SECONDS
         return True
 
+    def ensureWalletSynced(self) -> None:
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            if not self.isChainSynced():
+                raise TemporaryError(f"{self.coin_name()} wallet is syncing")
+
     def getWalletInfo(self):
         with self._mx_wallet:
             try:
