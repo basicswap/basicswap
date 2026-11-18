@@ -32,6 +32,7 @@ from . import __version__, GUI_VERSION, AMM_VERSION
 from . import config as cfg
 from .util import (
     BalanceError,
+    TemporaryError,
     LockedCoinError,
     dumpj,
     format_timestamp,
@@ -1185,7 +1186,7 @@ class HttpHandler(BaseHTTPRequestHandler):
                     swap_client.log.warning(clean_msg)
                     response = js_error(self, clean_msg)
                 else:
-                    if isinstance(ex, BalanceError):
+                    if isinstance(ex, (BalanceError, TemporaryError)):
                         # Suppress traceback
                         method: str = url_split[2] if len(url_split) > 2 else "unknown"
                         swap_client.log.error(f"js method: {method} failed - {ex}")
