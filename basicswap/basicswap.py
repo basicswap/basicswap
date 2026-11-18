@@ -1872,12 +1872,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if self.coin_clients[c]["connection_type"] not in ("rpc", "electrum"):
                 continue
             if c in self.xmr_based_coins:
-                continue  # TODO
+                ci.ensureWalletSynced()
+                continue
             if self.coin_clients[c]["connection_type"] == "electrum":
                 continue
             synced = round(ci.getBlockchainInfo()["verificationprogress"], 3)
             if synced < 1.0:
-                raise ValueError(
+                raise TemporaryError(
                     f"{ci.coin_name()} chain is still syncing, currently at {synced}."
                 )
 
@@ -6363,6 +6364,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
             budget_amount: int = bid.amount_to if reverse_bid else bid.amount
             if not funds_committed:
+                self.checkCoinsReady(offer.coin_from, offer.coin_to)
                 validate_offer_budget(
                     self,
                     offer,
@@ -7292,6 +7294,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             budget_amount: int = bid.amount_to if reverse_bid else bid.amount
+            self.checkCoinsReady(offer.coin_from, offer.coin_to)
             validate_offer_budget(
                 self,
                 offer,
@@ -7686,6 +7689,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.sendADSBidIntentAccept(bid, xmr_swap, offer, ci_to, use_cursor)
                 return
 
+            self.checkCoinsReady(offer.coin_from, offer.coin_to)
             validate_offer_budget(
                 self,
                 offer,
@@ -12539,6 +12543,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 KnownIdentity, use_cursor, {"address": bid.bid_addr}
             )
             self.evaluateKnownIdentityForAutoAccept(strategy, identity_stats)
+
+            try:
+                self.checkCoinsReady(offer.coin_from, offer.coin_to)
+            except Exception as e:
+                raise AutomationConstraintTemporary(str(e))
 
             # Ensure the coin from wallet has sufficient balance for multiple bids
             ci_from = self.ci(offer.coin_from)
