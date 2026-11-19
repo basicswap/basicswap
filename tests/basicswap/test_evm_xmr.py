@@ -5,7 +5,8 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-EVM<->XMR driver: both sides of a swap against SwapCreator on anvil.
+EVM<->XMR driver: both sides of a swap against SwapCreator on anvil, then
+against SwapFactory.
 
 Each side runs checkEvmXmrBidState and its queued actions on its own store;
 the lock message passes between them. Keys and DLEAGs are real; the Monero
@@ -25,6 +26,7 @@ from types import SimpleNamespace
 from coincurve import PublicKey
 from eth_account import Account
 from web3 import Web3
+from web3.exceptions import TimeExhausted
 
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
@@ -33,10 +35,11 @@ from basicswap.basicswap_util import ActionTypes, BidStates, MessageTypes, SwapT
 from basicswap.db import Bid, EvmXmrSwap, Offer
 from basicswap.interface.evm import keys as evmkeys
 from basicswap.interface.evm.rpc import EthRpcClient
-from basicswap.interface.evm.swapcreator import SwapCreator
+from basicswap.interface.evm.swapfactory import SwapFactory
 from basicswap.interface.xmr.xmr import XMRInterface
 from basicswap.messages_npb import EvmXmrLockMessage
 import basicswap.protocols.evm_xmr_swap_1 as ethdrv
+from basicswap.util import TemporaryError
 from tests.basicswap.util.anvil import (
     Anvil,
     KEY_0,
@@ -260,10 +263,11 @@ def lockMsg(payload_hex: str) -> dict:
 class EvmXmrDriverTest(unittest.TestCase):
     ETH_AMOUNT = 20 * ETH_COIN
     XMR_PICO = 500_000_000_000
+    DESIGN = "swapcreator"
 
     @classmethod
     def setUpClass(cls):
-        cls.anvil = Anvil(ANVIL_PORT)
+        cls.anvil = Anvil(ANVIL_PORT, cls.DESIGN)
 
     @classmethod
     def tearDownClass(cls):
@@ -369,19 +373,43 @@ class EvmXmrDriverTest(unittest.TestCase):
             nonce=ethdrv._nonce(bid.bid_id),
         )
         params.update(override)
-        receipt = ci.sendTx(
-            lambda tx_nonce: contract.sign_new_swap(
-                ci.account, **params, tx_nonce=tx_nonce
-            ),
-            "lock",
-        )
-        _, t1, t2, t3 = contract.new_swap_event(receipt)
+        if isinstance(contract, SwapFactory):
+            start: int = ci.rpc.get_block_time()
+            t1 = start + params["duration1"]
+            t2 = t1 + params["duration2"]
+            t3 = t2 + params["duration3"]
+            swap = contract.make_swap(
+                evm_swap.evm_addr,
+                params["claimer"],
+                params["claim_commitment"],
+                params["refund_commitment"],
+                t1,
+                t2,
+                t3,
+                params["value"],
+                params["nonce"],
+            )
+            receipt = ci.sendTx(
+                lambda tx_nonce: contract.sign_lock(
+                    ci.account, swap, start + LOCK_WAIT, tx_nonce
+                ),
+                "lock",
+            )
+        else:
+            receipt = ci.sendTx(
+                lambda tx_nonce: contract.sign_new_swap(
+                    ci.account, **params, tx_nonce=tx_nonce
+                ),
+                "lock",
+            )
+            _, t1, t2, t3 = contract.new_swap_event(receipt)
+            start = t1 - params["duration1"]
         m = EvmXmrLockMessage()
         m.bid_msg_id = bid.bid_id
         m.owner = evm_swap.evm_addr
         m.timeout1, m.timeout2, m.timeout3 = t1, t2, t3
         m.lock_tx_id = bytes(receipt["transactionHash"])
-        m.xmr_lock_deadline = t1 - params["duration1"] + LOCK_WAIT
+        m.xmr_lock_deadline = start + LOCK_WAIT
         payload_hex = "{:02x}".format(MessageTypes.EVM_XMR_LOCK) + m.to_bytes().hex()
         ethdrv.processEvmXmrLock(xmr, lockMsg(payload_hex))
 
@@ -535,7 +563,8 @@ class EvmXmrDriverTest(unittest.TestCase):
 
     def test_14_evm_lock_on_another_contract(self):
         evm, xmr, ledger = self._pair()
-        other = SwapCreator(evm._eth.rpc, self.anvil._deploy(Account.from_key(KEY_0)))
+        design = type(ethdrv._contract(evm, evm._store[EvmXmrSwap]))
+        other = design(evm._eth.rpc, self.anvil._deploy(Account.from_key(KEY_0)))
         self._hostile_lock(evm, xmr, contract=other)
         bid = xmr._store[Bid]
         ethdrv.checkEvmXmrBidState(xmr, bid.bid_id, bid, xmr._store[Offer])
@@ -646,6 +675,40 @@ class EvmXmrDriverTest(unittest.TestCase):
         )
         self.assertEqual(xmr.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
         self.assertEqual(len(ledger.locks), 1)
+
+
+class EvmXmrFactoryDriverTest(EvmXmrDriverTest):
+    DESIGN = "swapfactory"
+
+    def test_16_lock_reverts_past_its_deadline(self):
+        evm, xmr, ledger = self._pair()
+        bid_id = evm._store[Bid].bid_id
+        provider = self.anvil.w3.provider
+        wait_receipt = EthRpcClient.wait_receipt
+
+        def unmined(rpc, tx_hash, *args, **kwargs):
+            raise TimeExhausted()
+
+        provider.make_request("evm_setAutomine", [False])
+        EthRpcClient.wait_receipt = unmined
+        try:
+            balance = evm._eth.getSpendableBalance()
+            with self.assertRaisesRegex(TemporaryError, "not mined yet"):
+                ethdrv.sendEvmLock(evm, bid_id, None)
+            lock = evm._eth.signedHandle(bid_id, "lock")
+            self.anvil.warp(LOCK_WAIT + 10)
+        finally:
+            EthRpcClient.wait_receipt = wait_receipt
+            provider.make_request("evm_setAutomine", [True])
+        self.assertEqual(evm._eth.receiptFor(lock)["status"], 0)
+        ethdrv.sendEvmLock(evm, bid_id, None)
+        self.assertEqual(
+            BidStates(evm._store[Bid].state),
+            BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
+        )
+        self.assertEqual(evm._eth.signedHandle(bid_id, "lock"), lock)
+        self.assertGreater(evm._eth.getSpendableBalance(), balance - ETH_COIN)
+        self.assertEqual(evm.sent, [])
 
 
 class EvmClaimWindowTest(unittest.TestCase):

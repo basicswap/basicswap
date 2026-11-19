@@ -26,6 +26,7 @@ import basicswap.config as cfg
 from basicswap.db import DBMethods, create_db
 from basicswap.interface.eth.eth import ETHInterface
 from basicswap.interface.evm import swapcreator
+from basicswap.interface.evm.swapfactory import SwapFactory
 
 # anvil deterministic accounts (mnemonic: test test ... junk)
 KEY_0 = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
@@ -37,9 +38,19 @@ ANVIL_BIN = os.path.join(
 )
 REQUIREMENTS_MET = os.path.exists(ANVIL_BIN)
 SKIP_REASON = f"requires Foundry anvil ({ANVIL_BIN})"
-BYTECODE_PATH = os.path.join(
-    os.path.dirname(swapcreator.__file__), "swapcreator_bytecode.hex"
-)
+
+
+def load_bytecode(design: str) -> str:
+    path = os.path.join(os.path.dirname(swapcreator.__file__), f"{design}_bytecode.hex")
+    with open(path) as fp:
+        return fp.read().strip()
+
+
+class FactoryETHInterface(ETHInterface):
+    SWAP_CONTRACT = SwapFactory
+
+
+INTERFACES = {"swapcreator": ETHInterface, "swapfactory": FactoryETHInterface}
 
 
 class WalletDB(DBMethods):
@@ -61,8 +72,9 @@ class WalletDB(DBMethods):
 
 
 class Anvil:
-    def __init__(self, port: int):
+    def __init__(self, port: int, design: str = "swapcreator"):
         self.port = port
+        self.design = design
         self._db_dir = tempfile.mkdtemp(prefix="bsx-evm-")
         self.proc = subprocess.Popen(
             [ANVIL_BIN, "--port", str(port)],
@@ -87,9 +99,10 @@ class Anvil:
 
     def _deploy(self, owner) -> str:
         w3 = self.w3
-        with open(BYTECODE_PATH) as fp:
-            bytecode = fp.read().strip()
-        C = w3.eth.contract(abi=swapcreator.load_abi(), bytecode=bytecode)
+        C = w3.eth.contract(
+            abi=swapcreator.load_abi(self.design),
+            bytecode=load_bytecode(self.design),
+        )
         tx = C.constructor().build_transaction(
             {
                 "from": owner.address,
@@ -116,7 +129,7 @@ class Anvil:
             "contract_address": self.contract_address,
         }
         db = WalletDB(tempfile.mktemp(suffix=".sqlite", dir=self._db_dir))
-        ci = ETHInterface(cs, "regtest", swap_client=db)
+        ci = INTERFACES[self.design](cs, "regtest", swap_client=db)
         ci.setActiveAccount(key)
         return ci
 
