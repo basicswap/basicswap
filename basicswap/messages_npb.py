@@ -144,6 +144,7 @@ class OfferMessage(NonProtobufClass):
         19: ("proof_utxos", NPBW_BYTES, 0),
         20: ("auto_accept_type", NPBW_INT, 0),
         21: ("message_nets", NPBW_BYTES, NPBF_STR),
+        22: ("contract_address", NPBW_BYTES, NPBF_STR),  # EVM_XMR_SWAP only
     }
 
 
@@ -275,6 +276,51 @@ class ADSBidIntentAcceptMessage(NonProtobufClass):
         3: ("kbvf", NPBW_BYTES, 0),
         4: ("kbsf_dleag", NPBW_BYTES, 0),
         5: ("dest_af", NPBW_BYTES, 0),
+    }
+
+
+class EvmXmrBidMessage(NonProtobufClass):
+    # EVM_XMR_SWAP, bidder -> offerer; the rest of the DLEAG follows as XmrSplitMessages.
+    _map = {
+        1: ("protocol_version", NPBW_INT, 0),
+        2: ("offer_msg_id", NPBW_BYTES, 0),
+        3: ("time_valid", NPBW_INT, 0),
+        4: ("amount", NPBW_INT, 0),
+        5: ("amount_to", NPBW_INT, 0),
+        6: ("claimer_addr", NPBW_BYTES, NPBF_STR),  # XMR side only
+        7: ("kbv", NPBW_BYTES, 0),
+        8: ("kbs_dleag", NPBW_BYTES, 0),
+        9: ("message_nets", NPBW_BYTES, NPBF_STR),
+        10: ("gas_request", NPBW_INT, 0),  # XMR side only, wei
+    }
+
+
+class EvmXmrBidAcceptMessage(NonProtobufClass):
+    # EVM_XMR_SWAP, offerer -> bidder; the rest of the DLEAG follows as XmrSplitMessages.
+    _map = {
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("claimer_addr", NPBW_BYTES, NPBF_STR),  # XMR side only
+        3: ("kbv", NPBW_BYTES, 0),
+        4: ("kbs_dleag", NPBW_BYTES, 0),
+        5: ("contract_address", NPBW_BYTES, NPBF_STR),
+        6: ("gas_request", NPBW_INT, 0),  # XMR side only, wei
+    }
+
+
+class EvmXmrLockMessage(NonProtobufClass):
+    # EVM_XMR_SWAP, EVM side -> XMR side, after newSwap: the Swap fields the XMR side can't derive.
+    _map = {
+        1: ("bid_msg_id", NPBW_BYTES, 0),
+        2: ("owner", NPBW_BYTES, NPBF_STR),
+        3: ("timeout1", NPBW_INT, 0),
+        4: ("timeout2", NPBW_INT, 0),
+        5: ("timeout3", NPBW_INT, 0),
+        6: ("lock_tx_id", NPBW_BYTES, 0),
+        7: (
+            "xmr_lock_deadline",
+            NPBW_INT,
+            0,
+        ),  # EVM side refunds if no XMR lock is mined by then
     }
 
 

@@ -571,6 +571,15 @@ class XMRInterface(CoinInterface):
                     return tx_hash, paid
         return None
 
+    def findPendingBLockTx(self, kbv: bytes, Kbs: bytes):
+        """Txid of a send from our wallet to the joint address, mined or not."""
+        with self._mx_wallet:
+            self.openWallet(self._wallet_filename)
+            in_flight = self.findPendingLockTx(
+                {self.encodeSharedAddress(self.getPubkey(kbv), Kbs)}
+            )
+        return None if in_flight is None else in_flight[0]
+
     def publishBLockTx(
         self,
         kbv: bytes,

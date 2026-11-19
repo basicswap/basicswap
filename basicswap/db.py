@@ -12,7 +12,7 @@ import time
 from contextlib import contextmanager
 from enum import IntEnum, auto
 
-CURRENT_DB_VERSION = 42
+CURRENT_DB_VERSION = 43
 CURRENT_DB_DATA_VERSION = 11
 
 
@@ -510,6 +510,89 @@ class XmrSwap(Table):
             return 16000, 17000
         msg_split_info = self.msg_split_info.split(":")
         return int(msg_split_info[0]), int(msg_split_info[1])
+
+
+class EvmXmrSwap(Table):
+    # Per-bid state for EVM_XMR_SWAP (SwapCreator contract escrow). Keys are
+    # 32-byte keys valid on both curves, as in adaptor-sig swaps; the evm_*
+    # half is the EVM side's (leader), xmr_* the XMR side's (follower).
+    __tablename__ = "evm_xmr_swaps"
+
+    swap_id = Column("integer", primary_key=True, autoincrement=True)
+    bid_id = Column("blob")
+    contract_address = Column("string")
+    evm_coin = Column("integer")
+    contract_count = Column("integer")
+
+    evm_addr = Column("string")  # Swap owner
+    xmr_side_addr = Column("string")  # Swap claimer
+
+    evm_kbv = Column("blob")
+    evm_kbs = Column("blob")  # ours, or revealed by refund
+    evm_pkbs = Column("blob")
+    evm_pkas = Column("blob")  # secp256k1 point of evm_kbs, from its DLEAG
+
+    xmr_kbv = Column("blob")
+    xmr_kbs = Column("blob")  # ours, or revealed by claim
+    xmr_pkbs = Column("blob")
+    xmr_pkas = Column("blob")
+
+    peer_dleag = Column("blob")
+    msg_split_info = Column("string")
+    split_parent_msg_id = Column("blob")
+
+    timeout1 = Column("integer")
+    timeout2 = Column("integer")
+    timeout3 = Column("integer")
+    xmr_lock_deadline = Column(
+        "integer"
+    )  # the EVM side refunds if no XMR lock is mined by then
+
+    gas_request = Column("integer")  # wei the XMR side asked the EVM side for
+    gas_drip_txid = Column("blob")  # set once the drip is mined
+
+    evm_lock_tx_id = Column("blob")  # set once the lock is mined
+    evm_spend_tx_id = Column("blob")
+    evm_refund_tx_id = Column("blob")
+    b_lock_tx_id = Column("blob")
+
+    getMsgSplitInfo = XmrSwap.getMsgSplitInfo
+
+
+class EvmSignedTx(Table):
+    # Every tx the account signs, saved before broadcasting, so a stuck one
+    # can be re-signed at its nonce; versions of one tx share its handle
+    __tablename__ = "evm_signed_txs"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    coin_type = Column("integer")
+    address = Column("string")
+    nonce = Column("integer")
+    handle = Column("blob")  # txid of the first version
+    txid = Column("blob")
+    raw = Column("blob")
+    kind = Column("string")
+    bid_id = Column("blob")
+    bump_at = Column("integer")  # chain time from which to bump; None never
+    state = Column("integer")  # EvmTxStates: pending, mined or dropped
+    created_at = Column("integer")
+
+
+class EvmWalletTx(Table):
+    # EVM JSON-RPC has no address history, so the wallet keeps its own
+    __tablename__ = "evm_wallet_txs"
+
+    record_id = Column("integer", primary_key=True, autoincrement=True)
+    coin_type = Column("integer")
+    txid = Column("blob")
+    kind = Column("string")
+    amount = Column("integer")  # coin units, negative when sent
+    fee = Column("integer")
+    address = Column("string")  # our account's address
+    to_addr = Column("string")
+    bid_id = Column("blob")
+    block_height = Column("integer")
+    created_at = Column("integer")
 
 
 class XmrSplitData(Table):
