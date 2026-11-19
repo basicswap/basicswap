@@ -35,9 +35,12 @@ from web3.exceptions import ProviderConnectionError, Web3RPCError
 from basicswap.db import EvmSignedTx, EvmWalletTx
 from basicswap.interface.base import CoinInterface, Curves
 from basicswap.interface.evm.rpc import EthRpcClient, EthRpcError
-from basicswap.interface.evm.swapcreator import SwapCreator
+from basicswap.interface.evm.swapcreator import SwapContract, SwapCreator
+from basicswap.interface.evm.swapfactory import SwapFactory
 from basicswap.util import TemporaryError
 from basicswap.util.network import is_private_ip_address
+
+CONTRACT_DESIGNS = {"swapcreator": SwapCreator, "swapfactory": SwapFactory}
 
 
 class EvmTxStates(IntEnum):
@@ -220,19 +223,22 @@ class EVMInterface(CoinInterface):
             and address.lower() == self._contract_address.lower()
         )
 
-    def getContract(self, address=None) -> SwapCreator:
-        address = address or self.getContractAddress()
-        if (
-            self._contract is None
-            or self._contract.address.lower() != str(address).lower()
-        ):
-            contract = SwapCreator(self.rpc, address)
+    def getContract(self, address=None) -> SwapContract:
+        """The contract at address, as the design its code hash is pinned to;
+        unpinned, as SWAP_CONTRACT."""
+        address = Web3.to_checksum_address(address or self.getContractAddress())
+        if self._contract is None or self._contract.address != address:
             code_hashes = self._deployment.get("code_hashes")
-            if code_hashes is not None and contract.code_hash() not in code_hashes:
-                raise ValueError(f"No SwapCreator at {contract.address}")
+            design = self.SWAP_CONTRACT
+            if code_hashes is not None:
+                code_hash: str = Web3.keccak(self.rpc.w3.eth.get_code(address)).hex()
+                if code_hash not in code_hashes:
+                    raise ValueError(f"No known swap contract at {address}")
+                design = CONTRACT_DESIGNS[code_hashes[code_hash]]
+            contract = design(self.rpc, address)
             if not contract.verifies_secrets():
                 raise ValueError(
-                    f"SwapCreator at {contract.address} fails its secret check"
+                    f"{design.__name__} at {address} fails its secret check"
                 )
             self._contract = contract
         return self._contract
@@ -470,15 +476,12 @@ class EVMInterface(CoinInterface):
     RECEIPT_WAIT = 1
     # Gas used by a plain value transfer (the withdraw path).
     WITHDRAW_GAS = 21000
-    # Gas swap txs are sent with; chains that bill L1 data in gas need more
-    CLAIM_GAS = 75000
-    LOCK_GAS = 60000
-    READY_GAS = 40000
+    # Design of the swaps this coin starts; gas constants come from it
+    SWAP_CONTRACT = SwapCreator
     # The gas drip covers a claim at this multiple of the gas price
     DRIP_GAS_PRICE_MULTIPLE = 2
     # Kept per open swap so its refund can be sent and bumped through a spike,
     # priced at the higher of this multiple of the gas price and the fee cap
-    REFUND_GAS = 75000
     REFUND_RESERVE_PRICE_MULTIPLE = 4
     # Highest maxFeePerGas to sign, in wei; None for no cap
     MAX_FEE_PER_GAS = None
@@ -518,7 +521,7 @@ class EVMInterface(CoinInterface):
         """Wei the gas drip sends for one claim."""
         if gas_price is None:
             gas_price = self.rpc.gas_price()
-        return self.CLAIM_GAS * gas_price * self.DRIP_GAS_PRICE_MULTIPLE
+        return self.SWAP_CONTRACT.CLAIM_GAS * gas_price * self.DRIP_GAS_PRICE_MULTIPLE
 
     def refundReserve(self, gas_price: int = None) -> int:
         """Coin units kept back per open swap where we're the EVM side."""
@@ -528,11 +531,13 @@ class EVMInterface(CoinInterface):
             gas_price * self.REFUND_RESERVE_PRICE_MULTIPLE,
             self.MAX_FEE_PER_GAS or 0,
         )
-        return self.fromWei(self.REFUND_GAS * price, round_up=True)
+        return self.fromWei(self.SWAP_CONTRACT.REFUND_GAS * price, round_up=True)
 
     def estClaimFee(self) -> int:
         """Fee to claim a swap's escrow, in coin units."""
-        return self.fromWei(self.CLAIM_GAS * self.rpc.gas_price(), round_up=True)
+        return self.fromWei(
+            self.SWAP_CONTRACT.CLAIM_GAS * self.rpc.gas_price(), round_up=True
+        )
 
     def estSwapFee(
         self,
@@ -545,7 +550,9 @@ class EVMInterface(CoinInterface):
         drip; each flag set False leaves out a part already paid."""
         if gas_price is None:
             gas_price = self.rpc.gas_price()
-        gas: int = (self.LOCK_GAS if lock else 0) + (self.READY_GAS if ready else 0)
+        gas: int = (self.SWAP_CONTRACT.LOCK_GAS if lock else 0) + (
+            self.SWAP_CONTRACT.READY_GAS if ready else 0
+        )
         wei: int = gas * gas_price
         if drip:
             wei += self.WITHDRAW_GAS * gas_price + self.dripGasCost(gas_price)
@@ -620,6 +627,42 @@ class EVMInterface(CoinInterface):
         for row in self._signedTxs(cursor, state=EvmTxStates.PENDING):
             nonce = max(nonce, row.nonce + 1)
         return nonce
+
+    def signedHandle(self, bid_id: bytes, kind: str):
+        """Handle of the last tx signed for bid_id and kind, or None."""
+        sc = self._swap_client
+        cursor = sc.openDB()
+        try:
+            rows = self._signedTxs(cursor, bid_id=bid_id, kind=kind)
+            return rows[-1].handle if rows else None
+        finally:
+            sc.closeDB(cursor, commit=False)
+
+    def nonceTaken(self, handle: bytes, block="latest") -> bool:
+        """Whether a tx is mined by block at the nonce of the tx handle names,
+        ours or not."""
+        sc = self._swap_client
+        cursor = sc.openDB()
+        try:
+            nonce: int = self._signedTxs(cursor, handle=handle)[0].nonce
+            return self.rpc.get_transaction_count(self.account.address, block) > nonce
+        finally:
+            sc.closeDB(cursor, commit=False)
+
+    def nonceSpentElsewhere(self, handle: bytes) -> bool:
+        """Whether another tx we signed is mined at the nonce of the tx handle
+        names, so that one never will be."""
+        sc = self._swap_client
+        cursor = sc.openDB()
+        try:
+            nonce: int = self._signedTxs(cursor, handle=handle)[0].nonce
+            return any(
+                self.rpc.get_receipt(row.txid) is not None
+                for row in self._signedTxs(cursor, nonce=nonce)
+                if row.handle != handle
+            )
+        finally:
+            sc.closeDB(cursor, commit=False)
 
     def receiptFor(self, handle: bytes):
         """Receipt of whichever version of the tx handle names was mined, or None."""
