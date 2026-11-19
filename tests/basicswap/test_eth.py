@@ -29,7 +29,6 @@ from basicswap.interface.eth.eth import ETHInterface
 from basicswap.interface.evm import keys as evmkeys
 from basicswap.util import TemporaryError
 from basicswap.util.ecc import ep, getSecretBytes
-from basicswap.interface.evm.swapcreator import make_swap, swap_id
 from basicswap.interface.evm.base import nodesWithSelected, validateRpcUrl
 from basicswap.interface.evm.rpc import EthRpcClient, WrongChainError
 from basicswap.protocols.evm_xmr_swap_1 import evmAddressInOpenSwaps
@@ -104,7 +103,7 @@ class EthSettlementTest(unittest.TestCase):
             "lock",
         )
         sid, t1, t2, t3 = contract.new_swap_event(receipt)
-        swap = make_swap(
+        swap = contract.make_swap(
             owner.account.address,
             claimer.account.address,
             _commitment(claim_secret),
@@ -115,10 +114,10 @@ class EthSettlementTest(unittest.TestCase):
             self.VALUE,
             nonce,
         )
-        self.assertEqual(sid, swap_id(swap))
+        self.assertEqual(sid, contract.swap_id(swap))
         self.assertEqual((t2 - t1, t3 - t2), (DURATION, DURATION))
-        self.assertEqual(contract.stage(sid), "PENDING")
-        return swap, sid
+        self.assertEqual(contract.stage(swap), "PENDING")
+        return swap
 
     def test_01_wallet_and_chain(self):
         ci = self.anvil.iface(KEY_0)
@@ -157,14 +156,14 @@ class EthSettlementTest(unittest.TestCase):
         owner = self.anvil.iface(KEY_0)
         claimer = self.anvil.iface(KEY_1)
         claim_secret, refund_secret = _secret(), _secret()
-        swap, sid = self._new_swap(owner, claimer, claim_secret, refund_secret)
+        swap = self._new_swap(owner, claimer, claim_secret, refund_secret)
 
         _ready(owner, swap)
-        self.assertEqual(owner.getContract().stage(sid), "READY")
+        self.assertEqual(owner.getContract().stage(swap), "READY")
 
         balance_before = claimer.getSpendableBalance()
         _claim(claimer, swap, claim_secret)
-        self.assertEqual(owner.getContract().stage(sid), "COMPLETED")
+        self.assertEqual(owner.getContract().stage(swap), "COMPLETED")
         self.assertGreater(claimer.getSpendableBalance(), balance_before)
         self.assertEqual(
             owner.getContract().completion(swap),
@@ -175,7 +174,7 @@ class EthSettlementTest(unittest.TestCase):
         owner = self.anvil.iface(KEY_0)
         claimer = self.anvil.iface(KEY_1)
         claim_secret, refund_secret = _secret(), _secret()
-        swap, sid = self._new_swap(owner, claimer, claim_secret, refund_secret)
+        swap = self._new_swap(owner, claimer, claim_secret, refund_secret)
 
         with self.assertRaises(Exception):
             _refund(owner, swap, claim_secret)
@@ -189,7 +188,7 @@ class EthSettlementTest(unittest.TestCase):
         owner = self.anvil.iface(KEY_0)
         claimer = self.anvil.iface(KEY_1)
         claim_secret, refund_secret = _secret(small=True), _secret()
-        swap, sid = self._new_swap(owner, claimer, claim_secret, refund_secret)
+        swap = self._new_swap(owner, claimer, claim_secret, refund_secret)
         unreduced = (int.from_bytes(claim_secret, "big") + ep.o).to_bytes(32, "big")
         self.anvil.warp(DURATION + 1)
         with self.assertRaises(Exception):
@@ -205,16 +204,16 @@ class EthSettlementTest(unittest.TestCase):
         claimer = self.anvil.iface(KEY_1)
 
         claim_secret = _secret()
-        swap, sid = self._new_swap(owner, claimer, claim_secret, _secret())
+        swap = self._new_swap(owner, claimer, claim_secret, _secret())
         refund_secret = _secret()
-        swap_b, sid_b = self._new_swap(owner, claimer, _secret(), refund_secret)
+        swap_b = self._new_swap(owner, claimer, _secret(), refund_secret)
 
         self.anvil.warp(DURATION + 1)
         with self.assertRaises(Exception):
             _refund(owner, swap_b, refund_secret)
         self.anvil.warp(DURATION)
         _refund(owner, swap_b, refund_secret)
-        self.assertEqual(owner.getContract().stage(sid_b), "COMPLETED")
+        self.assertEqual(owner.getContract().stage(swap_b), "COMPLETED")
         with self.assertRaises(Exception):
             _claim(claimer, swap, claim_secret)
 
