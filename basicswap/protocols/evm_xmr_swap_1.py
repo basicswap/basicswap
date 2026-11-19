@@ -54,7 +54,7 @@ from basicswap.messages_npb import (
     EvmXmrLockMessage,
 )
 from basicswap.interface.evm import keys as evmkeys
-from basicswap.interface.evm.swapcreator import make_swap, swap_id
+from basicswap.interface.evm.swapfactory import SwapFactory
 from basicswap.interface.evm.rpc import EthRpcError
 from basicswap import multibid
 from basicswap.network.bsx_network import networkTypeToID
@@ -245,7 +245,7 @@ def _nonce(bid_id: bytes) -> int:
 
 def _swap(self, offer, bid, evm_swap) -> tuple:
     evm_amount, _ = evmAmountsForBid(self, offer, bid)
-    return make_swap(
+    return _contract(self, evm_swap).make_swap(
         evm_swap.evm_addr,
         evm_swap.xmr_side_addr,
         evmkeys.commitment(evm_swap.xmr_pkas),
@@ -267,8 +267,8 @@ def _evmLock(self, offer, bid, evm_swap):
     """(swap, state, revealed key); state is INVALID, PENDING, READY, CLAIMED or REFUNDED."""
     swap = _swap(self, offer, bid, evm_swap)
     contract = _contract(self, evm_swap)
-    sid: bytes = swap_id(swap)
-    stage: str = contract.stage(sid)
+    sid: bytes = contract.swap_id(swap)
+    stage: str = contract.stage(swap)
     if stage != "COMPLETED":
         return swap, stage, None
     kind, secret = contract.find_completion(
@@ -380,8 +380,10 @@ def _validateEvmLock(self, offer, evm_swap, swap, now: int) -> bool:
     receipt = _lockReceipt(self, evm_swap)
     ensure(receipt["status"] == 1, "EVM lock tx failed")
     contract = _contract(self, evm_swap)
-    sid = contract.new_swap_event(receipt)[0]
-    ensure(sid == swap_id(swap), "EVM lock tx created another swap")
+    ensure(
+        contract.lock_swap_id(receipt) == contract.swap_id(swap),
+        "EVM lock tx created another swap",
+    )
     duration: int = int(offer.lock_value)
     ensure(
         evm_swap.timeout2 - evm_swap.timeout1 == duration
@@ -392,7 +394,9 @@ def _validateEvmLock(self, offer, evm_swap, swap, now: int) -> bool:
     depth: int = ci_evm.rpc.get_block_number() - receipt["blockNumber"] + 1
     if depth < ci_evm.blocks_confirmed:
         return False
-    return not _anyBlocked(self, ci_evm, (contract.address, evm_swap.xmr_side_addr))
+    return not _anyBlocked(
+        self, ci_evm, (contract.escrow_address(swap), evm_swap.xmr_side_addr)
+    )
 
 
 def ensureContractUnblocked(ci_evm, address: str) -> None:
@@ -865,8 +869,46 @@ def processEvmXmrLock(self, msg) -> None:
 # --- queued action helpers ---------------------------------------------------
 
 
+def _fixTimeouts(self, evm_swap, duration: int, now: int) -> None:
+    evm_swap.timeout1 = now + duration
+    evm_swap.timeout2 = evm_swap.timeout1 + duration
+    evm_swap.timeout3 = evm_swap.timeout2 + duration
+    # A lock mined at the deadline leaves the EVM side two margins to refund in
+    evm_swap.xmr_lock_deadline = min(
+        now + self._evm_xmr_lock_wait,
+        evm_swap.timeout1 - 2 * self._sc_lock_release_min_margin,
+    )
+
+
+def _evmLockMissedDeadline(self, bid, evm_swap, ci_evm, cursor) -> bool:
+    """EVM side, per-swap: past its deadline lock() can only revert, so with no
+    lock mined the bid ends; True if it did."""
+    # One block for both reads, so a node switch can't pair a later time with
+    # an older nonce
+    block = ci_evm.rpc.w3.eth.get_block("latest")
+    if block["timestamp"] <= evm_swap.xmr_lock_deadline:
+        return False
+    lock = ci_evm.signedHandle(bid.bid_id, "lock")
+    receipt = None if lock is None else ci_evm.receiptFor(lock)
+    if receipt is not None and receipt["status"] == 1:
+        return False
+    if (
+        receipt is None
+        and lock is not None
+        and ci_evm.nonceTaken(lock, block["number"])
+        and not ci_evm.nonceSpentElsewhere(lock)
+    ):
+        raise TemporaryError("EVM lock nonce used, no receipt yet")
+    bid.setState(BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER)
+    self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
+    self.log.warning(
+        f"EVM lock for bid {self.log.id(bid.bid_id)} not mined by its deadline."
+    )
+    return True
+
+
 def sendEvmLock(self, bid_id: bytes, cursor) -> None:
-    """EVM side: escrow the EVM coin with newSwap and tell the XMR side the struct."""
+    """EVM side: escrow the EVM coin and tell the XMR side the struct."""
     bid, evm_swap = self.getXmrBidFromSession(cursor, bid_id, EvmXmrSwap)
     ensure(bid and evm_swap, f"Bid not found: {self.log.id(bid_id)}.")
     offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
@@ -876,8 +918,21 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
     contract = _contract(self, evm_swap)
     evm_amount, _ = evmAmountsForBid(self, offer, bid)
     duration: int = int(offer.lock_value)
+    # The swap address hashes the timeouts, so they're fixed before signing
+    per_swap: bool = isinstance(contract, SwapFactory)
+    if per_swap and evm_swap.timeout1 is None:
+        _fixTimeouts(self, evm_swap, duration, ci_evm.rpc.get_block_time())
+        self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
+        self.commitDB()
 
     def sign(tx_nonce):
+        if per_swap:
+            return contract.sign_lock(
+                ci_evm.account,
+                _swap(self, offer, bid, evm_swap),
+                evm_swap.xmr_lock_deadline,
+                tx_nonce,
+            )
         return contract.sign_new_swap(
             ci_evm.account,
             claim_commitment=evmkeys.commitment(evm_swap.xmr_pkas),
@@ -892,6 +947,8 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
         )
 
     sent: bool = self.countBidEvents(bid, EventLogTypes.EVM_LOCK_TX_SENT, cursor) > 0
+    if per_swap and _evmLockMissedDeadline(self, bid, evm_swap, ci_evm, cursor):
+        return
     if not sent:
         if _anyBlocked(self, ci_evm, (contract.address, evm_swap.evm_addr)):
             raise TemporaryError("EVM lock not sent, an address is blocked")
@@ -904,15 +961,21 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
             )
     try:
         # Signed once: a retry rebroadcasts it, and its nonce stops a second escrow
+        bump_at: int = evm_swap.xmr_lock_deadline if per_swap else None
         ci_evm.sendTx(
-            sign, "lock", bid_id, wait=False, error_decoder=contract.decode_error
+            sign,
+            "lock",
+            bid_id,
+            bump_at=bump_at,
+            wait=False,
+            error_decoder=contract.decode_error,
         )
         # Once sent the bid can't time out, or nothing would refund the escrow
         if not sent:
             self.logBidEvent(bid_id, EventLogTypes.EVM_LOCK_TX_SENT, "", cursor)
             self.commitDB()
         receipt = ci_evm.sendTx(
-            sign, "lock", bid_id, error_decoder=contract.decode_error
+            sign, "lock", bid_id, bump_at=bump_at, error_decoder=contract.decode_error
         )
     except TimeExhausted:
         raise TemporaryError("EVM lock tx not mined yet")
@@ -925,18 +988,19 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
     ):
         raise TemporaryError("EVM lock tx not confirmed yet")
     evm_swap.evm_lock_tx_id = bytes(receipt["transactionHash"])
-    sid, evm_swap.timeout1, evm_swap.timeout2, evm_swap.timeout3 = (
-        contract.new_swap_event(receipt)
-    )
-    # newSwap sets timeout1 to its block time plus the first duration
-    evm_swap.xmr_lock_deadline = evm_swap.timeout1 - duration + self._evm_xmr_lock_wait
-    ensure(sid == swap_id(_swap(self, offer, bid, evm_swap)), "Swap id mismatch")
+    if not per_swap:
+        _, t1, _, _ = contract.new_swap_event(receipt)
+        # newSwap sets timeout1 to its block time plus the first duration
+        _fixTimeouts(self, evm_swap, duration, t1 - duration)
+    swap: tuple = _swap(self, offer, bid, evm_swap)
+    sid: bytes = contract.swap_id(swap)
+    ensure(contract.lock_swap_id(receipt) == sid, "Swap id mismatch")
     ci_evm.recordTx(
         receipt["transactionHash"],
         "lock",
         -evm_amount,
         receipt,
-        to_addr=contract.address,
+        to_addr=contract.escrow_address(swap),
         bid_id=bid_id,
         cursor=cursor,
     )
@@ -1670,7 +1734,7 @@ def _xmrCheckEvmLock(self, bid_id, bid, offer, evm_swap, cursor) -> None:
     if state_name == "READY":
         # A reorg could swap setReady for a refund, reverting our claim and leaking its secret
         state_name = _contract(self, evm_swap).stage(
-            swap_id(swap), _confirmedHeight(self, evm_swap)
+            swap, _confirmedHeight(self, evm_swap)
         )
     if state_name == "READY" or (
         state_name == "PENDING"

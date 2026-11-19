@@ -1,0 +1,582 @@
+[
+  {
+    "type": "function",
+    "name": "PAYOUT_INIT_CODE_HASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "claim",
+    "inputs": [
+      {
+        "name": "_swap",
+        "type": "tuple",
+        "internalType": "struct SwapFactory.Swap",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimer",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "refundCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timeout1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout2",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout3",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_secret",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "lock",
+    "inputs": [
+      {
+        "name": "_swap",
+        "type": "tuple",
+        "internalType": "struct SwapFactory.Swap",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimer",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "refundCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timeout1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout2",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout3",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "mulVerify",
+    "inputs": [
+      {
+        "name": "scalar",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "qKeccak",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "payoutTo",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address payable"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "refund",
+    "inputs": [
+      {
+        "name": "_swap",
+        "type": "tuple",
+        "internalType": "struct SwapFactory.Swap",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimer",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "refundCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timeout1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout2",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout3",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_secret",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setReady",
+    "inputs": [
+      {
+        "name": "_swap",
+        "type": "tuple",
+        "internalType": "struct SwapFactory.Swap",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimer",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "refundCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timeout1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout2",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout3",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "stage",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum SwapFactory.Stage"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "swapAddress",
+    "inputs": [
+      {
+        "name": "_swap",
+        "type": "tuple",
+        "internalType": "struct SwapFactory.Swap",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimer",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "refundCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timeout1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout2",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout3",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "swapID",
+    "inputs": [
+      {
+        "name": "_swap",
+        "type": "tuple",
+        "internalType": "struct SwapFactory.Swap",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimer",
+            "type": "address",
+            "internalType": "address payable"
+          },
+          {
+            "name": "claimCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "refundCommitment",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timeout1",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout2",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "timeout3",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "event",
+    "name": "Claimed",
+    "inputs": [
+      {
+        "name": "swapID",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "s",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Locked",
+    "inputs": [
+      {
+        "name": "swapID",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Ready",
+    "inputs": [
+      {
+        "name": "swapID",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Refunded",
+    "inputs": [
+      {
+        "name": "swapID",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "s",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "InvalidSecret",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LockFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LockTooLate",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotTimeToRefund",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OnlySwapClaimer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OnlySwapOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SwapCompleted",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SwapNotPending",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooEarlyToClaim",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooLateToClaim",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongValue",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PayoutFailed",
+    "inputs": []
+  }
+]

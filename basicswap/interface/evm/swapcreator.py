@@ -11,7 +11,7 @@ contract with fixes and a claim window reopening after timeout3.
 
 swapcreator_abi.json and swapcreator_bytecode.hex (creation code, deployed by the
 tests) are generated from that build. BasicSwap only uses native coin swaps
-(asset 0).
+(asset 0). SwapContract holds what SwapFactory (swapfactory.py) shares.
 """
 
 import functools
@@ -32,54 +32,32 @@ from web3.logs import DISCARD
 from basicswap.interface.evm.keys import commitment
 from basicswap.util.ecc import ep
 
-_ABI_PATH = os.path.join(os.path.dirname(__file__), "swapcreator_abi.json")
+_ABI_DIR = os.path.dirname(__file__)
 
 STAGE = {0: "INVALID", 1: "PENDING", 2: "READY", 3: "COMPLETED"}
-SWAP_TYPE = (
-    "(address,address,bytes32,bytes32,uint256,uint256,uint256,address,uint256,uint256)"
-)
 LOG_BLOCK_RANGE = 5000
 
 
 @functools.cache
-def load_abi():
-    with open(_ABI_PATH, "r") as fp:
+def load_abi(name: str):
+    with open(os.path.join(_ABI_DIR, f"{name}_abi.json"), "r") as fp:
         return json.load(fp)
 
 
-def make_swap(
-    owner,
-    claimer,
-    claim_commitment: bytes,
-    refund_commitment: bytes,
-    timeout1: int,
-    timeout2: int,
-    timeout3: int,
-    value: int,
-    nonce: int,
-) -> tuple:
-    return (
-        Web3.to_checksum_address(owner),
-        Web3.to_checksum_address(claimer),
-        bytes(claim_commitment),
-        bytes(refund_commitment),
-        int(timeout1),
-        int(timeout2),
-        int(timeout3),
-        ADDRESS_ZERO,
-        int(value),
-        int(nonce),
-    )
+class SwapContract:
+    """What every swap contract design shares: secrets, setReady, claim, refund
+    and their events. Each design sets its own Swap struct."""
 
+    ABI: str
+    SWAP_TYPE: str
+    LOCK_GAS: int
+    READY_GAS: int
+    CLAIM_GAS: int
+    REFUND_GAS: int
 
-def swap_id(swap: tuple) -> bytes:
-    return bytes(Web3.keccak(abi_encode([SWAP_TYPE], [swap])))
-
-
-class SwapCreator:
     def __init__(self, rpc_client, address: str):
         self.rpc = rpc_client
-        self.abi = load_abi()
+        self.abi = load_abi(self.ABI)
         self.address = Web3.to_checksum_address(address)
         self.contract = rpc_client.w3.eth.contract(address=self.address, abi=self.abi)
         self._error_selectors = {
@@ -91,6 +69,33 @@ class SwapCreator:
             for e in filter_abi_by_type("event", self.abi)
             if e["name"] in ("Claimed", "Refunded")
         }
+
+    def make_swap(
+        self,
+        owner,
+        claimer,
+        claim_commitment: bytes,
+        refund_commitment: bytes,
+        timeout1: int,
+        timeout2: int,
+        timeout3: int,
+        value: int,
+        nonce: int,
+    ) -> tuple:
+        return (
+            Web3.to_checksum_address(owner),
+            Web3.to_checksum_address(claimer),
+            bytes(claim_commitment),
+            bytes(refund_commitment),
+            int(timeout1),
+            int(timeout2),
+            int(timeout3),
+            int(value),
+            int(nonce),
+        )
+
+    def swap_id(self, swap: tuple) -> bytes:
+        return bytes(Web3.keccak(abi_encode([self.SWAP_TYPE], [swap])))
 
     def decode_error(self, data) -> str:
         try:
@@ -110,34 +115,6 @@ class SwapCreator:
             nonce=tx_nonce,
             capped=capped,
         )
-
-    def sign_new_swap(
-        self,
-        account,
-        *,
-        claim_commitment: bytes,
-        refund_commitment: bytes,
-        claimer: str,
-        duration1: int,
-        duration2: int,
-        duration3: int,
-        value: int,
-        nonce: int,
-        tx_nonce: int,
-    ):
-        """newSwap escrowing value; nonce is the swap's, tx_nonce the account's."""
-        fn = self.contract.functions.newSwap(
-            claim_commitment,
-            refund_commitment,
-            Web3.to_checksum_address(claimer),
-            duration1,
-            duration2,
-            duration3,
-            ADDRESS_ZERO,
-            value,
-            nonce,
-        )
-        return self._sign(fn, account, tx_nonce, value)
 
     def sign_set_ready(self, account, swap: tuple, tx_nonce: int):
         return self._sign(self.contract.functions.setReady(swap), account, tx_nonce)
@@ -176,12 +153,74 @@ class SwapCreator:
             and not verify(secret + ep.o, c).call()
         )
 
-    def code_hash(self) -> str:
-        return Web3.keccak(self.rpc.w3.eth.get_code(self.address)).hex()
+    def find_completion(self, sid: bytes, from_block: int):
+        """("CLAIMED" | "REFUNDED", secret) for a completed swap, newest blocks first."""
+        w3 = self.rpc.w3
+        end: int = w3.eth.block_number
+        while end >= from_block:
+            start: int = max(from_block, end - LOG_BLOCK_RANGE + 1)
+            logs = w3.eth.get_logs(
+                {
+                    "address": self.address,
+                    "fromBlock": start,
+                    "toBlock": end,
+                    "topics": [list(self._completion_topics), sid],
+                }
+            )
+            for log in logs:
+                kind = self._completion_topics[bytes(log["topics"][0])]
+                return kind, bytes(log["topics"][2])
+            end = start - 1
+        return None, None
 
-    def stage(self, swap_id_: bytes, block="latest") -> str:
+
+class SwapCreator(SwapContract):
+    """The canonical design: one contract holds every swap's coins."""
+
+    ABI = "swapcreator"
+    SWAP_TYPE = "(address,address,bytes32,bytes32,uint256,uint256,uint256,address,uint256,uint256)"
+    LOCK_GAS = 60000
+    READY_GAS = 40000
+    CLAIM_GAS = 60000
+    REFUND_GAS = 60000
+
+    def make_swap(self, *fields) -> tuple:
+        swap = super().make_swap(*fields)
+        return swap[:7] + (ADDRESS_ZERO,) + swap[7:]
+
+    def sign_new_swap(
+        self,
+        account,
+        *,
+        claim_commitment: bytes,
+        refund_commitment: bytes,
+        claimer: str,
+        duration1: int,
+        duration2: int,
+        duration3: int,
+        value: int,
+        nonce: int,
+        tx_nonce: int,
+    ):
+        """newSwap escrowing value; nonce is the swap's, tx_nonce the account's."""
+        fn = self.contract.functions.newSwap(
+            claim_commitment,
+            refund_commitment,
+            Web3.to_checksum_address(claimer),
+            duration1,
+            duration2,
+            duration3,
+            ADDRESS_ZERO,
+            value,
+            nonce,
+        )
+        return self._sign(fn, account, tx_nonce, value)
+
+    def stage(self, swap: tuple, block="latest") -> str:
         return STAGE[
-            self.contract.functions.swaps(swap_id_).call(block_identifier=block)
+            self.contract.functions.swaps(self.swap_id(swap)).call(
+                block_identifier=block
+            )
         ]
 
     def new_swap_event(self, receipt):
@@ -201,22 +240,8 @@ class SwapCreator:
             int(swap["timeout3"]),
         )
 
-    def find_completion(self, swap_id_: bytes, from_block: int):
-        """("CLAIMED" | "REFUNDED", secret) for a completed swap, newest blocks first."""
-        w3 = self.rpc.w3
-        end: int = w3.eth.block_number
-        while end >= from_block:
-            start: int = max(from_block, end - LOG_BLOCK_RANGE + 1)
-            logs = w3.eth.get_logs(
-                {
-                    "address": self.address,
-                    "fromBlock": start,
-                    "toBlock": end,
-                    "topics": [list(self._completion_topics), swap_id_],
-                }
-            )
-            for log in logs:
-                kind = self._completion_topics[bytes(log["topics"][0])]
-                return kind, bytes(log["topics"][2])
-            end = start - 1
-        return None, None
+    def lock_swap_id(self, receipt) -> bytes:
+        return self.new_swap_event(receipt)[0]
+
+    def escrow_address(self, swap: tuple) -> str:
+        return self.address

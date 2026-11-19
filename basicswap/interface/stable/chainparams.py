@@ -30,8 +30,16 @@ params = {
     },
     "client": "stable",
     "decimal_places": 8,
-    # SwapCreator per chain id; code_hashes keeps every past keccak256 so in-flight swaps can settle
-    "deployments": {},
+    # Swap contract per chain id; code_hashes maps every past keccak256 to its
+    # design so in-flight swaps can settle
+    "deployments": {
+        2201: {  # testnet
+            "address": "0x96419c8126526962cCf28acBdfAB02118D2AA060",
+            "code_hashes": {
+                "66d8c64b3304957d6195a5dba374a36d7f876bda8039bb73f6997a278c6551cb": "swapfactory",
+            },
+        },
+    },
     # USDT0 per chain id; its blocklist can freeze native balances
     "blocklist": {
         988: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736",
