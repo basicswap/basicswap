@@ -62,6 +62,7 @@ from .basicswap_util import (
 from .chainparams import (
     Coins,
     chainparams,
+    evm_contract_coins,
     Fiat,
     ticker_map,
     coins_without_segwit,
@@ -133,6 +134,7 @@ from .util.network import (
 )
 from .util.smsg import smsgGetID
 from .interface.base import Curves
+from .interface.evm.base import nodesWithSelected, normaliseNodes, validateRpcUrl
 from .interface.part.part import PARTInterface, PARTInterfaceAnon, PARTInterfaceBlind
 from .script import OpCodes
 from .messages_npb import (
@@ -160,6 +162,7 @@ from .db import (
     CURRENT_DB_VERSION,
     DirectMessageRouteLink,
     EventLog,
+    EvmXmrSwap,
     getOrderByStr,
     KnownIdentity,
     MessageLink,
@@ -209,6 +212,7 @@ from .network.util import getMsgPubkey
 import basicswap.config as cfg
 import basicswap.protocols.atomic_swap_1 as atomic_swap_1
 import basicswap.protocols.xmr_swap_1 as xmr_swap_1
+import basicswap.protocols.evm_xmr_swap_1 as evm_xmr_swap_1
 
 PROTOCOL_VERSION_SECRET_HASH = 5
 MINPROTO_VERSION_SECRET_HASH = 4
@@ -220,7 +224,11 @@ PROTOCOL_VERSION_SPLIT_PARENT = 7
 # secp256k1 coin B key share proofs and kal_sig at this version or later sign a hash that includes the key
 PROTOCOL_VERSION_KEY_PROOFS = 8
 
-MINPROTO_VERSION = min(MINPROTO_VERSION_SECRET_HASH, MINPROTO_VERSION_ADAPTOR_SIG)
+MINPROTO_VERSION = min(
+    MINPROTO_VERSION_SECRET_HASH,
+    MINPROTO_VERSION_ADAPTOR_SIG,
+    evm_xmr_swap_1.MINPROTO_VERSION_EVM_XMR,
+)
 MAXPROTO_VERSION = 10
 
 MSG_TIME_LEEWAY = 2 * 60
@@ -329,6 +337,37 @@ def threadPollXMRChainState(swap_client, coin_type):
         swap_client.chainstate_delay_event.wait(
             random.randrange(20, 30)
         )  # Random to stagger updates
+
+
+def threadPollEvmChainState(swap_client, coin_type):
+    ci = swap_client.ci(coin_type)
+    cc = swap_client.coin_clients[coin_type]
+    reachable: bool = cc["core_version"] is not None
+    while not swap_client.chainstate_delay_event.is_set():
+        try:
+            chain_state = ci.getBlockchainInfo()
+            if not reachable:
+                swap_client.log.info(f"{ci.coin_name()} node reachable again.")
+                reachable = True
+            new_height: int = chain_state["blocks"]
+            block_changed = new_height != cc["chain_height"]
+            if block_changed:
+                with swap_client.mxDB:
+                    cc["chain_height"] = new_height
+            checkAndNotifyBalanceChange(
+                swap_client,
+                coin_type,
+                ci,
+                cc,
+                new_height,
+                "block" if block_changed else "poll",
+                chain_state,
+            )
+        except Exception as e:
+            if reachable:
+                swap_client.log.warning(f"{ci.coin_name()} node unreachable: {e}")
+                reachable = False
+        swap_client.chainstate_delay_event.wait(random.randrange(20, 30))
 
 
 def threadPollChainState(swap_client, coin_type):
@@ -513,6 +552,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     protocolInterfaces = {
         SwapTypes.SELLER_FIRST: atomic_swap_1.AtomicSwapInterface(),
         SwapTypes.XMR_SWAP: xmr_swap_1.XmrSwapInterface(),
+        SwapTypes.EVM_XMR_SWAP: evm_xmr_swap_1.EvmXmrSwapInterface(),
     }
 
     def __init__(
@@ -619,6 +659,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         self._sc_lock_release_min_margin = self.get_int_setting(
             "sc_lock_release_min_margin", 3600, 600, 24 * 3600
         )  # Seconds
+        self._evm_xmr_lock_wait = self.get_int_setting(
+            "evm_xmr_lock_wait", 7200, 3600, 24 * 3600
+        )  # Seconds the EVM side waits for a mined XMR lock before refunding
         self._redeem_rebroadcast_seconds = self.get_int_setting(
             "redeem_rebroadcast_seconds", 10 * 60, 1, 24 * 3600
         )  # Seconds
@@ -686,6 +729,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         )
         self.coins_without_segwit = coins_without_segwit
         self.xmr_based_coins = xmr_based_coins
+        self.evm_contract_coins = evm_contract_coins
 
         # TODO: Adjust ranges
         self.min_delay_event = self.get_int_setting("min_delay_event", 10, 0, 20 * 60)
@@ -1018,6 +1062,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "electrum_ssl",
             "electrum_poll_interval",
             "max_electrum_servers",
+            "rpc_url",
+            "chain_id",
+            "contract_address",
+            "max_fee_per_gas",
+            "remote_daemon_urls",
+            "automatically_select_daemon",
+            "account",
         ):
             if setting_name in chain_client_settings:
                 self.coin_clients[coin][setting_name] = chain_client_settings[
@@ -1347,6 +1398,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.firo.firo import FIROInterface
 
             return FIROInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.ETH:
+            from .interface.eth.eth import ETHInterface
+
+            return ETHInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.STABLE:
+            from .interface.stable.stable import STABLEInterface
+
+            return STABLEInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError("Unknown coin type")
 
@@ -1427,7 +1486,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("Error, terminating")
 
     def createCoinInterface(self, coin):
-        if self.coin_clients[coin]["connection_type"] in ("rpc", "electrum"):
+        if self.coin_clients[coin]["connection_type"] in ("rpc", "electrum", "web3"):
             self.coin_clients[coin]["interface"] = self.createInterface(coin)
         elif self.coin_clients[coin]["connection_type"] == "passthrough":
             self.coin_clients[coin]["interface"] = self.createPassthroughInterface(coin)
@@ -1538,6 +1597,20 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             elif self.coin_clients[c]["connection_type"] == "electrum":
                 ci = self.ci(c)
                 self.log.info(f"{ci.coin_name()} using Electrum light wallet mode")
+
+            elif self.coin_clients[c]["connection_type"] == "web3":
+                ci = self.ci(c)
+                try:
+                    core_version = ci.getDaemonVersion()
+                    self.log.info(f"{ci.coin_name()} node connected ({core_version})")
+                except Exception as e:
+                    core_version = None
+                    self.log.warning(f"{ci.coin_name()} node unreachable: {e}")
+                self.coin_clients[c]["core_version"] = core_version
+
+                t = threading.Thread(target=threadPollEvmChainState, args=(self, c))
+                self.threads.append(t)
+                t.start()
 
         self._initializeElectrumWallets()
 
@@ -2017,7 +2090,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def isBaseCoinActive(self, c) -> bool:
         if c not in chainparams:
             return False
-        if self.coin_clients[c]["connection_type"] in ("rpc", "electrum"):
+        if self.coin_clients[c]["connection_type"] in ("rpc", "electrum", "web3"):
             return True
         return False
 
@@ -3597,7 +3670,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
 
-        if offer.swap_type == SwapTypes.XMR_SWAP:
+        if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+            self.swaps_in_progress[bid.bid_id] = (bid, offer)
+        elif offer.swap_type == SwapTypes.XMR_SWAP:
             xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid.bid_id})
             self.watchXmrSwap(bid, offer, xmr_swap, cursor)
             recorded = self.getStringKV(f"b_lock_tx:{bid.bid_id.hex()}", cursor)
@@ -3839,11 +3914,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             cursor = self.openDB()
             bid_cursor = self.getNewDBCursor()
             for bid in self.query(Bid, bid_cursor):
-                if bid.in_progress == 1 or (
+                activate_bid = bid.in_progress == 1 or (
                     bid.state
                     and bid.state > BidStates.BID_RECEIVED
                     and bid.state < BidStates.SWAP_COMPLETED
-                ):
+                )
+                if activate_bid:
                     self.activateBidOrRetry(cursor, bid)
             self.buildNotificationsCache(cursor)
         finally:
@@ -3918,6 +3994,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return max(smsg_min_valid, min(smsg_max_valid, bid_valid))
 
     def is_reverse_ads_bid(self, coin_from, coin_to) -> bool:
+        # EVM coins only swap via EVM_XMR_SWAP, which has no reverse form
+        if coin_from in self.evm_contract_coins or coin_to in self.evm_contract_coins:
+            return False
         return coin_from in self.scriptless_coins + self.coins_without_segwit
 
     def validateSwapType(self, coin_from, coin_to, swap_type):
@@ -3925,6 +4004,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for coin in (coin_from, coin_to):
             if coin in self.balance_only_coins:
                 raise ValueError(f"Invalid coin: {coin.name}")
+
+        # EVM contract-escrow coins are only swappable via EVM_XMR_SWAP.
+        if swap_type != SwapTypes.EVM_XMR_SWAP:
+            for coin in (coin_from, coin_to):
+                if coin in self.evm_contract_coins:
+                    raise ValueError(
+                        f"Coin {coin.name} requires the EVM_XMR_SWAP swap type"
+                    )
+
+        if swap_type == SwapTypes.EVM_XMR_SWAP:
+            coins = {coin_from, coin_to}
+            if not (
+                Coins.XMR in coins and len(coins & set(self.evm_contract_coins)) == 1
+            ):
+                raise ValueError(
+                    f"Invalid swap type for: {coin_from.name} -> {coin_to.name}"
+                )
+            return
 
         if swap_type == SwapTypes.XMR_SWAP:
             reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
@@ -4228,6 +4325,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
     def validateOfferLockValue(
         self, swap_type, coin_from, coin_to, lock_type, lock_value: int
     ) -> None:
+        if swap_type == SwapTypes.EVM_XMR_SWAP:
+            ensure(
+                lock_type == TxLockTypes.SEQUENCE_LOCK_TIME
+                and lock_value >= self.min_sequence_lock_seconds
+                and lock_value <= self.max_sequence_lock_seconds,
+                "Invalid lock_value time",
+            )
+            # Leave the XMR side time to lock before the EVM side gives up
+            min_lock: int = max(
+                evm_xmr_swap_1.MIN_LOCK_SECONDS,
+                evm_xmr_swap_1.xmrLockMinMargin(self)
+                + self._sc_lock_release_min_margin,
+            )
+            ensure(
+                lock_value >= min_lock,
+                f"lock_value too short for an EVM swap, minimum {min_lock}s",
+            )
+            return
+
         coin_from_has_csv = self.coin_clients[coin_from]["use_csv"]
         coin_to_has_csv = self.coin_clients[coin_to]["use_csv"]
 
@@ -4343,6 +4459,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 or ci.interface_type() == Coins.PART_BLIND
             ):
                 ci.ensureFunds(ensure_balance + estimated_fee)
+            elif ci.interface_type() in self.evm_contract_coins:
+                evm_xmr_swap_1.ensureEvmFunds(
+                    self, ci.coin_type(), ensure_balance + estimated_fee
+                )
             elif ci.useBackend():
                 self.log.debug(
                     f"Electrum mode: skipping balance check for {ci.coin_name()}"
@@ -4402,6 +4522,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             raise ValueError("Unknown coin to type")
 
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
+        if swap_type == SwapTypes.EVM_XMR_SWAP:
+            # Fails without a deployed contract, before a bid could
+            evm_coin = evm_xmr_swap_1.evmCoin(self, coin_from_t, coin_to_t)
+            evm_contract_address: str = self.ci(evm_coin).getContractAddress()
         self.validateOfferLockValue(
             swap_type, coin_from_t, coin_to_t, lock_type, lock_value
         )
@@ -4449,11 +4573,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 tracking_total_budget = 0
                 tracking_max_fills = 0
 
-            msg_buf.protocol_version = (
-                PROTOCOL_VERSION_ADAPTOR_SIG
-                if swap_type == SwapTypes.XMR_SWAP
-                else PROTOCOL_VERSION_SECRET_HASH
-            )
+            if swap_type == SwapTypes.XMR_SWAP:
+                msg_buf.protocol_version = PROTOCOL_VERSION_ADAPTOR_SIG
+            elif swap_type == SwapTypes.EVM_XMR_SWAP:
+                msg_buf.protocol_version = evm_xmr_swap_1.PROTOCOL_VERSION_EVM_XMR
+                msg_buf.contract_address = evm_contract_address
+                evm_xmr_swap_1.ensureContractUnblocked(
+                    self.ci(evm_coin), msg_buf.contract_address
+                )
+            else:
+                msg_buf.protocol_version = PROTOCOL_VERSION_SECRET_HASH
             msg_buf.coin_from = int(coin_from)
             msg_buf.coin_to = int(coin_to)
             msg_buf.amount_from = int(amount)
@@ -4475,31 +4604,35 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "Auto-accept unavailable when amount or rate are variable",
                 )
 
-            if "from_fee_override" in extra_options:
-                msg_buf.fee_rate_from = ci_from.make_int(
-                    extra_options["from_fee_override"]
-                )
-            else:
-                # TODO: conf_target = ci_from.settings.get('conf_target', 2)
-                conf_target = 2
-                if "from_fee_conf_target" in extra_options:
-                    conf_target = extra_options["from_fee_conf_target"]
-                fee_rate, fee_src = self.getFeeRateForCoin(coin_from, conf_target)
-                if "from_fee_multiplier_percent" in extra_options:
-                    fee_rate *= extra_options["fee_multiplier"] / 100.0
-                msg_buf.fee_rate_from = ci_from.make_int(fee_rate)
+            # EVM gas is priced per tx; no offer fee rate applies
+            if swap_type != SwapTypes.EVM_XMR_SWAP:
+                if "from_fee_override" in extra_options:
+                    msg_buf.fee_rate_from = ci_from.make_int(
+                        extra_options["from_fee_override"]
+                    )
+                else:
+                    # TODO: conf_target = ci_from.settings.get('conf_target', 2)
+                    conf_target = 2
+                    if "from_fee_conf_target" in extra_options:
+                        conf_target = extra_options["from_fee_conf_target"]
+                    fee_rate, fee_src = self.getFeeRateForCoin(coin_from, conf_target)
+                    if "from_fee_multiplier_percent" in extra_options:
+                        fee_rate *= extra_options["fee_multiplier"] / 100.0
+                    msg_buf.fee_rate_from = ci_from.make_int(fee_rate)
 
-            if "to_fee_override" in extra_options:
-                msg_buf.fee_rate_to = ci_to.make_int(extra_options["to_fee_override"])
-            else:
-                # TODO: conf_target = ci_to.settings.get('conf_target', 2)
-                conf_target = 2
-                if "to_fee_conf_target" in extra_options:
-                    conf_target = extra_options["to_fee_conf_target"]
-                fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target)
-                if "to_fee_multiplier_percent" in extra_options:
-                    fee_rate *= extra_options["fee_multiplier"] / 100.0
-                msg_buf.fee_rate_to = ci_to.make_int(fee_rate)
+                if "to_fee_override" in extra_options:
+                    msg_buf.fee_rate_to = ci_to.make_int(
+                        extra_options["to_fee_override"]
+                    )
+                else:
+                    # TODO: conf_target = ci_to.settings.get('conf_target', 2)
+                    conf_target = 2
+                    if "to_fee_conf_target" in extra_options:
+                        conf_target = extra_options["to_fee_conf_target"]
+                    fee_rate, fee_src = self.getFeeRateForCoin(coin_to, conf_target)
+                    if "to_fee_multiplier_percent" in extra_options:
+                        fee_rate *= extra_options["fee_multiplier"] / 100.0
+                    msg_buf.fee_rate_to = ci_to.make_int(fee_rate)
 
             if swap_type == SwapTypes.XMR_SWAP:
                 ci_from.validateFeeRate(msg_buf.fee_rate_from, Concepts.OFFER)
@@ -4547,11 +4680,16 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
             # If a prefunded txn is not used, check that the wallet balance can cover the tx fee.
             if "prefunded_itx" not in extra_options:
-                # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
-                estimated_fee: int = ci_from.feeForVSize(
-                    msg_buf.fee_rate_from, ci_from.est_lock_tx_vsize()
-                )
-                self.ensureWalletCanSend(ci_from, swap_type, int(amount), estimated_fee)
+                if swap_type == SwapTypes.EVM_XMR_SWAP:
+                    self.ensureWalletCanSend(ci_from, swap_type, int(amount), 0)
+                else:
+                    # TODO: Better tx size estimate, xmr_swap_b_lock_tx_vsize could be larger than xmr_swap_b_lock_spend_tx_vsize
+                    estimated_fee: int = ci_from.feeForVSize(
+                        msg_buf.fee_rate_from, ci_from.est_lock_tx_vsize()
+                    )
+                    self.ensureWalletCanSend(
+                        ci_from, swap_type, int(amount), estimated_fee
+                    )
             elif ci_from.useBackend():
                 ci_from.claimChangeAddresses(
                     ci_from.loadTx(extra_options["prefunded_itx"]), cursor
@@ -5001,23 +5139,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise ValueError("grindForEd25519Key failed")
 
     def getWalletKey(self, coin_type, key_num, for_ed25519=False) -> bytes:
-        evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
-            "evkey"
-        ]
-
         key_path_base = "44445555h/1h/{}/{}".format(int(coin_type), key_num)
 
         if not for_ed25519:
-            extkey = self.callcoinrpc(
-                Coins.PART, "extkey", ["info", evkey, key_path_base]
-            )["key_info"]["result"]
-            return decodeWif(
-                self.callcoinrpc(Coins.PART, "extkey", ["info", extkey])["key_info"][
-                    "privkey"
-                ]
-            )
+            return self.getWalletKeyAtPath(key_path_base)
 
+        evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
+            "evkey"
+        ]
         return self.grindForEd25519Key(coin_type, evkey, key_path_base)
+
+    def getWalletKeyAtPath(self, key_path: str) -> bytes:
+        evkey = self.callcoinrpc(Coins.PART, "extkey", ["account", "default", "true"])[
+            "evkey"
+        ]
+        extkey = self.callcoinrpc(Coins.PART, "extkey", ["info", evkey, key_path])[
+            "key_info"
+        ]["result"]
+        return decodeWif(
+            self.callcoinrpc(Coins.PART, "extkey", ["info", extkey])["key_info"][
+                "privkey"
+            ]
+        )
 
     def getPathKey(
         self,
@@ -5204,6 +5347,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             # Fee estimate must be manually initiated
             return None
         ci = self.ci(coin_type)
+        if coin_type in self.evm_contract_coins:
+            return ci.make_int(fee_rate * ci.WITHDRAW_GAS, r=1)
         return ci.feeForVSize(ci.make_int(fee_rate, r=1), ci.getHTLCSpendTxVSize())
 
     def withdrawCoin(self, coin_type, value, addr_to, subfee: bool) -> str:
@@ -5217,6 +5362,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     value, addr_to, " subfee" if subfee else ""
                 )
         self.log.info(f"withdrawCoin {ci.ticker()}{info_str}")
+
+        if coin_type in self.evm_contract_coins:
+            free: int = evm_xmr_swap_1.evmFree(self, coin_type)
+            fee: int = 0 if subfee else ci.fromWei(ci.withdrawFeeWei(), round_up=True)
+            ensure(
+                ci.make_int(value) + fee <= free,
+                f"At most {ci.format_amount(max(0, free - fee))} {ci.ticker()} "
+                "can be withdrawn, the rest is held for open swaps",
+            )
 
         txid = ci.withdrawCoin(value, addr_to, subfee)
         self.log.info_s(f"In txn: {txid}")
@@ -5925,6 +6079,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
 
+        if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+            return evm_xmr_swap_1.postEvmXmrBid(
+                self, offer_id, amount, addr_send_from, extra_options
+            )
+
         ensure(
             offer.protocol_version >= MINPROTO_VERSION_SECRET_HASH,
             "Incompatible offer protocol version",
@@ -6089,13 +6248,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             else:
                 bid.txns[stx.tx_type] = stx
 
-    def getXmrBidFromSession(self, cursor, bid_id: bytes):
+    def getXmrBidFromSession(self, cursor, bid_id: bytes, swap_cls=XmrSwap):
         bid = self.queryOne(Bid, cursor, {"bid_id": bid_id})
         xmr_swap = None
         if bid:
-            xmr_swap = self.queryOne(XmrSwap, cursor, {"bid_id": bid_id})
+            xmr_swap = self.queryOne(swap_cls, cursor, {"bid_id": bid_id})
             self.loadBidTxns(bid, cursor)
         return bid, xmr_swap
+
+    def getPlanReadyTimeout(self, plan_id: bytes, cursor) -> int:
+        stored = self.getStringKV(f"plan_leg_timeout:{plan_id.hex()}", cursor)
+        return int(stored) if stored else self._plan_leg_timeout
 
     def getPlanLegs(self, plan_id: bytes, cursor):
         legs = list(self.query(Bid, cursor, {"plan_id": plan_id}))
@@ -6117,6 +6280,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             leg.is_adaptor = leg.xmr_swap is not None
             # Only the coin B payer may lock a leg; on a reverse bid that is the receiver.
             leg_offer = self.queryOne(Offer, cursor, {"offer_id": leg.offer_id})
+            if leg_offer is not None and leg_offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+                leg.offer = leg_offer
+                leg.evm_swap = self.queryOne(EvmXmrSwap, cursor, {"bid_id": leg.bid_id})
+                leg.is_adaptor = leg.evm_swap is not None
+                leg.locks_coin_b = leg.is_adaptor and not evm_xmr_swap_1.weAreEvmSide(
+                    self, leg_offer, leg
+                )
+                leg.coin_a_seen = (
+                    leg.is_adaptor and leg.evm_swap.evm_lock_tx_id is not None
+                )
+                leg.lock_remaining_seconds = (
+                    evm_xmr_swap_1.xmrLockRemaining(self, leg.evm_swap)
+                    if leg.locks_coin_b
+                    else None
+                )
+                continue
             reverse_bid: bool = leg_offer is not None and self.is_reverse_ads_bid(
                 leg_offer.coin_from, leg_offer.coin_to
             )
@@ -6273,6 +6452,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     xmr_offer = self.queryOne(
                         XmrOffer, cursor, {"offer_id": bid.offer_id}
                     )
+                elif offer and offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+                    xmr_swap = self.queryOne(EvmXmrSwap, cursor, {"bid_id": bid.bid_id})
                 self.loadBidTxns(bid, cursor)
                 if list_events:
                     events = self.list_bid_events(bid.bid_id, cursor)
@@ -6358,6 +6539,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if reverse_bid:
                     return self.acceptADSReverseBid(bid_id, use_cursor)
                 return self.acceptXmrBid(bid_id, use_cursor)
+
+            if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+                return evm_xmr_swap_1.acceptEvmXmrBid(self, bid_id, use_cursor)
 
             ensure(
                 bid.protocol_version >= MINPROTO_VERSION_SECRET_HASH,
@@ -7867,7 +8051,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def timeoutBid(self, bid_id: bytes, cursor=None) -> None:
         self.log.info(f"Bid {self.log.id(bid_id)} timed-out")
-        self.deactivateBidForReason(bid_id, BidStates.SWAP_TIMEDOUT, cursor=cursor)
+        try:
+            use_cursor = self.openDB(cursor)
+            self.removeQueuedActions(use_cursor, bid_id, None)
+            self.deactivateBidForReason(
+                bid_id, BidStates.SWAP_TIMEDOUT, cursor=use_cursor
+            )
+        finally:
+            if cursor is None:
+                self.closeDB(use_cursor)
 
     def setBidError(
         self,
@@ -8117,12 +8309,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         participate_script = self.deriveParticipateScript(bid_id, bid, offer)
         self.ensurePTxLockMargin(bid, offer, participate_script)
 
-        ready_timeout: int = self._plan_leg_timeout
-        stored_timeout = self.getStringKV(
-            f"plan_leg_timeout:{bid.plan_id.hex()}", cursor
-        )
-        if stored_timeout:
-            ready_timeout = int(stored_timeout)
+        ready_timeout: int = self.getPlanReadyTimeout(bid.plan_id, cursor)
 
         plan = plan_htlc_batch(
             self.getPlanHTLCLegs(bid.plan_id, cursor),
@@ -8883,8 +9070,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return None
 
     def findTxB(self, ci_to, xmr_swap, bid, cursor, bid_sender: bool) -> bool:
-        bid_changed = False
-
         found_tx = None
         check_amount: bool = (
             False if bid.debug_ind == DebugTypes.B_LOCK_TX_MISSED_SEND else True
@@ -8914,7 +9099,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid_sender,
                 check_amount=check_amount,
             )
+        return self.recordTxB(
+            ci_to, xmr_swap, bid, found_tx, bid.amount_to, check_amount, cursor
+        )[0]
 
+    def recordTxB(
+        self, ci_to, xmr_swap, bid, found_tx, amount: int, check_amount: bool, cursor
+    ) -> tuple[bool, bool]:
+        """(bid changed, valid lock tx B found)"""
+        bid_changed = False
         invalid_tx_found: bool = False
         if isinstance(found_tx, int) and found_tx == -1:
             invalid_tx_found = True
@@ -8924,7 +9117,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         elif check_amount and found_tx is not None:
             # Double check amount
             value_key: str = "amount" if "amount" in found_tx else "value"
-            if value_key not in found_tx or found_tx[value_key] != bid.amount_to:
+            if value_key not in found_tx or found_tx[value_key] != amount:
                 invalid_tx_found = True
         if invalid_tx_found:
             # Keep looking for a valid tx
@@ -8979,7 +9172,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             bid.xmr_b_lock_tx.chain_height = 0
             bid_changed = True
-        return bid_changed
+        return bid_changed, found_tx is not None and not invalid_tx_found
 
     def checkXmrBidState(self, bid_id: bytes, bid, offer):
         rv = False
@@ -10074,6 +10267,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if offer.swap_type == SwapTypes.XMR_SWAP:
             return self.checkXmrBidState(bid_id, bid, offer)
+        if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+            return evm_xmr_swap_1.checkEvmXmrBidState(self, bid_id, bid, offer)
 
         save_bid = False
         coin_from = Coins(offer.coin_from)
@@ -11732,7 +11927,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "SELECT b.bid_id FROM bids AS b, bidstates AS s "
                 + "WHERE b.active_ind = 1 AND s.state_id = b.state "
                 + " AND s.can_timeout AND b.state_time + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now "
-                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type IN (:tx_sent_event_type, :itx_sent_event_type))"
+                + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type IN (:tx_sent_event_type, :itx_sent_event_type, :evm_lock_sent_event_type))"
             )
             q = cursor.execute(
                 query_str,
@@ -11744,6 +11939,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "tx_mempool_event_type": EventLogTypes.LOCK_TX_A_IN_MEMPOOL,
                     "tx_sent_event_type": EventLogTypes.LOCK_TX_A_PUBLISHED,
                     "itx_sent_event_type": EventLogTypes.ITX_PUBLISHED,
+                    "evm_lock_sent_event_type": EventLogTypes.EVM_LOCK_TX_SENT,
                 },
             )
             for row in q:
@@ -11765,11 +11961,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         return q[0]
 
     def removeQueuedActions(self, cursor, bid_id: bytes, action_type) -> None:
+        """action_type None removes all of the bid's actions."""
         query: str = (
-            "DELETE FROM actions WHERE linked_id = :linked_id AND action_type = :action_type"
-        )
-        if self.debug:
-            query = "UPDATE actions SET active_ind = 2 WHERE linked_id = :linked_id AND action_type = :action_type"
+            "UPDATE actions SET active_ind = 2" if self.debug else "DELETE FROM actions"
+        ) + " WHERE linked_id = :linked_id"
+        if action_type is not None:
+            query += " AND action_type = :action_type"
         cursor.execute(query, {"linked_id": bid_id, "action_type": action_type})
 
     def isBidTransientError(self, bid_id: bytes, ex, cursor) -> bool:
@@ -11833,6 +12030,25 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     elif action_type == ActionTypes.ACCEPT_AS_REV_BID:
                         accepting_bid = True
                         self.acceptADSReverseBid(linked_id, cursor)
+                    elif action_type == ActionTypes.ACCEPT_EVM_XMR_BID:
+                        accepting_bid = True
+                        evm_xmr_swap_1.acceptEvmXmrBid(self, linked_id, cursor)
+                    elif action_type == ActionTypes.SEND_EVM_LOCK:
+                        evm_xmr_swap_1.sendEvmLock(self, linked_id, cursor)
+                    elif action_type == ActionTypes.SEND_XMR_LOCK_FOR_EVM:
+                        evm_xmr_swap_1.sendXmrLockForEvm(self, linked_id, cursor)
+                    elif action_type == ActionTypes.SEND_EVM_LOCK_READY:
+                        evm_xmr_swap_1.markEvmReady(self, linked_id, cursor)
+                    elif action_type == ActionTypes.CLAIM_EVM_LOCK:
+                        evm_xmr_swap_1.claimEvmLock(self, linked_id, cursor)
+                    elif action_type == ActionTypes.REDEEM_XMR_FOR_EVM:
+                        evm_xmr_swap_1.redeemXmrForEvm(self, linked_id, cursor)
+                    elif action_type == ActionTypes.REFUND_EVM_LOCK:
+                        evm_xmr_swap_1.refundEvmLock(self, linked_id, cursor)
+                    elif action_type == ActionTypes.RECOVER_XMR_FROM_EVM_REFUND:
+                        evm_xmr_swap_1.recoverXmrFromEvmRefund(self, linked_id, cursor)
+                    elif action_type == ActionTypes.SEND_EVM_GAS_DRIP:
+                        evm_xmr_swap_1.sendGasDrip(self, linked_id, cursor)
                     else:
                         self.log.warning(f"Unknown event type: {action_type}")
                 except TemporaryError as ex:
@@ -11927,22 +12143,31 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
             for bid in q_bids:
                 q = cursor.execute(
-                    "SELECT LENGTH(kbsl_dleag), LENGTH(kbsf_dleag), split_parent_msg_id FROM xmr_swaps WHERE bid_id = :bid_id",
-                    {
-                        "bid_id": bid.bid_id,
-                    },
-                ).fetchone()
-                kbsl_dleag_len: int = q[0]
-                kbsf_dleag_len: int = q[1]
-                split_parent_msg_id = q[2]
-
-                q = cursor.execute(
-                    "SELECT addr_from FROM offers WHERE offer_id = :offer_id",
+                    "SELECT addr_from, swap_type FROM offers WHERE offer_id = :offer_id",
                     {
                         "offer_id": bid.offer_id,
                     },
                 ).fetchone()
                 offer_addr_from: str = q[0]
+                is_evm_swap: bool = q[1] == SwapTypes.EVM_XMR_SWAP
+
+                if is_evm_swap:
+                    q = cursor.execute(
+                        "SELECT LENGTH(peer_dleag), LENGTH(peer_dleag), split_parent_msg_id FROM evm_xmr_swaps WHERE bid_id = :bid_id",
+                        {
+                            "bid_id": bid.bid_id,
+                        },
+                    ).fetchone()
+                else:
+                    q = cursor.execute(
+                        "SELECT LENGTH(kbsl_dleag), LENGTH(kbsf_dleag), split_parent_msg_id FROM xmr_swaps WHERE bid_id = :bid_id",
+                        {
+                            "bid_id": bid.bid_id,
+                        },
+                    ).fetchone()
+                kbsl_dleag_len: int = q[0]
+                kbsf_dleag_len: int = q[1]
+                split_parent_msg_id = q[2]
 
                 if bid.state == int(BidStates.BID_RECEIVING_ACC):
                     bid_type: str = "bid accept"
@@ -11971,9 +12196,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 if total_dleag_size >= dleag_proof_len:
                     try:
                         if bid.state == int(BidStates.BID_RECEIVING):
-                            self.receiveXmrBid(bid, cursor)
+                            if is_evm_swap:
+                                evm_xmr_swap_1.receiveEvmXmrBid(self, bid, cursor)
+                            else:
+                                self.receiveXmrBid(bid, cursor)
                         elif bid.state == int(BidStates.BID_RECEIVING_ACC):
-                            self.receiveXmrBidAccept(bid, cursor)
+                            if is_evm_swap:
+                                evm_xmr_swap_1.receiveEvmXmrBidAccept(self, bid, cursor)
+                            else:
+                                self.receiveXmrBidAccept(bid, cursor)
                         else:
                             raise ValueError("Unexpected bid state")
                     except Exception as ex:
@@ -12140,6 +12371,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             ensure(len(offer_data.proof_signature) == 0, "Unexpected data")
             ensure(len(offer_data.pkhash_seller) == 0, "Unexpected data")
             ensure(len(offer_data.secret_hash) == 0, "Unexpected data")
+        elif offer_data.swap_type == SwapTypes.EVM_XMR_SWAP:
+            if offer_data.protocol_version < evm_xmr_swap_1.MINPROTO_VERSION_EVM_XMR:
+                raise IncompatibleProtocol(
+                    "offer",
+                    offer_data.protocol_version,
+                    evm_xmr_swap_1.MINPROTO_VERSION_EVM_XMR,
+                )
+            ensure(len(offer_data.proof_address) == 0, "Unexpected data")
+            ensure(len(offer_data.proof_signature) == 0, "Unexpected data")
+            ensure(len(offer_data.pkhash_seller) == 0, "Unexpected data")
+            ensure(len(offer_data.secret_hash) == 0, "Unexpected data")
+            ci_evm = ci_from if coin_from in self.evm_contract_coins else ci_to
+            if not ci_evm.usesContract(offer_data.contract_address):
+                self.log.debug(
+                    f"Ignoring offer {self.logIDO(bytes.fromhex(msg['msgid']))} "
+                    f"on another {ci_evm.coin_name()} swap contract."
+                )
+                return
         else:
             raise ValueError(f"Unknown swap type {offer_data.swap_type}.")
 
@@ -12928,21 +13177,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsf_dleag) < ci_to.lengthDLEAG():
-                q = self.query(
-                    XmrSplitData,
+                xmr_swap.kbsf_dleag += self.splitDleag(
                     cursor,
-                    {
-                        "bid_id": bid.bid_id,
-                        "msg_type": int(XmrSplitMsgTypes.BID),
-                        "addr_from": addr_expect_from,
-                        "addr_to": addr_expect_to,
-                    },
-                    {"msg_sequence": "asc"},
+                    bid.bid_id,
+                    XmrSplitMsgTypes.BID,
+                    addr_expect_from,
+                    addr_expect_to,
+                    xmr_swap,
                 )
-                for row in q:
-                    if not self.splitDataBelongs(row, xmr_swap):
-                        continue
-                    xmr_swap.kbsf_dleag += row.dleag
 
             if not ci_to.verifyDLEAG(xmr_swap.kbsf_dleag):
                 raise ValueError("Invalid DLEAG proof.")
@@ -13017,21 +13259,14 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         if ci_to.curve_type() == Curves.ed25519:
             if len(xmr_swap.kbsl_dleag) < ci_to.lengthDLEAG():
-                q = self.query(
-                    XmrSplitData,
+                xmr_swap.kbsl_dleag += self.splitDleag(
                     cursor,
-                    {
-                        "bid_id": bid.bid_id,
-                        "msg_type": int(XmrSplitMsgTypes.BID_ACCEPT),
-                        "addr_from": addr_from,
-                        "addr_to": addr_to,
-                    },
-                    order_by={"msg_sequence": "asc"},
+                    bid.bid_id,
+                    XmrSplitMsgTypes.BID_ACCEPT,
+                    addr_from,
+                    addr_to,
+                    xmr_swap,
                 )
-                for row in q:
-                    if not self.splitDataBelongs(row, xmr_swap):
-                        continue
-                    xmr_swap.kbsl_dleag += row.dleag
             if not ci_to.verifyDLEAG(xmr_swap.kbsl_dleag):
                 raise ValueError("Invalid DLEAG proof.")
 
@@ -13083,6 +13318,26 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             delay, ActionTypes.SIGN_XMR_SWAP_LOCK_TX_A, bid.bid_id, cursor
         )
 
+    def validateIncomingBid(self, msg, offer, bid_data, now: int) -> int:
+        """The bid's rate, once the bid checks out against its offer."""
+        if not validOfferStateToReceiveBid(offer.state):
+            raise ValueError("Bad offer state")
+        ensure(msg["to"] == offer.addr_from, "Received on incorrect address")
+        ensure(now <= offer.expire_at, "Offer expired")
+        if offer.active_ind != 1:
+            raise RevokedOffer(
+                f"Bid {msg['msgid']} received for inactive offer {offer.offer_id.hex()}."
+            )
+        self.validateBidValidTime(
+            offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid
+        )
+        ensure(now <= msg["sent"] + bid_data.time_valid, "Bid expired")
+        bid_rate: int = self.ci(offer.coin_from).make_int(
+            bid_data.amount_to / bid_data.amount, r=1
+        )
+        self.validateBidAmount(offer, bid_data.amount, bid_rate)
+        return bid_rate
+
     def processXmrBid(self, msg) -> None:
         # MSG1L
         self.log.debug(
@@ -13115,21 +13370,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci_from = self.ci(offer.coin_from)
         ci_to = self.ci(offer.coin_to)
 
-        if not validOfferStateToReceiveBid(offer.state):
-            raise ValueError("Bad offer state")
-        ensure(msg["to"] == offer.addr_from, "Received on incorrect address")
-        ensure(now <= offer.expire_at, "Offer expired")
-        if offer.active_ind != 1:
-            raise RevokedOffer(
-                f"Bid {msg['msgid']} received for inactive offer {offer_id.hex()}."
-            )
-        self.validateBidValidTime(
-            offer.swap_type, offer.coin_from, offer.coin_to, bid_data.time_valid
-        )
-        ensure(now <= msg["sent"] + bid_data.time_valid, "Bid expired")
-
-        bid_rate: int = ci_from.make_int(bid_data.amount_to / bid_data.amount, r=1)
-        self.validateBidAmount(offer, bid_data.amount, bid_rate)
+        bid_rate: int = self.validateIncomingBid(msg, offer, bid_data, now)
 
         ensure(ci_to.verifyKey(bid_data.kbvf), "Invalid chain B follower view key")
         ensure(
@@ -14023,12 +14264,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             and prefunded_tx is None
             and hasattr(ci_to, "publishBLockTxs")
         ):
-            ready_timeout = self._plan_leg_timeout
-            stored_timeout = self.getStringKV(
-                f"plan_leg_timeout:{bid.plan_id.hex()}", cursor
-            )
-            if stored_timeout:
-                ready_timeout = int(stored_timeout)
+            ready_timeout = self.getPlanReadyTimeout(bid.plan_id, cursor)
 
             plan = plan_batch_decision(
                 self.getPlanLegs(bid.plan_id, cursor),
@@ -15336,6 +15572,22 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Update copy of bid in swaps_in_progress
         self.swaps_in_progress[bid_id] = (bid, offer)
 
+    def splitDleag(
+        self, cursor, bid_id: bytes, msg_type, addr_from: str, addr_to: str, xmr_swap
+    ) -> bytes:
+        q = self.query(
+            XmrSplitData,
+            cursor,
+            {
+                "bid_id": bid_id,
+                "msg_type": int(msg_type),
+                "addr_from": addr_from,
+                "addr_to": addr_to,
+            },
+            order_by={"msg_sequence": "asc"},
+        )
+        return b"".join(row.dleag for row in q if self.splitDataBelongs(row, xmr_swap))
+
     def splitDataBelongs(self, row, xmr_swap) -> bool:
         # Chunks from a peer before PROTOCOL_VERSION_SPLIT_PARENT carry no parent
         return (
@@ -15977,6 +16229,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.processXmrSplitMessage(msg)
             elif msg_type == MessageTypes.XMR_BID_LOCK_RELEASE_LF:
                 self.processXmrLockReleaseMessage(msg)
+            elif msg_type == MessageTypes.EVM_XMR_BID_FL:
+                evm_xmr_swap_1.processEvmXmrBid(self, msg)
+            elif msg_type == MessageTypes.EVM_XMR_BID_ACCEPT_LF:
+                evm_xmr_swap_1.processEvmXmrBidAccept(self, msg)
+            elif msg_type == MessageTypes.EVM_XMR_LOCK:
+                evm_xmr_swap_1.processEvmXmrLock(self, msg)
             elif msg_type == MessageTypes.ADS_BID_LF:
                 self.processADSBidReversed(msg)
             elif msg_type == MessageTypes.ADS_BID_ACCEPT_FL:
@@ -16219,7 +16477,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     except Exception as ex:
                         if self.debug_logs:
                             self.log.error("checkBidState %s", traceback.format_exc())
-                        if self.is_transient_error(ex):
+                        if self.isBidTransientError(bid_id, ex, None):
                             self.log.warning(
                                 f"checkBidState {self.log.id(bid_id)} {ex}."
                             )
@@ -16236,6 +16494,18 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
                 for bid_id, bid, offer in to_remove:
                     self.deactivateBid(None, offer, bid)
+
+                if not self.getLockedState()[1]:
+                    for coin_type in self.evm_contract_coins:
+                        if coin_type in self.coin_clients and self.isCoinActive(
+                            coin_type
+                        ):
+                            try:
+                                self.ci(coin_type).bumpTxs()
+                            except Exception as e:
+                                self.log.warning(
+                                    f"Bumping {Coins(coin_type).name} txs failed: {e}"
+                                )
 
                 if self._wallet_manager:
                     for bid_id, v in list(self.swaps_in_progress.items()):
@@ -17048,6 +17318,33 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                             f"Synced {display_name} wallet indices to full node."
                         )
 
+        # Switched before taking mxDB, whose block has no DB connection
+        coin_id = self.getCoinIdFromName(coin_name)
+        switched_account_coin = None
+        if "account" in data:
+            new_account = int(data["account"])
+            ensure(new_account >= 0, "Account must be 0 or more")
+            if self.settings["chainclients"][coin_name].get(
+                "account", 0
+            ) != new_account and self.isCoinActive(coin_id):
+                ci = self.ci(coin_id)
+                # Held through the switch, so no bid takes the old address meanwhile
+                cursor = self.openDB()
+                try:
+                    busy = evm_xmr_swap_1.evmAddressInOpenSwaps(
+                        self, coin_id, ci.account.address, cursor
+                    )
+                    # Only this account's key can claim or refund its escrows
+                    ensure(
+                        not busy,
+                        f"{ci.coin_name()} account {ci.getAccountIndex()} has "
+                        "swaps in progress, switch once they finish",
+                    )
+                    ci.setAccountIndex(new_account)
+                finally:
+                    self.closeDB(cursor, commit=False)
+                switched_account_coin = coin_id
+
         settings_copy = copy.deepcopy(self.settings)
         with self.mxDB:
             settings_cc = settings_copy["chainclients"][coin_name]
@@ -17070,7 +17367,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     continue
                 if settings_cc.get(setting) != data[setting]:
                     settings_changed = True
-                    suggest_reboot = True
+                    # EVM coins apply node selection live, below
+                    if settings_cc.get("connection_type") != "web3":
+                        suggest_reboot = True
                     settings_cc[setting] = data[setting]
 
             if "remotedaemonurls" in data:
@@ -17148,6 +17447,61 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     settings_changed = True
                     settings_cc["wallet_pwd"] = new_wallet_pwd
 
+            if "account" in data and settings_cc.get("account", 0) != new_account:
+                self.coin_clients[coin_id]["account"] = new_account
+                settings_cc["account"] = new_account
+                settings_changed = True
+
+            if "rpc_url" in data:
+                new_rpc_url = validateRpcUrl(data["rpc_url"])
+                if settings_cc.get("rpc_url", "") != new_rpc_url:
+                    settings_changed = True
+                    settings_cc["rpc_url"] = new_rpc_url
+                    self.coin_clients[coin_id]["rpc_url"] = new_rpc_url
+                    if self.isCoinActive(coin_id):
+                        self.ci(coin_id).setRpcUrl(new_rpc_url)
+
+            if "rpc_nodes" in data:
+                new_nodes = normaliseNodes(data["rpc_nodes"])
+                for node in new_nodes:
+                    validateRpcUrl(node["url"])
+                if settings_cc.get("remote_daemon_urls") != new_nodes:
+                    settings_changed = True
+                    settings_cc["remote_daemon_urls"] = new_nodes
+            if settings_cc.get("connection_type") == "web3" and any(
+                k in data
+                for k in ("rpc_url", "rpc_nodes", "automatically_select_daemon")
+            ):
+                nodes = nodesWithSelected(
+                    settings_cc.get("remote_daemon_urls", []),
+                    settings_cc.get("rpc_url", ""),
+                )
+                if settings_cc.get("remote_daemon_urls") != nodes:
+                    settings_changed = True
+                    settings_cc["remote_daemon_urls"] = nodes
+                cc = self.coin_clients[coin_id]
+                cc["remote_daemon_urls"] = settings_cc.get("remote_daemon_urls", [])
+                cc["automatically_select_daemon"] = settings_cc.get(
+                    "automatically_select_daemon", True
+                )
+                if self.isCoinActive(coin_id):
+                    self.ci(coin_id).setNodes(
+                        cc["remote_daemon_urls"], cc["automatically_select_daemon"]
+                    )
+
+            if "max_fee_per_gas" in data:
+                new_max_fee = data["max_fee_per_gas"]
+                if settings_cc.get("max_fee_per_gas") != new_max_fee:
+                    settings_changed = True
+                    # Absent, not None: None would read as no cap, not the default
+                    for d in (settings_cc, self.coin_clients[coin_id]):
+                        if new_max_fee is None:
+                            d.pop("max_fee_per_gas", None)
+                        else:
+                            d["max_fee_per_gas"] = new_max_fee
+                    if self.isCoinActive(coin_id):
+                        self.ci(coin_id).setMaxFeePerGas(new_max_fee)
+
             if "connection_type" in data:
                 new_connection_type = data["connection_type"]
                 old_connection_type = settings_cc.get("connection_type")
@@ -17215,6 +17569,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     json.dump(settings_copy, fp, indent=4)
                 shutil.move(settings_path_new, settings_path)
                 self.settings = settings_copy
+
+        if switched_account_coin is not None:
+            # The cached deposit address is the old account's
+            self.cacheNewAddressForCoin(switched_account_coin)
         return settings_changed, suggest_reboot, migration_message
 
     def enableCoin(self, coin_name: str) -> None:
@@ -17335,7 +17693,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         try:
             blockchaininfo = ci.getBlockchainInfo()
 
-            if self.coin_clients[coin].get("connection_type") == "electrum":
+            if (
+                self.coin_clients[coin].get("connection_type") == "electrum"
+                or self.coin_clients[coin]["core_version"] is None
+            ):
                 version = ci.getDaemonVersion()
                 self.coin_clients[coin]["core_version"] = version
             else:
@@ -17409,6 +17770,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 rv["main_address"] = self.getCachedMainWalletAddress(ci)
                 if "max_lock_amount" in walletinfo:
                     rv["max_lock_amount"] = walletinfo["max_lock_amount"]
+            elif coin in self.evm_contract_coins:
+                rv["account"] = ci.getAccountIndex()
             elif coin == Coins.LTC:
                 if self.coin_clients[coin].get("connection_type") != "electrum":
                     try:
@@ -17614,7 +17977,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             if c not in chainparams:
                 continue
             cc = self.coin_clients[c]
-            if cc["connection_type"] in ("rpc", "electrum"):
+            if cc["connection_type"] in ("rpc", "electrum", "web3"):
                 if (
                     not force_update
                     and now - cc.get("last_updated_wallet_info", 0)

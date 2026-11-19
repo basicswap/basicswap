@@ -364,8 +364,8 @@
             const balanceType = element.getAttribute('data-balance-type');
             const value = coinData[balanceType];
             if (value !== undefined) {
-              const ticker = coinData.ticker || coinId.toUpperCase();
-              const newBalance = balanceType === 'est_fee' ? value : `${value} ${ticker}`;
+              const symbol = coinData.symbol || coinData.ticker || coinId.toUpperCase();
+              const newBalance = balanceType === 'est_fee' ? value : `${value} ${symbol}`;
               if (element.textContent !== newBalance) {
                 element.textContent = newBalance;
                 console.log(`Updated ${balanceType}: ${coinData.name} -> ${newBalance}`);
@@ -389,7 +389,7 @@
       if (!badge) return;
 
       if (pendingAmount > 0) {
-        badge.textContent = `Pending: +${coinData.pending} ${coinData.ticker}`;
+        badge.textContent = `Pending: +${coinData.pending} ${coinData.symbol || coinData.ticker}`;
         badge.style.display = '';
       } else {
         badge.style.display = 'none';
@@ -434,6 +434,7 @@
 
       const pathParts = window.location.pathname.split('/');
       const ticker = pathParts[pathParts.length - 1];
+      const symbol = document.getElementById('transaction-history-section').dataset.symbol;
 
       let currentPage = 1;
       let totalPages = 1;
@@ -561,7 +562,7 @@
                     ${classBadges[tx.tx_class] ? `<span class="inline-flex items-center py-1 px-2 rounded-full text-xs font-semibold ${classBadges[tx.tx_class].cls}">${classBadges[tx.tx_class].label}</span>` : ''}
                     ${tx.is_swap ? `<span class="inline-flex items-center py-1 px-2 rounded-full text-xs font-semibold bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300">Swap</span>` : ''}
                     <span class="font-semibold ${amountClass}">
-                      ${amountPrefix}${escapeHtml(tx.amount)} ${escapeHtml(ticker.toUpperCase())}
+                      ${amountPrefix}${escapeHtml(tx.amount)} ${escapeHtml(symbol)}
                     </span>
                   </div>
                   <div class="flex items-center gap-4 text-sm">

@@ -19,6 +19,8 @@ from basicswap.interface.pivx.chainparams import params as pivx_params
 from basicswap.interface.dash.chainparams import params as dash_params
 from basicswap.interface.firo.chainparams import params as firo_params
 from basicswap.interface.bch.chainparams import params as bch_params
+from basicswap.interface.eth.chainparams import params as eth_params
+from basicswap.interface.stable.chainparams import params as stable_params
 
 
 class Coins(IntEnum):
@@ -40,6 +42,8 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    ETH = 19
+    STABLE = 20
 
 
 class Fiat(IntEnum):
@@ -58,6 +62,9 @@ scriptless_coins = (
 )
 xmr_based_coins = (Coins.XMR, Coins.WOW)
 
+evm_contract_coins = (Coins.ETH, Coins.STABLE)
+
+
 chainparams = {
     Coins.PART: part_params,
     Coins.BTC: btc_params,
@@ -71,6 +78,8 @@ chainparams = {
     Coins.FIRO: firo_params,
     Coins.BCH: bch_params,
     Coins.DOGE: doge_params,
+    Coins.ETH: eth_params,
+    Coins.STABLE: stable_params,
 }
 
 name_map = {}

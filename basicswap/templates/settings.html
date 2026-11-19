@@ -425,7 +425,7 @@
              </div>
             </div>
            </div>
-           {% else %}
+           {% elif not c.is_evm %}
            <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Blocks Confirmed Target</label>
             <input type="number" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="conf_target_{{ c.name }}" min="1" max="32" value="{{ c.conf_target }}" placeholder="6">
@@ -457,6 +457,47 @@
             </span>
             {% endif %}
            </div>
+           {% if c.is_evm %}
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">JSON-RPC URL</label>
+            <input type="text" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="rpc_url_{{ c.name }}" value="{{ c.rpc_url }}" placeholder="http://127.0.0.1:8545">
+           </div>
+           <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Max Fee Per Gas (gwei)</label>
+            <input type="number" step="any" min="0" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="max_fee_gwei_{{ c.name }}" value="{{ c.max_fee_gwei }}" placeholder="No cap">
+            <p class="text-xs text-gray-500 dark:text-gray-300 mt-1">Transactions wait while the network fee is above this. Blank restores the default.</p>
+           </div>
+           <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Automatically Select Node</label>
+            <div class="relative">
+             <select class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" name="autosetdaemon_{{ c.name }}">
+              <option value="true" {% if c.autosetdaemon %} selected{% endif %}>True</option>
+              <option value="false" {% if not c.autosetdaemon %} selected{% endif %}>False</option>
+             </select>
+             <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+             </div>
+            </div>
+            <p id="rpc-node-error-{{ c.name }}" class="hidden text-sm text-red-500 mt-2" role="alert"></p>
+            <div class="rpc-nodes mt-4" data-coin="{{ c.name }}" data-nodes="{{ c.rpc_nodes | tojson | forceescape }}">
+             <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nodes</label>
+              <button type="button" class="rpc-check-all inline-flex items-center text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50">
+               <span class="rpc-check-all-label">Check all</span>
+              </button>
+             </div>
+             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Click a node to health-check it (queries the block height, shows latency). Tick <span class="font-medium">Failover</span> to have the coin switch to that node when the one in use stops answering. <span class="font-medium">Use</span> makes it the node in use.</p>
+             <ul class="rpc-node-list space-y-2 mb-2"></ul>
+             <p class="rpc-node-empty hidden text-xs text-gray-400 dark:text-gray-500 italic mb-2">No nodes configured.</p>
+             <div class="flex gap-2">
+              <input type="text" class="rpc-node-add-input hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none dark:bg-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 dark:placeholder-gray-400 text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-1 focus:outline-none" placeholder="https://ethereum-rpc.publicnode.com">
+              <button type="button" class="rpc-node-add-btn whitespace-nowrap px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">Add</button>
+             </div>
+            </div>
+           </div>
+           {% endif %}
 
           </div>
          </div>

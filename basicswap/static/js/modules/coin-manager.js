@@ -19,6 +19,25 @@ const CoinManager = (function() {
             icon: 'Monero.png'
         },
         {
+            symbol: 'ETH',
+            name: 'ethereum',
+            displayName: 'Ethereum',
+            aliases: ['eth', 'ethereum'],
+            priceKey: 'ethereum',
+            historicalDays: 30,
+            icon: 'Ethereum.png'
+        },
+        {
+            symbol: 'USDT0_STABLE',
+            displaySymbol: 'USDT0',
+            name: 'stable',
+            displayName: 'USDT0 (Stable)',
+            aliases: ['stable', 'usdt0', 'usdt0_stable', 'usdt0 (stable)'],
+            priceKey: 'stable',
+            historicalDays: 30,
+            icon: 'USDT0-(Stable).png'
+        },
+        {
             symbol: 'PART',
             name: 'particl',
             displayName: 'Particl',
@@ -153,6 +172,10 @@ const CoinManager = (function() {
         getSymbol: function(identifier) {
             const coin = getCoinByAnyIdentifier(identifier);
             return coin ? coin.symbol : null;
+        },
+        getDisplaySymbol: function(identifier) {
+            const coin = getCoinByAnyIdentifier(identifier);
+            return coin ? (coin.displaySymbol || coin.symbol) : null;
         },
         getDisplayName: function(identifier) {
             if (!identifier) return null;

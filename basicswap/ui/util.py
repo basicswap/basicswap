@@ -15,12 +15,14 @@ from basicswap.util import (
 from basicswap.chainparams import (
     Coins,
     chainparams,
+    evm_contract_coins,
     getCoinIdFromTicker,
 )
 from basicswap.basicswap_util import (
     ActionTypes,
     BidStates,
     DebugTypes,
+    bidStatesForSwapType,
     canAcceptBidState,
     getLastBidState,
     strBidState,
@@ -33,6 +35,7 @@ from basicswap.basicswap_util import (
 )
 
 from basicswap.protocols.xmr_swap_1 import getChainBSplitKey, getChainBRemoteSplitKey
+import basicswap.protocols.evm_xmr_swap_1 as evm_xmr_swap_1
 
 PAGE_LIMIT = 1000
 
@@ -155,11 +158,11 @@ def getTxSpendHex(bid, tx_type):
     return obj.spend_txid.hex() + " {}".format(obj.spend_n)
 
 
-def listBidStates():
-    rv = []
-    for s in BidStates:
-        rv.append((int(s), strBidState(s)))
-    return rv
+def listBidStates(swap_type=None):
+    states = (
+        bidStatesForSwapType(swap_type) if swap_type is not None else list(BidStates)
+    )
+    return [(int(s), strBidState(s)) for s in states]
 
 
 def listBidActions():
@@ -167,6 +170,83 @@ def listBidActions():
     for a in ActionTypes:
         rv.append((int(a), a.name))
     return rv
+
+
+def describeEvmXmrState(bid, offer, evm_swap, ci_from, ci_to) -> str:
+    evm_is_from: bool = Coins(offer.coin_from) in evm_contract_coins
+    evm: str = (ci_from if evm_is_from else ci_to).ticker()
+    xmr: str = (ci_to if evm_is_from else ci_from).ticker()
+    state = bid.state
+    if state == BidStates.BID_ACCEPTED:
+        return f"Bid accepted, waiting for the {evm} lock"
+    if state == BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+        if evm_swap is None or evm_swap.b_lock_tx_id is None:
+            return f"{evm} lock sent, waiting for the {xmr} lock"
+        return f"{xmr} lock sent, waiting for it to confirm and the {evm} lock to be released"
+    if state == BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED:
+        return f"Both locks confirmed, waiting for the {evm} side to release the {evm} lock"
+    if state == BidStates.XMR_SWAP_LOCK_RELEASED:
+        return f"{evm} lock released, waiting for the {xmr} side to claim it"
+    if state == BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED:
+        return f"{evm} lock claimed, waiting for the {evm} side to spend the {xmr} lock"
+    if state == BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED:
+        return f"{xmr} lock spend tx sent, waiting for it to confirm in chain"
+    return ""
+
+
+def addEvmXmrSwapData(
+    swap_client, data, bid, offer, evm_swap, show_txns, show_lock_transfers
+) -> None:
+    evm_is_from: bool = Coins(offer.coin_from) in evm_contract_coins
+    ci_evm = swap_client.ci(Coins(offer.coin_from if evm_is_from else offer.coin_to))
+    ci_xmr = swap_client.ci(Coins.XMR)
+    evm: str = ci_evm.ticker()
+    data["evm_xmr_swap"] = True
+    data["coin_a_lock_refund_tx_est_final"] = "None"
+    if evm_swap is None:
+        return
+    if evm_swap.timeout1:
+        data["evm_timeouts"] = [
+            (f"{evm} lock refundable until (unless released)", evm_swap.timeout1),
+            (f"{evm} lock claimable until", evm_swap.timeout2),
+            (f"{evm} lock late refund until", evm_swap.timeout3),
+            (f"{evm} lock claimable again from", evm_swap.timeout3),
+        ]
+    if not show_txns:
+        return
+
+    txns = []
+    for tx_type, txid in (
+        (f"{evm} Lock", evm_swap.evm_lock_tx_id),
+        (f"{evm} Lock Claim", evm_swap.evm_spend_tx_id),
+        (f"{evm} Lock Refund", evm_swap.evm_refund_tx_id),
+        (f"{evm} Gas Drip", evm_swap.gas_drip_txid),
+        ("Chain B Lock", evm_swap.b_lock_tx_id),
+    ):
+        if txid is not None:
+            txns.append({"type": tx_type, "txid": txid.hex(), "confirms": None})
+    for tx_type, tx in bid.txns.items():
+        txns.append({"type": strTxType(tx_type), "txid": tx.txid.hex()})
+    data["txns"] = txns
+
+    if (
+        evm_swap.evm_kbv
+        and evm_swap.xmr_kbv
+        and evm_swap.evm_pkbs
+        and evm_swap.xmr_pkbs
+    ):
+        kbv, Kbs = evm_xmr_swap_1.sharedKeys(swap_client, evm_swap)
+        data["xmr_b_shared_address"] = ci_xmr.encodeSharedAddress(
+            ci_xmr.getPubkey(kbv), Kbs
+        )
+        data["xmr_b_shared_viewkey"] = ci_xmr.encodeKey(kbv)
+        if show_lock_transfers:
+            data["lock_transfers"] = json.dumps(
+                ci_xmr.showLockTransfers(kbv, Kbs, bid.chain_b_height_start),
+                indent=4,
+            )
+    elif show_lock_transfers:
+        data["lock_transfers"] = "Shared address not yet known."
 
 
 def describeBid(
@@ -252,7 +332,11 @@ def describeBid(
             state_description = "Bid abandoned"
         elif bid.state == BidStates.BID_ERROR:
             state_description = "Bid error"
-    elif offer.swap_type == SwapTypes.XMR_SWAP:
+    elif offer.swap_type == SwapTypes.EVM_XMR_SWAP and (
+        evm_description := describeEvmXmrState(bid, offer, xmr_swap, ci_from, ci_to)
+    ):
+        state_description = evm_description
+    elif offer.swap_type in (SwapTypes.XMR_SWAP, SwapTypes.EVM_XMR_SWAP):
         if bid.state == BidStates.BID_SENT:
             state_description = "Bid sent, waiting for offerer to accept"
         elif bid.state == BidStates.BID_RECEIVING:
@@ -403,7 +487,7 @@ def describeBid(
 
     if edit_bid:
         data["bid_state_ind"] = int(bid.state)
-        data["bid_states"] = listBidStates()
+        data["bid_states"] = listBidStates(offer.swap_type)
 
         if swap_client.debug_ui:
             data["debug_ind"] = bid.debug_ind
@@ -574,6 +658,11 @@ def describeBid(
                     bid.participate_tx.tx_data
                 )
 
+    if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+        addEvmXmrSwapData(
+            swap_client, data, bid, offer, xmr_swap, show_txns, show_lock_transfers
+        )
+
     if offer.swap_type == SwapTypes.XMR_SWAP:
         data["coin_a_lock_refund_tx_est_final"] = "None"
         data["coin_a_lock_refund_swipe_tx_est_final"] = "None"
@@ -717,7 +806,7 @@ def listAvailableCoins(swap_client, with_variants=True, split_from=False):
     for k, v in swap_client.coin_clients.items():
         if k not in chainparams:
             continue
-        if v["connection_type"] in ("rpc", "electrum"):
+        if v["connection_type"] in ("rpc", "electrum", "web3"):
             coins.append((int(k), getCoinName(k)))
             if split_from:
                 coins_from.append(coins[-1])
@@ -744,7 +833,7 @@ def listAvailableCoinsWithBalances(swap_client, with_variants=True, split_from=F
     for k, v in swap_client.coin_clients.items():
         if k not in chainparams:
             continue
-        if v["connection_type"] in ("rpc", "electrum"):
+        if v["connection_type"] in ("rpc", "electrum", "web3"):
 
             balance = "0.0"
             if k in wallets:
