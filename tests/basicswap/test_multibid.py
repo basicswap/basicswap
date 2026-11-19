@@ -12,7 +12,11 @@ import unittest
 
 from types import SimpleNamespace
 
-from basicswap.basicswap_util import ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER, SwapTypes
+from basicswap.basicswap_util import (
+    ADAPTOR_SIG_LOCK_SPEND_FEE_BUFFER,
+    BidStates,
+    SwapTypes,
+)
 from basicswap.bidplanner import (
     AUTO_ACCEPT_ANY,
     AUTO_ACCEPT_NONE,
@@ -28,6 +32,7 @@ from basicswap.bidplanner import (
 )
 from basicswap.chainparams import Coins
 from basicswap.interface.btc.btc import BTCInterface
+from basicswap.interface.eth.eth import ETHInterface
 from basicswap.interface.ltc.ltc import LTCInterface
 from basicswap.interface.xmr.xmr import XMRInterface
 from basicswap.js_server import js_bids_bulk
@@ -42,7 +47,7 @@ from basicswap.multibid import (
 )
 from basicswap.util import format_amount, make_int
 
-EXP = {Coins.XMR: 12, Coins.LTC: 8, Coins.BTC: 8}
+EXP = {Coins.XMR: 12, Coins.LTC: 8, Coins.BTC: 8, Coins.ETH: 8}
 XMR_TX_WEIGHTS = {1: 1604, 2: 2216}
 
 
@@ -114,6 +119,27 @@ def make_ci(cls, balance: int = 0, fee_rate: float = 0.0, redeem_fee_rate=None):
     return ci
 
 
+# Fixed EVM gas costs, in ETH units; the real ones come from the node's gas price
+EVM_CLAIM_FEE = 100_000
+EVM_LOCK_FEE = 100_000
+EVM_READY_FEE = 50_000
+EVM_DRIP = 150_000
+EVM_SWAP_FEE = EVM_LOCK_FEE + EVM_READY_FEE + EVM_DRIP
+EVM_REFUND_RESERVE = 200_000
+
+
+def make_evm_ci(balance: int):
+    ci = ETHInterface.__new__(ETHInterface)
+    ci.estClaimFee = lambda: EVM_CLAIM_FEE
+    ci._rpc = SimpleNamespace(gas_price=lambda: 1)
+    ci.estSwapFee = lambda lock=True, ready=True, drip=True, gas_price=None: (
+        lock * EVM_LOCK_FEE + ready * EVM_READY_FEE + drip * EVM_DRIP
+    )
+    ci.refundReserve = lambda gas_price=None: EVM_REFUND_RESERVE
+    ci.getSpendableBalance = lambda: balance
+    return ci
+
+
 def xmr_redeem_fee(swap_client) -> int:
     ci = swap_client.ci(Coins.XMR)
     return ci.feeForVSize(ci.getRedeemFeeRate(), ci.xmr_swap_b_lock_spend_tx_vsize())
@@ -153,6 +179,8 @@ class FakeOffer:
 
 
 class FakeSwapClient:
+    evm_contract_coins = (Coins.ETH, Coins.STABLE)
+
     def __init__(
         self,
         offers=(),
@@ -163,6 +191,8 @@ class FakeSwapClient:
     ):
         self.offers = list(offers)
         self.market_rate = market_rate
+        self.swaps_in_progress = {}
+        self.evm_swaps = {}
         self.log = logging.getLogger("fake")
         self.list_filters = None
         self.posted = []
@@ -180,6 +210,7 @@ class FakeSwapClient:
             ),
             Coins.LTC: make_ci(LTCInterface, balance=balance, fee_rate=fee_rate),
             Coins.BTC: make_ci(BTCInterface, balance=balance, fee_rate=fee_rate),
+            Coins.ETH: make_evm_ci(balance),
         }
 
     def getXmrOffer(self, offer_id: bytes, cursor=None):
@@ -193,8 +224,19 @@ class FakeSwapClient:
         )
         return offer, xmr_offer
 
+    def openDB(self, cursor=None):
+        return cursor
+
+    def closeDB(self, cursor, commit=True):
+        pass
+
+    def queryOne(self, table, cursor, constraints):
+        return self.evm_swaps.get(constraints["bid_id"])
+
     def is_reverse_ads_bid(self, coin_from, coin_to) -> bool:
         # Monero is the scriptless coin, so buying it is a reverse bid.
+        if {Coins(int(coin_from)), Coins(int(coin_to))} & set(self.evm_contract_coins):
+            return False
         return Coins(int(coin_from)) == Coins.XMR
 
     def ci(self, coin_type):
@@ -676,6 +718,126 @@ class TestPlanMultiBid(unittest.TestCase):
         plan, _, _ = planMultiBid(swap_client, Coins.XMR, Coins.LTC, FILL_SPEND, ltc(1))
 
         self.assertIn((b"chunky", REASON_MIN_TOO_HIGH), exclusions(plan))
+
+
+class TestEvmPairs(unittest.TestCase):
+    def test_buying_eth_with_xmr(self):
+        book = [
+            FakeOffer(
+                b"E1", 2, 0.5, Coins.ETH, Coins.XMR, swap_type=SwapTypes.EVM_XMR_SWAP
+            ),
+            FakeOffer(
+                b"E2", 2, 0.52, Coins.ETH, Coins.XMR, swap_type=SwapTypes.EVM_XMR_SWAP
+            ),
+        ]
+        swap_client = FakeSwapClient(book, market_rate=xmr(0.5), balance=xmr(5))
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.ETH, Coins.XMR, FILL_RECEIVE, units(3, Coins.ETH)
+        )
+        # Receive mode grosses up by each leg's claim fee
+        self.assertEqual([leg.offer_id for leg in plan.legs], [b"E1", b"E2"])
+        self.assertEqual(plan.fees, 2 * EVM_CLAIM_FEE)
+        self.assertEqual(plan.total_receive, units(3, Coins.ETH) + 2 * EVM_CLAIM_FEE)
+
+        placeMultiBid(
+            swap_client,
+            [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs],
+        )
+        self.assertEqual([p[0] for p in swap_client.posted], ["postBid", "postBid"])
+        self.assertTrue(
+            all("reserved_prevouts" not in o for o in swap_client.post_options)
+        )
+
+    def test_buying_xmr_with_eth(self):
+        book = [
+            FakeOffer(
+                b"X1", 1, 2.0, Coins.XMR, Coins.ETH, swap_type=SwapTypes.EVM_XMR_SWAP
+            ),
+            FakeOffer(
+                b"X2", 1, 2.0, Coins.XMR, Coins.ETH, swap_type=SwapTypes.EVM_XMR_SWAP
+            ),
+        ]
+        balance: int = units(3, Coins.ETH)
+        swap_client = FakeSwapClient(
+            book, market_rate=units(2.0, Coins.ETH), fee_rate=0.0001
+        )
+        swap_client._cis[Coins.ETH] = make_evm_ci(balance)
+        ci_xmr = swap_client.ci(Coins.XMR)
+        sweep_fee: int = ci_xmr.feeForVSize(
+            ci_xmr.make_int(0.0001, r=1), ci_xmr.xmr_swap_b_lock_spend_tx_vsize()
+        )
+
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.XMR, Coins.ETH, FILL_SPEND, None, spend_max=True
+        )
+        self.assertEqual(plan.num_bids, 2)
+        # Spend max leaves each leg's escrow gas and refund reserve in the account
+        self.assertEqual(
+            plan.total_spend, balance - 2 * (EVM_SWAP_FEE + EVM_REFUND_RESERVE)
+        )
+        self.assertEqual(plan.fees, 2 * sweep_fee)
+
+        legs = [{"offer_id": leg.offer_id, "amount": leg.amount} for leg in plan.legs]
+        swap_client._cis[Coins.ETH] = make_evm_ci(balance - 1)
+        with self.assertRaisesRegex(ValueError, "Insufficient"):
+            placeMultiBid(swap_client, legs)
+        swap_client._cis[Coins.ETH] = make_evm_ci(balance)
+        placed, failed, _ = placeMultiBid(swap_client, legs)
+        self.assertEqual((len(placed), failed), (2, []))
+        self.assertTrue(
+            all("reserved_prevouts" not in o for o in swap_client.post_options)
+        )
+
+    def test_open_evm_swap_is_held_back(self):
+        book = [
+            FakeOffer(
+                b"X1", 1, 2.0, Coins.XMR, Coins.ETH, swap_type=SwapTypes.EVM_XMR_SWAP
+            ),
+            FakeOffer(
+                b"X2", 1, 2.0, Coins.XMR, Coins.ETH, swap_type=SwapTypes.EVM_XMR_SWAP
+            ),
+        ]
+        balance: int = units(3, Coins.ETH)
+        swap_client = FakeSwapClient(
+            book, market_rate=units(2.0, Coins.ETH), fee_rate=0.0001
+        )
+        swap_client._cis[Coins.ETH] = make_evm_ci(balance)
+        # Our bid on an XMR->ETH offer, accepted, its escrow not yet sent
+        escrow: int = units(0.5, Coins.ETH)
+        swap_client.swaps_in_progress[b"open"] = (
+            SimpleNamespace(
+                state=BidStates.BID_ACCEPTED,
+                was_received=False,
+                amount=units(0.25, Coins.XMR),
+                amount_to=escrow,
+            ),
+            book[0],
+        )
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.XMR, Coins.ETH, FILL_SPEND, None, spend_max=True
+        )
+        needs: int = EVM_SWAP_FEE + EVM_REFUND_RESERVE
+        self.assertEqual(plan.total_spend, balance - escrow - needs - 2 * needs)
+
+        # Once locked, its escrow and lock gas are spent; after the drip, only
+        # setReady and the reserve remain
+        bid = swap_client.swaps_in_progress[b"open"][0]
+        bid.state = BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED
+        swap_client.evm_swaps[b"open"] = SimpleNamespace(
+            gas_request=1, gas_drip_txid=b"sent"
+        )
+        swap_client._cis[Coins.ETH] = make_evm_ci(balance - escrow - EVM_LOCK_FEE)
+        plan, _, _ = planMultiBid(
+            swap_client, Coins.XMR, Coins.ETH, FILL_SPEND, None, spend_max=True
+        )
+        self.assertEqual(
+            plan.total_spend,
+            balance
+            - escrow
+            - EVM_LOCK_FEE
+            - (EVM_READY_FEE + EVM_REFUND_RESERVE)
+            - 2 * needs,
+        )
 
 
 class TestRateScale(unittest.TestCase):

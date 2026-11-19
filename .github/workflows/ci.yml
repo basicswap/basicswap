@@ -32,6 +32,7 @@ jobs:
     outputs:
       test_matrix: ${{ steps.matrix.outputs.matrix }}
       plans: ${{ steps.filter.outputs.plans }}
+      evm: ${{ steps.filter.outputs.evm }}
     steps:
     - uses: actions/checkout@v7
     - id: filter
@@ -67,6 +68,14 @@ jobs:
             - 'basicswap/interface/xmr/xmr.py'
             - 'basicswap/wallet_manager.py'
             - 'tests/basicswap/test_btc_xmr.py'
+          evm:
+            - 'basicswap/interface/evm/**'
+            - 'basicswap/interface/eth/**'
+            - 'basicswap/interface/stable/**'
+            - 'basicswap/protocols/evm_xmr_swap_1.py'
+            - 'tests/basicswap/test_eth.py'
+            - 'tests/basicswap/test_evm_*.py'
+            - 'tests/basicswap/util/anvil.py'
     - name: Build coin test matrix
       id: matrix
       env:
@@ -202,6 +211,7 @@ jobs:
               pytest tests/basicswap/test_bidplanner.py
               pytest tests/basicswap/test_multibid.py
               pytest tests/basicswap/test_batch_lock.py
+              pytest tests/basicswap/test_evm_xmr_messages.py
           - name: test_nostr
             command: |
               pytest tests/basicswap/test_nostr.py
@@ -367,6 +377,48 @@ jobs:
         export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
         export XMR_BINDIR="$BIN_DIR/monero"
         pytest tests/basicswap/test_btc_xmr.py::${{ matrix.klass || 'TestBTC' }} -k "${{ matrix.tests }}"
+
+  test_evm:
+    needs: [changes, prepare-cores]
+    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.evm == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: pip
+        cache-dependency-path: |
+          requirements.txt
+          pyproject.toml
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt --require-hashes
+        pip install .[dev]
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf  # v1.9.2
+      with:
+        version: v1.7.1
+    - name: Prepare core versions file
+      run: |
+        basicswap-prepare --version --withcoins="$BASE_COINS" | tail -n +2 > core_versions.txt
+    - name: Restore coin cores cache
+      uses: actions/cache/restore@v6
+      with:
+        path: /tmp/cached_bin
+        key: cores-${{ runner.os }}-${{ hashFiles('**/core_versions.txt') }}
+        fail-on-cache-miss: true
+    - name: Run test_evm
+      run: |
+        export PYTHONPATH=$(pwd)
+        export ANVIL_BINDIR="$(dirname "$(which anvil)")"
+        export PARTICL_BINDIR="$BIN_DIR/particl"
+        export BITCOIN_BINDIR="$BIN_DIR/bitcoin"
+        export XMR_BINDIR="$BIN_DIR/monero"
+        pytest tests/basicswap/test_eth.py tests/basicswap/test_evm_xmr.py
+        pytest -x tests/basicswap/test_evm_xmr_p2p.py
 
   test_coins:
     needs: [changes, prepare-cores]
