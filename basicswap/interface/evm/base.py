@@ -10,31 +10,35 @@ Base interface for EVM-native-currency coins in basicswap.
 An EVM coin is account-based (like XMR) and is the "script/escrow coin" of an
 EVM_XMR_SWAP: swap funds are escrowed in the SwapCreator contract rather than a
 UTXO script.  This base manages an EVM account (HD-derived from the basicswap
-seed), connects to an external JSON-RPC node via web3, and wraps the contract.
+seed), connects to an external JSON-RPC node, and wraps the contract.
 
 Concrete coins (ETH, and further EVM chains) subclass EVMInterface and provide
 only their identity: coin_type(), ticker_str(), COIN() and per-network
 chainparams.  Everything else here is chain-agnostic.
 """
 
+import http.client
+import json
 import logging
 import time
+import urllib.error
 
 from enum import IntEnum
 from urllib.parse import urlparse
 
-import requests
-
 from eth_abi import decode as abi_decode, encode as abi_encode
-from eth_account import Account
-from eth_utils import function_signature_to_4byte_selector
-from eth_account.signers.local import LocalAccount
-from web3 import Web3
-from web3.exceptions import ProviderConnectionError, Web3RPCError
+from eth_utils import (
+    function_signature_to_4byte_selector,
+    is_address,
+    keccak,
+    to_canonical_address,
+    to_checksum_address,
+)
 
 from basicswap.db import EvmSignedTx, EvmWalletTx
 from basicswap.interface.base import CoinInterface, Curves
-from basicswap.interface.evm.rpc import EthRpcClient, EthRpcError
+from basicswap.interface.evm.keys import LocalAccount
+from basicswap.interface.evm.rpc import EthRpcClient, EthRpcError, RevertError, RpcError
 from basicswap.interface.evm.swapcreator import SwapContract, SwapCreator
 from basicswap.interface.evm.swapfactory import SwapFactory
 from basicswap.util import TemporaryError
@@ -160,8 +164,17 @@ class EVMInterface(CoinInterface):
 
     def is_transient_error(self, ex) -> bool:
         """Node trouble: rate limits, a lagging node, an unreachable one."""
+        if isinstance(ex, RpcError) and not isinstance(ex, RevertError):
+            return True
         if isinstance(
-            ex, (requests.RequestException, ProviderConnectionError, Web3RPCError)
+            ex,
+            (
+                urllib.error.URLError,
+                http.client.HTTPException,
+                ConnectionError,
+                TimeoutError,
+                json.JSONDecodeError,
+            ),
         ):
             return True
         return super().is_transient_error(ex)
@@ -205,8 +218,7 @@ class EVMInterface(CoinInterface):
             reason = "bypassing proxy (private ip address)"
             proxy = None
         else:
-            # socks5h so the node's hostname is resolved through tor too
-            proxy = f"socks5h://{sc.tor_proxy_host}:{sc.tor_proxy_port}"
+            proxy = (sc.tor_proxy_host, sc.tor_proxy_port)
             reason = f"through proxy at {sc.tor_proxy_host}"
         if log:
             self._log.info(f"Connecting to {self.coin_name()} node at {host} {reason}.")
@@ -226,12 +238,12 @@ class EVMInterface(CoinInterface):
     def getContract(self, address=None) -> SwapContract:
         """The contract at address, as the design its code hash is pinned to;
         unpinned, as SWAP_CONTRACT."""
-        address = Web3.to_checksum_address(address or self.getContractAddress())
+        address = to_checksum_address(address or self.getContractAddress())
         if self._contract is None or self._contract.address != address:
             code_hashes = self._deployment.get("code_hashes")
             design = self.SWAP_CONTRACT
             if code_hashes is not None:
-                code_hash: str = Web3.keccak(self.rpc.w3.eth.get_code(address)).hex()
+                code_hash: str = keccak(self.rpc.get_code(address)).hex()
                 if code_hash not in code_hashes:
                     raise ValueError(f"No known swap contract at {address}")
                 design = CONTRACT_DESIGNS[code_hashes[code_hash]]
@@ -250,7 +262,7 @@ class EVMInterface(CoinInterface):
         data = function_signature_to_4byte_selector(
             self._blocklist_function
         ) + abi_encode(["address"], [address])
-        result = self.rpc.w3.eth.call({"to": self._blocklist, "data": data})
+        result = self.rpc.eth_call(self._blocklist, data)
         return abi_decode(["bool"], result)[0]
 
     def getMaxFeePerGas(self):
@@ -284,7 +296,7 @@ class EVMInterface(CoinInterface):
 
     def setActiveAccount(self, private_key) -> None:
         """Import a raw private key (e.g. an anvil test account)."""
-        self._account = Account.from_key(private_key)
+        self._account = LocalAccount(private_key)
 
     def getAccountIndex(self) -> int:
         return self._account_index
@@ -312,7 +324,7 @@ class EVMInterface(CoinInterface):
         # wallet to be unlocked.
         if self._swap_client is None:
             raise ValueError("EVM wallet account not initialised")
-        self._account = Account.from_key(self.accountKey(self._account_index)[:32])
+        self._account = LocalAccount(self.accountKey(self._account_index)[:32])
         self.setWalletSeedWarning(False)
         return self._account
 
@@ -361,9 +373,7 @@ class EVMInterface(CoinInterface):
 
     def getSeedHash(self, seed: bytes, length: int = 20) -> bytes:
         # Seed id for the wallet is its derived account address bytes.
-
-        acct = Account.from_key(seed[:32])
-        return bytes(Web3.to_bytes(hexstr=acct.address))
+        return to_canonical_address(LocalAccount(seed[:32]).address)
 
     def getWalletSeedID(self) -> str:
         return self.getSeedHash(
@@ -413,8 +423,7 @@ class EVMInterface(CoinInterface):
 
     def isValidAddress(self, address: str) -> bool:
         try:
-
-            return Web3.is_address(address)
+            return is_address(address)
         except Exception:
             return False
 
@@ -686,7 +695,7 @@ class EVMInterface(CoinInterface):
         the last was dropped; returns its receipt, or its handle without wait.
 
         sign(nonce) returns (tx hash, raw tx). bump_at is the chain time from which
-        bumpTxs re-signs it. Raises TimeExhausted while unmined, TemporaryError while
+        bumpTxs re-signs it. Raises ReceiptTimeout while unmined, TemporaryError while
         its nonce is used but no version has a receipt, and EthRpcError if it
         reverted or the node refused it; a later call then signs it again.
         """
