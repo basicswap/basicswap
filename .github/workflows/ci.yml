@@ -72,6 +72,7 @@ jobs:
             - 'basicswap/interface/evm/**'
             - 'basicswap/interface/eth/**'
             - 'basicswap/interface/stable/**'
+            - 'basicswap/interface/arc/**'
             - 'basicswap/protocols/evm_xmr_swap_1.py'
             - 'tests/basicswap/test_eth.py'
             - 'tests/basicswap/test_evm_*.py'

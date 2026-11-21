@@ -21,6 +21,7 @@ from basicswap.interface.firo.chainparams import params as firo_params
 from basicswap.interface.bch.chainparams import params as bch_params
 from basicswap.interface.eth.chainparams import params as eth_params
 from basicswap.interface.stable.chainparams import params as stable_params
+from basicswap.interface.arc.chainparams import params as arc_params
 
 
 class Coins(IntEnum):
@@ -44,6 +45,7 @@ class Coins(IntEnum):
     DOGE = 18
     ETH = 19
     STABLE = 20
+    ARC = 21
 
 
 class Fiat(IntEnum):
@@ -62,7 +64,7 @@ scriptless_coins = (
 )
 xmr_based_coins = (Coins.XMR, Coins.WOW)
 
-evm_contract_coins = (Coins.ETH, Coins.STABLE)
+evm_contract_coins = (Coins.ETH, Coins.STABLE, Coins.ARC)
 
 
 chainparams = {
@@ -80,6 +82,7 @@ chainparams = {
     Coins.DOGE: doge_params,
     Coins.ETH: eth_params,
     Coins.STABLE: stable_params,
+    Coins.ARC: arc_params,
 }
 
 name_map = {}

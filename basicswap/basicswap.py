@@ -1406,6 +1406,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.stable.stable import STABLEInterface
 
             return STABLEInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.ARC:
+            from .interface.arc.arc import ARCInterface
+
+            return ARCInterface(self.coin_clients[coin], self.chain, self)
         else:
             raise ValueError("Unknown coin type")
 

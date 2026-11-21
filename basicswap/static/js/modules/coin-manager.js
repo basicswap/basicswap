@@ -38,6 +38,16 @@ const CoinManager = (function() {
             icon: 'USDT0-(Stable).png'
         },
         {
+            symbol: 'USDC_ARC',
+            displaySymbol: 'USDC',
+            name: 'arc',
+            displayName: 'USDC (Arc)',
+            aliases: ['arc', 'usdc', 'usdc_arc', 'usdc (arc)'],
+            priceKey: 'arc',
+            historicalDays: 30,
+            icon: 'USDC-(Arc).png'
+        },
+        {
             symbol: 'PART',
             name: 'particl',
             displayName: 'Particl',
