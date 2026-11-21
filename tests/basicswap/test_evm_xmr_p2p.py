@@ -57,7 +57,7 @@ class Test(BaseTest):
     def prepareExtraCoins(cls):
         to = cls.swap_clients[0].ci(Coins.ETH).account.address
         txid = cls.anvil.iface(KEY_0).withdrawCoin("100", to, False)
-        cls.anvil.w3.eth.wait_for_transaction_receipt(txid)
+        cls.anvil.rpc.wait_receipt(bytes.fromhex(txid))
 
     @classmethod
     def tearDownClass(cls):

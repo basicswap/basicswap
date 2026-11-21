@@ -13,7 +13,8 @@ with ecrecover, so the secret is the same 32-byte key the Monero side uses.
 """
 
 from coincurve import PublicKey
-from web3 import Web3
+from eth_keys import keys
+from eth_utils import keccak
 
 from basicswap.util.ecc import ep
 
@@ -21,9 +22,17 @@ from basicswap.util.ecc import ep
 def commitment(pk_secp256k1: bytes) -> bytes:
     """keccak256 of the uncompressed x||y; the contract compares its low 160 bits."""
     xy: bytes = PublicKey(bytes(pk_secp256k1)).format(compressed=False)[1:]
-    return bytes(Web3.keccak(xy))
+    return keccak(xy)
 
 
 def revealed_key(secret: bytes) -> bytes:
     """A secret from Claimed/Refunded as a key; the contract accepts it unreduced."""
     return (int.from_bytes(secret, "big") % ep.o).to_bytes(32, "big")
+
+
+class LocalAccount:
+    """A private key and its address."""
+
+    def __init__(self, key: bytes):
+        self.key = bytes(key)
+        self.address: str = keys.PrivateKey(self.key).public_key.to_checksum_address()

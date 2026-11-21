@@ -20,13 +20,13 @@ import unittest
 from unittest import mock
 
 from coincurve import PrivateKey
-from eth_account import Account
 
 from basicswap.basicswap_util import BidStates
 from basicswap.chainparams import Coins
 from basicswap.db import Bid, EvmSignedTx, EvmXmrSwap
 from basicswap.interface.eth.eth import ETHInterface
 from basicswap.interface.evm import keys as evmkeys
+from basicswap.interface.evm.keys import LocalAccount
 from basicswap.util import TemporaryError
 from basicswap.util.ecc import ep, getSecretBytes
 from basicswap.interface.evm.base import nodesWithSelected, validateRpcUrl
@@ -44,7 +44,9 @@ from tests.basicswap.util.anvil import (
 ANVIL_PORT = int(os.environ.get("TEST_ANVIL_PORT", "8656"))
 DURATION = 3600
 # anvil's third deterministic account, left to the bump test
-KEY_2 = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
+KEY_2 = bytes.fromhex(
+    "5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
+)
 
 
 def _secret(small: bool = False) -> bytes:
@@ -236,7 +238,12 @@ class EthSettlementTest(unittest.TestCase):
         rpc = self.anvil.iface(KEY_0).rpc
         fees = rpc.fee_params()
         needed: int = (
-            self.anvil.w3.eth.fee_history(1, "latest")["baseFeePerGas"][-1]
+            int(
+                self.anvil.rpc.request("eth_feeHistory", ["0x1", "latest", []])[
+                    "baseFeePerGas"
+                ][-1],
+                16,
+            )
             + fees["maxPriorityFeePerGas"]
         )
         rpc.max_fee_per_gas = needed - 1
@@ -253,7 +260,7 @@ class EthSettlementTest(unittest.TestCase):
 
     def test_05d_bump_stuck_txs(self):
         ci = self.anvil.iface(KEY_2)
-        w3 = self.anvil.w3
+        anvil = self.anvil.rpc
         to = self.anvil.iface(KEY_1).account.address
 
         def transfer(n):
@@ -270,10 +277,10 @@ class EthSettlementTest(unittest.TestCase):
         def priceUp():
             # Above what any version so far was signed at
             base = 4 * ci.rpc.fee_params(capped=False)["maxFeePerGas"]
-            w3.provider.make_request("anvil_setNextBlockBaseFeePerGas", [hex(base)])
-            w3.provider.make_request("evm_mine", [])
+            anvil.request("anvil_setNextBlockBaseFeePerGas", [hex(base)])
+            anvil.request("evm_mine")
 
-        w3.provider.make_request("evm_setAutomine", [False])
+        anvil.request("evm_setAutomine", [False])
         try:
             now = ci.rpc.get_block_time()
             blocker = ci.sendTx(transfer, "drip", b"bid", wait=False)
@@ -293,7 +300,7 @@ class EthSettlementTest(unittest.TestCase):
             self.assertEqual(len(versions(blocker)), 2)
             self.assertEqual(len(versions(urgent)), 2)
 
-            w3.provider.make_request("evm_mine", [])
+            anvil.request("evm_mine")
             receipt = ci.receiptFor(urgent)
             self.assertEqual(receipt["status"], 1)
             self.assertEqual(bytes(receipt["transactionHash"]), versions(urgent)[1])
@@ -301,22 +308,22 @@ class EthSettlementTest(unittest.TestCase):
             self.assertEqual(ci.sendTx(transfer, "claim", b"bid", wait=False), urgent)
             self.assertEqual(len(versions(urgent)), 2)
         finally:
-            w3.provider.make_request("evm_setAutomine", [True])
+            anvil.request("evm_setAutomine", [True])
 
     def test_05c_withdraw(self):
         sender = self.anvil.iface(KEY_0)
         to = self.anvil.iface(KEY_1).account.address
-        w3 = self.anvil.w3
+        rpc = self.anvil.rpc
 
-        before = w3.eth.get_balance(to)
+        before = rpc.get_balance(to)
         txid = sender.withdrawCoin("12.5", to, False)
-        w3.eth.wait_for_transaction_receipt(txid)
-        self.assertEqual(w3.eth.get_balance(to) - before, 125 * 10**17)
+        rpc.wait_receipt(bytes.fromhex(txid))
+        self.assertEqual(rpc.get_balance(to) - before, 125 * 10**17)
 
-        before = w3.eth.get_balance(to)
+        before = rpc.get_balance(to)
         txid = sender.withdrawCoin("1", to, True)
-        w3.eth.wait_for_transaction_receipt(txid)
-        received = w3.eth.get_balance(to) - before
+        rpc.wait_receipt(bytes.fromhex(txid))
+        received = rpc.get_balance(to) - before
         self.assertTrue(0 < received < 10**18)
 
         with self.assertRaises(ValueError):
@@ -341,8 +348,8 @@ class EthSettlementTest(unittest.TestCase):
         )
         self.assertGreaterEqual(rpc.get_block_number(), 1)
         self.assertEqual(switched, [live])
-        self.assertIn("error", rpc.w3.provider.make_request("no_such_method", []))
-        self.assertEqual(rpc.w3.provider.current, 1)
+        self.assertIn("error", rpc.provider.make_request("no_such_method", []))
+        self.assertEqual(rpc.provider.current, 1)
 
         self.assertGreaterEqual(
             EthRpcClient([(live, None)], chain_id=31337).get_block_number(), 1
@@ -378,7 +385,7 @@ class EthSettlementTest(unittest.TestCase):
 
     def test_05e_accounts(self):
         coin: int = int(Coins.ETH)
-        root_key: bytes = bytes.fromhex(KEY_0[2:])
+        root_key: bytes = KEY_0
         sc = mock.Mock(log=None)
         sc.getWalletKey.return_value = root_key
         sc.getWalletKeyAtPath.side_effect = lambda p: hashlib.sha256(
@@ -387,16 +394,14 @@ class EthSettlementTest(unittest.TestCase):
 
         def address(cs, network, path):
             ci = ETHInterface(cs, network, swap_client=sc)
-            expect = Account.from_key(hashlib.sha256(path.encode()).digest()).address
+            expect = LocalAccount(hashlib.sha256(path.encode()).digest()).address
             self.assertEqual(ci.account.address, expect)
             return ci
 
         # Every account is hardened, 0 included; the seed root is never one
         account_0 = address({}, "mainnet", f"44445555h/1h/{coin}h/0h")
         ci = address({"account": 3}, "mainnet", f"44445555h/1h/{coin}h/3h")
-        self.assertNotEqual(
-            account_0.account.address, Account.from_key(root_key).address
-        )
+        self.assertNotEqual(account_0.account.address, LocalAccount(root_key).address)
         seed_id: str = account_0.getSeedHash(root_key).hex()
         self.assertEqual(account_0.getWalletSeedID(), seed_id)
         self.assertEqual(ci.getWalletSeedID(), seed_id)

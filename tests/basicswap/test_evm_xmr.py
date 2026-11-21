@@ -24,9 +24,7 @@ import unittest
 from types import SimpleNamespace
 
 from coincurve import PublicKey
-from eth_account import Account
-from web3 import Web3
-from web3.exceptions import TimeExhausted
+from eth_utils import to_checksum_address
 
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
@@ -34,7 +32,8 @@ from basicswap.interface.eth.chainparams import ETH_COIN
 from basicswap.basicswap_util import ActionTypes, BidStates, MessageTypes, SwapTypes
 from basicswap.db import Bid, EvmXmrSwap, Offer
 from basicswap.interface.evm import keys as evmkeys
-from basicswap.interface.evm.rpc import EthRpcClient
+from basicswap.interface.evm.keys import LocalAccount
+from basicswap.interface.evm.rpc import EthRpcClient, ReceiptTimeout
 from basicswap.interface.evm.swapfactory import SwapFactory
 from basicswap.interface.xmr.xmr import XMRInterface
 from basicswap.messages_npb import EvmXmrLockMessage
@@ -564,7 +563,7 @@ class EvmXmrDriverTest(unittest.TestCase):
     def test_14_evm_lock_on_another_contract(self):
         evm, xmr, ledger = self._pair()
         design = type(ethdrv._contract(evm, evm._store[EvmXmrSwap]))
-        other = design(evm._eth.rpc, self.anvil._deploy(Account.from_key(KEY_0)))
+        other = design(evm._eth.rpc, self.anvil._deploy(LocalAccount(KEY_0)))
         self._hostile_lock(evm, xmr, contract=other)
         bid = xmr._store[Bid]
         ethdrv.checkEvmXmrBidState(xmr, bid.bid_id, bid, xmr._store[Offer])
@@ -577,10 +576,8 @@ class EvmXmrDriverTest(unittest.TestCase):
         self.assertEqual(evm.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
         self._deliver_lock(evm, xmr)
         # A blocklist that blocks every address
-        blocklist = Web3.to_checksum_address("0x" + "b1" * 20)
-        self.anvil.w3.provider.make_request(
-            "anvil_setCode", [blocklist, "0x600160005260206000f3"]
-        )
+        blocklist = to_checksum_address("0x" + "b1" * 20)
+        self.anvil.rpc.request("anvil_setCode", [blocklist, "0x600160005260206000f3"])
         xmr._eth._blocklist = blocklist
         xmr._eth._blocklist_function = "isBlocked(address)"
         self.assertEqual(xmr.step(), BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED)
@@ -646,7 +643,7 @@ class EvmXmrDriverTest(unittest.TestCase):
 
     def test_09_gas_drip(self):
         # An XMR side with no gas asks for it; the drip pays for its claim
-        evm, xmr, ledger = self._locked(xmr_key="0x" + secrets.token_hex(32))
+        evm, xmr, ledger = self._locked(xmr_key=secrets.token_bytes(32))
         self.assertEqual(xmr._eth.getSpendableBalance(), 0)
         self.assertGreater(evm._store[EvmXmrSwap].gas_request, 0)
 
@@ -683,13 +680,13 @@ class EvmXmrFactoryDriverTest(EvmXmrDriverTest):
     def test_16_lock_reverts_past_its_deadline(self):
         evm, xmr, ledger = self._pair()
         bid_id = evm._store[Bid].bid_id
-        provider = self.anvil.w3.provider
+        anvil = self.anvil.rpc
         wait_receipt = EthRpcClient.wait_receipt
 
         def unmined(rpc, tx_hash, *args, **kwargs):
-            raise TimeExhausted()
+            raise ReceiptTimeout()
 
-        provider.make_request("evm_setAutomine", [False])
+        anvil.request("evm_setAutomine", [False])
         EthRpcClient.wait_receipt = unmined
         try:
             balance = evm._eth.getSpendableBalance()
@@ -699,7 +696,7 @@ class EvmXmrFactoryDriverTest(EvmXmrDriverTest):
             self.anvil.warp(LOCK_WAIT + 10)
         finally:
             EthRpcClient.wait_receipt = wait_receipt
-            provider.make_request("evm_setAutomine", [True])
+            anvil.request("evm_setAutomine", [True])
         self.assertEqual(evm._eth.receiptFor(lock)["status"], 0)
         ethdrv.sendEvmLock(evm, bid_id, None)
         self.assertEqual(

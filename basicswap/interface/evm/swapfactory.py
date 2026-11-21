@@ -13,8 +13,7 @@ swapfactory_abi.json (with Payout's errors) and swapfactory_bytecode.hex (creati
 code, deployed by the tests) are generated from that build.
 """
 
-from web3 import Web3
-from web3.logs import DISCARD
+from eth_utils import keccak, to_canonical_address, to_checksum_address
 
 from basicswap.interface.evm.swapcreator import SwapContract
 
@@ -40,47 +39,35 @@ class SwapFactory(SwapContract):
 
     def swap_address(self, swap: tuple) -> str:
         if self._payout_init_code_hash is None:
-            self._payout_init_code_hash = bytes(
-                self.contract.functions.PAYOUT_INIT_CODE_HASH().call()
-            )
-        digest = Web3.keccak(
+            self._payout_init_code_hash = self.call("PAYOUT_INIT_CODE_HASH")
+        digest = keccak(
             b"\xff"
-            + Web3.to_bytes(hexstr=self.address)
+            + to_canonical_address(self.address)
             + self.swap_id(swap)
             + self._payout_init_code_hash
         )
-        return Web3.to_checksum_address(digest[12:])
+        return to_checksum_address(digest[12:])
 
     def escrow_address(self, swap: tuple) -> str:
         return self.swap_address(swap)
 
     def sign_lock(self, account, swap: tuple, deadline: int, tx_nonce: int):
         return self._sign(
-            self.contract.functions.lock(swap, deadline),
+            self.encode_call("lock", swap, deadline),
             account,
             tx_nonce,
             value=swap[7],
         )
 
     def lock_swap_id(self, receipt) -> bytes:
-        ours = [
-            e
-            for e in self.contract.events.Locked().process_receipt(
-                receipt, errors=DISCARD
-            )
-            if e.address == self.address
-        ]
+        ours = self.events(receipt, "Locked")
         if len(ours) != 1:
             raise ValueError(f"Expected one Locked event, found {len(ours)}")
-        return bytes(ours[0].args.swapID)
+        return ours[0]["swapID"]
 
     def stage(self, swap: tuple, block="latest") -> str:
         """The factory's stage; COMPLETED also once the address has a nonce."""
         address: str = self.swap_address(swap)
         if self.rpc.get_transaction_count(address, block) > 0:
             return "COMPLETED"
-        return STAGE[
-            self.contract.functions.stage(self.swap_id(swap)).call(
-                block_identifier=block
-            )
-        ]
+        return STAGE[self.call("stage", self.swap_id(swap), block=block)]

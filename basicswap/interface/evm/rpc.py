@@ -5,53 +5,179 @@
 # file LICENSE or http://www.opensource.org/licenses/mit-license.php.
 
 """
-Thin web3 JSON-RPC client for the EVM interface.
+JSON-RPC client for the EVM interface.
 
 Wraps one or more HTTP endpoints and provides read helpers plus EIP-1559
-contract-transaction signing with a locally held private key.  Hardware-wallet
+transaction signing with a locally held private key.  Hardware-wallet
 signing (Ledger/Trezor) is out of scope for the initial integration.
 """
 
-import logging
+import gzip
+import json
+import time
+import urllib.error
+import urllib.request
 
-import requests
+import rlp
+import socks
 
-from eth_account.typed_transactions import TypedTransaction
-from hexbytes import HexBytes
-from web3 import Web3
-from web3.exceptions import TransactionNotFound
-from web3.providers import JSONBaseProvider
+from eth_keys import keys
+from eth_utils import keccak, to_canonical_address, to_checksum_address
+from sockshandler import SocksiPyHandler
 
 from basicswap.util import TemporaryError
 
-for _name in ("web3", "urllib3"):
-    logging.getLogger(_name).setLevel(logging.WARNING)
+TX_TYPE_EIP1559 = b"\x02"
+TX_FIELDS = (
+    "chainId",
+    "nonce",
+    "maxPriorityFeePerGas",
+    "maxFeePerGas",
+    "gas",
+    "to",
+    "value",
+    "data",
+    "accessList",
+)
 
 
 class EthRpcError(Exception):
     pass
 
 
+class RpcError(Exception):
+    """An error response from the node."""
+
+    def __init__(self, error: dict):
+        super().__init__(error.get("message", str(error)))
+        self.data = error.get("data")
+
+
+class RevertError(RpcError):
+    pass
+
+
+class ReceiptTimeout(Exception):
+    pass
+
+
 def _endpointDown(e: Exception) -> bool:
-    if isinstance(e, (requests.ConnectionError, requests.Timeout)):
-        return True
-    if isinstance(e, requests.HTTPError) and e.response is not None:
-        return e.response.status_code >= 500 or e.response.status_code == 429
-    return False
+    if isinstance(e, urllib.error.HTTPError):
+        return e.code >= 500 or e.code == 429
+    return isinstance(e, OSError)
+
+
+def _hex(value) -> str:
+    if isinstance(value, int):
+        return hex(value)
+    if isinstance(value, (bytes, bytearray)):
+        return "0x" + bytes(value).hex()
+    return value
+
+
+def _bytes(value: str) -> bytes:
+    return bytes.fromhex(value[2:])
+
+
+def _receipt(r: dict) -> dict:
+    return {
+        "transactionHash": _bytes(r["transactionHash"]),
+        "blockNumber": int(r["blockNumber"], 16),
+        "status": int(r["status"], 16),
+        "gasUsed": int(r["gasUsed"], 16),
+        "effectiveGasPrice": int(r["effectiveGasPrice"], 16),
+        "contractAddress": r.get("contractAddress"),
+        "logs": [
+            {
+                "address": to_checksum_address(log["address"]),
+                "topics": [_bytes(t) for t in log["topics"]],
+                "data": _bytes(log["data"]),
+            }
+            for log in r["logs"]
+        ],
+    }
+
+
+def sign_tx(tx: dict, private_key: bytes):
+    """EIP-1559 tx from TX_FIELDS; returns (tx hash, raw tx)."""
+    to = tx.get("to")
+    fields = [
+        tx["chainId"],
+        tx["nonce"],
+        tx["maxPriorityFeePerGas"],
+        tx["maxFeePerGas"],
+        tx["gas"],
+        to_canonical_address(to) if to else b"",
+        tx["value"],
+        bytes(tx.get("data", b"")),
+        tx.get("accessList", []),
+    ]
+    unsigned: bytes = TX_TYPE_EIP1559 + rlp.encode(fields)
+    sig = keys.PrivateKey(bytes(private_key)).sign_msg_hash(keccak(unsigned))
+    raw: bytes = TX_TYPE_EIP1559 + rlp.encode(fields + [sig.v, sig.r, sig.s])
+    return keccak(raw), raw
+
+
+def decode_tx(raw: bytes) -> dict:
+    """The TX_FIELDS of a raw EIP-1559 tx."""
+    items = rlp.decode(bytes(raw)[1:])
+    tx = dict(zip(TX_FIELDS, items))
+    for name in ("chainId", "nonce", "maxPriorityFeePerGas", "maxFeePerGas", "gas"):
+        tx[name] = int.from_bytes(tx[name], "big")
+    tx["value"] = int.from_bytes(tx["value"], "big")
+    return tx
 
 
 class WrongChainError(Exception):
     pass
 
 
-class FailoverProvider(JSONBaseProvider):
+class HttpEndpoint:
+    def __init__(self, url: str, proxy=None, timeout: int = 30):
+        """proxy: (host, port) of a SOCKS5 proxy that resolves the host itself."""
+        self.endpoint_uri = url
+        self._timeout = timeout
+        handlers = []
+        if proxy is not None:
+            handlers.append(SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, *proxy))
+        self._opener = urllib.request.build_opener(*handlers)
+        self._request_id = 0
+
+    def make_request(self, method: str, params) -> dict:
+        self._request_id += 1
+        body = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": self._request_id,
+                "method": method,
+                "params": params,
+            }
+        ).encode()
+        request = urllib.request.Request(
+            self.endpoint_uri,
+            body,
+            {"Content-Type": "application/json", "User-Agent": "jsonrpc"},
+        )
+        with self._opener.open(request, timeout=self._timeout) as response:
+            data: bytes = response.read()
+            if response.headers.get("Content-Encoding") == "gzip":
+                data = gzip.decompress(data)
+            return json.loads(data)
+
+    def is_connected(self) -> bool:
+        try:
+            return "result" in self.make_request("web3_clientVersion", [])
+        except Exception:
+            return False
+
+
+class FailoverProvider:
     """Sends each request to the current endpoint, moving on while it is down.
 
     With chain_id set, an endpoint is used only once it reports that chain.
     """
 
     def __init__(self, providers, on_switch=None, chain_id=None, on_reject=None):
-        super().__init__()
         self.providers = providers
         self.current = 0
         self._on_switch = on_switch
@@ -99,8 +225,8 @@ class FailoverProvider(JSONBaseProvider):
             return response
         raise error
 
-    def is_connected(self, show_traceback: bool = False) -> bool:
-        return any(p.is_connected(show_traceback) for p in self.providers)
+    def is_connected(self) -> bool:
+        return any(p.is_connected() for p in self.providers)
 
 
 class EthRpcClient:
@@ -118,50 +244,92 @@ class EthRpcClient:
         self.max_fee_per_gas = max_fee_per_gas
         self.priority_fee = priority_fee
         self.chain_id = chain_id
-        providers = []
-        for url, proxy in endpoints:
-            request_kwargs = {"timeout": timeout}
-            if proxy:
-                request_kwargs["proxies"] = {"http": proxy, "https": proxy}
-            providers.append(Web3.HTTPProvider(url, request_kwargs=request_kwargs))
-        self.w3 = Web3(FailoverProvider(providers, on_switch, chain_id, on_reject))
+        self.provider = FailoverProvider(
+            [HttpEndpoint(url, proxy, timeout) for url, proxy in endpoints],
+            on_switch,
+            chain_id,
+            on_reject,
+        )
+
+    def request(self, method: str, params=()):
+        """The result of method; raises RpcError (RevertError for a revert)."""
+        response = self.provider.make_request(method, list(params))
+        error = response.get("error")
+        if error is not None:
+            if "revert" in str(error.get("message", "")).lower():
+                raise RevertError(error)
+            raise RpcError(error)
+        return response.get("result")
 
     # --- connection / chain ---
 
     def is_connected(self) -> bool:
         try:
-            return self.w3.is_connected()
+            return self.provider.is_connected()
         except Exception:
             return False
 
     def get_block_number(self) -> int:
-        return self.w3.eth.block_number
+        return int(self.request("eth_blockNumber"), 16)
+
+    def get_block(self, block="latest") -> dict:
+        b = self.request("eth_getBlockByNumber", [_hex(block), False])
+        return {"number": int(b["number"], 16), "timestamp": int(b["timestamp"], 16)}
 
     def get_block_time(self) -> int:
-        return self.w3.eth.get_block("latest")["timestamp"]
+        return self.get_block()["timestamp"]
 
     def client_version(self) -> str:
-        return self.w3.client_version.splitlines()[0]
+        return self.request("web3_clientVersion").splitlines()[0]
 
     def get_balance(self, address: str) -> int:
-        return self.w3.eth.get_balance(Web3.to_checksum_address(address))
+        return int(self.request("eth_getBalance", [address, "latest"]), 16)
 
     def get_transaction_count(self, address: str, block="latest") -> int:
-        return self.w3.eth.get_transaction_count(
-            Web3.to_checksum_address(address), block
+        return int(self.request("eth_getTransactionCount", [address, _hex(block)]), 16)
+
+    def get_code(self, address: str) -> bytes:
+        return _bytes(self.request("eth_getCode", [address, "latest"]))
+
+    def eth_call(self, to: str, data: bytes, block="latest") -> bytes:
+        return _bytes(
+            self.request("eth_call", [{"to": to, "data": _hex(data)}, _hex(block)])
         )
 
+    def get_logs(self, address: str, from_block: int, to_block: int, topics) -> list:
+        """topics: bytes, or a list of bytes for any of them, per position."""
+        logs = self.request(
+            "eth_getLogs",
+            [
+                {
+                    "address": address,
+                    "fromBlock": _hex(from_block),
+                    "toBlock": _hex(to_block),
+                    "topics": [
+                        (
+                            [_hex(t) for t in topic]
+                            if isinstance(topic, list)
+                            else _hex(topic)
+                        )
+                        for topic in topics
+                    ],
+                }
+            ],
+        )
+        return [{"topics": [_bytes(t) for t in log["topics"]]} for log in logs]
+
     def gas_price(self) -> int:
-        return self.w3.eth.gas_price
+        return int(self.request("eth_gasPrice"), 16)
 
     def _baseAndTip(self, capped: bool = True) -> tuple:
         """Raises TemporaryError while the fee needed now is above max_fee_per_gas."""
         tip: int = (
-            self.w3.eth.max_priority_fee
+            int(self.request("eth_maxPriorityFeePerGas"), 16)
             if self.priority_fee is None
             else self.priority_fee
         )
-        base: int = self.w3.eth.fee_history(1, "latest")["baseFeePerGas"][-1]
+        history = self.request("eth_feeHistory", ["0x1", "latest", []])
+        base: int = int(history["baseFeePerGas"][-1], 16)
         if (
             capped
             and self.max_fee_per_gas is not None
@@ -194,7 +362,7 @@ class EthRpcClient:
     def replacement_fees(self, raw: bytes):
         """Fees to re-sign raw with, uncapped: the price now and at least 1/8 above
         its own on both; None while it still pays the price now."""
-        tx = TypedTransaction.from_bytes(HexBytes(raw)).as_dict()
+        tx = decode_tx(raw)
         base, tip = self._baseAndTip(capped=False)
         if tx["maxFeePerGas"] >= base + tip and tx["maxPriorityFeePerGas"] >= tip:
             return None
@@ -205,20 +373,34 @@ class EthRpcClient:
 
     def resign(self, raw: bytes, private_key, fees: dict):
         """raw at the same nonce with new fees; returns (tx hash, raw tx, wei it needs)."""
-        tx = TypedTransaction.from_bytes(HexBytes(raw)).as_dict()
-        for field in ("type", "v", "r", "s"):
-            tx.pop(field, None)
+        tx = decode_tx(raw)
         tx.update(fees)
         return (
-            *self._sign(tx, private_key),
+            *sign_tx(tx, private_key),
             tx["gas"] * tx["maxFeePerGas"] + tx["value"],
         )
 
     # --- transactions ---
 
-    def sign_function(
+    def estimate_gas(self, txn: dict) -> int:
+        return int(
+            self.request(
+                "eth_estimateGas",
+                [
+                    {
+                        k: _hex(txn[k])
+                        for k in ("from", "to", "value", "data")
+                        if k in txn
+                    }
+                ],
+            ),
+            16,
+        )
+
+    def sign_call(
         self,
-        fn,
+        to: str,
+        data: bytes,
         from_address: str,
         private_key,
         nonce: int,
@@ -231,76 +413,66 @@ class EthRpcClient:
 
         Raises EthRpcError with a decoded revert reason if gas estimation fails.
         """
-        from_address = Web3.to_checksum_address(from_address)
-        w3 = self.w3
-
         if gas_limit is None:
             try:
-                estimated = fn.estimate_gas({"from": from_address, "value": value})
+                estimated = self.estimate_gas(
+                    {"from": from_address, "to": to, "value": value, "data": data}
+                )
             except Exception as e:
                 raise EthRpcError(self._describe_error(e, error_decoder))
             # estimate_gas can underestimate calls that transfer value (e.g. claim)
             gas_limit = (estimated * 5) // 4
 
-        tx_params = {
+        txn = {
             "chainId": self.chain_id,
             "nonce": nonce,
-            "from": from_address,
+            "to": to,
             "value": value,
+            "data": data,
             "gas": gas_limit,
             **self.fee_params(capped),
         }
-        txn = fn.build_transaction(tx_params)
-        signed = w3.eth.account.sign_transaction(txn, private_key=private_key)
-        return bytes(signed.hash), bytes(signed.raw_transaction)
+        return sign_tx(txn, private_key)
 
     def _transfer(
         self, from_address: str, to: str, value: int, fees: dict, nonce: int
     ) -> dict:
-        w3 = self.w3
         txn = {
             "chainId": self.chain_id,
             "nonce": nonce,
-            "from": from_address,
-            "to": Web3.to_checksum_address(to),
+            "to": to,
             "value": value,
             **fees,
         }
         try:
-            txn["gas"] = w3.eth.estimate_gas(txn)
+            txn["gas"] = self.estimate_gas({"from": from_address, **txn})
         except Exception as e:
             raise EthRpcError(self._describe_error(e))
         return txn
-
-    def _sign(self, txn: dict, private_key):
-        signed = self.w3.eth.account.sign_transaction(txn, private_key=private_key)
-        return bytes(signed.hash), bytes(signed.raw_transaction)
 
     def sign_transfer(
         self, from_address: str, private_key, to: str, value: int, nonce: int
     ):
         """Sign a plain native-coin transfer; returns (tx hash, raw tx)."""
-        from_address = Web3.to_checksum_address(from_address)
-        return self._sign(
+        return sign_tx(
             self._transfer(from_address, to, value, self.fee_params(), nonce),
             private_key,
         )
 
     def sign_sweep(self, from_address: str, private_key, to: str, nonce: int):
         """Sign a transfer of the whole balance less its fee; returns (tx hash, raw tx, value)."""
-        from_address = Web3.to_checksum_address(from_address)
         txn = self._transfer(from_address, to, 0, self.sweep_fee_params(), nonce)
         txn["value"] = self.get_balance(from_address) - txn["gas"] * txn["maxFeePerGas"]
         if txn["value"] <= 0:
             raise ValueError("Balance too small to pay the fee")
-        return (*self._sign(txn, private_key), txn["value"])
+        return (*sign_tx(txn, private_key), txn["value"])
 
     def broadcast(self, tx_hash: bytes, raw: bytes, error_decoder=None) -> None:
         """Raises EthRpcError if the node neither accepts the tx nor has seen it."""
         try:
-            self.w3.eth.send_raw_transaction(raw)
+            self.request("eth_sendRawTransaction", [_hex(raw)])
         except Exception as e:
-            if self._find_transaction(tx_hash) is None:
+            if self.get_transaction(tx_hash) is None:
                 raise EthRpcError(self._describe_error(e, error_decoder))
 
     def wait_receipt(
@@ -310,30 +482,37 @@ class EthRpcClient:
         timeout: int = 120,
         error_decoder=None,
     ):
-        """Raises EthRpcError if the tx reverted, and web3's TimeExhausted if it
+        """Raises EthRpcError if the tx reverted, and ReceiptTimeout if it
         isn't mined within timeout."""
-        w3 = self.w3
-        receipt = w3.eth.wait_for_transaction_receipt(
-            tx_hash, timeout=timeout, poll_latency=poll_latency
-        )
-        if receipt.get("status", 1) == 0:
+        deadline: float = time.monotonic() + timeout
+        receipt = self.get_receipt(tx_hash)
+        while receipt is None:
+            if time.monotonic() >= deadline:
+                raise ReceiptTimeout(f"Tx {bytes(tx_hash).hex()} not mined")
+            time.sleep(poll_latency)
+            receipt = self.get_receipt(tx_hash)
+        if receipt["status"] == 0:
             reason = self._replay_revert(
-                w3.eth.get_transaction(tx_hash), receipt, error_decoder
+                self.get_transaction(tx_hash), receipt, error_decoder
             )
             raise EthRpcError(f"Transaction reverted ({reason})")
         return receipt
 
     def get_receipt(self, tx_hash: bytes):
-        try:
-            return self.w3.eth.get_transaction_receipt(tx_hash)
-        except TransactionNotFound:
-            return None
+        r = self.request("eth_getTransactionReceipt", [_hex(tx_hash)])
+        return None if r is None else _receipt(r)
 
-    def _find_transaction(self, tx_hash: bytes):
-        try:
-            return self.w3.eth.get_transaction(tx_hash)
-        except TransactionNotFound:
+    def get_transaction(self, tx_hash: bytes):
+        """from, to, input and value of a tx the node knows, or None."""
+        tx = self.request("eth_getTransactionByHash", [_hex(tx_hash)])
+        if tx is None:
             return None
+        return {
+            "from": tx["from"],
+            "to": tx["to"],
+            "input": tx["input"],
+            "value": int(tx["value"], 16),
+        }
 
     def _replay_revert(self, tx, receipt, error_decoder) -> str:
         # Re-execute the tx at its block to recover the revert reason.
@@ -342,9 +521,9 @@ class EthRpcClient:
                 "from": tx["from"],
                 "to": tx["to"],
                 "data": tx["input"],
-                "value": tx["value"],
+                "value": _hex(tx["value"]),
             }
-            self.w3.eth.call(call_tx, receipt["blockNumber"] - 1)
+            self.request("eth_call", [call_tx, _hex(receipt["blockNumber"] - 1)])
             return "unknown"
         except Exception as e:
             return self._describe_error(e, error_decoder)

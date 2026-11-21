@@ -23,8 +23,6 @@ sends each one well inside it: a window's start must be past in a confirmed
 block, and its end a margin away.
 """
 
-from web3.exceptions import TimeExhausted
-
 from basicswap.util import ensure, TemporaryError
 from basicswap.chainparams import Coins
 from basicswap.basicswap_util import (
@@ -55,7 +53,7 @@ from basicswap.messages_npb import (
 )
 from basicswap.interface.evm import keys as evmkeys
 from basicswap.interface.evm.swapfactory import SwapFactory
-from basicswap.interface.evm.rpc import EthRpcError
+from basicswap.interface.evm.rpc import EthRpcError, ReceiptTimeout
 from basicswap import multibid
 from basicswap.network.bsx_network import networkTypeToID
 from basicswap.network.util import getMsgPubkey
@@ -259,8 +257,7 @@ def _swap(self, offer, bid, evm_swap) -> tuple:
 
 
 def _lockReceipt(self, evm_swap):
-    w3 = self.ci(evm_swap.evm_coin).rpc.w3
-    return w3.eth.get_transaction_receipt(evm_swap.evm_lock_tx_id)
+    return self.ci(evm_swap.evm_coin).rpc.get_receipt(evm_swap.evm_lock_tx_id)
 
 
 def _evmLock(self, offer, bid, evm_swap):
@@ -352,8 +349,8 @@ def _confirmedHeight(self, evm_swap) -> int:
 
 def _confirmedChainTime(self, evm_swap) -> int:
     """Time of the block at blocks_confirmed depth; a timeout past it stays past."""
-    w3 = self.ci(evm_swap.evm_coin).rpc.w3
-    return w3.eth.get_block(_confirmedHeight(self, evm_swap))["timestamp"]
+    rpc = self.ci(evm_swap.evm_coin).rpc
+    return rpc.get_block(_confirmedHeight(self, evm_swap))["timestamp"]
 
 
 def _evmClaimable(evm_swap, state_name, now, confirmed_now, margin: int) -> bool:
@@ -885,7 +882,7 @@ def _evmLockMissedDeadline(self, bid, evm_swap, ci_evm, cursor) -> bool:
     lock mined the bid ends; True if it did."""
     # One block for both reads, so a node switch can't pair a later time with
     # an older nonce
-    block = ci_evm.rpc.w3.eth.get_block("latest")
+    block = ci_evm.rpc.get_block()
     if block["timestamp"] <= evm_swap.xmr_lock_deadline:
         return False
     lock = ci_evm.signedHandle(bid.bid_id, "lock")
@@ -977,7 +974,7 @@ def sendEvmLock(self, bid_id: bytes, cursor) -> None:
         receipt = ci_evm.sendTx(
             sign, "lock", bid_id, bump_at=bump_at, error_decoder=contract.decode_error
         )
-    except TimeExhausted:
+    except ReceiptTimeout:
         raise TemporaryError("EVM lock tx not mined yet")
     except EthRpcError as e:
         raise TemporaryError(f"EVM lock tx failed: {e}")
@@ -1282,7 +1279,7 @@ def sendGasDrip(self, bid_id: bytes, cursor) -> None:
             "gas_drip",
             bid_id,
         )
-    except TimeExhausted:
+    except ReceiptTimeout:
         raise TemporaryError("EVM gas drip not mined yet")
     except EthRpcError as e:
         raise TemporaryError(f"EVM gas drip failed: {e}")
@@ -1290,7 +1287,7 @@ def sendGasDrip(self, bid_id: bytes, cursor) -> None:
     ci_evm.recordTx(
         evm_swap.gas_drip_txid,
         "gas_drip",
-        -ci_evm.fromWei(rpc.w3.eth.get_transaction(evm_swap.gas_drip_txid)["value"]),
+        -ci_evm.fromWei(rpc.get_transaction(evm_swap.gas_drip_txid)["value"]),
         receipt,
         to_addr=evm_swap.xmr_side_addr,
         bid_id=bid_id,
@@ -1321,7 +1318,7 @@ def markEvmReady(self, bid_id: bytes, cursor) -> None:
                     bid_id,
                     error_decoder=contract.decode_error,
                 )
-            except TimeExhausted:
+            except ReceiptTimeout:
                 self.log.info(
                     f"EVM setReady for bid {self.log.id(bid_id)} not mined yet."
                 )
@@ -1385,7 +1382,7 @@ def claimEvmLock(self, bid_id: bytes, cursor) -> None:
             bump_at=bump_at,
             error_decoder=contract.decode_error,
         )
-    except TimeExhausted:
+    except ReceiptTimeout:
         self.log.info(f"EVM claim for bid {self.log.id(bid_id)} not mined yet.")
         return
     except Exception as e:
@@ -1517,7 +1514,7 @@ def refundEvmLock(self, bid_id: bytes, cursor) -> None:
             bump_at=deadline - self._sc_lock_release_min_margin,
             error_decoder=contract.decode_error,
         )
-    except TimeExhausted:
+    except ReceiptTimeout:
         self.log.info(f"EVM refund for bid {self.log.id(bid_id)} not mined yet.")
         return
     except Exception as e:
