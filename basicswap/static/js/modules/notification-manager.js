@@ -833,7 +833,7 @@ function ensureToastContainer() {
 
       const isPendingToConfirmed = pendingDecrease > 0.00000001 && balanceIncrease > 0.00000001;
 
-      const displaySymbol = originalCoinSymbol;
+      const displaySymbol = coinData.symbol || originalCoinSymbol;
       let variantInfo = '';
 
       if (coinData.name !== 'Particl' && coinData.name.includes('Particl')) {

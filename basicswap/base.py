@@ -467,7 +467,7 @@ class BaseApp(DBMethods):
     )
 
     def is_transient_error(self, ex) -> bool:
-        if isinstance(ex, TemporaryError):
+        if isinstance(ex, (TemporaryError, TimeoutError)):
             return True
         if isinstance(ex, socks.ProxyError):
             return True

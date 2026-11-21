@@ -128,7 +128,7 @@
         {% if data.debug_ui == true %}
         {{ summary_row('Contract locked', data.lockmins ~ ' minutes') }}
         {% else %}
-        {{ summary_row('Contract locked', data.lockhrs ~ ' hours') }}
+        {{ summary_row('Contract locked', data.lockhrs ~ (' hours per window, three windows' if data.swap_type == 'evm_xmr_swap' else ' hours')) }}
         {% endif %}
         {{ summary_row('Auto accept', ns.strat_label) }}
         {% if data.tracking_mode_label is defined %}

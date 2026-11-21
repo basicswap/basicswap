@@ -5,3 +5,7 @@ pycryptodome==4.3.0
 PySocks==1.7.1
 websocket-client==1.9.2
 coincurve@https://github.com/basicswap/coincurve/archive/refs/tags/basicswap_v0.4.zip
+eth-abi==6.0.0
+eth-keys==0.8.0
+eth-utils==6.0.0
+rlp==5.0.0

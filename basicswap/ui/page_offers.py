@@ -41,6 +41,7 @@ from basicswap.basicswap_util import (
 from basicswap.chainparams import (
     Coins,
 )
+from basicswap.protocols import evm_xmr_swap_1
 from basicswap.offer_tracking import (
     OfferTrackingModes,
     offerTrackingModeFromString,
@@ -71,6 +72,8 @@ def swap_type_from_string(str_swap_type: str) -> SwapTypes:
         return SwapTypes.SELLER_FIRST
     elif str_swap_type == "xmr_swap" or str_swap_type == "adaptor_sig":
         return SwapTypes.XMR_SWAP
+    elif str_swap_type == "evm_xmr_swap":
+        return SwapTypes.EVM_XMR_SWAP
     else:
         raise ValueError("Unknown swap type")
 
@@ -218,7 +221,16 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
 
     if have_data_entry(form_data, "subfee"):
         parsed_data["subfee"] = True
-    if have_data_entry(form_data, "swap_type"):
+    if (
+        parsed_data.get("coin_from") in swap_client.evm_contract_coins
+        or parsed_data.get("coin_to") in swap_client.evm_contract_coins
+    ):
+        # EVM contract-escrow coins are only swappable via EVM_XMR_SWAP; force it
+        # regardless of any requested type (they have no other valid swap type).
+        page_data["swap_type"] = strSwapType(SwapTypes.EVM_XMR_SWAP)
+        parsed_data["swap_type"] = page_data["swap_type"]
+        swap_type = SwapTypes.EVM_XMR_SWAP
+    elif have_data_entry(form_data, "swap_type"):
         page_data["swap_type"] = get_data_entry(form_data, "swap_type")
         parsed_data["swap_type"] = page_data["swap_type"]
         swap_type = swap_type_from_string(parsed_data["swap_type"])
@@ -232,7 +244,7 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         parsed_data["swap_type"] = strSwapType(SwapTypes.XMR_SWAP)
         swap_type = SwapTypes.XMR_SWAP
 
-    if swap_type == SwapTypes.XMR_SWAP:
+    if swap_type in (SwapTypes.XMR_SWAP, SwapTypes.EVM_XMR_SWAP):
         page_data["swap_style"] = "xmr"
     else:
         page_data["swap_style"] = "atomic"
@@ -325,13 +337,14 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 parsed_data["from_fee_override"] = page_data["from_fee_override"]
 
                 from_fee_rate: int = ci_from.make_int(from_fee_override, r=1)
-                lock_spend_tx_fee: int = (
-                    ci_from.feeForVSize(
+                if parsed_data["coin_from"] in swap_client.evm_contract_coins:
+                    lock_spend_tx_fee: int = ci_from.estSwapFee()
+                elif reverse_bid:
+                    lock_spend_tx_fee = ci_from.feeForVSize(
                         from_fee_rate, ci_from.xmr_swap_b_lock_spend_tx_vsize()
                     )
-                    if reverse_bid
-                    else ci_from.estLockSpendFee(from_fee_rate)
-                )
+                else:
+                    lock_spend_tx_fee = ci_from.estLockSpendFee(from_fee_rate)
                 page_data["amt_from_lock_spend_tx_fee"] = ci_from.format_amount(
                     lock_spend_tx_fee
                 )
@@ -377,8 +390,9 @@ def postNewOfferFromParsed(swap_client, parsed_data):
     ):
         swap_type = SwapTypes.XMR_SWAP
 
-    if swap_type == SwapTypes.XMR_SWAP:
-        # All coins capable of segwit should be capable of csv
+    if swap_type in (SwapTypes.XMR_SWAP, SwapTypes.EVM_XMR_SWAP):
+        # All coins capable of segwit should be capable of csv; EVM_XMR_SWAP
+        # timing is enforced by the contract, not a script lock.
         lock_type = TxLockTypes.SEQUENCE_LOCK_TIME
     else:
         if (
@@ -1120,6 +1134,10 @@ def page_offer(self, url_split: list[str], post_string: str) -> bytes:
         if coin_to_variant in swap_client.xmr_based_coins:
             data["coin_to_balance"] = coin_to_wallet.get(
                 "max_lock_amount", data["coin_to_balance"]
+            )
+        elif coin_to_variant in swap_client.evm_contract_coins:
+            data["coin_to_balance"] = ci_to.format_amount(
+                max(0, evm_xmr_swap_1.evmSpendable(swap_client, coin_to_variant))
             )
 
         bid_can_subfee: bool = True

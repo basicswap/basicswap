@@ -139,7 +139,9 @@ def page_bid(self, url_split, post_string):
         ] + listBidActions()
 
     template = server.env.get_template(
-        "bid_xmr.html" if offer.swap_type == SwapTypes.XMR_SWAP else "bid.html"
+        "bid_xmr.html"
+        if offer.swap_type in (SwapTypes.XMR_SWAP, SwapTypes.EVM_XMR_SWAP)
+        else "bid.html"
     )
     return self.render_template(
         template,

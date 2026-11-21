@@ -7,6 +7,7 @@
 
 import json
 import random
+import time
 import urllib.parse
 
 from .util import (
@@ -156,7 +157,7 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
         for k, v in swap_client.coin_clients.items():
             if k not in chainparams:
                 continue
-            if v["connection_type"] in ("rpc", "electrum"):
+            if v["connection_type"] in ("rpc", "electrum", "web3"):
 
                 have_data = False
                 updating = False
@@ -193,19 +194,20 @@ def js_walletbalances(self, url_split, post_string, is_json) -> bytes:
                         if pending_amount > 0:
                             pending = ci.format_amount(pending_amount)
 
+                ci = swap_client.ci(k)
                 coin_entry = {
                     "id": int(k),
                     "name": getCoinName(k),
                     "balance": balance,
                     "pending": pending,
                     "ticker": chainparams[k]["ticker"],
+                    "symbol": ci.display_ticker(),
                     "connection_type": v["connection_type"],
                     "have_data": have_data,
                     "updating": updating,
                     "locked": locked,
                 }
 
-                ci = swap_client.ci(k)
                 if hasattr(ci, "getScanStatus"):
                     coin_entry["scan_status"] = ci.getScanStatus()
                 if hasattr(ci, "getElectrumServer"):
@@ -367,6 +369,16 @@ def js_wallets(self, url_split, post_string, is_json):
                 return bytes(
                     json.dumps({"txid": txid_hex, "address": new_addr}), "UTF-8"
                 )
+            elif cmd == "setaccount":
+                if coin_type not in swap_client.evm_contract_coins:
+                    raise ValueError("Invalid coin for command")
+                post_data = getFormData(post_string, is_json)
+                account = int(get_data_entry(post_data, "account"))
+                swap_client.editSettings(
+                    swap_client.coin_clients[coin_type]["name"], {"account": account}
+                )
+                swap_client.updateWalletsInfo(True, coin_type, wait_for_complete=True)
+                return bytes(json.dumps({"account": account}), "UTF-8")
             elif cmd == "reseed":
                 swap_client.reseedWallet(coin_type)
                 return bytes(json.dumps({"reseeded": True}), "UTF-8")
@@ -1214,6 +1226,16 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
 
     rv = {"coin_from": ci_from.ticker(), "fee": None}
     try:
+        if coin_from in swap_client.evm_contract_coins:
+            # fee is what each open swap holds back: its fees and refund reserve
+            gas_price: int = ci_from.rpc.gas_price()
+            swap_fee: int = ci_from.estSwapFee(gas_price=gas_price)
+            refund_reserve: int = ci_from.refundReserve(gas_price)
+            rv["swap_fee"] = ci_from.format_amount(swap_fee)
+            rv["refund_reserve"] = ci_from.format_amount(refund_reserve)
+            rv["fee"] = ci_from.format_amount(swap_fee + refund_reserve)
+            rv["fee_src"] = "gas_price"
+            return bytes(json.dumps(rv), "UTF-8")
         reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
         conf_target = (
             ci_from.getConfTarget() if coin_from not in (Coins.XMR, Coins.WOW) else 2
@@ -1222,9 +1244,10 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
             coin_from, conf_target
         )
         fee_rate_int = ci_from.make_int(from_fee_override, r=1)
+        # The XMR side of an EVM swap, like a reverse bid's, pays an XMR lock
         lock_spend_tx_fee: int = (
             ci_from.feeForVSize(fee_rate_int, ci_from.xmr_swap_b_lock_spend_tx_vsize())
-            if reverse_bid
+            if reverse_bid or coin_to in swap_client.evm_contract_coins
             else ci_from.estLockSpendFee(fee_rate_int)
         )
         rv["fee"] = ci_from.format_amount(lock_spend_tx_fee)
@@ -1821,6 +1844,56 @@ def js_active(self, url_split, post_string, is_json) -> bytes:
     return bytes(json.dumps(all_bids), "UTF-8")
 
 
+def _evmCoinFromPost(swap_client, post_data):
+    coin_name: str = get_data_entry(post_data, "coin")
+    coin = swap_client.getCoinIdFromName(coin_name)
+    ensure(coin in swap_client.evm_contract_coins, f"Not an EVM coin: {coin_name}")
+    return coin_name, coin
+
+
+def _testEvmNode(swap_client, coin, url: str) -> dict:
+    start = time.time()
+    try:
+        height: int = swap_client.ci(coin).testNode(url)
+    except Exception as e:
+        return {"reachable": False, "error": str(e)}
+    return {
+        "reachable": True,
+        "height": height,
+        "latency_ms": int((time.time() - start) * 1000),
+    }
+
+
+def js_testevmnode(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = getFormData(post_string, is_json)
+    _, coin = _evmCoinFromPost(swap_client, post_data)
+    rv = _testEvmNode(swap_client, coin, get_data_entry(post_data, "url"))
+    return bytes(json.dumps(rv), "UTF-8")
+
+
+def js_saveevmnodes(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = getFormData(post_string, is_json)
+    coin_name, _ = _evmCoinFromPost(swap_client, post_data)
+    swap_client.editSettings(
+        coin_name, {"rpc_nodes": get_data_entry(post_data, "nodes")}
+    )
+    return bytes(json.dumps({"success": True}), "UTF-8")
+
+
+def js_setevmnode(self, url_split, post_string, is_json) -> bytes:
+    swap_client = self.server.swap_client
+    post_data = getFormData(post_string, is_json)
+    coin_name, coin = _evmCoinFromPost(swap_client, post_data)
+    url: str = get_data_entry(post_data, "url")
+    rv = _testEvmNode(swap_client, coin, url)
+    if rv["reachable"]:
+        swap_client.editSettings(coin_name, {"rpc_url": url})
+        rv["success"] = True
+    return bytes(json.dumps(rv), "UTF-8")
+
+
 def js_coinprices(self, url_split, post_string, is_json) -> bytes:
     swap_client = self.server.swap_client
     post_data = {} if post_string == "" else getFormData(post_string, is_json)
@@ -2394,6 +2467,9 @@ endpoints = {
     "getcoinseed": js_getcoinseed,
     "setpassword": js_setpassword,
     "unlock": js_unlock,
+    "testevmnode": js_testevmnode,
+    "saveevmnodes": js_saveevmnodes,
+    "setevmnode": js_setevmnode,
     "lock": js_lock,
     "help": js_help,
     "logging": js_logging,

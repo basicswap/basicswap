@@ -47,7 +47,9 @@
       </div>
       <div class="px-6 mb-6">
        <h4 class="text-xl font-bold dark:text-white">{{ w.name }}
-        <span class="inline-block font-medium text-xs text-gray-500 dark:text-white">({{ w.ticker }})</span>
+        {% if not w.name.startswith(w.symbol) %}
+        <span class="inline-block font-medium text-xs text-gray-500 dark:text-white">({{ w.symbol }})</span>
+        {% endif %}
         {% if w.connection_type == 'electrum' %}
         <span class="inline-block py-1 px-2 rounded-full bg-yellow-100 text-xs text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">Light Wallet (Electrum)</span>
         {% else %}
@@ -65,16 +67,16 @@
       <div class="p-6 bg-coolGray-100 dark:bg-gray-600">
           <div class="flex mb-2 justify-between items-center">
               <h4 class="text-xs font-medium dark:text-white">Balance:</h4>
-              <div class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="balance">{{ w.balance }} {{ w.ticker }}</div>
+              <div class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="balance">{{ w.balance }} {{ w.symbol }}</div>
           </div>
           <div class="flex mb-2 justify-between items-center">
-              <h4 class="text-xs font-medium dark:text-white ">{{ w.ticker }} USD value:</h4>
+              <h4 class="text-xs font-medium dark:text-white ">{{ w.symbol }} USD value:</h4>
               <div class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 usd-value" data-coinname="{{ w.name }}"></div>
           </div>
         {% if w.pending %}
          <div class="flex mb-2 justify-between items-center">
            <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Pending:</h4>
-           <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}">+{{ w.pending }} {{ w.ticker }}</span>
+           <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}">+{{ w.pending }} {{ w.symbol }}</span>
           </div>
          <div class="flex mb-2 justify-between items-center">
            <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Pending USD value:</h4>
@@ -84,13 +86,13 @@
        {% if w.pending_out %}
          <div class="flex mb-2 justify-between items-center">
            <h4 class="text-xs font-bold text-yellow-600 dark:text-yellow-400">Unconfirmed:</h4>
-           <span class="bold inline-block py-1 px-2 rounded-full bg-yellow-100 text-xs text-yellow-600 dark:bg-gray-500 dark:text-yellow-400 coinname-value" data-coinname="{{ w.name }}">-{{ w.pending_out }} {{ w.ticker }}</span>
+           <span class="bold inline-block py-1 px-2 rounded-full bg-yellow-100 text-xs text-yellow-600 dark:bg-gray-500 dark:text-yellow-400 coinname-value" data-coinname="{{ w.name }}">-{{ w.pending_out }} {{ w.symbol }}</span>
           </div>
        {% endif %}
        {% if w.cid == '1' %} {# PART #}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Blind Balance:</h4>
-        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="blind_balance">{{ w.blind_balance }} {{ w.ticker }}</span>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="blind_balance">{{ w.blind_balance }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-medium dark:text-white">Blind USD value:</h4>
@@ -99,7 +101,7 @@
        {% if w.blind_unconfirmed %}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Blind Unconfirmed:</h4>
-        <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}" >+{{ w.blind_unconfirmed }} {{ w.ticker }}</span>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}" >+{{ w.blind_unconfirmed }} {{ w.symbol }}</span>
        </div>
       <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Blind Unconfirmed USD value:</h4>
@@ -108,7 +110,7 @@
        {% endif %}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Anon Balance:</h4>
-        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value"  data-coinname="{{ w.name }}" data-balance-type="anon_balance">{{ w.anon_balance }} {{ w.ticker }}</span>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value"  data-coinname="{{ w.name }}" data-balance-type="anon_balance">{{ w.anon_balance }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-medium dark:text-white">Anon USD value:</h4>
@@ -118,7 +120,7 @@
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Anon Pending:</h4>
         <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value" data-coinname="{{ w.name }}">
-        +{{ w.anon_pending }} {{ w.ticker }}</span>
+        +{{ w.anon_pending }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Anon Pending USD value:</h4>
@@ -129,7 +131,7 @@
        {% if w.cid == '3' and w.connection_type != 'electrum' %} {# LTC - MWEB not available in electrum mode #}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">MWEB Balance:</h4>
-        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="mweb_balance">{{ w.mweb_balance }} {{ w.ticker }}</span>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="mweb_balance">{{ w.mweb_balance }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-medium dark:text-white">MWEB USD value:</h4>
@@ -139,7 +141,7 @@
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-bold text-green-500 dark:text-green-500">MWEB Pending:</h4>
         <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value"  data-coinname="{{ w.name }}">
-        +{{ w.mweb_pending }} {{ w.ticker }}</span>
+        +{{ w.mweb_pending }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">MWEB Pending USD value:</h4>
@@ -151,7 +153,7 @@
        {% if w.cid == '13' %} {# FIRO #}
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-medium dark:text-white">Spark Balance:</h4>
-        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.ticker }}</span>
+        <span class="bold inline-block py-1 px-2 rounded-full bg-blue-100 text-xs text-black-500 dark:bg-gray-500 dark:text-gray-200 coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-medium dark:text-white">Spark USD value:</h4>
@@ -161,7 +163,7 @@
        <div class="flex mb-2 justify-between items-center">
         <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Spark Pending:</h4>
         <span class="bold inline-block py-1 px-2 rounded-full bg-green-100 text-xs text-green-500 dark:bg-gray-500 dark:text-green-500 coinname-value"  data-coinname="{{ w.name }}">
-        +{{ w.spark_pending }} {{ w.ticker }}</span>
+        +{{ w.spark_pending }} {{ w.symbol }}</span>
        </div>
         <div class="flex mb-2 justify-between items-center">
           <h4 class="text-xs font-bold text-green-500 dark:text-green-500">Spark Pending USD value:</h4>

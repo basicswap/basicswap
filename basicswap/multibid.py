@@ -30,6 +30,7 @@ from .bidplanner import (
     REASON_NOT_PICKED,
     REASON_OVER_LIMIT,
 )
+from .protocols import evm_xmr_swap_1
 from .util import ensure
 
 ANCHOR_MARKET: str = "market"
@@ -282,10 +283,21 @@ class FeeReserve:
         return spend + self.for_offers(offer_ids, spend) <= balance
 
 
+def spendable_balance(swap_client, ci) -> int:
+    """For an EVM coin, less what open EVM-side swaps still need."""
+    if ci.coin_type() in swap_client.evm_contract_coins:
+        return evm_xmr_swap_1.evmFree(swap_client, ci.coin_type())
+    return ci.getSpendableBalance()
+
+
 def plan_fee_reserve(swap_client, ci, offer_ids, splits: bool) -> FeeReserve:
     """Adaptor-sig locks pay the offer's to-rate and secret-hash locks the live
     rate. Only legs given their own inputs (splits) can need a split. Extra
-    inputs are priced at the highest of those rates."""
+    inputs are priced at the highest of those rates. An EVM coin pays each
+    leg's escrow gas from one account."""
+    if ci.coin_type() in swap_client.evm_contract_coins:
+        fee: int = evm_xmr_swap_1.evmSwapNeeds(ci)
+        return FeeReserve({offer_id: fee for offer_id in offer_ids})
     if ci.coin_type() in swap_client.xmr_based_coins:
         return FeeReserve({}, locks_fee=ci.estLockTxsFee, max_locks=ci.estMaxLockAmount)
     input_vsize: int = ci.est_tx_input_vsize()
@@ -358,6 +370,13 @@ def live_redeem_fee(ci) -> int:
     return ci.feeForVSize(fee_rate, ci.getHTLCSpendTxVSize())
 
 
+def isEvmPair(swap_client, coin_from, coin_to) -> bool:
+    return (
+        coin_from in swap_client.evm_contract_coins
+        or coin_to in swap_client.evm_contract_coins
+    )
+
+
 def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -> dict:
     """Per-offer fee to redeem the received coin_from. Adaptor-sig swaps spend
     the lock at the offer's committed rate; secret-hash swaps spend the HTLC at
@@ -367,7 +386,16 @@ def redeem_fees_by_offer(swap_client, coin_from, coin_to, ci_from, candidates) -
     a_fee_rate/b_fee_rate as the from/to rates, not as the chain A/B rates.
 
     A coin that sets its own redeem fee overrides that with the rate it will
-    actually pay."""
+    actually pay. EVM<->XMR offers pay the claim's gas, or sweep the XMR lock at
+    the live rate."""
+    if isEvmPair(swap_client, coin_from, coin_to):
+        if coin_from in swap_client.evm_contract_coins:
+            fee: int = ci_from.estClaimFee()
+        else:
+            fee = ci_from.feeForVSize(
+                ci_from.getRedeemFeeRate(), ci_from.xmr_swap_b_lock_spend_tx_vsize()
+            )
+        return {c.offer_id: fee for c in candidates}
     if swap_client.is_reverse_ads_bid(coin_from, coin_to):
         b_lock_spend_vsize: int = ci_from.xmr_swap_b_lock_spend_tx_vsize()
 
@@ -501,7 +529,9 @@ def planMultiBid(
 
     ci_from = swap_client.ci(coin_from)
     picked = set(manual_offers or [])
-    include_own: bool = allow_self_bids or len(picked) > 0
+    include_own: bool = (allow_self_bids or len(picked) > 0) and not isEvmPair(
+        swap_client, coin_from, coin_to
+    )
 
     offers = swap_client.listOffers(
         sent=False,
@@ -580,7 +610,7 @@ def planMultiBid(
         ci_to = swap_client.ci(coin_to)
         plan, target = plan_spend_max(
             fill,
-            ci_to.getSpendableBalance(),
+            spendable_balance(swap_client, ci_to),
             plan_fee_reserve(
                 swap_client,
                 ci_to,
@@ -669,7 +699,7 @@ def placeMultiBid(
     )
     # Every leg can be accepted, so the whole spend and its fees must be covered
     # up front. The bidder funds coin_to in both directions.
-    balance = ci_to.getSpendableBalance()
+    balance = spendable_balance(swap_client, ci_to)
     reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
     reserve = plan_fee_reserve(swap_client, ci_to, offers, reverse_bid)
     total_need = total_spend + reserve.for_offers(offers, total_spend)

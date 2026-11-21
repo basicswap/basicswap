@@ -30,7 +30,12 @@ import basicswap.config as cfg
 from basicswap import __version__
 from basicswap.base import getaddrinfo_tor
 from basicswap.basicswap import BasicSwap
-from basicswap.chainparams import Coins, chainparams, getCoinIdFromName
+from basicswap.chainparams import (
+    Coins,
+    chainparams,
+    evm_contract_coins,
+    getCoinIdFromName,
+)
 from basicswap.contrib.rpcauth import generate_salt
 from basicswap.ui.util import getCoinName
 from basicswap.util import ensure, path_exists, toBool
@@ -153,6 +158,38 @@ known_coins = {
 }
 
 disabled_coins = []
+
+# EVM coins connect to an external JSON-RPC node (web3), not a managed daemon,
+# so they are configured separately from known_coins: no binary download, no
+# datadir/daemon config, no wallet-rpc init.  The wallet is an HD account derived
+# from the basicswap seed at runtime by the coin interface.
+evm_coins = [chainparams[c]["name"] for c in evm_contract_coins]
+
+
+def getEvmConfigSegment(coin, chain: str) -> dict:
+    prefix = chainparams[coin]["client"].upper()
+    net = chainparams[coin][chain]
+    nodes = net.get("rpc_nodes_default", [])
+    rpc_url = os.getenv(f"{prefix}_RPC_URL") or (nodes[0] if nodes else "")
+    config = {
+        "connection_type": "web3",
+        "manage_daemon": False,  # external JSON-RPC node, no managed daemon
+        "rpc_url": rpc_url,
+        "remote_daemon_urls": [
+            {"url": url, "failover": True}
+            for url in ([rpc_url] if rpc_url not in nodes else []) + nodes
+            if url
+        ],
+        "automatically_select_daemon": True,
+        "chain_id": net.get("chain_id"),
+        "blocks_confirmed": net.get("blocks_confirmed", 1),
+        "core_type_group": "evm",
+    }
+    contract_address = os.getenv(f"{prefix}_CONTRACT_ADDRESS")
+    if contract_address:
+        config["contract_address"] = contract_address
+    return config
+
 
 known_networks = ["smsg", "simplex", "nostr"]
 disabled_networks = []
@@ -640,6 +677,8 @@ def addTorSettings(settings, tor_control_password):
 def modify_tor_config(
     settings, coin, tor_control_password=None, enable=False, extra_opts={}
 ):
+    if coin in evm_coins:
+        return
     coin_settings = settings["chainclients"][coin]
     data_dir = coin_settings["datadir"]
 
@@ -954,11 +993,16 @@ def initialise_wallets(
     extra_opts={},
 ):
     prepare_ctx = extra_opts["prepare_ctx"]
+    # EVM coins have no managed daemon / wallet-rpc and no prepare module; their
+    # account is derived from the seed by the coin interface at runtime.
+    evm_with_coins = [c for c in with_coins if c in evm_coins]
+    with_coins = [c for c in with_coins if c not in evm_coins]
     swap_client = None
     daemons = []
     daemon_args = ["-noconnect", "-nodnsseed"]
     generated_mnemonic: bool = False
     extended_keys = {}
+    evm_keys = {}
 
     coins_failed_to_initialise = []
     coins_failed_to_encrypt = []
@@ -1105,6 +1149,17 @@ def initialise_wallets(
                     extended_keys[getCoinName(c)] = account_key
             except Exception as e:
                 logger.debug(f"Could not generate extended key for {coin_name}: {e}")
+        for coin_name in evm_with_coins:
+            try:
+                c = swap_client.getCoinIdFromName(coin_name)
+                swap_client.createCoinInterface(c)
+                ci = swap_client.ci(c)
+                # A test chain's key is derived elsewhere and not worth exporting
+                if not ci.onMainnetChain():
+                    continue
+                evm_keys[getCoinName(c)] = "0x" + ci.accountKey(0)[:32].hex()
+            except Exception as e:
+                logger.warning(f"Could not derive the {coin_name} account key: {e}")
 
     finally:
         if swap_client:
@@ -1147,8 +1202,19 @@ def initialise_wallets(
                     "NOTE: These keys can be imported into Electrum using 'Use a master key'."
                 )
                 print("WARNING: Write these down NOW. They will not be shown again.\n")
+            printEvmKeys(evm_keys)
 
-    return extended_keys
+    return extended_keys, evm_keys
+
+
+def printEvmKeys(evm_keys) -> None:
+    if not evm_keys:
+        return
+    print("EVM account private keys (import into an EVM wallet such as MetaMask):")
+    for coin_name, key in evm_keys.items():
+        print(f"  {coin_name}: {key}")
+    print("")
+    print("WARNING: Write these down NOW. They will not be shown again.\n")
 
 
 def start_migration_daemons(swap_client, coin_names, settings, prepare_ctx, daemons):
@@ -1323,7 +1389,7 @@ def signal_handler(sig, frame):
 
 
 def ensure_coin_valid(coin_name: str, test_disabled: bool = True) -> None:
-    if coin_name not in known_coins:
+    if coin_name not in known_coins and coin_name not in evm_coins:
         exitWithError(f"Unknown coin {coin_name.capitalize()}")
     if test_disabled and not OVERRIDE_DISABLED_COINS and coin_name in disabled_coins:
         exitWithError(f"{coin_name.capitalize()} is disabled")
@@ -1735,6 +1801,8 @@ def main():
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
         "dogecoin": doge_prepare.getConfigSegment(prepare_ctx),
     }
+    for c in evm_contract_coins:
+        chainclients[chainparams[c]["name"]] = getEvmConfigSegment(c, chain)
 
     electrum_supported_coins = {
         "bitcoin": "btc",
@@ -1763,6 +1831,8 @@ def main():
                 ]
 
     for coin_name, coin_settings in chainclients.items():
+        if coin_name in evm_coins:
+            continue
         coin_id = getCoinIdFromName(coin_name)
         coin_params = chainparams[coin_id]
         if coin_settings.get("core_type_group", "") == "xmr":
@@ -1952,16 +2022,17 @@ def main():
 
             settings["chainclients"][add_coin] = chainclients[add_coin]
 
-            if not no_cores:
+            if not no_cores and add_coin not in evm_coins:
                 prepareCore(add_coin, settings, extra_opts)
 
             if not (prepare_bin_only or upgrade_cores):
-                prepareDataDir(
-                    add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
-                )
+                if add_coin not in evm_coins:
+                    prepareDataDir(
+                        add_coin, settings, chain, particl_wallet_mnemonic, extra_opts
+                    )
 
                 if particl_wallet_mnemonic != "none":
-                    extended_keys = initialise_wallets(
+                    extended_keys, evm_keys = initialise_wallets(
                         None,
                         {
                             add_coin,
@@ -1984,8 +2055,9 @@ def main():
                         print(
                             "WARNING: Write this down NOW. It will not be shown again.\n"
                         )
+                    printEvmKeys(evm_keys)
 
-                save_config(config_path, settings)
+            save_config(config_path, settings)
         finally:
             if "particl_daemon" in extra_opts:
                 finalise_daemon(extra_opts["particl_daemon"])
@@ -2229,6 +2301,8 @@ def main():
 
     if not no_cores:
         for c in with_coins:
+            if c in evm_coins:
+                continue  # External JSON-RPC node, no core binary to download
             prepareCore(c, settings, extra_opts)
 
     if prepare_bin_only:
@@ -2236,6 +2310,8 @@ def main():
         return 0
 
     for c in with_coins:
+        if c in evm_coins:
+            continue  # No managed daemon, so no datadir/config to write
         prepareDataDir(c, settings, chain, particl_wallet_mnemonic, extra_opts)
 
     if particl_wallet_mnemonic == "none":
