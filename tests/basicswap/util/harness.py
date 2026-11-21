@@ -31,6 +31,9 @@ from tests.basicswap.util.common import (
     LTC_BASE_PORT,
     LTC_BASE_RPC_PORT,
     PIVX_BASE_PORT,
+    RIN_BASE_PORT,
+    RIN_BASE_RPC_PORT,
+    RIN_BASE_TOR_PORT,
     BTC_USE_DESCRIPTORS,
     BTC_USE_LEGACY_KEY_PATHS,
 )
@@ -95,6 +98,10 @@ BITCOINCASH_RPC_PORT_BASE = int(
     os.getenv("BITCOINCASH_RPC_PORT_BASE", BCH_BASE_RPC_PORT)
 )
 DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT))
+
+RINCOIN_PORT_BASE = int(os.getenv("RINCOIN_PORT_BASE", RIN_BASE_PORT))
+RINCOIN_RPC_PORT_BASE = int(os.getenv("RINCOIN_RPC_PORT_BASE", RIN_BASE_RPC_PORT))
+RINCOIN_TOR_PORT_BASE = int(os.getenv("RINCOIN_TOR_PORT_BASE", RIN_BASE_TOR_PORT))
 
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
 
@@ -176,6 +183,9 @@ def run_prepare(
     os.environ["BCH_RPC_PORT"] = str(BITCOINCASH_RPC_PORT_BASE)
     os.environ["DOGE_PORT"] = str(DOGE_BASE_PORT)
     os.environ["DOGE_RPC_PORT"] = str(DOGECOIN_RPC_PORT_BASE)
+    os.environ["RIN_PORT"] = str(RINCOIN_PORT_BASE)
+    os.environ["RIN_RPC_PORT"] = str(RINCOIN_RPC_PORT_BASE)
+    os.environ["RIN_ONION_PORT"] = str(RINCOIN_TOR_PORT_BASE)
 
     testargs = [
         f'-datadir="{datadir_path}"',
@@ -385,6 +395,49 @@ def run_prepare(
                     )
             for opt in EXTRA_CONFIG_JSON.get(f"ncm{node_id}", []):
                 fp.write(opt + "\n")
+
+    if "rincoin" in coins_array:
+        # Pruned nodes don't provide blocks
+        config_filename = os.path.join(datadir_path, "rincoin", "rincoin.conf")
+        with open(config_filename, "r") as fp:
+            lines = fp.readlines()
+        with open(config_filename, "w") as fp:
+            for line in lines:
+                if not line.startswith("prune"):
+                    fp.write(line)
+            fp.write("bind=127.0.0.1\n")
+            fp.write("dnsseed=0\n")
+            fp.write("discover=0\n")
+            fp.write("listenonion=0\n")
+            fp.write("upnp=0\n")
+            # MWEB is not active on Rincoin mainnet, keep it off on regtest.
+            fp.write("vbparams=mweb:9999999999:9999999999\n")
+            # Wallet sends pay the relay fee, as in extended/test_rin.py.
+            fp.write("fallbackfee=0.00001\n")
+            fp.write("mintxfee=0.00001\n")
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = "test_rin_" + str(node_id)
+                rpc_pass = "test_rin_pwd_" + str(node_id)
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        rpc_user, salt, password_to_hmac(salt, rpc_pass)
+                    )
+                )
+                settings["chainclients"]["rincoin"]["rpcuser"] = rpc_user
+                settings["chainclients"]["rincoin"]["rpcpassword"] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write(
+                        "connect=127.0.0.1:{}\n".format(
+                            RINCOIN_PORT_BASE + ip + port_ofs
+                        )
+                    )
+            for opt in EXTRA_CONFIG_JSON.get(f"rin{node_id}", []):
+                fp.write(opt + "\n")
+        # The shared swap tests use locks of 12 and 16 blocks, a lock tx has to
+        # confirm before its refund path opens.
+        settings["chainclients"]["rincoin"]["blocks_confirmed"] = 2
 
     if "monero" in coins_array:
         with open(os.path.join(datadir_path, "monero", "monerod.conf"), "a") as fp:

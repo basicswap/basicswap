@@ -1327,6 +1327,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.nmc.nmc import NMCInterface
 
             return NMCInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.RIN:
+            from .interface.rin.rin import RINInterface
+
+            return RINInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.XMR:
             from .interface.xmr.xmr import XMRInterface
 
@@ -1374,6 +1378,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "dash",
                 "firo",
                 "bitcoincash",
+                "rincoin",
             ):
                 pidfilename += "d"
 
@@ -18564,6 +18569,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         wanted_coins = set(self.activeCoins()) | {
             ticker_map[t.lower()] for t in self.getChartCoins()
         }
+        # A coin without a rate id can't be fetched from any source
+        wanted_coins = {c for c in wanted_coins if chainparams[c]["rate_ids"]}
         fetched = set()
         retry_sources = []
         for rate_source in rate_sources_ordered:

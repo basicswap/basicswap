@@ -2,3 +2,4 @@ eventtypes
 wit
 ro
 hashin
+rin

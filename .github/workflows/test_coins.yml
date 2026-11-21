@@ -73,6 +73,7 @@ jobs:
             firo) add_entry test_firo firo;;
             bch) add_entry test_bch bitcoincash;;
             doge) add_entry test_doge dogecoin;;
+            rin) add_entry test_rin rincoin;;
             *)
               echo "Unknown coin: $1" >&2
               exit 1;;
@@ -98,7 +99,7 @@ jobs:
             exit 1
           fi
           if [ "$TEST_COINS" = "all" ]; then
-            TEST_COINS="part,ltc,dcr,nmc,wow,pivx,dash,firo,bch,doge"
+            TEST_COINS="part,ltc,dcr,nmc,wow,pivx,dash,firo,bch,doge,rin"
           fi
           IFS=','
           for c in $TEST_COINS; do
@@ -161,6 +162,12 @@ jobs:
       name: Running basicswap-prepare for ${{ matrix.test_coin }}
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=${{ matrix.test_coin }}
+    - name: Install Rincoin Core runtime libraries
+      if: ${{ contains(matrix.test_coin, 'rincoin') && matrix.skip_tests != 'true' }}
+      run: |
+        # The x86_64 Linux build of Rincoin Core 1.1.0 links these dynamically (Ubuntu 24.04 package names)
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libboost-filesystem1.83.0 libboost-thread1.83.0 libevent-2.1-7t64 libevent-pthreads-2.1-7t64 libfmt9 libminiupnpc17 libsqlite3-0 libzmq5
     - name: Run test_coins for ${{ matrix.test_coin_a }}
       if: ${{ matrix.skip_tests != 'true' }}
       env:

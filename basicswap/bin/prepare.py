@@ -71,6 +71,7 @@ from basicswap.interface.pivx.core import prepare_module as pivx_prepare
 from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
+from basicswap.interface.rin.core import prepare_module as rin_prepare
 from basicswap.network.nostr.prepare import prepare_module as nostr_prepare
 from basicswap.network.simplex.prepare import prepare_module as simplex_prepare
 
@@ -87,6 +88,7 @@ coin_prepare_modules = {
     "wownero": wow_prepare,
     "pivx": pivx_prepare,
     "firo": firo_prepare,
+    "rincoin": rin_prepare,
 }
 
 known_coins = {
@@ -149,6 +151,11 @@ known_coins = {
         doge_prepare.version,
         doge_prepare.version_tag,
         doge_prepare.signers.keys(),
+    ),
+    "rincoin": (
+        rin_prepare.version,
+        rin_prepare.version_tag,
+        rin_prepare.signers.keys(),
     ),
 }
 
@@ -723,6 +730,8 @@ def modify_tor_config(
             default_onionport = ltc_prepare.onion_port
         elif coin == "dogecoin":
             default_onionport = doge_prepare.onion_port
+        elif coin == "rincoin":
+            default_onionport = rin_prepare.onion_port
         elif coin in ("decred",):
             pass
         else:
@@ -1734,6 +1743,7 @@ def main():
         "firo": firo_prepare.getConfigSegment(prepare_ctx),
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
         "dogecoin": doge_prepare.getConfigSegment(prepare_ctx),
+        "rincoin": rin_prepare.getConfigSegment(prepare_ctx),
     }
 
     electrum_supported_coins = {

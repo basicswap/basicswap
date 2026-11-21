@@ -67,6 +67,7 @@ from tests.basicswap.util.harness import (
     FIRO_RPC_PORT_BASE,
     NMC_BASE_RPC_PORT,
     PIVX_RPC_PORT_BASE,
+    RINCOIN_RPC_PORT_BASE,
     TEST_PATH,
     XMR_BASE_RPC_PORT,
     prepare_nodes,
@@ -158,6 +159,8 @@ def updateThread(cls):
                 cls.callbchrpc(0, "generatetoaddress", [1, cls.bch_addr])
             if cls.doge_addr is not None:
                 cls.calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
+            if cls.rin_addr is not None:
+                cls.callrinrpc(0, "generatetoaddress", [1, cls.rin_addr])
         except Exception as e:
             print(f"updateThread error: {e}")
         cls.delay_event.wait(random.uniform(cls.update_min, cls.update_max))
@@ -495,6 +498,26 @@ def start_processes(self):
                 0, "generatetoaddress", [num_blocks - have_blocks, self.nmc_addr]
             )
 
+    if "rincoin" in self.test_coins_list:
+        self.callrinrpc = make_rpc_func(
+            RINCOIN_RPC_PORT_BASE + PORT_OFS,
+            "test_rin_{0}:test_rin_pwd_{0}",
+            default_wallet="bsx_wallet",
+        )
+        self.rin_addr = self.callrinrpc(0, "getnewaddress", ["mining_addr", "bech32"])
+        # Regtest activates CSV at 432, RIN3 (RIP-0009) at 840 and BIP65 at 1351.
+        num_blocks: int = 1352
+        have_blocks: int = self.callrinrpc(0, "getblockcount")
+        if have_blocks < num_blocks:
+            logging.info(
+                f"Mining {num_blocks - have_blocks} Rincoin blocks to {self.rin_addr}"
+            )
+            # In batches, an RPC call times out after 10 seconds
+            while have_blocks < num_blocks:
+                batch: int = min(400, num_blocks - have_blocks)
+                self.callrinrpc(0, "generatetoaddress", [batch, self.rin_addr])
+                have_blocks += batch
+
     if RESET_TEST:
         # Lower output split threshold for more stakeable outputs
         for i in range(NUM_NODES):
@@ -631,6 +654,7 @@ class BaseTestWithPrepare(unittest.TestCase):
     firo_addr = None
     bch_addr = None
     doge_addr = None
+    rin_addr = None
     test_coins_list = TEST_COINS_LIST.split(",")
 
     @classmethod

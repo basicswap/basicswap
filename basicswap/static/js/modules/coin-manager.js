@@ -102,6 +102,15 @@ const CoinManager = (function() {
             icon: 'Namecoin.png'
         },
         {
+            symbol: 'RIN',
+            name: 'rincoin',
+            displayName: 'Rincoin',
+            aliases: ['rin', 'rincoin'],
+            priceKey: 'rincoin',
+            historicalDays: 30,
+            icon: 'Rincoin.png'
+        },
+        {
             symbol: 'WOW',
             name: 'wownero',
             displayName: 'Wownero',
