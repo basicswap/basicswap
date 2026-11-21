@@ -114,6 +114,7 @@
     'DASH': {'name': 'Dash', 'symbol': 'DASH', 'image': 'Dash.png', 'show': true},
     'ETH': {'name': 'Ethereum', 'symbol': 'ETH', 'image': 'Ethereum.png', 'show': true},
     'USDT0_STABLE': {'name': 'USDT0 (Stable)', 'symbol': 'USDT0', 'image': 'USDT0-(Stable).png', 'show': true},
+    'USDC_ARC': {'name': 'USDC (Arc)', 'symbol': 'USDC', 'image': 'USDC-(Arc).png', 'show': true},
     'DOGE': {'name': 'Dogecoin', 'symbol': 'DOGE', 'image': 'Dogecoin.png', 'show': true},
     'DCR': {'name': 'Decred', 'symbol': 'DCR', 'image': 'Decred.png', 'show': true},
     'NMC': {'name': 'Namecoin', 'symbol': 'NMC', 'image': 'Namecoin.png', 'show': true},
@@ -121,7 +122,7 @@
     'WOW': {'name': 'Wownero', 'symbol': 'WOW', 'image': 'Wownero.png', 'show': true}
     }
   %}
-  {% set custom_order = ['BTC', 'ETH', 'XMR', 'PART', 'LTC', 'BCH', 'USDT0_STABLE', 'FIRO', 'PIVX', 'DASH', 'DOGE', 'DCR', 'NMC', 'ZANO', 'WOW'] %}
+  {% set custom_order = ['BTC', 'ETH', 'XMR', 'PART', 'LTC', 'BCH', 'USDT0_STABLE', 'USDC_ARC', 'FIRO', 'PIVX', 'DASH', 'DOGE', 'DCR', 'NMC', 'ZANO', 'WOW'] %}
 
   {% if enabled_chart_coins is string %}
     {% if enabled_chart_coins == "" %}
