@@ -5496,6 +5496,17 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci.setWalletRestoreHeight(found_height)
         return found_height
 
+    def getChainBHeightStart(self, ci, cursor=None) -> int:
+        """Height to scan for a swap's coin B lock from, at least the wallet's restore height."""
+        height: int = ci.getChainHeight()
+        wallet_restore_height: int = self.getWalletRestoreHeight(ci, cursor)
+        if height < wallet_restore_height:
+            self.log.warning(
+                f"{ci.coin_name()} swap restore height clamped to {wallet_restore_height}."
+            )
+            return wallet_restore_height
+        return height
+
     def getNewContractId(self, cursor):
         self._contract_count += 1
         cursor.execute(
@@ -7210,14 +7221,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 )
 
             bid.chain_a_height_start = ci_from.getChainHeight()
-            bid.chain_b_height_start = ci_to.getChainHeight()
-
-            wallet_restore_height = self.getWalletRestoreHeight(ci_to, cursor)
-            if bid.chain_b_height_start < wallet_restore_height:
-                bid.chain_b_height_start = wallet_restore_height
-                self.log.warning(
-                    f"Adaptor-sig swap restore height clamped to {wallet_restore_height}"
-                )
+            bid.chain_b_height_start = self.getChainBHeightStart(ci_to, cursor)
             if "prefunded_tx" in extra_options:
                 prefunded_tx = PrefundedTx(
                     active_ind=1,
@@ -13165,7 +13169,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 pk_bid_addr=pk_from,
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
-                chain_b_height_start=ci_to.getChainHeight(),
+                chain_b_height_start=self.getChainBHeightStart(ci_to),
                 message_nets=bid_message_nets,
             )
 
@@ -13178,12 +13182,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 kbsf_dleag=bid_data.kbsf_dleag,
             )
             self.setMsgSplitInfo(xmr_swap)
-            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
-            if bid.chain_b_height_start < wallet_restore_height:
-                bid.chain_b_height_start = wallet_restore_height
-                self.log.warning(
-                    f"Adaptor-sig swap restore height clamped to {wallet_restore_height}."
-                )
         else:
             ensure(
                 bid.state == BidStates.BID_SENT,
@@ -15671,7 +15669,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 was_sent=False,
                 was_received=True,
                 chain_a_height_start=ci_from.getChainHeight(),
-                chain_b_height_start=ci_to.getChainHeight(),
+                chain_b_height_start=self.getChainBHeightStart(ci_to),
                 message_nets=bid_data.message_nets,
             )
 
@@ -15679,12 +15677,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 bid_id=bid_id,
             )
             self.setMsgSplitInfo(xmr_swap)
-            wallet_restore_height = self.getWalletRestoreHeight(ci_to)
-            if bid.chain_b_height_start < wallet_restore_height:
-                bid.chain_b_height_start = wallet_restore_height
-                self.log.warning(
-                    f"Adaptor-sig swap restore height clamped to {wallet_restore_height}."
-                )
         else:
             ensure(
                 bid.state == BidStates.BID_REQUEST_SENT,
@@ -15796,14 +15788,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         xmr_swap.split_parent_msg_id = bytes.fromhex(msg["msgid"])
 
         bid.chain_a_height_start: int = ci_from.getChainHeight()
-        bid.chain_b_height_start: int = ci_to.getChainHeight()
-
-        wallet_restore_height: int = self.getWalletRestoreHeight(ci_to)
-        if bid.chain_b_height_start < wallet_restore_height:
-            bid.chain_b_height_start = wallet_restore_height
-            self.log.warning(
-                f"Reverse adaptor-sig swap restore height clamped to {wallet_restore_height}"
-            )
+        bid.chain_b_height_start: int = self.getChainBHeightStart(ci_to)
 
         bid.setState(BidStates.BID_RECEIVING)
 
