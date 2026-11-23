@@ -3592,7 +3592,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             "SELECT 1 FROM smsgaddresses WHERE addr = :addr AND active_ind = 0",
             {"addr": recv_addr},
         ).fetchone():
-            self.editSMSGAddress(recv_addr, 1, cursor=cursor)
+            try:
+                self.editSMSGAddress(recv_addr, 1, cursor=cursor)
+            except Exception as e:
+                self.log.warning(
+                    f"Receive address not re-enabled for bid {self.log.id(bid.bid_id)}: {e}"
+                )
         self.loadBidTxns(bid, cursor)
 
         coin_from = Coins(offer.coin_from)
@@ -18371,6 +18376,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
     def retireUnusedSMSGAddresses(self, max_addresses: int = 500) -> None:
         if self._is_locked is True:
+            return
+        if not any(
+            n.get("type") == "smsg" for n in getattr(self, "active_networks", [])
+        ):
             return
         cursor = self.openDB()
         try:
