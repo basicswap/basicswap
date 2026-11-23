@@ -322,8 +322,9 @@ class XMRInterface(CoinInterface):
                 self.openWallet(self._wallet_filename)
                 # TODO: Check address
                 return  # Wallet exists
-            except Exception as e:  # noqa: F841
-                pass
+            except Exception as e:
+                if self.is_transient_error(e):
+                    raise
 
             Kbv = self.getPubkey(key_view)
             Kbs = self.getPubkey(key_spend)
