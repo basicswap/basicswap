@@ -918,11 +918,6 @@ def process_offers(args, config, script_state) -> None:
                     )
                     if revoke_offer(offer_id, args):
                         print("Offer revoked, will repost with accurate amount")
-                        for i, prev_offer in enumerate(prev_template_offers):
-                            if prev_offer.get("offer_id") == offer_id:
-                                del prev_template_offers[i]
-                                break
-                        write_state(args.statefile, script_state)
                         offers_found -= 1
                 elif template_fixed_remaining is not None and (
                     float(offer.get("tracking_filled_amount", 0))
@@ -977,22 +972,15 @@ def process_offers(args, config, script_state) -> None:
                     result = read_json_api(f"revokeoffer/{old_offer_id}", {})
                     if args.debug:
                         print(f"Revoke result: {result}")
-
-                    for i, prev_offer in enumerate(prev_template_offers):
-                        if prev_offer.get("offer_id") == old_offer_id:
-                            del prev_template_offers[i]
-                            break
                 except Exception as e:
                     print(f"Error revoking duplicate offer {old_offer_id}: {e}")
 
             offers_found = 1
 
             if newest_offer.get("offer_id") not in template_offer_ids:
-                if "offers" not in script_state:
-                    script_state["offers"] = {}
-                if offer_template["name"] not in script_state["offers"]:
-                    script_state["offers"][offer_template["name"]] = []
-                script_state["offers"][offer_template["name"]].append(
+                script_state.setdefault("offers", {}).setdefault(
+                    offer_template["id"], []
+                ).append(
                     {"offer_id": newest_offer["offer_id"], "time": int(time.time())}
                 )
                 write_state(args.statefile, script_state)
