@@ -5789,7 +5789,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "Attempting to reduce amount to match offer rate within tolerance."
                 )
 
-                adjust_tries: int = 10000 if ci_from.exp() > 8 else 1000
+                adjust_tries: int = min(
+                    10000 if ci_from.exp() > 8 else 1000,
+                    amount - offer.min_bid_amount + 1,
+                )
                 best_amount = amount
                 best_amount_to = amount_to
                 best_bid_rate = bid_rate
