@@ -5501,7 +5501,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         height: int = ci.getChainHeight()
         wallet_restore_height: int = self.getWalletRestoreHeight(ci, cursor)
         if height < wallet_restore_height:
-            self.log.warning(f"Swap restore height clamped to {wallet_restore_height}.")
+            self.log.warning(
+                f"{ci.coin_name()} swap restore height clamped to {wallet_restore_height}."
+            )
             return wallet_restore_height
         return height
 
