@@ -12429,7 +12429,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise AutomationConstraint("Bidder has too many failed swaps")
         return True
 
-    def shouldAutoAcceptBid(self, offer, bid, cursor=None, options={}) -> bool:
+    def shouldAutoAcceptBid(self, offer, bid, cursor=None) -> bool:
         try:
             use_cursor = self.openDB(cursor)
 
@@ -12465,10 +12465,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             bid_amount: int = bid.amount
             bid_rate: int = bid.rate
 
-            reverse_bid: bool = options.get("reverse_bid", False)
+            reverse_bid: bool = offer.bid_reversed
+            # A reverse bid's amount/rate are stored from the bidder's side.
             if reverse_bid:
                 bid_amount = bid.amount_to
-                bid_rate = options.get("bid_rate")
+                bid_rate = self.ci(offer.coin_from).make_int(
+                    bid.amount / bid.amount_to, r=1
+                )
 
             self.log.debug(f"Evaluating against strategy {strategy.record_id}.")
 
@@ -15716,8 +15719,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 cursor,
             )
 
-            options = {"reverse_bid": True, "bid_rate": bid_rate}
-            if self.shouldAutoAcceptBid(offer, bid, cursor, options=options):
+            if self.shouldAutoAcceptBid(offer, bid, cursor):
                 delay = self.get_delay_event_seconds()
                 self.log.info(
                     f"Auto accepting reverse adaptor-sig bid {self.log.id(bid.bid_id)} in {delay} seconds."
