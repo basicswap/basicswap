@@ -18305,7 +18305,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 self.editSMSGAddress(
                     active_address["addr"], active_ind=0, cursor=cursor
                 )
-            num_disabled += 1
+                num_disabled += 1
         finally:
             self.closeDB(cursor)
 
@@ -18318,7 +18318,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         for smsg_addr in all_keys:
             if smsg_addr["address"] == self.network_addr:
                 continue
-            if smsg_addr["receive"] != 0:
+            if int(smsg_addr["receive"]) == 1:
                 self.log.warning(
                     "Disabling smsg key found in core and not bsx: {}.".format(
                         self.log.addr(smsg_addr["address"])
@@ -18336,7 +18336,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         receiving = {
             k["address"]
             for k in local_keys["wallet_keys"] + local_keys["smsg_keys"]
-            if k["receive"] == "1"
+            if int(k["receive"]) == 1
         }
         cursor = self.openDB()
         try:
