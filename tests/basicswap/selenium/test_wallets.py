@@ -90,10 +90,12 @@ def test_wallets(driver):
     driver.find_element(By.NAME, f"amt_{part_id}").send_keys("10")
     for name in (f"withdraw_type_from_{part_id}", f"withdraw_type_to_{part_id}"):
         click_option(driver.find_element(By.NAME, name), "Plain")
+    form_page = driver.find_element(By.TAG_NAME, "html")
     driver.find_element(By.NAME, f"withdraw_{part_id}").click()
     WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.ID, "confirmYes"))
     ).click()
+    WebDriverWait(driver, 30).until(EC.staleness_of(form_page))
     WebDriverWait(driver, 30).until(
         lambda d: d.find_elements(By.CLASS_NAME, "infomsg")
         or d.find_elements(By.CLASS_NAME, "error_msg")
