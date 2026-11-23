@@ -13,7 +13,7 @@ params = {
         "coingecko.com": "dash",
         "kraken.com": "DASHUSD",
         "kucoin.com": "DASH-USDT",
-        "mexc.com": "DASHUSDT",
+        # "mexc.com": "DASHUSDT",  # delisted 2026-11-13
         # "coinlore.com": "8",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "dash-dash",
         # "neroswap.com": N/A  # not listed on neroswap

@@ -15,7 +15,7 @@ params = {
         "coingecko.com": "monero",
         "kraken.com": "XXMRZUSD",
         "kucoin.com": "XMR-USDT",
-        "mexc.com": "XMRUSDT",
+        # "mexc.com": "XMRUSDT",  # delisted 2026-11-13
         # "coinlore.com": "28",  # no per-coin timestamp, used only where CoinPaprika is unreliable
         "coinpaprika.com": "xmr-monero",
         "neroswap.com": "XMR",
