@@ -33,6 +33,12 @@ params = {
     # Swap contract per chain id; code_hashes maps every past keccak256 to its
     # design so in-flight swaps can settle
     "deployments": {
+        988: {  # mainnet
+            "address": "0x7df19AD2321ad2dA0F20e9c1d51378D9eb100eA6",
+            "code_hashes": {
+                "5860dfbd5ce5b422d1aa1e5491be4feedeabc21bb9ead50a11359c144ed1dac7": "swapfactory",
+            },
+        },
         2201: {  # testnet
             "address": "0x910a3801EEf5D50103396E9739d9FD0b7Cb3683D",
             "code_hashes": {
@@ -55,8 +61,8 @@ params = {
             "https://stable.gateway.tenderly.co",
             "https://stable.drpc.org",
         ],
-        "min_amount": STABLE_COIN // 1000,
-        "max_amount": 100000 * STABLE_COIN,
+        "min_amount": STABLE_COIN,
+        "max_amount": 15000 * STABLE_COIN,
         "blocks_confirmed": 2,
     },
     "testnet": {
@@ -66,14 +72,14 @@ params = {
             "https://rpc.testnet.stable.xyz",
             "https://stable-testnet-evm-rpc.publicnode.com",
         ],
-        "min_amount": STABLE_COIN // 1000,
+        "min_amount": STABLE_COIN,
         "max_amount": 100000 * STABLE_COIN,
         "blocks_confirmed": 2,
     },
     "regtest": {
         "rpcport": 0,
         "chain_id": 31337,  # anvil default
-        "min_amount": STABLE_COIN // 1000,
+        "min_amount": STABLE_COIN,
         "max_amount": 100000 * STABLE_COIN,
         "blocks_confirmed": 1,
     },

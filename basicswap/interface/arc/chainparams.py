@@ -27,6 +27,12 @@ params = {
     "client": "arc",
     "decimal_places": 8,
     "deployments": {
+        5042: {  # mainnet
+            "address": "0x7df19AD2321ad2dA0F20e9c1d51378D9eb100eA6",
+            "code_hashes": {
+                "5860dfbd5ce5b422d1aa1e5491be4feedeabc21bb9ead50a11359c144ed1dac7": "swapfactory",
+            },
+        },
         5042002: {  # testnet
             "address": "0xC7CA49c43A74670115AAD78fb8423fa39E89d8Bb",
             "code_hashes": {
@@ -49,8 +55,8 @@ params = {
             "https://arc.drpc.org",
             "https://arc.gateway.tenderly.co",
         ],
-        "min_amount": ARC_COIN // 1000,
-        "max_amount": 100000 * ARC_COIN,
+        "min_amount": ARC_COIN,
+        "max_amount": 15000 * ARC_COIN,
         "blocks_confirmed": 1,
     },
     "testnet": {
@@ -62,14 +68,14 @@ params = {
             "https://arc-testnet.drpc.org",
             "https://arc-testnet.gateway.tenderly.co",
         ],
-        "min_amount": ARC_COIN // 1000,
+        "min_amount": ARC_COIN,
         "max_amount": 100000 * ARC_COIN,
         "blocks_confirmed": 1,
     },
     "regtest": {
         "rpcport": 0,
         "chain_id": 31337,
-        "min_amount": ARC_COIN // 1000,
+        "min_amount": ARC_COIN,
         "max_amount": 100000 * ARC_COIN,
         "blocks_confirmed": 1,
     },
