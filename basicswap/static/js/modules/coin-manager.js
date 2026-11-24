@@ -47,6 +47,15 @@ const CoinManager = (function() {
             icon: 'PIVX.png'
         },
         {
+            symbol: 'DIVI',
+            name: 'divi',
+            displayName: 'Divi',
+            aliases: ['divi'],
+            priceKey: 'divi',
+            historicalDays: 30,
+            icon: 'Divi.png'
+        },
+        {
             symbol: 'FIRO',
             name: 'firo',
             displayName: 'Firo',

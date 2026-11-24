@@ -327,7 +327,7 @@ const ui = {
   },
 
   setActiveContainer: (containerId) => {
-    const containerIds = ['btc', 'xmr', 'part', 'pivx', 'firo', 'dash', 'ltc', 'doge', 'eth', 'dcr', 'nmc', 'zano', 'wow', 'bch'].map(id => `${id}-container`);
+    const containerIds = ['btc', 'xmr', 'part', 'pivx', 'firo', 'dash', 'ltc', 'doge', 'eth', 'dcr', 'nmc', 'zano', 'wow', 'bch', 'divi'].map(id => `${id}-container`);
     containerIds.forEach(id => {
       const container = document.getElementById(id);
       if (container) {

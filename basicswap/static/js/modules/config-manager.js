@@ -224,6 +224,7 @@ const ConfigManager = (function() {
                 'litecoin': { usd: null, btc: null },
                 'particl': { usd: null, btc: null },
                 'pivx': { usd: null, btc: null },
+                'divi': { usd: null, btc: null },
                 'monero': { usd: null, btc: null },
                 'zano': { usd: null, btc: null },
                 'wownero': { usd: null, btc: null },
