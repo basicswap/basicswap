@@ -26,7 +26,7 @@ params = {
     "mainnet": {
         "rpcport": 18081,
         "walletrpcport": 18082,
-        "min_amount": 1000000000,
+        "min_amount": XMR_COIN // 1000,  # 0.001
         "max_amount": 10000000 * XMR_COIN,
         "address_prefix": 18,
         "subaddress_prefix": 42,
@@ -34,7 +34,7 @@ params = {
     "testnet": {
         "rpcport": 28081,
         "walletrpcport": 28082,
-        "min_amount": 1000000000,
+        "min_amount": XMR_COIN // 1000,
         "max_amount": 10000000 * XMR_COIN,
         "address_prefix": 18,
         "subaddress_prefix": 42,
@@ -42,7 +42,7 @@ params = {
     "regtest": {
         "rpcport": 18081,
         "walletrpcport": 18082,
-        "min_amount": 1000000000,
+        "min_amount": XMR_COIN // 1000,
         "max_amount": 10000000 * XMR_COIN,
         "address_prefix": 18,
         "subaddress_prefix": 42,

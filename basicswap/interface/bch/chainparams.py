@@ -34,7 +34,7 @@ params = {
         "key_prefix": 128,
         "hrp": "bitcoincash",
         "bip44": 0,
-        "min_amount": 100000,
+        "min_amount": COIN // 1000,  # 0.001
         "max_amount": 10000000 * COIN,
     },
     "testnet": {
@@ -44,7 +44,7 @@ params = {
         "key_prefix": 239,
         "hrp": "bchtest",
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN // 1000,
         "max_amount": 10000000 * COIN,
         "name": "testnet3",
     },
@@ -55,7 +55,7 @@ params = {
         "key_prefix": 239,
         "hrp": "bchreg",
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN // 1000,
         "max_amount": 10000000 * COIN,
     },
 }

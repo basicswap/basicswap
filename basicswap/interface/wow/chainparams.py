@@ -25,8 +25,8 @@ params = {
     "decimal_places": 11,
     "mainnet": {
         "rpcport": 34568,
-        "walletrpcport": 34572,  # todo
-        "min_amount": 100000000,
+        "walletrpcport": 34572,
+        "min_amount": WOW_COIN,  # 1
         "max_amount": 10000000 * WOW_COIN,
         "address_prefix": 4146,
         "subaddress_prefix": 12208,
@@ -34,7 +34,7 @@ params = {
     "testnet": {
         "rpcport": 44568,
         "walletrpcport": 44572,
-        "min_amount": 100000000,
+        "min_amount": WOW_COIN,
         "max_amount": 10000000 * WOW_COIN,
         "address_prefix": 4146,
         "subaddress_prefix": 12208,
@@ -42,7 +42,7 @@ params = {
     "regtest": {
         "rpcport": 54568,
         "walletrpcport": 54572,
-        "min_amount": 100000000,
+        "min_amount": WOW_COIN,
         "max_amount": 10000000 * WOW_COIN,
         "address_prefix": 4146,
         "subaddress_prefix": 12208,

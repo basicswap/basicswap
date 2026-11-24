@@ -32,7 +32,7 @@ params = {
         "key_prefix": 210,
         "hrp": "",
         "bip44": 136,
-        "min_amount": 100000,
+        "min_amount": COIN // 10,  # 0.1
         "max_amount": 10000000 * COIN,
     },
     "testnet": {
@@ -42,7 +42,7 @@ params = {
         "key_prefix": 185,
         "hrp": "",
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN // 10,
         "max_amount": 10000000 * COIN,
     },
     "regtest": {
@@ -52,7 +52,7 @@ params = {
         "key_prefix": 239,
         "hrp": "",
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN // 10,
         "max_amount": 10000000 * COIN,
     },
 }
