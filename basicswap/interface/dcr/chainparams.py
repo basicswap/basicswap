@@ -28,7 +28,7 @@ params = {
         "script_address": 0x071A,
         "key_prefix": 0x22DE,
         "bip44": 42,
-        "min_amount": 100000,
+        "min_amount": COIN // 100,  # 0.01
         "max_amount": 10000000 * COIN,
     },
     "testnet": {
@@ -37,7 +37,7 @@ params = {
         "script_address": 0x0EFC,
         "key_prefix": 0x230E,
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN // 100,
         "max_amount": 10000000 * COIN,
         "name": "testnet3",
     },
@@ -47,7 +47,7 @@ params = {
         "script_address": 0x0E6C,
         "key_prefix": 0x2307,
         "bip44": 115,
-        "min_amount": 100000,
+        "min_amount": COIN // 100,
         "max_amount": 10000000 * COIN,
     },
 }

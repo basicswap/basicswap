@@ -28,7 +28,7 @@ params = {
         "key_prefix": 158,
         "hrp": "doge",
         "bip44": 3,
-        "min_amount": 100000,  # TODO increase above fee
+        "min_amount": COIN,  # 1
         "max_amount": 10000000 * COIN,
     },
     "testnet": {
@@ -38,7 +38,7 @@ params = {
         "key_prefix": 241,
         "hrp": "tdge",
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN,
         "max_amount": 10000000 * COIN,
         "name": "testnet4",
     },
@@ -49,7 +49,7 @@ params = {
         "key_prefix": 239,
         "hrp": "rdge",
         "bip44": 1,
-        "min_amount": 100000,
+        "min_amount": COIN,
         "max_amount": 10000000 * COIN,
     },
 }
