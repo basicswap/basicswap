@@ -58,6 +58,8 @@ jobs:
             - 'basicswap/interface/bch/**'
           doge:
             - 'basicswap/interface/doge/**'
+          rin:
+            - 'basicswap/interface/rin/**'
           plans:
             - 'basicswap/multibid.py'
             - 'basicswap/bidplanner.py'
@@ -80,6 +82,7 @@ jobs:
         FIRO_CHANGED: ${{ steps.filter.outputs.firo }}
         BCH_CHANGED: ${{ steps.filter.outputs.bch }}
         DOGE_CHANGED: ${{ steps.filter.outputs.doge }}
+        RIN_CHANGED: ${{ steps.filter.outputs.rin }}
       run: |
         entries=""
         # add_entry name test_coin [test_coin_a] [test_coin_b] [skip_tests]
@@ -122,6 +125,9 @@ jobs:
         fi
         if [ "$DOGE_CHANGED" = "true" ]; then
           add_entry test_doge dogecoin
+        fi
+        if [ "$RIN_CHANGED" = "true" ]; then
+          add_entry test_rin rincoin
         fi
         echo "Coin test matrix: [$entries]"
         echo "matrix=[$entries]" >> "$GITHUB_OUTPUT"
@@ -202,6 +208,7 @@ jobs:
               pytest tests/basicswap/test_bidplanner.py
               pytest tests/basicswap/test_multibid.py
               pytest tests/basicswap/test_batch_lock.py
+              pytest tests/basicswap/test_rin.py
           - name: test_nostr
             command: |
               pytest tests/basicswap/test_nostr.py
@@ -418,6 +425,12 @@ jobs:
       name: Running basicswap-prepare for ${{ matrix.test_coin }}
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=${{ matrix.test_coin }}
+    - name: Install Rincoin Core runtime libraries
+      if: ${{ contains(matrix.test_coin, 'rincoin') && matrix.skip_tests != 'true' }}
+      run: |
+        # The x86_64 Linux build of Rincoin Core 1.1.0 links these dynamically (Ubuntu 24.04 package names)
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libboost-filesystem1.83.0 libboost-thread1.83.0 libevent-2.1-7t64 libevent-pthreads-2.1-7t64 libfmt9 libminiupnpc17 libsqlite3-0 libzmq5
     - name: Run test_coins for ${{ matrix.test_coin_a }}
       if: ${{ matrix.skip_tests != 'true' }}
       env:
