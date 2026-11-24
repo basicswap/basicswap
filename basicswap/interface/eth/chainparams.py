@@ -21,7 +21,14 @@ params = {
     },
     "client": "eth",
     "decimal_places": 8,
-    "deployments": {},
+    "deployments": {
+        1: {  # mainnet
+            "address": "0x7df19AD2321ad2dA0F20e9c1d51378D9eb100eA6",
+            "code_hashes": {
+                "906a606a45f2ee5b5be9e85a08541cf2b97afd0c77f6080f14e48b368ef8e6e5": "swapcreator",
+            },
+        },
+    },
     "mainnet": {
         "rpcport": 8545,
         "rpc_nodes_default": [
@@ -33,7 +40,7 @@ params = {
         ],
         "chain_id": 1,
         "min_amount": ETH_COIN // 1000,
-        "max_amount": 1000 * ETH_COIN,
+        "max_amount": 10 * ETH_COIN,
         "blocks_confirmed": 4,
     },
     "testnet": {
