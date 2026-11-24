@@ -4230,11 +4230,11 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ci_from = self.ci(coin_from)
         ci_to = self.ci(coin_to)
         ensure(amount >= min_bid_amount, "amount < min_bid_amount")
-        ensure(amount > ci_from.min_amount(), "From amount below min value for chain")
-        ensure(amount < ci_from.max_amount(), "From amount above max value for chain")
+        ensure(amount >= ci_from.min_amount(), "From amount below min value for chain")
+        ensure(amount <= ci_from.max_amount(), "From amount above max value for chain")
 
-        ensure(amount_to > ci_to.min_amount(), "To amount below min value for chain")
-        ensure(amount_to < ci_to.max_amount(), "To amount above max value for chain")
+        ensure(amount_to >= ci_to.min_amount(), "To amount below min value for chain")
+        ensure(amount_to <= ci_to.max_amount(), "To amount above max value for chain")
 
     def validateOfferLockValue(
         self, swap_type, coin_from, coin_to, lock_type, lock_value: int
