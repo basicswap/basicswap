@@ -33,7 +33,7 @@ Create offers
             "offer_valid_seconds": Seconds that the generated offers will be valid for.
             "automation_strategy": Auto accept bids setting - "accept_all", "accept_known", or "none" (default: "accept_all")
             "adjust_rates_based_on_market": Per-offer setting to adjust rates based on existing market offers (default: false)
-            "amount_step": REQUIRED - Offer size increment for privacy. Must be between 0.001 and "amount".
+            "amount_step": REQUIRED - Offer size increment for privacy. Must be between coin_from's minimum amount and "amount".
                           This prevents revealing exact wallet balance by creating stepped offers.
                           Example: 150 LTC balance, 100 LTC offer, 5 LTC increment, 76 LTC min balance = creates 70 LTC offer.
                           Without this, partial fills would reveal your exact remaining balance.
@@ -86,7 +86,7 @@ import urllib.error
 import base64
 from urllib.request import urlopen
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 
 delay_event = threading.Event()
 shutdown_in_progress = False
@@ -280,10 +280,15 @@ def findCoin(coin: str, known_coins) -> str:
     return coin
 
 
+def coinMinAmount(coin_name: str) -> float:
+    if coin_name not in coins_map:
+        raise ValueError(f"Unknown coin {coin_name}")
+    return float(coins_map[coin_name]["min_amount"])
+
+
 def readConfig(args, known_coins):
     config_path: str = args.configfile
     num_changes: int = 0
-    min_swap_size = 0.001
 
     with open(config_path) as fs:
         config = json.load(fs)
@@ -344,6 +349,15 @@ def readConfig(args, known_coins):
             offer_template["enabled"] = True
             num_changes += 1
         elif offer_template["enabled"] is not True:
+            continue
+        try:
+            offer_template["coin_from"] = findCoin(
+                offer_template["coin_from"], known_coins
+            )
+            offer_template["coin_to"] = findCoin(offer_template["coin_to"], known_coins)
+            min_swap_size = coinMinAmount(offer_template["coin_from"])
+        except ValueError as e:
+            print(f"Skipping offer template {offer_template['name']}: {e}")
             continue
         if "amount" not in offer_template:
             offer_template["amount"] = 0
@@ -440,17 +454,6 @@ def readConfig(args, known_coins):
             )
             offer_template["lock_hours"] = DEFAULT_LOCK_HOURS
             num_changes += 1
-
-        if offer_template.get("enabled", True) is False:
-            continue
-        try:
-            offer_template["coin_from"] = findCoin(
-                offer_template["coin_from"], known_coins
-            )
-            offer_template["coin_to"] = findCoin(offer_template["coin_to"], known_coins)
-        except ValueError as e:
-            print(f"Skipping offer template {offer_template['name']}: {e}")
-            continue
     config["num_enabled_offers"] = num_enabled
 
     bid_templates = config["bids"]
@@ -482,10 +485,6 @@ def readConfig(args, known_coins):
             num_changes += 1
         bid_ids_map[bid_template["id"]] = bid_template
 
-        if bid_template.get("min_swap_amount", 0.0) < min_swap_size:
-            print("Setting min_swap_amount for bid template", bid_template["name"])
-            bid_template["min_swap_amount"] = min_swap_size
-
         if "address" not in bid_template:
             print("Setting address to auto for bid", bid_template["name"])
             bid_template["address"] = "auto"
@@ -506,9 +505,13 @@ def readConfig(args, known_coins):
         try:
             bid_template["coin_from"] = findCoin(bid_template["coin_from"], known_coins)
             bid_template["coin_to"] = findCoin(bid_template["coin_to"], known_coins)
+            min_swap_size = coinMinAmount(bid_template["coin_from"])
         except ValueError as e:
             print(f"Skipping bid template {bid_template['name']}: {e}")
             continue
+        if bid_template.get("min_swap_amount", 0.0) < min_swap_size:
+            print("Setting min_swap_amount for bid template", bid_template["name"])
+            bid_template["min_swap_amount"] = min_swap_size
     config["num_enabled_bids"] = num_enabled
 
     config["main_loop_delay"] = config.get("main_loop_delay", 60)
@@ -601,7 +604,12 @@ def attempt_pre_offer_bids(
 
         # Calculate and execute bids
         total_filled = execute_bid_plan(
-            biddable_offers, offer_template, amount_to_offer, use_rate, debug
+            biddable_offers,
+            offer_template,
+            amount_to_offer,
+            use_rate,
+            float(coin_to_data["min_amount"]),
+            debug,
         )
 
         remaining_amount = max(0, amount_to_offer - total_filled)
@@ -651,7 +659,9 @@ def filter_biddable_offers(offers, offer_template, our_rate, debug=False):
     return filtered
 
 
-def execute_bid_plan(offers, offer_template, total_amount, our_rate, debug=False):
+def execute_bid_plan(
+    offers, offer_template, total_amount, our_rate, coin_min_amount, debug=False
+):
     """Calculate and execute optimal bid amounts"""
     max_bid_percentage = offer_template.get("max_bid_percentage", 50)
     max_bid_amount = total_amount * (max_bid_percentage / 100)
@@ -666,7 +676,7 @@ def execute_bid_plan(offers, offer_template, total_amount, our_rate, debug=False
         try:
             offer_amount = float(offer.get("amount_from", 0))
             offer_rate = float(offer["rate"])
-            min_bid_amount = offer_template.get("min_bid_amount", 0.001)
+            min_bid_amount = offer_template.get("min_bid_amount", coin_min_amount)
 
             # Calculate how much we can bid on this offer
             # We're buying coin_to, so we need to calculate based on their offer_amount
@@ -1459,7 +1469,9 @@ def process_offers(args, config, script_state) -> None:
         )
 
         # Check if we still need to create an offer after bidding
-        min_remaining_offer = offer_template.get("min_remaining_offer", 0.001)
+        min_remaining_offer = offer_template.get(
+            "min_remaining_offer", float(coin_from_data["min_amount"])
+        )
         if final_offer_amount < min_remaining_offer:
             print(
                 f"Fully filled via bids, skipping AMM offer creation for {offer_template['name']}"
@@ -1723,9 +1735,7 @@ def process_bids(args, config, script_state) -> None:
                     print(f"Error processing offer data: {e}, offer: {offer}")
                 continue
 
-            min_swap_amount = bid_template.get(
-                "min_swap_amount", 0.001
-            )  # TODO: Make default vary per coin
+            min_swap_amount = bid_template["min_swap_amount"]
             can_adjust_offer_amount: bool = offer["amount_negotiable"]
             can_adjust_bid_amount: bool = bid_template.get("amount_variable", True)
             can_adjust_amount: bool = can_adjust_offer_amount and can_adjust_bid_amount
