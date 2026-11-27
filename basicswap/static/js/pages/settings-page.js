@@ -19,6 +19,7 @@
       this.setupMigrationIndicator();
       this.setupServerDiscovery();
       this.setupNetworkStatus();
+      this.setupRpcNodes();
     },
 
     setupTabs: function() {
@@ -1051,6 +1052,221 @@
       row.appendChild(status);
       list.appendChild(row);
     });
+  };
+
+  // EVM JSON-RPC node list. Each change is saved at once; the list is the
+  // source of truth for which nodes the coin fails over to.
+  SettingsPage.setupRpcNodes = function() {
+    document.querySelectorAll('.rpc-nodes').forEach(container => this.initRpcNodeList(container));
+  };
+
+  SettingsPage.initRpcNodeList = function(container) {
+    const coin = container.dataset.coin;
+    const listEl = container.querySelector('.rpc-node-list');
+    const emptyEl = container.querySelector('.rpc-node-empty');
+    const addInput = container.querySelector('.rpc-node-add-input');
+    const addBtn = container.querySelector('.rpc-node-add-btn');
+    const checkAllBtn = container.querySelector('.rpc-check-all');
+    const urlInput = document.querySelector(`[name="rpc_url_${coin}"]`);
+    const errorEl = document.getElementById(`rpc-node-error-${coin}`);
+    if (!listEl) return;
+
+    let nodes = [];
+    try {
+      nodes = (JSON.parse(container.dataset.nodes || '[]') || [])
+        .map(n => ({ url: String(n.url || '').trim(), failover: n.failover !== false, status: 'unknown', latency: null }))
+        .filter(n => n.url !== '');
+    } catch (e) {
+      nodes = [];
+    }
+
+    const SPINNER = '<svg class="w-3.5 h-3.5 mr-1 animate-spin inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+
+    const showError = (msg) => { if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove('hidden'); } };
+    const clearError = () => { if (errorEl) { errorEl.classList.add('hidden'); errorEl.textContent = ''; } };
+    const selectedUrl = () => (urlInput ? urlInput.value.trim() : '');
+
+    const post = (endpoint, body, timeoutMs) => {
+      const controller = new AbortController();
+      const to = setTimeout(() => controller.abort(), timeoutMs || 20000);
+      return fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ coin: coin }, body)),
+        signal: controller.signal
+      }).then(r => r.json()).finally(() => clearTimeout(to));
+    };
+
+    const saveNodes = () => post('/json/saveevmnodes', { nodes: nodes.map(n => ({ url: n.url, failover: !!n.failover })) })
+      .then(data => { if (!(data && data.success)) showError((data && data.error) || 'Failed to save node list.'); })
+      .catch(() => showError('Failed to save node list.'));
+
+    const dotClass = (status) => 'rpc-node-dot shrink-0 w-2 h-2 rounded-full ' +
+      (status === 'ok' ? 'bg-green-500' : (status === 'bad' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-500'));
+
+    const applyProbe = (row, node) => {
+      row.querySelector('.rpc-node-dot').className = dotClass(node.status);
+      const status = row.querySelector('.rpc-node-status');
+      if (node.status === 'ok') {
+        status.className = 'rpc-node-status shrink-0 text-xs font-medium text-green-600 dark:text-green-400';
+        status.textContent = node.latency + ' ms';
+      } else if (node.status === 'bad') {
+        status.className = 'rpc-node-status shrink-0 text-xs font-medium text-red-500';
+        status.textContent = 'unreachable';
+      } else {
+        status.className = 'rpc-node-status shrink-0 text-xs text-gray-400 dark:text-gray-500';
+        status.textContent = '';
+      }
+    };
+
+    const probeNode = (node, row) => {
+      const status = row.querySelector('.rpc-node-status');
+      status.className = 'rpc-node-status shrink-0 text-xs text-gray-400 dark:text-gray-500';
+      status.textContent = 'checking…';
+      return post('/json/testevmnode', { url: node.url })
+        .then(data => {
+          node.status = data.reachable ? 'ok' : 'bad';
+          node.latency = data.reachable ? data.latency_ms : null;
+          if (!data.reachable && data.error) row.title = data.error;
+        })
+        .catch(() => { node.status = 'bad'; node.latency = null; })
+        .finally(() => applyProbe(row, node));
+    };
+
+    const statusRank = (n) => (n.status === 'ok' ? 0 : (n.status === 'unknown' ? 1 : 2));
+    const reorder = () => nodes.sort((a, b) => (statusRank(a) - statusRank(b)) ||
+      ((a.status === 'ok' && b.status === 'ok') ? (a.latency || 0) - (b.latency || 0) : 0));
+
+    const useNode = (node, btn) => {
+      clearError();
+      btn.disabled = true;
+      btn.innerHTML = SPINNER + 'Applying…';
+      post('/json/setevmnode', { url: node.url })
+        .then(data => {
+          if (data && data.success) {
+            if (urlInput) { urlInput.value = node.url; urlInput.defaultValue = node.url; }
+            node.status = 'ok';
+            node.latency = data.latency_ms;
+            render();
+          } else {
+            showError((data && data.error) || `Failed to use ${node.url}.`);
+            btn.disabled = false;
+            btn.textContent = 'Use';
+          }
+        })
+        .catch(() => { showError(`Failed to use ${node.url}.`); btn.disabled = false; btn.textContent = 'Use'; });
+    };
+
+    const buildRow = (node) => {
+      const isSelected = node.url === selectedUrl();
+      const li = document.createElement('li');
+      li.className = 'rpc-node flex items-center gap-2 flex-wrap rounded-lg border p-2 bg-white dark:bg-gray-800 ' +
+        (isSelected ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-200 dark:border-gray-600');
+
+      const probeBtn = document.createElement('button');
+      probeBtn.type = 'button';
+      probeBtn.className = 'flex items-center gap-2 min-w-0 grow text-left cursor-pointer';
+      probeBtn.title = 'Health-check this node';
+      const dot = document.createElement('span');
+      dot.className = dotClass(node.status);
+      const urlSpan = document.createElement('span');
+      urlSpan.className = 'truncate font-mono text-sm text-gray-900 dark:text-white';
+      urlSpan.textContent = node.url;
+      const statusSpan = document.createElement('span');
+      statusSpan.className = 'rpc-node-status shrink-0 text-xs text-gray-400 dark:text-gray-500';
+      probeBtn.append(dot, urlSpan, statusSpan);
+      probeBtn.addEventListener('click', () => { probeNode(node, li).then(() => { reorder(); render(); }); });
+
+      const actions = document.createElement('div');
+      actions.className = 'flex items-center gap-1 shrink-0';
+
+      const foLabel = document.createElement('label');
+      foLabel.className = 'flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap cursor-pointer mr-1';
+      const foCb = document.createElement('input');
+      foCb.type = 'checkbox';
+      foCb.className = 'w-4 h-4 text-blue-600 rounded border-gray-300';
+      foCb.checked = !!node.failover;
+      foCb.addEventListener('change', () => { node.failover = foCb.checked; saveNodes(); });
+      foLabel.append(foCb, document.createTextNode('Failover'));
+
+      let useControl;
+      if (isSelected) {
+        useControl = document.createElement('span');
+        useControl.className = 'inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-white';
+        useControl.textContent = 'Selected';
+        useControl.title = 'The coin is currently using this node';
+      } else {
+        useControl = document.createElement('button');
+        useControl.type = 'button';
+        useControl.className = 'inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg border border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500';
+        useControl.textContent = 'Use';
+        useControl.title = 'Use this node and save';
+        useControl.addEventListener('click', () => useNode(node, useControl));
+      }
+
+      const rmBtn = document.createElement('button');
+      rmBtn.type = 'button';
+      rmBtn.setAttribute('aria-label', 'Remove node');
+      rmBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
+      if (isSelected) {
+        rmBtn.disabled = true;
+        rmBtn.title = "Can't remove the node the coin is using";
+        rmBtn.className = 'inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-300 dark:text-gray-500 cursor-not-allowed';
+      } else {
+        rmBtn.title = 'Remove node';
+        rmBtn.className = 'inline-flex items-center justify-center w-9 h-9 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500';
+        rmBtn.addEventListener('click', () => {
+          SettingsPage.showConfirmDialog('Remove node', `Remove ${node.url} from the node list?`,
+            () => { nodes = nodes.filter(n => n !== node); render(); saveNodes(); });
+        });
+      }
+
+      actions.append(foLabel, useControl, rmBtn);
+      li.append(probeBtn, actions);
+      applyProbe(li, node);
+      return li;
+    };
+
+    const render = () => {
+      listEl.innerHTML = '';
+      if (emptyEl) emptyEl.classList.toggle('hidden', nodes.length !== 0);
+      nodes.forEach(node => listEl.appendChild(buildRow(node)));
+    };
+
+    const addNode = () => {
+      const raw = (addInput.value || '').trim();
+      if (raw === '') return;
+      if (!/^https?:\/\/[^/\s]+/.test(raw)) { addInput.classList.add('border-red-500'); return; }
+      addInput.classList.remove('border-red-500');
+      if (!nodes.some(n => n.url === raw)) {
+        nodes.push({ url: raw, failover: true, status: 'unknown', latency: null });
+        render();
+        saveNodes();
+      }
+      addInput.value = '';
+    };
+
+    if (addBtn) addBtn.addEventListener('click', addNode);
+    if (addInput) addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addNode(); } });
+    if (urlInput) urlInput.addEventListener('change', render);
+
+    if (checkAllBtn) checkAllBtn.addEventListener('click', () => {
+      if (nodes.length === 0) return;
+      const label = checkAllBtn.querySelector('.rpc-check-all-label');
+      const origLabel = label ? label.textContent : '';
+      checkAllBtn.disabled = true;
+      if (label) label.textContent = 'Checking…';
+      const rows = Array.from(listEl.querySelectorAll('.rpc-node'));
+      nodes.reduce((p, node, i) => p.then(() => (rows[i] ? probeNode(node, rows[i]) : null)), Promise.resolve())
+        .finally(() => {
+          checkAllBtn.disabled = false;
+          if (label) label.textContent = origLabel || 'Check all';
+          reorder();
+          render();
+        });
+    });
+
+    render();
   };
 
   SettingsPage.cleanup = function() {

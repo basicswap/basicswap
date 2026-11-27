@@ -255,6 +255,7 @@ const AddrFromHint = {
 const FeeEstimate = {
     fee: null,
     feeStr: null,
+    label: 'swap network fee',
     pairKey: null,
     refresh: function() {
         const coinFrom = DOM.getValue('coin_from');
@@ -273,6 +274,7 @@ const FeeEstimate = {
             try {
                 const obj = (typeof resp === 'string') ? JSON.parse(resp) : resp;
                 const f = parseFloat(obj && obj.fee);
+                this.label = obj && obj.refund_reserve ? 'swap network fee and refund reserve' : 'swap network fee';
                 if (isFinite(f)) { this.fee = f; this.feeStr = obj.fee; }
                 else { this.fee = null; this.feeStr = null; }
             } catch (e) {
@@ -704,6 +706,7 @@ const BalanceHint = {
         const fee = (window.FeeEstimate && typeof FeeEstimate.fee === 'number') ? FeeEstimate.fee : null;
         const feeStr = (window.FeeEstimate && FeeEstimate.feeStr) ? FeeEstimate.feeStr : null;
         const coinSuffix = coin ? ' ' + coin : '';
+        const feeLabel = window.FeeEstimate ? FeeEstimate.label : 'swap network fee';
         if (balance === null || isNaN(sendValue) || sendValue <= 0) {
             hint.textContent = '';
             hint.className = 'text-xs mt-2';
@@ -713,14 +716,14 @@ const BalanceHint = {
             hint.textContent = 'Exceeds available balance (' + balance + coinSuffix + ').';
             hint.className = 'text-xs mt-2 offer-hint-danger';
         } else if (fee !== null && (sendValue + fee) > balance) {
-            hint.textContent = 'This plus the swap network fee (~' + feeStr + coinSuffix + ') is more than your balance. Lower the amount.';
+            hint.textContent = 'This plus the ' + feeLabel + ' (~' + feeStr + coinSuffix + ') is more than your balance. Lower the amount.';
             hint.className = 'text-xs mt-2 offer-hint-warn';
         } else if (fee === null && sendValue >= balance * 0.9) {
             hint.textContent = 'Uses most of your balance — leave room for the swap network fee.';
             hint.className = 'text-xs mt-2 offer-hint-warn';
         } else {
             let msg = 'Within available balance (' + balance + coinSuffix + ').';
-            if (feeStr) msg += '\nPlus ~' + feeStr + coinSuffix + ' swap network fee.';
+            if (feeStr) msg += '\nPlus ~' + feeStr + coinSuffix + ' ' + feeLabel + '.';
             hint.textContent = msg;
             hint.className = 'text-xs mt-2 offer-hint-ok';
         }

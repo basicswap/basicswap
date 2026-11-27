@@ -6,6 +6,8 @@
 
 import html
 
+from decimal import Decimal, InvalidOperation
+
 from .util import (
     getCoinName,
     get_data_entry,
@@ -23,7 +25,21 @@ from basicswap.basicswap_util import (
 from basicswap.chainparams import (
     Coins,
 )
+from basicswap.interface.evm.base import nodesWithSelected
 from basicswap.util.rfc2440 import rfc2440_hash_password
+
+
+def _gweiToWei(value: str):
+    """None for a blank field, which restores the chain's default cap."""
+    value = value.strip()
+    if value == "":
+        return None
+    try:
+        wei = int(Decimal(value) * 10**9)
+    except InvalidOperation:
+        raise ValueError(f"Invalid max fee per gas: {value}")
+    ensure(wei > 0, "Max fee per gas must be above 0")
+    return wei
 
 
 def page_settings(self, url_split, post_string):
@@ -335,6 +351,22 @@ def page_settings(self, url_split, post_string):
                             == "true"
                             else False
                         )
+                    elif (
+                        swap_client.getCoinIdFromName(name)
+                        in swap_client.evm_contract_coins
+                    ):
+                        data["rpc_url"] = get_data_entry_or(
+                            form_data, "rpc_url_" + name, ""
+                        )
+                        data["automatically_select_daemon"] = (
+                            get_data_entry_or(
+                                form_data, "autosetdaemon_" + name, "true"
+                            )
+                            == "true"
+                        )
+                        data["max_fee_per_gas"] = _gweiToWei(
+                            get_data_entry_or(form_data, "max_fee_gwei_" + name, "")
+                        )
                     else:
                         data["conf_target"] = int(
                             get_data_entry(form_data, "conf_target_" + name)
@@ -474,7 +506,13 @@ def page_settings(self, url_split, post_string):
         "litecoin",
     )
 
-    sorted_names = sorted(swap_client.settings["chainclients"].keys())
+    display_names = {}
+    for name in swap_client.settings["chainclients"]:
+        try:
+            display_names[name] = getCoinName(swap_client.getCoinIdFromName(name))
+        except Exception:
+            display_names[name] = name
+    sorted_names = sorted(display_names, key=lambda name: display_names[name].lower())
     from basicswap.interface.electrumx import (
         DEFAULT_ELECTRUM_SERVERS,
         DEFAULT_MAX_ELECTRUM_SERVERS,
@@ -483,10 +521,7 @@ def page_settings(self, url_split, post_string):
 
     for name in sorted_names:
         c = swap_client.settings["chainclients"][name]
-        try:
-            display_name = getCoinName(swap_client.getCoinIdFromName(name))
-        except Exception:
-            display_name = name
+        display_name = display_names[name]
 
         clearnet_servers = c.get("electrum_clearnet_servers", None)
         onion_servers = c.get("electrum_onion_servers", None)
@@ -548,6 +583,28 @@ def page_settings(self, url_split, post_string):
             # Disabled coins have no interface to read the resolved setting from
             chains_formatted[-1]["altruistic"] = c.get(
                 "altruistic", swap_client.getBaseAltruistic()
+            )
+        if swap_client.getCoinIdFromName(name) in swap_client.evm_contract_coins:
+            chains_formatted[-1]["is_evm"] = True
+            rpc_url = c.get("rpc_url", "")
+            if not rpc_url:
+                rpchost = c.get("rpchost", "127.0.0.1")
+                rpcport = c.get("rpcport", "")
+                if rpcport:
+                    rpc_url = f"http://{rpchost}:{rpcport}"
+            chains_formatted[-1]["rpc_url"] = rpc_url
+            chains_formatted[-1]["rpc_nodes"] = nodesWithSelected(
+                c.get("remote_daemon_urls", []), rpc_url
+            )
+            chains_formatted[-1]["autosetdaemon"] = c.get(
+                "automatically_select_daemon", True
+            )
+            max_fee = c.get("max_fee_per_gas")
+            coin_id = swap_client.getCoinIdFromName(name)
+            if max_fee is None and swap_client.isCoinActive(coin_id):
+                max_fee = swap_client.ci(coin_id).getMaxFeePerGas()
+            chains_formatted[-1]["max_fee_gwei"] = (
+                "" if max_fee is None else f"{Decimal(max_fee) / 10**9:f}"
             )
 
         if name == "particl":

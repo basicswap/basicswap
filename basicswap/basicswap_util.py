@@ -74,6 +74,11 @@ class MessageTypes(IntEnum):
     PORTAL_OFFER = auto()
     PORTAL_SEND = auto()
 
+    # Appended at the end so existing message-type values are not shifted.
+    EVM_XMR_BID_FL = auto()
+    EVM_XMR_BID_ACCEPT_LF = auto()
+    EVM_XMR_LOCK = auto()
+
 
 class AddressTypes(IntEnum):
     OFFER = auto()
@@ -91,6 +96,7 @@ class SwapTypes(IntEnum):
     BUYER_FIRST_2MSG = auto()
     XMR_SWAP = auto()
     XMR_BCH_SWAP = auto()
+    EVM_XMR_SWAP = auto()
 
 
 class OfferStates(IntEnum):
@@ -194,6 +200,16 @@ class ActionTypes(IntEnum):
     SEND_MERCY_TX = auto()
     SEND_PARTICIPATE_TX = auto()
 
+    ACCEPT_EVM_XMR_BID = auto()
+    SEND_EVM_LOCK = auto()
+    SEND_XMR_LOCK_FOR_EVM = auto()
+    SEND_EVM_LOCK_READY = auto()
+    CLAIM_EVM_LOCK = auto()
+    REDEEM_XMR_FOR_EVM = auto()
+    REFUND_EVM_LOCK = auto()
+    RECOVER_XMR_FROM_EVM_REFUND = auto()
+    SEND_EVM_GAS_DRIP = auto()
+
 
 class EventLogTypes(IntEnum):
     FAILED_TX_B_LOCK_PUBLISH = auto()
@@ -246,6 +262,14 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_SPEND_TX_MISSING = auto()
     LOCK_TX_B_SPEND_TX_CONFIRMED = auto()
     LOCK_TX_A_REFUND_SPEND_TX_CONFIRMED = auto()
+
+    EVM_LOCK_TX_PUBLISHED = auto()
+    EVM_LOCK_TX_SEEN = auto()
+    EVM_LOCK_SPEND_TX_PUBLISHED = auto()
+    EVM_LOCK_REFUND_TX_PUBLISHED = auto()
+    EVM_LOCK_TX_READY = auto()
+    EVM_GAS_DRIP_TX_PUBLISHED = auto()
+    EVM_LOCK_TX_SENT = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -422,6 +446,72 @@ def strBidState(state):
     return "Unknown" + " " + str(state)
 
 
+_COMMON_BID_STATES = (
+    BidStates.BID_SENT,
+    BidStates.BID_RECEIVING,
+    BidStates.BID_RECEIVED,
+    BidStates.BID_RECEIVING_ACC,
+    BidStates.BID_ACCEPTED,
+    BidStates.SWAP_COMPLETED,
+    BidStates.SWAP_DELAYING,
+    BidStates.SWAP_TIMEDOUT,
+    BidStates.BID_ABANDONED,
+    BidStates.BID_ERROR,
+    BidStates.BID_STALLED_FOR_TEST,
+    BidStates.BID_REJECTED,
+    BidStates.BID_STATE_UNKNOWN,
+    BidStates.BID_REQUEST_SENT,
+    BidStates.BID_REQUEST_ACCEPTED,
+    BidStates.BID_EXPIRED,
+    BidStates.BID_AACCEPT_DELAY,
+    BidStates.BID_AACCEPT_FAIL,
+    BidStates.CONNECT_REQ_SENT,
+)
+_SELLER_FIRST_BID_STATES = (
+    BidStates.SWAP_INITIATED,
+    BidStates.SWAP_PARTICIPATING,
+)
+_XMR_SWAP_BID_STATES = (
+    BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+    BidStates.XMR_SWAP_HAVE_SCRIPT_COIN_SPEND_TX,
+    BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED,
+    BidStates.XMR_SWAP_LOCK_RELEASED,
+    BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED,
+    BidStates.XMR_SWAP_SCRIPT_TX_PREREFUND,
+    BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED,
+    BidStates.XMR_SWAP_NOSCRIPT_TX_RECOVERED,
+    BidStates.XMR_SWAP_FAILED_REFUNDED,
+    BidStates.XMR_SWAP_FAILED_SWIPED,
+    BidStates.XMR_SWAP_FAILED,
+    BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_TX_SIGS,
+    BidStates.XMR_SWAP_MSG_SCRIPT_LOCK_SPEND_TX,
+)
+_EVM_XMR_SWAP_BID_STATES = (
+    BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED,
+    BidStates.XMR_SWAP_NOSCRIPT_COIN_LOCKED,
+    BidStates.XMR_SWAP_LOCK_RELEASED,
+    BidStates.XMR_SWAP_SCRIPT_TX_REDEEMED,
+    BidStates.XMR_SWAP_NOSCRIPT_TX_REDEEMED,
+    BidStates.XMR_SWAP_FAILED_REFUNDED,
+    BidStates.XMR_SWAP_FAILED_NOTHING_TO_RECOVER,
+)
+
+
+def bidStatesForSwapType(swap_type):
+    """BidStates reachable for a swap type, in enum order.  Unknown/None returns
+    every state (no filter)."""
+    if swap_type == SwapTypes.SELLER_FIRST:
+        specific = _SELLER_FIRST_BID_STATES
+    elif swap_type == SwapTypes.XMR_SWAP:
+        specific = _XMR_SWAP_BID_STATES
+    elif swap_type == SwapTypes.EVM_XMR_SWAP:
+        specific = _EVM_XMR_SWAP_BID_STATES
+    else:
+        return list(BidStates)
+    keep = set(_COMMON_BID_STATES) | set(specific)
+    return [s for s in BidStates if s in keep]
+
+
 def strTxState(state):
     if state == TxStates.TX_NONE:
         return "None"
@@ -583,6 +673,20 @@ def describeEventEntry(event_type, event_msg):
         return "Lock tx B spend tx confirmed in chain"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_CONFIRMED:
         return "Lock tx A refund spend tx confirmed in chain"
+    if event_type == EventLogTypes.EVM_LOCK_TX_PUBLISHED:
+        return "EVM escrow lock tx published"
+    if event_type == EventLogTypes.EVM_LOCK_TX_SENT:
+        return "EVM escrow lock tx sent"
+    if event_type == EventLogTypes.EVM_LOCK_TX_SEEN:
+        return "EVM escrow lock tx seen in chain"
+    if event_type == EventLogTypes.EVM_LOCK_TX_READY:
+        return "EVM escrow released for claim (ready)"
+    if event_type == EventLogTypes.EVM_LOCK_SPEND_TX_PUBLISHED:
+        return "EVM escrow claim tx published (spend key revealed)"
+    if event_type == EventLogTypes.EVM_LOCK_REFUND_TX_PUBLISHED:
+        return "EVM escrow refund tx published"
+    if event_type == EventLogTypes.EVM_GAS_DRIP_TX_PUBLISHED:
+        return "EVM claim gas sent to the XMR side"
 
 
 def getVoutByAddress(txjs, p2sh):
@@ -642,6 +746,8 @@ def strSwapType(swap_type) -> str:
         return "seller_first"
     if swap_type == SwapTypes.XMR_SWAP:
         return "xmr_swap"
+    if swap_type == SwapTypes.EVM_XMR_SWAP:
+        return "evm_xmr_swap"
     return None
 
 
@@ -650,6 +756,8 @@ def strSwapDesc(swap_type) -> str:
         return "Secret Hash"
     if swap_type == SwapTypes.XMR_SWAP:
         return "Adaptor Sig"
+    if swap_type == SwapTypes.EVM_XMR_SWAP:
+        return "Contract Escrow"
     return None
 
 

@@ -4,7 +4,7 @@
 <script src="/static/js/libs//qrcode.js"></script>
 <script src="/static/js/modules/qrcode-manager.js"></script>
 
-{{ page_header('(' ~ w.ticker ~ ') ' ~ w.name ~ ' Wallet', icon=w.name, title_size='text-3xl', title_extra_class='', dots_style='all') }}
+{{ page_header((w.name if w.name.startswith(w.symbol) else '(' ~ w.symbol ~ ') ' ~ w.name) ~ ' Wallet', icon=w.name, title_size='text-3xl', title_extra_class='', dots_style='all') }}
 
 {% include 'inc_messages.html' %}
 
@@ -103,7 +103,7 @@
                 To use funds with external wallets, transfer to a new address.
               </p>
               <p class="mt-2 text-xs text-yellow-500 dark:text-yellow-500">
-                Use the withdraw function below to send funds to a new <code class="bg-yellow-100 dark:bg-yellow-800/50 px-1 rounded">{{ w.ticker | lower }}1...</code> address.
+                Use the withdraw function below to send funds to a new <code class="bg-yellow-100 dark:bg-yellow-800/50 px-1 rounded">{{ w.symbol | lower }}1...</code> address.
               </p>
             </div>
           </div>
@@ -138,13 +138,13 @@
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Balance: </td>
                           <td class="py-3 px-6 bold">
-                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="balance">{{ w.balance }} {{ w.ticker }}</span>
+                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="balance">{{ w.balance }} {{ w.symbol }}</span>
                             (<span class="usd-value"></span>)
                             {% if w.pending %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500" data-coinname="{{ w.name }}" data-badge-type="pending">Pending: +{{ w.pending }} {{ w.ticker }} </span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500" data-coinname="{{ w.name }}" data-badge-type="pending">Pending: +{{ w.pending }} {{ w.symbol }} </span>
                             {% endif %}
                             {% if w.pending_out %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-yellow-100 text-yellow-600 dark:bg-gray-500 dark:text-yellow-400">Unconfirmed: -{{ w.pending_out }} {{ w.ticker }} </span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-yellow-100 text-yellow-600 dark:bg-gray-500 dark:text-yellow-400">Unconfirmed: -{{ w.pending_out }} {{ w.symbol }} </span>
                             {% endif %}
                           </td>
                         </tr>
@@ -152,20 +152,20 @@
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Blind"> </span>Blind Balance: </td>
                           <td class="py-3 px-6 bold">
-                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="blind_balance">{{ w.blind_balance }} {{ w.ticker }}</span>
+                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="blind_balance">{{ w.blind_balance }} {{ w.symbol }}</span>
                             (<span class="usd-value"></span>)
                             {% if w.blind_unconfirmed %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.blind_unconfirmed }} {{ w.ticker }}</span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Unconfirmed: +{{ w.blind_unconfirmed }} {{ w.symbol }}</span>
                             {% endif %}
                           </td>
                         </tr>
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Anon"> </span>Anon Balance: </td>
                           <td class="py-3 px-6 bold">
-                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="anon_balance">{{ w.anon_balance }} {{ w.ticker }}</span>
+                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="anon_balance">{{ w.anon_balance }} {{ w.symbol }}</span>
                             (<span class="usd-value"></span>)
                             {% if w.anon_pending %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.ticker }}</span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.anon_pending }} {{ w.symbol }}</span>
                             {% endif %}
                           </td>
                         </tr>
@@ -177,10 +177,10 @@
                             {% if is_electrum_mode %}
                             <span class="text-gray-400 dark:text-gray-300">Not available in light mode</span>
                             {% else %}
-                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="mweb_balance">{{ w.mweb_balance }} {{ w.ticker }}</span>
+                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="mweb_balance">{{ w.mweb_balance }} {{ w.symbol }}</span>
                             (<span class="usd-value"></span>)
                             {% if w.mweb_pending %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.ticker }} </span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.mweb_pending }} {{ w.symbol }} </span>
                             {% endif %}
                             {% endif %}
                           </td>
@@ -189,7 +189,7 @@
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} MWEB"> </span>MWEB in Plain Balance: </td>
                           <td class="py-3 px-6 bold">
-                            <span>{{ w.mweb_in_plain }} {{ w.ticker }}</span>
+                            <span>{{ w.mweb_in_plain }} {{ w.symbol }}</span>
                           </td>
                           <td class="py-3 px-6 bold">
                             <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="convertmweb_{{ w.cid }}" value="Convert" data-confirm-mweb-change-convert> Convert </button>
@@ -200,10 +200,10 @@
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Spark"> </span>Spark Balance: </td>
                           <td class="py-3 px-6 bold">
-                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.ticker }}</span>
+                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.symbol }}</span>
                             (<span class="usd-value"></span>)
                             {% if w.spark_pending %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.spark_pending }} {{ w.ticker }} </span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.spark_pending }} {{ w.symbol }} </span>
                             {% endif %}
                           </td>
                         </tr>
@@ -211,10 +211,10 @@
                         <tr class="opacity-100 text-gray-500 dark:text-gray-100 hover:bg-coolGray-200 dark:hover:bg-gray-600">
                           <td class="py-3 px-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }} Spark"> </span>Spark Balance: </td>
                           <td class="py-3 px-6 bold">
-                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.ticker }}</span>
+                            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.symbol }}</span>
                             (<span class="usd-value"></span>)
                             {% if w.spark_pending %}
-                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.spark_pending }} {{ w.ticker }} </span>
+                              <span class="inline-block py-1 px-2 rounded-full bg-green-100 text-green-500 dark:bg-gray-500 dark:text-green-500">Pending: +{{ w.spark_pending }} {{ w.symbol }} </span>
                             {% endif %}
                           </td>
                         </tr>
@@ -425,11 +425,20 @@
                               <div class="relative flex justify-center items-center">
                                 <div data-tooltip-target="tooltip-copy-default" class="input-like-container hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full focus:ring-0" id="main_deposit_address">{{ w.deposit_address }}</div>
                               </div>
+                              {% if w.is_evm %}
+                              <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center gap-2 mt-5">
+                                <label for="account_{{ w.cid }}" class="font-medium text-sm dark:text-white">Account</label>
+                                <input id="account_{{ w.cid }}" type="number" step="1" min="0" name="account_{{ w.cid }}" value="{{ w.account }}" class="w-20 hover:border-blue-500 bg-gray-50 text-gray-900 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 text-sm rounded-md outline-none focus:ring-blue-500 focus:border-blue-500 p-2">
+                                <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="setaccount_{{ w.cid }}" value="Switch account">Switch account</button>
+                              </div>
+                              <p class="text-xs text-center text-gray-500 dark:text-gray-300 mt-2 px-6">Each account is a separate address and key from the same seed. Funds stay with their account; withdraw before switching. Can't switch while this account has swaps in progress.</p>
+                              {% else %}
                               <div class="opacity-100 text-gray-500 dark:text-gray-100 flex justify-center items-center">
                                 <div class="py-3 px-6 bold mt-5">
                                   <button type="submit" class="flex justify-center py-2 px-4 bg-blue-500 hover:bg-blue-600 font-medium text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="newaddr_{{ w.cid }}" value="New Deposit Address"> {{ circular_arrows_svg | safe }} New {{ w.name }} Deposit Address </button>
                                 </div>
                               </div>
+                              {% endif %}
                                {% endif %}
                             </div>
                           </div>
@@ -547,7 +556,7 @@
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Balance: </td>
            <td class="py-3 px-6">
-            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="balance">{{ w.balance }} {{ w.ticker }}</span>
+            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="balance">{{ w.balance }} {{ w.symbol }}</span>
             (<span class="usd-value"></span>)
            </td>
           </tr>
@@ -559,7 +568,7 @@
             {% if is_electrum_mode %}
             <span class="text-gray-400 dark:text-gray-300">Not available in light mode</span>
             {% else %}
-            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="mweb_balance">{{ w.mweb_balance }} {{ w.ticker }}</span>
+            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="mweb_balance">{{ w.mweb_balance }} {{ w.symbol }}</span>
             (<span class="usd-value"></span>)
             {% endif %}
            </td>
@@ -569,7 +578,7 @@
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold w-1/4"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Spark Balance: </td>
            <td class="py-3 px-6">
-            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.ticker }}</span>
+            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.symbol }}</span>
             (<span class="usd-value"></span>)
            </td>
           </tr>
@@ -578,7 +587,7 @@
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold w-1/4"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Spark Balance: </td>
            <td class="py-3 px-6">
-            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.ticker }}</span>
+            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="spark_balance">{{ w.spark_balance }} {{ w.symbol }}</span>
             (<span class="usd-value"></span>)
            </td>
           </tr>
@@ -587,14 +596,14 @@
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Blind Balance: </td>
            <td class="py-3 px-6">
-            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="blind_balance">{{ w.blind_balance }} {{ w.ticker }}</span>
+            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="blind_balance">{{ w.blind_balance }} {{ w.symbol }}</span>
             (<span class="usd-value"></span>)
            </td>
           </tr>
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold"> <span class="inline-flex align-middle items-center justify-center w-9 h-10 bg-white-50 rounded"> <img class="h-7" src="/static/images/coins/{{ w.name }}.png" alt="{{ w.name }}"> </span>Anon Balance: </td>
            <td class="py-3 px-6">
-            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="anon_balance">{{ w.anon_balance }} {{ w.ticker }}</span>
+            <span class="coinname-value" data-coinname="{{ w.name }}" data-balance-type="anon_balance">{{ w.anon_balance }} {{ w.symbol }}</span>
             (<span class="usd-value"></span>)
            </td>
           </tr>
@@ -649,12 +658,12 @@
           {% endif %}
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold"> {{ w.name }} Address: </td>
-           <td class="py-3 px-6"> <input placeholder="{{ w.ticker }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
+           <td class="py-3 px-6"> <input placeholder="{{ w.symbol }} Address" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" name="to_{{ w.cid }}" value="{{ w.wd_address }}"> </td>
           </tr>
           <tr class="opacity-100 text-gray-500 dark:text-gray-100">
            <td class="py-4 pl-6 bold"> {{ w.name }} Amount:
            <td class="py-3 px-6">
-            <div class="flex"> <input placeholder="{{ w.ticker }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
+            <div class="flex"> <input placeholder="{{ w.symbol }} Amount" class="hover:border-blue-500 bg-gray-50 text-gray-900 appearance-none pr-10 dark:bg-gray-500 dark:text-white border border-gray-300 dark:border-gray-400 dark:text-gray-50 dark:placeholder-gray-400 text-lg lg:text-sm rounded-lg outline-none focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 focus:ring-0" type="text" id="amount" name="amt_{{ w.cid }}" value="{{ w.wd_value }}">
              <div class="ml-2 flex">
 
 {% if w.cid == '1' %}
@@ -796,7 +805,7 @@
                   <div class="flex flex-wrap justify-end">
                     {% if w.cid in '6, 9' %}
                     {# XMR | WOW #}
-                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="estfee_{{ w.cid }}" value="Estimate Fee">Estimate {{ w.ticker }} Fee </button> </div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="estfee_{{ w.cid }}" value="Estimate Fee">Estimate {{ w.symbol }} Fee </button> </div>
                     {# / XMR | WOW #}
                     {% elif w.show_utxo_groups %}
                     {% elif is_electrum_mode %}
@@ -804,7 +813,7 @@
                     {% else %}
                     <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" id="showutxogroups" name="showutxogroups" value="Show UTXO Groups"> {{ utxo_groups_svg | safe }} Show UTXO Groups </button> </div>
                     {% endif %}
-                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" data-confirm-withdrawal>{{ withdraw_svg | safe }} Withdraw {{ w.ticker }} </button></div>
+                    <div class="w-full md:w-auto p-1.5 mx-1"> <button type="submit" class="flex flex-wrap justify-center w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 font-medium text-lg lg:text-sm text-white border border-blue-500 rounded-md shadow-button focus:ring-0 focus:outline-none" name="withdraw_{{ w.cid }}" value="Withdraw" data-confirm-withdrawal>{{ withdraw_svg | safe }} Withdraw {{ w.symbol }} </button></div>
                   </div>
                 </div>
               </div>
@@ -903,7 +912,7 @@
       <div class="flex flex-wrap items-center justify-between -m-2">
         <div class="w-full pt-2">
           <div class="lg:container mt-5 mx-auto">
-            <div id="transaction-history-section" class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
+            <div id="transaction-history-section" data-symbol="{{ w.symbol }}" class="pt-6 pb-8 bg-coolGray-100 dark:bg-gray-500 rounded-xl">
               <div class="px-6">
                 <div id="tx-tabs" class="flex flex-wrap gap-2 mb-4">
                   <button type="button" data-tx-filter="all" class="tx-tab py-1.5 px-4 text-sm font-medium rounded-md focus:outline-none focus:ring-0 bg-blue-500 text-white">All</button>

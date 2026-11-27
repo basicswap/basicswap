@@ -41,6 +41,7 @@ def format_wallet_data(swap_client, ci, w):
         "name": ci.coin_name(),
         "version": w.get("version", "?"),
         "ticker": ci.ticker_mainnet(),
+        "symbol": ci.display_ticker(),
         "cid": str(int(coin_id)),
         "balance": w.get("balance", "?"),
         "blocks": w.get("blocks", "?"),
@@ -310,6 +311,17 @@ def page_wallet(self, url_split, post_string):
             swap_client.cacheNewStealthAddressForCoin(coin_id)
         elif have_data_entry(form_data, "newsparkaddr_" + cid):
             swap_client.cacheNewStealthAddressForCoin(coin_id)
+        elif have_data_entry(form_data, "setaccount_" + cid):
+            try:
+                account = int(get_data_entry(form_data, "account_" + cid))
+                swap_client.editSettings(
+                    swap_client.coin_clients[coin_id]["name"], {"account": account}
+                )
+                messages.append(f"Switched to account {account}")
+            except Exception as ex:
+                err_messages.append(f"Account not switched: {ex}")
+            # Render the new account's balance, not the old one still cached
+            swap_client.updateWalletsInfo(True, coin_id, wait_for_complete=True)
         elif have_data_entry(form_data, "reseed_" + cid):
             try:
                 swap_client.reseedWallet(coin_id)
@@ -523,6 +535,9 @@ def page_wallet(self, url_split, post_string):
             "Unknown" if est_fee is None else ci.format_amount(est_fee)
         )
         wallet_data["deposit_address"] = w.get("deposit_address", "Refresh necessary")
+        if k in swap_client.evm_contract_coins:
+            wallet_data["is_evm"] = True
+            wallet_data["account"] = ci.getAccountIndex()
 
         if k in swap_client.xmr_based_coins:
             wallet_data["main_address"] = w.get("main_address", "Refresh necessary")
