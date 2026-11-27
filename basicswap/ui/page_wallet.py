@@ -515,10 +515,16 @@ def page_wallet(self, url_split, post_string):
             except Exception:
                 pass
 
-        fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
-        est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
-        wallet_data["fee_rate"] = ci.format_amount(int(fee_rate * ci.COIN()))
-        wallet_data["fee_rate_src"] = fee_src
+        try:
+            fee_rate, fee_src = swap_client.getFeeRateForCoin(k)
+            est_fee = swap_client.estimateWithdrawFee(k, fee_rate)
+            wallet_data["fee_rate"] = ci.format_amount(int(fee_rate * ci.COIN()))
+            wallet_data["fee_rate_src"] = fee_src
+        except Exception as e:
+            swap_client.log.warning(f"No fee estimate for {ci.coin_name()}: {e}")
+            est_fee = None
+            wallet_data["fee_rate"] = "Unknown"
+            wallet_data["fee_rate_src"] = "none"
         wallet_data["est_fee"] = (
             "Unknown" if est_fee is None else ci.format_amount(est_fee)
         )

@@ -1420,23 +1420,7 @@ class BTCInterface(FeeValidator, Secp256k1Interface):
         def try_get_fee_rate(self, conf_target):
 
             if self.useBackend():
-                try:
-                    fee_sat_vb = self._backend.estimateFee(conf_target)
-                    if fee_sat_vb and fee_sat_vb > 0:
-                        fee_rate = (fee_sat_vb * 1000) / 1e8
-                        if (
-                            self._high_feerate > 0
-                            and self.make_int(fee_rate) > self._high_feerate
-                        ):
-                            self._log.warning(
-                                f"Electrum fee estimate {fee_rate} for {self.coin_name()} "
-                                f"exceeds high_feerate {self._high_feerate}, using default"
-                            )
-                            return 0.00001, "electrum_default"
-                        return fee_rate, "electrum"
-                except Exception as e:
-                    self._log.debug(f"Electrum estimateFee failed: {e}")
-                return 0.00001, "electrum_default"
+                return self._backend.estimateFee(conf_target), "electrum"
 
             now: float = time.time()
             cached = self._rpc_fee_rate_cache.get(conf_target)
