@@ -1215,11 +1215,8 @@ def js_offer_fee_estimate(self, url_split, post_string, is_json) -> bytes:
     rv = {"coin_from": ci_from.ticker(), "fee": None}
     try:
         reverse_bid: bool = swap_client.is_reverse_ads_bid(coin_from, coin_to)
-        conf_target = (
-            ci_from.getConfTarget() if coin_from not in (Coins.XMR, Coins.WOW) else 2
-        )
-        from_fee_override, fee_src = swap_client.getFeeRateForCoin(
-            coin_from, conf_target
+        from_fee_override, fee_src = swap_client.getOfferFeeRate(
+            coin_from, *swap_client.getOfferFeeDefaults(coin_from)
         )
         fee_rate_int = ci_from.make_int(from_fee_override, r=1)
         lock_spend_tx_fee: int = (

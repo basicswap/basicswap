@@ -95,8 +95,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data["coin_from"] = getCoinType(get_data_entry(form_data, "coin_from"))
         coin_from = Coins(page_data["coin_from"])
         ci_from = swap_client.ci(coin_from)
-        if coin_from not in swap_client.xmr_based_coins:
-            page_data["fee_from_conf"] = ci_from._conf_target  # Set default value
+        page_data["fee_from_conf"], page_data["fee_from_extra"] = (
+            swap_client.getOfferFeeDefaults(coin_from)
+        )
         parsed_data["coin_from"] = coin_from
     except Exception:
         errors.append("Unknown Coin From")
@@ -105,8 +106,9 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
         page_data["coin_to"] = getCoinType(get_data_entry(form_data, "coin_to"))
         coin_to = Coins(page_data["coin_to"])
         ci_to = swap_client.ci(coin_to)
-        if coin_to not in swap_client.xmr_based_coins:
-            page_data["fee_to_conf"] = ci_to._conf_target  # Set default value
+        page_data["fee_to_conf"], page_data["fee_to_extra"] = (
+            swap_client.getOfferFeeDefaults(coin_to)
+        )
         parsed_data["coin_to"] = coin_to
     except Exception:
         errors.append("Unknown Coin To")
@@ -257,8 +259,6 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     if have_data_entry(form_data, "fee_from_extra"):
         page_data["fee_from_extra"] = int(get_data_entry(form_data, "fee_from_extra"))
         parsed_data["fee_from_extra"] = page_data["fee_from_extra"]
-    else:
-        page_data["fee_from_extra"] = 0
 
     if have_data_entry(form_data, "fee_to_conf"):
         page_data["fee_to_conf"] = int(get_data_entry(form_data, "fee_to_conf"))
@@ -267,8 +267,6 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
     if have_data_entry(form_data, "fee_to_extra"):
         page_data["fee_to_extra"] = int(get_data_entry(form_data, "fee_to_extra"))
         parsed_data["fee_to_extra"] = page_data["fee_to_extra"]
-    else:
-        page_data["fee_to_extra"] = 0
 
     if have_data_entry(form_data, "check_offer"):
         page_data["check_offer"] = True
@@ -311,14 +309,12 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 parsed_data["from_fee_override"] = page_data["from_fee_override"]
             else:
                 from_fee_override, page_data["from_fee_src"] = (
-                    swap_client.getFeeRateForCoin(
-                        parsed_data["coin_from"], page_data["fee_from_conf"]
+                    swap_client.getOfferFeeRate(
+                        parsed_data["coin_from"],
+                        page_data["fee_from_conf"],
+                        page_data["fee_from_extra"],
                     )
                 )
-                if page_data["fee_from_extra"] > 0:
-                    from_fee_override += from_fee_override * (
-                        float(page_data["fee_from_extra"]) / 100.0
-                    )
                 page_data["from_fee_override"] = ci_from.format_amount(
                     ci_from.make_int(from_fee_override, r=1)
                 )
@@ -337,26 +333,19 @@ def parseOfferFormData(swap_client, form_data, page_data, options={}):
                 )
                 page_data["tla_from"] = ci_from.ticker()
 
-            if ci_to in swap_client.xmr_based_coins:
-                if have_data_entry(form_data, "fee_rate_to"):
-                    page_data["to_fee_override"] = get_data_entry(
-                        form_data, "fee_rate_to"
-                    )
-                    parsed_data["to_fee_override"] = page_data["to_fee_override"]
-                else:
-                    to_fee_override, page_data["to_fee_src"] = (
-                        swap_client.getFeeRateForCoin(
-                            parsed_data["coin_to"], page_data["fee_to_conf"]
-                        )
-                    )
-                    if page_data["fee_to_extra"] > 0:
-                        to_fee_override += to_fee_override * (
-                            float(page_data["fee_to_extra"]) / 100.0
-                        )
-                    page_data["to_fee_override"] = ci_to.format_amount(
-                        ci_to.make_int(to_fee_override, r=1)
-                    )
-                    parsed_data["to_fee_override"] = page_data["to_fee_override"]
+            if have_data_entry(form_data, "fee_rate_to"):
+                page_data["to_fee_override"] = get_data_entry(form_data, "fee_rate_to")
+                parsed_data["to_fee_override"] = page_data["to_fee_override"]
+            else:
+                to_fee_override, page_data["to_fee_src"] = swap_client.getOfferFeeRate(
+                    parsed_data["coin_to"],
+                    page_data["fee_to_conf"],
+                    page_data["fee_to_extra"],
+                )
+                page_data["to_fee_override"] = ci_to.format_amount(
+                    ci_to.make_int(to_fee_override, r=1)
+                )
+                parsed_data["to_fee_override"] = page_data["to_fee_override"]
     except Exception as e:
         # Error is expected if missing fields
         if swap_client.debug_logs:
@@ -399,16 +388,14 @@ def postNewOfferFromParsed(swap_client, parsed_data):
 
     if "fee_from_conf" in parsed_data:
         extra_options["from_fee_conf_target"] = parsed_data["fee_from_conf"]
-    if "fee_from_conf" in parsed_data:
-        extra_options["from_fee_conf_target"] = parsed_data["fee_from_conf"]
-    if "from_fee_multiplier_percent" in parsed_data:
+    if "fee_from_extra" in parsed_data:
         extra_options["from_fee_multiplier_percent"] = parsed_data["fee_from_extra"]
     if "from_fee_override" in parsed_data:
         extra_options["from_fee_override"] = parsed_data["from_fee_override"]
 
     if "fee_to_conf" in parsed_data:
         extra_options["to_fee_conf_target"] = parsed_data["fee_to_conf"]
-    if "to_fee_multiplier_percent" in parsed_data:
+    if "fee_to_extra" in parsed_data:
         extra_options["to_fee_multiplier_percent"] = parsed_data["fee_to_extra"]
     if "to_fee_override" in parsed_data:
         extra_options["to_fee_override"] = parsed_data["to_fee_override"]
