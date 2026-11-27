@@ -496,6 +496,18 @@ class CoinPrepareModule(ReleasePrepareModule):
         # Coin specific config lines, override per coin
         self.writeRpcAuth(fp, salt)
 
+    def writeChainSelection(self, ctx: PrepareContext, fp, chain: str) -> None:
+        # Select the network and open its section of the core config file
+        if chain == "mainnet":
+            return
+        fp.write(chain + "=1\n")
+        if chain == "testnet":
+            fp.write("[test]\n\n")
+        elif chain == "regtest":
+            fp.write("[regtest]\n\n")
+        else:
+            ctx.logger.warning(f"Unknown chain {chain}")
+
     def prepareDataDir(
         self,
         ctx: PrepareContext,
@@ -522,14 +534,7 @@ class CoinPrepareModule(ReleasePrepareModule):
         if os.path.exists(core_conf_path):
             exitWithError(f"{core_conf_path} exists")
         with open(core_conf_path, "w") as fp:
-            if chain != "mainnet":
-                fp.write(chain + "=1\n")
-                if chain == "testnet":
-                    fp.write("[test]\n\n")
-                elif chain == "regtest":
-                    fp.write("[regtest]\n\n")
-                else:
-                    ctx.logger.warning(f"Unknown chain {chain}")
+            self.writeChainSelection(ctx, fp, chain)
 
             if ctx.rpcbind_ip != "127.0.0.1":
                 fp.write("rpcallowip=127.0.0.1\n")

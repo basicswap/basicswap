@@ -246,6 +246,7 @@ class EventLogTypes(IntEnum):
     LOCK_TX_B_SPEND_TX_MISSING = auto()
     LOCK_TX_B_SPEND_TX_CONFIRMED = auto()
     LOCK_TX_A_REFUND_SPEND_TX_CONFIRMED = auto()
+    PTX_REDEEM_ABANDONED_LOCK_CLOSE = auto()
 
 
 class XmrSplitMsgTypes(IntEnum):
@@ -537,6 +538,8 @@ def describeEventEntry(event_type, event_msg):
         return "Lock tx A spend abandoned, refund timelock too close"
     if event_type == EventLogTypes.LOCK_TX_B_ABANDONED_LOCK_CLOSE:
         return "Lock tx B send abandoned, refund timelock too close"
+    if event_type == EventLogTypes.PTX_REDEEM_ABANDONED_LOCK_CLOSE:
+        return "Participate tx redeem abandoned, refund timelock too close"
     if event_type == EventLogTypes.LOCK_TX_A_REFUND_SPEND_TX_SEEN:
         return "Lock tx A refund spend tx seen in chain"
     if event_type == EventLogTypes.SYSTEM_WARNING:

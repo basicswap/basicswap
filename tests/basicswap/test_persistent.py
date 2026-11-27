@@ -68,6 +68,7 @@ from tests.basicswap.util.harness import (
     NMC_BASE_RPC_PORT,
     PIVX_RPC_PORT_BASE,
     TEST_PATH,
+    TRUENORTH_RPC_PORT_BASE,
     XMR_BASE_RPC_PORT,
     prepare_nodes,
 )
@@ -158,6 +159,8 @@ def updateThread(cls):
                 cls.callbchrpc(0, "generatetoaddress", [1, cls.bch_addr])
             if cls.doge_addr is not None:
                 cls.calldogerpc(0, "generatetoaddress", [1, cls.doge_addr])
+            if cls.north_addr is not None:
+                cls.callnorthrpc(0, "generatetoaddress", [1, cls.north_addr])
         except Exception as e:
             print(f"updateThread error: {e}")
         cls.delay_event.wait(random.uniform(cls.update_min, cls.update_max))
@@ -495,6 +498,27 @@ def start_processes(self):
                 0, "generatetoaddress", [num_blocks - have_blocks, self.nmc_addr]
             )
 
+    if "truenorth" in self.test_coins_list:
+        self.callnorthrpc = make_rpc_func(
+            TRUENORTH_RPC_PORT_BASE + PORT_OFS,
+            "test_north_{0}:test_north_pwd_{0}",
+            default_wallet="bsx_wallet",
+        )
+        self.north_addr = self.callnorthrpc(
+            0, "getnewaddress", ["mining_addr", "bech32"]
+        )
+        num_blocks: int = 500
+        have_blocks: int = self.callnorthrpc(0, "getblockcount")
+        if have_blocks < num_blocks:
+            logging.info(
+                f"Mining {num_blocks - have_blocks} TrueNorth blocks to {self.north_addr}"
+            )
+            # Blocks are RandomX hashed, in batches an RPC call stays within its timeout
+            while have_blocks < num_blocks:
+                batch: int = min(20, num_blocks - have_blocks)
+                self.callnorthrpc(0, "generatetoaddress", [batch, self.north_addr])
+                have_blocks += batch
+
     if RESET_TEST:
         # Lower output split threshold for more stakeable outputs
         for i in range(NUM_NODES):
@@ -631,6 +655,7 @@ class BaseTestWithPrepare(unittest.TestCase):
     firo_addr = None
     bch_addr = None
     doge_addr = None
+    north_addr = None
     test_coins_list = TEST_COINS_LIST.split(",")
 
     @classmethod

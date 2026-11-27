@@ -102,6 +102,15 @@ const CoinManager = (function() {
             icon: 'Namecoin.png'
         },
         {
+            symbol: 'NORTH',
+            name: 'truenorth',
+            displayName: 'TrueNorth',
+            aliases: ['north', 'truenorth'],
+            priceKey: 'truenorth',
+            historicalDays: 30,
+            icon: 'TrueNorth.png'
+        },
+        {
             symbol: 'WOW',
             name: 'wownero',
             displayName: 'Wownero',

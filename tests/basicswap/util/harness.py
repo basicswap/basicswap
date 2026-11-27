@@ -30,6 +30,9 @@ from tests.basicswap.util.common import (
     BTC_BASE_TOR_PORT,
     LTC_BASE_PORT,
     LTC_BASE_RPC_PORT,
+    NORTH_BASE_PORT,
+    NORTH_BASE_RPC_PORT,
+    NORTH_BASE_TOR_PORT,
     PIVX_BASE_PORT,
     BTC_USE_DESCRIPTORS,
     BTC_USE_LEGACY_KEY_PATHS,
@@ -95,6 +98,10 @@ BITCOINCASH_RPC_PORT_BASE = int(
     os.getenv("BITCOINCASH_RPC_PORT_BASE", BCH_BASE_RPC_PORT)
 )
 DOGECOIN_RPC_PORT_BASE = int(os.getenv("DOGECOIN_RPC_PORT_BASE", DOGE_BASE_RPC_PORT))
+
+TRUENORTH_PORT_BASE = int(os.getenv("TRUENORTH_PORT_BASE", NORTH_BASE_PORT))
+TRUENORTH_RPC_PORT_BASE = int(os.getenv("TRUENORTH_RPC_PORT_BASE", NORTH_BASE_RPC_PORT))
+TRUENORTH_TOR_PORT_BASE = int(os.getenv("TRUENORTH_TOR_PORT_BASE", NORTH_BASE_TOR_PORT))
 
 EXTRA_CONFIG_JSON = json.loads(os.getenv("EXTRA_CONFIG_JSON", "{}"))
 
@@ -176,6 +183,9 @@ def run_prepare(
     os.environ["BCH_RPC_PORT"] = str(BITCOINCASH_RPC_PORT_BASE)
     os.environ["DOGE_PORT"] = str(DOGE_BASE_PORT)
     os.environ["DOGE_RPC_PORT"] = str(DOGECOIN_RPC_PORT_BASE)
+    os.environ["NORTH_PORT"] = str(TRUENORTH_PORT_BASE)
+    os.environ["NORTH_RPC_PORT"] = str(TRUENORTH_RPC_PORT_BASE)
+    os.environ["NORTH_ONION_PORT"] = str(TRUENORTH_TOR_PORT_BASE)
 
     testargs = [
         f'-datadir="{datadir_path}"',
@@ -567,6 +577,48 @@ def run_prepare(
                         "connect=127.0.0.1:{}\n".format(DOGE_BASE_PORT + ip + port_ofs)
                     )
             for opt in EXTRA_CONFIG_JSON.get(f"doge{node_id}", []):
+                fp.write(opt + "\n")
+
+    if "truenorth" in coins_array:
+        # One confirmation is enough on regtest
+        settings["chainclients"]["truenorth"]["blocks_confirmed"] = 1
+        # Pruned nodes don't provide blocks
+        config_filename = os.path.join(datadir_path, "truenorth", "truenorth.conf")
+        with open(config_filename, "r") as fp:
+            lines = fp.readlines()
+        with open(config_filename, "w") as fp:
+            for line in lines:
+                if not line.startswith("prune"):
+                    fp.write(line)
+            # As for bitcoin, a bind for the onion port stops the node binding the default one
+            fp.write(
+                "bind=127.0.0.1:{}=onion\n".format(
+                    TRUENORTH_TOR_PORT_BASE + node_id + port_ofs
+                )
+            )
+            fp.write("dnsseed=0\n")
+            fp.write("discover=0\n")
+            fp.write("listenonion=0\n")
+            fp.write("upnp=0\n")
+            if use_rpcauth:
+                salt = generate_salt(16)
+                rpc_user = "test_north_" + str(node_id)
+                rpc_pass = "test_north_pwd_" + str(node_id)
+                fp.write(
+                    "rpcauth={}:{}${}\n".format(
+                        rpc_user, salt, password_to_hmac(salt, rpc_pass)
+                    )
+                )
+                settings["chainclients"]["truenorth"]["rpcuser"] = rpc_user
+                settings["chainclients"]["truenorth"]["rpcpassword"] = rpc_pass
+            for ip in range(num_nodes):
+                if ip != node_id:
+                    fp.write(
+                        "connect=127.0.0.1:{}\n".format(
+                            TRUENORTH_PORT_BASE + ip + port_ofs
+                        )
+                    )
+            for opt in EXTRA_CONFIG_JSON.get(f"north{node_id}", []):
                 fp.write(opt + "\n")
 
     settings["debug"] = True

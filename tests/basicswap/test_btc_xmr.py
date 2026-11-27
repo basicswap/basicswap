@@ -392,7 +392,7 @@ class TestFunctions(BaseTest):
         logging.info(
             f"---------- Test {coin_from.name} to {coin_to.name} leader confirms lock refund tx before revealing kbsl"
         )
-        assert coin_from == Coins.BTC, "Mining control assumes coin a is BTC"
+        assert coin_from == self.test_coin_from, "Mining control is for the test coin"
 
         id_offerer: int = self.node_a_id
         id_bidder: int = self.node_b_id
@@ -433,6 +433,7 @@ class TestFunctions(BaseTest):
             wait_for=(self.extra_wait_time + 40),
         )
 
+        mining_addr: str = self.getMiningAddr()
         self.pauseMining()
         try:
             swap_clients[id_follower].setBidDebugInd(
@@ -449,7 +450,7 @@ class TestFunctions(BaseTest):
                 event_type=EventLogTypes.LOCK_TX_A_PUBLISHED,
                 wait_for=(self.extra_wait_time + 60),
             )
-            self.callnoderpc("generatetoaddress", [lock_value + 2, self.old_btc_addr])
+            self.callnoderpc("generatetoaddress", [lock_value + 2, mining_addr])
 
             # Leader now broadcasts the lock refund tx, which stays unconfirmed
             # because mining is paused.
@@ -475,7 +476,7 @@ class TestFunctions(BaseTest):
 
             # Confirm the lock refund tx; the leader may now reveal kbsl.
             self.callnoderpc(
-                "generatetoaddress", [ci_from.blocks_confirmed, self.old_btc_addr]
+                "generatetoaddress", [ci_from.blocks_confirmed, mining_addr]
             )
             wait_for_event(
                 test_delay_event,
@@ -2909,7 +2910,7 @@ class BasicSwapTest(TestFunctions):
                 self.test_coin_from.name
             )
         )
-        if self.test_coin_from != Coins.BTC:
+        if self.test_coin_from not in (Coins.BTC, Coins.NORTH):
             return  # submitpackage
 
         swap_clients = self.swap_clients
@@ -2970,11 +2971,12 @@ class BasicSwapTest(TestFunctions):
             refund_spend_tx, refund_script, refund_value, bytes((1,))
         )
 
+        mining_addr: str = self.getMiningAddr()
         self.pauseMining()
         try:
             ci.rpc("sendrawtransaction", [lock_tx.hex()])
             # Confirm the lock tx and mature the pre-refund tx's csv
-            self.callnoderpc("generatetoaddress", [lock_value + 2, self.old_btc_addr])
+            self.callnoderpc("generatetoaddress", [lock_value + 2, mining_addr])
 
             # The follower claims, the lock spend tx is now in the mempool
             ci.rpc("sendrawtransaction", [lock_spend_tx.hex()])
@@ -3653,7 +3655,7 @@ class BasicSwapTest(TestFunctions):
     def test_02_e_leader_confirm_refund_before_spend(self):
         if not self.has_segwit:
             return
-        if self.test_coin_from != Coins.BTC:
+        if self.test_coin_from not in (Coins.BTC, Coins.NORTH):
             return
         self.do_test_02b_leader_confirm_refund_before_spend(
             self.test_coin_from, Coins.XMR

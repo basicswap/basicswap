@@ -71,6 +71,7 @@ from basicswap.interface.pivx.core import prepare_module as pivx_prepare
 from basicswap.interface.firo.core import prepare_module as firo_prepare
 from basicswap.interface.doge.core import prepare_module as doge_prepare
 from basicswap.interface.nmc.core import prepare_module as nmc_prepare
+from basicswap.interface.north.core import prepare_module as north_prepare
 from basicswap.network.nostr.prepare import prepare_module as nostr_prepare
 from basicswap.network.simplex.prepare import prepare_module as simplex_prepare
 
@@ -87,6 +88,7 @@ coin_prepare_modules = {
     "wownero": wow_prepare,
     "pivx": pivx_prepare,
     "firo": firo_prepare,
+    "truenorth": north_prepare,
 }
 
 known_coins = {
@@ -149,6 +151,11 @@ known_coins = {
         doge_prepare.version,
         doge_prepare.version_tag,
         doge_prepare.signers.keys(),
+    ),
+    "truenorth": (
+        north_prepare.version,
+        north_prepare.version_tag,
+        north_prepare.signers.keys(),
     ),
 }
 
@@ -304,7 +311,7 @@ def getWalletName(coin_params: str, default_name: str, prefix_override=None) -> 
 
 def getDescriptorWalletOption(coin_params):
     ticker: str = coin_params["ticker"]
-    default_option: bool = True if ticker in ("BTC", "NMC") else False
+    default_option: bool = True if ticker in ("BTC", "NMC", "NORTH") else False
     return toBool(os.getenv(ticker + "_USE_DESCRIPTORS", default_option))
 
 
@@ -723,6 +730,8 @@ def modify_tor_config(
             default_onionport = ltc_prepare.onion_port
         elif coin == "dogecoin":
             default_onionport = doge_prepare.onion_port
+        elif coin == "truenorth":
+            default_onionport = north_prepare.onion_port
         elif coin in ("decred",):
             pass
         else:
@@ -1734,6 +1743,7 @@ def main():
         "firo": firo_prepare.getConfigSegment(prepare_ctx),
         "bitcoincash": bch_prepare.getConfigSegment(prepare_ctx),
         "dogecoin": doge_prepare.getConfigSegment(prepare_ctx),
+        "truenorth": north_prepare.getConfigSegment(prepare_ctx),
     }
 
     electrum_supported_coins = {
@@ -1787,7 +1797,7 @@ def main():
 
         ticker: str = coin_params["ticker"]
         if getDescriptorWalletOption(coin_params):
-            if coin_id not in (Coins.BTC, Coins.NMC):
+            if coin_id not in (Coins.BTC, Coins.NMC, Coins.NORTH):
                 raise ValueError(f"Descriptor wallet unavailable for {coin_name}")
 
             coin_settings["use_descriptors"] = True

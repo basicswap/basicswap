@@ -73,6 +73,7 @@ jobs:
             firo) add_entry test_firo firo;;
             bch) add_entry test_bch bitcoincash;;
             doge) add_entry test_doge dogecoin;;
+            north) add_entry test_north truenorth;;
             *)
               echo "Unknown coin: $1" >&2
               exit 1;;
@@ -98,7 +99,7 @@ jobs:
             exit 1
           fi
           if [ "$TEST_COINS" = "all" ]; then
-            TEST_COINS="part,ltc,dcr,nmc,wow,pivx,dash,firo,bch,doge"
+            TEST_COINS="part,ltc,dcr,nmc,wow,pivx,dash,firo,bch,doge,north"
           fi
           IFS=','
           for c in $TEST_COINS; do
@@ -161,6 +162,12 @@ jobs:
       name: Running basicswap-prepare for ${{ matrix.test_coin }}
       run: |
         basicswap-prepare --bindir="$BIN_DIR" --preparebinonly --withcoins=${{ matrix.test_coin }}
+    - name: Install TrueNorth Core runtime libraries
+      if: ${{ contains(matrix.test_coin, 'truenorth') && matrix.skip_tests != 'true' }}
+      run: |
+        # The linux-x86_64 build of TrueNorth Core links these dynamically (Ubuntu 24.04 package names)
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends libevent-core-2.1-7t64 libevent-extra-2.1-7t64 libevent-pthreads-2.1-7t64 libnuma1 libsqlite3-0
     - name: Run test_coins for ${{ matrix.test_coin_a }}
       if: ${{ matrix.skip_tests != 'true' }}
       env:
