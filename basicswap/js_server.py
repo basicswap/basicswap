@@ -12,6 +12,7 @@ import urllib.parse
 from .util import (
     LockedCoinError,
     ensure,
+    format_amount,
     toBool,
 )
 from .util.network import (
@@ -125,6 +126,8 @@ def js_coins(self, url_split, post_string, is_json) -> bytes:
         cc = swap_client.coin_clients[coin]
         coin_chainparams = chainparams[cc["coin"]]
         coin_active: bool = False if cc["connection_type"] == "none" else True
+        network_params = coin_chainparams[swap_client.chain]
+        decimal_places: int = coin_chainparams["decimal_places"]
         if coin == Coins.LTC_MWEB:
             coin_active = False
         entry = {
@@ -132,7 +135,9 @@ def js_coins(self, url_split, post_string, is_json) -> bytes:
             "ticker": coin_chainparams["ticker"],
             "name": getCoinName(coin),
             "active": coin_active,
-            "decimal_places": coin_chainparams["decimal_places"],
+            "decimal_places": decimal_places,
+            "min_amount": format_amount(network_params["min_amount"], decimal_places),
+            "max_amount": format_amount(network_params["max_amount"], decimal_places),
         }
         if coin == Coins.PART_ANON:
             entry["variant"] = "Anon"
