@@ -1307,6 +1307,11 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
     offer = self.queryOne(Offer, cursor, {"offer_id": bid.offer_id})
     ensure(offer, f"Offer not found: {self.log.id(bid.offer_id)}.")
     ci_xmr = _xmrInterface(self, offer)
+    if bid.state != BidStates.XMR_SWAP_SCRIPT_COIN_LOCKED:
+        self.log.warning(
+            f"Not sending the {ci_xmr.ticker_mainnet()} lock for EVM bid {self.log.id(bid_id)} in state {BidStates(bid.state).name}."
+        )
+        return
 
     swap, state_name, _ = _evmLock(self, offer, bid, evm_swap)
     if state_name == "REFUNDED":
@@ -1351,6 +1356,10 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
             self.saveBidInSession(bid.bid_id, bid, cursor, evm_swap)
             return
 
+    # A lock sent before a restart, with no record or none to keep
+    if b_lock_txid is None and _findXmrLock(self, offer, bid, evm_swap, cursor):
+        b_lock_txid = evm_swap.b_lock_tx_id
+        b_lock_vout = bid.getLockTXBVout()
     batch = []
     covered = [0]
     if b_lock_txid is None:
@@ -1416,9 +1425,19 @@ def sendXmrLockForEvm(self, bid_id: bytes, cursor) -> None:
                 )
                 self.commitDB()
                 return
-            if b_lock_tx is not None:
-                self.dropRecordedBLockTx(ci_xmr, bid_id, cursor)
-            raise
+            if b_lock_tx is not None and ci_xmr.isWalletTransaction(b_lock_tx):
+                # It reached the node despite the error
+                b_lock_txid = ci_xmr.getTxid(b_lock_tx)
+            else:
+                if b_lock_tx is not None:
+                    self.dropRecordedBLockTx(ci_xmr, bid_id, cursor)
+                self.setBidError(
+                    bid, f"publishBLockTx failed: {ex}", save_bid=False, cursor=cursor
+                )
+                self.saveBidInSession(
+                    bid_id, bid, cursor, evm_swap, save_in_progress=offer
+                )
+                return
     for n, leg in enumerate(batch, start=1):
         if n in covered:
             _setXmrLockSent(self, leg, leg.offer, leg.evm_swap, b_lock_txid, cursor)
