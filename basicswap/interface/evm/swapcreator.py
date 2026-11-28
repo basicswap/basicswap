@@ -18,9 +18,11 @@ import functools
 import json
 import os
 
-from eth_abi import decode as abi_decode, encode as abi_encode
 from coincurve import PublicKey
-from eth_utils import (
+
+from basicswap.interface.evm.codec import (
+    abi_decode,
+    abi_encode,
     collapse_if_tuple,
     event_abi_to_log_topic,
     filter_abi_by_type,
@@ -30,7 +32,6 @@ from eth_utils import (
     keccak,
     to_checksum_address,
 )
-
 from basicswap.interface.evm.keys import commitment
 from basicswap.util.ecc import ep
 

@@ -13,7 +13,11 @@ swapfactory_abi.json (with Payout's errors) and swapfactory_bytecode.hex (creati
 code, deployed by the tests) are generated from that build.
 """
 
-from eth_utils import keccak, to_canonical_address, to_checksum_address
+from basicswap.interface.evm.codec import (
+    keccak,
+    to_canonical_address,
+    to_checksum_address,
+)
 
 from basicswap.interface.evm.swapcreator import SwapContract
 

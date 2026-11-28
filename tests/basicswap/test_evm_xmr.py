@@ -24,7 +24,6 @@ import unittest
 from types import SimpleNamespace
 
 from coincurve import PublicKey
-from eth_utils import to_checksum_address
 
 from basicswap.basicswap import BasicSwap
 from basicswap.chainparams import Coins
@@ -32,6 +31,7 @@ from basicswap.interface.eth.chainparams import ETH_COIN
 from basicswap.basicswap_util import ActionTypes, BidStates, MessageTypes, SwapTypes
 from basicswap.db import Bid, EvmXmrSwap, Offer
 from basicswap.interface.evm import keys as evmkeys
+from basicswap.interface.evm.codec import to_checksum_address
 from basicswap.interface.evm.keys import LocalAccount
 from basicswap.interface.evm.rpc import EthRpcClient, ReceiptTimeout
 from basicswap.interface.evm.swapfactory import SwapFactory

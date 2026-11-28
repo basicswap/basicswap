@@ -12,9 +12,9 @@ to the keccak hash of its secp256k1 public key and checks a revealed secret
 with ecrecover, so the secret is the same 32-byte key the Monero side uses.
 """
 
-from coincurve import PublicKey
-from eth_keys import keys
-from eth_utils import keccak
+from coincurve import PrivateKey, PublicKey
+
+from basicswap.interface.evm.codec import keccak, to_checksum_address
 
 from basicswap.util.ecc import ep
 
@@ -30,9 +30,16 @@ def revealed_key(secret: bytes) -> bytes:
     return (int.from_bytes(secret, "big") % ep.o).to_bytes(32, "big")
 
 
+def sign_hash(key: bytes, msg_hash: bytes) -> tuple:
+    """(v, r, s), v the recovery id; libsecp256k1 gives the low s Ethereum requires."""
+    sig: bytes = PrivateKey(bytes(key)).sign_recoverable(bytes(msg_hash), hasher=None)
+    return sig[64], int.from_bytes(sig[:32], "big"), int.from_bytes(sig[32:64], "big")
+
+
 class LocalAccount:
     """A private key and its address."""
 
     def __init__(self, key: bytes):
         self.key = bytes(key)
-        self.address: str = keys.PrivateKey(self.key).public_key.to_checksum_address()
+        xy: bytes = PublicKey.from_secret(self.key).format(compressed=False)[1:]
+        self.address: str = to_checksum_address(keccak(xy)[12:])

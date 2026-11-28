@@ -26,17 +26,17 @@ import urllib.error
 from enum import IntEnum
 from urllib.parse import urlparse
 
-from eth_abi import decode as abi_decode, encode as abi_encode
-from eth_utils import (
+from basicswap.db import EvmSignedTx, EvmWalletTx
+from basicswap.interface.base import CoinInterface, Curves
+from basicswap.interface.evm.codec import (
+    abi_decode,
+    abi_encode,
     function_signature_to_4byte_selector,
     is_address,
     keccak,
     to_canonical_address,
     to_checksum_address,
 )
-
-from basicswap.db import EvmSignedTx, EvmWalletTx
-from basicswap.interface.base import CoinInterface, Curves
 from basicswap.interface.evm.keys import LocalAccount
 from basicswap.interface.evm.rpc import EthRpcClient, EthRpcError, RevertError, RpcError
 from basicswap.interface.evm.swapcreator import SwapContract, SwapCreator

@@ -18,13 +18,18 @@ import time
 import urllib.error
 import urllib.request
 
-import rlp
 import socks
 
-from eth_keys import keys
-from eth_utils import keccak, to_canonical_address, to_checksum_address
 from sockshandler import SocksiPyHandler
 
+from basicswap.interface.evm.codec import (
+    keccak,
+    rlp_decode,
+    rlp_encode,
+    to_canonical_address,
+    to_checksum_address,
+)
+from basicswap.interface.evm.keys import sign_hash
 from basicswap.util import TemporaryError
 
 TX_TYPE_EIP1559 = b"\x02"
@@ -112,15 +117,15 @@ def sign_tx(tx: dict, private_key: bytes):
         bytes(tx.get("data", b"")),
         tx.get("accessList", []),
     ]
-    unsigned: bytes = TX_TYPE_EIP1559 + rlp.encode(fields)
-    sig = keys.PrivateKey(bytes(private_key)).sign_msg_hash(keccak(unsigned))
-    raw: bytes = TX_TYPE_EIP1559 + rlp.encode(fields + [sig.v, sig.r, sig.s])
+    unsigned: bytes = TX_TYPE_EIP1559 + rlp_encode(fields)
+    v, r, s = sign_hash(private_key, keccak(unsigned))
+    raw: bytes = TX_TYPE_EIP1559 + rlp_encode(fields + [v, r, s])
     return keccak(raw), raw
 
 
 def decode_tx(raw: bytes) -> dict:
     """The TX_FIELDS of a raw EIP-1559 tx."""
-    items = rlp.decode(bytes(raw)[1:])
+    items = rlp_decode(bytes(raw)[1:])
     tx = dict(zip(TX_FIELDS, items))
     for name in ("chainId", "nonce", "maxPriorityFeePerGas", "maxFeePerGas", "gas"):
         tx[name] = int.from_bytes(tx[name], "big")
