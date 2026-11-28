@@ -921,6 +921,13 @@ def js_bids(self, url_split, post_string: str, is_json: bool) -> bytes:
                 extra_options["bypass_fee_validation"] = toBool(
                     get_data_entry(post_data, "bypass_fee_checks")
                 )
+            if offer.swap_type == SwapTypes.EVM_XMR_SWAP and (
+                have_data_entry(post_data, "destination_address")
+                or have_data_entry(post_data, "destination_script")
+            ):
+                raise ValueError(
+                    "EVM swaps pay this wallet, a destination is not supported"
+                )
             if have_data_entry(post_data, "destination_address"):
                 if reverse_bid:
                     extra_options["dest_bl"] = get_data_entry(

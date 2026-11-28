@@ -6106,6 +6106,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return self.postXmrBid(offer_id, amount, addr_send_from, extra_options)
 
         if offer.swap_type == SwapTypes.EVM_XMR_SWAP:
+            ensure(
+                "dest_af" not in extra_options and "dest_bl" not in extra_options,
+                "EVM swaps pay this wallet, a destination is not supported",
+            )
             return evm_xmr_swap_1.postEvmXmrBid(
                 self, offer_id, amount, addr_send_from, extra_options
             )
