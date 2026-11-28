@@ -776,6 +776,16 @@ class TestPlanHTLCBatch(unittest.TestCase):
         tight = HTLCLeg(b"self", lock_value=7200, lock_remaining_seconds=3800)
         self.assertFalse(self.decide([tight, waiting], ready_timeout=600).wait)
 
+    def test_hold_margin_is_added_to_half_the_lock(self):
+        # sendPlanParticipateTx passes both coins' confirmation allowances, the
+        # participate txn is refused once ensurePTxLockMargin can't pass
+        waiting = HTLCLeg(b"a", state=BidStates.BID_ACCEPTED)
+        leg = HTLCLeg(b"self", lock_value=7200, lock_remaining_seconds=6000)
+        self.assertTrue(self.decide([leg, waiting], ready_timeout=600).wait)
+        self.assertFalse(
+            self.decide([leg, waiting], ready_timeout=600, lock_margin=3600).wait
+        )
+
     def test_still_batches_ready_legs_when_it_cannot_hold(self):
         # Refusing to wait must not cost the legs that are already ready.
         tight = HTLCLeg(b"self", lock_value=7200, lock_remaining_seconds=3800)
@@ -937,7 +947,7 @@ class TestBLockTxRetry(unittest.TestCase):
         sc.getXmrOfferFromSession = lambda cursor, offer_id: (offer, xmr_offer)
         sc.is_reverse_ads_bid = lambda coin_from, coin_to: False
         sc.ci = lambda coin_type: ci
-        sc.getBLockMinMargin = lambda ci_to: lock["margin"]
+        sc.getBLockMinMargin = lambda ci_to, ci_from: lock["margin"]
         sc.getLegLockRemaining = lambda leg, *args: lock[
             "sibling_remaining" if leg is sibling else "remaining"
         ]
@@ -999,6 +1009,39 @@ class TestBLockTxRetry(unittest.TestCase):
         self.assertEqual(c.published, [c.published[0]] * 3)
         self.assertEqual(c.bid.xmr_b_lock_tx.txid, c.ci.getTxid(c.published[0]))
         self.assertEqual(c.kv, {})
+
+    def test_b_lock_margin_takes_coin_a(self):
+        # The margins come from coin A, the coin of the lock tx A, which is
+        # offer.coin_to on a reverse bid
+        class Stop(Exception):
+            pass
+
+        class Named:
+            def __init__(self, ci, name):
+                self._ci = ci
+                self.name = name
+
+            def __getattr__(self, attr):
+                return getattr(self._ci, attr)
+
+        for reverse_bid in (False, True):
+            c = self.make_client()
+            offer, _ = c.sc.getXmrOfferFromSession(None, c.bid.offer_id)
+            coin_a = offer.coin_to if reverse_bid else offer.coin_from
+            c.sc.ci = lambda coin_type, ci=c.ci, coin_a=coin_a: Named(
+                ci, "A" if coin_type == coin_a else "B"
+            )
+            c.sc.is_reverse_ads_bid = lambda coin_from, coin_to, r=reverse_bid: r
+            seen = []
+
+            def margin(ci_to, ci_from):
+                seen.append((ci_to.name, ci_from.name))
+                raise Stop()
+
+            c.sc.getBLockMinMargin = margin
+            with self.assertRaises(Stop):
+                c.sc.sendXmrBidCoinBLockTx(c.bid_id, None)
+            self.assertEqual(seen, [("B", "A")], reverse_bid)
 
     def test_late_retry_tracks_a_tx_the_node_has(self):
         from basicswap.interface.base import TemporaryError

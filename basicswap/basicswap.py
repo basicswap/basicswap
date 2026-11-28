@@ -180,6 +180,7 @@ from .multibid import (
     CONFIRM_INTERVAL_MULTIPLE,
     MAX_CONFIRM_WAIT_SECONDS,
     MIN_LEG_TIMEOUT_SECONDS,
+    PEER_CONFIRM_ALLOWANCE_SECONDS,
     plan_batch_decision,
     plan_htlc_batch,
 )
@@ -1024,7 +1025,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     setting_name
                 ]
 
-        if coin in (Coins.BTC, Coins.FIRO, Coins.LTC):
+        if coin in (Coins.BTC, Coins.FIRO, Coins.LTC, Coins.NORTH):
             if not chain_client_settings.get("min_relay_fee"):
                 chain_client_settings["min_relay_fee"] = 0.00001
 
@@ -1327,6 +1328,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             from .interface.nmc.nmc import NMCInterface
 
             return NMCInterface(self.coin_clients[coin], self.chain, self)
+        elif coin == Coins.NORTH:
+            from .interface.north.north import NORTHInterface
+
+            return NORTHInterface(self.coin_clients[coin], self.chain, self)
         elif coin == Coins.XMR:
             from .interface.xmr.xmr import XMRInterface
 
@@ -1374,6 +1379,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 "dash",
                 "firo",
                 "bitcoincash",
+                "truenorth",
             ):
                 pidfilename += "d"
 
@@ -4284,6 +4290,38 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         else:
             raise ValueError("Unknown locktype")
 
+    def ensureOfferLockValueFits(
+        self, swap_type, coin_from, coin_to, lock_type, lock_value: int
+    ) -> None:
+        """Refuse a lock time the swap's margin checks would refuse even if every
+        txn confirmed at once.  Block count locks are regtest only and have no
+        comparable margin."""
+        if lock_type != TxLockTypes.SEQUENCE_LOCK_TIME:
+            return
+        if swap_type == SwapTypes.XMR_SWAP:
+            reverse_bid: bool = self.is_reverse_ads_bid(coin_from, coin_to)
+            ci_a = self.ci(coin_to if reverse_bid else coin_from)
+            ci_b = self.ci(coin_from if reverse_bid else coin_to)
+            # sendXmrBidCoinBLockTx
+            needed = self.getBLockMinMargin(ci_b, ci_a)
+        elif swap_type == SwapTypes.SELLER_FIRST:
+            # ensurePTxLockMargin with the initiate txn just confirmed, the
+            # participateTxnConfirmed margin follows from it
+            needed = (
+                2
+                * (
+                    self.getConfirmAllowance(self.ci(coin_from))
+                    + self.getConfirmAllowance(self.ci(coin_to))
+                )
+                + 1
+            )
+        else:
+            return
+        ensure(
+            lock_value >= needed,
+            f"Lock time too short for {Coins(coin_from).name} to {Coins(coin_to).name}: {lock_value}s < {needed}s",
+        )
+
     def validateOfferValidTime(
         self, offer_type, coin_from, coin_to, valid_for_seconds: int
     ) -> None:
@@ -4414,6 +4452,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
 
         self.validateSwapType(coin_from_t, coin_to_t, swap_type)
         self.validateOfferLockValue(
+            swap_type, coin_from_t, coin_to_t, lock_type, lock_value
+        )
+        self.ensureOfferLockValueFits(
             swap_type, coin_from_t, coin_to_t, lock_type, lock_value
         )
 
@@ -6169,12 +6210,42 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             * CONFIRM_INTERVAL_MULTIPLE
         )
 
-    def getBLockMinMargin(self, ci_to) -> int:
+    def getLockReleaseMinMargin(self, ci_from) -> int:
+        """Least time left on the coin A refund timelock to release the lock tx
+        secret with, the follower's lock spend tx must confirm before the
+        refund opens."""
+        return max(self._sc_lock_release_min_margin, self.getConfirmAllowance(ci_from))
+
+    def getLockSpendMinMargin(self, ci_from) -> int:
+        """Least time left on the coin A refund timelock for the follower to
+        publish the coin A lock spend tx with.  The spend reveals the coin B
+        keyshare, it must be buried in chain A before the refund opens."""
+        return max(self._sc_lock_spend_min_margin, self.getConfirmAllowance(ci_from))
+
+    def getBLockMinMargin(self, ci_to, ci_from) -> int:
         """Least time left on the coin A refund timelock to send a coin B lock
         with, the release and spend margins are checked again once it confirms."""
         return max(
-            self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin
+            self.getLockReleaseMinMargin(ci_from), self.getLockSpendMinMargin(ci_from)
         ) + self.getConfirmAllowance(ci_to)
+
+    def getPlanBLockHoldMargin(self, ci_to, ci_from) -> int:
+        """Margin for the bid plan's hold check, which adds
+        PEER_CONFIRM_ALLOWANCE_SECONDS for the coin B lock tx to confirm.  A
+        coin B that takes longer gets the rest of its allowance here, so a held
+        leg can still send its coin B lock."""
+        return max(
+            self.getLockReleaseMinMargin(ci_from), self.getLockSpendMinMargin(ci_from)
+        ) + max(0, self.getConfirmAllowance(ci_to) - PEER_CONFIRM_ALLOWANCE_SECONDS)
+
+    def getPlanPTxHoldMargin(self, ci_from, ci_to) -> int:
+        """Time a held secret hash leg needs on its initiate txn refund timelock
+        past half the lock value, so ensurePTxLockMargin still passes when the
+        hold ends."""
+        return max(
+            PEER_CONFIRM_ALLOWANCE_SECONDS,
+            self.getConfirmAllowance(ci_from) + self.getConfirmAllowance(ci_to),
+        )
 
     def getLegLockRemaining(self, leg, leg_offer, reverse_bid: bool, cursor):
         """Seconds left on a ready leg's coin A lock refund timelock, or None
@@ -8105,6 +8176,28 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             )
         return None
 
+    def getPTxLockRemaining(self, bid, offer) -> int | None:
+        """Seconds left on the participate txn refund timelock, or None when it
+        cannot be determined or the lock counts blocks."""
+        ptx = bid.participate_tx
+        if ptx is None:
+            return None
+        ci_to = self.ci(offer.coin_to)
+        if offer.lock_type == TxLockTypes.SEQUENCE_LOCK_TIME:
+            # The participate txn refund is locked for half the lock value
+            return ci_to.csvLockRemaining(
+                offer.lock_type,
+                ci_to.getExpectedSequence(offer.lock_type, offer.lock_value // 2),
+                ptx.block_height,
+                ptx.block_time,
+            )
+        if offer.lock_type == TxLockTypes.ABS_LOCK_TIME and ptx.script is not None:
+            chain_mtp = ci_to.getChainMedianTime()
+            if chain_mtp is None:
+                return None
+            return atomic_swap_1.extractScriptLockValue(ptx.script) - chain_mtp
+        return None
+
     def ensurePTxLockMargin(self, bid, offer, participate_script: bytearray) -> None:
         """Refuse a participate txn the seller could still redeem after refunding
         the initiate txn."""
@@ -8148,6 +8241,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             confirm_timeout=self.getPlanConfirmTimeout(
                 self.ci(offer.coin_from), ready_timeout
             ),
+            lock_margin=self.getPlanPTxHoldMargin(self.ci(offer.coin_from), ci_to),
         )
         if plan.wait:
             self.log.info(
@@ -8701,6 +8795,24 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Seller redeems from participate txn
         if bid.was_received:
             ci_to = self.ci(offer.coin_to)
+            # The redeem reveals the secret.  Published too close to the
+            # participate txn refund, a reorg can replace it with the refund
+            # while the secret already unlocks the initiate txn.
+            ptx_remaining = self.getPTxLockRemaining(bid, offer)
+            redeem_margin: int = self.getConfirmAllowance(ci_to)
+            if ptx_remaining is not None and ptx_remaining < redeem_margin:
+                self.log.error(
+                    f"Not redeeming the participate tx for bid {self.log.id(bid_id)}, "
+                    f"refund timelock too close: {ptx_remaining} < {redeem_margin}."
+                )
+                self.logEvent(
+                    Concepts.BID,
+                    bid.bid_id,
+                    EventLogTypes.PTX_REDEEM_ABANDONED_LOCK_CLOSE,
+                    f"{ptx_remaining} < {redeem_margin}",
+                    None,
+                )
+                return
             txn = self.createRedeemTxn(ci_to.coin_type(), bid)
             redeem_tx = self.publishRedeemTxn(
                 ci_to, bid, TxTypes.PTX_REDEEM, bytes.fromhex(txn)
@@ -9859,6 +9971,10 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             parent_tx.block_time,
         )
 
+    def getMercyWatchTimeoutBlocks(self, ci_from) -> int:
+        # The swiper sends the mercy tx once the swipe is blocks_confirmed deep
+        return max(self._mercy_watch_timeout_blocks, 2 * ci_from.blocks_confirmed)
+
     def _removeMercyWatch(self, ci_from, bid) -> None:
         swipe_tx = bid.txns.get(TxTypes.XMR_SWAP_A_LOCK_REFUND_SWIPE, None)
         if swipe_tx is None:
@@ -9874,14 +9990,15 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return False
 
         blocks_watched: int = ci_from.getChainHeight() - swipe_tx.chain_height
+        watch_timeout_blocks: int = self.getMercyWatchTimeoutBlocks(ci_from)
         give_up_reason: str = ""
-        if blocks_watched >= self._mercy_watch_timeout_blocks:
+        if blocks_watched >= watch_timeout_blocks:
             give_up_reason = f"{blocks_watched} blocks passed"
 
         if not give_up_reason:
             self.log.debug(
                 f"Waiting for a mercy tx for bid {self.log.id(bid.bid_id)}: "
-                f"{blocks_watched} / {self._mercy_watch_timeout_blocks} blocks."
+                f"{blocks_watched} / {watch_timeout_blocks} blocks."
             )
             return False
 
@@ -10052,7 +10169,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             give_up_reason = "the swipe tx height is unknown"
         else:
             blocks_waited: int = ci_from.getChainHeight() - swipe_tx.chain_height
-            if blocks_waited >= self._mercy_watch_timeout_blocks:
+            if blocks_waited >= self.getMercyWatchTimeoutBlocks(ci_from):
                 give_up_reason = f"{blocks_waited} blocks passed"
 
         if give_up_reason:
@@ -11739,6 +11856,9 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         # Time for transaction to be mined into the chain, measured from the last
         # state change so the bidder's chosen expiry can't extend it.
         # Only timeout waiting for the tx to be mined if not the sending the tx.
+        # The longer period applies once the coin A lock tx has been seen in the
+        # mempool, or the coin A lock tx or initiate tx is in a block, for it to
+        # reach blocks_confirmed.
         tx_grace_period: int = self._sc_lock_tx_timeout
         tx_mempool_grace_period: int = self._sc_lock_tx_mempool_timeout
 
@@ -11746,7 +11866,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             query_str = (
                 "SELECT b.bid_id FROM bids AS b, bidstates AS s "
                 + "WHERE b.active_ind = 1 AND s.state_id = b.state "
-                + " AND s.can_timeout AND b.state_time + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now "
+                + " AND s.can_timeout AND b.state_time + (CASE WHEN EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type = :tx_mempool_event_type) OR EXISTS(SELECT bid_id FROM transactions WHERE bid_id = b.bid_id AND tx_type IN (:itx_type, :a_lock_tx_type) AND block_height IS NOT NULL) THEN :tx_mempool_grace_period ELSE :tx_grace_period END) <= :now "
                 + " AND NOT EXISTS(SELECT event_id FROM eventlog WHERE linked_type = :event_linked_type AND linked_id = b.bid_id AND event_type IN (:tx_sent_event_type, :itx_sent_event_type))"
             )
             q = cursor.execute(
@@ -11759,6 +11879,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     "tx_mempool_event_type": EventLogTypes.LOCK_TX_A_IN_MEMPOOL,
                     "tx_sent_event_type": EventLogTypes.LOCK_TX_A_PUBLISHED,
                     "itx_sent_event_type": EventLogTypes.ITX_PUBLISHED,
+                    "itx_type": int(TxTypes.ITX),
+                    "a_lock_tx_type": int(TxTypes.XMR_SWAP_A_LOCK),
                 },
             )
             for row in q:
@@ -12102,6 +12224,13 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             offer_data.min_bid_amount,
         )
         self.validateOfferLockValue(
+            offer_data.swap_type,
+            coin_from,
+            coin_to,
+            offer_data.lock_type,
+            offer_data.lock_value,
+        )
+        self.ensureOfferLockValueFits(
             offer_data.swap_type,
             coin_from,
             coin_to,
@@ -13911,6 +14040,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         ensure(xmr_offer, f"Adaptor-sig offer not found: {self.log.id(bid.offer_id)}.")
 
         reverse_bid: bool = self.is_reverse_ads_bid(offer.coin_from, offer.coin_to)
+        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         ci_to = self.ci(offer.coin_from if reverse_bid else offer.coin_to)
         b_fee_rate: int = xmr_offer.a_fee_rate if reverse_bid else xmr_offer.b_fee_rate
         was_sent: bool = bid.was_received if reverse_bid else bid.was_sent
@@ -13925,7 +14055,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         recorded = self.getStringKV(f"b_lock_tx:{bid_id.hex()}", cursor)
         if recorded is not None:
             recorded = json.loads(recorded)
-        lock_margin: int = self.getBLockMinMargin(ci_to)
+        lock_margin: int = self.getBLockMinMargin(ci_to, ci_from)
         lock_remaining = self.getLegLockRemaining(bid, offer, reverse_bid, cursor)
         too_late: bool = lock_remaining is not None and lock_remaining < lock_margin
         track_only: bool = False
@@ -13970,7 +14100,6 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
             return
 
         # Sending lock tx B can't be undone, and lock tx A may have left the chain since it was last checked
-        ci_from = self.ci(offer.coin_to if reverse_bid else offer.coin_from)
         if not track_only and not self.coinALockConfirmed(bid, xmr_swap, ci_from):
             raise TemporaryError(
                 f"Lock tx A for bid {self.log.id(bid_id)} is not confirmed deeply enough to send lock tx B."
@@ -14049,9 +14178,7 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 now=self.getTime(),
                 ready_timeout=ready_timeout,
                 confirm_timeout=self.getPlanConfirmTimeout(ci_from, ready_timeout),
-                lock_margin=max(
-                    self._sc_lock_release_min_margin, self._sc_lock_spend_min_margin
-                ),
+                lock_margin=self.getPlanBLockHoldMargin(ci_to, ci_from),
             )
             for leg in plan.drop:
                 leg_bid, _ = self.getXmrBidFromSession(cursor, leg.bid_id)
@@ -14336,11 +14463,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise TemporaryError(
                     f"Can't determine the coin a lock refund timelock for bid {self.log.id(bid_id)}."
                 )
-            if lock_remaining < self._sc_lock_release_min_margin:
+            release_margin: int = self.getLockReleaseMinMargin(ci_from)
+            if lock_remaining < release_margin:
                 # Releasing now would let the lock spend and refund txs be broadcast together
                 self.log.error(
                     f"Not releasing the lock tx secret for bid {self.log.id(bid_id)}, "
-                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_release_min_margin}."
+                    f"refund timelock too close: {lock_remaining} < {release_margin}."
                 )
                 self.logBidEvent(
                     bid.bid_id,
@@ -14446,11 +14574,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                 raise TemporaryError(
                     f"Can't determine the coin a lock refund timelock for bid {self.log.id(bid_id)}."
                 )
-            if lock_remaining < self._sc_lock_spend_min_margin:
+            spend_margin: int = self.getLockSpendMinMargin(ci_from)
+            if lock_remaining < spend_margin:
                 # Publishing now would reveal the coin b keyshare with too little time to confirm
                 self.log.error(
                     f"Not publishing the lock spend tx for bid {self.log.id(bid_id)}, "
-                    f"refund timelock too close: {lock_remaining} < {self._sc_lock_spend_min_margin}."
+                    f"refund timelock too close: {lock_remaining} < {spend_margin}."
                 )
                 self.logBidEvent(
                     bid.bid_id,
@@ -18650,6 +18779,8 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
         wanted_coins = set(self.activeCoins()) | {
             ticker_map[t.lower()] for t in self.getChartCoins()
         }
+        # A coin without a rate id can't be fetched from any source
+        wanted_coins = {c for c in wanted_coins if chainparams[c]["rate_ids"]}
         fetched = set()
         retry_sources = []
         for rate_source in rate_sources_ordered:
@@ -19079,6 +19210,12 @@ class BasicSwap(BaseApp, BSXNetwork, UIApp):
                     price_coin_to = Coins.PART
                 elif price_coin_to == Coins.LTC_MWEB:
                     price_coin_to = Coins.LTC
+
+                for price_coin in (price_coin_from, price_coin_to):
+                    if not chainparams[price_coin]["rate_ids"]:
+                        raise ValueError(
+                            f"No rate source lists {chainparams[price_coin]['ticker']}"
+                        )
 
                 if price_coin_from == price_coin_to:
                     rate = 1.0

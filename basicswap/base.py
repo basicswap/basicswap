@@ -430,7 +430,12 @@ class BaseApp(DBMethods):
             command_cli,
         ]
         if self.chain != "mainnet":
-            args.append("-" + self.chain)
+            # A test chain can have another name, TrueNorth's is testnet4
+            args.append(
+                chainparams[coin_type]
+                .get(self.chain, {})
+                .get("cli_chain_arg", "-" + self.chain)
+            )
         args.append("-datadir=" + datadir)
         args += shlex.split(params)
         p = subprocess.Popen(

@@ -168,15 +168,15 @@ def _htlc_leg_ready(leg) -> bool:
     return leg.state == BidStates.SWAP_INITIATED and not leg.ptx_sent
 
 
-def _htlc_can_hold(ready) -> bool:
+def _htlc_can_hold(ready, lock_margin: int = PEER_CONFIRM_ALLOWANCE_SECONDS) -> bool:
     """Whether the batch can be held without spending a leg's redeem window. The
     seller may sit on a participate txn until its own refund unlocks, so half the
-    contract belongs to the buyer's redeem and must outlast the hold. A leg with
-    no measurable window does not block a hold."""
+    contract belongs to the buyer's redeem and must outlast the hold, with
+    lock_margin on top for the txns to confirm. A leg with no measurable window
+    does not block a hold."""
     return all(
         leg.lock_remaining_seconds is None
-        or leg.lock_remaining_seconds
-        > leg.lock_value // 2 + PEER_CONFIRM_ALLOWANCE_SECONDS
+        or leg.lock_remaining_seconds > leg.lock_value // 2 + lock_margin
         for leg in ready
     )
 
@@ -189,6 +189,7 @@ def plan_htlc_batch(
     now: int = 0,
     ready_timeout: int = 0,
     confirm_timeout: Optional[int] = None,
+    lock_margin: int = PEER_CONFIRM_ALLOWANCE_SECONDS,
 ):
     """Decide whether bid_id sends its participate txn now and which sibling legs
     share it.
@@ -197,8 +198,8 @@ def plan_htlc_batch(
     measured from the longest-held ready leg. Its initiate txn has ready_timeout
     to be seen and, once seen, confirm_timeout to confirm (None means the same
     for both), because arrival is a peer's responsiveness while confirmation is a
-    chain's block time. Waiting stops early once holding would eat into a ready
-    leg's own redeem window."""
+    chain's block time. Waiting stops early once a ready leg has less than half
+    its lock value plus lock_margin left on its initiate txn refund timelock."""
     me = next((leg for leg in legs if leg.bid_id == bid_id), None)
     if me is None:
         return BatchPlan(wait=False, batch=[], drop=[])
@@ -212,7 +213,7 @@ def plan_htlc_batch(
     held_for = max(now - leg.state_time for leg in ready)
     if confirm_timeout is None:
         confirm_timeout = ready_timeout
-    can_hold: bool = _htlc_can_hold(ready)
+    can_hold: bool = _htlc_can_hold(ready, lock_margin)
 
     batch, waiting = [], False
     for leg in siblings:

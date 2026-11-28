@@ -19,6 +19,7 @@ from basicswap.interface.pivx.chainparams import params as pivx_params
 from basicswap.interface.dash.chainparams import params as dash_params
 from basicswap.interface.firo.chainparams import params as firo_params
 from basicswap.interface.bch.chainparams import params as bch_params
+from basicswap.interface.north.chainparams import params as north_params
 
 
 class Coins(IntEnum):
@@ -40,6 +41,7 @@ class Coins(IntEnum):
     # ZANO = 16
     BCH = 17
     DOGE = 18
+    NORTH = 20
 
 
 class Fiat(IntEnum):
@@ -71,6 +73,7 @@ chainparams = {
     Coins.FIRO: firo_params,
     Coins.BCH: bch_params,
     Coins.DOGE: doge_params,
+    Coins.NORTH: north_params,
 }
 
 name_map = {}
